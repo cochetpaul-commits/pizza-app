@@ -64,3 +64,7 @@ pnpm-debug.log*
 
 # backups
 *.BAK.*
+# local junk
+pizza-app@0.1.0/
+next/
+
