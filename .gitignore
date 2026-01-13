@@ -77,3 +77,6 @@ pizza-app@0.1.0
 *.BAK
 *.BAK-*
 *.bak
+
+# local scripts (manual tests)
+scripts/
