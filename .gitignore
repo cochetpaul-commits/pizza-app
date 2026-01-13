@@ -72,3 +72,8 @@ next/
 # local junk (files or folders)
 next
 pizza-app@0.1.0
+
+# backups (local)
+*.BAK
+*.BAK-*
+*.bak
