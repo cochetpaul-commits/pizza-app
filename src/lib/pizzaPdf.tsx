@@ -19,34 +19,42 @@ export type PizzaPdfData = {
 };
 
 const TERRACOTTA = "#B65C3A";
-const LIGHT_GRAY = "#F4F1EE";
-const BORDER = "#DDD";
+const TEXT = "#111111";
+const MUTED = "#666666";
+const BORDER = "#E5E5E5";
+const SOFT = "#F6F4F2";
 
 const styles = StyleSheet.create({
   page: {
-    padding: 36,
+    padding: 32,
     fontFamily: "Helvetica",
     fontSize: 11,
-    color: "#111",
+    color: TEXT,
   },
 
-  /* HEADER */
+  /* BRAND */
   brand: {
     textAlign: "center",
-    fontSize: 16,
-    letterSpacing: 2,
+    fontSize: 14,
     fontWeight: "bold",
+    letterSpacing: 1,
     marginBottom: 18,
   },
 
+  /* HEADER 2 COL */
   headerRow: {
     flexDirection: "row",
     gap: 20,
-    marginBottom: 18,
+    marginBottom: 24,
   },
 
   headerLeft: {
     flex: 1,
+  },
+
+  headerRight: {
+    width: 180,
+    alignItems: "flex-end",
   },
 
   pizzaName: {
@@ -58,27 +66,38 @@ const styles = StyleSheet.create({
 
   subtitle: {
     fontSize: 11,
-    color: "#555",
-    marginBottom: 10,
+    color: MUTED,
+    marginBottom: 12,
   },
 
-  badges: {
+  infoBox: {
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 8,
+    padding: 10,
+    backgroundColor: SOFT,
+    gap: 6,
+  },
+
+  infoRow: {
     flexDirection: "row",
-    gap: 8,
+    justifyContent: "space-between",
   },
 
-  badge: {
+  infoLabel: {
     fontSize: 9,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    backgroundColor: LIGHT_GRAY,
+    color: MUTED,
+  },
+
+  infoValue: {
+    fontSize: 10,
+    fontWeight: "bold",
   },
 
   photo: {
-    width: 150,
-    height: 150,
-    borderRadius: 10,
+    width: 180,
+    height: 180,
+    borderRadius: 12,
     objectFit: "cover",
   },
 
@@ -103,7 +122,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "bold",
     textTransform: "uppercase",
-    color: "#666",
+    color: MUTED,
   },
 
   row: {
@@ -119,10 +138,23 @@ const styles = StyleSheet.create({
 
   notesBox: {
     marginTop: 6,
-    padding: 10,
-    borderRadius: 6,
-    backgroundColor: LIGHT_GRAY,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: SOFT,
+    borderWidth: 1,
+    borderColor: BORDER,
     minHeight: 60,
+  },
+
+  footer: {
+    position: "absolute",
+    bottom: 16,
+    left: 32,
+    right: 32,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    fontSize: 8,
+    color: MUTED,
   },
 });
 
@@ -132,27 +164,39 @@ export function PizzaPdfDocument({ data }: { data: PizzaPdfData }) {
       <Page size="A4" style={styles.page}>
 
         {/* BRAND */}
-        <Text style={styles.brand}>BELLO MIO – PICCOLA MIA</Text>
+        <Text style={styles.brand}>BELLO MIO — PICCOLA MIA</Text>
 
         {/* HEADER */}
         <View style={styles.headerRow}>
+
+          {/* LEFT */}
           <View style={styles.headerLeft}>
             <Text style={styles.pizzaName}>{data.pizzaName}</Text>
             <Text style={styles.subtitle}>
-              Fiche technique : empâtement + ingrédients avant/après four + grammages + notes.
+              Fiche technique — empâtement, ingrédients avant / après four, grammages & notes
             </Text>
 
-            <View style={styles.badges}>
-              <Text style={styles.badge}>
-                Empâtement : {data.doughRecipeName ? `${data.doughRecipeName} (${data.doughRecipeType})` : "Aucun"}
-              </Text>
-              <Text style={styles.badge}>
-                Export : {data.exportedAt}
-              </Text>
+            <View style={styles.infoBox}>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Empâtement</Text>
+                <Text style={styles.infoValue}>
+                  {data.doughRecipeName
+                    ? `${data.doughRecipeName} (${data.doughRecipeType})`
+                    : "Aucun"}
+                </Text>
+              </View>
+
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Export</Text>
+                <Text style={styles.infoValue}>{data.exportedAt}</Text>
+              </View>
             </View>
           </View>
 
-          {data.photoUrl ? <Image src={data.photoUrl} style={styles.photo} /> : null}
+          {/* RIGHT */}
+          <View style={styles.headerRight}>
+            {data.photoUrl ? <Image src={data.photoUrl} style={styles.photo} /> : null}
+          </View>
         </View>
 
         {/* AVANT FOUR */}
@@ -189,6 +233,12 @@ export function PizzaPdfDocument({ data }: { data: PizzaPdfData }) {
         <Text style={styles.sectionTitle}>Notes / Procédé</Text>
         <View style={styles.notesBox}>
           <Text>{data.notes || ""}</Text>
+        </View>
+
+        {/* FOOTER */}
+        <View style={styles.footer}>
+          <Text>Bello Mio / Piccola Mia</Text>
+          <Text>Pizza — PDF</Text>
         </View>
 
       </Page>
