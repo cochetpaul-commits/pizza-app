@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import PizzaIngredientList from "@/components/PizzaIngredientList";
-import type { Ingredient, PizzaIngredientRow } from "@/lib/types";
+import type { Ingredient, PizzaIngredientRow, UnitType } from "@/lib/types";
 
 type RecipeRow = { id: string; name: string; type: string };
 
@@ -15,8 +15,8 @@ type PizzaIngredientDBRow = {
   ingredient_id: string;
   stage: "pre" | "post";
   qty: number | null;
-  unit: string;
-  sort_order: number;
+  unit: string | null;
+  sort_order: number | null;
 };
 
 type PizzaRowDB = {
@@ -27,21 +27,41 @@ type PizzaRowDB = {
   photo_url: string | null;
 };
 
+function normalizeUnit(u: unknown): UnitType {
+  const s = String(u ?? "").trim();
+  // UnitType = "g" | "ml" | "pcs" | "pinch" | "dash"
+  const allowed: UnitType[] = ["g", "ml", "pcs", "pinch", "dash"];
+  return allowed.includes(s as UnitType) ? (s as UnitType) : "g";
+}
+
 function normalizeRows(all: PizzaIngredientRow[]) {
-  const cleaned = all
+  const cleaned: PizzaIngredientRow[] = all
     .filter((r) => r.ingredient_id)
-    .map((r) => ({
-      ...r,
-      qty: r.qty === "" ? "" : Number(r.qty),
-      unit: r.unit || "g",
-      sort_order: Number.isFinite(r.sort_order as number) ? (r.sort_order as number) : 0,
-    }));
+    .map((r) => {
+      const qty: number | "" =
+        r.qty === ""
+          ? ""
+          : typeof r.qty === "number"
+          ? r.qty
+          : (() => {
+              const n = Number(r.qty);
+              return Number.isFinite(n) ? n : "";
+            })();
+
+      return {
+        ...r,
+        qty,
+        unit: normalizeUnit(r.unit),
+        sort_order: Number.isFinite(Number(r.sort_order)) ? Number(r.sort_order) : 0,
+      } as PizzaIngredientRow;
+    });
 
   const out: PizzaIngredientRow[] = [];
   (["pre", "post"] as const).forEach((stage) => {
     const stageRows = cleaned
       .filter((r) => r.stage === stage)
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+
     stageRows.forEach((r, i) => out.push({ ...r, sort_order: i }));
   });
 
@@ -209,16 +229,17 @@ export default function PizzaForm(props: { pizzaId?: string }) {
       setPhotoPreview(p.photo_url ?? null);
 
       const dbRows = (pi ?? []) as PizzaIngredientDBRow[];
+
       const uiRows: PizzaIngredientRow[] = dbRows.map((r) => ({
         id: r.id,
         ingredient_id: r.ingredient_id,
-        qty: typeof r.qty === "number" ? r.qty : "",
-        unit: r.unit || "g",
-        stage: r.stage,
-        sort_order: r.sort_order ?? 0,
+        qty: typeof r.qty === "number" && Number.isFinite(r.qty) ? r.qty : "",
+        unit: normalizeUnit(r.unit),
+        stage: r.stage === "post" ? "post" : "pre",
+        sort_order: Number.isFinite(Number(r.sort_order)) ? Number(r.sort_order) : 0,
       }));
-      setRows(uiRows);
 
+      setRows(uiRows);
       setStatus("OK");
     };
 
@@ -232,7 +253,6 @@ export default function PizzaForm(props: { pizzaId?: string }) {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) throw new Error("NOT_LOGGED");
 
-    // Chemin: {uid}/{pizza-or-temp}/{timestamp}-{slug}.jpg
     const uid = auth.user.id;
     const baseName = slugify(form?.name?.trim() || "pizza");
     const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
@@ -263,24 +283,19 @@ export default function PizzaForm(props: { pizzaId?: string }) {
       const f = e.target.files?.[0];
       if (!f) return;
 
-      // Preview immédiat (UX)
       const local = URL.createObjectURL(f);
       setPhotoPreview(local);
 
-      // Upload
       const url = await uploadPhoto(f);
 
-      // Nettoie preview local, remplace par URL publique
       URL.revokeObjectURL(local);
       setPhotoPreview(url);
 
-      // Stocke dans le form (sera persisté au save)
       setForm((p) => (p ? { ...p, photo_url: url } : p));
     } catch (err) {
       setSaveError({ message: "Upload photo impossible", details: safeMessage(err) });
       setPhotoPreview(form?.photo_url || null);
     } finally {
-      // reset input
       if (fileRef.current) fileRef.current.value = "";
     }
   }
@@ -395,7 +410,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
         pizza_id: id,
         ingredient_id: r.ingredient_id!,
         stage: r.stage,
-        qty: Number(r.qty),
+        qty: r.qty as number, // safe: validateRows => number > 0
         unit: r.unit,
         sort_order: r.sort_order ?? 0,
       }));
@@ -412,7 +427,6 @@ export default function PizzaForm(props: { pizzaId?: string }) {
     setSaveOk(true);
     setTimeout(() => setSaveOk(false), 900);
 
-    // UX : si création, bascule sur /pizzas/[id]
     if (!pizzaId) {
       router.push(`/pizzas/${id}`);
     }
@@ -549,15 +563,14 @@ export default function PizzaForm(props: { pizzaId?: string }) {
         </div>
 
         <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            onChange={onPickPhoto}
-            disabled={photoUploading}
-          />
+          <input ref={fileRef} type="file" accept="image/*" onChange={onPickPhoto} disabled={photoUploading} />
 
-          <button className="btn" type="button" onClick={clearPhoto} disabled={photoUploading || (!form.photo_url && !photoPreview)}>
+          <button
+            className="btn"
+            type="button"
+            onClick={clearPhoto}
+            disabled={photoUploading || (!form.photo_url && !photoPreview)}
+          >
             Supprimer la photo
           </button>
 
@@ -574,6 +587,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
           </div>
         ) : null}
       </div>
+
       <div style={{ marginTop: 14, display: "grid", gap: 14 }}>
         <PizzaIngredientList title="Ingrédients avant four" stage="pre" ingredients={ingredients} rows={rows} onChange={setRows} />
         <PizzaIngredientList

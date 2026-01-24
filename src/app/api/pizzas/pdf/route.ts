@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import React from "react";
-import { renderToBuffer } from "@react-pdf/renderer";
+import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { PizzaPdfDocument, type PizzaPdfData } from "@/lib/pizzaPdf";
 
 export const runtime = "nodejs";
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
 
     const pizzaRow = pizza as PizzaRow;
 
-    // 2) Dough recipe
+    // 2) Dough recipe (optionnel)
     let doughName: string | null = null;
     let doughType: string | null = null;
 
@@ -105,14 +105,10 @@ export async function POST(req: Request) {
 
     // 4) Fetch ingredient names (minimal)
     const ingredientIds = Array.from(new Set(piRows.map((r) => r.ingredient_id)));
-    let ingMap = new Map<string, string | null>();
+    const ingMap = new Map<string, string | null>();
 
     if (ingredientIds.length) {
-      const { data: ings, error: iErr } = await supabase
-        .from("ingredients")
-        .select("id,name")
-        .in("id", ingredientIds);
-
+      const { data: ings, error: iErr } = await supabase.from("ingredients").select("id,name").in("id", ingredientIds);
       if (!iErr && ings) {
         for (const it of ings as IngRow[]) ingMap.set(it.id, it.name ?? null);
       }
@@ -149,15 +145,17 @@ export async function POST(req: Request) {
       photoUrl: pizzaRow.photo_url ?? null,
     };
 
-    // IMPORTANT: pas de JSX dans route.ts
-    const element = React.createElement(PizzaPdfDocument, { data });
-    const pdfBuffer = await renderToBuffer(element);
+    // ✅ TypeScript: on force le type exact attendu par renderToBuffer
+    const documentElement = PizzaPdfDocument({ data }) as unknown as React.ReactElement<DocumentProps>;
+    const pdfBuffer = await renderToBuffer(documentElement);
 
     const base = slugify(pizzaRow.name ?? "pizza");
     const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
     const filename = `pizza-${base}-${ts}.pdf`;
 
-    return new NextResponse(pdfBuffer, {
+    const pdfBody = new Uint8Array(pdfBuffer);
+
+    return new NextResponse(pdfBody, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",

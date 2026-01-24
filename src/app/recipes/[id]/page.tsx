@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { calculerPate } from "@/lib/pateEngine";
 import { TopNav } from "@/components/TopNav";
 import PercentStepper from "@/components/PercentStepper";
 import NumberStepper from "@/components/NumberStepper";
 
+function isUuid(v: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+}
 type DoughType = "direct" | "biga" | "focaccia";
 type FlourMixItem = { name: string; percent: number };
 
@@ -22,6 +25,7 @@ type Recipe = {
   yeast_percent?: number | null;
   biga_yeast_percent?: number | null;
   flour_mix?: any;
+  procedure?: string | null;
   created_at: string;
   user_id: string;
   [key: string]: any;
@@ -50,7 +54,7 @@ function normalize2To100(a: number, b: number) {
 export default function RecipePage() {
   const params = useParams();
   const id = (params?.id as string) || "";
-
+  const router = useRouter();
   const [state, setState] = useState<{
     status: "loading" | "NOT_LOGGED" | "OK" | "ERROR";
     recipe?: Recipe;
@@ -62,19 +66,24 @@ export default function RecipePage() {
   const [poidsPaton, setPoidsPaton] = useState<number>(264);
 
   // FORM (strings pour éviter crash en saisie)
-const [form, setForm] = useState<{
-  name: string;
-  type: DoughType;
-  hydration_total: string;
-  salt_percent: string;
-  honey_percent: string;
-  oil_percent: string;
-  yeast_ui: string;
-  flourA_name: string;
-  flourA_percent: string;
-  flourB_name: string;
-  flourB_percent: string;
-} | null>(null);
+  const [form, setForm] = useState<{
+    name: string;
+    type: DoughType;
+    hydration_total: string;
+    salt_percent: string;
+    honey_percent: string;
+    oil_percent: string;
+    yeast_ui: string;
+
+    flourA_name: string;
+    flourA_percent: string;
+    flourB_name: string;
+    flourB_percent: string;
+
+    // ✅ nouveau champ
+    procedure: string;
+  } | null>(null);
+
   const [saveState, setSaveState] = useState<{ saving: boolean; error?: any; ok?: boolean }>({
     saving: false,
   });
@@ -180,17 +189,32 @@ const [form, setForm] = useState<{
         return;
       }
 
-      if (!id) {
-        setState({ status: "ERROR", error: { message: "id manquant" } });
+      if (!id || !isUuid(id)) {
+  setState({
+    status: "ERROR",
+    error: { message: "ID invalide (UUID attendu)" },
+  });
+  return;
+}
+
+            const { data: recipe, error } = await supabase
+        .from("recipes")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (error) {
+        setState({ status: "ERROR", error });
         return;
       }
 
-      const { data: recipe, error } = await supabase.from("recipes").select("*").eq("id", id).single();
-      if (error || !recipe) {
-        setState({ status: "ERROR", error: error ?? { message: "Recette introuvable" } });
+      if (!recipe) {
+        setState({
+          status: "ERROR",
+          error: { message: "Empâtement introuvable" },
+        });
         return;
       }
-
       const rr = recipe as Recipe;
 
       const mix = Array.isArray(rr.flour_mix) ? rr.flour_mix : [];
@@ -206,33 +230,36 @@ const [form, setForm] = useState<{
           : String((rr as any).yeast_percent ?? 0);
 
       setForm({
-  name: String(rr.name ?? ""),
-  type,
-  hydration_total: String(rr.hydration_total ?? 65),
-  salt_percent: String(rr.salt_percent ?? 2),
-  honey_percent: String(rr.honey_percent ?? 0),
-  oil_percent: String(rr.oil_percent ?? 0),
-  yeast_ui: yeastUi,
-  flourA_name: String(a.name ?? "Tipo 00"),
-  flourA_percent: String(a.percent ?? 80),
-  flourB_name: String(b.name ?? "Tipo 1"),
-  flourB_percent: String(b.percent ?? 20),
-});
+        name: String(rr.name ?? ""),
+        type,
+        hydration_total: String(rr.hydration_total ?? 65),
+        salt_percent: String(rr.salt_percent ?? 2),
+        honey_percent: String(rr.honey_percent ?? 0),
+        oil_percent: String(rr.oil_percent ?? 0),
+        yeast_ui: yeastUi,
+        flourA_name: String(a.name ?? "Tipo 00"),
+        flourA_percent: String(a.percent ?? 80),
+        flourB_name: String(b.name ?? "Tipo 1"),
+        flourB_percent: String(b.percent ?? 20),
+
+        // ✅ procedure depuis DB
+        procedure: String(rr.procedure ?? ""),
+      });
+
       setState({ status: "OK", recipe: rr });
     };
 
     run();
-  }, [id]);
-
+    }, [id, router]);
   // SAVE
   const saveRecipe = async () => {
-    if (!form.name || !form.name.trim()) {
-  setSaveState({
-    saving: false,
-    error: { message: "Le nom de l’empâtement est obligatoire" },
-  });
-  return;
-}
+    if (!form?.name || !form.name.trim()) {
+      setSaveState({
+        saving: false,
+        error: { message: "Le nom de l’empâtement est obligatoire" },
+      });
+      return;
+    }
 
     setSaveState({ saving: true, error: null, ok: false });
 
@@ -252,14 +279,24 @@ const [form, setForm] = useState<{
     ];
 
     const payload: any = {
-  name: (form.name ?? "").trim() || "Sans nom",
-  type: form.type,
-  hydration_total: hydration,
-  salt_percent: salt,
-  honey_percent: honey,
-  oil_percent: oil,
-  flour_mix,
-};
+      name: (form.name ?? "").trim() || "Sans nom",
+      type: form.type,
+
+      hydration_total: hydration,
+      salt_percent: salt,
+      honey_percent: honey,
+      oil_percent: oil,
+
+      flour_mix,
+
+      // 🔴 OBLIGATOIRE (DB NOT NULL)
+      balls_count: nbPatons,
+      ball_weight: poidsPaton,
+
+      // ✅ nouveau champ
+      procedure: (form.procedure ?? "").toString(),
+    };
+
     if (form.type === "biga") {
       payload.biga_yeast_percent = yeastUi;
       payload.yeast_percent = 0;
@@ -296,7 +333,11 @@ const [form, setForm] = useState<{
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ recipeId: id }),
+        body: JSON.stringify({
+          recipeId: id,
+          nbPatons,
+          poidsPaton,
+        }),
       });
 
       if (!res.ok) {
@@ -387,40 +428,43 @@ const [form, setForm] = useState<{
       />
 
       {/* N. pâtons + grammage */}
-<div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "end" }}>
-  <NumberStepper
-    label="N. pâtons"
-    value={nbPatons}
-    onChange={(n) => setNbPatons(Math.max(1, n))}
-    step={1}
-    min={1}
-    max={5000}
-  />
+      <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "end" }}>
+        <NumberStepper label="N. pâtons" value={nbPatons} onChange={(n) => setNbPatons(Math.max(1, n))} step={1} min={1} max={5000} />
+        <NumberStepper label="Grammage pâton" value={poidsPaton} onChange={(n) => setPoidsPaton(Math.max(1, n))} step={1} min={1} max={2000} suffix="g" />
+      </div>
 
-  <NumberStepper
-    label="Grammage pâton"
-    value={poidsPaton}
-    onChange={(n) => setPoidsPaton(Math.max(1, n))}
-    step={1}
-    min={1}
-    max={2000}
-    suffix="g"
-  />
-</div>
+      {/* Nom */}
+      <div style={{ marginTop: 16 }}>
+        <div className="muted" style={{ marginBottom: 6 }}>
+          Nom de l’empâtement
+        </div>
+        <input
+          className="input"
+          value={form.name ?? ""}
+          onChange={(e) => setForm((p) => (p ? { ...p, name: e.target.value } : p))}
+          placeholder="Ex : Biga hiver 65%"
+          style={{ fontSize: 17, fontWeight: 600, color: "#ffffff" }}
+        />
+      </div>
 
-{/* Nom */}
-<div style={{ marginTop: 16 }}>
-  <div className="muted" style={{ marginBottom: 6 }}>
-    Nom de l’empâtement
-  </div>
-  <input
-    className="input"
-    value={form.name ?? ""}
-    onChange={(e) => setForm((p) => (p ? { ...p, name: e.target.value } : p))}
-    placeholder="Ex : Biga hiver 65%"
-    style={{ fontSize: 17, fontWeight: 600, color: "#ffffff" }}
-  />
-</div>
+      {/* ✅ Procédure */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="muted" style={{ marginBottom: 8 }}>
+          Procédure (protocole)
+        </div>
+
+        <textarea
+          className="input"
+          value={form.procedure ?? ""}
+          onChange={(e) => setForm((p) => (p ? { ...p, procedure: e.target.value } : p))}
+          placeholder="Ex : Eau froide 4°C. Mettre farine + eau au pétrin vitesse 1 (3 min), puis sel, puis vitesse 2 (6 min)…"
+          rows={6}
+          style={{ resize: "vertical", lineHeight: 1.35 }}
+        />
+        <p className="muted" style={{ marginTop: 8 }}>
+          Conseil : court, actionnable, 6–10 lignes max.
+        </p>
+      </div>
 
       <div className="card" style={{ marginTop: 16 }}>
         {saveState.error ? (
@@ -440,11 +484,7 @@ const [form, setForm] = useState<{
           <div className="muted" style={{ marginBottom: 8 }}>
             Type
           </div>
-          <select
-            className="input"
-            value={form.type ?? "direct"}
-            onChange={(e) => setForm((p) => (p ? { ...p, type: e.target.value as DoughType } : p))}
-          >
+          <select className="input" value={form.type ?? "direct"} onChange={(e) => setForm((p) => (p ? { ...p, type: e.target.value as DoughType } : p))}>
             <option value="direct">direct</option>
             <option value="biga">biga</option>
             <option value="focaccia">focaccia</option>
@@ -467,37 +507,11 @@ const [form, setForm] = useState<{
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1.2fr 260px 1.2fr 260px", gap: 12, alignItems: "center" }}>
-            <input
-              className="input"
-              value={form.flourA_name ?? ""}
-              onChange={(e) => setForm((p) => (p ? { ...p, flourA_name: e.target.value } : p))}
-              placeholder="Nom farine A"
-            />
+            <input className="input" value={form.flourA_name ?? ""} onChange={(e) => setForm((p) => (p ? { ...p, flourA_name: e.target.value } : p))} placeholder="Nom farine A" />
+            <NumberStepper value={clamp(toNumSafe(form.flourA_percent ?? "", 80), 0, 100)} onChange={(n) => setForm((p) => (p ? { ...p, flourA_percent: String(n) } : p))} step={1} min={0} max={100} suffix="%" />
 
-            <NumberStepper
-              value={clamp(toNumSafe(form.flourA_percent ?? "", 80), 0, 100)}
-              onChange={(n) => setForm((p) => (p ? { ...p, flourA_percent: String(n) } : p))}
-              step={1}
-              min={0}
-              max={100}
-              suffix="%"
-            />
-
-            <input
-              className="input"
-              value={form.flourB_name ?? ""}
-              onChange={(e) => setForm((p) => (p ? { ...p, flourB_name: e.target.value } : p))}
-              placeholder="Nom farine B"
-            />
-
-            <NumberStepper
-              value={clamp(toNumSafe(form.flourB_percent ?? "", 20), 0, 100)}
-              onChange={(n) => setForm((p) => (p ? { ...p, flourB_percent: String(n) } : p))}
-              step={1}
-              min={0}
-              max={100}
-              suffix="%"
-            />
+            <input className="input" value={form.flourB_name ?? ""} onChange={(e) => setForm((p) => (p ? { ...p, flourB_name: e.target.value } : p))} placeholder="Nom farine B" />
+            <NumberStepper value={clamp(toNumSafe(form.flourB_percent ?? "", 20), 0, 100)} onChange={(n) => setForm((p) => (p ? { ...p, flourB_percent: String(n) } : p))} step={1} min={0} max={100} suffix="%" />
           </div>
 
           <p className="muted" style={{ marginTop: 8 }}>

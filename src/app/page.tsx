@@ -28,25 +28,37 @@ export default function Home() {
 
   return (
     <main className="container">
-      <div className="topbar" style={{ alignItems: "center", marginTop: 10 }}>
-        <div>
-          <h1 className="h1" style={{ margin: 0 }}>
-            Accueil
+      <div
+        style={{
+          marginTop: 14,
+          display: "grid",
+          gridTemplateColumns: "1fr auto 1fr",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        <div />
+
+        <div style={{ textAlign: "center" }}>
+          <h1 className="h1" style={{ margin: 0, letterSpacing: 0.2 }}>
+            ifratelligroup
           </h1>
-          <p className="muted" style={{ marginTop: 6 }}>
-            Pizza App — dashboard
+          <p className="muted" style={{ marginTop: 6, marginBottom: 0 }}>
+            Dashboard
           </p>
         </div>
 
-        {status === "ok" ? (
-          <button className="btn" type="button" onClick={signOut}>
-            Déconnexion
-          </button>
-        ) : (
-          <Link className="btn btnPrimary" href="/login">
-            Se connecter
-          </Link>
-        )}
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          {status === "ok" ? (
+            <button className="btn" type="button" onClick={signOut}>
+              Déconnexion
+            </button>
+          ) : (
+            <Link className="btn btnPrimary" href="/login">
+              Se connecter
+            </Link>
+          )}
+        </div>
       </div>
 
       {status === "loading" ? <p className="muted">Chargement…</p> : null}
@@ -60,38 +72,81 @@ export default function Home() {
       ) : null}
 
       {status === "ok" ? (
-        <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
-          <div className="card">
-            <p className="cardTitle">Fiches pizza</p>
-            <p className="muted" style={{ marginTop: 6 }}>
-              Créer / modifier / PDF
+        <div style={{ marginTop: 18, display: "grid", gap: 14 }}>
+          {/* PIZZA */}
+          <div className="card" style={{ paddingTop: 18 }}>
+            <p className="cardTitle" style={{ textAlign: "center", marginBottom: 6, letterSpacing: 1 }}>
+              PIZZA
             </p>
-            <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-              <Link className="btn btnPrimary" href="/pizzas">
-                Ouvrir
+            <p className="muted" style={{ marginTop: 0, textAlign: "center" }}>
+              Recettes pizza
+            </p>
+
+            <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap", justifyContent: "center" }}>
+              <Link className="btn btnPrimary btnWide" href="/pizzas/new">
+                Créer pizza
               </Link>
-              <Link className="btn" href="/pizzas/new">
-                Nouvelle fiche
+              <Link className="btn btnWide" href="/pizzas">
+                Fiches recettes
               </Link>
             </div>
           </div>
 
-          <div className="card">
-            <p className="cardTitle">Fiches empâtement</p>
-            <p className="muted" style={{ marginTop: 6 }}>
-              Page unique (nom + pâtons + % + phases biga + PDF)
+          {/* EMPÂTEMENT */}
+          <div className="card" style={{ paddingTop: 18 }}>
+            <p className="cardTitle" style={{ textAlign: "center", marginBottom: 6, letterSpacing: 1 }}>
+              EMPÂTEMENT
             </p>
-            <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-              <Link className="btn btnPrimary" href="/recipes">
-                Ouvrir
+            <p className="muted" style={{ marginTop: 0, textAlign: "center" }}>
+              Fiches techniques empâtement
+            </p>
+
+            <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap", justifyContent: "center" }}>
+              <Link className="btn btnPrimary btnWide" href="/recipes/new">
+                Créer empâtement
               </Link>
-              <Link className="btn" href="/recipes/new">
-                Nouvel empâtement
+              <Link className="btn btnWide" href="/recipes">
+                Fiches techniques
               </Link>
             </div>
           </div>
 
-          <p className="muted" style={{ marginTop: 4 }}>
+          {/* PREP (recettes pivot) */}
+          <div className="card" style={{ paddingTop: 18 }}>
+            <p className="cardTitle" style={{ textAlign: "center", marginBottom: 6, letterSpacing: 1 }}>
+              PRÉPARATIONS
+            </p>
+            <p className="muted" style={{ marginTop: 0, textAlign: "center" }}>
+              Pesto, bolognaise, tiramisu, sauces…
+            </p>
+
+            <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap", justifyContent: "center" }}>
+              <Link className="btn btnPrimary btnWide" href="/prep/new">
+                Nouvelle recette pivot
+              </Link>
+              <Link className="btn btnWide" href="/prep">
+                Recettes pivot
+              </Link>
+            </div>
+          </div>
+
+          {/* INGREDIENTS */}
+          <div className="card" style={{ paddingTop: 18 }}>
+            <p className="cardTitle" style={{ textAlign: "center", marginBottom: 6, letterSpacing: 1 }}>
+              INGRÉDIENTS
+            </p>
+            <p className="muted" style={{ marginTop: 0, textAlign: "center" }}>
+              Index + coûts (€/g, €/ml, €/pc)
+            </p>
+
+            <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap", justifyContent: "center" }}>
+              <Link className="btn btnPrimary btnWide" href="/ingredients">
+                Index ingrédients
+              </Link>
+            </div>
+          </div>
+
+          <p className="muted" style={{ marginTop: 6, textAlign: "center" }}>
             Connecté : {email}
           </p>
         </div>

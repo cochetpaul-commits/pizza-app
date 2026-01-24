@@ -1,0 +1,152 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
+import { TopNav } from "@/components/TopNav";
+
+type PrepRecipeRow = {
+  id: string;
+  name: string;
+  pivot_unit: string;
+  created_at: string;
+};
+
+export default function PrepRecipesPage() {
+  const router = useRouter();
+  const [state, setState] = useState<{
+    status: "loading" | "NOT_LOGGED" | "OK" | "ERROR";
+    rows?: PrepRecipeRow[];
+    error?: any;
+  }>({ status: "loading" });
+
+  const load = async () => {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) {
+      setState({ status: "NOT_LOGGED" });
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("prep_recipes")
+      .select("id,name,pivot_unit,created_at")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      setState({ status: "ERROR", error });
+      return;
+    }
+
+    setState({ status: "OK", rows: (data ?? []) as PrepRecipeRow[] });
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const del = async (id: string, name: string) => {
+    const ok = window.confirm(`Supprimer cette recette pivot ?\n\n${name}`);
+    if (!ok) return;
+
+    const { error } = await supabase.from("prep_recipes").delete().eq("id", id);
+    if (error) {
+      setState((p) => ({ ...p, status: "ERROR", error }));
+      return;
+    }
+
+    setState((p) => ({
+      ...p,
+      rows: (p.rows ?? []).filter((x) => x.id !== id),
+    }));
+  };
+
+  if (state.status === "loading") {
+    return (
+      <main className="container">
+        <p className="muted">Chargement…</p>
+      </main>
+    );
+  }
+
+  if (state.status === "NOT_LOGGED") {
+    return (
+      <main className="container">
+        <p className="muted">NOT_LOGGED</p>
+        <Link className="btn btnPrimary" href="/login">
+          Aller sur /login
+        </Link>
+      </main>
+    );
+  }
+
+  if (state.status === "ERROR") {
+    return (
+      <main className="container">
+        <TopNav />
+        <h1 className="h1" style={{ marginTop: 12 }}>
+          Recettes pivot (prep)
+        </h1>
+        <pre className="errorBox">{JSON.stringify(state.error, null, 2)}</pre>
+      </main>
+    );
+  }
+
+  const rows = state.rows ?? [];
+
+  return (
+    <main className="container">
+      <TopNav />
+
+      <div className="rowBetween" style={{ marginTop: 12 }}>
+        <div>
+          <h1 className="h1" style={{ margin: 0 }}>
+            Recettes pivot (prep)
+          </h1>
+          <p className="muted" style={{ marginTop: 6 }}>
+            Pesto, bolognaise, tiramisu, sauces… (basées sur un ingrédient pivot)
+          </p>
+        </div>
+
+        <button className="btn btnPrimary" onClick={() => router.push("/prep/new")}>
+          Nouvelle recette pivot
+        </button>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="muted" style={{ marginTop: 12 }}>
+          Aucune recette pivot créée.
+        </p>
+      ) : (
+        <div className="card" style={{ marginTop: 12 }}>
+          <div className="muted" style={{ marginBottom: 10 }}>
+            {rows.length} recette(s)
+          </div>
+
+          <div style={{ display: "grid", gap: 10 }}>
+            {rows.map((r) => (
+              <div key={r.id} className="listRow" style={{ alignItems: "center" }}>
+                <div style={{ cursor: "pointer" }} onClick={() => router.push(`/prep/${r.id}`)}>
+                  <div style={{ fontWeight: 700, textTransform: "uppercase" }}>{r.name}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    pivot : {r.pivot_unit} • {new Date(r.created_at).toLocaleString("fr-FR")}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button className="btn btnPrimary" onClick={() => router.push(`/prep/${r.id}`)}>
+                    Ouvrir
+                  </button>
+                  <button className="btn btnDanger" onClick={() => del(r.id, r.name)}>
+                    Supprimer
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}

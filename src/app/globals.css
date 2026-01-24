@@ -339,3 +339,59 @@ input[type="number"] {
   border-radius: 12px;
   padding: 0;
 }
+/* ===== ifratelligroup theme (warm / cream / terracotta) ===== */
+
+:root{
+  --bg: #f3eadc;           /* crème */
+  --card: #efe2d3;         /* crème + dense */
+  --text: #2f3a33;         /* vert très sombre */
+  --muted: #6f6a61;        /* taupe */
+  --border: #d9c7b6;       /* beige bord */
+  --primary: #c97a5a;      /* terracotta */
+  --primary-hover: #b86a4c;
+  --primary-text: #ffffff;
+}
+
+/* background global */
+html, body{
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* cards plus “matière” */
+.card{
+  background: rgba(239, 226, 211, 0.72);
+  border: 1px solid rgba(217, 199, 182, 0.85);
+  box-shadow: 0 10px 30px rgba(47, 58, 51, 0.10);
+  backdrop-filter: blur(10px);
+}
+
+/* textes */
+.muted{ color: var(--muted); }
+
+/* boutons : centrage garanti */
+.btn{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;  /* <-- centre le texte */
+  text-align: center;       /* <-- au cas où */
+  border: 1px solid rgba(217, 199, 182, 0.95);
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text);
+}
+
+/* bouton primaire terracotta */
+.btnPrimary{
+  background: var(--primary);
+  border-color: rgba(201, 122, 90, 0.95);
+  color: var(--primary-text);
+}
+
+.btnPrimary:hover{
+  background: var(--primary-hover);
+}
+
+/* optionnel : rendre les gros boutons plus “cartes” */
+.btn.btnWide{
+  min-width: 220px;
+}
