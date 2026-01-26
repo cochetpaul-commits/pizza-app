@@ -486,12 +486,8 @@ export default function PizzaForm(props: { pizzaId?: string }) {
     setTimeout(() => setSaveOk(false), 900);
 
     if (!pizzaId) {
-      router.replace(`/pizzas/${id}`);
-      router.refresh();
-      setTimeout(() => {
-        if (window.location.pathname.includes("/pizzas/new")) window.location.assign(`/pizzas/${id}`);
-      }, 50);
-    }
+  router.replace(`/pizzas/${id}`);
+}
   };
 
   const del = async () => {
@@ -509,7 +505,6 @@ export default function PizzaForm(props: { pizzaId?: string }) {
     }
 
     router.replace("/pizzas");
-    router.refresh();
   };
 
   if (status === "loading") {
