@@ -1,19 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
 
 type PizzaRow = {
   id: string;
-  name: string;
+  name: string | null;
   dough_recipe_id: string | null;
   notes: string | null;
   created_at: string;
   user_id: string;
 };
+
+function isDraftName(name: string | null | undefined) {
+  const n = String(name ?? "").trim();
+  if (!n) return true;
+  return n.toLowerCase() === "pizza (à nommer)";
+}
+
+function displayName(name: string | null | undefined) {
+  const n = String(name ?? "").trim();
+  if (!n || n.toLowerCase() === "pizza (à nommer)") return "Pizza (à nommer)";
+  return n;
+}
 
 export default function PizzasPage() {
   const router = useRouter();
@@ -64,6 +76,20 @@ export default function PizzasPage() {
     }));
   };
 
+  const pizzas = state.pizzas ?? [];
+
+  const split = useMemo(() => {
+    const drafts: PizzaRow[] = [];
+    const real: PizzaRow[] = [];
+
+    for (const p of pizzas) {
+      if (isDraftName(p.name)) drafts.push(p);
+      else real.push(p);
+    }
+
+    return { real, drafts };
+  }, [pizzas]);
+
   if (state.status === "loading") {
     return (
       <main className="container">
@@ -94,38 +120,73 @@ export default function PizzasPage() {
     );
   }
 
-  const pizzas = state.pizzas ?? [];
-
   return (
     <main className="container">
-      <TopNav title="Fiches pizza" subtitle={`${pizzas.length} fiche(s)`} />
+      <TopNav
+        title="Fiches pizza"
+        subtitle={`${split.real.length} fiche(s)${split.drafts.length ? ` + ${split.drafts.length} brouillon(s)` : ""}`}
+      />
 
-      {pizzas.length === 0 ? (
+      {split.real.length === 0 && split.drafts.length === 0 ? (
         <p className="muted">Aucune fiche pizza créée.</p>
       ) : (
-        <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ display: "grid", gap: 10 }}>
-            {pizzas.map((p) => (
-              <div key={p.id} className="listRow">
-                <div>
-                  <div style={{ fontWeight: 700, textTransform: "uppercase" }}>{p.name}</div>
-                  <div className="muted" style={{ fontSize: 12 }}>
-                    {new Date(p.created_at).toLocaleString("fr-FR")}
-                  </div>
-                </div>
+        <>
+          {split.real.length ? (
+            <div className="card" style={{ marginTop: 12 }}>
+              <div style={{ display: "grid", gap: 10 }}>
+                {split.real.map((p) => (
+                  <div key={p.id} className="listRow">
+                    <div>
+                      <div style={{ fontWeight: 700, textTransform: "uppercase" }}>{displayName(p.name)}</div>
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        {new Date(p.created_at).toLocaleString("fr-FR")}
+                      </div>
+                    </div>
 
-                <div style={{ display: "flex", gap: 10 }}>
-                  <button className="btn btnPrimary" onClick={() => router.push(`/pizzas/${p.id}`)}>
-                    Ouvrir
-                  </button>
-                  <button className="btn btnDanger" onClick={() => del(p.id)}>
-                    Supprimer
-                  </button>
-                </div>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button className="btn btnPrimary" onClick={() => router.push(`/pizzas/${p.id}`)}>
+                        Ouvrir
+                      </button>
+                      <button className="btn btnDanger" onClick={() => del(p.id)}>
+                        Supprimer
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+          ) : null}
+
+          {split.drafts.length ? (
+            <div className="card" style={{ marginTop: 12, opacity: 0.92 }}>
+              <div className="muted" style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0.4, marginBottom: 10 }}>
+                BROUILLONS (à supprimer ou à terminer)
+              </div>
+
+              <div style={{ display: "grid", gap: 10 }}>
+                {split.drafts.map((p) => (
+                  <div key={p.id} className="listRow">
+                    <div>
+                      <div style={{ fontWeight: 700, textTransform: "uppercase" }}>{displayName(p.name)}</div>
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        {new Date(p.created_at).toLocaleString("fr-FR")}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button className="btn btnPrimary" onClick={() => router.push(`/pizzas/${p.id}`)}>
+                        Ouvrir
+                      </button>
+                      <button className="btn btnDanger" onClick={() => del(p.id)}>
+                        Supprimer
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </>
       )}
     </main>
   );

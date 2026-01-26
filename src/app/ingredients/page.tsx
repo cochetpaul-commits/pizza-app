@@ -2,44 +2,68 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+
+type Category =
+  | "charcuterie"
+  | "fromage"
+  | "poisson"
+  | "viande"
+  | "legume"
+  | "herbe"
+  | "epicerie"
+  | "alcool"
+  | "autre";
 
 type Ingredient = {
   id: string;
   name: string;
-  category: string;
+  category: Category;
   allergens: string | null;
   is_active: boolean;
   default_unit: string;
 
-  purchase_price: number | null; // ex: 22.95
-  purchase_unit: number | null; // ex: 1000
-  purchase_unit_label: string | null; // ex: "g"
-  purchase_unit_name: string; // ex: "kg"
+  purchase_price: number | null;
+  purchase_unit: number | null;
+  purchase_unit_label: string | null;
+  purchase_unit_name: string | null;
 
-  cost_per_unit: number | null; // GENERATED ALWAYS => lecture seule (€/g si unit_label="g")
+  cost_per_unit: number | null; 
 
   density_g_per_ml: number | null;
   piece_weight_g: number | null;
   piece_volume_ml: number | null;
+
+  source_prep_recipe_id?: string | null;
+  source_prep_recipe_name?: string | null;
 };
 
-const CATEGORIES = [
-  "charcuterie",
-  "fromage",
-  "poisson",
-  "viande",
-  "legume",
-  "herbe",
-  "epicerie",
-  "alcool",
-  "autre",
+type IngredientUpsert = {
+  name: string;
+  category: Category;
+  allergens: string | null;
+  is_active: boolean;
+  default_unit: string;
+  purchase_price: number | null;
+  purchase_unit: number | null;
+  purchase_unit_label: string | null;
+  purchase_unit_name: string | null;
+  density_g_per_ml: number | null;
+  piece_weight_g: number | null;
+  piece_volume_ml: number | null;
+  source_prep_recipe_id?: string | null;
+  source_prep_recipe_name?: string | null;
+};
+
+const CATEGORIES: Category[] = [
+  "charcuterie", "fromage", "poisson", "viande", "legume", "herbe", "epicerie", "alcool", "autre",
 ];
 
-function nfmt(v: number | null | undefined, digits = 3) {
-  if (v == null || !Number.isFinite(v)) return "—";
-  return Number(v).toFixed(digits);
-}
+const CAT_COLORS: Record<Category, string> = {
+  charcuterie: "#C2415C", fromage: "#F59E0B", poisson: "#2563EB", viande: "#B91C1C",
+  legume: "#16A34A", herbe: "#22C55E", epicerie: "#6B7280", alcool: "#7C3AED", autre: "#111827",
+};
 
 function parseNum(s: string): number | null {
   const t = s.trim();
@@ -48,74 +72,78 @@ function parseNum(s: string): number | null {
   return Number.isFinite(v) ? v : null;
 }
 
+function fmtMoney(v: number) {
+  return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtPriceLine(x: Ingredient): { main: string; sub: string } {
+  const cpu = x.cost_per_unit;
+  const lbl = (x.purchase_unit_label ?? "").toLowerCase().trim();
+  const unitName = (x.purchase_unit_name ?? "kg").toLowerCase();
+
+  if (cpu != null && Number.isFinite(cpu)) {
+    // Cas du KG ou du LITRE (On stocke tout en g ou ml internement)
+    if (lbl === "g" || lbl === "ml") {
+      const perBase = cpu * 1000;
+      const displayUnit = unitName === "l" ? "L" : "kg";
+      const sub = x.purchase_price != null ? `${fmtMoney(x.purchase_price)} € / ${displayUnit}` : "—";
+      return { main: `${fmtMoney(perBase)} €/${displayUnit}`, sub: `base: ${sub}` };
+    }
+
+    // Cas de la PIÈCE
+    if (lbl === "pc" || lbl === "pcs") {
+      const sub = x.piece_weight_g ? `poids pièce: ${fmtMoney(x.piece_weight_g)} g` : "poids pièce: —";
+      return { main: `${fmtMoney(cpu)} €/pc`, sub };
+    }
+  }
+
+  return { main: "—", sub: "prix non renseigné" };
+}
+
 export default function IngredientsPage() {
+  const router = useRouter();
   const [items, setItems] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Recherche
   const [q, setQ] = useState("");
 
-  // Ajout
+  // States Création
   const [newName, setNewName] = useState("");
-  const [newCategory, setNewCategory] = useState("epicerie");
-  const [newPricePerKg, setNewPricePerKg] = useState(""); // € / kg
+  const [newCategory, setNewCategory] = useState<Category>("autre");
+  const [newMode, setNewMode] = useState<"kg" | "l" | "pc">("kg");
+  const [newPrice, setNewPrice] = useState("");
+  const [newPieceWeightG, setNewPieceWeightG] = useState("");
+  const [newDensity, setNewDensity] = useState("1.0");
 
-  // Edition
+  // States Edition
   const [editingId, setEditingId] = useState<string | null>(null);
   const [edit, setEdit] = useState<{
     name: string;
-    category: string;
-    allergens: string;
+    category: Category;
     is_active: boolean;
-    default_unit: string;
-
-    purchase_price: string;
-    purchase_unit: string;
-    purchase_unit_label: string;
-    purchase_unit_name: string;
-
-    density_g_per_ml: string;
-    piece_weight_g: string;
-    piece_volume_ml: string;
+    mode: "kg" | "l" | "pc";
+    price: string;
+    pieceWeightG: string;
+    density: string;
   } | null>(null);
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
     if (!qq) return items;
-    return items.filter((x) => x.name.toLowerCase().includes(qq));
+    return items.filter((x) => (x.name ?? "").toLowerCase().includes(qq));
   }, [items, q]);
 
   async function load() {
     setLoading(true);
     const { data, error } = await supabase
       .from("ingredients")
-      .select(
-        [
-          "id",
-          "name",
-          "category",
-          "allergens",
-          "is_active",
-          "default_unit",
-          "purchase_price",
-          "purchase_unit",
-          "purchase_unit_label",
-          "purchase_unit_name",
-          "cost_per_unit",
-          "density_g_per_ml",
-          "piece_weight_g",
-          "piece_volume_ml",
-        ].join(",")
-      )
+      .select("*")
       .order("name", { ascending: true });
 
     if (error) {
       alert(error.message);
-      setLoading(false);
-      return;
+    } else {
+      setItems((data ?? []) as Ingredient[]);
     }
-
-    setItems(((data ?? []) as unknown) as Ingredient[]);
     setLoading(false);
   }
 
@@ -125,331 +153,207 @@ export default function IngredientsPage() {
 
   async function addIngredient(e: React.FormEvent) {
     e.preventDefault();
-
     const name = newName.trim();
-    if (!name) return;
-
-    const pricePerKg = parseNum(newPricePerKg);
-    // Si prix/kg est renseigné -> on stocke purchase_price=prix et purchase_unit=1000g
-    // La DB calcule cost_per_unit = purchase_price / purchase_unit => €/g
-    const payload: any = {
-      name,
-      category: newCategory,
-      is_active: true,
-      default_unit: "g",
-      purchase_unit_name: "kg", // NOT NULL dans ta DB
-    };
-
-    if (pricePerKg != null) {
-      payload.purchase_price = pricePerKg;
-      payload.purchase_unit = 1000;
-      payload.purchase_unit_label = "g";
-      payload.purchase_unit_name = "kg";
-    }
-
-    // IMPORTANT: on n’envoie JAMAIS cost_per_unit (GENERATED ALWAYS)
-    const { error } = await supabase.from("ingredients").insert(payload);
-    if (error) {
-      alert(error.message);
+    const price = parseNum(newPrice);
+    if (!name || price == null || price <= 0) {
+      alert("Nom et prix valides obligatoires.");
       return;
     }
 
-    setNewName("");
-    setNewPricePerKg("");
-    await load();
+    const payload: IngredientUpsert = {
+      name,
+      category: newCategory,
+      allergens: null,
+      is_active: true,
+      default_unit: newMode === "l" ? "ml" : "g",
+      purchase_price: price,
+      purchase_unit: newMode === "pc" ? 1 : 1000,
+      purchase_unit_label: newMode === "l" ? "ml" : (newMode === "kg" ? "g" : "pc"),
+      purchase_unit_name: newMode,
+      density_g_per_ml: newMode === "l" ? (parseNum(newDensity) || 1.0) : 1.0,
+      piece_weight_g: newMode === "pc" ? parseNum(newPieceWeightG) : null,
+      piece_volume_ml: null,
+    };
+
+    const { error } = await supabase.from("ingredients").insert(payload);
+    if (error) alert(error.message);
+    else {
+      setNewName(""); setNewPrice(""); setNewPieceWeightG(""); setNewDensity("1.0");
+      await load();
+    }
   }
 
   function startEdit(x: Ingredient) {
+    const uName = (x.purchase_unit_name ?? "kg").toLowerCase() as "kg" | "l" | "pc";
     setEditingId(x.id);
     setEdit({
-      name: x.name ?? "",
-      category: x.category ?? "epicerie",
-      allergens: x.allergens ?? "",
-      is_active: !!x.is_active,
-      default_unit: x.default_unit ?? "g",
-
-      purchase_price: x.purchase_price == null ? "" : String(x.purchase_price),
-      purchase_unit: x.purchase_unit == null ? "" : String(x.purchase_unit),
-      purchase_unit_label: x.purchase_unit_label ?? "g",
-      purchase_unit_name: x.purchase_unit_name ?? "kg",
-
-      density_g_per_ml: x.density_g_per_ml == null ? "" : String(x.density_g_per_ml),
-      piece_weight_g: x.piece_weight_g == null ? "" : String(x.piece_weight_g),
-      piece_volume_ml: x.piece_volume_ml == null ? "" : String(x.piece_volume_ml),
+      name: x.name,
+      category: x.category,
+      is_active: x.is_active,
+      mode: uName,
+      price: x.purchase_price?.toString() || "",
+      pieceWeightG: x.piece_weight_g?.toString() || "",
+      density: x.density_g_per_ml?.toString() || "1.0",
     });
-  }
-
-  function cancelEdit() {
-    setEditingId(null);
-    setEdit(null);
   }
 
   async function saveEdit() {
     if (!editingId || !edit) return;
+    const price = parseNum(edit.price);
+    if (!edit.name.trim() || price == null) return;
 
-    const payload: any = {
+    const payload: Partial<IngredientUpsert> = {
       name: edit.name.trim(),
       category: edit.category,
-      allergens: edit.allergens.trim() === "" ? null : edit.allergens.trim(),
       is_active: edit.is_active,
-      default_unit: edit.default_unit,
-
-      purchase_price: parseNum(edit.purchase_price),
-      purchase_unit: parseNum(edit.purchase_unit),
-      purchase_unit_label: edit.purchase_unit_label.trim() === "" ? null : edit.purchase_unit_label.trim(),
-      purchase_unit_name: (edit.purchase_unit_name.trim() || "kg"),
-
-      density_g_per_ml: parseNum(edit.density_g_per_ml),
-      piece_weight_g: parseNum(edit.piece_weight_g),
-      piece_volume_ml: parseNum(edit.piece_volume_ml),
+      purchase_price: price,
+      purchase_unit: edit.mode === "pc" ? 1 : 1000,
+      purchase_unit_label: edit.mode === "l" ? "ml" : (edit.mode === "kg" ? "g" : "pc"),
+      purchase_unit_name: edit.mode,
+      density_g_per_ml: edit.mode === "l" ? parseNum(edit.density) : 1.0,
+      piece_weight_g: edit.mode === "pc" ? parseNum(edit.pieceWeightG) : null,
     };
 
-    // IMPORTANT : cost_per_unit = GENERATED ALWAYS => ne jamais l'envoyer !
     const { error } = await supabase.from("ingredients").update(payload).eq("id", editingId);
-    if (error) {
-      alert(error.message);
-      return;
+    if (error) alert(error.message);
+    else {
+      setEditingId(null);
+      await load();
     }
-
-    cancelEdit();
-    await load();
   }
 
   async function del(id: string, name: string) {
-    const ok = window.confirm(`Supprimer cet ingrédient ?\n\n${name}`);
-    if (!ok) return;
-
-    const { error } = await supabase.from("ingredients").delete().eq("id", id);
-    if (error) {
-      alert(error.message);
-      return;
+    if (window.confirm(`Supprimer ${name} ?`)) {
+      await supabase.from("ingredients").delete().eq("id", id);
+      await load();
     }
-    await load();
   }
+
+  // UI Styles
+  const cardPad: React.CSSProperties = { padding: 16 };
+  const label: React.CSSProperties = { fontSize: 12, opacity: 0.75, marginBottom: 6 };
+  const input: React.CSSProperties = { width: "100%", height: 44, borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", padding: "0 12px", fontSize: 16, background: "rgba(255,255,255,0.65)" };
+  const select: React.CSSProperties = { ...input, paddingRight: 34 };
 
   return (
     <main className="container">
       <div className="rowBetween" style={{ marginTop: 12 }}>
         <div>
           <h1 className="h1" style={{ margin: 0 }}>Index ingrédients</h1>
-          <p className="muted" style={{ marginTop: 6 }}>
-            Le coût affiché vient de <b>cost_per_unit</b> (calculé automatiquement) = <b>purchase_price / purchase_unit</b>.
-          </p>
+          <p className="muted">Gérez vos coûts au kg, au litre ou à la pièce.</p>
         </div>
-
         <div style={{ display: "flex", gap: 10 }}>
           <Link className="btn" href="/">Dashboard</Link>
-          <button className="btn" type="button" onClick={load}>Rafraîchir</button>
+          <button className="btn" onClick={load}>Rafraîchir</button>
         </div>
       </div>
 
-      {/* AJOUT */}
-      <div className="card" style={{ marginTop: 12 }}>
-        <div className="cardTitle">Ajouter un ingrédient</div>
-
-        <form onSubmit={addIngredient} style={{ display: "grid", gap: 10, marginTop: 10 }}>
-          <div style={{ display: "grid", gap: 10, gridTemplateColumns: "2fr 1fr" }}>
-            <input
-              className="input"
-              placeholder="Nom (ex: Basilic)"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-            />
-
-            <select className="input" value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
+      {/* CREATION */}
+      <div className="card" style={{ ...cardPad, marginTop: 12 }}>
+        <div style={{ fontSize: 16, fontWeight: 900 }}>Créer un ingrédient</div>
+        <form onSubmit={addIngredient} style={{ marginTop: 12, display: "grid", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
+            <div>
+              <div style={label}>Ingrédient</div>
+              <input style={input} placeholder="Ex: Huile d'olive" value={newName} onChange={(e) => setNewName(e.target.value)} />
+            </div>
+            <div>
+              <div style={label}>Catégorie</div>
+              <select style={select} value={newCategory} onChange={(e) => setNewCategory(e.target.value as Category)}>
+                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
           </div>
 
-          <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr" }}>
-            <input
-              className="input"
-              placeholder="Prix en €/kg (→ calc €/g) ex: 18,50"
-              inputMode="decimal"
-              value={newPricePerKg}
-              onChange={(e) => setNewPricePerKg(e.target.value)}
-            />
-
-            <button className="btn btnPrimary" type="submit">
-              Ajouter
-            </button>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "end" }}>
+            <div>
+              <div style={label}>Mode d'achat & Prix</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <select style={select} value={newMode} onChange={(e) => setNewMode(e.target.value as any)}>
+                  <option value="kg">Kilo (kg)</option>
+                  <option value="l">Litre (L)</option>
+                  <option value="pc">Pièce (pc)</option>
+                </select>
+                <input style={input} placeholder="Prix" inputMode="decimal" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} />
+              </div>
+            </div>
+            <button className="btn btnPrimary" type="submit" style={{ height: 44 }}>Ajouter</button>
           </div>
 
-          <p className="muted" style={{ margin: 0 }}>
-            Exemple : si tu mets <b>18,50 €/kg</b>, on stocke purchase_unit=1000g et la DB calcule automatiquement <b>0,0185 €/g</b>.
-          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {newMode === "l" && (
+              <div>
+                <div style={label}>Densité (kg/L) - Ex: 0.92 pour l'huile</div>
+                <input style={input} value={newDensity} onChange={(e) => setNewDensity(e.target.value)} />
+              </div>
+            )}
+            {newMode === "pc" && (
+              <div>
+                <div style={label}>Poids d'une pièce (g)</div>
+                <input style={input} placeholder="Ex: 125" value={newPieceWeightG} onChange={(e) => setNewPieceWeightG(e.target.value)} />
+              </div>
+            )}
+          </div>
         </form>
       </div>
 
       {/* RECHERCHE */}
-      <div style={{ marginTop: 12 }}>
-        <input
-          className="input"
-          placeholder="Rechercher…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-      </div>
+      <input style={{ ...input, marginTop: 12 }} placeholder="Rechercher..." value={q} onChange={(e) => setQ(e.target.value)} />
 
       {/* LISTE */}
-      <div className="card" style={{ marginTop: 12 }}>
-        <div className="muted" style={{ marginBottom: 10 }}>
-          {loading ? "Chargement…" : `${filtered.length} ingrédient(s)`}
-        </div>
-
-        {filtered.length === 0 && !loading ? (
-          <p className="muted" style={{ margin: 0 }}>Aucun ingrédient.</p>
-        ) : (
-          <div style={{ display: "grid", gap: 10 }}>
-            {filtered.map((x) => {
-              const isEditing = editingId === x.id;
-
-              return (
-                <div key={x.id} className="listRow" style={{ alignItems: "flex-start" }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                      <div>
-                        <div style={{ fontWeight: 800 }}>{x.name}</div>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          {x.category} • {x.is_active ? "actif" : "inactif"}
-                        </div>
-                      </div>
-
-                      <div style={{ textAlign: "right", minWidth: 180 }}>
-                        <div style={{ fontWeight: 800 }}>
-                          {x.cost_per_unit == null ? "—" : `${nfmt(x.cost_per_unit, 6)} €/g`}
-                        </div>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          purchase: {x.purchase_price ?? "—"} / {x.purchase_unit ?? "—"} {x.purchase_unit_label ?? ""} ({x.purchase_unit_name})
-                        </div>
-                      </div>
+      <div className="card" style={{ ...cardPad, marginTop: 12 }}>
+        <div style={{ display: "grid", gap: 10 }}>
+          {filtered.map((x) => {
+            const isEditing = editingId === x.id;
+            const price = fmtPriceLine(x);
+            return (
+              <div key={x.id} style={{ border: "1px solid rgba(0,0,0,0.1)", borderRadius: 12, padding: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: 12 }}>
+                  <div>
+                    <div style={{ fontWeight: 900, color: CAT_COLORS[x.category] }}>{x.name}</div>
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      {x.source_prep_recipe_name ? `Pivot: ${x.source_prep_recipe_name}` : x.category}
                     </div>
-
-                    {isEditing && edit ? (
-                      <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
-                        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "2fr 1fr" }}>
-                          <input
-                            className="input"
-                            value={edit.name}
-                            onChange={(e) => setEdit({ ...edit, name: e.target.value })}
-                            placeholder="Nom"
-                          />
-                          <select
-                            className="input"
-                            value={edit.category}
-                            onChange={(e) => setEdit({ ...edit, category: e.target.value })}
-                          >
-                            {CATEGORIES.map((c) => (
-                              <option key={c} value={c}>{c}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr" }}>
-                          <input
-                            className="input"
-                            value={edit.allergens}
-                            onChange={(e) => setEdit({ ...edit, allergens: e.target.value })}
-                            placeholder="Allergènes (optionnel)"
-                          />
-                          <select
-                            className="input"
-                            value={edit.is_active ? "true" : "false"}
-                            onChange={(e) => setEdit({ ...edit, is_active: e.target.value === "true" })}
-                          >
-                            <option value="true">Actif</option>
-                            <option value="false">Inactif</option>
-                          </select>
-                        </div>
-
-                        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
-                          <input
-                            className="input"
-                            value={edit.purchase_price}
-                            onChange={(e) => setEdit({ ...edit, purchase_price: e.target.value })}
-                            placeholder="purchase_price (ex: 22.95)"
-                            inputMode="decimal"
-                          />
-                          <input
-                            className="input"
-                            value={edit.purchase_unit}
-                            onChange={(e) => setEdit({ ...edit, purchase_unit: e.target.value })}
-                            placeholder="purchase_unit (ex: 1000)"
-                            inputMode="decimal"
-                          />
-                          <input
-                            className="input"
-                            value={edit.purchase_unit_label}
-                            onChange={(e) => setEdit({ ...edit, purchase_unit_label: e.target.value })}
-                            placeholder="unit label (ex: g)"
-                          />
-                          <input
-                            className="input"
-                            value={edit.purchase_unit_name}
-                            onChange={(e) => setEdit({ ...edit, purchase_unit_name: e.target.value })}
-                            placeholder="unit name (ex: kg)"
-                          />
-                        </div>
-
-                        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr 1fr" }}>
-                          <input
-                            className="input"
-                            value={edit.density_g_per_ml}
-                            onChange={(e) => setEdit({ ...edit, density_g_per_ml: e.target.value })}
-                            placeholder="densité g/ml (optionnel)"
-                            inputMode="decimal"
-                          />
-                          <input
-                            className="input"
-                            value={edit.piece_weight_g}
-                            onChange={(e) => setEdit({ ...edit, piece_weight_g: e.target.value })}
-                            placeholder="poids pièce g (optionnel)"
-                            inputMode="decimal"
-                          />
-                          <input
-                            className="input"
-                            value={edit.piece_volume_ml}
-                            onChange={(e) => setEdit({ ...edit, piece_volume_ml: e.target.value })}
-                            placeholder="volume pièce ml (optionnel)"
-                            inputMode="decimal"
-                          />
-                        </div>
-
-                        <p className="muted" style={{ margin: 0 }}>
-                          Note : <b>cost_per_unit</b> est calculé par la DB, donc tu modifies seulement <b>purchase_price</b> et <b>purchase_unit</b>.
-                        </p>
-                      </div>
-                    ) : null}
                   </div>
-
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                    {isEditing ? (
-                      <>
-                        <button className="btn btnPrimary" type="button" onClick={saveEdit}>
-                          Sauvegarder
-                        </button>
-                        <button className="btn" type="button" onClick={cancelEdit}>
-                          Annuler
-                        </button>
-                      </>
+                  <div>
+                    <div style={label}>Densité / Poids</div>
+                    <div style={{ fontWeight: 600 }}>
+                      {x.purchase_unit_name === "l" ? `${x.density_g_per_ml} kg/L` : x.piece_weight_g ? `${x.piece_weight_g} g/pc` : "—"}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontWeight: 950, fontSize: 18 }}>{price.main}</div>
+                    <div className="muted" style={{ fontSize: 11 }}>{price.sub}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {!isEditing ? (
+                      <button className="btn btnPrimary" onClick={() => startEdit(x)}>Modifier</button>
                     ) : (
-                      <>
-                        <button className="btn btnPrimary" type="button" onClick={() => startEdit(x)}>
-                          Modifier
-                        </button>
-                        <button className="btn btnDanger" type="button" onClick={() => del(x.id, x.name)}>
-                          Supprimer
-                        </button>
-                      </>
+                      <button className="btn btnPrimary" onClick={saveEdit}>OK</button>
                     )}
+                    <button className="btn btnDanger" onClick={() => del(x.id, x.name)}>X</button>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+
+                {isEditing && edit && (
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #eee", display: "grid", gap: 10 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                      <input style={input} value={edit.name} onChange={e => setEdit({...edit, name: e.target.value})} />
+                      <input style={input} placeholder="Prix" value={edit.price} onChange={e => setEdit({...edit, price: e.target.value})} />
+                      <select style={select} value={edit.mode} onChange={e => setEdit({...edit, mode: e.target.value as any})}>
+                        <option value="kg">kg</option>
+                        <option value="l">L</option>
+                        <option value="pc">pc</option>
+                      </select>
+                    </div>
+                    {edit.mode === "l" && <input style={input} placeholder="Densité" value={edit.density} onChange={e => setEdit({...edit, density: e.target.value})} />}
+                    {edit.mode === "pc" && <input style={input} placeholder="Poids pièce (g)" value={edit.pieceWeightG} onChange={e => setEdit({...edit, pieceWeightG: e.target.value})} />}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </main>
   );

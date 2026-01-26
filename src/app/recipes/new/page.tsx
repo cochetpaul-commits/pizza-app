@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -16,11 +16,20 @@ function makeAutoName() {
 
 export default function NewRecipePage() {
   const router = useRouter();
-  const [state, setState] = useState<{ status: "loading" | "CREATING" | "ERROR"; error?: any }>({
-    status: "loading",
-  });
+
+  const didRunRef = useRef(false);
+  const [state, setState] = useState<{
+    status: "CREATING" | "ERROR";
+    error?: any;
+    createdId?: string;
+  }>({ status: "CREATING" });
 
   useEffect(() => {
+    // IMPORTANT: en dev, React Strict Mode peut exécuter l'effet 2 fois.
+    // Ce guard empêche le double insert + navigation bancale.
+    if (didRunRef.current) return;
+    didRunRef.current = true;
+
     const run = async () => {
       try {
         setState({ status: "CREATING" });
@@ -67,8 +76,7 @@ Cuisson : __`;
           // DB procedure NOT NULL (si tu as appliqué le SQL)
           procedure: defaultProcedure,
 
-          // Si la colonne existe et est NOT NULL, ça sécurise.
-          // Si elle n’existe pas, Supabase ignorera (mais normalement elle existe chez toi).
+          // Si la colonne existe
           user_id: auth.user.id,
         };
 
@@ -84,10 +92,23 @@ Cuisson : __`;
         }
 
         if (insertErr) throw insertErr;
-        if (!data?.id) throw new Error("ID manquant après création");
+        const newId = (data as any)?.id as string | undefined;
+        if (!newId) throw new Error("ID manquant après création");
 
-        router.replace(`/recipes/${data.id}`);
+        // stocke l'id (utile si on doit afficher un fallback)
+        setState({ status: "CREATING", createdId: newId });
+
+        // Navigation "soft" + fallback "hard" si le routeur ne bouge pas
+        router.replace(`/recipes/${newId}`);
         router.refresh();
+
+        // Fallback: si après 800ms on est toujours là, on force la navigation.
+        window.setTimeout(() => {
+          // Si on est encore sur /recipes/new, on force.
+          if (window.location.pathname.includes("/recipes/new")) {
+            window.location.assign(`/recipes/${newId}`);
+          }
+        }, 800);
       } catch (e: any) {
         setState({
           status: "ERROR",
@@ -99,10 +120,24 @@ Cuisson : __`;
     run();
   }, [router]);
 
-  if (state.status === "loading" || state.status === "CREATING") {
+  if (state.status === "CREATING") {
     return (
       <main className="container">
-        <p className="muted">{state.status === "CREATING" ? "Création de l’empâtement…" : "Chargement…"}</p>
+        <p className="muted">Création de l’empâtement…</p>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+          <button className="btn" type="button" onClick={() => window.location.reload()}>
+            Recharger
+          </button>
+          <button className="btn" type="button" onClick={() => router.replace("/recipes")}>
+            Retour liste empâtements
+          </button>
+          {state.createdId ? (
+            <button className="btn btnPrimary" type="button" onClick={() => window.location.assign(`/recipes/${state.createdId}`)}>
+              Ouvrir l’empâtement
+            </button>
+          ) : null}
+        </div>
       </main>
     );
   }
@@ -111,9 +146,14 @@ Cuisson : __`;
     <main className="container">
       <h1 className="h1">Erreur</h1>
       <pre className="code">{JSON.stringify(state.error ?? {}, null, 2)}</pre>
-      <button className="btn" type="button" onClick={() => router.replace("/recipes")}>
-        Retour liste empâtements
-      </button>
+      <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+        <button className="btn" type="button" onClick={() => router.replace("/recipes")}>
+          Retour liste empâtements
+        </button>
+        <button className="btn" type="button" onClick={() => window.location.reload()}>
+          Recharger
+        </button>
+      </div>
     </main>
   );
 }

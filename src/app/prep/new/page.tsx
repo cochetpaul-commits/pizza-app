@@ -1,122 +1,118 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 type Ingredient = { id: string; name: string };
 
+function makeAutoName() {
+  const now = new Date();
+  const d = now.toLocaleDateString("fr-FR");
+  const t = now.toLocaleTimeString("fr-FR").slice(0, 5).replace(":", "h");
+  const suffix = Math.random().toString(16).slice(2, 6).toUpperCase(); // 4 chars
+  return `Recette pivot ${d} ${t} ${suffix}`;
+}
+
 export default function NewPrepRecipePage() {
   const router = useRouter();
+  const didRun = useRef(false);
 
-  const [loading, setLoading] = useState(true);
-  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [error, setError] = useState<any>(null);
-
-  const [name, setName] = useState("Pesto (à nommer)");
-  const [pivotIngredientId, setPivotIngredientId] = useState<string>("");
-  const [pivotUnit, setPivotUnit] = useState<"g" | "ml" | "pc">("g");
+  const [state, setState] = useState<{
+    status: "loading" | "CREATING" | "ERROR";
+    error?: any;
+  }>({ status: "loading" });
 
   useEffect(() => {
+    // Anti double-run (React Strict Mode en dev)
+    if (didRun.current) return;
+    didRun.current = true;
+
     const run = async () => {
-      setLoading(true);
-      setError(null);
+      try {
+        setState({ status: "CREATING" });
 
-      const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) {
-        setError({ message: "NOT_LOGGED" });
-        setLoading(false);
-        return;
+        // 1) Auth
+        const { data: auth } = await supabase.auth.getUser();
+        if (!auth.user) throw new Error("NOT_LOGGED");
+
+        // 2) Choisir un pivot par défaut : 1er ingrédient actif (ordre alphabétique)
+        const { data: ing, error: eIng } = await supabase
+          .from("ingredients")
+          .select("id,name")
+          .eq("is_active", true)
+          .order("name", { ascending: true })
+          .limit(1);
+
+        if (eIng) throw eIng;
+
+        const first = (ing?.[0] as Ingredient | undefined) ?? null;
+        if (!first?.id) throw new Error("Aucun ingrédient actif. Ajoute au moins 1 ingrédient dans l’index.");
+
+        // 3) Créer la recette pivot (valeurs par défaut)
+        const basePayload: any = {
+          name: makeAutoName(), // évite les collisions si contrainte unique
+          pivot_ingredient_id: first.id,
+          pivot_unit: "g",
+        };
+
+        let { data, error: eIns } = await supabase.from("prep_recipes").insert(basePayload).select("id").single();
+
+        // Si collision unique -> 2e essai avec un autre nom
+        if (eIns && (eIns as any).code === "23505") {
+          const retryPayload = { ...basePayload, name: makeAutoName() };
+          const retry = await supabase.from("prep_recipes").insert(retryPayload).select("id").single();
+          data = retry.data as any;
+          eIns = retry.error as any;
+        }
+
+        if (eIns) throw eIns;
+        if (!data?.id) throw new Error("ID manquant après création");
+
+        const url = `/prep/${data.id}`;
+
+        // 4) Redirection fiable
+        router.replace(url);
+        router.refresh();
+
+        // Fallback hard si Turbopack/route transition bloque (rare mais réel)
+        setTimeout(() => {
+          if (typeof window !== "undefined" && window.location?.pathname !== url) {
+            window.location.href = url;
+          }
+        }, 400);
+      } catch (e: any) {
+        setState({
+          status: "ERROR",
+          error: { message: e?.message ?? "Erreur création", details: e },
+        });
       }
-
-      const { data, error: e1 } = await supabase.from("ingredients").select("id,name").eq("is_active", true).order("name");
-      if (e1) {
-        setError(e1);
-        setLoading(false);
-        return;
-      }
-
-      const list = (data ?? []) as Ingredient[];
-      setIngredients(list);
-      setPivotIngredientId(list?.[0]?.id ?? "");
-      setLoading(false);
     };
 
     run();
-  }, []);
+  }, [router]);
 
-  const create = async () => {
-    setError(null);
-
-    const n = name.trim();
-    if (!n) return;
-    if (!pivotIngredientId) return;
-
-    const { data, error: e } = await supabase
-      .from("prep_recipes")
-      .insert({
-        name: n,
-        pivot_ingredient_id: pivotIngredientId,
-        pivot_unit: pivotUnit,
-      })
-      .select("id")
-      .single();
-
-    if (e) {
-      setError(e);
-      return;
-    }
-
-    router.replace(`/prep/${data.id}`);
-    router.refresh();
-  };
-
-  if (loading) {
+  if (state.status === "ERROR") {
     return (
       <main className="container">
-        <p className="muted">Chargement…</p>
+        <h1 className="h1">Erreur</h1>
+        <pre className="code">{JSON.stringify(state.error ?? {}, null, 2)}</pre>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+          <button className="btn" type="button" onClick={() => window.location.reload()}>
+            Réessayer
+          </button>
+          <button className="btn" type="button" onClick={() => router.replace("/prep")}>
+            Retour
+          </button>
+        </div>
       </main>
     );
   }
 
   return (
     <main className="container">
-      <h1 className="h1">Nouvelle recette pivot</h1>
-
-      {error ? <pre className="errorBox">{JSON.stringify(error, null, 2)}</pre> : null}
-
-      <div className="card" style={{ marginTop: 12, display: "grid", gap: 10 }}>
-        <label className="muted">Nom</label>
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
-
-        <label className="muted">Ingrédient pivot</label>
-        <select className="input" value={pivotIngredientId} onChange={(e) => setPivotIngredientId(e.target.value)}>
-          {ingredients.map((i) => (
-            <option key={i.id} value={i.id}>
-              {i.name}
-            </option>
-          ))}
-        </select>
-
-        <label className="muted">Unité pivot</label>
-        <select className="input" value={pivotUnit} onChange={(e) => setPivotUnit(e.target.value as any)}>
-          <option value="g">g</option>
-          <option value="ml">ml</option>
-          <option value="pc">pc</option>
-        </select>
-
-        <button className="btn btnPrimary" onClick={create}>
-          Créer
-        </button>
-
-        <button className="btn" onClick={() => router.replace("/prep")}>
-          Retour liste
-        </button>
-      </div>
-
-      <p className="muted" style={{ marginTop: 12 }}>
-        Après création, on rentre les lignes “ingrédients” avec des ratios par 1 unité de pivot.
-      </p>
+      <p className="muted">{state.status === "CREATING" ? "Création de la recette pivot…" : "Chargement…"}</p>
     </main>
   );
 }
