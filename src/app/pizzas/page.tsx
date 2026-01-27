@@ -47,6 +47,8 @@ export default function PizzasPage() {
       const { data, error } = await supabase
         .from("pizza_recipes")
         .select("id,name,dough_recipe_id,notes,created_at,user_id")
+        .neq("name", "Pizza (à nommer)")
+        .neq("name", "")
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -76,18 +78,12 @@ export default function PizzasPage() {
     }));
   };
 
-  const pizzas = state.pizzas ?? [];
+  const pizzas = useMemo(() => {
+    return (state.pizzas ?? []).filter((p) => !isDraftName(p.name));
+  }, [state.pizzas]);
 
   const split = useMemo(() => {
-    const drafts: PizzaRow[] = [];
-    const real: PizzaRow[] = [];
-
-    for (const p of pizzas) {
-      if (isDraftName(p.name)) drafts.push(p);
-      else real.push(p);
-    }
-
-    return { real, drafts };
+    return { real: pizzas, drafts: [] as PizzaRow[] };
   }, [pizzas]);
 
   if (state.status === "loading") {
@@ -122,71 +118,34 @@ export default function PizzasPage() {
 
   return (
     <main className="container">
-      <TopNav
-        title="Fiches pizza"
-        subtitle={`${split.real.length} fiche(s)${split.drafts.length ? ` + ${split.drafts.length} brouillon(s)` : ""}`}
-      />
+      <TopNav title="Fiches pizza" subtitle={`${split.real.length} fiche(s)`} />
 
-      {split.real.length === 0 && split.drafts.length === 0 ? (
+      {split.real.length === 0 ? (
         <p className="muted">Aucune fiche pizza créée.</p>
       ) : (
-        <>
-          {split.real.length ? (
-            <div className="card" style={{ marginTop: 12 }}>
-              <div style={{ display: "grid", gap: 10 }}>
-                {split.real.map((p) => (
-                  <div key={p.id} className="listRow">
-                    <div>
-                      <div style={{ fontWeight: 700, textTransform: "uppercase" }}>{displayName(p.name)}</div>
-                      <div className="muted" style={{ fontSize: 12 }}>
-                        {new Date(p.created_at).toLocaleString("fr-FR")}
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <button className="btn btnPrimary" onClick={() => router.push(`/pizzas/${p.id}`)}>
-                        Ouvrir
-                      </button>
-                      <button className="btn btnDanger" onClick={() => del(p.id)}>
-                        Supprimer
-                      </button>
-                    </div>
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ display: "grid", gap: 10 }}>
+            {split.real.map((p) => (
+              <div key={p.id} className="listRow">
+                <div>
+                  <div style={{ fontWeight: 700, textTransform: "uppercase" }}>{displayName(p.name)}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    {new Date(p.created_at).toLocaleString("fr-FR")}
                   </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
+                </div>
 
-          {split.drafts.length ? (
-            <div className="card" style={{ marginTop: 12, opacity: 0.92 }}>
-              <div className="muted" style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0.4, marginBottom: 10 }}>
-                BROUILLONS (à supprimer ou à terminer)
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button className="btn btnPrimary" onClick={() => router.push(`/pizzas/${p.id}`)}>
+                    Ouvrir
+                  </button>
+                  <button className="btn btnDanger" onClick={() => del(p.id)}>
+                    Supprimer
+                  </button>
+                </div>
               </div>
-
-              <div style={{ display: "grid", gap: 10 }}>
-                {split.drafts.map((p) => (
-                  <div key={p.id} className="listRow">
-                    <div>
-                      <div style={{ fontWeight: 700, textTransform: "uppercase" }}>{displayName(p.name)}</div>
-                      <div className="muted" style={{ fontSize: 12 }}>
-                        {new Date(p.created_at).toLocaleString("fr-FR")}
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <button className="btn btnPrimary" onClick={() => router.push(`/pizzas/${p.id}`)}>
-                        Ouvrir
-                      </button>
-                      <button className="btn btnDanger" onClick={() => del(p.id)}>
-                        Supprimer
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </>
+            ))}
+          </div>
+        </div>
       )}
     </main>
   );
