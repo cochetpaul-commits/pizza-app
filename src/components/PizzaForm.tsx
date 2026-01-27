@@ -434,13 +434,13 @@ export default function PizzaForm(props: { pizzaId?: string }) {
     let id = pizzaId;
 
     const payload = {
-      name: nm,
-      dough_recipe_id: form.dough_recipe_id ? form.dough_recipe_id : null,
-      notes: form.notes?.trim() || null,
-      photo_url: form.photo_url?.trim() || null,
-      updated_at: new Date().toISOString(),
-      is_draft: false,
-    };
+  name: nm,
+  dough_recipe_id: form.dough_recipe_id ? form.dough_recipe_id : null,
+  notes: form.notes?.trim() || null,
+  photo_url: form.photo_url?.trim() || null,
+  is_draft: false,
+  updated_at: new Date().toISOString(),
+};
 
     if (!id) {
       const { data, error: insErr } = await supabase.from("pizza_recipes").insert(payload).select("id").single();
