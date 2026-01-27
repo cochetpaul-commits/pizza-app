@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
@@ -13,18 +13,12 @@ type PizzaRow = {
   notes: string | null;
   created_at: string;
   user_id: string;
+  is_draft: boolean;
 };
-
-function isDraftName(name: string | null | undefined) {
-  const n = String(name ?? "").trim();
-  if (!n) return true;
-  return n.toLowerCase() === "pizza (à nommer)";
-}
 
 function displayName(name: string | null | undefined) {
   const n = String(name ?? "").trim();
-  if (!n || n.toLowerCase() === "pizza (à nommer)") return "Pizza (à nommer)";
-  return n;
+  return n || "Pizza";
 }
 
 export default function PizzasPage() {
@@ -46,9 +40,8 @@ export default function PizzasPage() {
 
       const { data, error } = await supabase
         .from("pizza_recipes")
-        .select("id,name,dough_recipe_id,notes,created_at,user_id")
-        .neq("name", "Pizza (à nommer)")
-        .neq("name", "")
+        .select("id,name,dough_recipe_id,notes,created_at,user_id,is_draft")
+        .eq("is_draft", false)
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -77,14 +70,6 @@ export default function PizzasPage() {
       pizzas: (p.pizzas ?? []).filter((x) => x.id !== id),
     }));
   };
-
-  const pizzas = useMemo(() => {
-    return (state.pizzas ?? []).filter((p) => !isDraftName(p.name));
-  }, [state.pizzas]);
-
-  const split = useMemo(() => {
-    return { real: pizzas, drafts: [] as PizzaRow[] };
-  }, [pizzas]);
 
   if (state.status === "loading") {
     return (
@@ -116,16 +101,18 @@ export default function PizzasPage() {
     );
   }
 
+  const pizzas = state.pizzas ?? [];
+
   return (
     <main className="container">
-      <TopNav title="Fiches pizza" subtitle={`${split.real.length} fiche(s)`} />
+      <TopNav title="Fiches pizza" subtitle={`${pizzas.length} fiche(s)`} />
 
-      {split.real.length === 0 ? (
+      {pizzas.length === 0 ? (
         <p className="muted">Aucune fiche pizza créée.</p>
       ) : (
         <div className="card" style={{ marginTop: 12 }}>
           <div style={{ display: "grid", gap: 10 }}>
-            {split.real.map((p) => (
+            {pizzas.map((p) => (
               <div key={p.id} className="listRow">
                 <div>
                   <div style={{ fontWeight: 700, textTransform: "uppercase" }}>{displayName(p.name)}</div>

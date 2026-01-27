@@ -22,6 +22,7 @@ type PizzaRowDB = {
   dough_recipe_id: string | null;
   notes: string | null;
   photo_url: string | null;
+  is_draft?: boolean | null;
 };
 
 type PizzaIngredientDBRow = {
@@ -243,7 +244,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
 
       const { data: pizza, error: pizzaErr } = await supabase
         .from("pizza_recipes")
-        .select("id,name,dough_recipe_id,notes,photo_url")
+        .select("id,name,dough_recipe_id,notes,photo_url,is_draft")
         .eq("id", pizzaId)
         .maybeSingle();
 
@@ -351,7 +352,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
       setPhotoPreview(url);
 
       setForm((p) => (p ? { ...p, photo_url: url } : p));
-    } catch (err) {
+    } catch {
       setSaveError({ message: "Upload photo impossible" });
       setPhotoPreview(form?.photo_url || null);
     } finally {
@@ -402,13 +403,14 @@ export default function PizzaForm(props: { pizzaId?: string }) {
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 800);
-    } catch (e) {
+    } catch {
       setSaveError({ message: "Export PDF impossible" });
     }
   };
 
   const save = async () => {
     if (!form) return;
+    if (saving) return;
 
     setSaveError(null);
     setSaveOk(false);
@@ -437,6 +439,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
       notes: form.notes?.trim() || null,
       photo_url: form.photo_url?.trim() || null,
       updated_at: new Date().toISOString(),
+      is_draft: false,
     };
 
     if (!id) {
@@ -486,8 +489,8 @@ export default function PizzaForm(props: { pizzaId?: string }) {
     setTimeout(() => setSaveOk(false), 900);
 
     if (!pizzaId) {
-  router.replace(`/pizzas/${id}`);
-}
+      router.replace(`/pizzas/${id}`);
+    }
   };
 
   const del = async () => {
@@ -522,7 +525,19 @@ export default function PizzaForm(props: { pizzaId?: string }) {
       <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
         <div style={{ maxWidth: 980, margin: "0 auto" }}>
           <div style={{ color: theme.muted }}>NOT_LOGGED</div>
-          <Link href="/login" style={{ display: "inline-block", marginTop: 12, padding: "10px 14px", borderRadius: 12, background: theme.primary, color: theme.primaryText, textDecoration: "none", fontWeight: 900 }}>
+          <Link
+            href="/login"
+            style={{
+              display: "inline-block",
+              marginTop: 12,
+              padding: "10px 14px",
+              borderRadius: 12,
+              background: theme.primary,
+              color: theme.primaryText,
+              textDecoration: "none",
+              fontWeight: 900,
+            }}
+          >
             Aller sur /login
           </Link>
         </div>
@@ -538,7 +553,15 @@ export default function PizzaForm(props: { pizzaId?: string }) {
             ← Retour
           </Link>
           <h1 style={{ marginTop: 14, marginBottom: 10 }}>Erreur</h1>
-          <pre style={{ background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, overflow: "auto" }}>
+          <pre
+            style={{
+              background: "#fff",
+              border: `1px solid ${theme.border}`,
+              borderRadius: 12,
+              padding: 12,
+              overflow: "auto",
+            }}
+          >
             {JSON.stringify(error, null, 2)}
           </pre>
         </div>
@@ -625,7 +648,16 @@ export default function PizzaForm(props: { pizzaId?: string }) {
         </div>
 
         {saveError ? (
-          <pre style={{ marginTop: 12, background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, overflow: "auto" }}>
+          <pre
+            style={{
+              marginTop: 12,
+              background: "#fff",
+              border: `1px solid ${theme.border}`,
+              borderRadius: 12,
+              padding: 12,
+              overflow: "auto",
+            }}
+          >
             {JSON.stringify(saveError, null, 2)}
           </pre>
         ) : null}
@@ -715,7 +747,12 @@ export default function PizzaForm(props: { pizzaId?: string }) {
 
             <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
               <input ref={fileRef} type="file" accept="image/*" onChange={onPickPhoto} disabled={photoUploading} />
-              <button type="button" onClick={clearPhoto} disabled={photoUploading || (!form.photo_url && !photoPreview)} style={btn}>
+              <button
+                type="button"
+                onClick={clearPhoto}
+                disabled={photoUploading || (!form.photo_url && !photoPreview)}
+                style={btn}
+              >
                 Retirer
               </button>
               {photoUploading ? <span style={{ color: theme.muted, fontWeight: 900 }}>Upload…</span> : null}
