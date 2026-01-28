@@ -457,63 +457,72 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
   };
 
   const saveAsIngredient = async () => {
-    if (!form) return;
-    if (!recipeId) {
-      setSaveError({ message: "Sauvegarde d’abord la fiche avant enregistrement dans l’index." });
-      return;
-    }
-    if (savingIndex) return;
+  if (!form) return;
 
-    setSavingIndex(true);
-    setSaveError(null);
+  if (!recipeId) {
+    setSaveError({ message: "Sauvegarde d’abord la fiche avant enregistrement dans l’index." });
+    return;
+  }
+  if (savingIndex) return;
 
-    try {
-      if (computed.missing) throw new Error("Un ou plusieurs ingrédients n’ont pas de prix (cost_per_unit manquant).");
-      if (yieldGramsNum <= 0) throw new Error("Rendement (g) invalide.");
-      if (computed.totalCost <= 0) throw new Error("Coût total invalide.");
+  setSavingIndex(true);
+  setSaveError(null);
 
-      const totalCost = round2(computed.totalCost);
-      const totalWeight = round0(yieldGramsNum);
-      const name = (form.name.trim() || "Recette cuisine").slice(0, 120);
+  try {
+    if (computed.missing) throw new Error("Un ou plusieurs ingrédients n’ont pas de prix (cost_per_unit manquant).");
+    if (yieldGramsNum <= 0) throw new Error("Rendement (g) invalide.");
+    if (computed.totalCost <= 0) throw new Error("Coût total invalide.");
 
-      const ingredientPayload: any = {
-        name,
-        category: "autre",
-        is_active: true,
-        default_unit: "g",
-        purchase_price: totalCost,
-        purchase_unit: totalWeight,
-        purchase_unit_label: "g",
-        purchase_unit_name: "kg",
-        updated_at: new Date().toISOString(),
-      };
+    const totalCost = round2(computed.totalCost);
+    const totalWeight = round0(yieldGramsNum);
+    const name = (form.name.trim() || "Recette cuisine").slice(0, 120);
 
-      if (form.output_ingredient_id) {
-        const { error: eUpd } = await supabase.from("ingredients").update(ingredientPayload).eq("id", form.output_ingredient_id);
-        if (eUpd) throw eUpd;
-        return;
+    const cost_per_unit = totalWeight > 0 ? totalCost / totalWeight : 0;
+
+    const ingredientPayload: any = {
+      name,
+      category: "autre",
+      is_active: true,
+      cost_per_unit,
+      updated_at: new Date().toISOString(),
+    };
+
+    let targetIngredientId = form.output_ingredient_id ?? null;
+
+    if (targetIngredientId) {
+      const { error: eUpd } = await supabase.from("ingredients").update(ingredientPayload).eq("id", targetIngredientId);
+      if (eUpd) throw eUpd;
+    } else {
+      const { data: existing, error: eFind } = await supabase.from("ingredients").select("id").eq("name", name).maybeSingle();
+      if (eFind) throw eFind;
+
+      if (existing?.id) {
+        targetIngredientId = existing.id;
+        const { error: eUpd2 } = await supabase.from("ingredients").update(ingredientPayload).eq("id", targetIngredientId);
+        if (eUpd2) throw eUpd2;
+      } else {
+        const { data: ins, error: eIns } = await supabase.from("ingredients").insert(ingredientPayload).select("id").single();
+        if (eIns) throw eIns;
+
+        targetIngredientId = String((ins as any)?.id ?? "");
+        if (!targetIngredientId) throw new Error("ID ingrédient manquant après création");
       }
-
-      const { data: ins, error: eIns } = await supabase.from("ingredients").insert(ingredientPayload).select("id").single();
-      if (eIns) throw eIns;
-
-      const newId = String((ins as any)?.id ?? "");
-      if (!newId) throw new Error("ID ingrédient manquant après création");
 
       const { error: eBind } = await supabase
         .from("kitchen_recipes")
-        .update({ output_ingredient_id: newId, updated_at: new Date().toISOString() })
+        .update({ output_ingredient_id: targetIngredientId, updated_at: new Date().toISOString() })
         .eq("id", recipeId);
 
       if (eBind) throw eBind;
 
-      setForm((p) => (p ? { ...p, output_ingredient_id: newId } : p));
-    } catch (e: any) {
-      setSaveError({ message: "Index impossible", details: String(e?.message ?? e) });
-    } finally {
-      setSavingIndex(false);
+      setForm((p) => (p ? { ...p, output_ingredient_id: targetIngredientId } : p));
     }
-  };
+  } catch (e: any) {
+    setSaveError({ message: "Index impossible", details: String(e?.message ?? e) });
+  } finally {
+    setSavingIndex(false);
+  }
+};
 
   if (status === "loading") {
     return (
@@ -629,13 +638,31 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
               <div>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Rendement final (g)</div>
+                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Rendement final mesuré (g)</div>
                 <input
                   style={{ ...input, textAlign: "center", fontWeight: 950 }}
                   inputMode="decimal"
                   value={form.yield_grams}
                   onChange={(e) => setForm((p) => (p ? { ...p, yield_grams: e.target.value } : p))}
                 />
+
+                <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    style={{ ...btn, height: 38 }}
+                    onClick={() => {
+                      const v = Math.round(ingredientWeightGrams);
+                      setForm((p) => (p ? { ...p, yield_grams: v > 0 ? String(v) : p.yield_grams } : p));
+                    }}
+                    disabled={ingredientWeightGrams <= 0}
+                  >
+                    = Poids ingrédients
+                  </button>
+
+                  <div style={{ color: theme.muted, fontSize: 12, fontWeight: 800, alignSelf: "center" }}>
+                    Pèse en fin de recette pour un coût/kg juste.
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -695,7 +722,12 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
               <div>
                 <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Qté</div>
-                <input style={{ ...input, textAlign: "center", fontWeight: 950 }} inputMode="decimal" value={newQty} onChange={(e) => setNewQty(e.target.value)} />
+                <input
+                  style={{ ...input, textAlign: "center", fontWeight: 950 }}
+                  inputMode="decimal"
+                  value={newQty}
+                  onChange={(e) => setNewQty(e.target.value)}
+                />
               </div>
 
               <div>
