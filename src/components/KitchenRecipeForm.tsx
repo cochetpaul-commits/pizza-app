@@ -495,63 +495,71 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
   };
 
   const saveAsIngredient = async () => {
-    if (!form) return;
-    if (!recipeId) {
-      setSaveError({ message: "Sauvegarde d’abord la fiche avant enregistrement dans l’index." });
+  if (!form) return;
+  if (!recipeId) {
+    setSaveError({ message: "Sauvegarde d’abord la fiche avant enregistrement dans l’index." });
+    return;
+  }
+  if (savingIndex) return;
+
+  setSavingIndex(true);
+  setSaveError(null);
+
+  try {
+    if (computed.missing) throw new Error("Un ou plusieurs ingrédients n’ont pas de prix (cost_per_unit manquant).");
+    if (yieldGramsNum <= 0) throw new Error("Rendement (g) invalide.");
+    if (computed.totalCost <= 0) throw new Error("Coût total invalide.");
+
+    const totalCost = round2(computed.totalCost);
+    const totalWeight = round0(yieldGramsNum);
+    const name = (form.name.trim() || "Recette cuisine").slice(0, 120);
+
+    const ingredientPayload: any = {
+      name,
+      category: "autre",
+      is_active: true,
+      default_unit: "g",
+      purchase_price: totalCost,
+      purchase_unit: totalWeight,
+      purchase_unit_label: "g",
+      purchase_unit_name: "kg",
+      updated_at: new Date().toISOString(),
+    };
+
+    // 1) Si déjà lié : MAJ directe par id
+    if (form.output_ingredient_id) {
+      const { error: eUpd } = await supabase.from("ingredients").update(ingredientPayload).eq("id", form.output_ingredient_id);
+      if (eUpd) throw eUpd;
       return;
     }
-    if (savingIndex) return;
 
-    setSavingIndex(true);
-    setSaveError(null);
+    // 2) Sinon : UPSERT par name (évite le duplicate key)
+    const { data: up, error: eUp } = await supabase
+      .from("ingredients")
+      .upsert(ingredientPayload, { onConflict: "name" })
+      .select("id")
+      .single();
 
-    try {
-      if (computed.missing) throw new Error("Un ou plusieurs ingrédients n’ont pas de prix (cost_per_unit manquant).");
-      if (yieldGramsNum <= 0) throw new Error("Rendement (g) invalide.");
-      if (computed.totalCost <= 0) throw new Error("Coût total invalide.");
+    if (eUp) throw eUp;
 
-      const totalCost = round2(computed.totalCost);
-      const totalWeight = round0(yieldGramsNum);
-      const name = (form.name.trim() || "Recette cuisine").slice(0, 120);
+    const newId = String((up as any)?.id ?? "");
+    if (!newId) throw new Error("ID ingrédient manquant après upsert");
 
-      const ingredientPayload: any = {
-        name,
-        category: "autre",
-        is_active: true,
-        default_unit: "g",
-        purchase_price: totalCost,
-        purchase_unit: totalWeight,
-        purchase_unit_label: "g",
-        purchase_unit_name: "kg",
-        updated_at: new Date().toISOString(),
-      };
+    // 3) On lie la recette à l'ingrédient trouvé/créé
+    const { error: eBind } = await supabase
+      .from("kitchen_recipes")
+      .update({ output_ingredient_id: newId, updated_at: new Date().toISOString() })
+      .eq("id", recipeId);
 
-      if (form.output_ingredient_id) {
-        const { error: eUpd } = await supabase.from("ingredients").update(ingredientPayload).eq("id", form.output_ingredient_id);
-        if (eUpd) throw eUpd;
-        return;
-      }
+    if (eBind) throw eBind;
 
-      const { data: ins, error: eIns } = await supabase.from("ingredients").insert(ingredientPayload).select("id").single();
-      if (eIns) throw eIns;
-
-      const newId = String((ins as any)?.id ?? "");
-      if (!newId) throw new Error("ID ingrédient manquant après création");
-
-      const { error: eBind } = await supabase
-        .from("kitchen_recipes")
-        .update({ output_ingredient_id: newId, updated_at: new Date().toISOString() })
-        .eq("id", recipeId);
-
-      if (eBind) throw eBind;
-
-      setForm((p) => (p ? { ...p, output_ingredient_id: newId } : p));
-    } catch (e: any) {
-      setSaveError({ message: "Index impossible", details: String(e?.message ?? e) });
-    } finally {
-      setSavingIndex(false);
-    }
-  };
+    setForm((p) => (p ? { ...p, output_ingredient_id: newId } : p));
+  } catch (e: any) {
+    setSaveError({ message: "Index impossible", details: String(e?.message ?? e) });
+  } finally {
+    setSavingIndex(false);
+  }
+};
 
   if (status === "loading") {
     return (
