@@ -477,13 +477,15 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     const totalWeight = round0(yieldGramsNum);
     const name = (form.name.trim() || "Recette cuisine").slice(0, 120);
 
-    const cost_per_unit = totalWeight > 0 ? totalCost / totalWeight : 0;
-
     const ingredientPayload: any = {
       name,
       category: "autre",
       is_active: true,
-      cost_per_unit,
+      default_unit: "g",
+      purchase_price: totalCost,
+      purchase_unit: totalWeight,
+      purchase_unit_label: "g",
+      purchase_unit_name: "kg",
       updated_at: new Date().toISOString(),
     };
 
@@ -492,31 +494,32 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     if (targetIngredientId) {
       const { error: eUpd } = await supabase.from("ingredients").update(ingredientPayload).eq("id", targetIngredientId);
       if (eUpd) throw eUpd;
-    } else {
-      const { data: existing, error: eFind } = await supabase.from("ingredients").select("id").eq("name", name).maybeSingle();
-      if (eFind) throw eFind;
-
-      if (existing?.id) {
-        targetIngredientId = existing.id;
-        const { error: eUpd2 } = await supabase.from("ingredients").update(ingredientPayload).eq("id", targetIngredientId);
-        if (eUpd2) throw eUpd2;
-      } else {
-        const { data: ins, error: eIns } = await supabase.from("ingredients").insert(ingredientPayload).select("id").single();
-        if (eIns) throw eIns;
-
-        targetIngredientId = String((ins as any)?.id ?? "");
-        if (!targetIngredientId) throw new Error("ID ingrédient manquant après création");
-      }
-
-      const { error: eBind } = await supabase
-        .from("kitchen_recipes")
-        .update({ output_ingredient_id: targetIngredientId, updated_at: new Date().toISOString() })
-        .eq("id", recipeId);
-
-      if (eBind) throw eBind;
-
-      setForm((p) => (p ? { ...p, output_ingredient_id: targetIngredientId } : p));
+      return;
     }
+
+    const { data: existing, error: eFind } = await supabase.from("ingredients").select("id").eq("name", name).maybeSingle();
+    if (eFind) throw eFind;
+
+    if (existing?.id) {
+      targetIngredientId = existing.id;
+      const { error: eUpd2 } = await supabase.from("ingredients").update(ingredientPayload).eq("id", targetIngredientId);
+      if (eUpd2) throw eUpd2;
+    } else {
+      const { data: ins, error: eIns } = await supabase.from("ingredients").insert(ingredientPayload).select("id").single();
+      if (eIns) throw eIns;
+
+      targetIngredientId = String((ins as any)?.id ?? "");
+      if (!targetIngredientId) throw new Error("ID ingrédient manquant après création");
+    }
+
+    const { error: eBind } = await supabase
+      .from("kitchen_recipes")
+      .update({ output_ingredient_id: targetIngredientId, updated_at: new Date().toISOString() })
+      .eq("id", recipeId);
+
+    if (eBind) throw eBind;
+
+    setForm((p) => (p ? { ...p, output_ingredient_id: targetIngredientId } : p));
   } catch (e: any) {
     setSaveError({ message: "Index impossible", details: String(e?.message ?? e) });
   } finally {
