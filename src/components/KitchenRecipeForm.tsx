@@ -418,8 +418,12 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     setTimeout(() => setSaveOk(false), 900);
 
     if (!recipeId) {
-      router.replace(`/kitchen/${id}`);
-    }
+  router.replace(`/kitchen/${id}`);
+  router.refresh();
+  setTimeout(() => {
+    if (window.location.pathname.includes("/kitchen/new")) window.location.assign(`/kitchen/${id}`);
+  }, 50);
+}
   };
 
   const saveAsIngredient = async () => {
