@@ -8,25 +8,24 @@ import type { Ingredient } from "@/lib/types";
 
 type KitchenRecipeRowDB = {
   id: string;
+  user_id: string;
   name: string | null;
   yield_grams: number | null;
   portions_count: number | null;
   notes: string | null;
   procedure: string | null;
   output_ingredient_id: string | null;
-  is_draft?: boolean | null;
+  is_active: boolean | null;
+  is_draft: boolean | null;
 };
 
-type LineDB = {
-  id: string;
-  recipe_id: string;
+type LineUI = {
+  id: string; // DB id ou "tmp-..."
+  recipe_id: string; // vide si pas encore créé
   ingredient_id: string;
-  qty: number | null;
-  unit: string | null;
-  sort_order: number | null;
-};
-
-type LineUI = LineDB & {
+  qty: number;
+  unit: "g" | "ml" | "pc";
+  sort_order: number;
   ingredient_name?: string;
   ingredient_cost_per_unit?: number | null;
 };
@@ -52,17 +51,8 @@ function fmtKg(v: number) {
   return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + " €/kg";
 }
 
-function getObj(v: unknown): Record<string, unknown> | null {
-  return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
-}
-
-function getString(v: unknown, fallback = "") {
-  return typeof v === "string" ? v : fallback;
-}
-
-function getNumber(v: unknown, fallback = 0) {
-  const n = typeof v === "number" ? v : Number(v);
-  return Number.isFinite(n) ? n : fallback;
+function tmpId() {
+  return `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 export default function KitchenRecipeForm(props: { recipeId?: string }) {
@@ -72,6 +62,8 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
   const [status, setStatus] = useState<"loading" | "NOT_LOGGED" | "ERROR" | "OK">("loading");
   const [error, setError] = useState<unknown>(null);
+
+  const [uid, setUid] = useState<string | null>(null);
 
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [lines, setLines] = useState<LineUI[]>([]);
@@ -175,6 +167,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
   const load = async () => {
     setStatus("loading");
     setError(null);
+    setSaveError(null);
 
     const { data: auth, error: authErr } = await supabase.auth.getUser();
     if (authErr) {
@@ -186,6 +179,8 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       setStatus("NOT_LOGGED");
       return;
     }
+
+    setUid(auth.user.id);
 
     const { data: ing, error: ingErr } = await supabase
       .from("ingredients")
@@ -200,6 +195,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
     const ingList = (ing ?? []) as Ingredient[];
     setIngredients(ingList);
+    setNewIngredientId(ingList[0]?.id ?? "");
 
     if (!isEdit) {
       setForm({
@@ -211,7 +207,6 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
         output_ingredient_id: null,
       });
       setLines([]);
-      setNewIngredientId(ingList[0]?.id ?? "");
       setStatus("OK");
       return;
     }
@@ -224,7 +219,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
     const { data: r, error: rErr } = await supabase
       .from("kitchen_recipes")
-      .select("id,name,yield_grams,portions_count,notes,procedure,output_ingredient_id,is_draft")
+      .select("id,user_id,name,yield_grams,portions_count,notes,procedure,output_ingredient_id,is_active,is_draft")
       .eq("id", recipeId)
       .maybeSingle();
 
@@ -252,7 +247,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
     const { data: ln, error: lErr } = await supabase
       .from("kitchen_recipe_lines")
-      .select("id,recipe_id,ingredient_id,qty,unit,sort_order,ingredients(name,cost_per_unit)")
+      .select("id,recipe_id,ingredient_id,qty,unit,sort_order")
       .eq("recipe_id", recipeId)
       .order("sort_order", { ascending: true });
 
@@ -262,33 +257,58 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       return;
     }
 
-    const mapped: LineUI[] = (ln ?? []).map((raw) => {
-      const row = getObj(raw) ?? {};
-      const ingObj = getObj(row["ingredients"]) ?? {};
-
+    const mapped: LineUI[] = (ln ?? []).map((raw: any) => {
+      const ingRow = ingList.find((x: any) => x.id === raw.ingredient_id);
       return {
-        id: getString(row["id"]),
-        recipe_id: getString(row["recipe_id"]),
-        ingredient_id: getString(row["ingredient_id"]),
-        qty: getNumber(row["qty"]),
-        unit: getString(row["unit"], "g"),
-        sort_order: getNumber(row["sort_order"], 0),
-        ingredient_name: getString(ingObj["name"]),
-        ingredient_cost_per_unit: typeof ingObj["cost_per_unit"] === "number" ? (ingObj["cost_per_unit"] as number) : null,
+        id: String(raw.id),
+        recipe_id: String(raw.recipe_id),
+        ingredient_id: String(raw.ingredient_id),
+        qty: n2(raw.qty),
+        unit: (String(raw.unit || "g") as any) === "ml" ? "ml" : (String(raw.unit || "g") as any) === "pc" ? "pc" : "g",
+        sort_order: n2(raw.sort_order),
+        ingredient_name: String((ingRow as any)?.name ?? ""),
+        ingredient_cost_per_unit: typeof (ingRow as any)?.cost_per_unit === "number" ? ((ingRow as any).cost_per_unit as number) : null,
       };
     });
 
     setLines(mapped);
-
-    const first = ingList[0]?.id ?? "";
-    setNewIngredientId(first);
-
     setStatus("OK");
   };
 
   useEffect(() => {
     void load();
   }, [recipeId, isEdit]);
+
+  const addLineLocal = () => {
+    if (!form) return;
+    if (!newIngredientId) return;
+
+    const qty = Number(String(newQty).replace(",", "."));
+    if (!Number.isFinite(qty) || qty <= 0) return;
+
+    const ingRow = ingredients.find((x: any) => x.id === newIngredientId);
+    const nextSort = (lines?.length ? Math.max(...lines.map((l) => n2(l.sort_order))) : -1) + 1;
+
+    const row: LineUI = {
+      id: tmpId(),
+      recipe_id: recipeId ?? "",
+      ingredient_id: newIngredientId,
+      qty,
+      unit: newUnit,
+      sort_order: nextSort,
+      ingredient_name: String((ingRow as any)?.name ?? ""),
+      ingredient_cost_per_unit: typeof (ingRow as any)?.cost_per_unit === "number" ? ((ingRow as any).cost_per_unit as number) : null,
+    };
+
+    setLines((p) => [...(p ?? []), row]);
+    setNewQty("");
+  };
+
+  const delLine = async (lineId: string) => {
+    const ok = window.confirm("Supprimer cette ligne ?");
+    if (!ok) return;
+    setLines((p) => (p ?? []).filter((x) => x.id !== lineId));
+  };
 
   const save = async () => {
     if (!form) return;
@@ -316,34 +336,79 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       return;
     }
 
+    const { data: auth, error: authErr } = await supabase.auth.getUser();
+    if (authErr) {
+      setSaveError(authErr);
+      return;
+    }
+    if (!auth.user) {
+      setSaveError({ message: "NOT_LOGGED" });
+      return;
+    }
+
     setSaving(true);
 
     let id = recipeId;
 
-    const payload = {
+    const recipePayload: any = {
       name: nm,
-      yield_grams: Math.round(yg),
-      portions_count: Math.round(pc),
+      yield_grams: round0(yg),
+      portions_count: round0(pc),
       notes: form.notes?.trim() || null,
       procedure: form.procedure?.trim() || null,
       output_ingredient_id: form.output_ingredient_id ?? null,
       updated_at: new Date().toISOString(),
+      is_active: true,
       is_draft: false,
     };
 
     if (!id) {
-      const { data, error: insErr } = await supabase.from("kitchen_recipes").insert(payload).select("id").single();
+      recipePayload.user_id = auth.user.id;
+      const { data, error: insErr } = await supabase.from("kitchen_recipes").insert(recipePayload).select("id").single();
       if (insErr) {
         setSaving(false);
         setSaveError(insErr);
         return;
       }
-      id = (data as { id: string }).id;
+      id = (data as any)?.id as string;
+      if (!id) {
+        setSaving(false);
+        setSaveError({ message: "ID manquant après création" });
+        return;
+      }
     } else {
-      const { error: updErr } = await supabase.from("kitchen_recipes").update(payload).eq("id", id);
+      const { error: updErr } = await supabase.from("kitchen_recipes").update(recipePayload).eq("id", id);
       if (updErr) {
         setSaving(false);
         setSaveError(updErr);
+        return;
+      }
+    }
+
+    const { error: delErr } = await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", id);
+    if (delErr) {
+      setSaving(false);
+      setSaveError(delErr);
+      return;
+    }
+
+    const cleaned = (lines ?? [])
+      .slice()
+      .filter((l) => l.ingredient_id && n2(l.qty) > 0)
+      .sort((a, b) => n2(a.sort_order) - n2(b.sort_order))
+      .map((l, idx) => ({
+        recipe_id: id,
+        ingredient_id: l.ingredient_id,
+        qty: n2(l.qty),
+        unit: l.unit,
+        sort_order: idx,
+      }));
+
+    if (cleaned.length) {
+      const { error: insLinesErr } = await supabase.from("kitchen_recipe_lines").insert(cleaned);
+      if (insLinesErr) {
+        setSaving(false);
+        setSaveError(insLinesErr);
         return;
       }
     }
@@ -355,73 +420,6 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     if (!recipeId) {
       router.replace(`/kitchen/${id}`);
     }
-  };
-
-  const addLine = async () => {
-    if (!form) return;
-    if (!newIngredientId) return;
-
-    const qty = Number(String(newQty).replace(",", "."));
-    if (!Number.isFinite(qty) || qty <= 0) return;
-
-    setAdding(true);
-
-    try {
-      const id = recipeId;
-      if (!id) {
-        setSaveError({ message: "Impossible d’ajouter une ligne avant création. Passe par /kitchen/new." });
-        return;
-      }
-
-      const nextSort = (lines?.length ? Math.max(...lines.map((l) => n2(l.sort_order))) : -1) + 1;
-
-      const { data, error: e } = await supabase
-        .from("kitchen_recipe_lines")
-        .insert({
-          recipe_id: id,
-          ingredient_id: newIngredientId,
-          qty,
-          unit: newUnit,
-          sort_order: nextSort,
-        })
-        .select("id,recipe_id,ingredient_id,qty,unit,sort_order,ingredients(name,cost_per_unit)")
-        .single();
-
-      if (e) throw e;
-
-      const row = getObj(data) ?? {};
-      const ingObj = getObj(row["ingredients"]) ?? {};
-
-      const added: LineUI = {
-        id: getString(row["id"]),
-        recipe_id: getString(row["recipe_id"]),
-        ingredient_id: getString(row["ingredient_id"]),
-        qty: getNumber(row["qty"]),
-        unit: getString(row["unit"], "g"),
-        sort_order: getNumber(row["sort_order"], nextSort),
-        ingredient_name: getString(ingObj["name"]),
-        ingredient_cost_per_unit: typeof ingObj["cost_per_unit"] === "number" ? (ingObj["cost_per_unit"] as number) : null,
-      };
-
-      setLines((p) => [...(p ?? []), added]);
-      setNewQty("");
-    } catch (err) {
-      setSaveError({ message: "Erreur ajout ligne", details: err });
-    } finally {
-      setAdding(false);
-    }
-  };
-
-  const delLine = async (lineId: string) => {
-    const ok = window.confirm("Supprimer cette ligne ?");
-    if (!ok) return;
-
-    const { error: e } = await supabase.from("kitchen_recipe_lines").delete().eq("id", lineId);
-    if (e) {
-      setSaveError(e);
-      return;
-    }
-    setLines((p) => (p ?? []).filter((x) => x.id !== lineId));
   };
 
   const saveAsIngredient = async () => {
@@ -445,7 +443,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
       const name = (form.name.trim() || "Recette cuisine").slice(0, 120);
 
-      const ingredientPayload = {
+      const ingredientPayload: any = {
         name,
         category: "autre",
         is_active: true,
@@ -466,7 +464,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       const { data: ins, error: eIns } = await supabase.from("ingredients").insert(ingredientPayload).select("id").single();
       if (eIns) throw eIns;
 
-      const newId = getString(getObj(ins)?.["id"]);
+      const newId = String((ins as any)?.id ?? "");
       if (!newId) throw new Error("ID ingrédient manquant après création");
 
       const { error: eBind } = await supabase
@@ -573,7 +571,11 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
         <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 14 }}>
           <div style={card}>
             <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Nom</div>
-            <input style={{ ...input, fontSize: 20, fontWeight: 950 }} value={form.name} onChange={(e) => setForm((p) => (p ? { ...p, name: e.target.value } : p))} />
+            <input
+              style={{ ...input, fontSize: 20, fontWeight: 950 }}
+              value={form.name}
+              onChange={(e) => setForm((p) => (p ? { ...p, name: e.target.value } : p))}
+            />
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
               <div>
@@ -619,9 +621,9 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
               <div>
                 <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Ingrédient</div>
                 <select style={input} value={newIngredientId} onChange={(e) => setNewIngredientId(e.target.value)}>
-                  {ingredients.map((i) => (
-                    <option key={(i as any).id} value={(i as any).id}>
-                      {(i as any).name}
+                  {ingredients.map((i: any) => (
+                    <option key={i.id} value={i.id}>
+                      {i.name}
                     </option>
                   ))}
                 </select>
@@ -641,7 +643,20 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
                 </select>
               </div>
 
-              <button type="button" onClick={addLine} disabled={adding || saving} style={btnPrimary}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (adding || saving) return;
+                  setAdding(true);
+                  try {
+                    addLineLocal();
+                  } finally {
+                    setAdding(false);
+                  }
+                }}
+                disabled={adding || saving}
+                style={btnPrimary}
+              >
                 {adding ? "Ajout…" : "Ajouter"}
               </button>
             </div>
