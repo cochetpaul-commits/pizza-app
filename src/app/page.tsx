@@ -122,10 +122,29 @@ export default function Home() {
 
             <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap", justifyContent: "center" }}>
               <Link className="btn btnPrimary btnWide" href="/prep/new">
-                Nouvelle recette pivot
+                Créer recette pivot
               </Link>
               <Link className="btn btnWide" href="/prep">
                 Recettes pivot
+              </Link>
+            </div>
+          </div>
+
+          {/* CUISINE */}
+          <div className="card" style={{ paddingTop: 18 }}>
+            <p className="cardTitle" style={{ textAlign: "center", marginBottom: 6, letterSpacing: 1 }}>
+              CUISINE
+            </p>
+            <p className="muted" style={{ marginTop: 0, textAlign: "center" }}>
+              Fiches techniques cuisine
+            </p>
+
+            <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap", justifyContent: "center" }}>
+              <Link className="btn btnPrimary btnWide" href="/kitchen/new">
+                Créer fiche cuisine
+              </Link>
+              <Link className="btn btnWide" href="/kitchen">
+                Fiches cuisine
               </Link>
             </div>
           </div>
