@@ -17,8 +17,6 @@ type KitchenRecipeRowDB = {
   output_ingredient_id: string | null;
   is_active: boolean | null;
   is_draft: boolean | null;
-  vat_sale_rate: number | null;
-  target_margin: number | null;
 };
 
 type Unit = "g" | "ml" | "pc";
@@ -47,10 +45,6 @@ function round0(v: number) {
   return Math.round(v);
 }
 
-function clamp(v: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, v));
-}
-
 function fmtMoney(v: number) {
   return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
@@ -59,29 +53,24 @@ function fmtKg(v: number) {
   return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + " €/kg";
 }
 
+function fmtPct(v: number) {
+  return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
+}
+
 function tmpId() {
   return `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function toPercentString(rate: unknown, fallbackPercent: number) {
-  const r = n2(rate);
-  if (r > 0 && r <= 1) return String(round2(r * 100));
-  return String(fallbackPercent);
-}
-
-function parsePercentInput(s: string, min: number, max: number) {
+function parsePositiveNumber(s: string) {
   const t = String(s ?? "").trim();
   if (!t) return null;
   const n = Number(t.replace(",", "."));
-  if (!Number.isFinite(n)) return null;
-  return clamp(n, min, max);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-function unitFrom(v: unknown): Unit {
-  const s = String(v ?? "").toLowerCase();
-  if (s === "ml") return "ml";
-  if (s === "pc") return "pc";
-  return "g";
+function displayQtyInputValue(qty: number) {
+  const n = n2(qty);
+  return n > 0 ? String(n) : "";
 }
 
 export default function KitchenRecipeForm(props: { recipeId?: string }) {
@@ -102,8 +91,6 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     notes: string;
     procedure: string;
     output_ingredient_id: string | null;
-    vat_sale_percent: string;
-    target_margin_percent: string;
   } | null>(null);
 
   const [saving, setSaving] = useState(false);
@@ -115,7 +102,6 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
   const [newIngredientId, setNewIngredientId] = useState<string>("");
   const [newQty, setNewQty] = useState<string>("");
   const [newUnit, setNewUnit] = useState<Unit>("g");
-  const [adding, setAdding] = useState(false);
 
   const theme = {
     bg: "#f3eadc",
@@ -124,7 +110,10 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     muted: "#6f6a61",
     border: "#d9c7b6",
     primary: "#c97a5a",
+    primaryHover: "#b86a4c",
     primaryText: "#fff",
+    warnBg: "#fff6e8",
+    warnBorder: "#f2d4a7",
   };
 
   const yieldGramsNum = useMemo(() => {
@@ -137,15 +126,17 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     return Number.isFinite(n) && n > 0 ? n : 0;
   }, [form?.portions_count]);
 
-  const vatRate = useMemo(() => {
-    const p = parsePercentInput(form?.vat_sale_percent ?? "", 0, 100);
-    return p == null ? 0 : p / 100;
-  }, [form?.vat_sale_percent]);
+  const ingredientWeightGrams = useMemo(() => {
+    return (lines ?? []).reduce((acc, l) => {
+      if (l.unit !== "g") return acc;
+      return acc + n2(l.qty);
+    }, 0);
+  }, [lines]);
 
-  const marginRate = useMemo(() => {
-    const p = parsePercentInput(form?.target_margin_percent ?? "", 0, 99);
-    return p == null ? 0 : p / 100;
-  }, [form?.target_margin_percent]);
+  const lossPercent = useMemo(() => {
+    if (ingredientWeightGrams <= 0 || yieldGramsNum <= 0) return 0;
+    return (1 - yieldGramsNum / ingredientWeightGrams) * 100;
+  }, [ingredientWeightGrams, yieldGramsNum]);
 
   const computed = useMemo(() => {
     const rows = (lines ?? [])
@@ -163,20 +154,8 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     const costPerKg = yieldGramsNum > 0 ? totalCost / (yieldGramsNum / 1000) : 0;
     const costPerPortion = portionsNum > 0 ? totalCost / portionsNum : 0;
 
-    const safeMargin = clamp(marginRate, 0, 0.99);
-    const priceHT = safeMargin < 0.999 ? totalCost / (1 - safeMargin) : 0;
-    const priceTTC = priceHT * (1 + clamp(vatRate, 0, 1));
-
-    return {
-      rows,
-      missing,
-      totalCost: round2(totalCost),
-      costPerKg,
-      costPerPortion,
-      priceHT: round2(priceHT),
-      priceTTC: round2(priceTTC),
-    };
-  }, [lines, yieldGramsNum, portionsNum, marginRate, vatRate]);
+    return { rows, missing, totalCost: round2(totalCost), costPerKg, costPerPortion };
+  }, [lines, yieldGramsNum, portionsNum]);
 
   const card = {
     background: theme.card,
@@ -253,8 +232,6 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
         notes: "",
         procedure: "",
         output_ingredient_id: null,
-        vat_sale_percent: "10",
-        target_margin_percent: "70",
       });
       setLines([]);
       setStatus("OK");
@@ -269,7 +246,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
     const { data: r, error: rErr } = await supabase
       .from("kitchen_recipes")
-      .select("id,user_id,name,yield_grams,portions_count,notes,procedure,output_ingredient_id,is_active,is_draft,vat_sale_rate,target_margin")
+      .select("id,user_id,name,yield_grams,portions_count,notes,procedure,output_ingredient_id,is_active,is_draft")
       .eq("id", recipeId)
       .maybeSingle();
 
@@ -293,8 +270,6 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       notes: String(rr.notes ?? ""),
       procedure: String(rr.procedure ?? ""),
       output_ingredient_id: rr.output_ingredient_id ?? null,
-      vat_sale_percent: toPercentString(rr.vat_sale_rate, 10),
-      target_margin_percent: toPercentString(rr.target_margin, 70),
     });
 
     const { data: ln, error: lErr } = await supabase
@@ -311,12 +286,15 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
     const mapped: LineUI[] = (ln ?? []).map((raw: any) => {
       const ingRow = ingList.find((x: any) => x.id === raw.ingredient_id);
+      const unitRaw = String(raw.unit || "g");
+      const unit: Unit = unitRaw === "ml" ? "ml" : unitRaw === "pc" ? "pc" : "g";
+
       return {
         id: String(raw.id),
         recipe_id: String(raw.recipe_id),
         ingredient_id: String(raw.ingredient_id),
         qty: n2(raw.qty),
-        unit: unitFrom(raw.unit),
+        unit,
         sort_order: n2(raw.sort_order),
         ingredient_name: String((ingRow as any)?.name ?? ""),
         ingredient_cost_per_unit: typeof (ingRow as any)?.cost_per_unit === "number" ? ((ingRow as any).cost_per_unit as number) : null,
@@ -339,8 +317,8 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     if (!form) return;
     if (!newIngredientId) return;
 
-    const qty = Number(String(newQty).replace(",", "."));
-    if (!Number.isFinite(qty) || qty <= 0) return;
+    const qty = parsePositiveNumber(newQty);
+    if (qty == null) return;
 
     const ingRow = ingredients.find((x: any) => x.id === newIngredientId);
     const nextSort = (lines?.length ? Math.max(...lines.map((l) => n2(l.sort_order))) : -1) + 1;
@@ -360,7 +338,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     setNewQty("");
   };
 
-  const delLine = async (lineId: string) => {
+  const delLine = (lineId: string) => {
     const ok = window.confirm("Supprimer cette ligne ?");
     if (!ok) return;
     setLines((p) => (p ?? []).filter((x) => x.id !== lineId));
@@ -392,18 +370,6 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       return;
     }
 
-    const vatP = parsePercentInput(form.vat_sale_percent, 0, 100);
-    if (vatP == null) {
-      setSaveError({ message: "TVA invalide" });
-      return;
-    }
-
-    const mP = parsePercentInput(form.target_margin_percent, 0, 99);
-    if (mP == null) {
-      setSaveError({ message: "Marge invalide" });
-      return;
-    }
-
     const { data: auth, error: authErr } = await supabase.auth.getUser();
     if (authErr) {
       setSaveError(authErr);
@@ -428,20 +394,16 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       updated_at: new Date().toISOString(),
       is_active: true,
       is_draft: false,
-      vat_sale_rate: round2(vatP / 100),
-      target_margin: round2(mP / 100),
     };
 
     if (!id) {
       recipePayload.user_id = auth.user.id;
-
       const { data, error: insErr } = await supabase.from("kitchen_recipes").insert(recipePayload).select("id").single();
       if (insErr) {
         setSaving(false);
         setSaveError(insErr);
         return;
       }
-
       id = (data as any)?.id as string;
       if (!id) {
         setSaving(false);
@@ -495,71 +457,63 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
   };
 
   const saveAsIngredient = async () => {
-  if (!form) return;
-  if (!recipeId) {
-    setSaveError({ message: "Sauvegarde d’abord la fiche avant enregistrement dans l’index." });
-    return;
-  }
-  if (savingIndex) return;
-
-  setSavingIndex(true);
-  setSaveError(null);
-
-  try {
-    if (computed.missing) throw new Error("Un ou plusieurs ingrédients n’ont pas de prix (cost_per_unit manquant).");
-    if (yieldGramsNum <= 0) throw new Error("Rendement (g) invalide.");
-    if (computed.totalCost <= 0) throw new Error("Coût total invalide.");
-
-    const totalCost = round2(computed.totalCost);
-    const totalWeight = round0(yieldGramsNum);
-    const name = (form.name.trim() || "Recette cuisine").slice(0, 120);
-
-    const ingredientPayload: any = {
-      name,
-      category: "autre",
-      is_active: true,
-      default_unit: "g",
-      purchase_price: totalCost,
-      purchase_unit: totalWeight,
-      purchase_unit_label: "g",
-      purchase_unit_name: "kg",
-      updated_at: new Date().toISOString(),
-    };
-
-    // 1) Si déjà lié : MAJ directe par id
-    if (form.output_ingredient_id) {
-      const { error: eUpd } = await supabase.from("ingredients").update(ingredientPayload).eq("id", form.output_ingredient_id);
-      if (eUpd) throw eUpd;
+    if (!form) return;
+    if (!recipeId) {
+      setSaveError({ message: "Sauvegarde d’abord la fiche avant enregistrement dans l’index." });
       return;
     }
+    if (savingIndex) return;
 
-    // 2) Sinon : UPSERT par name (évite le duplicate key)
-    const { data: up, error: eUp } = await supabase
-      .from("ingredients")
-      .upsert(ingredientPayload, { onConflict: "name" })
-      .select("id")
-      .single();
+    setSavingIndex(true);
+    setSaveError(null);
 
-    if (eUp) throw eUp;
+    try {
+      if (computed.missing) throw new Error("Un ou plusieurs ingrédients n’ont pas de prix (cost_per_unit manquant).");
+      if (yieldGramsNum <= 0) throw new Error("Rendement (g) invalide.");
+      if (computed.totalCost <= 0) throw new Error("Coût total invalide.");
 
-    const newId = String((up as any)?.id ?? "");
-    if (!newId) throw new Error("ID ingrédient manquant après upsert");
+      const totalCost = round2(computed.totalCost);
+      const totalWeight = round0(yieldGramsNum);
+      const name = (form.name.trim() || "Recette cuisine").slice(0, 120);
 
-    // 3) On lie la recette à l'ingrédient trouvé/créé
-    const { error: eBind } = await supabase
-      .from("kitchen_recipes")
-      .update({ output_ingredient_id: newId, updated_at: new Date().toISOString() })
-      .eq("id", recipeId);
+      const ingredientPayload: any = {
+        name,
+        category: "autre",
+        is_active: true,
+        default_unit: "g",
+        purchase_price: totalCost,
+        purchase_unit: totalWeight,
+        purchase_unit_label: "g",
+        purchase_unit_name: "kg",
+        updated_at: new Date().toISOString(),
+      };
 
-    if (eBind) throw eBind;
+      if (form.output_ingredient_id) {
+        const { error: eUpd } = await supabase.from("ingredients").update(ingredientPayload).eq("id", form.output_ingredient_id);
+        if (eUpd) throw eUpd;
+        return;
+      }
 
-    setForm((p) => (p ? { ...p, output_ingredient_id: newId } : p));
-  } catch (e: any) {
-    setSaveError({ message: "Index impossible", details: String(e?.message ?? e) });
-  } finally {
-    setSavingIndex(false);
-  }
-};
+      const { data: ins, error: eIns } = await supabase.from("ingredients").insert(ingredientPayload).select("id").single();
+      if (eIns) throw eIns;
+
+      const newId = String((ins as any)?.id ?? "");
+      if (!newId) throw new Error("ID ingrédient manquant après création");
+
+      const { error: eBind } = await supabase
+        .from("kitchen_recipes")
+        .update({ output_ingredient_id: newId, updated_at: new Date().toISOString() })
+        .eq("id", recipeId);
+
+      if (eBind) throw eBind;
+
+      setForm((p) => (p ? { ...p, output_ingredient_id: newId } : p));
+    } catch (e: any) {
+      setSaveError({ message: "Index impossible", details: String(e?.message ?? e) });
+    } finally {
+      setSavingIndex(false);
+    }
+  };
 
   if (status === "loading") {
     return (
@@ -610,6 +564,8 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     );
   }
 
+  const yieldTooHigh = ingredientWeightGrams > 0 && yieldGramsNum > ingredientWeightGrams;
+
   return (
     <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
       <div style={{ maxWidth: 980, margin: "0 auto" }}>
@@ -631,13 +587,28 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
         <div style={{ marginTop: 12 }}>
           <h1 style={{ margin: 0, fontSize: 34, letterSpacing: -0.4 }}>Fiche cuisine</h1>
-          <div style={{ color: theme.muted, marginTop: 4 }}>Ingrédients + rendement + portions + TVA + marge + notes + procédé</div>
+          <div style={{ color: theme.muted, marginTop: 4 }}>Ingrédients + rendement + portions + notes + procédé</div>
         </div>
 
         {saveError ? (
           <pre style={{ marginTop: 12, background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, overflow: "auto" }}>
             {JSON.stringify(saveError, null, 2)}
           </pre>
+        ) : null}
+
+        {yieldTooHigh ? (
+          <div
+            style={{
+              marginTop: 12,
+              background: theme.warnBg,
+              border: `1px solid ${theme.warnBorder}`,
+              borderRadius: 12,
+              padding: 12,
+              fontWeight: 800,
+            }}
+          >
+            Rendement ({round0(yieldGramsNum)} g) supérieur au poids ingrédients en g ({round0(ingredientWeightGrams)} g). Vérifie la saisie.
+          </div>
         ) : null}
 
         <div style={{ marginTop: 14, ...card }}>
@@ -650,11 +621,15 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
         <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 14 }}>
           <div style={card}>
             <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Nom</div>
-            <input style={{ ...input, fontSize: 20, fontWeight: 950 }} value={form.name} onChange={(e) => setForm((p) => (p ? { ...p, name: e.target.value } : p))} />
+            <input
+              style={{ ...input, fontSize: 20, fontWeight: 950 }}
+              value={form.name}
+              onChange={(e) => setForm((p) => (p ? { ...p, name: e.target.value } : p))}
+            />
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
               <div>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Rendement (g)</div>
+                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Rendement final (g)</div>
                 <input
                   style={{ ...input, textAlign: "center", fontWeight: 950 }}
                   inputMode="decimal"
@@ -675,41 +650,16 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
-              <div>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>TVA vente (%)</div>
-                <select
-                  style={input}
-                  value={form.vat_sale_percent}
-                  onChange={(e) => setForm((p) => (p ? { ...p, vat_sale_percent: e.target.value } : p))}
-                >
-                  <option value="5.5">5,5</option>
-                  <option value="10">10</option>
-                  <option value="20">20</option>
-                  <option value={form.vat_sale_percent || "10"}>Perso: {form.vat_sale_percent || "10"}</option>
-                </select>
-                <input
-                  style={{ ...input, marginTop: 8, textAlign: "center", fontWeight: 950 }}
-                  inputMode="decimal"
-                  value={form.vat_sale_percent}
-                  onChange={(e) => setForm((p) => (p ? { ...p, vat_sale_percent: e.target.value } : p))}
-                />
+              <div style={{ background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 14, padding: 12 }}>
+                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Poids ingrédients (g)</div>
+                <div style={{ fontSize: 26, fontWeight: 950, marginTop: 2 }}>{round0(ingredientWeightGrams).toLocaleString("fr-FR")} g</div>
+                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Somme des lignes en unité “g”</div>
               </div>
 
-              <div>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Marge (taux de marque %)</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {[60, 65, 70, 75].map((v) => (
-                    <button key={v} type="button" style={btn} onClick={() => setForm((p) => (p ? { ...p, target_margin_percent: String(v) } : p))}>
-                      {v}%
-                    </button>
-                  ))}
-                </div>
-                <input
-                  style={{ ...input, marginTop: 8, textAlign: "center", fontWeight: 950 }}
-                  inputMode="decimal"
-                  value={form.target_margin_percent}
-                  onChange={(e) => setForm((p) => (p ? { ...p, target_margin_percent: e.target.value } : p))}
-                />
+              <div style={{ background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 14, padding: 12 }}>
+                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Perte (%)</div>
+                <div style={{ fontSize: 26, fontWeight: 950, marginTop: 2 }}>{ingredientWeightGrams > 0 ? fmtPct(lossPercent) : "—"}</div>
+                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Basé sur rendement / poids ingrédients</div>
               </div>
             </div>
 
@@ -724,20 +674,6 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
                 <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Coût / kg</div>
                 <div style={{ fontSize: 28, fontWeight: 950, marginTop: 2 }}>{fmtKg(yieldGramsNum > 0 ? computed.costPerKg : 0)}</div>
                 <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Coût / portion: {fmtMoney(portionsNum > 0 ? computed.costPerPortion : 0)}</div>
-              </div>
-            </div>
-
-            <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div style={{ background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 14, padding: 12 }}>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Prix conseillé HT</div>
-                <div style={{ fontSize: 28, fontWeight: 950, marginTop: 2 }}>{fmtMoney(computed.priceHT)}</div>
-                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Marge: {form.target_margin_percent || "0"}%</div>
-              </div>
-
-              <div style={{ background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 14, padding: 12 }}>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Prix conseillé TTC</div>
-                <div style={{ fontSize: 28, fontWeight: 950, marginTop: 2 }}>{fmtMoney(computed.priceTTC)}</div>
-                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>TVA: {form.vat_sale_percent || "0"}%</div>
               </div>
             </div>
           </div>
@@ -764,28 +700,15 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
               <div>
                 <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Unité</div>
-                <select style={input} value={newUnit} onChange={(e) => setNewUnit(unitFrom(e.target.value))}>
+                <select style={input} value={newUnit} onChange={(e) => setNewUnit(e.target.value as Unit)}>
                   <option value="g">g</option>
                   <option value="ml">ml</option>
                   <option value="pc">pc</option>
                 </select>
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  if (adding || saving) return;
-                  setAdding(true);
-                  try {
-                    addLineLocal();
-                  } finally {
-                    setAdding(false);
-                  }
-                }}
-                disabled={adding || saving}
-                style={btnPrimary}
-              >
-                {adding ? "Ajout…" : "Ajouter"}
+              <button type="button" onClick={addLineLocal} disabled={saving} style={btnPrimary}>
+                Ajouter
               </button>
             </div>
           </div>
@@ -803,7 +726,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
                 key={r.id}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "2fr 140px 90px 140px auto",
+                  gridTemplateColumns: "2fr 110px 90px 110px auto",
                   gap: 10,
                   alignItems: "center",
                   padding: "12px 10px",
@@ -817,23 +740,17 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
                 <input
                   style={{ ...input, height: 40, textAlign: "center", fontWeight: 950 }}
                   inputMode="decimal"
-                  value={String(r.qty ?? "")}
+                  value={displayQtyInputValue(r.qty)}
                   onChange={(e) => {
-                    const t = String(e.target.value ?? "").trim();
-                    if (!t) {
-                      updateLine(r.id, { qty: 0 });
-                      return;
-                    }
-                    const n = Number(t.replace(",", "."));
-                    if (!Number.isFinite(n)) return;
-                    updateLine(r.id, { qty: n });
+                    const v = parsePositiveNumber(e.target.value);
+                    updateLine(r.id, { qty: v == null ? 0 : v });
                   }}
                 />
 
                 <select
-                  style={{ ...input, height: 40 }}
-                  value={r.unit}
-                  onChange={(e) => updateLine(r.id, { unit: unitFrom(e.target.value) })}
+                  style={{ ...input, height: 40, padding: "0 10px", fontWeight: 950 }}
+                  value={(r.unit ?? "g") as Unit}
+                  onChange={(e) => updateLine(r.id, { unit: e.target.value as Unit })}
                 >
                   <option value="g">g</option>
                   <option value="ml">ml</option>
