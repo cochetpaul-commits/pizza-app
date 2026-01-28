@@ -19,12 +19,14 @@ type KitchenRecipeRowDB = {
   is_draft: boolean | null;
 };
 
+type Unit = "g" | "ml" | "pc";
+
 type LineUI = {
   id: string; // DB id ou "tmp-..."
   recipe_id: string; // vide si pas encore créé
   ingredient_id: string;
-  qty: number;
-  unit: "g" | "ml" | "pc";
+  qty: number | null;
+  unit: Unit;
   sort_order: number;
   ingredient_name?: string;
   ingredient_cost_per_unit?: number | null;
@@ -55,6 +57,13 @@ function tmpId() {
   return `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function normalizeUnit(u: unknown): Unit {
+  const s = String(u ?? "").trim();
+  if (s === "ml") return "ml";
+  if (s === "pc") return "pc";
+  return "g";
+}
+
 export default function KitchenRecipeForm(props: { recipeId?: string }) {
   const router = useRouter();
   const isEdit = Boolean(props.recipeId);
@@ -62,8 +71,6 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
   const [status, setStatus] = useState<"loading" | "NOT_LOGGED" | "ERROR" | "OK">("loading");
   const [error, setError] = useState<unknown>(null);
-
-  const [uid, setUid] = useState<string | null>(null);
 
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [lines, setLines] = useState<LineUI[]>([]);
@@ -85,7 +92,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
   const [newIngredientId, setNewIngredientId] = useState<string>("");
   const [newQty, setNewQty] = useState<string>("");
-  const [newUnit, setNewUnit] = useState<"g" | "ml" | "pc">("g");
+  const [newUnit, setNewUnit] = useState<Unit>("g");
   const [adding, setAdding] = useState(false);
 
   const theme = {
@@ -164,6 +171,22 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     color: theme.primaryText,
   };
 
+  const updateLine = (id: string, patch: Partial<LineUI>) => {
+    setLines((prev) => (prev ?? []).map((l) => (l.id === id ? { ...l, ...patch } : l)));
+  };
+
+  const qtyToString = (v: unknown) => {
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) && n > 0 ? String(n) : "";
+  };
+
+  const parseQtyInput = (s: string) => {
+    const t = String(s ?? "").trim();
+    if (!t) return null;
+    const n = Number(t.replace(",", "."));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+
   const load = async () => {
     setStatus("loading");
     setError(null);
@@ -179,8 +202,6 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       setStatus("NOT_LOGGED");
       return;
     }
-
-    setUid(auth.user.id);
 
     const { data: ing, error: ingErr } = await supabase
       .from("ingredients")
@@ -263,8 +284,8 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
         id: String(raw.id),
         recipe_id: String(raw.recipe_id),
         ingredient_id: String(raw.ingredient_id),
-        qty: n2(raw.qty),
-        unit: (String(raw.unit || "g") as any) === "ml" ? "ml" : (String(raw.unit || "g") as any) === "pc" ? "pc" : "g",
+        qty: typeof raw.qty === "number" && Number.isFinite(raw.qty) ? raw.qty : null,
+        unit: normalizeUnit(raw.unit),
         sort_order: n2(raw.sort_order),
         ingredient_name: String((ingRow as any)?.name ?? ""),
         ingredient_cost_per_unit: typeof (ingRow as any)?.cost_per_unit === "number" ? ((ingRow as any).cost_per_unit as number) : null,
@@ -346,6 +367,12 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       return;
     }
 
+    const bad = (lines ?? []).some((l) => l.ingredient_id && (l.qty == null || n2(l.qty) <= 0));
+    if (bad) {
+      setSaveError({ message: "Une ou plusieurs quantités sont invalides (vide ou <= 0)." });
+      return;
+    }
+
     setSaving(true);
 
     let id = recipeId;
@@ -400,7 +427,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
         recipe_id: id,
         ingredient_id: l.ingredient_id,
         qty: n2(l.qty),
-        unit: l.unit,
+        unit: normalizeUnit(l.unit),
         sort_order: idx,
       }));
 
@@ -418,12 +445,8 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     setTimeout(() => setSaveOk(false), 900);
 
     if (!recipeId) {
-  router.replace(`/kitchen/${id}`);
-  router.refresh();
-  setTimeout(() => {
-    if (window.location.pathname.includes("/kitchen/new")) window.location.assign(`/kitchen/${id}`);
-  }, 50);
-}
+      router.replace(`/kitchen/${id}`);
+    }
   };
 
   const saveAsIngredient = async () => {
@@ -575,11 +598,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
         <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 14 }}>
           <div style={card}>
             <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Nom</div>
-            <input
-              style={{ ...input, fontSize: 20, fontWeight: 950 }}
-              value={form.name}
-              onChange={(e) => setForm((p) => (p ? { ...p, name: e.target.value } : p))}
-            />
+            <input style={{ ...input, fontSize: 20, fontWeight: 950 }} value={form.name} onChange={(e) => setForm((p) => (p ? { ...p, name: e.target.value } : p))} />
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
               <div>
@@ -640,7 +659,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
               <div>
                 <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Unité</div>
-                <select style={input} value={newUnit} onChange={(e) => setNewUnit(e.target.value as any)}>
+                <select style={input} value={newUnit} onChange={(e) => setNewUnit(normalizeUnit(e.target.value))}>
                   <option value="g">g</option>
                   <option value="ml">ml</option>
                   <option value="pc">pc</option>
@@ -690,8 +709,22 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
               >
                 <div style={{ fontWeight: 950 }}>{r.ingredient_name ?? "—"}</div>
 
-                <div style={{ textAlign: "right", fontWeight: 950 }}>
-                  {round0(r.qty)} <span style={{ color: theme.muted, fontWeight: 900 }}>{r.unit}</span>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
+                  <input
+                    style={{ ...input, width: 110, textAlign: "center", fontWeight: 950 }}
+                    inputMode="decimal"
+                    value={qtyToString(r.qty)}
+                    onChange={(e) => updateLine(r.id, { qty: parseQtyInput(e.target.value) })}
+                  />
+                  <select
+                    style={{ ...input, width: 90, textAlign: "center", fontWeight: 950 }}
+                    value={normalizeUnit(r.unit)}
+                    onChange={(e) => updateLine(r.id, { unit: normalizeUnit(e.target.value) })}
+                  >
+                    <option value="g">g</option>
+                    <option value="ml">ml</option>
+                    <option value="pc">pc</option>
+                  </select>
                 </div>
 
                 <div style={{ textAlign: "right", fontWeight: 950 }}>{fmtMoney(n2(r.cost))}</div>
