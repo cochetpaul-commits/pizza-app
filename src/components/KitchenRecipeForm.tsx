@@ -767,14 +767,14 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
               <div>
                 <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>TVA vente (%)</div>
                 <select
-                  style={{ ...input, fontWeight: 950 }}
-                  value={String(vatRateNum)}
-                  onChange={(e) => setForm((p) => (p ? { ...p, vat_rate: e.target.value } : p))}
-                >
-                  <option value="0.055">5,5%</option>
-                  <option value="0.10">10%</option>
-                  <option value="0.20">20%</option>
-                </select>
+  style={{ ...input, fontWeight: 950 }}
+  value={form.vat_rate || "0.10"}
+  onChange={(e) => setForm((p) => (p ? { ...p, vat_rate: e.target.value } : p))}
+>
+  <option value="0.055">5,5%</option>
+  <option value="0.10">10%</option>
+  <option value="0.20">20%</option>
+</select>
               </div>
 
               <div>
