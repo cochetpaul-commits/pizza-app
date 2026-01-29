@@ -10,15 +10,16 @@ type KitchenRecipeRowDB = {
   id: string;
   user_id: string;
   name: string | null;
+  category: string | null;
   yield_grams: number | null;
   portions_count: number | null;
+  vat_rate: number | null; // ex: 10 pour 10%
+  margin_rate: number | null; // ex: 60 pour 60% (taux de marque)
   notes: string | null;
   procedure: string | null;
   output_ingredient_id: string | null;
   is_active: boolean | null;
   is_draft: boolean | null;
-  vat_rate: number | null;
-  margin_rate: number | null;
 };
 
 type Unit = "g" | "ml" | "pc";
@@ -31,61 +32,51 @@ type LineUI = {
   unit: Unit;
   sort_order: number;
   ingredient_name?: string;
-  ingredient_cost_per_unit?: number | null;
+  ingredient_cost_per_unit?: number | null; // €/g ou €/ml ou €/pc
 };
 
 function n2(v: unknown) {
   const x = typeof v === "number" ? v : Number(v);
   return Number.isFinite(x) ? x : 0;
 }
-
-function round2(v: number) {
-  return Math.round(v * 100) / 100;
-}
-
 function round0(v: number) {
   return Math.round(v);
 }
-
-function fmtMoney(v: number) {
+function round2(v: number) {
+  return Math.round(v * 100) / 100;
+}
+function round3(v: number) {
+  return Math.round(v * 1000) / 1000;
+}
+function fmtMoney2(v: number) {
   return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
-
-function fmtKg(v: number) {
+function fmtKg3(v: number) {
   return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + " €/kg";
 }
-
 function fmtPct1(v: number) {
   return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
 }
-
 function tmpId() {
   return `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
-
 function parsePositiveNumber(s: string) {
   const t = String(s ?? "").trim();
   if (!t) return null;
   const n = Number(t.replace(",", "."));
   return Number.isFinite(n) && n > 0 ? n : null;
 }
-
 function displayQtyInputValue(qty: number) {
   const n = n2(qty);
   return n > 0 ? String(n) : "";
 }
 
-function clamp(v: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, v));
-}
-
-function safeRateFromString(s: string, fallback: number) {
-  const t = String(s ?? "").trim();
-  if (!t) return fallback;
-  const n = Number(t.replace(",", "."));
-  if (!Number.isFinite(n)) return fallback;
-  return n;
-}
+const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "preparation", label: "Préparation" },
+  { value: "plat_cuisine", label: "Plat cuisiné" },
+  { value: "dessert", label: "Dessert" },
+  { value: "autre", label: "Autre" },
+];
 
 export default function KitchenRecipeForm(props: { recipeId?: string }) {
   const router = useRouter();
@@ -100,13 +91,14 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
   const [form, setForm] = useState<{
     name: string;
+    category: string;
     yield_grams: string;
     portions_count: string;
+    vat_rate: string;
+    margin_rate: string;
     notes: string;
     procedure: string;
     output_ingredient_id: string | null;
-    vat_rate: string;
-    margin_rate: string;
   } | null>(null);
 
   const [saving, setSaving] = useState(false);
@@ -135,36 +127,44 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     background: theme.card,
     border: `1px solid ${theme.border}`,
     borderRadius: 16,
-    padding: 16,
+    padding: 14,
   } as const;
 
   const input = {
     width: "100%",
-    height: 44,
-    borderRadius: 12,
+    height: 40,
+    borderRadius: 10,
     border: `1px solid ${theme.border}`,
-    padding: "0 12px",
-    fontSize: 16,
+    padding: "0 10px",
+    fontSize: 15,
     background: "#fff",
     color: theme.text,
   } as const;
 
   const btn = {
-    height: 44,
-    padding: "0 14px",
-    borderRadius: 12,
+    height: 40,
+    padding: "0 12px",
+    borderRadius: 10,
     border: `1px solid ${theme.border}`,
     background: "#fff",
     color: theme.text,
     fontWeight: 900 as const,
     cursor: "pointer",
-  } as const;
+  };
 
   const btnPrimary = {
     ...btn,
     background: theme.primary,
     border: `1px solid ${theme.primary}`,
     color: theme.primaryText,
+  };
+
+  const metricBox = {
+    background: "#fff",
+    border: `1px solid ${theme.border}`,
+    borderRadius: 12,
+    padding: 10,
+    minHeight: 78,
   } as const;
 
   const yieldGramsNum = useMemo(() => {
@@ -177,16 +177,14 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     return Number.isFinite(n) && n > 0 ? n : 0;
   }, [form?.portions_count]);
 
-  const vatRateNum = useMemo(() => {
-    const fallback = 0.1;
-    const v = safeRateFromString(form?.vat_rate ?? "", fallback);
-    return clamp(v, 0, 0.3);
+  const vatPct = useMemo(() => {
+    const n = Number(String(form?.vat_rate ?? "").replace(",", "."));
+    return Number.isFinite(n) && n >= 0 ? n : 0;
   }, [form?.vat_rate]);
 
-  const marginRateNum = useMemo(() => {
-    const fallback = 0.6;
-    const v = safeRateFromString(form?.margin_rate ?? "", fallback);
-    return clamp(v, 0, 0.95);
+  const marginPct = useMemo(() => {
+    const n = Number(String(form?.margin_rate ?? "").replace(",", "."));
+    return Number.isFinite(n) && n >= 0 ? n : 0;
   }, [form?.margin_rate]);
 
   const ingredientWeightGrams = useMemo(() => {
@@ -196,10 +194,13 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     }, 0);
   }, [lines]);
 
+  const yieldTooHigh = ingredientWeightGrams > 0 && yieldGramsNum > ingredientWeightGrams;
+
   const lossPercent = useMemo(() => {
-    if (ingredientWeightGrams <= 0 || yieldGramsNum <= 0) return 0;
+    if (ingredientWeightGrams <= 0 || yieldGramsNum <= 0) return null;
+    if (yieldTooHigh) return null;
     return (1 - yieldGramsNum / ingredientWeightGrams) * 100;
-  }, [ingredientWeightGrams, yieldGramsNum]);
+  }, [ingredientWeightGrams, yieldGramsNum, yieldTooHigh]);
 
   const computed = useMemo(() => {
     const rows = (lines ?? [])
@@ -228,23 +229,24 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
   }, [lines, yieldGramsNum, portionsNum]);
 
   const pricing = useMemo(() => {
-    const m = marginRateNum;
-    const v = vatRateNum;
+    const m = Math.min(Math.max(marginPct, 0), 99.9) / 100;
+    const v = Math.min(Math.max(vatPct, 0), 100) / 100;
 
-    const denom = 1 - m;
-    const htKg = denom > 0 ? computed.costPerKg / denom : 0;
-    const ttcKg = htKg * (1 + v);
+    const pvPortionHT = computed.costPerPortion > 0 && m < 1 ? computed.costPerPortion / (1 - m) : 0;
+    const pvPortionTTC = pvPortionHT > 0 ? pvPortionHT * (1 + v) : 0;
 
-    const htPortion = denom > 0 ? computed.costPerPortion / denom : 0;
-    const ttcPortion = htPortion * (1 + v);
+    const pvKgHT = computed.costPerKg > 0 && m < 1 ? computed.costPerKg / (1 - m) : 0;
+    const pvKgTTC = pvKgHT > 0 ? pvKgHT * (1 + v) : 0;
 
     return {
-      htKg: round2(htKg),
-      ttcKg: round2(ttcKg),
-      htPortion: round2(htPortion),
-      ttcPortion: round2(ttcPortion),
+      portionHT: pvPortionHT,
+      portionTTC: pvPortionTTC,
+      kgHT: pvKgHT,
+      kgTTC: pvKgTTC,
+      vatPct,
+      marginPct,
     };
-  }, [computed.costPerKg, computed.costPerPortion, marginRateNum, vatRateNum]);
+  }, [computed.costPerPortion, computed.costPerKg, vatPct, marginPct]);
 
   const load = async () => {
     setStatus("loading");
@@ -280,13 +282,14 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     if (!isEdit) {
       setForm({
         name: "",
+        category: "plat_cuisine",
         yield_grams: "1000",
         portions_count: "1",
+        vat_rate: "10",
+        margin_rate: "60",
         notes: "",
         procedure: "",
         output_ingredient_id: null,
-        vat_rate: "0.10",
-        margin_rate: "0.60",
       });
       setLines([]);
       setStatus("OK");
@@ -301,7 +304,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
     const { data: r, error: rErr } = await supabase
       .from("kitchen_recipes")
-      .select("id,user_id,name,yield_grams,portions_count,notes,procedure,output_ingredient_id,is_active,is_draft,vat_rate,margin_rate")
+      .select("id,user_id,name,category,yield_grams,portions_count,vat_rate,margin_rate,notes,procedure,output_ingredient_id,is_active,is_draft")
       .eq("id", recipeId)
       .maybeSingle();
 
@@ -320,13 +323,14 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
     setForm({
       name: String(rr.name ?? ""),
+      category: String(rr.category ?? "plat_cuisine"),
       yield_grams: String(rr.yield_grams ?? 1000),
       portions_count: String(rr.portions_count ?? 1),
+      vat_rate: String(rr.vat_rate ?? 10),
+      margin_rate: String(rr.margin_rate ?? 60),
       notes: String(rr.notes ?? ""),
       procedure: String(rr.procedure ?? ""),
       output_ingredient_id: rr.output_ingredient_id ?? null,
-      vat_rate: String(typeof rr.vat_rate === "number" ? rr.vat_rate : 0.1),
-      margin_rate: String(typeof rr.margin_rate === "number" ? rr.margin_rate : 0.6),
     });
 
     const { data: ln, error: lErr } = await supabase
@@ -414,28 +418,12 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       return;
     }
 
-    const yg = yieldGramsNum;
-    const pc = portionsNum;
-
-    if (yg <= 0) {
+    if (yieldGramsNum <= 0) {
       setSaveError({ message: "Rendement (g) invalide" });
       return;
     }
-
-    if (pc <= 0) {
+    if (portionsNum <= 0) {
       setSaveError({ message: "Nombre de portions invalide" });
-      return;
-    }
-
-    const mr = marginRateNum;
-    if (!(mr >= 0 && mr < 0.95)) {
-      setSaveError({ message: "Marge (taux de marque) invalide" });
-      return;
-    }
-
-    const vr = vatRateNum;
-    if (!(vr >= 0 && vr <= 0.3)) {
-      setSaveError({ message: "TVA invalide" });
       return;
     }
 
@@ -455,13 +443,14 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
     const recipePayload: any = {
       name: nm,
-      yield_grams: round0(yg),
-      portions_count: round0(pc),
+      category: form.category || "plat_cuisine",
+      yield_grams: round0(yieldGramsNum),
+      portions_count: round0(portionsNum),
+      vat_rate: round2(vatPct),
+      margin_rate: round2(marginPct),
       notes: form.notes?.trim() || null,
       procedure: form.procedure?.trim() || null,
       output_ingredient_id: form.output_ingredient_id ?? null,
-      vat_rate: vr,
-      margin_rate: mr,
       updated_at: new Date().toISOString(),
       is_active: true,
       is_draft: false,
@@ -559,44 +548,45 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
         updated_at: new Date().toISOString(),
       };
 
+      const bindToRecipe = async (ingredientId: string) => {
+        const { error: eBind } = await supabase
+          .from("kitchen_recipes")
+          .update({ output_ingredient_id: ingredientId, updated_at: new Date().toISOString() })
+          .eq("id", recipeId);
+        if (eBind) throw eBind;
+        setForm((p) => (p ? { ...p, output_ingredient_id: ingredientId } : p));
+      };
+
       if (form.output_ingredient_id) {
         const { error: eUpd } = await supabase.from("ingredients").update(ingredientPayload).eq("id", form.output_ingredient_id);
         if (eUpd) throw eUpd;
         return;
       }
 
-      const { data: existing } = await supabase.from("ingredients").select("id").eq("name", name).maybeSingle();
-      const existingId = String((existing as any)?.id ?? "");
-
-      if (existingId) {
-        const { error: eUpd2 } = await supabase.from("ingredients").update(ingredientPayload).eq("id", existingId);
-        if (eUpd2) throw eUpd2;
-
-        const { error: eBind2 } = await supabase
-          .from("kitchen_recipes")
-          .update({ output_ingredient_id: existingId, updated_at: new Date().toISOString() })
-          .eq("id", recipeId);
-
-        if (eBind2) throw eBind2;
-
-        setForm((p) => (p ? { ...p, output_ingredient_id: existingId } : p));
-        return;
-      }
-
       const { data: ins, error: eIns } = await supabase.from("ingredients").insert(ingredientPayload).select("id").single();
-      if (eIns) throw eIns;
+
+      if (eIns) {
+        const pgCode = (eIns as any)?.code;
+        const msg = String((eIns as any)?.message ?? "");
+        if (pgCode === "23505" || msg.includes("duplicate key")) {
+          const { data: existing, error: eFind } = await supabase.from("ingredients").select("id").eq("name", name).maybeSingle();
+          if (eFind) throw eFind;
+          const existingId = String((existing as any)?.id ?? "");
+          if (!existingId) throw eIns;
+
+          const { error: eUpd2 } = await supabase.from("ingredients").update(ingredientPayload).eq("id", existingId);
+          if (eUpd2) throw eUpd2;
+
+          await bindToRecipe(existingId);
+          return;
+        }
+        throw eIns;
+      }
 
       const newId = String((ins as any)?.id ?? "");
       if (!newId) throw new Error("ID ingrédient manquant après création");
 
-      const { error: eBind } = await supabase
-        .from("kitchen_recipes")
-        .update({ output_ingredient_id: newId, updated_at: new Date().toISOString() })
-        .eq("id", recipeId);
-
-      if (eBind) throw eBind;
-
-      setForm((p) => (p ? { ...p, output_ingredient_id: newId } : p));
+      await bindToRecipe(newId);
     } catch (e: any) {
       setSaveError({ message: "Index impossible", details: String(e?.message ?? e) });
     } finally {
@@ -653,15 +643,6 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     );
   }
 
-  const yieldTooHigh = ingredientWeightGrams > 0 && yieldGramsNum > ingredientWeightGrams;
-
-  const setMarginPreset = (pct: number) => {
-    const r = clamp(pct / 100, 0, 0.95);
-    setForm((p) => (p ? { ...p, margin_rate: String(r) } : p));
-  };
-
-  const marginPct = round2(marginRateNum * 100);
-
   return (
     <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
       <div style={{ maxWidth: 980, margin: "0 auto" }}>
@@ -681,9 +662,9 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
           </div>
         </div>
 
-        <div style={{ marginTop: 12 }}>
-          <h1 style={{ margin: 0, fontSize: 34, letterSpacing: -0.4 }}>Fiche cuisine</h1>
-          <div style={{ color: theme.muted, marginTop: 4 }}>Ingrédients + rendement + portions + TVA + marge + prix conseillé</div>
+        <div style={{ marginTop: 10 }}>
+          <h1 style={{ margin: 0, fontSize: 30, letterSpacing: -0.4 }}>Fiche cuisine</h1>
+          <div style={{ color: theme.muted, marginTop: 4 }}>Ingrédients + rendement + portions + TVA + marge + prix</div>
         </div>
 
         {saveError ? (
@@ -707,209 +688,181 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
           </div>
         ) : null}
 
-        <div style={{ marginTop: 14, ...card }}>
-          <div style={{ fontWeight: 950, fontSize: 22, textAlign: "center" }}>{form.name.trim() ? form.name.trim() : "Recette"}</div>
+        <div style={{ marginTop: 12, ...card }}>
+          <div style={{ fontWeight: 950, fontSize: 20, textAlign: "center" }}>{form.name.trim() ? form.name.trim() : "Recette"}</div>
           <div style={{ color: theme.muted, textAlign: "center", marginTop: 6, fontSize: 13 }}>
-            Rendement: {yieldGramsNum || 0} g · Portions: {portionsNum || 0} · TVA: {fmtPct1(vatRateNum * 100)} · Marge: {fmtPct1(marginRateNum * 100)}
+            Rendement: {yieldGramsNum || 0} g · Portions: {portionsNum || 0}
           </div>
         </div>
 
-        <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 14 }}>
-          <div style={card}>
-            <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Nom</div>
-            <input
-              style={{ ...input, fontSize: 20, fontWeight: 950 }}
-              value={form.name}
-              onChange={(e) => setForm((p) => (p ? { ...p, name: e.target.value } : p))}
-            />
+        <div style={{ marginTop: 12, ...card }}>
+          <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Nom recette</div>
+          <input
+            style={{ ...input, height: 42, fontSize: 18, fontWeight: 950 }}
+            placeholder="Ex: Lasagne bolognaise"
+            value={form.name}
+            onChange={(e) => setForm((p) => (p ? { ...p, name: e.target.value } : p))}
+          />
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
-              <div>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Rendement final mesuré (g)</div>
-                <input
-                  style={{ ...input, textAlign: "center", fontWeight: 950 }}
-                  inputMode="decimal"
-                  value={form.yield_grams}
-                  onChange={(e) => setForm((p) => (p ? { ...p, yield_grams: e.target.value } : p))}
-                />
+          <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <div>
+              <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Catégorie</div>
+              <select style={input} value={form.category} onChange={(e) => setForm((p) => (p ? { ...p, category: e.target.value } : p))}>
+                {CATEGORY_OPTIONS.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    style={{ ...btn, height: 38 }}
-                    onClick={() => {
-                      const v = Math.round(ingredientWeightGrams);
-                      setForm((p) => (p ? { ...p, yield_grams: v > 0 ? String(v) : p.yield_grams } : p));
-                    }}
-                    disabled={ingredientWeightGrams <= 0}
-                  >
-                    = Poids ingrédients
-                  </button>
+            <div>
+              <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Rendement final mesuré (g)</div>
+              <input
+                style={{ ...input, textAlign: "center", fontWeight: 950 }}
+                inputMode="decimal"
+                value={form.yield_grams}
+                onChange={(e) => setForm((p) => (p ? { ...p, yield_grams: e.target.value } : p))}
+              />
+            </div>
 
-                  <div style={{ color: theme.muted, fontSize: 12, fontWeight: 800, alignSelf: "center" }}>
-                    Pèse en fin de recette pour un coût/kg juste.
-                  </div>
-                </div>
+            <div>
+              <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Portions</div>
+              <input
+                style={{ ...input, textAlign: "center", fontWeight: 950 }}
+                inputMode="numeric"
+                value={form.portions_count}
+                onChange={(e) => setForm((p) => (p ? { ...p, portions_count: e.target.value } : p))}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              style={{ ...btn, height: 34 }}
+              onClick={() => {
+                const v = Math.round(ingredientWeightGrams);
+                setForm((p) => (p ? { ...p, yield_grams: v > 0 ? String(v) : p.yield_grams } : p));
+              }}
+              disabled={ingredientWeightGrams <= 0}
+            >
+              = Poids ingrédients
+            </button>
+            <div style={{ color: theme.muted, fontSize: 12, fontWeight: 800 }}>Pèse en fin de recette pour un coût/kg juste.</div>
+          </div>
+
+          <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
+            <div style={metricBox}>
+              <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Poids ingrédients (g)</div>
+              <div style={{ fontSize: 22, fontWeight: 950, marginTop: 2 }}>{round0(ingredientWeightGrams).toLocaleString("fr-FR")} g</div>
+              <div style={{ color: theme.muted, fontSize: 12, marginTop: 2 }}>Somme des lignes en “g”</div>
+            </div>
+
+            <div style={metricBox}>
+              <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Perte (%)</div>
+              <div style={{ fontSize: 22, fontWeight: 950, marginTop: 2 }}>
+                {lossPercent == null ? "—" : fmtPct1(lossPercent)}
               </div>
+              <div style={{ color: theme.muted, fontSize: 12, marginTop: 2 }}>Rendement / ingrédients</div>
+            </div>
 
-              <div>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Portions</div>
-                <input
-                  style={{ ...input, textAlign: "center", fontWeight: 950 }}
-                  inputMode="numeric"
-                  value={form.portions_count}
-                  onChange={(e) => setForm((p) => (p ? { ...p, portions_count: e.target.value } : p))}
-                />
+            <div style={metricBox}>
+              <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Coût total</div>
+              <div style={{ fontSize: 22, fontWeight: 950, marginTop: 2 }}>{fmtMoney2(computed.totalCost)}</div>
+              {computed.missing ? <div style={{ color: theme.muted, fontSize: 12, marginTop: 2 }}>Prix manquant</div> : <div style={{ height: 16 }} />}
+            </div>
+
+            <div style={metricBox}>
+              <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Coût / kg</div>
+              <div style={{ fontSize: 22, fontWeight: 950, marginTop: 2 }}>{fmtKg3(yieldGramsNum > 0 ? computed.costPerKg : 0)}</div>
+              <div style={{ color: theme.muted, fontSize: 12, marginTop: 2 }}>Coût/portion: {fmtMoney2(portionsNum > 0 ? computed.costPerPortion : 0)}</div>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
+            <div style={metricBox}>
+              <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 6 }}>TVA vente (%)</div>
+              <select
+                style={{ ...input, height: 40, fontWeight: 950 }}
+                value={form.vat_rate}
+                onChange={(e) => setForm((p) => (p ? { ...p, vat_rate: e.target.value } : p))}
+              >
+                <option value="5.5">5,5</option>
+                <option value="10">10</option>
+                <option value="20">20</option>
+              </select>
+            </div>
+
+            <div style={metricBox}>
+              <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 6 }}>Marge (taux de marque %)</div>
+              <input
+                style={{ ...input, height: 40, textAlign: "center", fontWeight: 950 }}
+                inputMode="decimal"
+                value={form.margin_rate}
+                onChange={(e) => setForm((p) => (p ? { ...p, margin_rate: e.target.value } : p))}
+              />
+              <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>PV HT = Coût / (1 - marge)</div>
+            </div>
+
+            <div style={metricBox}>
+              <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Prix conseillé portion TTC</div>
+              <div style={{ fontSize: 22, fontWeight: 950, marginTop: 2 }}>{fmtMoney2(pricing.portionTTC)}</div>
+              <div style={{ color: theme.muted, fontSize: 12, marginTop: 2 }}>
+                TVA: {fmtPct1(pricing.vatPct)} · Marge: {fmtPct1(pricing.marginPct)}
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
-              <div>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>TVA vente (%)</div>
-                <select
-  style={{ ...input, fontWeight: 950 }}
-  value={form.vat_rate || "0.10"}
-  onChange={(e) => setForm((p) => (p ? { ...p, vat_rate: e.target.value } : p))}
->
-  <option value="0.055">5,5%</option>
-  <option value="0.10">10%</option>
-  <option value="0.20">20%</option>
-</select>
+            <div style={metricBox}>
+              <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Prix conseillé / kg TTC</div>
+              <div style={{ fontSize: 22, fontWeight: 950, marginTop: 2 }}>
+                {round3(pricing.kgTTC).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} €/kg
               </div>
-
-              <div>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Marge (taux de marque %)</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {[55, 60, 65, 70].map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      style={{
-                        ...btn,
-                        height: 38,
-                        padding: "0 10px",
-                        border: Math.abs(marginPct - p) < 0.2 ? `1px solid ${theme.primary}` : `1px solid ${theme.border}`,
-                        background: Math.abs(marginPct - p) < 0.2 ? theme.warnBg : "#fff",
-                      }}
-                      onClick={() => setMarginPreset(p)}
-                    >
-                      {p}%
-                    </button>
-                  ))}
-                </div>
-
-                <div style={{ marginTop: 8 }}>
-                  <input
-                    style={{ ...input, height: 38, textAlign: "center", fontWeight: 950 }}
-                    inputMode="decimal"
-                    value={String(marginPct).replace(".", ",")}
-                    onChange={(e) => {
-                      const t = e.target.value;
-                      const n = Number(String(t).replace(",", "."));
-                      if (!Number.isFinite(n)) return;
-                      const r = clamp(n / 100, 0, 0.95);
-                      setForm((p) => (p ? { ...p, margin_rate: String(r) } : p));
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
-              <div style={{ background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 14, padding: 12 }}>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Poids ingrédients (g)</div>
-                <div style={{ fontSize: 26, fontWeight: 950, marginTop: 2 }}>{round0(ingredientWeightGrams).toLocaleString("fr-FR")} g</div>
-                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Somme des lignes en unité “g”</div>
-              </div>
-
-              <div style={{ background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 14, padding: 12 }}>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Perte (%)</div>
-                <div style={{ fontSize: 26, fontWeight: 950, marginTop: 2 }}>{ingredientWeightGrams > 0 ? fmtPct1(lossPercent) : "—"}</div>
-                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Basé sur rendement / poids ingrédients</div>
-              </div>
-            </div>
-
-            <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div style={{ background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 14, padding: 12 }}>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Coût total</div>
-                <div style={{ fontSize: 28, fontWeight: 950, marginTop: 2 }}>{fmtMoney(computed.totalCost)}</div>
-                {computed.missing ? <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Prix manquant sur un ingrédient</div> : null}
-              </div>
-
-              <div style={{ background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 14, padding: 12 }}>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Coût / kg</div>
-                <div style={{ fontSize: 28, fontWeight: 950, marginTop: 2 }}>{fmtKg(yieldGramsNum > 0 ? computed.costPerKg : 0)}</div>
-                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Coût / portion: {fmtMoney(portionsNum > 0 ? computed.costPerPortion : 0)}</div>
-              </div>
-            </div>
-
-            <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div style={{ background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 14, padding: 12 }}>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Prix conseillé HT</div>
-                <div style={{ fontSize: 28, fontWeight: 950, marginTop: 2 }}>{fmtMoney(pricing.htKg)}</div>
-                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>
-                  /kg · Portion: {fmtMoney(pricing.htPortion)}
-                </div>
-              </div>
-
-              <div style={{ background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 14, padding: 12 }}>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Prix conseillé TTC</div>
-                <div style={{ fontSize: 28, fontWeight: 950, marginTop: 2 }}>{fmtMoney(pricing.ttcKg)}</div>
-                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>
-                  /kg · Portion: {fmtMoney(pricing.ttcPortion)} · TVA: {fmtPct1(vatRateNum * 100)}
-                </div>
+              <div style={{ color: theme.muted, fontSize: 12, marginTop: 2 }}>
+                TVA: {fmtPct1(pricing.vatPct)} · Marge: {fmtPct1(pricing.marginPct)}
               </div>
             </div>
           </div>
 
-          <div style={card}>
-            <div style={{ fontSize: 16, fontWeight: 950 }}>Ajouter une ligne</div>
-
-            <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: 10, alignItems: "end" }}>
-              <div>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Ingrédient</div>
-                <select style={input} value={newIngredientId} onChange={(e) => setNewIngredientId(e.target.value)}>
-                  {ingredients.map((i: any) => (
-                    <option key={i.id} value={i.id}>
-                      {i.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Qté</div>
-                <input
-                  style={{ ...input, textAlign: "center", fontWeight: 950 }}
-                  inputMode="decimal"
-                  value={newQty}
-                  onChange={(e) => setNewQty(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Unité</div>
-                <select style={input} value={newUnit} onChange={(e) => setNewUnit(e.target.value as Unit)}>
-                  <option value="g">g</option>
-                  <option value="ml">ml</option>
-                  <option value="pc">pc</option>
-                </select>
-              </div>
-
-              <button type="button" onClick={addLineLocal} disabled={saving} style={btnPrimary}>
-                Ajouter
-              </button>
+          <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: 10, alignItems: "end" }}>
+            <div>
+              <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Ingrédient</div>
+              <select style={input} value={newIngredientId} onChange={(e) => setNewIngredientId(e.target.value)}>
+                {ingredients.map((i: any) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name}
+                  </option>
+                ))}
+              </select>
             </div>
+
+            <div>
+              <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Qté</div>
+              <input style={{ ...input, textAlign: "center", fontWeight: 950 }} inputMode="decimal" value={newQty} onChange={(e) => setNewQty(e.target.value)} />
+            </div>
+
+            <div>
+              <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Unité</div>
+              <select style={input} value={newUnit} onChange={(e) => setNewUnit(e.target.value as Unit)}>
+                <option value="g">g</option>
+                <option value="ml">ml</option>
+                <option value="pc">pc</option>
+              </select>
+            </div>
+
+            <button type="button" onClick={addLineLocal} disabled={saving} style={btnPrimary}>
+              Ajouter
+            </button>
           </div>
         </div>
 
-        <div style={{ marginTop: 14, ...card }}>
+        <div style={{ marginTop: 12, ...card }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
             <div style={{ fontSize: 16, fontWeight: 950 }}>Composition</div>
             <div style={{ color: theme.muted, fontSize: 12, fontWeight: 900 }}>{computed.rows.length} ligne(s)</div>
           </div>
 
-          <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+          <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
             {computed.rows.map((r: any) => (
               <div
                 key={r.id}
@@ -918,7 +871,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
                   gridTemplateColumns: "2fr 110px 90px 110px auto",
                   gap: 10,
                   alignItems: "center",
-                  padding: "12px 10px",
+                  padding: "10px 10px",
                   border: `1px solid ${theme.border}`,
                   borderRadius: 12,
                   background: "#fff",
@@ -927,7 +880,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
                 <div style={{ fontWeight: 950 }}>{r.ingredient_name ?? "—"}</div>
 
                 <input
-                  style={{ ...input, height: 40, textAlign: "center", fontWeight: 950 }}
+                  style={{ ...input, height: 36, textAlign: "center", fontWeight: 950 }}
                   inputMode="decimal"
                   value={displayQtyInputValue(r.qty)}
                   onChange={(e) => {
@@ -937,7 +890,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
                 />
 
                 <select
-                  style={{ ...input, height: 40, padding: "0 10px", fontWeight: 950 }}
+                  style={{ ...input, height: 36, padding: "0 10px", fontWeight: 950 }}
                   value={(r.unit ?? "g") as Unit}
                   onChange={(e) => updateLine(r.id, { unit: e.target.value as Unit })}
                 >
@@ -946,7 +899,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
                   <option value="pc">pc</option>
                 </select>
 
-                <div style={{ textAlign: "right", fontWeight: 950 }}>{fmtMoney(n2(r.cost))}</div>
+                <div style={{ textAlign: "right", fontWeight: 950 }}>{fmtMoney2(n2(r.cost))}</div>
 
                 <button type="button" onClick={() => delLine(r.id)} style={btn}>
                   Supprimer
@@ -958,7 +911,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
           </div>
         </div>
 
-        <div style={{ marginTop: 14, ...card }}>
+        <div style={{ marginTop: 12, ...card }}>
           <div style={{ fontSize: 16, fontWeight: 950 }}>Notes</div>
           <textarea
             style={{ ...input, height: "auto", minHeight: 110, padding: 12, lineHeight: 1.4, marginTop: 10, resize: "vertical", fontWeight: 700 }}
@@ -967,7 +920,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
           />
         </div>
 
-        <div style={{ marginTop: 14, ...card }}>
+        <div style={{ marginTop: 12, ...card }}>
           <div style={{ fontSize: 16, fontWeight: 950 }}>Procédé</div>
           <textarea
             style={{ ...input, height: "auto", minHeight: 160, padding: 12, lineHeight: 1.4, marginTop: 10, resize: "vertical", fontWeight: 700 }}
