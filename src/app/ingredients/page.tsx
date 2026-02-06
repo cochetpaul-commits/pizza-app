@@ -13,11 +13,13 @@ const CATEGORIES = [
   "autre",
   "charcuterie",
   "fromage",
+  "cremerie",
   "poisson",
   "herbe",
   "legume",
   "epicerie",
   "boisson",
+  "surgele",
 ] as const;
 
 type Category = (typeof CATEGORIES)[number];
@@ -29,11 +31,13 @@ const CAT_COLORS: Record<Category, string> = {
   autre: "#111827",
   charcuterie: "#9A3412",
   fromage: "#92400E",
+  cremerie: "#A16207",
   poisson: "#075985",
   herbe: "#166534",
   legume: "#3F6212",
   epicerie: "#4C1D95",
   boisson: "#0F766E",
+  surgele: "#1D4ED8",
 };
 
 type Supplier = {
@@ -181,7 +185,8 @@ function fmtOfferPriceLine(o: LatestOffer): { main: string; sub: string } {
   const pk = o.price_kind;
 
   if (pk === "unit") {
-    if (o.unit === "kg" && o.unit_price != null) return { main: `${fmtMoney(o.unit_price)} € /kg`, sub: "offre fournisseur" };
+    if (o.unit === "kg" && o.unit_price != null)
+      return { main: `${fmtMoney(o.unit_price)} € /kg`, sub: "offre fournisseur" };
     if (o.unit === "l" && o.unit_price != null) {
       const d = o.density_kg_per_l != null ? ` • densité: ${fmtQty(o.density_kg_per_l)} kg/L` : "";
       return { main: `${fmtMoney(o.unit_price)} € /L`, sub: `offre fournisseur${d}` };
@@ -190,7 +195,10 @@ function fmtOfferPriceLine(o: LatestOffer): { main: string; sub: string } {
       const pw = n2(o.piece_weight_g);
       if (pw > 0) {
         const eurPerKg = (o.unit_price / pw) * 1000;
-        return { main: `${fmtMoney(o.unit_price)} €/pc`, sub: `≈ ${fmtMoney(eurPerKg)} €/kg • ${fmtQty(pw)} g/pc` };
+        return {
+          main: `${fmtMoney(o.unit_price)} €/pc`,
+          sub: `≈ ${fmtMoney(eurPerKg)} €/kg • ${fmtQty(pw)} g/pc`,
+        };
       }
       return { main: `${fmtMoney(o.unit_price)} €/pc`, sub: "poids pièce: —" };
     }
@@ -198,13 +206,24 @@ function fmtOfferPriceLine(o: LatestOffer): { main: string; sub: string } {
   }
 
   if (pk === "pack_simple") {
-    if (o.pack_price == null || o.pack_total_qty == null || o.pack_total_qty <= 0 || o.pack_unit == null) {
+    if (
+      o.pack_price == null ||
+      o.pack_total_qty == null ||
+      o.pack_total_qty <= 0 ||
+      o.pack_unit == null
+    ) {
       return { main: "—", sub: "offre incomplète" };
     }
     const per = o.pack_price / o.pack_total_qty;
     const unit = o.pack_unit === "kg" ? "kg" : "L";
-    const d = o.pack_unit === "l" && o.density_kg_per_l != null ? ` • densité: ${fmtQty(o.density_kg_per_l)} kg/L` : "";
-    return { main: `${fmtMoney(per)} € /${unit}`, sub: `pack: ${fmtMoney(o.pack_price)} € / ${fmtQty(o.pack_total_qty)} ${unit}${d}` };
+    const d =
+      o.pack_unit === "l" && o.density_kg_per_l != null
+        ? ` • densité: ${fmtQty(o.density_kg_per_l)} kg/L`
+        : "";
+    return {
+      main: `${fmtMoney(per)} € /${unit}`,
+      sub: `pack: ${fmtMoney(o.pack_price)} € / ${fmtQty(o.pack_total_qty)} ${unit}${d}`,
+    };
   }
 
   if (pk === "pack_composed") {
@@ -217,17 +236,28 @@ function fmtOfferPriceLine(o: LatestOffer): { main: string; sub: string } {
       if (pw <= 0) return { main: "—", sub: "poids pièce manquant" };
       const perPc = o.pack_price / o.pack_count;
       const eurPerKg = (perPc / pw) * 1000;
-      return { main: `${fmtMoney(perPc)} €/pc`, sub: `pack: ${fmtMoney(o.pack_price)} € / ${fmtQty(o.pack_count)} pcs • ≈ ${fmtMoney(eurPerKg)} €/kg` };
+      return {
+        main: `${fmtMoney(perPc)} €/pc`,
+        sub: `pack: ${fmtMoney(o.pack_price)} € / ${fmtQty(o.pack_count)} pcs • ≈ ${fmtMoney(
+          eurPerKg
+        )} €/kg`,
+      };
     }
 
-    if (o.pack_each_qty == null || o.pack_each_qty <= 0) return { main: "—", sub: "quantité par élément manquante" };
+    if (o.pack_each_qty == null || o.pack_each_qty <= 0)
+      return { main: "—", sub: "quantité par élément manquante" };
     const total = o.pack_count * o.pack_each_qty;
     const unit = o.pack_each_unit === "kg" ? "kg" : "L";
     const per = o.pack_price / total;
-    const d = o.pack_each_unit === "l" && o.density_kg_per_l != null ? ` • densité: ${fmtQty(o.density_kg_per_l)} kg/L` : "";
+    const d =
+      o.pack_each_unit === "l" && o.density_kg_per_l != null
+        ? ` • densité: ${fmtQty(o.density_kg_per_l)} kg/L`
+        : "";
     return {
       main: `${fmtMoney(per)} € /${unit}`,
-      sub: `pack: ${fmtMoney(o.pack_price)} € / ${fmtQty(o.pack_count)} × ${fmtQty(o.pack_each_qty)} ${unit} (= ${fmtQty(total)} ${unit})${d}`,
+      sub: `pack: ${fmtMoney(o.pack_price)} € / ${fmtQty(o.pack_count)} × ${fmtQty(
+        o.pack_each_qty
+      )} ${unit} (= ${fmtQty(total)} ${unit})${d}`,
     };
   }
 
@@ -314,6 +344,10 @@ export default function IngredientsPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("to_check");
 
+  const [filterCategory, setFilterCategory] = useState<"all" | Category>("all");
+  const [filterSupplier, setFilterSupplier] = useState<"all" | string>("all");
+  const [includeNoOffer, setIncludeNoOffer] = useState(true);
+
   const suppliersMap = useMemo(() => {
     const m = new Map<string, Supplier>();
     for (const s of suppliers) m.set(s.id, s);
@@ -342,12 +376,28 @@ export default function IngredientsPage() {
     let base = items;
 
     if (tab !== "all") {
-      base = items.filter((x) => ((x.status ?? "to_check") as IngredientStatus) === tab);
+      base = base.filter((x) => ((x.status ?? "to_check") as IngredientStatus) === tab);
+    }
+
+    if (filterCategory !== "all") {
+      base = base.filter((x) => x.category === filterCategory);
+    }
+
+    if (!includeNoOffer) {
+      base = base.filter((x) => offersByIngredientId.has(x.id));
+    }
+
+    if (filterSupplier !== "all") {
+      base = base.filter((x) => {
+        const off = offersByIngredientId.get(x.id);
+        const supplierForFilter = (off?.supplier_id ?? x.supplier_id ?? null) as string | null;
+        return supplierForFilter != null && supplierForFilter === filterSupplier;
+      });
     }
 
     if (!qq) return base;
     return base.filter((x) => (x.name ?? "").toLowerCase().includes(qq));
-  }, [items, q, tab]);
+  }, [items, q, tab, filterCategory, filterSupplier, includeNoOffer, offersByIngredientId]);
 
   async function load() {
     setLoading(true);
@@ -371,9 +421,7 @@ export default function IngredientsPage() {
     if (ingErr) alert(ingErr.message);
     else setItems((ingData ?? []) as Ingredient[]);
 
-    const { data: offData, error: offErr } = await supabase
-      .from("v_latest_offers")
-      .select("*");
+    const { data: offData, error: offErr } = await supabase.from("v_latest_offers").select("*");
 
     if (offErr) alert(offErr.message);
     else setOffers((offData ?? []) as LatestOffer[]);
@@ -701,7 +749,19 @@ export default function IngredientsPage() {
     if (!d) return "";
     const line = fmtOfferPriceLine(d);
     return `${line.main} • ${line.sub}`;
-  }, [priceKind, newUnit, newUnitPrice, newDensity, newPieceWeightG, packPrice, packTotalQty, packCount, packEachQty, packEachUnit, packPieceWeightG]);
+  }, [
+    priceKind,
+    newUnit,
+    newUnitPrice,
+    newDensity,
+    newPieceWeightG,
+    packPrice,
+    packTotalQty,
+    packCount,
+    packEachQty,
+    packEachUnit,
+    packPieceWeightG,
+  ]);
 
   function buildOfferFromCreate(ingredient_id: string, uid: string): any | null {
     const supplier_id = normalizeSupplierId(newSupplierId);
@@ -1056,7 +1116,18 @@ export default function IngredientsPage() {
           alert("Poids pièce obligatoire (g).");
           return null;
         }
-        return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "pc", unit_price: p, price: p, piece_weight_g: pw, density_kg_per_l: null, is_active: true };
+        return {
+          user_id: uid,
+          ingredient_id,
+          supplier_id,
+          price_kind: "unit",
+          unit: "pc",
+          unit_price: p,
+          price: p,
+          piece_weight_g: pw,
+          density_kg_per_l: null,
+          is_active: true,
+        };
       }
 
       if (edit.unit === "l") {
@@ -1065,10 +1136,32 @@ export default function IngredientsPage() {
           alert("Densité obligatoire (kg/L).");
           return null;
         }
-        return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "l", unit_price: p, price: p, density_kg_per_l: d, piece_weight_g: null, is_active: true };
+        return {
+          user_id: uid,
+          ingredient_id,
+          supplier_id,
+          price_kind: "unit",
+          unit: "l",
+          unit_price: p,
+          price: p,
+          density_kg_per_l: d,
+          piece_weight_g: null,
+          is_active: true,
+        };
       }
 
-      return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "kg", unit_price: p, price: p, density_kg_per_l: null, piece_weight_g: null, is_active: true };
+      return {
+        user_id: uid,
+        ingredient_id,
+        supplier_id,
+        price_kind: "unit",
+        unit: "kg",
+        unit_price: p,
+        price: p,
+        density_kg_per_l: null,
+        piece_weight_g: null,
+        is_active: true,
+      };
     }
 
     if (edit.priceKind === "pack_simple") {
@@ -1089,10 +1182,34 @@ export default function IngredientsPage() {
           alert("Densité obligatoire (kg/L).");
           return null;
         }
-        return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_simple", pack_price: pp, price: pp, pack_total_qty: qty, pack_unit: "l", density_kg_per_l: d, piece_weight_g: null, is_active: true };
+        return {
+          user_id: uid,
+          ingredient_id,
+          supplier_id,
+          price_kind: "pack_simple",
+          pack_price: pp,
+          price: pp,
+          pack_total_qty: qty,
+          pack_unit: "l",
+          density_kg_per_l: d,
+          piece_weight_g: null,
+          is_active: true,
+        };
       }
 
-      return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_simple", pack_price: pp, price: pp, pack_total_qty: qty, pack_unit: "kg", density_kg_per_l: null, piece_weight_g: null, is_active: true };
+      return {
+        user_id: uid,
+        ingredient_id,
+        supplier_id,
+        price_kind: "pack_simple",
+        pack_price: pp,
+        price: pp,
+        pack_total_qty: qty,
+        pack_unit: "kg",
+        density_kg_per_l: null,
+        piece_weight_g: null,
+        is_active: true,
+      };
     }
 
     if (edit.priceKind === "pack_composed") {
@@ -1113,7 +1230,19 @@ export default function IngredientsPage() {
           alert("Poids pièce obligatoire (g).");
           return null;
         }
-        return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_unit: "pc", piece_weight_g: pw, density_kg_per_l: null, is_active: true };
+        return {
+          user_id: uid,
+          ingredient_id,
+          supplier_id,
+          price_kind: "pack_composed",
+          pack_price: pp,
+          price: pp,
+          pack_count: c,
+          pack_each_unit: "pc",
+          piece_weight_g: pw,
+          density_kg_per_l: null,
+          is_active: true,
+        };
       }
 
       const each = parseNum(edit.packEachQty);
@@ -1128,10 +1257,36 @@ export default function IngredientsPage() {
           alert("Densité obligatoire (kg/L).");
           return null;
         }
-        return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_qty: each, pack_each_unit: "l", density_kg_per_l: d, piece_weight_g: null, is_active: true };
+        return {
+          user_id: uid,
+          ingredient_id,
+          supplier_id,
+          price_kind: "pack_composed",
+          pack_price: pp,
+          price: pp,
+          pack_count: c,
+          pack_each_qty: each,
+          pack_each_unit: "l",
+          density_kg_per_l: d,
+          piece_weight_g: null,
+          is_active: true,
+        };
       }
 
-      return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_qty: each, pack_each_unit: "kg", density_kg_per_l: null, piece_weight_g: null, is_active: true };
+      return {
+        user_id: uid,
+        ingredient_id,
+        supplier_id,
+        price_kind: "pack_composed",
+        pack_price: pp,
+        price: pp,
+        pack_count: c,
+        pack_each_qty: each,
+        pack_each_unit: "kg",
+        density_kg_per_l: null,
+        piece_weight_g: null,
+        is_active: true,
+      };
     }
 
     return null;
@@ -1151,12 +1306,13 @@ export default function IngredientsPage() {
       pack_total_qty: edit.priceKind === "pack_simple" ? parseNum(edit.packTotalQty) : null,
       pack_unit: edit.priceKind === "pack_simple" ? edit.packUnit : null,
       pack_count: edit.priceKind === "pack_composed" ? parseNum(edit.packCount) : null,
-      pack_each_qty: edit.priceKind === "pack_composed" && edit.packEachUnit !== "pc" ? parseNum(edit.packEachQty) : null,
+      pack_each_qty:
+        edit.priceKind === "pack_composed" && edit.packEachUnit !== "pc"
+          ? parseNum(edit.packEachQty)
+          : null,
       pack_each_unit: edit.priceKind === "pack_composed" ? edit.packEachUnit : null,
       density_kg_per_l:
-        edit.unit === "l" || edit.packUnit === "l" || edit.packEachUnit === "l"
-          ? parseNum(edit.density)
-          : null,
+        edit.unit === "l" || edit.packUnit === "l" || edit.packEachUnit === "l" ? parseNum(edit.density) : null,
       piece_weight_g:
         (edit.unit === "pc" ? parseNum(edit.pieceWeightG) : null) ??
         (edit.packEachUnit === "pc" ? parseNum(edit.packPieceWeightG) : null),
@@ -1271,25 +1427,92 @@ export default function IngredientsPage() {
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn" onClick={() => router.push("/")}>Accueil</button>
-          <button className="btn" onClick={load}>Rafraîchir</button>
+          <button className="btn" onClick={() => router.push("/")}>
+            Accueil
+          </button>
+          <button className="btn" onClick={load}>
+            Rafraîchir
+          </button>
         </div>
       </div>
 
       <div style={{ marginTop: 12 }}>
         <div role="tablist" aria-label="Filtre statut ingrédients" style={tabsWrap}>
-          <button role="tab" aria-selected={tab === "to_check"} style={tabBtn(tab === "to_check")} onClick={() => setTab("to_check")}>
+          <button
+            role="tab"
+            aria-selected={tab === "to_check"}
+            style={tabBtn(tab === "to_check")}
+            onClick={() => setTab("to_check")}
+          >
             À contrôler ({counts.to_check})
           </button>
-          <button role="tab" aria-selected={tab === "validated"} style={tabBtn(tab === "validated")} onClick={() => setTab("validated")}>
+          <button
+            role="tab"
+            aria-selected={tab === "validated"}
+            style={tabBtn(tab === "validated")}
+            onClick={() => setTab("validated")}
+          >
             Validés ({counts.validated})
           </button>
-          <button role="tab" aria-selected={tab === "unknown"} style={tabBtn(tab === "unknown")} onClick={() => setTab("unknown")}>
+          <button
+            role="tab"
+            aria-selected={tab === "unknown"}
+            style={tabBtn(tab === "unknown")}
+            onClick={() => setTab("unknown")}
+          >
             Incompris ({counts.unknown})
           </button>
           <button role="tab" aria-selected={tab === "all"} style={tabBtn(tab === "all")} onClick={() => setTab("all")}>
             Tous ({counts.all})
           </button>
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 16, marginTop: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "end" }}>
+          <div>
+            <div style={label}>Filtre catégorie</div>
+            <select style={select} value={filterCategory} onChange={(e) => setFilterCategory(e.target.value as any)}>
+              <option value="all">Tous</option>
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <div style={label}>Filtre fournisseur</div>
+            <select
+              style={select}
+              value={filterSupplier}
+              onChange={(e) => setFilterSupplier(e.target.value as any)}
+            >
+              <option value="all">Tous</option>
+              {suppliers
+                .filter((s) => s.is_active)
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10, height: 44 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={includeNoOffer}
+                onChange={(e) => setIncludeNoOffer(e.target.checked)}
+              />
+              <span style={{ fontWeight: 800 }}>Inclure sans offre</span>
+            </label>
+            <span className="muted" style={{ fontSize: 12 }}>
+              (sinon: uniquement ceux avec une offre)
+            </span>
+          </div>
         </div>
       </div>
 
@@ -1300,13 +1523,20 @@ export default function IngredientsPage() {
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
             <div>
               <div style={label}>Ingrédient</div>
-              <input style={input} placeholder="Ex: Huile d'olive" value={newName} onChange={(e) => setNewName(e.target.value)} />
+              <input
+                style={input}
+                placeholder="Ex: Huile d'olive"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+              />
             </div>
             <div>
               <div style={label}>Catégorie</div>
               <select style={select} value={newCategory} onChange={(e) => setNewCategory(e.target.value as Category)}>
                 {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
                 ))}
               </select>
             </div>
@@ -1317,9 +1547,13 @@ export default function IngredientsPage() {
               <div style={label}>Fournisseur</div>
               <select style={select} value={newSupplierId} onChange={(e) => setNewSupplierId(e.target.value)}>
                 <option value="">—</option>
-                {suppliers.filter((s) => s.is_active).map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
+                {suppliers
+                  .filter((s) => s.is_active)
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
               </select>
             </div>
 
@@ -1373,7 +1607,13 @@ export default function IngredientsPage() {
               {newUnit === "pc" && (
                 <div>
                   <div style={label}>Poids d'une pièce (g)</div>
-                  <input style={input} placeholder="Ex: 125" inputMode="decimal" value={newPieceWeightG} onChange={(e) => setNewPieceWeightG(e.target.value)} />
+                  <input
+                    style={input}
+                    placeholder="Ex: 125"
+                    inputMode="decimal"
+                    value={newPieceWeightG}
+                    onChange={(e) => setNewPieceWeightG(e.target.value)}
+                  />
                 </div>
               )}
             </>
@@ -1392,14 +1632,26 @@ export default function IngredientsPage() {
 
                 <div>
                   <div style={label}>Prix du pack (€)</div>
-                  <input style={input} placeholder="Ex: 53.99" inputMode="decimal" value={packPrice} onChange={(e) => setPackPrice(e.target.value)} />
+                  <input
+                    style={input}
+                    placeholder="Ex: 53.99"
+                    inputMode="decimal"
+                    value={packPrice}
+                    onChange={(e) => setPackPrice(e.target.value)}
+                  />
                 </div>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "end" }}>
                 <div>
                   <div style={label}>Quantité totale du pack ({newUnit === "kg" ? "kg" : "L"})</div>
-                  <input style={input} placeholder={newUnit === "kg" ? "Ex: 25" : "Ex: 12"} inputMode="decimal" value={packTotalQty} onChange={(e) => setPackTotalQty(e.target.value)} />
+                  <input
+                    style={input}
+                    placeholder={newUnit === "kg" ? "Ex: 25" : "Ex: 12"}
+                    inputMode="decimal"
+                    value={packTotalQty}
+                    onChange={(e) => setPackTotalQty(e.target.value)}
+                  />
                 </div>
                 <div className="muted" style={{ fontSize: 12 }}>
                   {previewCreatePack ? previewCreatePack : "—"}
@@ -1420,12 +1672,24 @@ export default function IngredientsPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "end" }}>
                 <div>
                   <div style={label}>Prix du pack (€)</div>
-                  <input style={input} placeholder="Ex: 18.56" inputMode="decimal" value={packPrice} onChange={(e) => setPackPrice(e.target.value)} />
+                  <input
+                    style={input}
+                    placeholder="Ex: 18.56"
+                    inputMode="decimal"
+                    value={packPrice}
+                    onChange={(e) => setPackPrice(e.target.value)}
+                  />
                 </div>
 
                 <div>
                   <div style={label}>Nombre d'unités</div>
-                  <input style={input} placeholder="Ex: 8" inputMode="decimal" value={packCount} onChange={(e) => setPackCount(e.target.value)} />
+                  <input
+                    style={input}
+                    placeholder="Ex: 8"
+                    inputMode="decimal"
+                    value={packCount}
+                    onChange={(e) => setPackCount(e.target.value)}
+                  />
                 </div>
               </div>
 
@@ -1442,12 +1706,24 @@ export default function IngredientsPage() {
                 {packEachUnit !== "pc" ? (
                   <div>
                     <div style={label}>Quantité par élément ({packEachUnit === "kg" ? "kg" : "L"})</div>
-                    <input style={input} placeholder={packEachUnit === "kg" ? "Ex: 1" : "Ex: 1.5"} inputMode="decimal" value={packEachQty} onChange={(e) => setPackEachQty(e.target.value)} />
+                    <input
+                      style={input}
+                      placeholder={packEachUnit === "kg" ? "Ex: 1" : "Ex: 1.5"}
+                      inputMode="decimal"
+                      value={packEachQty}
+                      onChange={(e) => setPackEachQty(e.target.value)}
+                    />
                   </div>
                 ) : (
                   <div>
                     <div style={label}>Poids d'une pièce (g)</div>
-                    <input style={input} placeholder="Ex: 125" inputMode="decimal" value={packPieceWeightG} onChange={(e) => setPackPieceWeightG(e.target.value)} />
+                    <input
+                      style={input}
+                      placeholder="Ex: 125"
+                      inputMode="decimal"
+                      value={packPieceWeightG}
+                      onChange={(e) => setPackPieceWeightG(e.target.value)}
+                    />
                   </div>
                 )}
               </div>
@@ -1467,7 +1743,12 @@ export default function IngredientsPage() {
         </form>
       </div>
 
-      <input style={{ ...input, marginTop: 12 }} placeholder="Rechercher..." value={q} onChange={(e) => setQ(e.target.value)} />
+      <input
+        style={{ ...input, marginTop: 12 }}
+        placeholder="Rechercher..."
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
 
       <div className="card" style={{ ...cardPad, marginTop: 12 }}>
         {loading ? <div className="muted">Chargement…</div> : null}
@@ -1485,7 +1766,10 @@ export default function IngredientsPage() {
             const st = (x.status ?? "to_check") as IngredientStatus;
 
             return (
-              <div key={x.id} style={{ border: "1px solid rgba(0,0,0,0.1)", borderRadius: 12, padding: 12 }}>
+              <div
+                key={x.id}
+                style={{ border: "1px solid rgba(0,0,0,0.1)", borderRadius: 12, padding: 12 }}
+              >
                 <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: 12 }}>
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -1570,33 +1854,63 @@ export default function IngredientsPage() {
 
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontWeight: 950, fontSize: 18 }}>{price.main}</div>
-                    <div className="muted" style={{ fontSize: 11 }}>{price.sub}</div>
+                    <div className="muted" style={{ fontSize: 11 }}>
+                      {price.sub}
+                    </div>
                   </div>
 
                   <div style={{ display: "flex", gap: 6 }}>
                     {!isEditing ? (
-                      <button className="btn btnPrimary" onClick={() => startEdit(x)}>Modifier</button>
+                      <button className="btn btnPrimary" onClick={() => startEdit(x)}>
+                        Modifier
+                      </button>
                     ) : (
-                      <button className="btn btnPrimary" onClick={saveEdit}>OK</button>
+                      <button className="btn btnPrimary" onClick={saveEdit}>
+                        OK
+                      </button>
                     )}
-                    <button className="btn btnDanger" onClick={() => del(x.id, x.name)}>X</button>
+                    <button className="btn btnDanger" onClick={() => del(x.id, x.name)}>
+                      X
+                    </button>
                   </div>
                 </div>
 
                 {isEditing && edit && (
-                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #eee", display: "grid", gap: 10 }}>
+                  <div
+                    style={{
+                      marginTop: 12,
+                      paddingTop: 12,
+                      borderTop: "1px solid #eee",
+                      display: "grid",
+                      gap: 10,
+                    }}
+                  >
                     <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10 }}>
                       <input style={input} value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
-                      <select style={select} value={edit.category} onChange={(e) => setEdit({ ...edit, category: e.target.value as Category })}>
+                      <select
+                        style={select}
+                        value={edit.category}
+                        onChange={(e) => setEdit({ ...edit, category: e.target.value as Category })}
+                      >
                         {CATEGORIES.map((c) => (
-                          <option key={c} value={c}>{c}</option>
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
                         ))}
                       </select>
-                      <select style={select} value={edit.supplierId} onChange={(e) => setEdit({ ...edit, supplierId: e.target.value })}>
+                      <select
+                        style={select}
+                        value={edit.supplierId}
+                        onChange={(e) => setEdit({ ...edit, supplierId: e.target.value })}
+                      >
                         <option value="">—</option>
-                        {suppliers.filter((s) => s.is_active).map((s) => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
+                        {suppliers
+                          .filter((s) => s.is_active)
+                          .map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name}
+                            </option>
+                          ))}
                       </select>
                     </div>
 
@@ -1604,12 +1918,20 @@ export default function IngredientsPage() {
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <span style={{ fontWeight: 800 }}>Offre fournisseur</span>
                         <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <input type="checkbox" checked={edit.useOffer} onChange={(e) => setEdit({ ...edit, useOffer: e.target.checked })} />
+                          <input
+                            type="checkbox"
+                            checked={edit.useOffer}
+                            onChange={(e) => setEdit({ ...edit, useOffer: e.target.checked })}
+                          />
                           <span className="muted">recommandé</span>
                         </label>
                       </div>
 
-                      <select style={select} value={edit.is_active ? "1" : "0"} onChange={(e) => setEdit({ ...edit, is_active: e.target.value === "1" })}>
+                      <select
+                        style={select}
+                        value={edit.is_active ? "1" : "0"}
+                        onChange={(e) => setEdit({ ...edit, is_active: e.target.value === "1" })}
+                      >
                         <option value="1">Actif</option>
                         <option value="0">Inactif</option>
                       </select>
@@ -1619,7 +1941,11 @@ export default function IngredientsPage() {
                       <>
                         <div>
                           <div style={label}>Mode prix</div>
-                          <select style={select} value={edit.priceKind} onChange={(e) => setEdit({ ...edit, priceKind: e.target.value as PriceKind })}>
+                          <select
+                            style={select}
+                            value={edit.priceKind}
+                            onChange={(e) => setEdit({ ...edit, priceKind: e.target.value as PriceKind })}
+                          >
                             <option value="unit">Unitaire</option>
                             <option value="pack_simple">Pack</option>
                             <option value="pack_composed">Pack composé</option>
@@ -1629,8 +1955,17 @@ export default function IngredientsPage() {
                         {edit.priceKind === "unit" && (
                           <>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                              <input style={input} placeholder="Prix unitaire" value={edit.unitPrice} onChange={(e) => setEdit({ ...edit, unitPrice: e.target.value })} />
-                              <select style={select} value={edit.unit} onChange={(e) => setEdit({ ...edit, unit: e.target.value as any })}>
+                              <input
+                                style={input}
+                                placeholder="Prix unitaire"
+                                value={edit.unitPrice}
+                                onChange={(e) => setEdit({ ...edit, unitPrice: e.target.value })}
+                              />
+                              <select
+                                style={select}
+                                value={edit.unit}
+                                onChange={(e) => setEdit({ ...edit, unit: e.target.value as any })}
+                              >
                                 <option value="kg">kg</option>
                                 <option value="l">L</option>
                                 <option value="pc">pc</option>
@@ -1638,62 +1973,126 @@ export default function IngredientsPage() {
                             </div>
 
                             {edit.unit === "l" && (
-                              <input style={input} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => setEdit({ ...edit, density: e.target.value })} />
+                              <input
+                                style={input}
+                                placeholder="Densité (kg/L)"
+                                value={edit.density}
+                                onChange={(e) => setEdit({ ...edit, density: e.target.value })}
+                              />
                             )}
 
                             {edit.unit === "pc" && (
-                              <input style={input} placeholder="Poids pièce (g)" value={edit.pieceWeightG} onChange={(e) => setEdit({ ...edit, pieceWeightG: e.target.value })} />
+                              <input
+                                style={input}
+                                placeholder="Poids pièce (g)"
+                                value={edit.pieceWeightG}
+                                onChange={(e) => setEdit({ ...edit, pieceWeightG: e.target.value })}
+                              />
                             )}
 
-                            <div className="muted" style={{ fontSize: 12 }}>{previewEditPack ? previewEditPack : "—"}</div>
+                            <div className="muted" style={{ fontSize: 12 }}>
+                              {previewEditPack ? previewEditPack : "—"}
+                            </div>
                           </>
                         )}
 
                         {edit.priceKind === "pack_simple" && (
                           <>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                              <input style={input} placeholder="Prix pack (€)" value={edit.packPrice} onChange={(e) => setEdit({ ...edit, packPrice: e.target.value })} />
-                              <input style={input} placeholder="Quantité totale (kg/L)" value={edit.packTotalQty} onChange={(e) => setEdit({ ...edit, packTotalQty: e.target.value })} />
-                              <select style={select} value={edit.packUnit} onChange={(e) => setEdit({ ...edit, packUnit: e.target.value as any })}>
+                              <input
+                                style={input}
+                                placeholder="Prix pack (€)"
+                                value={edit.packPrice}
+                                onChange={(e) => setEdit({ ...edit, packPrice: e.target.value })}
+                              />
+                              <input
+                                style={input}
+                                placeholder="Quantité totale (kg/L)"
+                                value={edit.packTotalQty}
+                                onChange={(e) => setEdit({ ...edit, packTotalQty: e.target.value })}
+                              />
+                              <select
+                                style={select}
+                                value={edit.packUnit}
+                                onChange={(e) => setEdit({ ...edit, packUnit: e.target.value as any })}
+                              >
                                 <option value="kg">kg</option>
                                 <option value="l">L</option>
                               </select>
                             </div>
 
                             {edit.packUnit === "l" && (
-                              <input style={input} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => setEdit({ ...edit, density: e.target.value })} />
+                              <input
+                                style={input}
+                                placeholder="Densité (kg/L)"
+                                value={edit.density}
+                                onChange={(e) => setEdit({ ...edit, density: e.target.value })}
+                              />
                             )}
 
-                            <div className="muted" style={{ fontSize: 12 }}>{previewEditPack ? previewEditPack : "—"}</div>
+                            <div className="muted" style={{ fontSize: 12 }}>
+                              {previewEditPack ? previewEditPack : "—"}
+                            </div>
                           </>
                         )}
 
                         {edit.priceKind === "pack_composed" && (
                           <>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                              <input style={input} placeholder="Prix pack (€)" value={edit.packPrice} onChange={(e) => setEdit({ ...edit, packPrice: e.target.value })} />
-                              <input style={input} placeholder="Nombre d'unités (ex: 8)" value={edit.packCount} onChange={(e) => setEdit({ ...edit, packCount: e.target.value })} />
+                              <input
+                                style={input}
+                                placeholder="Prix pack (€)"
+                                value={edit.packPrice}
+                                onChange={(e) => setEdit({ ...edit, packPrice: e.target.value })}
+                              />
+                              <input
+                                style={input}
+                                placeholder="Nombre d'unités (ex: 8)"
+                                value={edit.packCount}
+                                onChange={(e) => setEdit({ ...edit, packCount: e.target.value })}
+                              />
                             </div>
 
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                              <select style={select} value={edit.packEachUnit} onChange={(e) => setEdit({ ...edit, packEachUnit: e.target.value as any })}>
+                              <select
+                                style={select}
+                                value={edit.packEachUnit}
+                                onChange={(e) => setEdit({ ...edit, packEachUnit: e.target.value as any })}
+                              >
                                 <option value="l">L</option>
                                 <option value="kg">kg</option>
                                 <option value="pc">pc</option>
                               </select>
 
                               {edit.packEachUnit !== "pc" ? (
-                                <input style={input} placeholder="Quantité par unité (ex: 1.5)" value={edit.packEachQty} onChange={(e) => setEdit({ ...edit, packEachQty: e.target.value })} />
+                                <input
+                                  style={input}
+                                  placeholder="Quantité par unité (ex: 1.5)"
+                                  value={edit.packEachQty}
+                                  onChange={(e) => setEdit({ ...edit, packEachQty: e.target.value })}
+                                />
                               ) : (
-                                <input style={input} placeholder="Poids pièce (g)" value={edit.packPieceWeightG} onChange={(e) => setEdit({ ...edit, packPieceWeightG: e.target.value })} />
+                                <input
+                                  style={input}
+                                  placeholder="Poids pièce (g)"
+                                  value={edit.packPieceWeightG}
+                                  onChange={(e) => setEdit({ ...edit, packPieceWeightG: e.target.value })}
+                                />
                               )}
                             </div>
 
                             {edit.packEachUnit === "l" && (
-                              <input style={input} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => setEdit({ ...edit, density: e.target.value })} />
+                              <input
+                                style={input}
+                                placeholder="Densité (kg/L)"
+                                value={edit.density}
+                                onChange={(e) => setEdit({ ...edit, density: e.target.value })}
+                              />
                             )}
 
-                            <div className="muted" style={{ fontSize: 12 }}>{previewEditPack ? previewEditPack : "—"}</div>
+                            <div className="muted" style={{ fontSize: 12 }}>
+                              {previewEditPack ? previewEditPack : "—"}
+                            </div>
                           </>
                         )}
                       </>
