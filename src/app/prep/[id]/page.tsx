@@ -1,7 +1,7 @@
 "use client";
 import { offerToCpu } from "@/lib/offerPricing";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
@@ -9,7 +9,7 @@ import { TopNav } from "@/components/TopNav";
 type Ingredient = {
   id: string;
   name: string;
-  cost_per_unit: number | null; // €/g (ou €/ml ou €/pc) - colonne générée côté DB
+  cost_per_unit: number | null; // €/g (ou €/ml ou €/pc) — colonne DB (fallback)
   is_active?: boolean;
   category?: string | null;
 };
@@ -26,12 +26,12 @@ type Line = {
   id: string;
   prep_recipe_id: string;
   ingredient_id: string;
-  amount_per_1_pivot: number; // ratio stocké (ex: 200/300)
+  amount_per_1_pivot: number;
   unit: "g" | "ml" | "pc";
   sort_order: number;
 
   ingredient_name?: string;
-  ingredient_cost_per_unit?: number | null;
+  ingredient_cost_per_unit?: number | null; // fallback DB
 };
 
 type ComputedRow = Line & {
@@ -45,7 +45,7 @@ type Computed = {
   pivotCost: number;
   linesCost: number;
   totalCost: number;
-  totalWeight: number;
+  totalQty: number;
   costPerKg: number;
 };
 
@@ -54,8 +54,9 @@ type AppError = {
   details?: unknown;
 };
 
-function n2(v: number) {
-  return Number.isFinite(v) ? v : 0;
+function n2(v: unknown) {
+  const x = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(x) ? x : 0;
 }
 
 function round2(v: number) {
@@ -114,10 +115,8 @@ export default function PrepRecipeDetailPage() {
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, { g?: number; ml?: number; pcs?: number }>>({});
   const [lines, setLines] = useState<Line[]>([]);
 
-  // UX: pivot amount visible + modifiable, non stocké
   const [pivotAmount, setPivotAmount] = useState<string>("300");
 
-  // Form add line
   const [newIngredientId, setNewIngredientId] = useState<string>("");
   const [newQtyForThisPivot, setNewQtyForThisPivot] = useState<string>("");
   const [newUnit, setNewUnit] = useState<"g" | "ml" | "pc">("g");
@@ -133,48 +132,46 @@ export default function PrepRecipeDetailPage() {
     return ingredients.find((x) => x.id === recipe.pivot_ingredient_id) ?? null;
   }, [recipe, ingredients]);
 
-  const computed: Computed = useMemo(() => {
-    if (!recipe)
-      return {
-        rows: [],
-        pivotCost: 0,
-        linesCost: 0,
-        totalCost: 0,
-        totalWeight: 0,
-        costPerKg: 0,
-      };
+  const pickCpu = (iid: string, unit: "g" | "ml" | "pc", fallbackCostPerUnit?: number | null) => {
+    const m = iid ? priceByIngredient[iid] : undefined;
+    const fromOffers =
+      unit === "g" ? m?.g : unit === "ml" ? m?.ml : unit === "pc" ? m?.pcs : undefined;
 
-    const pivotCost =
-      pivotIngredient?.cost_per_unit != null && pivotAmountNum > 0
-        ? pivotIngredient.cost_per_unit * pivotAmountNum
-        : 0;
+    const cpu = n2(fromOffers ?? fallbackCostPerUnit);
+    return cpu > 0 ? cpu : 0;
+  };
+
+  const computed: Computed = useMemo(() => {
+    if (!recipe) {
+      return { rows: [], pivotCost: 0, linesCost: 0, totalCost: 0, totalQty: 0, costPerKg: 0 };
+    }
+
+    const pivotCpu = pivotIngredient ? pickCpu(pivotIngredient.id, recipe.pivot_unit, pivotIngredient.cost_per_unit) : 0;
+    const pivotCost = pivotCpu > 0 && pivotAmountNum > 0 ? pivotCpu * pivotAmountNum : 0;
 
     const rows: ComputedRow[] = (lines ?? [])
       .slice()
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       .map((l) => {
-        const qty = pivotAmountNum > 0 ? l.amount_per_1_pivot * pivotAmountNum : 0;
-        const cpu = (l.ingredient_cost_per_unit ?? null) != null ? (l.ingredient_cost_per_unit as number) : null;
+        const qty = pivotAmountNum > 0 ? n2(l.amount_per_1_pivot) * pivotAmountNum : 0;
+
+        const cpuPicked = pickCpu(String(l.ingredient_id ?? ""), l.unit ?? "g", l.ingredient_cost_per_unit ?? null);
+        const cpu = cpuPicked > 0 ? cpuPicked : null;
+
         const cost = cpu != null ? cpu * qty : 0;
 
-        return {
-          ...l,
-          qty,
-          cost,
-          cpu,
-        };
+        return { ...l, qty, cost, cpu };
       });
 
     const linesCost = rows.reduce((acc, r) => acc + n2(r.cost), 0);
     const totalCost = pivotCost + linesCost;
 
-    const linesWeight = rows.reduce((acc, r) => acc + n2(r.qty), 0);
-    const totalWeight = pivotAmountNum + linesWeight;
+    const totalQty = pivotAmountNum + rows.reduce((acc, r) => acc + n2(r.qty), 0);
 
-    const costPerKg = totalWeight > 0 ? totalCost / (totalWeight / 1000) : 0;
+    const costPerKg = recipe.pivot_unit === "g" && totalQty > 0 ? totalCost / (totalQty / 1000) : 0;
 
-    return { rows, pivotCost, linesCost, totalCost, totalWeight, costPerKg };
-  }, [recipe, lines, pivotAmountNum, pivotIngredient]);
+    return { rows, pivotCost, linesCost, totalCost, totalQty, costPerKg };
+  }, [recipe, lines, pivotAmountNum, pivotIngredient, priceByIngredient]);
 
   const load = async () => {
     setLoading(true);
@@ -184,7 +181,6 @@ export default function PrepRecipeDetailPage() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("NOT_LOGGED");
 
-      // 1) recipe
       const { data: r, error: eR } = await supabase
         .from("prep_recipes")
         .select("id,name,pivot_ingredient_id,pivot_unit,output_ingredient_id")
@@ -198,7 +194,6 @@ export default function PrepRecipeDetailPage() {
       setRecipe(rr);
       setNewUnit(rr.pivot_unit);
 
-      // 2) ingredients
       const { data: ing, error: eI } = await supabase
         .from("ingredients")
         .select("id,name,cost_per_unit,is_active,category")
@@ -209,27 +204,22 @@ export default function PrepRecipeDetailPage() {
       const ingList = (ing ?? []) as Ingredient[];
       setIngredients(ingList);
 
-    const { data: offers, error: offErr } = await supabase
-      .from("v_latest_offers")
-      .select("ingredient_id, unit, unit_price");
+      const { data: offers, error: offErr } = await supabase.from("v_latest_offers").select("ingredient_id, unit, unit_price");
+      if (offErr) {
+        setError(offErr as any);
+        return;
+      }
 
-    if (offErr) {
-      setError(offErr);
-      return;
-    }
+      const priceMap: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
+      (offers ?? []).forEach((o: any) => {
+        const iid = String(o.ingredient_id ?? "");
+        if (!iid) return;
+        const cpu = offerToCpu(o.unit, o.unit_price);
+        if (!priceMap[iid]) priceMap[iid] = {};
+        priceMap[iid] = { ...priceMap[iid], ...cpu };
+      });
+      setPriceByIngredient(priceMap);
 
-    const priceMap: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
-    (offers ?? []).forEach((o: any) => {
-      const id = String(o.ingredient_id ?? "");
-      if (!id) return;
-      const cpu = offerToCpu(o.unit, o.unit_price);
-      if (!priceMap[id]) priceMap[id] = {};
-      priceMap[id] = { ...priceMap[id], ...cpu };
-    });
-    setPriceByIngredient(priceMap);
-
-
-      // 3) lines (+ join ingredient name/cost)
       const { data: ln, error: eL } = await supabase
         .from("prep_recipe_lines")
         .select("id,prep_recipe_id,ingredient_id,amount_per_1_pivot,unit,sort_order,ingredients(name,cost_per_unit)")
@@ -250,14 +240,12 @@ export default function PrepRecipeDetailPage() {
           unit: (getString(row["unit"], "g") as "g" | "ml" | "pc") ?? "g",
           sort_order: getNumber(row["sort_order"], 0),
           ingredient_name: getString(ingObj["name"]),
-          ingredient_cost_per_unit:
-            typeof ingObj["cost_per_unit"] === "number" ? (ingObj["cost_per_unit"] as number) : null,
+          ingredient_cost_per_unit: typeof ingObj["cost_per_unit"] === "number" ? (ingObj["cost_per_unit"] as number) : null,
         };
       });
 
       setLines(mapped);
 
-      // defaults for add line
       const firstOther = ingList.find((z) => z.id !== rr.pivot_ingredient_id) ?? ingList[0];
       setNewIngredientId(firstOther?.id ?? "");
     } catch (e: unknown) {
@@ -270,7 +258,6 @@ export default function PrepRecipeDetailPage() {
   useEffect(() => {
     if (!id) return;
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const saveRecipe = async () => {
@@ -299,9 +286,6 @@ export default function PrepRecipeDetailPage() {
     }
   };
 
-  // ===== Enregistrer la recette comme ingrédient (index) =====
-  // IMPORTANT: on RECALCULE ici pivot + lignes pour éviter les valeurs "computed" incohérentes au clic
-  // et on arrondit (centimes + grammes) pour éviter les variations flottantes.
   const saveAsIngredient = async () => {
     if (!recipe) return;
     if (savingIndex) return;
@@ -313,76 +297,74 @@ export default function PrepRecipeDetailPage() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("NOT_LOGGED");
 
-      if (!pivotIngredient || pivotIngredient.cost_per_unit == null) {
-        throw new Error("Pivot: coût manquant. Renseigne le prix du pivot dans l’index ingrédients.");
+      if (!pivotIngredient) {
+        throw new Error("Pivot introuvable.");
       }
       if (pivotAmountNum <= 0) {
         throw new Error("Quantité pivot invalide.");
       }
 
-      // Recalc solide
-      const pivotCost = pivotIngredient.cost_per_unit * pivotAmountNum;
+      const pivotCpu = pickCpu(pivotIngredient.id, recipe.pivot_unit, pivotIngredient.cost_per_unit);
+      if (pivotCpu <= 0) {
+        throw new Error("Pivot: coût manquant. Ajoute un prix (offers ou cost_per_unit).");
+      }
+
+      const pivotCost = pivotCpu * pivotAmountNum;
 
       const rows = (lines ?? []).map((l) => {
-        const qty = l.amount_per_1_pivot * pivotAmountNum;
-        const cpu = (l.ingredient_cost_per_unit ?? null) != null ? (l.ingredient_cost_per_unit as number) : null;
+        const qty = n2(l.amount_per_1_pivot) * pivotAmountNum;
+        const cpuPicked = pickCpu(String(l.ingredient_id ?? ""), l.unit ?? "g", l.ingredient_cost_per_unit ?? null);
+        const cpu = cpuPicked > 0 ? cpuPicked : null;
         const cost = cpu != null ? cpu * qty : 0;
         return { qty, cost, cpu, line: l };
       });
 
       const missing = rows.find((r) => r.cpu == null);
       if (missing) {
-        throw new Error("Impossible d’enregistrer: un ingrédient n’a pas de prix (coût interne manquant).");
+        throw new Error("Impossible d’enregistrer: un ingrédient n’a pas de prix (offers ou cost_per_unit manquant).");
       }
 
       const linesCost = rows.reduce((acc, r) => acc + n2(r.cost), 0);
-      const linesWeight = rows.reduce((acc, r) => acc + n2(r.qty), 0);
+      const totalCost = round2(pivotCost + linesCost);
 
-      const totalCostRaw = pivotCost + linesCost;
-      const totalWeightRaw = pivotAmountNum + linesWeight; // en g (si pivot_unit = g)
-
-      const totalCost = round2(totalCostRaw); // € arrondi centimes
-      const totalWeight = round0(totalWeightRaw); // g arrondi
+      const totalQty = round0(pivotAmountNum + rows.reduce((acc, r) => acc + n2(r.qty), 0));
 
       if (!Number.isFinite(totalCost) || totalCost <= 0) {
-        throw new Error("Impossible d’enregistrer: coût total invalide (vérifie les coûts ingrédients).");
+        throw new Error("Impossible d’enregistrer: coût total invalide.");
       }
-      if (!Number.isFinite(totalWeight) || totalWeight <= 0) {
-        throw new Error("Impossible d’enregistrer: poids total invalide.");
+      if (!Number.isFinite(totalQty) || totalQty <= 0) {
+        throw new Error("Impossible d’enregistrer: quantité totale invalide.");
       }
 
       const name = (recipe.name?.trim() || "Recette pivot").slice(0, 120);
 
-      // On stocke: purchase_price = coût total batch, purchase_unit = poids total batch (g)
-      // => la DB calcule cost_per_unit en €/g
-      const ingredientPayload = {
-  name,
-  category: "autre",
-  is_active: true,
-  default_unit: "g",
+      const defaultUnit = recipe.pivot_unit;
+      const unitLabel = recipe.pivot_unit;
 
-  purchase_price: totalCost,
-  purchase_unit: totalWeight,
-  purchase_unit_label: "g",
-  purchase_unit_name: "kg",
+      const ingredientPayload: any = {
+        name,
+        category: "autre",
+        is_active: true,
+        default_unit: defaultUnit,
 
-  // ✅ Traçabilité (B)
-  source_prep_recipe_id: recipe.id,
-  source_prep_recipe_name: name,
+        purchase_price: totalCost,
+        purchase_unit: totalQty,
+        purchase_unit_label: unitLabel,
+        purchase_unit_name: unitLabel,
 
-  updated_at: new Date().toISOString(),
-};
+        source_prep_recipe_id: recipe.id,
+        source_prep_recipe_name: name,
 
-      // UPDATE si déjà lié
+        updated_at: new Date().toISOString(),
+      };
+
       if (recipe.output_ingredient_id) {
         const { error: eUpd } = await supabase.from("ingredients").update(ingredientPayload).eq("id", recipe.output_ingredient_id);
         if (eUpd) throw eUpd;
-
         await load();
         return;
       }
 
-      // INSERT + bind
       const { data: ins, error: eIns } = await supabase.from("ingredients").insert(ingredientPayload).select("id").single();
       if (eIns) throw eIns;
 
@@ -476,7 +458,7 @@ export default function PrepRecipeDetailPage() {
   if (loading) {
     return (
       <main className="container">
-      <TopNav title="Préparation" />
+        <TopNav title="Préparation" />
         <p className="muted">Chargement…</p>
       </main>
     );
@@ -511,7 +493,6 @@ export default function PrepRecipeDetailPage() {
     );
   }
 
-  // ---- UI styles (sans toucher le global CSS) ----
   const labelStyle: React.CSSProperties = { fontSize: 12, opacity: 0.75, marginBottom: 6 };
   const inputStyle: React.CSSProperties = {
     width: "100%",
@@ -523,10 +504,7 @@ export default function PrepRecipeDetailPage() {
     background: "rgba(255,255,255,0.65)",
   };
 
-  const selectStyle: React.CSSProperties = {
-    ...inputStyle,
-    paddingRight: 34,
-  };
+  const selectStyle: React.CSSProperties = { ...inputStyle, paddingRight: 34 };
 
   const bigTitleStyle: React.CSSProperties = {
     fontSize: 28,
@@ -550,7 +528,6 @@ export default function PrepRecipeDetailPage() {
     <main className="container">
       <TopNav title="Préparation" />
 
-      {/* Header actions */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
         <button className="btn" type="button" onClick={() => router.replace("/prep")}>
           Retour
@@ -567,13 +544,12 @@ export default function PrepRecipeDetailPage() {
         </div>
       </div>
 
-      {/* Title centered */}
       <div style={{ marginTop: 10 }}>
         <h1 className="h1" style={bigTitleStyle}>
           {recipe.name?.trim() ? recipe.name : "Recette pivot"}
         </h1>
         <p className="muted" style={{ textAlign: "center", marginTop: 6 }}>
-          Tu saisis des quantités réelles pour {pivotAmountNum || 0} {recipe.pivot_unit} de pivot. Le ratio est géré en arrière-plan.
+          Tu saisis des quantités réelles pour {pivotAmountNum || 0} {recipe.pivot_unit} de pivot.
         </p>
       </div>
 
@@ -583,7 +559,6 @@ export default function PrepRecipeDetailPage() {
         </pre>
       ) : null}
 
-      {/* Card: Name + Pivot row */}
       <div className="card" style={{ ...cardStyle, marginTop: 12 }}>
         <div style={{ marginBottom: 12 }}>
           <div style={labelStyle}>Nom de la recette</div>
@@ -650,7 +625,7 @@ export default function PrepRecipeDetailPage() {
             </div>
             <div style={{ fontSize: 20, fontWeight: 900 }}>{fmtMoney(computed.totalCost)}</div>
             <div className="muted" style={{ fontSize: 12 }}>
-              Poids total: {Math.round(computed.totalWeight)} {recipe.pivot_unit}
+              Total: {Math.round(computed.totalQty)} {recipe.pivot_unit}
             </div>
           </div>
 
@@ -658,7 +633,7 @@ export default function PrepRecipeDetailPage() {
             <div className="muted" style={{ fontSize: 12 }}>
               Coût / kg
             </div>
-            <div style={{ fontSize: 22, fontWeight: 950 }}>{fmtKg(computed.costPerKg)}</div>
+            <div style={{ fontSize: 22, fontWeight: 950 }}>{recipe.pivot_unit === "g" ? fmtKg(computed.costPerKg) : "—"}</div>
           </div>
         </div>
       </div>
@@ -697,7 +672,7 @@ export default function PrepRecipeDetailPage() {
         </div>
 
         <p className="muted" style={{ marginTop: 10, marginBottom: 0, fontSize: 12 }}>
-          Exemple: pivot = 300g. Tu saisis Parmesan = 200 → le ratio stocké automatiquement = 200/300.
+          Exemple: pivot = 300g. Tu saisis Parmesan = 200 → ratio stocké = 200/300.
         </p>
       </div>
 
@@ -711,7 +686,7 @@ export default function PrepRecipeDetailPage() {
           </div>
 
           <div style={{ fontSize: 14, fontWeight: 800 }}>
-            Coût / kg: <span style={{ fontSize: 18 }}>{fmtKg(computed.costPerKg)}</span>
+            Coût / kg: <span style={{ fontSize: 18 }}>{recipe.pivot_unit === "g" ? fmtKg(computed.costPerKg) : "—"}</span>
           </div>
         </div>
 
@@ -779,14 +754,7 @@ export default function PrepRecipeDetailPage() {
           </p>
         ) : null}
 
-        <div
-          style={{
-            marginTop: 14,
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 10,
-          }}
-        >
+        <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
           <div style={kpiCard}>
             <div className="muted" style={{ fontSize: 12 }}>
               Coût pivot
@@ -809,7 +777,7 @@ export default function PrepRecipeDetailPage() {
             <div className="muted" style={{ fontSize: 12 }}>
               Coût / kg
             </div>
-            <div style={{ fontSize: 20, fontWeight: 950 }}>{fmtKg(computed.costPerKg)}</div>
+            <div style={{ fontSize: 20, fontWeight: 950 }}>{recipe.pivot_unit === "g" ? fmtKg(computed.costPerKg) : "—"}</div>
           </div>
         </div>
       </div>
