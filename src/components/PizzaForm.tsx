@@ -211,7 +211,8 @@ export default function PizzaForm(props: { pizzaId?: string }) {
   const costs = useMemo(() => {
     const toppings = rows.reduce((acc, r) => {
       if (!r.ingredient_id) return acc;
-      const cpu = n2(priceByIngredient[r.ingredient_id]);
+      const ing = ingredients.find((x) => x.id === r.ingredient_id);
+      const cpu = n2((priceByIngredient[r.ingredient_id] ?? (ing as any)?.cost_per_unit));
       const qty = typeof r.qty === "number" ? r.qty : n2(r.qty);
       return acc + n2(qty) * cpu;
     }, 0);
@@ -274,7 +275,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
 
       const { data: ing, error: ingErr } = await supabase
         .from("ingredients")
-        .select("id,name,category,allergens,is_active")
+        .select("id,name,category,allergens,is_active,cost_per_unit")
         .order("name", { ascending: true });
 
       if (ingErr) {
@@ -895,7 +896,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
             <div style={{ color: theme.muted, fontSize: 12, fontWeight: 900 }}>Ajoute ingrédients + quantités + unité</div>
           </div>
           <div style={{ marginTop: 10 }}>
-            <PizzaIngredientList stage="pre" ingredients={ingredients} rows={rows} onChange={setRows} />
+            <PizzaIngredientList stage="pre" ingredients={ingredients} rows={rows} onChange={setRows}  priceByIngredient={priceByIngredient} />
           </div>
         </div>
 
@@ -905,7 +906,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
             <div style={{ color: theme.muted, fontSize: 12, fontWeight: 900 }}>Finition / sortie de four</div>
           </div>
           <div style={{ marginTop: 10 }}>
-            <PizzaIngredientList stage="post" ingredients={ingredients} rows={rows} onChange={setRows} />
+            <PizzaIngredientList stage="post" ingredients={ingredients} rows={rows} onChange={setRows}  priceByIngredient={priceByIngredient} />
           </div>
         </div>
 
