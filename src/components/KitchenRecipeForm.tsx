@@ -1,4 +1,5 @@
 "use client";
+import { offerToCpu } from "@/lib/offerPricing";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -34,6 +35,12 @@ type LineUI = {
   ingredient_name?: string;
   ingredient_cost_per_unit?: number | null;
 };
+
+type LatestOfferRow = {
+  ingredient_id: string;
+  unit_price: number;
+};
+
 
 function n2(v: unknown) {
   const x = typeof v === "number" ? v : Number(v);
@@ -87,6 +94,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
   const [error, setError] = useState<unknown>(null);
 
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [priceByIngredient, setPriceByIngredient] = useState<Record<string, { g?: number; ml?: number; pcs?: number }>>({});
   const [lines, setLines] = useState<LineUI[]>([]);
 
   const [form, setForm] = useState<{
@@ -278,6 +286,28 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     setIngredients(ingList);
     setNewIngredientId(ingList[0]?.id ?? "");
 
+    const { data: offers, error: offErr } = await supabase
+      .from("v_latest_offers")
+      .select("ingredient_id, unit, unit_price");
+
+    if (offErr) {
+      setStatus("ERROR");
+      setError(offErr);
+      return;
+    }
+
+    const priceMapCpu: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
+    (offers ?? []).forEach((o: any) => {
+      const id = String(o.ingredient_id ?? "");
+      if (!id) return;
+      const cpu = offerToCpu(o.unit, o.unit_price);
+      if (!priceMapCpu[id]) priceMapCpu[id] = {};
+      priceMapCpu[id] = { ...priceMapCpu[id], ...cpu };
+    });
+
+    setPriceByIngredient(priceMapCpu);
+
+
     if (!isEdit) {
       setForm({
         name: "",
@@ -357,7 +387,18 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
         unit,
         sort_order: n2(raw.sort_order),
         ingredient_name: String((ingRow as any)?.name ?? ""),
-        ingredient_cost_per_unit: typeof (ingRow as any)?.cost_per_unit === "number" ? ((ingRow as any).cost_per_unit as number) : null,
+        ingredient_cost_per_unit: (() => {
+      const m = priceByIngredient[String(newIngredientId)];
+      const u = String(newUnit ?? "g").toLowerCase();
+      const cpu =
+        u === "ml"
+          ? m?.ml
+          : u === "pc" || u === "pcs"
+          ? m?.pcs
+          : m?.g;
+      if (typeof cpu === "number") return cpu;
+      return typeof (ingRow as any)?.cost_per_unit === "number" ? ((ingRow as any).cost_per_unit as number) : null;
+    })(),
       };
     });
 
@@ -391,7 +432,18 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       unit: newUnit,
       sort_order: nextSort,
       ingredient_name: String((ingRow as any)?.name ?? ""),
-      ingredient_cost_per_unit: typeof (ingRow as any)?.cost_per_unit === "number" ? ((ingRow as any).cost_per_unit as number) : null,
+      ingredient_cost_per_unit: (() => {
+      const m = priceByIngredient[String(newIngredientId)];
+      const u = String(newUnit ?? "g").toLowerCase();
+      const cpu =
+        u === "ml"
+          ? m?.ml
+          : u === "pc" || u === "pcs"
+          ? m?.pcs
+          : m?.g;
+      if (typeof cpu === "number") return cpu;
+      return typeof (ingRow as any)?.cost_per_unit === "number" ? ((ingRow as any).cost_per_unit as number) : null;
+    })(),
     };
 
     setLines((p) => [...(p ?? []), row]);

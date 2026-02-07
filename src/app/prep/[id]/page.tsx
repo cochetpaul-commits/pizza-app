@@ -1,4 +1,5 @@
 "use client";
+import { offerToCpu } from "@/lib/offerPricing";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -110,6 +111,7 @@ export default function PrepRecipeDetailPage() {
 
   const [recipe, setRecipe] = useState<PrepRecipe | null>(null);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [priceByIngredient, setPriceByIngredient] = useState<Record<string, { g?: number; ml?: number; pcs?: number }>>({});
   const [lines, setLines] = useState<Line[]>([]);
 
   // UX: pivot amount visible + modifiable, non stocké
@@ -152,7 +154,7 @@ export default function PrepRecipeDetailPage() {
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       .map((l) => {
         const qty = pivotAmountNum > 0 ? l.amount_per_1_pivot * pivotAmountNum : 0;
-        const cpu = l.ingredient_cost_per_unit ?? null;
+        const cpu = (l.ingredient_cost_per_unit ?? null) != null ? (l.ingredient_cost_per_unit as number) : null;
         const cost = cpu != null ? cpu * qty : 0;
 
         return {
@@ -206,6 +208,26 @@ export default function PrepRecipeDetailPage() {
       if (eI) throw eI;
       const ingList = (ing ?? []) as Ingredient[];
       setIngredients(ingList);
+
+    const { data: offers, error: offErr } = await supabase
+      .from("v_latest_offers")
+      .select("ingredient_id, unit, unit_price");
+
+    if (offErr) {
+      setError(offErr);
+      return;
+    }
+
+    const priceMap: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
+    (offers ?? []).forEach((o: any) => {
+      const id = String(o.ingredient_id ?? "");
+      if (!id) return;
+      const cpu = offerToCpu(o.unit, o.unit_price);
+      if (!priceMap[id]) priceMap[id] = {};
+      priceMap[id] = { ...priceMap[id], ...cpu };
+    });
+    setPriceByIngredient(priceMap);
+
 
       // 3) lines (+ join ingredient name/cost)
       const { data: ln, error: eL } = await supabase
@@ -303,7 +325,7 @@ export default function PrepRecipeDetailPage() {
 
       const rows = (lines ?? []).map((l) => {
         const qty = l.amount_per_1_pivot * pivotAmountNum;
-        const cpu = l.ingredient_cost_per_unit ?? null;
+        const cpu = (l.ingredient_cost_per_unit ?? null) != null ? (l.ingredient_cost_per_unit as number) : null;
         const cost = cpu != null ? cpu * qty : 0;
         return { qty, cost, cpu, line: l };
       });

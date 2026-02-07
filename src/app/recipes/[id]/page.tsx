@@ -1,4 +1,5 @@
 "use client";
+import { offerToCpu } from "@/lib/offerPricing";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -17,7 +18,7 @@ type FlourMixItem = { name: string; percent: number };
 type IngredientRow = {
   id: string;
   name: string | null;
-  cost_per_unit: number | null; // €/g (ou €/ml, etc) — ici on utilise en €/g pour la pâte
+  cost_per_unit: number | null;
   is_active?: boolean | null;
 };
 
@@ -33,13 +34,10 @@ type Recipe = {
   biga_yeast_percent?: number | null;
   flour_mix?: any;
   procedure?: string | null;
-
-  // Calculés / stockés
   balls_count?: number | null;
   ball_weight?: number | null;
   total_cost?: number | null;
   yield_grams?: number | null;
-
   created_at: string;
   user_id: string;
   [key: string]: any;
@@ -94,13 +92,11 @@ function keyName(s: string) {
 function bestMatchByAliases(ings: IngredientRow[], aliases: string[]) {
   const a = aliases.map((x) => keyName(x)).filter(Boolean);
 
-  // 1) match exact
   for (const ing of ings) {
     const kn = keyName(String(ing.name ?? ""));
     if (!kn) continue;
     if (a.includes(kn)) return ing;
   }
-  // 2) match contains (heuristique)
   for (const ing of ings) {
     const kn = keyName(String(ing.name ?? ""));
     if (!kn) continue;
@@ -120,13 +116,14 @@ export default function RecipePage() {
     error?: any;
   }>({ status: "loading" });
 
-  const [ingredients, setIngredients] = useState<IngredientRow[]>([]);
+  const setError = (e: unknown) => setState((p) => ({ ...p, status: "ERROR", error: e }));
 
-  // PROD INPUTS (modifiables via steppers)
+  const [ingredients, setIngredients] = useState<IngredientRow[]>([]);
+  const [priceByIngredient, setPriceByIngredient] = useState<Record<string, { g?: number; ml?: number; pcs?: number }>>({});
+
   const [nbPatons, setNbPatons] = useState<number>(150);
   const [poidsPaton, setPoidsPaton] = useState<number>(264);
 
-  // FORM (strings pour éviter crash en saisie)
   const [form, setForm] = useState<{
     name: string;
     type: DoughType;
@@ -135,24 +132,16 @@ export default function RecipePage() {
     honey_percent: string;
     oil_percent: string;
     yeast_ui: string;
-
     flourA_name: string;
     flourA_percent: string;
     flourB_name: string;
     flourB_percent: string;
-
     procedure: string;
   } | null>(null);
 
-  const [saveState, setSaveState] = useState<{ saving: boolean; error?: any; ok?: boolean }>({
-    saving: false,
-  });
+  const [saveState, setSaveState] = useState<{ saving: boolean; error?: any; ok?: boolean }>({ saving: false });
+  const [pdfState, setPdfState] = useState<{ exporting: boolean; error?: any; ok?: boolean }>({ exporting: false });
 
-  const [pdfState, setPdfState] = useState<{ exporting: boolean; error?: any; ok?: boolean }>({
-    exporting: false,
-  });
-
-  // PARSING
   const parsed = useMemo(() => {
     const hydration = clamp(toNumSafe(form?.hydration_total ?? "", 65), 0, 120);
     const salt = clamp(toNumSafe(form?.salt_percent ?? "", 2), 0, 10);
@@ -193,7 +182,6 @@ export default function RecipePage() {
 
   const isBiga = (form?.type ?? "direct") === "biga";
 
-  // CALCUL pâte
   const result = useMemo(() => {
     if (!form) {
       return {
@@ -228,7 +216,6 @@ export default function RecipePage() {
     });
   }, [form, form?.type, nbPatons, poidsPaton, isBiga, parsed.hydration, parsed.salt, parsed.honey, parsed.oil, parsed.yeastUi, parsed.flourMix]);
 
-  // Option A — Coût auto depuis index ingrédients
   const costing = useMemo(() => {
     const flourTotalG = n2(result?.totals?.flour_total_g);
     const waterG = n2(result?.totals?.water_g);
@@ -250,10 +237,17 @@ export default function RecipePage() {
     const missing: string[] = [];
     const parts: Array<{ label: string; grams: number; cpu: number; cost: number }> = [];
 
+    const pickCpuG = (ing: IngredientRow | null) => {
+      const iid = String(ing?.id ?? "");
+      const fromOffers = iid ? priceByIngredient[iid] : undefined;
+      const cpu = n2(fromOffers?.g ?? ing?.cost_per_unit);
+      return cpu;
+    };
+
     const pushByExactName = (label: string, grams: number, name: string) => {
       if (grams <= 0) return;
       const ing = bestMatchByAliases(ingredients, [name, label]);
-      const cpu = n2(ing?.cost_per_unit);
+      const cpu = pickCpuG(ing);
       if (!ing || cpu <= 0) missing.push(label);
       parts.push({ label, grams, cpu, cost: grams * cpu });
     };
@@ -261,16 +255,14 @@ export default function RecipePage() {
     const pushByAliases = (label: string, grams: number, aliases: string[]) => {
       if (grams <= 0) return;
       const ing = bestMatchByAliases(ingredients, aliases);
-      const cpu = n2(ing?.cost_per_unit);
+      const cpu = pickCpuG(ing);
       if (!ing || cpu <= 0) missing.push(label);
       parts.push({ label, grams, cpu, cost: grams * cpu });
     };
 
-    // Farines : on tente match sur nom exact
     pushByExactName("Farine A", flourAG, flourAName || "Farine A");
     pushByExactName("Farine B", flourBG, flourBName || "Farine B");
 
-    // Autres : heuristiques
     pushByAliases("Eau", waterG, ["eau", "water"]);
     pushByAliases("Sel", saltG, ["sel", "sel fin", "salt"]);
     pushByAliases("Miel", honeyG, ["miel", "honey"]);
@@ -283,16 +275,10 @@ export default function RecipePage() {
     const costPerKg = yieldGrams > 0 ? totalCost / (yieldGrams / 1000) : 0;
     const costPerBall = nbPatons > 0 ? totalCost / nbPatons : 0;
 
-    return {
-      parts,
-      missing,
-      totalCost,
-      yieldGrams,
-      costPerKg,
-      costPerBall,
-    };
+    return { parts, missing, totalCost, yieldGrams, costPerKg, costPerBall };
   }, [
     ingredients,
+    priceByIngredient,
     result?.totals?.flour_total_g,
     result?.totals?.water_g,
     result?.totals?.salt_g,
@@ -306,7 +292,6 @@ export default function RecipePage() {
     nbPatons,
   ]);
 
-  // LOAD
   useEffect(() => {
     const run = async () => {
       const { data: auth } = await supabase.auth.getUser();
@@ -320,16 +305,33 @@ export default function RecipePage() {
         return;
       }
 
-      const { data: ing, error: ingErr } = await supabase
-        .from("ingredients")
-        .select("id,name,cost_per_unit,is_active")
-        .order("name", { ascending: true });
+      const { data: ing, error: ingErr } = await supabase.from("ingredients").select("id,name,cost_per_unit,is_active").order("name", { ascending: true });
 
       if (ingErr) {
         setState({ status: "ERROR", error: ingErr });
         return;
       }
-      setIngredients((ing ?? []) as IngredientRow[]);
+      const ingList = (ing ?? []) as IngredientRow[];
+      setIngredients(ingList);
+
+      const { data: offers, error: offErr } = await supabase
+        .from("v_latest_offers")
+        .select("ingredient_id, unit, unit_price");
+
+      if (offErr) {
+        setState((p) => ({ ...p, status: "ERROR", error: offErr }));
+        return;
+      }
+
+      const priceMap: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
+      (offers ?? []).forEach((o: any) => {
+        const id = String(o.ingredient_id ?? "");
+        if (!id) return;
+        const cpu = offerToCpu(o.unit, o.unit_price);
+        if (!priceMap[id]) priceMap[id] = {};
+        priceMap[id] = { ...priceMap[id], ...cpu };
+      });
+      setPriceByIngredient(priceMap);
 
       const { data: recipe, error } = await supabase.from("recipes").select("*").eq("id", id).maybeSingle();
 
@@ -377,7 +379,6 @@ export default function RecipePage() {
     run();
   }, [id]);
 
-  // SAVE
   const saveRecipe = async () => {
     if (!form?.name || !form.name.trim()) {
       setSaveState({ saving: false, error: { message: "Le nom de l’empâtement est obligatoire" } });
@@ -416,23 +417,16 @@ export default function RecipePage() {
     const payload: any = {
       name: (form.name ?? "").trim() || "Sans nom",
       type: form.type,
-
       hydration_total: hydration,
       salt_percent: salt,
       honey_percent: honey,
       oil_percent: oil,
-
       flour_mix,
-
       balls_count: nbPatons,
       ball_weight: poidsPaton,
-
       procedure: (form.procedure ?? "").toString(),
-
-      // ✅ Option A : on stocke le coût et le rendement
       total_cost: round2(costing.totalCost),
       yield_grams: Math.round(costing.yieldGrams),
-
       updated_at: new Date().toISOString(),
     };
 
@@ -454,7 +448,6 @@ export default function RecipePage() {
     setTimeout(() => setSaveState((p) => ({ ...p, ok: false })), 1200);
   };
 
-  // EXPORT PDF
   const exportPdf = async () => {
     try {
       if (!id) return;
@@ -468,15 +461,8 @@ export default function RecipePage() {
 
       const res = await fetch("/api/recipes/pdf", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          recipeId: id,
-          nbPatons,
-          poidsPaton,
-        }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ recipeId: id, nbPatons, poidsPaton }),
       });
 
       if (!res.ok) {
@@ -501,14 +487,10 @@ export default function RecipePage() {
       setPdfState({ exporting: false, ok: true });
       setTimeout(() => setPdfState((p) => ({ ...p, ok: false })), 900);
     } catch (e: any) {
-      setPdfState({
-        exporting: false,
-        error: { message: "Export PDF impossible", details: String(e?.message ?? e) },
-      });
+      setPdfState({ exporting: false, error: { message: "Export PDF impossible", details: String(e?.message ?? e) } });
     }
   };
 
-  // UI STATES
   if (state.status === "loading") {
     return (
       <main className="container">
@@ -584,7 +566,6 @@ export default function RecipePage() {
         />
       </div>
 
-      {/* Coût Option A */}
       <div className="card" style={{ marginTop: 16 }}>
         <div className="muted" style={{ marginBottom: 10 }}>
           Coût (Option A — calcul auto depuis l’index ingrédients)
@@ -628,7 +609,6 @@ export default function RecipePage() {
         )}
       </div>
 
-      {/* Procédure */}
       <div className="card" style={{ marginTop: 16 }}>
         <div className="muted" style={{ marginBottom: 8 }}>
           Procédure (protocole)
@@ -648,17 +628,8 @@ export default function RecipePage() {
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
-        {saveState.error ? (
-          <pre className="code" style={{ marginTop: 10 }}>
-            {JSON.stringify(saveState.error, null, 2)}
-          </pre>
-        ) : null}
-
-        {pdfState.error ? (
-          <pre className="code" style={{ marginTop: 10 }}>
-            {JSON.stringify(pdfState.error, null, 2)}
-          </pre>
-        ) : null}
+        {saveState.error ? <pre className="code" style={{ marginTop: 10 }}>{JSON.stringify(saveState.error, null, 2)}</pre> : null}
+        {pdfState.error ? <pre className="code" style={{ marginTop: 10 }}>{JSON.stringify(pdfState.error, null, 2)}</pre> : null}
 
         <div style={{ marginTop: 12 }}>
           <div className="muted" style={{ marginBottom: 8 }}>
@@ -701,7 +672,6 @@ export default function RecipePage() {
       {!isBiga && (
         <div style={{ marginTop: 20 }}>
           <h2 className="h2">Quantités</h2>
-
           {result.warnings?.length > 0 && <pre className="code">{JSON.stringify(result.warnings, null, 2)}</pre>}
 
           <div className="kv" style={{ marginTop: 10 }}>
@@ -736,7 +706,6 @@ export default function RecipePage() {
       {isBiga && (
         <div style={{ marginTop: 20 }}>
           <h2 className="h2">Phases</h2>
-
           {result.warnings?.length > 0 && <pre className="code">{JSON.stringify(result.warnings, null, 2)}</pre>}
 
           {Array.isArray(result.phases) && result.phases.length > 0 ? (

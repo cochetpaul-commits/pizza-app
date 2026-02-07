@@ -1,4 +1,5 @@
 "use client";
+import { offerToCpu } from "@/lib/offerPricing";
 
 import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -18,6 +19,7 @@ type DoughRecipeRow = {
 
 type LatestOfferRow = {
   ingredient_id: string;
+  unit: string;
   unit_price: number;
 };
 
@@ -139,7 +141,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
   const [recipes, setRecipes] = useState<DoughRecipeRow[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [rows, setRows] = useState<PizzaIngredientRow[]>([]);
-  const [priceByIngredient, setPriceByIngredient] = useState<Record<string, number>>({});
+  const [priceByIngredient, setPriceByIngredient] = useState<Record<string, { g?: number; ml?: number; pcs?: number }>>({});
 
   const [form, setForm] = useState<{
     name: string;
@@ -212,7 +214,12 @@ export default function PizzaForm(props: { pizzaId?: string }) {
     const toppings = rows.reduce((acc, r) => {
       if (!r.ingredient_id) return acc;
       const ing = ingredients.find((x) => x.id === r.ingredient_id);
-      const cpu = n2((priceByIngredient[r.ingredient_id] ?? (ing as any)?.cost_per_unit));
+      const cpuObj = (priceByIngredient as any)[r.ingredient_id];
+      const u = normalizeUnit(r.unit);
+      const cpu = n2(
+        (u === "g" ? cpuObj?.g : u === "ml" ? cpuObj?.ml : u === "pcs" ? cpuObj?.pcs : undefined) ??
+          (ing as any)?.cost_per_unit
+      );
       const qty = typeof r.qty === "number" ? r.qty : n2(r.qty);
       return acc + n2(qty) * cpu;
     }, 0);
@@ -287,7 +294,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
  
       const { data: offers, error: offErr } = await supabase
         .from("v_latest_offers")
-        .select("ingredient_id, unit_price");
+        .select("ingredient_id, unit_price, unit");
  
       if (offErr) {
         setStatus("ERROR");
@@ -295,13 +302,14 @@ export default function PizzaForm(props: { pizzaId?: string }) {
         return;
       }
  
-      const priceMap: Record<string, number> = {};
+      const priceMap: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
       (offers ?? []).forEach((o: LatestOfferRow) => {
-        if (typeof o.unit_price === "number") {
-          priceMap[o.ingredient_id] = o.unit_price;
-        }
+        const id = String(o.ingredient_id ?? "");
+        if (!id) return;
+        const cpu = offerToCpu(o.unit, o.unit_price);
+        if (!priceMap[id]) priceMap[id] = {};
+        priceMap[id] = { ...priceMap[id], ...cpu };
       });
- 
       setPriceByIngredient(priceMap);
 
       if (!isEdit) {

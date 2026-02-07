@@ -27,10 +27,11 @@ type Props = {
   ingredients: Ingredient[];
   rows: PizzaIngredientRow[];
   onChange: (rows: PizzaIngredientRow[]) => void;
+  priceByIngredient?: Record<string, { g?: number; ml?: number; pcs?: number }>;
 };
 
 export default function PizzaIngredientList(props: Props) {
-  const { stage, ingredients, rows, onChange } = props;
+  const { stage, ingredients, rows, onChange, priceByIngredient } = props;
 
   const stageRows = useMemo(() => {
     return (rows ?? [])
@@ -111,8 +112,17 @@ export default function PizzaIngredientList(props: Props) {
   };
 
   const costPerUnit = (r: any) => {
-    if (typeof r?._cpu === "number") return r._cpu;
-    const ing = ingredients.find((x) => x.id === r.ingredient_id);
+    const ing = ingredients.find((x: any) => String(x.id) === String(r.ingredient_id));
+    const id = String(r.ingredient_id ?? "");
+    const unit = String(r.unit ?? "g").toLowerCase();
+    const fromOffers = priceByIngredient ? priceByIngredient[id] : undefined;
+    const cpu =
+      unit === "ml"
+        ? fromOffers?.ml
+        : unit === "pc" || unit === "pcs"
+        ? fromOffers?.pcs
+        : fromOffers?.g;
+    if (typeof cpu === "number") return n2(cpu);
     return n2((ing as any)?.cost_per_unit);
   };
 
