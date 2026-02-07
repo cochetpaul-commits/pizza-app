@@ -13,8 +13,8 @@ type KitchenRecipeRowDB = {
   category: string | null;
   yield_grams: number | null;
   portions_count: number | null;
-  vat_rate: number | null; // ex: 10 pour 10%
-  margin_rate: number | null; // ex: 60 pour 60% (taux de marque)
+  vat_rate: number | null;
+  margin_rate: number | null;
   notes: string | null;
   procedure: string | null;
   output_ingredient_id: string | null;
@@ -32,7 +32,7 @@ type LineUI = {
   unit: Unit;
   sort_order: number;
   ingredient_name?: string;
-  ingredient_cost_per_unit?: number | null; // €/g ou €/ml ou €/pc
+  ingredient_cost_per_unit?: number | null;
 };
 
 function n2(v: unknown) {
@@ -104,7 +104,6 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
   const [saveError, setSaveError] = useState<unknown>(null);
-
   const [savingIndex, setSavingIndex] = useState(false);
 
   const [newIngredientId, setNewIngredientId] = useState<string>("");
@@ -150,14 +149,14 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     color: theme.text,
     fontWeight: 900 as const,
     cursor: "pointer",
-  };
+  } as const;
 
   const btnPrimary = {
     ...btn,
     background: theme.primary,
     border: `1px solid ${theme.primary}`,
     color: theme.primaryText,
-  };
+  } as const;
 
   const metricBox = {
     background: "#fff",
@@ -405,6 +404,49 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     setLines((p) => (p ?? []).filter((x) => x.id !== lineId));
   };
 
+  const exportPdf = async () => {
+    try {
+      if (!recipeId) {
+        setSaveError({ message: "PDF: sauvegarde d’abord la recette (il faut un ID)." });
+        return;
+      }
+
+      const { data: session } = await supabase.auth.getSession();
+      const token = session.session?.access_token;
+      if (!token) throw new Error("Token manquant (session)");
+
+      const res = await fetch("/api/kitchen/pdf", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ recipeId: recipeId }),
+      });
+
+      if (!res.ok) {
+        const j = await res.json().catch(() => null);
+        throw new Error(j?.message ? `${j.message}${j.details ? ` — ${j.details}` : ""}` : `HTTP ${res.status}`);
+      }
+
+      const blob = await res.blob();
+      const cd = res.headers.get("content-disposition") || "";
+      const match = cd.match(/filename="([^"]+)"/);
+      const filename = match?.[1] || "recette-cuisine.pdf";
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 800);
+    } catch (e: any) {
+      setSaveError({ message: "Export PDF cuisine impossible", details: String(e?.message ?? "") });
+    }
+  };
+
   const save = async () => {
     if (!form) return;
     if (saving) return;
@@ -647,11 +689,15 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
       <div style={{ maxWidth: 980, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-          <Link href="/kitchen" style={{ color: theme.muted, textDecoration: "none", fontWeight: 900 }}>
+          <Link href="/" style={{ color: theme.muted, textDecoration: "none", fontWeight: 900 }}>
             Accueil
           </Link>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <button type="button" onClick={exportPdf} disabled={saving || !isEdit} style={btn}>
+              PDF
+            </button>
+
             <button type="button" onClick={saveAsIngredient} disabled={savingIndex || saving || !isEdit} style={btn}>
               {savingIndex ? "Index…" : form.output_ingredient_id ? "MAJ index" : "Index"}
             </button>
@@ -684,7 +730,9 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
               fontWeight: 800,
             }}
           >
-            Rendement ({round0(yieldGramsNum)} g) supérieur au poids ingrédients en g ({round0(ingredientWeightGrams)} g). Vérifie la saisie.
+            {`Rendement (${round0(yieldGramsNum)} g) supérieur au poids ingrédients en g (${round0(
+              ingredientWeightGrams
+            )} g). Vérifie la saisie.`}
           </div>
         ) : null}
 
@@ -761,9 +809,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
             <div style={metricBox}>
               <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Perte (%)</div>
-              <div style={{ fontSize: 22, fontWeight: 950, marginTop: 2 }}>
-                {lossPercent == null ? "—" : fmtPct1(lossPercent)}
-              </div>
+              <div style={{ fontSize: 22, fontWeight: 950, marginTop: 2 }}>{lossPercent == null ? "—" : fmtPct1(lossPercent)}</div>
               <div style={{ color: theme.muted, fontSize: 12, marginTop: 2 }}>Rendement / ingrédients</div>
             </div>
 
@@ -783,11 +829,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
           <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
             <div style={metricBox}>
               <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 6 }}>TVA vente (%)</div>
-              <select
-                style={{ ...input, height: 40, fontWeight: 950 }}
-                value={form.vat_rate}
-                onChange={(e) => setForm((p) => (p ? { ...p, vat_rate: e.target.value } : p))}
-              >
+              <select style={{ ...input, height: 40, fontWeight: 950 }} value={form.vat_rate} onChange={(e) => setForm((p) => (p ? { ...p, vat_rate: e.target.value } : p))}>
                 <option value="5.5">5,5</option>
                 <option value="10">10</option>
                 <option value="20">20</option>
@@ -838,7 +880,12 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
             <div>
               <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Qté</div>
-              <input style={{ ...input, textAlign: "center", fontWeight: 950 }} inputMode="decimal" value={newQty} onChange={(e) => setNewQty(e.target.value)} />
+              <input
+                style={{ ...input, textAlign: "center", fontWeight: 950 }}
+                inputMode="decimal"
+                value={newQty}
+                onChange={(e) => setNewQty(e.target.value)}
+              />
             </div>
 
             <div>

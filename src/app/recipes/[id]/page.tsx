@@ -14,6 +14,13 @@ function isUuid(v: string) {
 type DoughType = "direct" | "biga" | "focaccia";
 type FlourMixItem = { name: string; percent: number };
 
+type IngredientRow = {
+  id: string;
+  name: string | null;
+  cost_per_unit: number | null; // €/g (ou €/ml, etc) — ici on utilise en €/g pour la pâte
+  is_active?: boolean | null;
+};
+
 type Recipe = {
   id: string;
   name: string;
@@ -26,6 +33,13 @@ type Recipe = {
   biga_yeast_percent?: number | null;
   flour_mix?: any;
   procedure?: string | null;
+
+  // Calculés / stockés
+  balls_count?: number | null;
+  ball_weight?: number | null;
+  total_cost?: number | null;
+  yield_grams?: number | null;
+
   created_at: string;
   user_id: string;
   [key: string]: any;
@@ -51,15 +65,62 @@ function normalize2To100(a: number, b: number) {
   return { a: aNorm, b: bNorm, total: 100 };
 }
 
+function n2(v: unknown) {
+  const x = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(x) ? x : 0;
+}
+
+function round2(v: number) {
+  return Math.round(v * 100) / 100;
+}
+
+function fmtMoney2(v: number) {
+  return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+}
+
+function fmtKg3(v: number) {
+  return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + " €/kg";
+}
+
+function keyName(s: string) {
+  return (s ?? "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function bestMatchByAliases(ings: IngredientRow[], aliases: string[]) {
+  const a = aliases.map((x) => keyName(x)).filter(Boolean);
+
+  // 1) match exact
+  for (const ing of ings) {
+    const kn = keyName(String(ing.name ?? ""));
+    if (!kn) continue;
+    if (a.includes(kn)) return ing;
+  }
+  // 2) match contains (heuristique)
+  for (const ing of ings) {
+    const kn = keyName(String(ing.name ?? ""));
+    if (!kn) continue;
+    if (a.some((w) => w && kn.includes(w))) return ing;
+  }
+  return null;
+}
+
 export default function RecipePage() {
   const params = useParams();
   const id = (params?.id as string) || "";
   const router = useRouter();
+
   const [state, setState] = useState<{
     status: "loading" | "NOT_LOGGED" | "OK" | "ERROR";
     recipe?: Recipe;
     error?: any;
   }>({ status: "loading" });
+
+  const [ingredients, setIngredients] = useState<IngredientRow[]>([]);
 
   // PROD INPUTS (modifiables via steppers)
   const [nbPatons, setNbPatons] = useState<number>(150);
@@ -80,7 +141,6 @@ export default function RecipePage() {
     flourB_name: string;
     flourB_percent: string;
 
-    // ✅ nouveau champ
     procedure: string;
   } | null>(null);
 
@@ -92,7 +152,7 @@ export default function RecipePage() {
     exporting: false,
   });
 
-  // PARSING (toujours appelé)
+  // PARSING
   const parsed = useMemo(() => {
     const hydration = clamp(toNumSafe(form?.hydration_total ?? "", 65), 0, 120);
     const salt = clamp(toNumSafe(form?.salt_percent ?? "", 2), 0, 10);
@@ -133,7 +193,7 @@ export default function RecipePage() {
 
   const isBiga = (form?.type ?? "direct") === "biga";
 
-  // CALCUL (toujours appelé)
+  // CALCUL pâte
   const result = useMemo(() => {
     if (!form) {
       return {
@@ -166,18 +226,84 @@ export default function RecipePage() {
           },
       flourMix: parsed.flourMix,
     });
+  }, [form, form?.type, nbPatons, poidsPaton, isBiga, parsed.hydration, parsed.salt, parsed.honey, parsed.oil, parsed.yeastUi, parsed.flourMix]);
+
+  // Option A — Coût auto depuis index ingrédients
+  const costing = useMemo(() => {
+    const flourTotalG = n2(result?.totals?.flour_total_g);
+    const waterG = n2(result?.totals?.water_g);
+    const saltG = n2(result?.totals?.salt_g);
+    const honeyG = n2(result?.totals?.honey_g);
+    const oilG = n2(result?.totals?.oil_g);
+    const yeastG = n2(result?.totals?.yeast_g);
+
+    const flourAName = (form?.flourA_name ?? "").trim();
+    const flourBName = (form?.flourB_name ?? "").trim();
+
+    const aPct = clamp(toNumSafe(form?.flourA_percent ?? "", 80), 0, 100);
+    const bPct = clamp(toNumSafe(form?.flourB_percent ?? "", 20), 0, 100);
+    const norm = normalize2To100(aPct, bPct);
+
+    const flourAG = flourTotalG > 0 ? (flourTotalG * norm.a) / 100 : 0;
+    const flourBG = flourTotalG > 0 ? (flourTotalG * norm.b) / 100 : 0;
+
+    const missing: string[] = [];
+    const parts: Array<{ label: string; grams: number; cpu: number; cost: number }> = [];
+
+    const pushByExactName = (label: string, grams: number, name: string) => {
+      if (grams <= 0) return;
+      const ing = bestMatchByAliases(ingredients, [name, label]);
+      const cpu = n2(ing?.cost_per_unit);
+      if (!ing || cpu <= 0) missing.push(label);
+      parts.push({ label, grams, cpu, cost: grams * cpu });
+    };
+
+    const pushByAliases = (label: string, grams: number, aliases: string[]) => {
+      if (grams <= 0) return;
+      const ing = bestMatchByAliases(ingredients, aliases);
+      const cpu = n2(ing?.cost_per_unit);
+      if (!ing || cpu <= 0) missing.push(label);
+      parts.push({ label, grams, cpu, cost: grams * cpu });
+    };
+
+    // Farines : on tente match sur nom exact
+    pushByExactName("Farine A", flourAG, flourAName || "Farine A");
+    pushByExactName("Farine B", flourBG, flourBName || "Farine B");
+
+    // Autres : heuristiques
+    pushByAliases("Eau", waterG, ["eau", "water"]);
+    pushByAliases("Sel", saltG, ["sel", "sel fin", "salt"]);
+    pushByAliases("Miel", honeyG, ["miel", "honey"]);
+    pushByAliases("Huile", oilG, ["huile", "huile olive", "huile d'olive", "olive"]);
+    pushByAliases("Levure", yeastG, ["levure", "levure seche", "levure fraiche", "yeast"]);
+
+    const totalCost = round2(parts.reduce((acc, p) => acc + n2(p.cost), 0));
+    const yieldGrams = Math.round(flourTotalG + waterG + saltG + honeyG + oilG + yeastG);
+
+    const costPerKg = yieldGrams > 0 ? totalCost / (yieldGrams / 1000) : 0;
+    const costPerBall = nbPatons > 0 ? totalCost / nbPatons : 0;
+
+    return {
+      parts,
+      missing,
+      totalCost,
+      yieldGrams,
+      costPerKg,
+      costPerBall,
+    };
   }, [
-    form,
-    form?.type,
+    ingredients,
+    result?.totals?.flour_total_g,
+    result?.totals?.water_g,
+    result?.totals?.salt_g,
+    result?.totals?.honey_g,
+    result?.totals?.oil_g,
+    result?.totals?.yeast_g,
+    form?.flourA_name,
+    form?.flourB_name,
+    form?.flourA_percent,
+    form?.flourB_percent,
     nbPatons,
-    poidsPaton,
-    isBiga,
-    parsed.hydration,
-    parsed.salt,
-    parsed.honey,
-    parsed.oil,
-    parsed.yeastUi,
-    parsed.flourMix,
   ]);
 
   // LOAD
@@ -190,18 +316,22 @@ export default function RecipePage() {
       }
 
       if (!id || !isUuid(id)) {
-  setState({
-    status: "ERROR",
-    error: { message: "ID invalide (UUID attendu)" },
-  });
-  return;
-}
+        setState({ status: "ERROR", error: { message: "ID invalide (UUID attendu)" } });
+        return;
+      }
 
-            const { data: recipe, error } = await supabase
-        .from("recipes")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
+      const { data: ing, error: ingErr } = await supabase
+        .from("ingredients")
+        .select("id,name,cost_per_unit,is_active")
+        .order("name", { ascending: true });
+
+      if (ingErr) {
+        setState({ status: "ERROR", error: ingErr });
+        return;
+      }
+      setIngredients((ing ?? []) as IngredientRow[]);
+
+      const { data: recipe, error } = await supabase.from("recipes").select("*").eq("id", id).maybeSingle();
 
       if (error) {
         setState({ status: "ERROR", error });
@@ -209,25 +339,22 @@ export default function RecipePage() {
       }
 
       if (!recipe) {
-        setState({
-          status: "ERROR",
-          error: { message: "Empâtement introuvable" },
-        });
+        setState({ status: "ERROR", error: { message: "Empâtement introuvable" } });
         return;
       }
+
       const rr = recipe as Recipe;
 
       const mix = Array.isArray(rr.flour_mix) ? rr.flour_mix : [];
       const a = mix[0] ?? { name: "Tipo 00", percent: 80 };
       const b = mix[1] ?? { name: "Tipo 1", percent: 20 };
 
-      const type: DoughType =
-        rr.type === "direct" || rr.type === "biga" || rr.type === "focaccia" ? (rr.type as DoughType) : "direct";
+      const type: DoughType = rr.type === "direct" || rr.type === "biga" || rr.type === "focaccia" ? (rr.type as DoughType) : "direct";
 
-      const yeastUi =
-        type === "biga"
-          ? String((rr as any).biga_yeast_percent ?? 0)
-          : String((rr as any).yeast_percent ?? 0);
+      const yeastUi = type === "biga" ? String((rr as any).biga_yeast_percent ?? 0) : String((rr as any).yeast_percent ?? 0);
+
+      setNbPatons(Math.max(1, n2((rr as any).balls_count) || 150));
+      setPoidsPaton(Math.max(1, n2((rr as any).ball_weight) || 264));
 
       setForm({
         name: String(rr.name ?? ""),
@@ -241,8 +368,6 @@ export default function RecipePage() {
         flourA_percent: String(a.percent ?? 80),
         flourB_name: String(b.name ?? "Tipo 1"),
         flourB_percent: String(b.percent ?? 20),
-
-        // ✅ procedure depuis DB
         procedure: String(rr.procedure ?? ""),
       });
 
@@ -250,13 +375,23 @@ export default function RecipePage() {
     };
 
     run();
-    }, [id, router]);
+  }, [id]);
+
   // SAVE
   const saveRecipe = async () => {
     if (!form?.name || !form.name.trim()) {
+      setSaveState({ saving: false, error: { message: "Le nom de l’empâtement est obligatoire" } });
+      return;
+    }
+
+    if (costing.missing.length > 0) {
       setSaveState({
         saving: false,
-        error: { message: "Le nom de l’empâtement est obligatoire" },
+        error: {
+          message: "Coût empâtement impossible (prix manquant dans l’index ingrédients).",
+          missing: costing.missing,
+          hint: "Mets un cost_per_unit (€/g) sur les ingrédients correspondants (farines, eau, sel, huile, levure…).",
+        },
       });
       return;
     }
@@ -289,12 +424,16 @@ export default function RecipePage() {
 
       flour_mix,
 
-      // 🔴 OBLIGATOIRE (DB NOT NULL)
       balls_count: nbPatons,
       ball_weight: poidsPaton,
 
-      // ✅ nouveau champ
       procedure: (form.procedure ?? "").toString(),
+
+      // ✅ Option A : on stocke le coût et le rendement
+      total_cost: round2(costing.totalCost),
+      yield_grams: Math.round(costing.yieldGrams),
+
+      updated_at: new Date().toISOString(),
     };
 
     if (form.type === "biga") {
@@ -427,13 +566,11 @@ export default function RecipePage() {
         }
       />
 
-      {/* N. pâtons + grammage */}
       <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "end" }}>
         <NumberStepper label="N. pâtons" value={nbPatons} onChange={(n) => setNbPatons(Math.max(1, n))} step={1} min={1} max={5000} />
         <NumberStepper label="Grammage pâton" value={poidsPaton} onChange={(n) => setPoidsPaton(Math.max(1, n))} step={1} min={1} max={2000} suffix="g" />
       </div>
 
-      {/* Nom */}
       <div style={{ marginTop: 16 }}>
         <div className="muted" style={{ marginBottom: 6 }}>
           Nom de l’empâtement
@@ -443,11 +580,55 @@ export default function RecipePage() {
           value={form.name ?? ""}
           onChange={(e) => setForm((p) => (p ? { ...p, name: e.target.value } : p))}
           placeholder="Ex : Biga hiver 65%"
-          style={{ fontSize: 17, fontWeight: 600, color: "#ffffff" }}
+          style={{ fontSize: 17, fontWeight: 600 }}
         />
       </div>
 
-      {/* ✅ Procédure */}
+      {/* Coût Option A */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="muted" style={{ marginBottom: 10 }}>
+          Coût (Option A — calcul auto depuis l’index ingrédients)
+        </div>
+
+        {costing.missing.length > 0 ? (
+          <div className="errorBox" style={{ marginTop: 10 }}>
+            <div style={{ fontWeight: 800 }}>Prix manquant dans l’index</div>
+            <div className="muted" style={{ marginTop: 6 }}>
+              À corriger dans “Ingrédients” (cost_per_unit en €/g) :
+            </div>
+            <div style={{ marginTop: 6, fontWeight: 800 }}>{costing.missing.join(" · ")}</div>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 10 }}>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="muted" style={{ fontSize: 12 }}>
+                Rendement
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 900 }}>{Math.round(costing.yieldGrams).toLocaleString("fr-FR")} g</div>
+            </div>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="muted" style={{ fontSize: 12 }}>
+                Coût total
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtMoney2(costing.totalCost)}</div>
+            </div>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="muted" style={{ fontSize: 12 }}>
+                Coût / kg
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtKg3(costing.costPerKg)}</div>
+            </div>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="muted" style={{ fontSize: 12 }}>
+                Coût / pâton
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtMoney2(costing.costPerBall)}</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Procédure */}
       <div className="card" style={{ marginTop: 16 }}>
         <div className="muted" style={{ marginBottom: 8 }}>
           Procédure (protocole)
@@ -479,7 +660,6 @@ export default function RecipePage() {
           </pre>
         ) : null}
 
-        {/* TYPE */}
         <div style={{ marginTop: 12 }}>
           <div className="muted" style={{ marginBottom: 8 }}>
             Type
@@ -491,7 +671,6 @@ export default function RecipePage() {
           </select>
         </div>
 
-        {/* POURCENTAGES */}
         <div style={{ marginTop: 12 }}>
           <PercentStepper label="Hydratation" value={form.hydration_total ?? ""} onChange={(v) => setForm((p) => (p ? { ...p, hydration_total: v } : p))} step={0.5} min={0} max={120} suffix="%" />
           <PercentStepper label="Sel" value={form.salt_percent ?? ""} onChange={(v) => setForm((p) => (p ? { ...p, salt_percent: v } : p))} step={0.1} min={0} max={10} suffix="%" />
@@ -500,7 +679,6 @@ export default function RecipePage() {
           <PercentStepper label={isBiga ? "Levure (phase 2)" : "Levure"} value={form.yeast_ui ?? ""} onChange={(v) => setForm((p) => (p ? { ...p, yeast_ui: v } : p))} step={0.05} min={0} max={10} suffix="%" />
         </div>
 
-        {/* MIX FARINES */}
         <div style={{ marginTop: 14 }}>
           <div className="muted" style={{ marginBottom: 8 }}>
             Mix farines (2)
@@ -520,7 +698,6 @@ export default function RecipePage() {
         </div>
       </div>
 
-      {/* DIRECT/FOCACCIA */}
       {!isBiga && (
         <div style={{ marginTop: 20 }}>
           <h2 className="h2">Quantités</h2>
@@ -556,7 +733,6 @@ export default function RecipePage() {
         </div>
       )}
 
-      {/* BIGA */}
       {isBiga && (
         <div style={{ marginTop: 20 }}>
           <h2 className="h2">Phases</h2>

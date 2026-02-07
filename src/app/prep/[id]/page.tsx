@@ -454,7 +454,7 @@ export default function PrepRecipeDetailPage() {
   if (loading) {
     return (
       <main className="container">
-        <TopNav />
+      <TopNav title="Préparation" />
         <p className="muted">Chargement…</p>
       </main>
     );
@@ -463,7 +463,7 @@ export default function PrepRecipeDetailPage() {
   if (error && !recipe) {
     return (
       <main className="container">
-        <TopNav />
+        <TopNav title="Préparation" />
         <div style={{ marginTop: 12 }}>
           <p className="muted">Recette introuvable.</p>
           <pre className="code" style={{ marginTop: 10 }}>
@@ -480,7 +480,7 @@ export default function PrepRecipeDetailPage() {
   if (!recipe) {
     return (
       <main className="container">
-        <TopNav />
+        <TopNav title="Préparation" />
         <p className="muted">Recette introuvable.</p>
         <button className="btn" type="button" onClick={() => router.replace("/prep")}>
           Retour
@@ -526,7 +526,7 @@ export default function PrepRecipeDetailPage() {
 
   return (
     <main className="container">
-      <TopNav />
+      <TopNav title="Préparation" />
 
       {/* Header actions */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>

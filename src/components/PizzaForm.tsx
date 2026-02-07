@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import PizzaIngredientList from "@/components/PizzaIngredientList";
@@ -45,7 +45,15 @@ function round2(v: number) {
 }
 
 function fmtMoney(v: number) {
-  return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+  return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+}
+
+function fmtPct1(v: number) {
+  return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
+}
+
+function fmtKg3(v: number) {
+  return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + " €/kg";
 }
 
 function normalizeUnit(u: unknown): UnitType {
@@ -135,6 +143,9 @@ export default function PizzaForm(props: { pizzaId?: string }) {
 
   const [ballWeightG, setBallWeightG] = useState<string>("264");
 
+  const [vatRate, setVatRate] = useState<string>("10");
+  const [marginRate, setMarginRate] = useState<string>("60");
+
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
   const [saveError, setSaveError] = useState<unknown>(null);
@@ -170,13 +181,33 @@ export default function PizzaForm(props: { pizzaId?: string }) {
     return Number.isFinite(n) && n > 0 ? n : 0;
   }, [ballWeightG]);
 
+  const ingredientWeightGrams = useMemo(() => {
+    return rows.reduce((acc, r) => {
+      if (!r.ingredient_id) return acc;
+      const u = normalizeUnit(r.unit);
+      if (u !== "g") return acc;
+      const qty = typeof r.qty === "number" ? r.qty : n2(r.qty);
+      return acc + n2(qty);
+    }, 0);
+  }, [rows]);
+
+  const vatPct = useMemo(() => {
+    const n = Number(String(vatRate).replace(",", "."));
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  }, [vatRate]);
+
+  const marginPct = useMemo(() => {
+    const n = Number(String(marginRate).replace(",", "."));
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  }, [marginRate]);
+
   const costs = useMemo(() => {
     const toppings = rows.reduce((acc, r) => {
       if (!r.ingredient_id) return acc;
       const ing = ingredients.find((x) => x.id === r.ingredient_id);
       const cpu = n2((ing as any)?.cost_per_unit);
       const qty = typeof r.qty === "number" ? r.qty : n2(r.qty);
-      return acc + qty * cpu;
+      return acc + n2(qty) * cpu;
     }, 0);
 
     const totalCost = n2(dough?.total_cost);
@@ -188,9 +219,29 @@ export default function PizzaForm(props: { pizzaId?: string }) {
       toppings: round2(toppings),
       dough: round2(doughCost),
       total: round2(toppings + doughCost),
-      doughCpuG: doughCpuG,
+      doughCpuG,
     };
   }, [rows, ingredients, dough, ballWeightNum]);
+
+  const weightTotalGrams = useMemo(() => {
+    const w = n2(ballWeightNum) + n2(ingredientWeightGrams);
+    return w > 0 ? w : 0;
+  }, [ballWeightNum, ingredientWeightGrams]);
+
+  const costPerKg = useMemo(() => {
+    if (weightTotalGrams <= 0) return 0;
+    return costs.total / (weightTotalGrams / 1000);
+  }, [costs.total, weightTotalGrams]);
+
+  const pricing = useMemo(() => {
+    const m = Math.min(Math.max(marginPct, 0), 99.9) / 100;
+    const v = Math.min(Math.max(vatPct, 0), 100) / 100;
+
+    const pvHT = costs.total > 0 && m < 1 ? costs.total / (1 - m) : 0;
+    const pvTTC = pvHT > 0 ? pvHT * (1 + v) : 0;
+
+    return { pvHT, pvTTC, vatPct, marginPct };
+  }, [costs.total, vatPct, marginPct]);
 
   useEffect(() => {
     const run = async () => {
@@ -232,6 +283,8 @@ export default function PizzaForm(props: { pizzaId?: string }) {
         setRows([]);
         setPhotoPreview(null);
         setBallWeightG("264");
+        setVatRate("10");
+        setMarginRate("60");
         setStatus("OK");
         return;
       }
@@ -434,13 +487,13 @@ export default function PizzaForm(props: { pizzaId?: string }) {
     let id = pizzaId;
 
     const payload = {
-  name: nm,
-  dough_recipe_id: form.dough_recipe_id ? form.dough_recipe_id : null,
-  notes: form.notes?.trim() || null,
-  photo_url: form.photo_url?.trim() || null,
-  is_draft: false,
-  updated_at: new Date().toISOString(),
-};
+      name: nm,
+      dough_recipe_id: form.dough_recipe_id ? form.dough_recipe_id : null,
+      notes: form.notes?.trim() || null,
+      photo_url: form.photo_url?.trim() || null,
+      is_draft: false,
+      updated_at: new Date().toISOString(),
+    };
 
     if (!id) {
       const { data, error: insErr } = await supabase.from("pizza_recipes").insert(payload).select("id").single();
@@ -615,36 +668,44 @@ export default function PizzaForm(props: { pizzaId?: string }) {
     color: theme.primaryText,
   };
 
+  const metricBox = {
+    background: "#fff",
+    border: `1px solid ${theme.border}`,
+    borderRadius: 14,
+    padding: 12,
+    minHeight: 82,
+  } as const;
+
   return (
     <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
       <div style={{ maxWidth: 980, margin: "0 auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-          <Link href="/pizzas" style={{ color: theme.muted, textDecoration: "none", fontWeight: 900 }}>
-            Accueil
-          </Link>
-
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            {isEdit ? (
-              <button type="button" onClick={exportPdf} disabled={saving} style={btn}>
-                PDF
-              </button>
-            ) : null}
-
-            {isEdit ? (
-              <button type="button" onClick={del} disabled={saving} style={btn}>
-                Supprimer
-              </button>
-            ) : null}
-
-            <button type="button" onClick={save} disabled={saving} style={btnPrimary}>
-              {saving ? "Sauvegarde…" : saveOk ? "OK" : "Sauvegarder"}
-            </button>
-          </div>
-        </div>
-
         <div style={{ marginTop: 12 }}>
-          <h1 style={{ margin: 0, fontSize: 34, letterSpacing: -0.4 }}>Fiche pizza</h1>
+          <h1 style={{ margin: 0, fontSize: 34, letterSpacing: -0.4 }}>Créer une pizza</h1>
           <div style={{ color: theme.muted, marginTop: 4 }}>Empâtement + ingrédients + notes</div>
+
+          <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <button type="button" onClick={() => router.push("/")} style={btn}>
+              Accueil
+            </button>
+
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              {isEdit ? (
+                <button type="button" onClick={exportPdf} disabled={saving} style={btn}>
+                  PDF
+                </button>
+              ) : null}
+
+              {isEdit ? (
+                <button type="button" onClick={del} disabled={saving} style={btn}>
+                  Supprimer
+                </button>
+              ) : null}
+
+              <button type="button" onClick={save} disabled={saving} style={btnPrimary}>
+                {saving ? "Sauvegarde…" : saveOk ? "OK" : "Sauvegarder"}
+              </button>
+            </div>
+          </div>
         </div>
 
         {saveError ? (
@@ -663,9 +724,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
         ) : null}
 
         <div style={{ marginTop: 14, ...card }}>
-          <div style={{ fontWeight: 950, fontSize: 22, textAlign: "center" }}>
-            {form.name.trim() ? form.name.trim() : "Pizza (à nommer)"}
-          </div>
+          <div style={{ fontWeight: 950, fontSize: 22, textAlign: "center" }}>{form.name.trim() ? form.name.trim() : "Pizza (à nommer)"}</div>
           <div style={{ color: theme.muted, textAlign: "center", marginTop: 6, fontSize: 13 }}>
             {rowsCount.pre} avant four · {rowsCount.post} après four · total {rowsCount.total}
           </div>
@@ -709,16 +768,66 @@ export default function PizzaForm(props: { pizzaId?: string }) {
               </div>
             </div>
 
-            <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div style={{ background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 14, padding: 12 }}>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Coût empâtement</div>
-                <div style={{ fontSize: 28, fontWeight: 950, marginTop: 2 }}>{fmtMoney(costs.dough)}</div>
+            <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>TVA vente (%)</div>
+                <select style={input} value={vatRate} onChange={(e) => setVatRate(e.target.value)}>
+                  <option value="5.5">5,5</option>
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                </select>
               </div>
 
-              <div style={{ background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 14, padding: 12 }}>
+              <div>
+                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Marge (taux de marque %)</div>
+                <input
+                  style={{ ...input, textAlign: "center", fontWeight: 950 }}
+                  inputMode="decimal"
+                  value={marginRate}
+                  onChange={(e) => setMarginRate(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div style={metricBox}>
+                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Coût empâtement</div>
+                <div style={{ fontSize: 26, fontWeight: 950, marginTop: 2 }}>{fmtMoney(costs.dough)}</div>
+                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Pâton: {Math.round(ballWeightNum)} g</div>
+              </div>
+
+              <div style={metricBox}>
                 <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Coût total</div>
-                <div style={{ fontSize: 28, fontWeight: 950, marginTop: 2 }}>{fmtMoney(costs.total)}</div>
+                <div style={{ fontSize: 26, fontWeight: 950, marginTop: 2 }}>{fmtMoney(costs.total)}</div>
                 <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Toppings: {fmtMoney(costs.toppings)}</div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div style={metricBox}>
+                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Poids ingrédients (g)</div>
+                <div style={{ fontSize: 26, fontWeight: 950, marginTop: 2 }}>{Math.round(ingredientWeightGrams).toLocaleString("fr-FR")} g</div>
+                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Somme des lignes en “g”</div>
+              </div>
+
+              <div style={metricBox}>
+                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Coût / kg</div>
+                <div style={{ fontSize: 26, fontWeight: 950, marginTop: 2 }}>{fmtKg3(costPerKg)}</div>
+                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Poids total: {Math.round(weightTotalGrams)} g</div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div style={metricBox}>
+                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Prix conseillé HT</div>
+                <div style={{ fontSize: 26, fontWeight: 950, marginTop: 2 }}>{fmtMoney(pricing.pvHT)}</div>
+                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Marge: {fmtPct1(pricing.marginPct)}</div>
+              </div>
+
+              <div style={metricBox}>
+                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Prix conseillé TTC</div>
+                <div style={{ fontSize: 26, fontWeight: 950, marginTop: 2 }}>{fmtMoney(pricing.pvTTC)}</div>
+                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>TVA: {fmtPct1(pricing.vatPct)}</div>
               </div>
             </div>
           </div>
@@ -747,12 +856,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
 
             <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
               <input ref={fileRef} type="file" accept="image/*" onChange={onPickPhoto} disabled={photoUploading} />
-              <button
-                type="button"
-                onClick={clearPhoto}
-                disabled={photoUploading || (!form.photo_url && !photoPreview)}
-                style={btn}
-              >
+              <button type="button" onClick={clearPhoto} disabled={photoUploading || (!form.photo_url && !photoPreview)} style={btn}>
                 Retirer
               </button>
               {photoUploading ? <span style={{ color: theme.muted, fontWeight: 900 }}>Upload…</span> : null}
