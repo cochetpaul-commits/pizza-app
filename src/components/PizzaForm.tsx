@@ -16,6 +16,12 @@ type DoughRecipeRow = {
   ball_weight: number | null;
 };
 
+type LatestOfferRow = {
+  ingredient_id: string;
+  unit_price: number;
+};
+
+
 type PizzaRowDB = {
   id: string;
   name: string | null;
@@ -133,6 +139,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
   const [recipes, setRecipes] = useState<DoughRecipeRow[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [rows, setRows] = useState<PizzaIngredientRow[]>([]);
+  const [priceByIngredient, setPriceByIngredient] = useState<Record<string, number>>({});
 
   const [form, setForm] = useState<{
     name: string;
@@ -204,8 +211,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
   const costs = useMemo(() => {
     const toppings = rows.reduce((acc, r) => {
       if (!r.ingredient_id) return acc;
-      const ing = ingredients.find((x) => x.id === r.ingredient_id);
-      const cpu = n2((ing as any)?.cost_per_unit);
+      const cpu = n2(priceByIngredient[r.ingredient_id]);
       const qty = typeof r.qty === "number" ? r.qty : n2(r.qty);
       return acc + n2(qty) * cpu;
     }, 0);
@@ -268,7 +274,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
 
       const { data: ing, error: ingErr } = await supabase
         .from("ingredients")
-        .select("id,name,category,allergens,is_active,cost_per_unit")
+        .select("id,name,category,allergens,is_active")
         .order("name", { ascending: true });
 
       if (ingErr) {
@@ -277,6 +283,25 @@ export default function PizzaForm(props: { pizzaId?: string }) {
         return;
       }
       setIngredients((ing ?? []) as Ingredient[]);
+ 
+      const { data: offers, error: offErr } = await supabase
+        .from("v_latest_offers")
+        .select("ingredient_id, unit_price");
+ 
+      if (offErr) {
+        setStatus("ERROR");
+        setError(offErr);
+        return;
+      }
+ 
+      const priceMap: Record<string, number> = {};
+      (offers ?? []).forEach((o: LatestOfferRow) => {
+        if (typeof o.unit_price === "number") {
+          priceMap[o.ingredient_id] = o.unit_price;
+        }
+      });
+ 
+      setPriceByIngredient(priceMap);
 
       if (!isEdit) {
         setForm({ name: "", dough_recipe_id: "", notes: "", photo_url: "" });
