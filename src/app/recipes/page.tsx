@@ -62,9 +62,8 @@ export default function RecipesPage() {
       const now = new Date();
       const autoName = `Empâtement ${now.toLocaleDateString("fr-FR")} ${now.toLocaleTimeString("fr-FR").slice(0, 5)}`;
 
-      // Valeurs par défaut (tu pourras modifier ensuite dans la fiche)
       const payload: any = {
-        name: autoName, // Nom auto => pas obligatoire côté utilisateur
+        name: autoName,
         type: "biga",
         hydration_total: 65,
         salt_percent: 2,
@@ -74,8 +73,6 @@ export default function RecipesPage() {
           { name: "Tipo 00", percent: 80 },
           { name: "Tipo 1", percent: 20 },
         ],
-
-        // IMPORTANT (compat DB NOT NULL)
         yeast_percent: 0,
         biga_yeast_percent: 0,
       };
@@ -84,7 +81,6 @@ export default function RecipesPage() {
       if (error) throw error;
       if (!data?.id) throw new Error("ID manquant après création");
 
-      // FLUX DIRECT : on ouvre la fiche immédiatement
       router.push(`/recipes/${data.id}`);
       router.refresh();
     } catch (e: any) {
@@ -110,6 +106,12 @@ export default function RecipesPage() {
     }));
   };
 
+  const topActions = (
+    <button className="btn btnPrimary" onClick={createNewRecipe} disabled={creatingNew}>
+      {creatingNew ? "Création…" : "Nouvel empâtement"}
+    </button>
+  );
+
   if (state.status === "loading") {
     return (
       <main className="container">
@@ -132,10 +134,7 @@ export default function RecipesPage() {
   if (state.status === "ERROR") {
     return (
       <main className="container">
-        <TopNav />
-        <h1 className="h1" style={{ marginTop: 12 }}>
-          Empâtements
-        </h1>
+        <TopNav title="Empâtements" subtitle="Création et suivi de tes pâtes" actions={topActions} />
         <pre className="errorBox">{JSON.stringify(state.error, null, 2)}</pre>
       </main>
     );
@@ -145,22 +144,7 @@ export default function RecipesPage() {
 
   return (
     <main className="container">
-      <TopNav />
-
-      <div className="rowBetween" style={{ marginTop: 12 }}>
-        <div>
-          <h1 className="h1" style={{ margin: 0 }}>
-            Empâtements
-          </h1>
-          <p className="muted" style={{ marginTop: 6 }}>
-            Clique sur un empâtement pour l’ouvrir
-          </p>
-        </div>
-
-        <button className="btn btnPrimary" onClick={createNewRecipe} disabled={creatingNew}>
-          {creatingNew ? "Création…" : "Nouvel empâtement"}
-        </button>
-      </div>
+      <TopNav title="Empâtements" subtitle="Clique sur un empâtement pour l’ouvrir" actions={topActions} />
 
       {createError ? (
         <pre className="code" style={{ marginTop: 12 }}>

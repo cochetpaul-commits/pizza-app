@@ -73,7 +73,6 @@ export default function Home() {
 
       {status === "ok" ? (
         <div style={{ marginTop: 18, display: "grid", gap: 14 }}>
-          {/* PIZZA */}
           <div className="card" style={{ paddingTop: 18 }}>
             <p className="cardTitle" style={{ textAlign: "center", marginBottom: 6, letterSpacing: 1 }}>
               PIZZA
@@ -92,7 +91,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* EMPÂTEMENT */}
           <div className="card" style={{ paddingTop: 18 }}>
             <p className="cardTitle" style={{ textAlign: "center", marginBottom: 6, letterSpacing: 1 }}>
               EMPÂTEMENT
@@ -111,7 +109,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* PREP (recettes pivot) */}
           <div className="card" style={{ paddingTop: 18 }}>
             <p className="cardTitle" style={{ textAlign: "center", marginBottom: 6, letterSpacing: 1 }}>
               PRÉPARATIONS
@@ -130,7 +127,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* CUISINE */}
           <div className="card" style={{ paddingTop: 18 }}>
             <p className="cardTitle" style={{ textAlign: "center", marginBottom: 6, letterSpacing: 1 }}>
               CUISINE
@@ -149,7 +145,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* INGREDIENTS */}
           <div className="card" style={{ paddingTop: 18 }}>
             <p className="cardTitle" style={{ textAlign: "center", marginBottom: 6, letterSpacing: 1 }}>
               INGRÉDIENTS
@@ -161,6 +156,24 @@ export default function Home() {
             <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap", justifyContent: "center" }}>
               <Link className="btn btnPrimary btnWide" href="/ingredients">
                 Index ingrédients
+              </Link>
+            </div>
+          </div>
+
+          <div className="card" style={{ paddingTop: 18 }}>
+            <p className="cardTitle" style={{ textAlign: "center", marginBottom: 6, letterSpacing: 1 }}>
+              FACTURES
+            </p>
+            <p className="muted" style={{ marginTop: 0, textAlign: "center" }}>
+              Import fournisseurs → mise à jour des prix
+            </p>
+
+            <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap", justifyContent: "center" }}>
+              <Link className="btn btnWide" href="/invoices/mael">
+                Import MAEL
+              </Link>
+              <Link className="btn btnPrimary btnWide" href="/invoices/metro">
+                Import METRO
               </Link>
             </div>
           </div>

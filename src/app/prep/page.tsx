@@ -84,7 +84,7 @@ export default function PrepRecipesPage() {
   if (state.status === "ERROR") {
     return (
       <main className="container">
-        <TopNav />
+        <TopNav title="Recettes pivot" />
         <h1 className="h1" style={{ marginTop: 12 }}>
           Recettes pivot (prep)
         </h1>
@@ -97,7 +97,7 @@ export default function PrepRecipesPage() {
 
   return (
     <main className="container">
-      <TopNav />
+      <TopNav title="Recettes pivot" />
 
       <div className="rowBetween" style={{ marginTop: 12 }}>
         <div>
