@@ -62,19 +62,17 @@ export async function POST(req: Request) {
       auth: { persistSession: false },
     });
 
-    // 1) Pizza
     const { data: pizza, error: pErr } = await supabase
       .from("pizza_recipes")
       .select("id,name,notes,dough_recipe_id,photo_url")
       .eq("id", pizzaId)
       .maybeSingle();
 
-    if (pErr) return NextResponse.json({ message: pErr.message }, { status: 500 });
+    if (pErr) return NextResponse.json({ message: "Pizza fetch error", details: pErr.message }, { status: 500 });
     if (!pizza) return NextResponse.json({ message: "Pizza introuvable" }, { status: 404 });
 
     const pizzaRow = pizza as PizzaRow;
 
-    // 2) Dough recipe (optionnel)
     let doughName: string | null = null;
     let doughType: string | null = null;
 
@@ -92,7 +90,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3) Pizza ingredients
     const { data: pi, error: piErr } = await supabase
       .from("pizza_ingredients")
       .select("ingredient_id,stage,qty,unit,sort_order")
@@ -100,10 +97,10 @@ export async function POST(req: Request) {
       .order("stage", { ascending: true })
       .order("sort_order", { ascending: true });
 
-    if (piErr) return NextResponse.json({ message: piErr.message }, { status: 500 });
+    if (piErr) return NextResponse.json({ message: "Pizza ingredients error", details: piErr.message }, { status: 500 });
+
     const piRows = ((pi ?? []) as PiRow[]).slice();
 
-    // 4) Fetch ingredient names (minimal)
     const ingredientIds = Array.from(new Set(piRows.map((r) => r.ingredient_id)));
     const ingMap = new Map<string, string | null>();
 
@@ -120,7 +117,6 @@ export async function POST(req: Request) {
         name: ingMap.get(r.ingredient_id) ?? null,
         qty: r.qty ?? null,
         unit: r.unit ?? null,
-        sort_order: r.sort_order ?? null,
       }));
 
     const post = piRows
@@ -129,7 +125,6 @@ export async function POST(req: Request) {
         name: ingMap.get(r.ingredient_id) ?? null,
         qty: r.qty ?? null,
         unit: r.unit ?? null,
-        sort_order: r.sort_order ?? null,
       }));
 
     const exportedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
@@ -145,7 +140,6 @@ export async function POST(req: Request) {
       photoUrl: pizzaRow.photo_url ?? null,
     };
 
-    // ✅ TypeScript: on force le type exact attendu par renderToBuffer
     const documentElement = PizzaPdfDocument({ data }) as unknown as React.ReactElement<DocumentProps>;
     const pdfBuffer = await renderToBuffer(documentElement);
 
@@ -160,6 +154,7 @@ export async function POST(req: Request) {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${filename}"`,
+        "Cache-Control": "no-store",
       },
     });
   } catch (e) {
