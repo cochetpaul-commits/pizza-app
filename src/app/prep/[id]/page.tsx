@@ -409,7 +409,7 @@ export default function PrepRecipeDetailPage() {
           prep_recipe_id: recipe.id,
           ingredient_id: newIngredientId,
           amount_per_1_pivot: ratio,
-          unit: newUnit,
+          unit: "g",
           sort_order: nextSort,
         })
         .select("id,prep_recipe_id,ingredient_id,amount_per_1_pivot,unit,sort_order,ingredients(name,cost_per_unit)")
