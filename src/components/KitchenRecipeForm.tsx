@@ -691,16 +691,18 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       const totalCost = round2(computed.totalCost);
       const totalWeight = round0(yieldGramsNum);
       const name = (form.name.trim() || "Recette cuisine").slice(0, 120);
+      const cpu = totalWeight > 0 ? totalCost / totalWeight : 0; // €/g
+      if (!(cpu > 0)) throw new Error("Coût/unité invalide (€/g).");
 
       const ingredientPayload: Record<string, unknown> = {
         name,
-        category: "autre",
+        category: "preparation",
         is_active: true,
         default_unit: "g",
+        cost_per_unit: cpu,
         purchase_price: totalCost,
         purchase_unit: totalWeight,
         purchase_unit_label: "g",
-        purchase_unit_name: "kg",
         updated_at: new Date().toISOString(),
       };
 
