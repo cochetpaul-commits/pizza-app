@@ -1,268 +1,35 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
+import type { Session } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabaseClient";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
-);
+import {
+  CATEGORIES,
+  CAT_COLORS,
+  type Category,
+  type Ingredient,
+  type IngredientStatus,
+  type IngredientUpsert,
+  type LatestOffer,
+  type PriceKind,
+  type Supplier,
+  type Tab,
+} from "@/types/ingredients";
 
-const CATEGORIES = [
-  "autre",
-  "charcuterie",
-  "fromage",
-  "cremerie",
-  "poisson",
-  "herbe",
-  "legume",
-  "epicerie",
-  "boisson",
-  "surgele",
-] as const;
+import {
+  fmtLegacyPriceLine,
+  fmtOfferPriceLine,
+  legacyHasPrice,
+  normalizeSupplierId,
+  offerHasPrice,
+  parseNum,
+  fmtQty,
+} from "@/lib/offers";
 
-type Category = (typeof CATEGORIES)[number];
-type PriceKind = "unit" | "pack_simple" | "pack_composed";
-type IngredientStatus = "to_check" | "validated" | "unknown";
-type Tab = IngredientStatus | "all";
-
-const CAT_COLORS: Record<Category, string> = {
-  autre: "#111827",
-  charcuterie: "#9A3412",
-  fromage: "#92400E",
-  cremerie: "#A16207",
-  poisson: "#075985",
-  herbe: "#166534",
-  legume: "#3F6212",
-  epicerie: "#4C1D95",
-  boisson: "#0F766E",
-  surgele: "#1D4ED8",
-};
-
-type Supplier = {
-  id: string;
-  name: string;
-  is_active: boolean;
-};
-
-type Ingredient = {
-  id: string;
-  name: string;
-  category: Category;
-  allergens: any;
-  is_active: boolean;
-  default_unit: string | null;
-
-  purchase_price: number | null;
-  purchase_unit: number | null;
-  purchase_unit_label: string | null;
-  purchase_unit_name: string | null;
-
-  density_g_per_ml: number | null;
-  piece_weight_g: number | null;
-  piece_volume_ml: number | null;
-
-  supplier_id: string | null;
-  source_prep_recipe_name?: string | null;
-
-  status?: IngredientStatus | null;
-  status_note?: string | null;
-  validated_at?: string | null;
-  validated_by?: string | null;
-
-  cost_per_unit?: number | null;
-};
-
-type LatestOffer = {
-  id?: string;
-  ingredient_id: string;
-  supplier_id: string;
-
-  price_kind: PriceKind;
-
-  unit: "kg" | "l" | "pc" | null;
-  unit_price: number | null;
-
-  pack_price: number | null;
-  pack_total_qty: number | null;
-  pack_unit: "kg" | "l" | null;
-
-  pack_count: number | null;
-  pack_each_qty: number | null;
-  pack_each_unit: "kg" | "l" | "pc" | null;
-
-  density_kg_per_l: number | null;
-  piece_weight_g: number | null;
-
-  updated_at?: string | null;
-};
-
-type IngredientUpsert = {
-  name: string;
-  category: Category;
-  allergens: any;
-  is_active: boolean;
-  default_unit: string | null;
-
-  purchase_price: number | null;
-  purchase_unit: number | null;
-  purchase_unit_label: string | null;
-  purchase_unit_name: string | null;
-
-  density_g_per_ml: number | null;
-  piece_weight_g: number | null;
-  piece_volume_ml: number | null;
-
-  supplier_id: string | null;
-};
-
-function normalizeSupplierId(x: string): string | null {
-  const v = (x ?? "").trim();
-  return v ? v : null;
-}
-
-function parseNum(x: string): number | null {
-  if (x == null) return null;
-  const s = String(x).trim().replace(/\s+/g, "").replace(",", ".");
-  if (!s) return null;
-  const n = Number(s);
-  if (!Number.isFinite(n)) return null;
-  return n;
-}
-
-function n2(x: any): number {
-  const n = Number(x);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function fmtQty(x: number): string {
-  return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 3 }).format(x);
-}
-
-function fmtMoney(x: number): string {
-  return new Intl.NumberFormat("fr-FR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(x);
-}
-
-function fmtLegacyPriceLine(x: Ingredient): { main: string; sub: string } {
-  const cpu = x.cost_per_unit;
-  const lbl = (x.purchase_unit_label ?? "").toLowerCase().trim();
-
-  if (cpu != null && Number.isFinite(cpu)) {
-    if (lbl === "g") {
-      const perKg = cpu * 1000;
-      return {
-        main: `${fmtMoney(perKg)} € /kg`,
-        sub: x.purchase_price != null ? `base: ${fmtMoney(x.purchase_price)} €` : "—",
-      };
-    }
-    if (lbl === "ml") {
-      const perL = cpu * 1000;
-      return {
-        main: `${fmtMoney(perL)} € /L`,
-        sub: x.purchase_price != null ? `base: ${fmtMoney(x.purchase_price)} €` : "—",
-      };
-    }
-    if (lbl === "pc") {
-      const main =
-        x.purchase_price != null ? `${fmtMoney(x.purchase_price)} €/pc` : `${fmtMoney(cpu)} €/pc`;
-      const w = n2(x.piece_weight_g);
-      if (w > 0 && x.purchase_price != null) {
-        const eurPerKg = (x.purchase_price / w) * 1000;
-        return { main, sub: `≈ ${fmtMoney(eurPerKg)} €/kg • ${fmtQty(w)} g/pc` };
-      }
-      return { main, sub: "poids pièce: —" };
-    }
-  }
-
-  return { main: "—", sub: "prix non renseigné" };
-}
-
-function fmtOfferPriceLine(o: LatestOffer): { main: string; sub: string } {
-  const pk = o.price_kind;
-
-  if (pk === "unit") {
-    if (o.unit === "kg" && o.unit_price != null)
-      return { main: `${fmtMoney(o.unit_price)} € /kg`, sub: "offre fournisseur" };
-    if (o.unit === "l" && o.unit_price != null) {
-      const d = o.density_kg_per_l != null ? ` • densité: ${fmtQty(o.density_kg_per_l)} kg/L` : "";
-      return { main: `${fmtMoney(o.unit_price)} € /L`, sub: `offre fournisseur${d}` };
-    }
-    if (o.unit === "pc" && o.unit_price != null) {
-      const pw = n2(o.piece_weight_g);
-      if (pw > 0) {
-        const eurPerKg = (o.unit_price / pw) * 1000;
-        return {
-          main: `${fmtMoney(o.unit_price)} €/pc`,
-          sub: `≈ ${fmtMoney(eurPerKg)} €/kg • ${fmtQty(pw)} g/pc`,
-        };
-      }
-      return { main: `${fmtMoney(o.unit_price)} €/pc`, sub: "poids pièce: —" };
-    }
-    return { main: "—", sub: "offre incomplète" };
-  }
-
-  if (pk === "pack_simple") {
-    if (
-      o.pack_price == null ||
-      o.pack_total_qty == null ||
-      o.pack_total_qty <= 0 ||
-      o.pack_unit == null
-    ) {
-      return { main: "—", sub: "offre incomplète" };
-    }
-    const per = o.pack_price / o.pack_total_qty;
-    const unit = o.pack_unit === "kg" ? "kg" : "L";
-    const d =
-      o.pack_unit === "l" && o.density_kg_per_l != null
-        ? ` • densité: ${fmtQty(o.density_kg_per_l)} kg/L`
-        : "";
-    return {
-      main: `${fmtMoney(per)} € /${unit}`,
-      sub: `pack: ${fmtMoney(o.pack_price)} € / ${fmtQty(o.pack_total_qty)} ${unit}${d}`,
-    };
-  }
-
-  if (pk === "pack_composed") {
-    if (o.pack_price == null || o.pack_count == null || o.pack_count <= 0 || o.pack_each_unit == null) {
-      return { main: "—", sub: "offre incomplète" };
-    }
-
-    if (o.pack_each_unit === "pc") {
-      const pw = n2(o.piece_weight_g);
-      if (pw <= 0) return { main: "—", sub: "poids pièce manquant" };
-      const perPc = o.pack_price / o.pack_count;
-      const eurPerKg = (perPc / pw) * 1000;
-      return {
-        main: `${fmtMoney(perPc)} €/pc`,
-        sub: `pack: ${fmtMoney(o.pack_price)} € / ${fmtQty(o.pack_count)} pcs • ≈ ${fmtMoney(
-          eurPerKg
-        )} €/kg`,
-      };
-    }
-
-    if (o.pack_each_qty == null || o.pack_each_qty <= 0)
-      return { main: "—", sub: "quantité par élément manquante" };
-    const total = o.pack_count * o.pack_each_qty;
-    const unit = o.pack_each_unit === "kg" ? "kg" : "L";
-    const per = o.pack_price / total;
-    const d =
-      o.pack_each_unit === "l" && o.density_kg_per_l != null
-        ? ` • densité: ${fmtQty(o.density_kg_per_l)} kg/L`
-        : "";
-    return {
-      main: `${fmtMoney(per)} € /${unit}`,
-      sub: `pack: ${fmtMoney(o.pack_price)} € / ${fmtQty(o.pack_count)} × ${fmtQty(
-        o.pack_each_qty
-      )} ${unit} (= ${fmtQty(total)} ${unit})${d}`,
-    };
-  }
-
-  return { main: "—", sub: "offre inconnue" };
-}
+type OfferPayload = Record<string, unknown>;
 
 function statusLabel(s: IngredientStatus): string {
   if (s === "validated") return "validé";
@@ -270,8 +37,8 @@ function statusLabel(s: IngredientStatus): string {
   return "à contrôler";
 }
 
-function statusBadgeStyle(s: IngredientStatus): React.CSSProperties {
-  const base: React.CSSProperties = {
+function statusBadgeStyle(s: IngredientStatus): CSSProperties {
+  const base: CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
     gap: 6,
@@ -286,51 +53,9 @@ function statusBadgeStyle(s: IngredientStatus): React.CSSProperties {
   if (s === "unknown") return { ...base, borderColor: "rgba(234,88,12,0.35)" };
   return { ...base, borderColor: "rgba(2,132,199,0.35)" };
 }
-
-function offerHasPrice(o: LatestOffer | undefined): boolean {
-  if (!o) return false;
-
-  if (o.price_kind === "unit") {
-    return o.unit != null && o.unit_price != null && Number.isFinite(o.unit_price) && o.unit_price > 0;
-  }
-
-  if (o.price_kind === "pack_simple") {
-    return (
-      o.pack_price != null &&
-      Number.isFinite(o.pack_price) &&
-      o.pack_price > 0 &&
-      o.pack_total_qty != null &&
-      Number.isFinite(o.pack_total_qty) &&
-      o.pack_total_qty > 0 &&
-      o.pack_unit != null
-    );
-  }
-
-  if (o.price_kind === "pack_composed") {
-    if (!(o.pack_price != null && Number.isFinite(o.pack_price) && o.pack_price > 0)) return false;
-    if (!(o.pack_count != null && Number.isFinite(o.pack_count) && o.pack_count > 0)) return false;
-    if (o.pack_each_unit == null) return false;
-
-    if (o.pack_each_unit === "pc") {
-      return o.piece_weight_g != null && Number.isFinite(o.piece_weight_g) && o.piece_weight_g > 0;
-    }
-
-    return o.pack_each_qty != null && Number.isFinite(o.pack_each_qty) && o.pack_each_qty > 0;
-  }
-
-  return false;
-}
-
-function legacyHasPrice(x: Ingredient): boolean {
-  const cpu = x.cost_per_unit;
-  if (cpu != null && Number.isFinite(cpu) && cpu > 0) return true;
-
-  const pp = x.purchase_price;
-  const pu = x.purchase_unit;
-  if (pp != null && Number.isFinite(pp) && pp > 0 && pu != null && Number.isFinite(pu) && pu > 0) return true;
-
-  return false;
-}
+  type IngredientPatch = Partial<
+  Pick<Ingredient, "status" | "status_note" | "validated_at" | "validated_by">
+>;
 
 export default function IngredientsPage() {
   const router = useRouter();
@@ -341,9 +66,30 @@ export default function IngredientsPage() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
 
-  const [userId, setUserId] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("to_check");
+  const [session, setSession] = useState<Session | null>(null);
 
+  useEffect(() => {
+    let unsub: { unsubscribe: () => void } | null = null;
+
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      setSession(data.session ?? null);
+
+      const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+        setSession(nextSession ?? null);
+      });
+
+      unsub = sub?.subscription ?? null;
+    })();
+
+    return () => {
+      if (unsub) unsub.unsubscribe();
+    };
+  }, []);
+
+  const userId = session?.user?.id ?? null;
+
+  const [tab, setTab] = useState<Tab>("to_check");
   const [filterCategory, setFilterCategory] = useState<"all" | Category>("all");
   const [filterSupplier, setFilterSupplier] = useState<"all" | string>("all");
   const [includeNoOffer, setIncludeNoOffer] = useState(true);
@@ -402,27 +148,15 @@ export default function IngredientsPage() {
   async function load() {
     setLoading(true);
 
-    const { data: u } = await supabase.auth.getUser();
-    setUserId(u.user?.id ?? null);
-
-    const { data: supData, error: supErr } = await supabase
-      .from("suppliers")
-      .select("id,name,is_active")
-      .order("name", { ascending: true });
-
+    const { data: supData, error: supErr } = await supabase.from("suppliers").select("id,name,is_active").order("name", { ascending: true });
     if (supErr) alert(supErr.message);
     else setSuppliers((supData ?? []) as Supplier[]);
 
-    const { data: ingData, error: ingErr } = await supabase
-      .from("ingredients")
-      .select("*")
-      .order("name", { ascending: true });
-
+    const { data: ingData, error: ingErr } = await supabase.from("ingredients").select("*").order("name", { ascending: true });
     if (ingErr) alert(ingErr.message);
     else setItems((ingData ?? []) as Ingredient[]);
 
     const { data: offData, error: offErr } = await supabase.from("v_latest_offers").select("*");
-
     if (offErr) alert(offErr.message);
     else setOffers((offData ?? []) as LatestOffer[]);
 
@@ -441,13 +175,15 @@ export default function IngredientsPage() {
       }
     }
 
-    const patch: any = { status: next };
+    const patch: IngredientPatch = { status: next };
 
     if (next === "validated") {
-      const { data: u } = await supabase.auth.getUser();
-      const uid = u.user?.id ?? null;
+      if (!userId) {
+        alert("Utilisateur non connecté.");
+        return;
+      }
       patch.validated_at = new Date().toISOString();
-      patch.validated_by = uid;
+      patch.validated_by = userId;
       patch.status_note = null;
     }
 
@@ -473,12 +209,13 @@ export default function IngredientsPage() {
   }
 
   useEffect(() => {
-    load();
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  void load();
   }, []);
 
-  const cardPad: React.CSSProperties = { padding: 16 };
-  const label: React.CSSProperties = { fontSize: 12, opacity: 0.75, marginBottom: 6 };
-  const input: React.CSSProperties = {
+  const cardPad: CSSProperties = { padding: 16 };
+  const label: CSSProperties = { fontSize: 12, opacity: 0.75, marginBottom: 6 };
+  const input: CSSProperties = {
     width: "100%",
     height: 44,
     borderRadius: 10,
@@ -487,9 +224,9 @@ export default function IngredientsPage() {
     fontSize: 16,
     background: "rgba(255,255,255,0.65)",
   };
-  const select: React.CSSProperties = { ...input, paddingRight: 34 };
+  const select: CSSProperties = { ...input, paddingRight: 34 };
 
-  const tabsWrap: React.CSSProperties = {
+  const tabsWrap: CSSProperties = {
     display: "inline-flex",
     gap: 0,
     borderRadius: 999,
@@ -498,7 +235,7 @@ export default function IngredientsPage() {
     overflow: "hidden",
   };
 
-  const tabBtn = (active: boolean): React.CSSProperties => ({
+  const tabBtn = (active: boolean): CSSProperties => ({
     height: 36,
     padding: "0 12px",
     border: "none",
@@ -570,19 +307,56 @@ export default function IngredientsPage() {
     setPackPieceWeightG("");
   }
 
-  function draftOfferFromCreate(): LatestOffer | null {
-    if (priceKind === "unit") {
-      const p = parseNum(newUnitPrice);
-      if (p == null || p <= 0) return null;
+  const previewCreatePack = useMemo(() => {
+  let d: LatestOffer | null = null;
 
+  if (priceKind === "unit") {
+    const p = parseNum(newUnitPrice);
+    if (p != null && p > 0) {
       if (newUnit === "pc") {
         const pw = parseNum(newPieceWeightG);
-        if (pw == null || pw <= 0) return null;
-        return {
+        if (pw != null && pw > 0) {
+          d = {
+            ingredient_id: "",
+            supplier_id: "",
+            price_kind: "unit",
+            unit: "pc",
+            unit_price: p,
+            pack_price: null,
+            pack_total_qty: null,
+            pack_unit: null,
+            pack_count: null,
+            pack_each_qty: null,
+            pack_each_unit: null,
+            density_kg_per_l: null,
+            piece_weight_g: pw,
+          };
+        }
+      } else if (newUnit === "l") {
+        const dens = parseNum(newDensity);
+        if (dens != null && dens > 0) {
+          d = {
+            ingredient_id: "",
+            supplier_id: "",
+            price_kind: "unit",
+            unit: "l",
+            unit_price: p,
+            pack_price: null,
+            pack_total_qty: null,
+            pack_unit: null,
+            pack_count: null,
+            pack_each_qty: null,
+            pack_each_unit: null,
+            density_kg_per_l: dens,
+            piece_weight_g: null,
+          };
+        }
+      } else {
+        d = {
           ingredient_id: "",
           supplier_id: "",
           price_kind: "unit",
-          unit: "pc",
+          unit: "kg",
           unit_price: p,
           pack_price: null,
           pack_total_qty: null,
@@ -591,57 +365,35 @@ export default function IngredientsPage() {
           pack_each_qty: null,
           pack_each_unit: null,
           density_kg_per_l: null,
-          piece_weight_g: pw,
-        };
-      }
-
-      if (newUnit === "l") {
-        const d = parseNum(newDensity);
-        if (d == null || d <= 0) return null;
-        return {
-          ingredient_id: "",
-          supplier_id: "",
-          price_kind: "unit",
-          unit: "l",
-          unit_price: p,
-          pack_price: null,
-          pack_total_qty: null,
-          pack_unit: null,
-          pack_count: null,
-          pack_each_qty: null,
-          pack_each_unit: null,
-          density_kg_per_l: d,
           piece_weight_g: null,
         };
       }
-
-      return {
-        ingredient_id: "",
-        supplier_id: "",
-        price_kind: "unit",
-        unit: "kg",
-        unit_price: p,
-        pack_price: null,
-        pack_total_qty: null,
-        pack_unit: null,
-        pack_count: null,
-        pack_each_qty: null,
-        pack_each_unit: null,
-        density_kg_per_l: null,
-        piece_weight_g: null,
-      };
     }
-
-    if (priceKind === "pack_simple") {
-      const pp = parseNum(packPrice);
-      const qty = parseNum(packTotalQty);
-      if (pp == null || pp <= 0) return null;
-      if (qty == null || qty <= 0) return null;
-
+  } else if (priceKind === "pack_simple") {
+    const pp = parseNum(packPrice);
+    const qty = parseNum(packTotalQty);
+    if (pp != null && pp > 0 && qty != null && qty > 0) {
       if (newUnit === "l") {
-        const d = parseNum(newDensity);
-        if (d == null || d <= 0) return null;
-        return {
+        const dens = parseNum(newDensity);
+        if (dens != null && dens > 0) {
+          d = {
+            ingredient_id: "",
+            supplier_id: "",
+            price_kind: "pack_simple",
+            unit: null,
+            unit_price: null,
+            pack_price: pp,
+            pack_total_qty: qty,
+            pack_unit: "l",
+            pack_count: null,
+            pack_each_qty: null,
+            pack_each_unit: null,
+            density_kg_per_l: dens,
+            piece_weight_g: null,
+          };
+        }
+      } else {
+        d = {
           ingredient_id: "",
           supplier_id: "",
           price_kind: "pack_simple",
@@ -649,127 +401,118 @@ export default function IngredientsPage() {
           unit_price: null,
           pack_price: pp,
           pack_total_qty: qty,
-          pack_unit: "l",
+          pack_unit: "kg",
           pack_count: null,
           pack_each_qty: null,
           pack_each_unit: null,
-          density_kg_per_l: d,
+          density_kg_per_l: null,
           piece_weight_g: null,
         };
       }
-
-      return {
-        ingredient_id: "",
-        supplier_id: "",
-        price_kind: "pack_simple",
-        unit: null,
-        unit_price: null,
-        pack_price: pp,
-        pack_total_qty: qty,
-        pack_unit: "kg",
-        pack_count: null,
-        pack_each_qty: null,
-        pack_each_unit: null,
-        density_kg_per_l: null,
-        piece_weight_g: null,
-      };
     }
-
-    if (priceKind === "pack_composed") {
-      const pp = parseNum(packPrice);
-      const c = parseNum(packCount);
-      if (pp == null || pp <= 0) return null;
-      if (c == null || c <= 0) return null;
-
+  } else if (priceKind === "pack_composed") {
+    const pp = parseNum(packPrice);
+    const c = parseNum(packCount);
+    if (pp != null && pp > 0 && c != null && c > 0) {
       if (packEachUnit === "pc") {
         const pw = parseNum(packPieceWeightG);
-        if (pw == null || pw <= 0) return null;
-        return {
-          ingredient_id: "",
-          supplier_id: "",
-          price_kind: "pack_composed",
-          unit: null,
-          unit_price: null,
-          pack_price: pp,
-          pack_total_qty: null,
-          pack_unit: null,
-          pack_count: c,
-          pack_each_qty: null,
-          pack_each_unit: "pc",
-          density_kg_per_l: null,
-          piece_weight_g: pw,
-        };
+        if (pw != null && pw > 0) {
+          d = {
+            ingredient_id: "",
+            supplier_id: "",
+            price_kind: "pack_composed",
+            unit: null,
+            unit_price: null,
+            pack_price: pp,
+            pack_total_qty: null,
+            pack_unit: null,
+            pack_count: c,
+            pack_each_qty: null,
+            pack_each_unit: "pc",
+            density_kg_per_l: null,
+            piece_weight_g: pw,
+          };
+        }
+      } else {
+        const each = parseNum(packEachQty);
+        if (each != null && each > 0) {
+          if (packEachUnit === "l") {
+            const dens = parseNum(newDensity);
+            if (dens != null && dens > 0) {
+              d = {
+                ingredient_id: "",
+                supplier_id: "",
+                price_kind: "pack_composed",
+                unit: null,
+                unit_price: null,
+                pack_price: pp,
+                pack_total_qty: null,
+                pack_unit: null,
+                pack_count: c,
+                pack_each_qty: each,
+                pack_each_unit: "l",
+                density_kg_per_l: dens,
+                piece_weight_g: null,
+              };
+            }
+          } else {
+            d = {
+              ingredient_id: "",
+              supplier_id: "",
+              price_kind: "pack_composed",
+              unit: null,
+              unit_price: null,
+              pack_price: pp,
+              pack_total_qty: null,
+              pack_unit: null,
+              pack_count: c,
+              pack_each_qty: each,
+              pack_each_unit: "kg",
+              density_kg_per_l: null,
+              piece_weight_g: null,
+            };
+          }
+        }
       }
-
-      const each = parseNum(packEachQty);
-      if (each == null || each <= 0) return null;
-
-      if (packEachUnit === "l") {
-        const d = parseNum(newDensity);
-        if (d == null || d <= 0) return null;
-        return {
-          ingredient_id: "",
-          supplier_id: "",
-          price_kind: "pack_composed",
-          unit: null,
-          unit_price: null,
-          pack_price: pp,
-          pack_total_qty: null,
-          pack_unit: null,
-          pack_count: c,
-          pack_each_qty: each,
-          pack_each_unit: "l",
-          density_kg_per_l: d,
-          piece_weight_g: null,
-        };
-      }
-
-      return {
-        ingredient_id: "",
-        supplier_id: "",
-        price_kind: "pack_composed",
-        unit: null,
-        unit_price: null,
-        pack_price: pp,
-        pack_total_qty: null,
-        pack_unit: null,
-        pack_count: c,
-        pack_each_qty: each,
-        pack_each_unit: "kg",
-        density_kg_per_l: null,
-        piece_weight_g: null,
-      };
     }
-
-    return null;
   }
 
-  const previewCreatePack = useMemo(() => {
-    const d = draftOfferFromCreate();
-    if (!d) return "";
-    const line = fmtOfferPriceLine(d);
-    return `${line.main} • ${line.sub}`;
-  }, [
-    priceKind,
-    newUnit,
-    newUnitPrice,
-    newDensity,
-    newPieceWeightG,
-    packPrice,
-    packTotalQty,
-    packCount,
-    packEachQty,
-    packEachUnit,
-    packPieceWeightG,
-  ]);
+  if (!d) return "";
+  const line = fmtOfferPriceLine(d);
+  return `${line.main} • ${line.sub}`;
+}, [priceKind, newUnit, newUnitPrice, newDensity, newPieceWeightG, packPrice, packTotalQty, packCount, packEachQty, packEachUnit, packPieceWeightG]);
 
-  function buildOfferFromCreate(ingredient_id: string, uid: string): any | null {
+type SupplierOfferPayload = {
+  user_id: string;
+  ingredient_id: string;
+  supplier_id: string;
+
+  price_kind: PriceKind;
+  is_active: boolean;
+
+  price: number;
+
+  unit?: "kg" | "l" | "pc" | null;
+  unit_price?: number | null;
+
+  pack_price?: number | null;
+  pack_total_qty?: number | null;
+  pack_unit?: "kg" | "l" | null;
+
+  pack_count?: number | null;
+  pack_each_qty?: number | null;
+  pack_each_unit?: "kg" | "l" | "pc" | null;
+
+  density_kg_per_l?: number | null;
+  piece_weight_g?: number | null;
+};
+
+  function buildOfferFromCreate(ingredient_id: string, uid: string): SupplierOfferPayload | null {
     const supplier_id = normalizeSupplierId(newSupplierId);
     if (!supplier_id) {
       alert("Fournisseur obligatoire pour enregistrer une offre.");
       return null;
     }
-
     if (!uid) {
       alert("Utilisateur non connecté. Impossible d'enregistrer l'offre.");
       return null;
@@ -788,18 +531,7 @@ export default function IngredientsPage() {
           alert("Poids pièce obligatoire (g).");
           return null;
         }
-        return {
-          user_id: uid,
-          ingredient_id,
-          supplier_id,
-          price_kind: "unit",
-          unit: "pc",
-          unit_price: p,
-          price: p,
-          piece_weight_g: pw,
-          density_kg_per_l: null,
-          is_active: true,
-        };
+        return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "pc", unit_price: p, price: p, piece_weight_g: pw, density_kg_per_l: null, is_active: true };
       }
 
       if (newUnit === "l") {
@@ -808,32 +540,10 @@ export default function IngredientsPage() {
           alert("Densité obligatoire (kg/L).");
           return null;
         }
-        return {
-          user_id: uid,
-          ingredient_id,
-          supplier_id,
-          price_kind: "unit",
-          unit: "l",
-          unit_price: p,
-          price: p,
-          density_kg_per_l: d,
-          piece_weight_g: null,
-          is_active: true,
-        };
+        return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "l", unit_price: p, price: p, density_kg_per_l: d, piece_weight_g: null, is_active: true };
       }
 
-      return {
-        user_id: uid,
-        ingredient_id,
-        supplier_id,
-        price_kind: "unit",
-        unit: "kg",
-        unit_price: p,
-        price: p,
-        density_kg_per_l: null,
-        piece_weight_g: null,
-        is_active: true,
-      };
+      return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "kg", unit_price: p, price: p, density_kg_per_l: null, piece_weight_g: null, is_active: true };
     }
 
     if (priceKind === "pack_simple") {
@@ -854,34 +564,10 @@ export default function IngredientsPage() {
           alert("Densité obligatoire (kg/L).");
           return null;
         }
-        return {
-          user_id: uid,
-          ingredient_id,
-          supplier_id,
-          price_kind: "pack_simple",
-          pack_price: pp,
-          price: pp,
-          pack_total_qty: qty,
-          pack_unit: "l",
-          density_kg_per_l: d,
-          piece_weight_g: null,
-          is_active: true,
-        };
+        return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_simple", pack_price: pp, price: pp, pack_total_qty: qty, pack_unit: "l", density_kg_per_l: d, piece_weight_g: null, is_active: true };
       }
 
-      return {
-        user_id: uid,
-        ingredient_id,
-        supplier_id,
-        price_kind: "pack_simple",
-        pack_price: pp,
-        price: pp,
-        pack_total_qty: qty,
-        pack_unit: "kg",
-        density_kg_per_l: null,
-        piece_weight_g: null,
-        is_active: true,
-      };
+      return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_simple", pack_price: pp, price: pp, pack_total_qty: qty, pack_unit: "kg", density_kg_per_l: null, piece_weight_g: null, is_active: true };
     }
 
     if (priceKind === "pack_composed") {
@@ -902,19 +588,7 @@ export default function IngredientsPage() {
           alert("Poids pièce obligatoire (g).");
           return null;
         }
-        return {
-          user_id: uid,
-          ingredient_id,
-          supplier_id,
-          price_kind: "pack_composed",
-          pack_price: pp,
-          price: pp,
-          pack_count: c,
-          pack_each_unit: "pc",
-          piece_weight_g: pw,
-          density_kg_per_l: null,
-          is_active: true,
-        };
+        return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_unit: "pc", piece_weight_g: pw, density_kg_per_l: null, is_active: true };
       }
 
       const each = parseNum(packEachQty);
@@ -929,36 +603,10 @@ export default function IngredientsPage() {
           alert("Densité obligatoire (kg/L).");
           return null;
         }
-        return {
-          user_id: uid,
-          ingredient_id,
-          supplier_id,
-          price_kind: "pack_composed",
-          pack_price: pp,
-          price: pp,
-          pack_count: c,
-          pack_each_qty: each,
-          pack_each_unit: "l",
-          density_kg_per_l: d,
-          piece_weight_g: null,
-          is_active: true,
-        };
+        return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_qty: each, pack_each_unit: "l", density_kg_per_l: d, piece_weight_g: null, is_active: true };
       }
 
-      return {
-        user_id: uid,
-        ingredient_id,
-        supplier_id,
-        price_kind: "pack_composed",
-        pack_price: pp,
-        price: pp,
-        pack_count: c,
-        pack_each_qty: each,
-        pack_each_unit: "kg",
-        density_kg_per_l: null,
-        piece_weight_g: null,
-        is_active: true,
-      };
+      return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_qty: each, pack_each_unit: "kg", density_kg_per_l: null, piece_weight_g: null, is_active: true };
     }
 
     return null;
@@ -1003,23 +651,15 @@ export default function IngredientsPage() {
     const ingredient_id = ins.data.id as string;
 
     if (supplier_id) {
-      const { data: u } = await supabase.auth.getUser();
-      const uid = u.user?.id ?? null;
-      if (!uid) {
+      if (!userId) {
         alert("Utilisateur non connecté. Impossible d'enregistrer l'offre.");
         return;
       }
 
-      const offerPayload = buildOfferFromCreate(ingredient_id, uid);
+      const offerPayload = buildOfferFromCreate(ingredient_id, userId);
       if (!offerPayload) return;
 
-      const dPrev = await supabase
-        .from("supplier_offers")
-        .update({ is_active: false })
-        .eq("ingredient_id", ingredient_id)
-        .eq("supplier_id", supplier_id)
-        .eq("is_active", true);
-
+      const dPrev = await supabase.from("supplier_offers").update({ is_active: false }).eq("ingredient_id", ingredient_id).eq("supplier_id", supplier_id).eq("is_active", true);
       if (dPrev.error) {
         alert(dPrev.error.message);
         return;
@@ -1027,19 +667,12 @@ export default function IngredientsPage() {
 
       let off = await supabase.from("supplier_offers").insert(offerPayload);
 
-      if (off.error && (off.error as any).code === "23505") {
-        const dPrev2 = await supabase
-          .from("supplier_offers")
-          .update({ is_active: false })
-          .eq("ingredient_id", ingredient_id)
-          .eq("supplier_id", supplier_id)
-          .eq("is_active", true);
-
+      if (off.error && (off.error as { code?: string }).code === "23505") {
+        const dPrev2 = await supabase.from("supplier_offers").update({ is_active: false }).eq("ingredient_id", ingredient_id).eq("supplier_id", supplier_id).eq("is_active", true);
         if (dPrev2.error) {
           alert(dPrev2.error.message);
           return;
         }
-
         off = await supabase.from("supplier_offers").insert(offerPayload);
       }
 
@@ -1071,7 +704,7 @@ export default function IngredientsPage() {
       useOffer: true,
       priceKind: off?.price_kind ?? "unit",
 
-      unit: (off?.unit ?? "kg") as any,
+      unit: (off?.unit ?? "kg") as "kg" | "l" | "pc",
       unitPrice: off?.unit_price != null ? String(off.unit_price) : "",
 
       density: off?.density_kg_per_l != null ? String(off.density_kg_per_l) : "1.0",
@@ -1079,16 +712,16 @@ export default function IngredientsPage() {
 
       packTotalQty: off?.pack_total_qty != null ? String(off.pack_total_qty) : "",
       packPrice: off?.pack_price != null ? String(off.pack_price) : "",
-      packUnit: (off?.pack_unit ?? "kg") as any,
+      packUnit: (off?.pack_unit ?? "kg") as "kg" | "l",
 
       packCount: off?.pack_count != null ? String(off.pack_count) : "",
       packEachQty: off?.pack_each_qty != null ? String(off.pack_each_qty) : "",
-      packEachUnit: (off?.pack_each_unit ?? "l") as any,
+      packEachUnit: (off?.pack_each_unit ?? "l") as "kg" | "l" | "pc",
       packPieceWeightG: off?.piece_weight_g != null ? String(off.piece_weight_g) : "",
     });
   }
 
-  function buildOfferFromEdit(ingredient_id: string, uid: string): any | null {
+  function buildOfferFromEdit(ingredient_id: string, uid: string): OfferPayload | null {
     if (!edit) return null;
     if (!edit.useOffer) return null;
 
@@ -1116,18 +749,7 @@ export default function IngredientsPage() {
           alert("Poids pièce obligatoire (g).");
           return null;
         }
-        return {
-          user_id: uid,
-          ingredient_id,
-          supplier_id,
-          price_kind: "unit",
-          unit: "pc",
-          unit_price: p,
-          price: p,
-          piece_weight_g: pw,
-          density_kg_per_l: null,
-          is_active: true,
-        };
+        return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "pc", unit_price: p, price: p, piece_weight_g: pw, density_kg_per_l: null, is_active: true };
       }
 
       if (edit.unit === "l") {
@@ -1136,32 +758,10 @@ export default function IngredientsPage() {
           alert("Densité obligatoire (kg/L).");
           return null;
         }
-        return {
-          user_id: uid,
-          ingredient_id,
-          supplier_id,
-          price_kind: "unit",
-          unit: "l",
-          unit_price: p,
-          price: p,
-          density_kg_per_l: d,
-          piece_weight_g: null,
-          is_active: true,
-        };
+        return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "l", unit_price: p, price: p, density_kg_per_l: d, piece_weight_g: null, is_active: true };
       }
 
-      return {
-        user_id: uid,
-        ingredient_id,
-        supplier_id,
-        price_kind: "unit",
-        unit: "kg",
-        unit_price: p,
-        price: p,
-        density_kg_per_l: null,
-        piece_weight_g: null,
-        is_active: true,
-      };
+      return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "kg", unit_price: p, price: p, density_kg_per_l: null, piece_weight_g: null, is_active: true };
     }
 
     if (edit.priceKind === "pack_simple") {
@@ -1182,34 +782,10 @@ export default function IngredientsPage() {
           alert("Densité obligatoire (kg/L).");
           return null;
         }
-        return {
-          user_id: uid,
-          ingredient_id,
-          supplier_id,
-          price_kind: "pack_simple",
-          pack_price: pp,
-          price: pp,
-          pack_total_qty: qty,
-          pack_unit: "l",
-          density_kg_per_l: d,
-          piece_weight_g: null,
-          is_active: true,
-        };
+        return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_simple", pack_price: pp, price: pp, pack_total_qty: qty, pack_unit: "l", density_kg_per_l: d, piece_weight_g: null, is_active: true };
       }
 
-      return {
-        user_id: uid,
-        ingredient_id,
-        supplier_id,
-        price_kind: "pack_simple",
-        pack_price: pp,
-        price: pp,
-        pack_total_qty: qty,
-        pack_unit: "kg",
-        density_kg_per_l: null,
-        piece_weight_g: null,
-        is_active: true,
-      };
+      return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_simple", pack_price: pp, price: pp, pack_total_qty: qty, pack_unit: "kg", density_kg_per_l: null, piece_weight_g: null, is_active: true };
     }
 
     if (edit.priceKind === "pack_composed") {
@@ -1230,19 +806,7 @@ export default function IngredientsPage() {
           alert("Poids pièce obligatoire (g).");
           return null;
         }
-        return {
-          user_id: uid,
-          ingredient_id,
-          supplier_id,
-          price_kind: "pack_composed",
-          pack_price: pp,
-          price: pp,
-          pack_count: c,
-          pack_each_unit: "pc",
-          piece_weight_g: pw,
-          density_kg_per_l: null,
-          is_active: true,
-        };
+        return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_unit: "pc", piece_weight_g: pw, density_kg_per_l: null, is_active: true };
       }
 
       const each = parseNum(edit.packEachQty);
@@ -1257,36 +821,10 @@ export default function IngredientsPage() {
           alert("Densité obligatoire (kg/L).");
           return null;
         }
-        return {
-          user_id: uid,
-          ingredient_id,
-          supplier_id,
-          price_kind: "pack_composed",
-          pack_price: pp,
-          price: pp,
-          pack_count: c,
-          pack_each_qty: each,
-          pack_each_unit: "l",
-          density_kg_per_l: d,
-          piece_weight_g: null,
-          is_active: true,
-        };
+        return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_qty: each, pack_each_unit: "l", density_kg_per_l: d, piece_weight_g: null, is_active: true };
       }
 
-      return {
-        user_id: uid,
-        ingredient_id,
-        supplier_id,
-        price_kind: "pack_composed",
-        pack_price: pp,
-        price: pp,
-        pack_count: c,
-        pack_each_qty: each,
-        pack_each_unit: "kg",
-        density_kg_per_l: null,
-        piece_weight_g: null,
-        is_active: true,
-      };
+      return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_qty: each, pack_each_unit: "kg", density_kg_per_l: null, piece_weight_g: null, is_active: true };
     }
 
     return null;
@@ -1306,16 +844,10 @@ export default function IngredientsPage() {
       pack_total_qty: edit.priceKind === "pack_simple" ? parseNum(edit.packTotalQty) : null,
       pack_unit: edit.priceKind === "pack_simple" ? edit.packUnit : null,
       pack_count: edit.priceKind === "pack_composed" ? parseNum(edit.packCount) : null,
-      pack_each_qty:
-        edit.priceKind === "pack_composed" && edit.packEachUnit !== "pc"
-          ? parseNum(edit.packEachQty)
-          : null,
+      pack_each_qty: edit.priceKind === "pack_composed" && edit.packEachUnit !== "pc" ? parseNum(edit.packEachQty) : null,
       pack_each_unit: edit.priceKind === "pack_composed" ? edit.packEachUnit : null,
-      density_kg_per_l:
-        edit.unit === "l" || edit.packUnit === "l" || edit.packEachUnit === "l" ? parseNum(edit.density) : null,
-      piece_weight_g:
-        (edit.unit === "pc" ? parseNum(edit.pieceWeightG) : null) ??
-        (edit.packEachUnit === "pc" ? parseNum(edit.packPieceWeightG) : null),
+      density_kg_per_l: edit.unit === "l" || edit.packUnit === "l" || edit.packEachUnit === "l" ? parseNum(edit.density) : null,
+      piece_weight_g: (edit.unit === "pc" ? parseNum(edit.pieceWeightG) : null) ?? (edit.packEachUnit === "pc" ? parseNum(edit.packPieceWeightG) : null),
     };
 
     const line = fmtOfferPriceLine(d);
@@ -1347,23 +879,15 @@ export default function IngredientsPage() {
     }
 
     if (edit.useOffer && supplier_id) {
-      const { data: u } = await supabase.auth.getUser();
-      const uid = u.user?.id ?? null;
-      if (!uid) {
+      if (!userId) {
         alert("Utilisateur non connecté. Impossible d'enregistrer l'offre.");
         return;
       }
 
-      const offerPayload = buildOfferFromEdit(editingId, uid);
+      const offerPayload = buildOfferFromEdit(editingId, userId);
       if (!offerPayload) return;
 
-      const dPrev = await supabase
-        .from("supplier_offers")
-        .update({ is_active: false })
-        .eq("ingredient_id", editingId)
-        .eq("supplier_id", supplier_id)
-        .eq("is_active", true);
-
+      const dPrev = await supabase.from("supplier_offers").update({ is_active: false }).eq("ingredient_id", editingId).eq("supplier_id", supplier_id).eq("is_active", true);
       if (dPrev.error) {
         alert(dPrev.error.message);
         return;
@@ -1371,19 +895,12 @@ export default function IngredientsPage() {
 
       let off = await supabase.from("supplier_offers").insert(offerPayload);
 
-      if (off.error && (off.error as any).code === "23505") {
-        const dPrev2 = await supabase
-          .from("supplier_offers")
-          .update({ is_active: false })
-          .eq("ingredient_id", editingId)
-          .eq("supplier_id", supplier_id)
-          .eq("is_active", true);
-
+      if (off.error && (off.error as { code?: string }).code === "23505") {
+        const dPrev2 = await supabase.from("supplier_offers").update({ is_active: false }).eq("ingredient_id", editingId).eq("supplier_id", supplier_id).eq("is_active", true);
         if (dPrev2.error) {
           alert(dPrev2.error.message);
           return;
         }
-
         off = await supabase.from("supplier_offers").insert(offerPayload);
       }
 
@@ -1438,28 +955,13 @@ export default function IngredientsPage() {
 
       <div style={{ marginTop: 12 }}>
         <div role="tablist" aria-label="Filtre statut ingrédients" style={tabsWrap}>
-          <button
-            role="tab"
-            aria-selected={tab === "to_check"}
-            style={tabBtn(tab === "to_check")}
-            onClick={() => setTab("to_check")}
-          >
+          <button role="tab" aria-selected={tab === "to_check"} style={tabBtn(tab === "to_check")} onClick={() => setTab("to_check")}>
             À contrôler ({counts.to_check})
           </button>
-          <button
-            role="tab"
-            aria-selected={tab === "validated"}
-            style={tabBtn(tab === "validated")}
-            onClick={() => setTab("validated")}
-          >
+          <button role="tab" aria-selected={tab === "validated"} style={tabBtn(tab === "validated")} onClick={() => setTab("validated")}>
             Validés ({counts.validated})
           </button>
-          <button
-            role="tab"
-            aria-selected={tab === "unknown"}
-            style={tabBtn(tab === "unknown")}
-            onClick={() => setTab("unknown")}
-          >
+          <button role="tab" aria-selected={tab === "unknown"} style={tabBtn(tab === "unknown")} onClick={() => setTab("unknown")}>
             Incompris ({counts.unknown})
           </button>
           <button role="tab" aria-selected={tab === "all"} style={tabBtn(tab === "all")} onClick={() => setTab("all")}>
@@ -1472,7 +974,11 @@ export default function IngredientsPage() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "end" }}>
           <div>
             <div style={label}>Filtre catégorie</div>
-            <select style={select} value={filterCategory} onChange={(e) => setFilterCategory(e.target.value as any)}>
+            <select
+  style={select}
+  value={filterCategory}
+  onChange={(e) => setFilterCategory((e.target.value as "all" | Category))}
+>
               <option value="all">Tous</option>
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>
@@ -1484,11 +990,7 @@ export default function IngredientsPage() {
 
           <div>
             <div style={label}>Filtre fournisseur</div>
-            <select
-              style={select}
-              value={filterSupplier}
-              onChange={(e) => setFilterSupplier(e.target.value as any)}
-            >
+            <select style={select} value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)}>
               <option value="all">Tous</option>
               {suppliers
                 .filter((s) => s.is_active)
@@ -1502,11 +1004,7 @@ export default function IngredientsPage() {
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, height: 44 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={includeNoOffer}
-                onChange={(e) => setIncludeNoOffer(e.target.checked)}
-              />
+              <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} />
               <span style={{ fontWeight: 800 }}>Inclure sans offre</span>
             </label>
             <span className="muted" style={{ fontSize: 12 }}>
@@ -1523,12 +1021,7 @@ export default function IngredientsPage() {
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
             <div>
               <div style={label}>Ingrédient</div>
-              <input
-                style={input}
-                placeholder="Ex: Huile d'olive"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-              />
+              <input style={input} placeholder="Ex: Huile d'olive" value={newName} onChange={(e) => setNewName(e.target.value)} />
             </div>
             <div>
               <div style={label}>Catégorie</div>
@@ -1578,7 +1071,7 @@ export default function IngredientsPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "end" }}>
                 <div>
                   <div style={label}>Unité</div>
-                  <select style={select} value={newUnit} onChange={(e) => setNewUnit(e.target.value as any)}>
+                 <select style={select} value={newUnit} onChange={(e) => setNewUnit(e.target.value as "kg" | "l" | "pc")}>
                     <option value="kg">Kilo (kg)</option>
                     <option value="l">Litre (L)</option>
                     <option value="pc">Pièce (pc)</option>
@@ -1606,14 +1099,8 @@ export default function IngredientsPage() {
 
               {newUnit === "pc" && (
                 <div>
-                  <div style={label}>Poids d'une pièce (g)</div>
-                  <input
-                    style={input}
-                    placeholder="Ex: 125"
-                    inputMode="decimal"
-                    value={newPieceWeightG}
-                    onChange={(e) => setNewPieceWeightG(e.target.value)}
-                  />
+                  <div style={label}>Poids d&apos;une pièce (g)</div>
+                  <input style={input} placeholder="Ex: 125" inputMode="decimal" value={newPieceWeightG} onChange={(e) => setNewPieceWeightG(e.target.value)} />
                 </div>
               )}
             </>
@@ -1624,7 +1111,7 @@ export default function IngredientsPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "end" }}>
                 <div>
                   <div style={label}>Unité pack</div>
-                  <select style={select} value={newUnit} onChange={(e) => setNewUnit(e.target.value as any)}>
+                  <select style={select} value={newUnit} onChange={(e) => setNewUnit(e.target.value as "kg" | "l" | "pc")}>
                     <option value="kg">Kilo (kg)</option>
                     <option value="l">Litre (L)</option>
                   </select>
@@ -1632,13 +1119,7 @@ export default function IngredientsPage() {
 
                 <div>
                   <div style={label}>Prix du pack (€)</div>
-                  <input
-                    style={input}
-                    placeholder="Ex: 53.99"
-                    inputMode="decimal"
-                    value={packPrice}
-                    onChange={(e) => setPackPrice(e.target.value)}
-                  />
+                  <input style={input} placeholder="Ex: 53.99" inputMode="decimal" value={packPrice} onChange={(e) => setPackPrice(e.target.value)} />
                 </div>
               </div>
 
@@ -1672,31 +1153,19 @@ export default function IngredientsPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "end" }}>
                 <div>
                   <div style={label}>Prix du pack (€)</div>
-                  <input
-                    style={input}
-                    placeholder="Ex: 18.56"
-                    inputMode="decimal"
-                    value={packPrice}
-                    onChange={(e) => setPackPrice(e.target.value)}
-                  />
+                  <input style={input} placeholder="Ex: 18.56" inputMode="decimal" value={packPrice} onChange={(e) => setPackPrice(e.target.value)} />
                 </div>
 
                 <div>
-                  <div style={label}>Nombre d'unités</div>
-                  <input
-                    style={input}
-                    placeholder="Ex: 8"
-                    inputMode="decimal"
-                    value={packCount}
-                    onChange={(e) => setPackCount(e.target.value)}
-                  />
+                  <div style={label}>Nombre d&apos;unités</div>
+                  <input style={input} placeholder="Ex: 8" inputMode="decimal" value={packCount} onChange={(e) => setPackCount(e.target.value)} />
                 </div>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "end" }}>
                 <div>
                   <div style={label}>Unité de chaque élément</div>
-                  <select style={select} value={packEachUnit} onChange={(e) => setPackEachUnit(e.target.value as any)}>
+                  <select style={select} value={packEachUnit} onChange={(e) => setPackEachUnit(e.target.value as "kg" | "l" | "pc")}>
                     <option value="l">Litre (L)</option>
                     <option value="kg">Kilo (kg)</option>
                     <option value="pc">Pièce (pc)</option>
@@ -1716,14 +1185,8 @@ export default function IngredientsPage() {
                   </div>
                 ) : (
                   <div>
-                    <div style={label}>Poids d'une pièce (g)</div>
-                    <input
-                      style={input}
-                      placeholder="Ex: 125"
-                      inputMode="decimal"
-                      value={packPieceWeightG}
-                      onChange={(e) => setPackPieceWeightG(e.target.value)}
-                    />
+                    <div style={label}>Poids d&apos;une pièce (g)</div>
+                    <input style={input} placeholder="Ex: 125" inputMode="decimal" value={packPieceWeightG} onChange={(e) => setPackPieceWeightG(e.target.value)} />
                   </div>
                 )}
               </div>
@@ -1743,12 +1206,7 @@ export default function IngredientsPage() {
         </form>
       </div>
 
-      <input
-        style={{ ...input, marginTop: 12 }}
-        placeholder="Rechercher..."
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
+      <input style={{ ...input, marginTop: 12 }} placeholder="Rechercher..." value={q} onChange={(e) => setQ(e.target.value)} />
 
       <div className="card" style={{ ...cardPad, marginTop: 12 }}>
         {loading ? <div className="muted">Chargement…</div> : null}
@@ -1766,10 +1224,7 @@ export default function IngredientsPage() {
             const st = (x.status ?? "to_check") as IngredientStatus;
 
             return (
-              <div
-                key={x.id}
-                style={{ border: "1px solid rgba(0,0,0,0.1)", borderRadius: 12, padding: 12 }}
-              >
+              <div key={x.id} style={{ border: "1px solid rgba(0,0,0,0.1)", borderRadius: 12, padding: 12 }}>
                 <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: 12 }}>
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -1876,33 +1331,17 @@ export default function IngredientsPage() {
                 </div>
 
                 {isEditing && edit && (
-                  <div
-                    style={{
-                      marginTop: 12,
-                      paddingTop: 12,
-                      borderTop: "1px solid #eee",
-                      display: "grid",
-                      gap: 10,
-                    }}
-                  >
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #eee", display: "grid", gap: 10 }}>
                     <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10 }}>
                       <input style={input} value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
-                      <select
-                        style={select}
-                        value={edit.category}
-                        onChange={(e) => setEdit({ ...edit, category: e.target.value as Category })}
-                      >
+                      <select style={select} value={edit.category} onChange={(e) => setEdit({ ...edit, category: e.target.value as Category })}>
                         {CATEGORIES.map((c) => (
                           <option key={c} value={c}>
                             {c}
                           </option>
                         ))}
                       </select>
-                      <select
-                        style={select}
-                        value={edit.supplierId}
-                        onChange={(e) => setEdit({ ...edit, supplierId: e.target.value })}
-                      >
+                      <select style={select} value={edit.supplierId} onChange={(e) => setEdit({ ...edit, supplierId: e.target.value })}>
                         <option value="">—</option>
                         {suppliers
                           .filter((s) => s.is_active)
@@ -1918,20 +1357,12 @@ export default function IngredientsPage() {
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <span style={{ fontWeight: 800 }}>Offre fournisseur</span>
                         <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <input
-                            type="checkbox"
-                            checked={edit.useOffer}
-                            onChange={(e) => setEdit({ ...edit, useOffer: e.target.checked })}
-                          />
+                          <input type="checkbox" checked={edit.useOffer} onChange={(e) => setEdit({ ...edit, useOffer: e.target.checked })} />
                           <span className="muted">recommandé</span>
                         </label>
                       </div>
 
-                      <select
-                        style={select}
-                        value={edit.is_active ? "1" : "0"}
-                        onChange={(e) => setEdit({ ...edit, is_active: e.target.value === "1" })}
-                      >
+                      <select style={select} value={edit.is_active ? "1" : "0"} onChange={(e) => setEdit({ ...edit, is_active: e.target.value === "1" })}>
                         <option value="1">Actif</option>
                         <option value="0">Inactif</option>
                       </select>
@@ -1941,11 +1372,7 @@ export default function IngredientsPage() {
                       <>
                         <div>
                           <div style={label}>Mode prix</div>
-                          <select
-                            style={select}
-                            value={edit.priceKind}
-                            onChange={(e) => setEdit({ ...edit, priceKind: e.target.value as PriceKind })}
-                          >
+                          <select style={select} value={edit.priceKind} onChange={(e) => setEdit({ ...edit, priceKind: e.target.value as PriceKind })}>
                             <option value="unit">Unitaire</option>
                             <option value="pack_simple">Pack</option>
                             <option value="pack_composed">Pack composé</option>
@@ -1955,40 +1382,17 @@ export default function IngredientsPage() {
                         {edit.priceKind === "unit" && (
                           <>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                              <input
-                                style={input}
-                                placeholder="Prix unitaire"
-                                value={edit.unitPrice}
-                                onChange={(e) => setEdit({ ...edit, unitPrice: e.target.value })}
-                              />
-                              <select
-                                style={select}
-                                value={edit.unit}
-                                onChange={(e) => setEdit({ ...edit, unit: e.target.value as any })}
-                              >
+                              <input style={input} placeholder="Prix unitaire" value={edit.unitPrice} onChange={(e) => setEdit({ ...edit, unitPrice: e.target.value })} />
+                             <select style={select} value={edit.unit} onChange={(e) => setEdit({ ...edit, unit: e.target.value as "kg" | "l" | "pc" })}>
                                 <option value="kg">kg</option>
                                 <option value="l">L</option>
                                 <option value="pc">pc</option>
                               </select>
                             </div>
 
-                            {edit.unit === "l" && (
-                              <input
-                                style={input}
-                                placeholder="Densité (kg/L)"
-                                value={edit.density}
-                                onChange={(e) => setEdit({ ...edit, density: e.target.value })}
-                              />
-                            )}
+                            {edit.unit === "l" && <input style={input} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => setEdit({ ...edit, density: e.target.value })} />}
 
-                            {edit.unit === "pc" && (
-                              <input
-                                style={input}
-                                placeholder="Poids pièce (g)"
-                                value={edit.pieceWeightG}
-                                onChange={(e) => setEdit({ ...edit, pieceWeightG: e.target.value })}
-                              />
-                            )}
+                            {edit.unit === "pc" && <input style={input} placeholder="Poids pièce (g)" value={edit.pieceWeightG} onChange={(e) => setEdit({ ...edit, pieceWeightG: e.target.value })} />}
 
                             <div className="muted" style={{ fontSize: 12 }}>
                               {previewEditPack ? previewEditPack : "—"}
@@ -1999,36 +1403,15 @@ export default function IngredientsPage() {
                         {edit.priceKind === "pack_simple" && (
                           <>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                              <input
-                                style={input}
-                                placeholder="Prix pack (€)"
-                                value={edit.packPrice}
-                                onChange={(e) => setEdit({ ...edit, packPrice: e.target.value })}
-                              />
-                              <input
-                                style={input}
-                                placeholder="Quantité totale (kg/L)"
-                                value={edit.packTotalQty}
-                                onChange={(e) => setEdit({ ...edit, packTotalQty: e.target.value })}
-                              />
-                              <select
-                                style={select}
-                                value={edit.packUnit}
-                                onChange={(e) => setEdit({ ...edit, packUnit: e.target.value as any })}
-                              >
+                              <input style={input} placeholder="Prix pack (€)" value={edit.packPrice} onChange={(e) => setEdit({ ...edit, packPrice: e.target.value })} />
+                              <input style={input} placeholder="Quantité totale (kg/L)" value={edit.packTotalQty} onChange={(e) => setEdit({ ...edit, packTotalQty: e.target.value })} />
+                             <select style={select} value={edit.packUnit} onChange={(e) => setEdit({ ...edit, packUnit: e.target.value as "kg" | "l" })}>
                                 <option value="kg">kg</option>
                                 <option value="l">L</option>
                               </select>
                             </div>
 
-                            {edit.packUnit === "l" && (
-                              <input
-                                style={input}
-                                placeholder="Densité (kg/L)"
-                                value={edit.density}
-                                onChange={(e) => setEdit({ ...edit, density: e.target.value })}
-                              />
-                            )}
+                            {edit.packUnit === "l" && <input style={input} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => setEdit({ ...edit, density: e.target.value })} />}
 
                             <div className="muted" style={{ fontSize: 12 }}>
                               {previewEditPack ? previewEditPack : "—"}
@@ -2039,56 +1422,25 @@ export default function IngredientsPage() {
                         {edit.priceKind === "pack_composed" && (
                           <>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                              <input
-                                style={input}
-                                placeholder="Prix pack (€)"
-                                value={edit.packPrice}
-                                onChange={(e) => setEdit({ ...edit, packPrice: e.target.value })}
-                              />
-                              <input
-                                style={input}
-                                placeholder="Nombre d'unités (ex: 8)"
-                                value={edit.packCount}
-                                onChange={(e) => setEdit({ ...edit, packCount: e.target.value })}
-                              />
+                              <input style={input} placeholder="Prix pack (€)" value={edit.packPrice} onChange={(e) => setEdit({ ...edit, packPrice: e.target.value })} />
+                              <input style={input} placeholder="Nombre d'unités (ex: 8)" value={edit.packCount} onChange={(e) => setEdit({ ...edit, packCount: e.target.value })} />
                             </div>
 
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                              <select
-                                style={select}
-                                value={edit.packEachUnit}
-                                onChange={(e) => setEdit({ ...edit, packEachUnit: e.target.value as any })}
-                              >
+                             <select style={select} value={edit.packEachUnit} onChange={(e) => setEdit({ ...edit, packEachUnit: e.target.value as "kg" | "l" | "pc" })}>
                                 <option value="l">L</option>
                                 <option value="kg">kg</option>
                                 <option value="pc">pc</option>
                               </select>
 
                               {edit.packEachUnit !== "pc" ? (
-                                <input
-                                  style={input}
-                                  placeholder="Quantité par unité (ex: 1.5)"
-                                  value={edit.packEachQty}
-                                  onChange={(e) => setEdit({ ...edit, packEachQty: e.target.value })}
-                                />
+                                <input style={input} placeholder="Quantité par unité (ex: 1.5)" value={edit.packEachQty} onChange={(e) => setEdit({ ...edit, packEachQty: e.target.value })} />
                               ) : (
-                                <input
-                                  style={input}
-                                  placeholder="Poids pièce (g)"
-                                  value={edit.packPieceWeightG}
-                                  onChange={(e) => setEdit({ ...edit, packPieceWeightG: e.target.value })}
-                                />
+                                <input style={input} placeholder="Poids pièce (g)" value={edit.packPieceWeightG} onChange={(e) => setEdit({ ...edit, packPieceWeightG: e.target.value })} />
                               )}
                             </div>
 
-                            {edit.packEachUnit === "l" && (
-                              <input
-                                style={input}
-                                placeholder="Densité (kg/L)"
-                                value={edit.density}
-                                onChange={(e) => setEdit({ ...edit, density: e.target.value })}
-                              />
-                            )}
+                            {edit.packEachUnit === "l" && <input style={input} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => setEdit({ ...edit, density: e.target.value })} />}
 
                             <div className="muted" style={{ fontSize: 12 }}>
                               {previewEditPack ? previewEditPack : "—"}

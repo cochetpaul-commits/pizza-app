@@ -17,10 +17,16 @@ function tmpId() {
 }
 
 function normalizeUnit(u: unknown): UnitType {
-  const s = String(u ?? "").trim();
+  const s = String(u ?? "").trim().toLowerCase();
   const allowed: UnitType[] = ["g", "ml", "pcs", "pinch", "dash"];
   return allowed.includes(s as UnitType) ? (s as UnitType) : "g";
 }
+
+type Row = PizzaIngredientRow & {
+  qty: number | "";
+  _locked?: boolean;
+  _label?: string | null;
+};
 
 type Props = {
   stage: "pre" | "post";
@@ -34,7 +40,7 @@ export default function PizzaIngredientList(props: Props) {
   const { stage, ingredients, rows, onChange, priceByIngredient } = props;
 
   const stageRows = useMemo(() => {
-    return (rows ?? [])
+    return ((rows ?? []) as Row[])
       .filter((r) => r.stage === stage)
       .slice()
       .sort((a, b) => n2(a.sort_order) - n2(b.sort_order));
@@ -80,10 +86,9 @@ export default function PizzaIngredientList(props: Props) {
     const firstId = ingredients?.[0]?.id ?? "";
     if (!firstId) return;
 
-    const nextSort =
-      stageRows.length > 0 ? Math.max(...stageRows.map((r) => n2(r.sort_order))) + 1 : 0;
+    const nextSort = stageRows.length > 0 ? Math.max(...stageRows.map((r) => n2(r.sort_order))) + 1 : 0;
 
-    const row: any = {
+    const row: Row = {
       id: tmpId(),
       ingredient_id: firstId,
       qty: "",
@@ -92,13 +97,11 @@ export default function PizzaIngredientList(props: Props) {
       sort_order: nextSort,
     };
 
-    const next = [...(rows ?? []), row] as PizzaIngredientRow[];
-    onChange(next);
+    onChange([...(rows ?? []), row] as PizzaIngredientRow[]);
   };
 
   const delRow = (id: string) => {
-    const next = (rows ?? []).filter((r) => r.id !== id);
-    onChange(next);
+    onChange((rows ?? []).filter((r) => r.id !== id));
   };
 
   const updateRow = (id: string, patch: Partial<PizzaIngredientRow>) => {
@@ -107,26 +110,25 @@ export default function PizzaIngredientList(props: Props) {
   };
 
   const ingredientName = (ingredientId: string) => {
-    const ing = ingredients.find((x) => x.id === ingredientId);
-    return String((ing as any)?.name ?? "—");
+    const ing = ingredients.find((x) => x.id === ingredientId) ?? null;
+    const nm = (ing as unknown as { name?: unknown })?.name;
+    return String(nm ?? "—");
   };
 
-  const costPerUnit = (r: any) => {
-    const ing = ingredients.find((x: any) => String(x.id) === String(r.ingredient_id));
+  const costPerUnit = (r: Row) => {
+    const ing = ingredients.find((x) => String(x.id) === String(r.ingredient_id)) ?? null;
     const id = String(r.ingredient_id ?? "");
-    const unit = String(r.unit ?? "g").toLowerCase();
+    const unit = normalizeUnit(r.unit);
+
     const fromOffers = priceByIngredient ? priceByIngredient[id] : undefined;
-    const cpu =
-      unit === "ml"
-        ? fromOffers?.ml
-        : unit === "pc" || unit === "pcs"
-        ? fromOffers?.pcs
-        : fromOffers?.g;
-    if (typeof cpu === "number") return n2(cpu);
-    return n2((ing as any)?.cost_per_unit);
+    const cpuFromOffers = unit === "ml" ? fromOffers?.ml : unit === "pcs" ? fromOffers?.pcs : fromOffers?.g;
+    if (typeof cpuFromOffers === "number") return n2(cpuFromOffers);
+
+    const fb = (ing as unknown as { cost_per_unit?: unknown })?.cost_per_unit;
+    return n2(fb);
   };
 
-  const rowCost = (r: any) => {
+  const rowCost = (r: Row) => {
     const qty = typeof r.qty === "number" ? r.qty : n2(r.qty);
     return qty * costPerUnit(r);
   };
@@ -139,13 +141,15 @@ export default function PizzaIngredientList(props: Props) {
       </div>
 
       <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
-        {stageRows.map((r: any) => {
+        {stageRows.map((r) => {
           const locked = Boolean(r?._locked);
           const label = locked ? String(r?._label ?? ingredientName(r.ingredient_id)) : ingredientName(r.ingredient_id);
+          const rowId = typeof r.id === "string" ? r.id : "";
+          if (!rowId) return null;
 
           return (
             <div
-              key={r.id}
+              key={rowId}
               style={{
                 display: "grid",
                 gridTemplateColumns: "2fr 110px 90px 110px auto",
@@ -162,12 +166,12 @@ export default function PizzaIngredientList(props: Props) {
               ) : (
                 <select
                   style={{ ...input, height: 36, padding: "0 10px", fontWeight: 950 }}
-                  value={r.ingredient_id ?? ""}
-                  onChange={(e) => updateRow(r.id, { ingredient_id: e.target.value })}
+                  value={String(r.ingredient_id ?? "")}
+                  onChange={(e) => updateRow(rowId, { ingredient_id: e.target.value })}
                 >
-                  {ingredients.map((i: any) => (
+                  {ingredients.map((i) => (
                     <option key={i.id} value={i.id}>
-                      {i.name}
+                      {String((i as { name?: unknown }).name ?? "—")}
                     </option>
                   ))}
                 </select>
@@ -180,9 +184,9 @@ export default function PizzaIngredientList(props: Props) {
                 disabled={locked}
                 onChange={(e) => {
                   const t = e.target.value.trim();
-                  if (!t) return updateRow(r.id, { qty: "" as any });
+                  if (!t) return updateRow(rowId, { qty: "" as unknown as number });
                   const n = Number(t.replace(",", "."));
-                  updateRow(r.id, { qty: Number.isFinite(n) ? (n as any) : ("" as any) });
+                  updateRow(rowId, { qty: Number.isFinite(n) ? n : ("" as unknown as number) });
                 }}
               />
 
@@ -190,7 +194,7 @@ export default function PizzaIngredientList(props: Props) {
                 style={{ ...input, height: 36, padding: "0 10px", fontWeight: 950 }}
                 value={normalizeUnit(r.unit)}
                 disabled={locked}
-                onChange={(e) => updateRow(r.id, { unit: e.target.value as UnitType })}
+                onChange={(e) => updateRow(rowId, { unit: e.target.value as UnitType })}
               >
                 <option value="g">g</option>
                 <option value="ml">ml</option>
@@ -206,7 +210,7 @@ export default function PizzaIngredientList(props: Props) {
                   —
                 </button>
               ) : (
-                <button type="button" onClick={() => delRow(r.id)} style={btn}>
+                <button type="button" onClick={() => delRow(rowId)} style={btn}>
                   Supprimer
                 </button>
               )}

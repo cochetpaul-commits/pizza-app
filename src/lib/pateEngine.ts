@@ -81,8 +81,13 @@ const BIGA_HYDRATION_PCT = 45; // % eau sur farine biga
 const BIGA_YEAST_PCT = 0.5; // % levure sur farine biga
 const EPS = 1e-9;
 
-function n(v: any): number {
-  const x = typeof v === "string" ? Number(v) : (v as number);
+function n(v: unknown): number {
+  const x =
+    typeof v === "number"
+      ? v
+      : typeof v === "string"
+      ? Number(v)
+      : 0;
   return Number.isFinite(x) ? x : 0;
 }
 

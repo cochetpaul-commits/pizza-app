@@ -27,7 +27,7 @@ export default function PizzasPage() {
   const [state, setState] = useState<{
     status: "loading" | "NOT_LOGGED" | "OK" | "ERROR";
     pizzas?: PizzaRow[];
-    error?: any;
+    error?: unknown;
   }>({ status: "loading" });
 
   useEffect(() => {

@@ -29,8 +29,9 @@ export default function LoginPage() {
       setMsg(`OK: ${data.user?.email ?? ""}`);
       router.push("/");
       router.refresh();
-    } catch (e: any) {
-      setMsg(`ERROR: ${String(e?.message ?? e)}`);
+      } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : String(e);
+      setMsg(`ERROR: ${msg}`);
     }
   };
 

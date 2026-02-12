@@ -151,10 +151,7 @@ function fmtPct(n: number | null) {
   if (n === null || !Number.isFinite(n)) return "—";
   return `${n}%`;
 }
-function fmtNum(n: number | null) {
-  if (n === null || !Number.isFinite(n)) return "—";
-  return String(n);
-}
+
 function fmtG(n: number | null | undefined) {
   if (n === null || n === undefined || !Number.isFinite(n)) return "—";
   return `${Math.round(n)} g`;
@@ -217,7 +214,16 @@ export function RecipePdfDocument(props: { data: RecipePdfData }) {
 
   const totalDough = Number.isFinite(d.nbPatons) && Number.isFinite(d.poidsPaton) ? d.nbPatons * d.poidsPaton : null;
 
-  const totals = d.totals ?? ({} as any);
+  type Totals = Partial<{
+  flour_total_g: number;
+  water_g: number;
+  salt_g: number;
+  honey_g: number;
+  oil_g: number;
+  yeast_g: number;
+}>;
+
+const totals = (d.totals ?? {}) as Totals;
 
   // phases
   const phases = Array.isArray(d.phases) ? d.phases : [];

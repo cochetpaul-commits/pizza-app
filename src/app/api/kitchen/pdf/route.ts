@@ -62,8 +62,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const body = (await req.json().catch(() => null)) as any;
-    const kitchenId = String(body?.kitchenId || body?.recipeId || body?.id || "");
+        const body = (await req.json().catch(() => null)) as unknown;
+    const b = (body && typeof body === "object") ? (body as Record<string, unknown>) : {};
+    const kitchenId = String(b.kitchenId ?? b.recipeId ?? b.id ?? "").trim();
     if (!kitchenId) {
       return NextResponse.json({ message: "kitchenId manquant" }, { status: 400 });
     }
@@ -79,7 +80,7 @@ export async function POST(req: Request) {
       .eq("id", kitchenId)
       .maybeSingle();
 
-    if (rErr) return NextResponse.json({ message: rErr.message, details: (rErr as any)?.details ?? null }, { status: 500 });
+        if (rErr) return NextResponse.json({ message: rErr.message, details: rErr.details ?? null }, { status: 500 });
     if (!recipe) return NextResponse.json({ message: "Recette introuvable" }, { status: 404 });
 
     const rr = recipe as KitchenRow;
@@ -90,7 +91,7 @@ export async function POST(req: Request) {
       .eq("recipe_id", kitchenId)
       .order("sort_order", { ascending: true });
 
-    if (lErr) return NextResponse.json({ message: lErr.message, details: (lErr as any)?.details ?? null }, { status: 500 });
+        if (lErr) return NextResponse.json({ message: lErr.message, details: lErr.details ?? null }, { status: 500 });
 
     const lineRows = ((ln ?? []) as LineRow[]).slice();
     const ingredientIds = Array.from(new Set(lineRows.map((r) => String(r.ingredient_id || "")).filter(Boolean)));
@@ -103,7 +104,7 @@ export async function POST(req: Request) {
         .select("id,name,cost_per_unit")
         .in("id", ingredientIds);
 
-      if (iErr) return NextResponse.json({ message: iErr.message, details: (iErr as any)?.details ?? null }, { status: 500 });
+           if (iErr) return NextResponse.json({ message: iErr.message, details: iErr.details ?? null }, { status: 500 });
 
       for (const it of (ings ?? []) as IngRow[]) {
         ingMap.set(String(it.id), { name: it.name ?? null, cpu: n2(it.cost_per_unit) });
@@ -157,8 +158,8 @@ export async function POST(req: Request) {
         "Cache-Control": "no-store",
       },
     });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    } catch (e: unknown) {
+     const msg = e instanceof Error ? e.message : typeof e === "string" ? e : String(e);
     return NextResponse.json({ message: "Export PDF cuisine impossible", details: msg }, { status: 500 });
   }
 }

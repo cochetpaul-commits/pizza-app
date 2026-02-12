@@ -18,7 +18,7 @@ export default function PrepRecipesPage() {
   const [state, setState] = useState<{
     status: "loading" | "NOT_LOGGED" | "OK" | "ERROR";
     rows?: PrepRecipeRow[];
-    error?: any;
+    error?: unknown;
   }>({ status: "loading" });
 
   const load = async () => {
@@ -41,9 +41,17 @@ export default function PrepRecipesPage() {
     setState({ status: "OK", rows: (data ?? []) as PrepRecipeRow[] });
   };
 
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      if (cancelled) return;
+      await load();
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const del = async (id: string, name: string) => {

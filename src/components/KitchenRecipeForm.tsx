@@ -35,12 +35,40 @@ type LineUI = {
   ingredient_name?: string;
   ingredient_cost_per_unit?: number | null;
 };
+type PgError = { code?: string; message?: string };
 
-type LatestOfferRow = {
-  ingredient_id: string;
-  unit_price: number;
+type LatestOffer = {
+  ingredient_id?: unknown;
+  unit?: unknown;
+  unit_price?: unknown;
 };
 
+type DbLine = {
+  id?: unknown;
+  recipe_id?: unknown;
+  ingredient_id?: unknown;
+  qty?: unknown;
+  unit?: unknown;
+  sort_order?: unknown;
+};
+
+type ComputedLine = LineUI & {
+  cpu: number | null;
+  cost: number;
+};
+
+function getObj(v: unknown) {
+  return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
+}
+function getString(v: unknown, fallback = "") {
+  const s = typeof v === "string" ? v : v == null ? "" : String(v);
+  const t = s.trim();
+  return t ? t : fallback;
+}
+function getNumber(v: unknown, fallback = 0) {
+  const n = typeof v === "number" ? v : Number(String(v).replace(",", "."));
+  return Number.isFinite(n) ? n : fallback;
+}
 
 function n2(v: unknown) {
   const x = typeof v === "number" ? v : Number(v);
@@ -210,18 +238,18 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
   }, [ingredientWeightGrams, yieldGramsNum, yieldTooHigh]);
 
   const computed = useMemo(() => {
-    const rows = (lines ?? [])
+    const rows: ComputedLine[] = (lines ?? [])
       .slice()
       .sort((a, b) => n2(a.sort_order) - n2(b.sort_order))
       .map((l) => {
         const qty = n2(l.qty);
-        const cpu = l.ingredient_cost_per_unit ?? null;
+        const cpu = typeof l.ingredient_cost_per_unit === "number" ? l.ingredient_cost_per_unit : null;
         const cost = cpu != null ? cpu * qty : 0;
         return { ...l, qty, cpu, cost };
       });
 
     const missing = rows.some((r) => r.cpu == null);
-    const totalCost = rows.reduce((acc, r) => acc + n2((r as any).cost), 0);
+    const totalCost = rows.reduce((acc, r) => acc + n2(r.cost), 0);
 
     const costPerKg = yieldGramsNum > 0 ? totalCost / (yieldGramsNum / 1000) : 0;
     const costPerPortion = portionsNum > 0 ? totalCost / portionsNum : 0;
@@ -234,7 +262,6 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       costPerPortion,
     };
   }, [lines, yieldGramsNum, portionsNum]);
-
   const pricing = useMemo(() => {
     const m = Math.min(Math.max(marginPct, 0), 99.9) / 100;
     const v = Math.min(Math.max(vatPct, 0), 100) / 100;
@@ -297,12 +324,18 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     }
 
     const priceMapCpu: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
-    (offers ?? []).forEach((o: any) => {
-      const id = String(o.ingredient_id ?? "");
-      if (!id) return;
-      const cpu = offerToCpu(o.unit, o.unit_price);
-      if (!priceMapCpu[id]) priceMapCpu[id] = {};
-      priceMapCpu[id] = { ...priceMapCpu[id], ...cpu };
+
+    (offers ?? []).forEach((o: unknown) => {
+      const row = getObj(o) as LatestOffer | null;
+      const iid = getString(row?.ingredient_id, "");
+      if (!iid) return;
+
+      const unit = getString(row?.unit, "");
+      const unitPrice = getNumber(row?.unit_price, 0);
+
+      const cpu = offerToCpu(unit, unitPrice);
+      if (!priceMapCpu[iid]) priceMapCpu[iid] = {};
+      priceMapCpu[iid] = { ...priceMapCpu[iid], ...cpu };
     });
 
     setPriceByIngredient(priceMapCpu);
@@ -374,31 +407,36 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       return;
     }
 
-    const mapped: LineUI[] = (ln ?? []).map((raw: any) => {
-      const ingRow = ingList.find((x: any) => x.id === raw.ingredient_id);
-      const unitRaw = String(raw.unit || "g");
+    const pickCpu = (iid: string, unit: Unit, fallbackCostPerUnit: unknown) => {
+      const m = priceMapCpu[iid];
+      const fromOffers = unit === "ml" ? m?.ml : unit === "pc" ? m?.pcs : m?.g;
+      const cpuOffer = typeof fromOffers === "number" ? fromOffers : null;
+      if (cpuOffer != null) return cpuOffer;
+
+      const fb = typeof fallbackCostPerUnit === "number" ? fallbackCostPerUnit : getNumber(fallbackCostPerUnit, 0);
+      return fb > 0 ? fb : null;
+    };
+
+    const mapped: LineUI[] = (ln ?? []).map((raw: unknown) => {
+      const row = getObj(raw) as DbLine | null;
+
+      const lineIngredientId = getString(row?.ingredient_id, "");
+      const ingRow = ingList.find((x) => x.id === lineIngredientId) ?? null;
+
+      const unitRaw = getString(row?.unit, "g").toLowerCase();
       const unit: Unit = unitRaw === "ml" ? "ml" : unitRaw === "pc" ? "pc" : "g";
 
+      const fallbackCpu = getObj(ingRow)?.["cost_per_unit"];
+
       return {
-        id: String(raw.id),
-        recipe_id: String(raw.recipe_id),
-        ingredient_id: String(raw.ingredient_id),
-        qty: n2(raw.qty),
+        id: getString(row?.id, tmpId()),
+        recipe_id: getString(row?.recipe_id, recipeId ?? ""),
+        ingredient_id: lineIngredientId,
+        qty: n2(row?.qty),
         unit,
-        sort_order: n2(raw.sort_order),
-        ingredient_name: String((ingRow as any)?.name ?? ""),
-        ingredient_cost_per_unit: (() => {
-      const m = priceByIngredient[String(newIngredientId)];
-      const u = String(newUnit ?? "g").toLowerCase();
-      const cpu =
-        u === "ml"
-          ? m?.ml
-          : u === "pc" || u === "pcs"
-          ? m?.pcs
-          : m?.g;
-      if (typeof cpu === "number") return cpu;
-      return typeof (ingRow as any)?.cost_per_unit === "number" ? ((ingRow as any).cost_per_unit as number) : null;
-    })(),
+        sort_order: n2(row?.sort_order),
+        ingredient_name: getString(getObj(ingRow)?.["name"], ""),
+        ingredient_cost_per_unit: pickCpu(lineIngredientId, unit, fallbackCpu),
       };
     });
 
@@ -407,9 +445,18 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
   };
 
   useEffect(() => {
-    void load();
-  }, [recipeId, isEdit]);
+    let cancelled = false;
 
+    (async () => {
+      if (cancelled) return;
+      await load();
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [recipeId, isEdit]);
   const updateLine = (id: string, patch: Partial<LineUI>) => {
     setLines((prev) => (prev ?? []).map((l) => (l.id === id ? { ...l, ...patch } : l)));
   };
@@ -421,7 +468,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     const qty = parsePositiveNumber(newQty);
     if (qty == null) return;
 
-    const ingRow = ingredients.find((x: any) => x.id === newIngredientId);
+    const ingRow = ingredients.find((x) => x.id === newIngredientId) ?? null;
     const nextSort = (lines?.length ? Math.max(...lines.map((l) => n2(l.sort_order))) : -1) + 1;
 
     const row: LineUI = {
@@ -431,19 +478,17 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       qty,
       unit: newUnit,
       sort_order: nextSort,
-      ingredient_name: String((ingRow as any)?.name ?? ""),
-      ingredient_cost_per_unit: (() => {
-      const m = priceByIngredient[String(newIngredientId)];
-      const u = String(newUnit ?? "g").toLowerCase();
-      const cpu =
-        u === "ml"
-          ? m?.ml
-          : u === "pc" || u === "pcs"
-          ? m?.pcs
-          : m?.g;
-      if (typeof cpu === "number") return cpu;
-      return typeof (ingRow as any)?.cost_per_unit === "number" ? ((ingRow as any).cost_per_unit as number) : null;
-    })(),
+      ingredient_name: String(ingRow?.name ?? ""),
+            ingredient_cost_per_unit: (() => {
+        const m = priceByIngredient[String(newIngredientId)];
+        const u = String(newUnit ?? "g").toLowerCase();
+        const fromOffers = u === "ml" ? m?.ml : u === "pc" || u === "pcs" ? m?.pcs : m?.g;
+        if (typeof fromOffers === "number") return fromOffers;
+
+        const fb = getObj(ingRow)?.["cost_per_unit"];
+        const fbNum = typeof fb === "number" ? fb : getNumber(fb, 0);
+        return fbNum > 0 ? fbNum : null;
+      })(),
     };
 
     setLines((p) => [...(p ?? []), row]);
@@ -494,9 +539,10 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 800);
-    } catch (e: any) {
-      setSaveError({ message: "Export PDF cuisine impossible", details: String(e?.message ?? "") });
-    }
+    } catch (e: unknown) {
+  const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "";
+  setSaveError({ message: "Export PDF cuisine impossible", details: msg });
+  }
   };
 
   const save = async () => {
@@ -535,7 +581,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
     let id = recipeId;
 
-    const recipePayload: any = {
+    const recipePayload: Record<string, unknown> = {
       name: nm,
       category: form.category || "plat_cuisine",
       yield_grams: round0(yieldGramsNum),
@@ -552,13 +598,13 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
     if (!id) {
       recipePayload.user_id = auth.user.id;
-      const { data, error: insErr } = await supabase.from("kitchen_recipes").insert(recipePayload).select("id").single();
+      const { data, error: insErr } = await supabase.from("kitchen_recipes").insert(recipePayload).select("id").single<{ id: string }>();
       if (insErr) {
         setSaving(false);
         setSaveError(insErr);
         return;
       }
-      id = (data as any)?.id as string;
+      id = data?.id;
       if (!id) {
         setSaving(false);
         setSaveError({ message: "ID manquant après création" });
@@ -630,7 +676,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       const totalWeight = round0(yieldGramsNum);
       const name = (form.name.trim() || "Recette cuisine").slice(0, 120);
 
-      const ingredientPayload: any = {
+      const ingredientPayload: Record<string, unknown> = {
         name,
         category: "autre",
         is_active: true,
@@ -660,12 +706,12 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       const { data: ins, error: eIns } = await supabase.from("ingredients").insert(ingredientPayload).select("id").single();
 
       if (eIns) {
-        const pgCode = (eIns as any)?.code;
-        const msg = String((eIns as any)?.message ?? "");
+        const pgCode = (eIns as PgError | null)?.code;
+        const msg = String((eIns as PgError | null)?.message ?? "");
         if (pgCode === "23505" || msg.includes("duplicate key")) {
           const { data: existing, error: eFind } = await supabase.from("ingredients").select("id").eq("name", name).maybeSingle();
           if (eFind) throw eFind;
-          const existingId = String((existing as any)?.id ?? "");
+          const existingId = getString(getObj(existing)?.["id"], "");
           if (!existingId) throw eIns;
 
           const { error: eUpd2 } = await supabase.from("ingredients").update(ingredientPayload).eq("id", existingId);
@@ -677,12 +723,13 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
         throw eIns;
       }
 
-      const newId = String((ins as any)?.id ?? "");
+      const newId = getString(getObj(ins)?.["id"], "");
       if (!newId) throw new Error("ID ingrédient manquant après création");
 
       await bindToRecipe(newId);
-    } catch (e: any) {
-      setSaveError({ message: "Index impossible", details: String(e?.message ?? e) });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "";
+      setSaveError({ message: "Index impossible", details: msg });
     } finally {
       setSavingIndex(false);
     }
@@ -922,7 +969,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
             <div>
               <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Ingrédient</div>
               <select style={input} value={newIngredientId} onChange={(e) => setNewIngredientId(e.target.value)}>
-                {ingredients.map((i: any) => (
+                {ingredients.map((i) => (
                   <option key={i.id} value={i.id}>
                     {i.name}
                   </option>
@@ -962,7 +1009,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
           </div>
 
           <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
-            {computed.rows.map((r: any) => (
+            {computed.rows.map((r) => (
               <div
                 key={r.id}
                 style={{

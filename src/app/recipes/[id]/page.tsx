@@ -2,7 +2,7 @@
 import { offerToCpu } from "@/lib/offerPricing";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { calculerPate } from "@/lib/pateEngine";
 import { TopNav } from "@/components/TopNav";
@@ -32,7 +32,7 @@ type Recipe = {
   oil_percent: number | null;
   yeast_percent?: number | null;
   biga_yeast_percent?: number | null;
-  flour_mix?: any;
+  flour_mix?: unknown;
   procedure?: string | null;
   balls_count?: number | null;
   ball_weight?: number | null;
@@ -40,7 +40,7 @@ type Recipe = {
   yield_grams?: number | null;
   created_at: string;
   user_id: string;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 function toNumSafe(v: string, fallback: number) {
@@ -108,15 +108,12 @@ function bestMatchByAliases(ings: IngredientRow[], aliases: string[]) {
 export default function RecipePage() {
   const params = useParams();
   const id = (params?.id as string) || "";
-  const router = useRouter();
 
   const [state, setState] = useState<{
     status: "loading" | "NOT_LOGGED" | "OK" | "ERROR";
     recipe?: Recipe;
-    error?: any;
+    error?: unknown;
   }>({ status: "loading" });
-
-  const setError = (e: unknown) => setState((p) => ({ ...p, status: "ERROR", error: e }));
 
   const [ingredients, setIngredients] = useState<IngredientRow[]>([]);
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, { g?: number; ml?: number; pcs?: number }>>({});
@@ -139,8 +136,8 @@ export default function RecipePage() {
     procedure: string;
   } | null>(null);
 
-  const [saveState, setSaveState] = useState<{ saving: boolean; error?: any; ok?: boolean }>({ saving: false });
-  const [pdfState, setPdfState] = useState<{ exporting: boolean; error?: any; ok?: boolean }>({ exporting: false });
+  const [saveState, setSaveState] = useState<{ saving: boolean; error?: unknown; ok?: boolean }>({ saving: false });
+  const [pdfState, setPdfState] = useState<{ exporting: boolean; error?: unknown; ok?: boolean }>({ exporting: false });
 
   const parsed = useMemo(() => {
     const hydration = clamp(toNumSafe(form?.hydration_total ?? "", 65), 0, 120);
@@ -182,17 +179,17 @@ export default function RecipePage() {
 
   const isBiga = (form?.type ?? "direct") === "biga";
 
-  const result = useMemo(() => {
+    const result = useMemo(() => {
     if (!form) {
       return {
         totals: { flour_total_g: 0, water_g: 0, salt_g: 0, honey_g: 0, oil_g: 0, yeast_g: 0 },
         phases: [],
         warnings: [],
-      } as any;
+      };
     }
 
     return calculerPate({
-      type: (form.type ?? "direct") as any,
+      type: (form.type ?? "direct") as DoughType,
       nbPatons,
       poidsPaton,
       recipe: isBiga
@@ -214,7 +211,7 @@ export default function RecipePage() {
           },
       flourMix: parsed.flourMix,
     });
-  }, [form, form?.type, nbPatons, poidsPaton, isBiga, parsed.hydration, parsed.salt, parsed.honey, parsed.oil, parsed.yeastUi, parsed.flourMix]);
+  }, [form, nbPatons, poidsPaton, isBiga, parsed.hydration, parsed.salt, parsed.honey, parsed.oil, parsed.yeastUi, parsed.flourMix]);
 
   const costing = useMemo(() => {
     const flourTotalG = n2(result?.totals?.flour_total_g);
@@ -324,10 +321,11 @@ export default function RecipePage() {
       }
 
       const priceMap: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
-      (offers ?? []).forEach((o: any) => {
-        const id = String(o.ingredient_id ?? "");
+        (offers ?? []).forEach((o: unknown) => {
+        const obj = (o && typeof o === "object") ? (o as Record<string, unknown>) : {};
+        const id = String(obj["ingredient_id"] ?? "");
         if (!id) return;
-        const cpu = offerToCpu(o.unit, o.unit_price);
+        const cpu = offerToCpu(String(obj["unit"] ?? ""), obj["unit_price"]);
         if (!priceMap[id]) priceMap[id] = {};
         priceMap[id] = { ...priceMap[id], ...cpu };
       });
@@ -353,10 +351,11 @@ export default function RecipePage() {
 
       const type: DoughType = rr.type === "direct" || rr.type === "biga" || rr.type === "focaccia" ? (rr.type as DoughType) : "direct";
 
-      const yeastUi = type === "biga" ? String((rr as any).biga_yeast_percent ?? 0) : String((rr as any).yeast_percent ?? 0);
+      const rrAny = rr as Record<string, unknown>;
+            const yeastUi = type === "biga" ? String(rrAny["biga_yeast_percent"] ?? 0) :             String(rrAny["yeast_percent"] ?? 0);
 
-      setNbPatons(Math.max(1, n2((rr as any).balls_count) || 150));
-      setPoidsPaton(Math.max(1, n2((rr as any).ball_weight) || 264));
+      setNbPatons(Math.max(1, n2(rrAny["balls_count"]) || 150));
+      setPoidsPaton(Math.max(1, n2(rrAny["ball_weight"]) || 264));
 
       setForm({
         name: String(rr.name ?? ""),
@@ -414,7 +413,7 @@ export default function RecipePage() {
       { name: form.flourB_name.trim() || "Farine B", percent: norm.b },
     ];
 
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       name: (form.name ?? "").trim() || "Sans nom",
       type: form.type,
       hydration_total: hydration,
@@ -486,8 +485,9 @@ export default function RecipePage() {
 
       setPdfState({ exporting: false, ok: true });
       setTimeout(() => setPdfState((p) => ({ ...p, ok: false })), 900);
-    } catch (e: any) {
-      setPdfState({ exporting: false, error: { message: "Export PDF impossible", details: String(e?.message ?? e) } });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : String(e);
+      setPdfState({ exporting: false, error: { message: "Export PDF impossible", details: msg } });
     }
   };
 
@@ -710,50 +710,61 @@ export default function RecipePage() {
 
           {Array.isArray(result.phases) && result.phases.length > 0 ? (
             <div className="grid" style={{ marginTop: 10 }}>
-              {result.phases.map((p: any, idx: number) => (
-                <div key={idx} className="card">
-                  <p className="cardTitle">{p.name}</p>
+              {result.phases.map((p: unknown, idx: number) => {
+  const ph = (p && typeof p === "object") ? (p as Record<string, unknown>) : {};
+  const flourG = n2(ph["flour_g"]);
+  const waterG = n2(ph["water_g"]);
+  const yeastG = n2(ph["yeast_g"]);
+  const saltG = n2(ph["salt_g"]);
+  const honeyG = n2(ph["honey_g"]);
+  const oilG = n2(ph["oil_g"]);
 
-                  <div className="kv" style={{ marginTop: 10 }}>
-                    <div className="kvItem">
-                      <span className="kvKey">Farine</span>
-                      <span className="kvVal">{p.flour_g} g</span>
-                    </div>
-                    <div className="kvItem">
-                      <span className="kvKey">Eau</span>
-                      <span className="kvVal">{p.water_g} g</span>
-                    </div>
+  return (
+    <div key={idx} className="card">
+      <p className="cardTitle">{String(ph["name"] ?? "")}</p>
 
-                    {p.yeast_g > 0 && (
-                      <div className="kvItem">
-                        <span className="kvKey">Levure</span>
-                        <span className="kvVal">{p.yeast_g} g</span>
-                      </div>
-                    )}
+      <div className="kv" style={{ marginTop: 10 }}>
+        <div className="kvItem">
+          <span className="kvKey">Farine</span>
+          <span className="kvVal">{flourG} g</span>
+        </div>
 
-                    {p.salt_g > 0 && (
-                      <div className="kvItem">
-                        <span className="kvKey">Sel</span>
-                        <span className="kvVal">{p.salt_g} g</span>
-                      </div>
-                    )}
+        <div className="kvItem">
+          <span className="kvKey">Eau</span>
+          <span className="kvVal">{waterG} g</span>
+        </div>
 
-                    {p.honey_g > 0 && (
-                      <div className="kvItem">
-                        <span className="kvKey">Miel</span>
-                        <span className="kvVal">{p.honey_g} g</span>
-                      </div>
-                    )}
+        {yeastG > 0 && (
+          <div className="kvItem">
+            <span className="kvKey">Levure</span>
+            <span className="kvVal">{yeastG} g</span>
+          </div>
+        )}
 
-                    {p.oil_g > 0 && (
-                      <div className="kvItem">
-                        <span className="kvKey">Huile</span>
-                        <span className="kvVal">{p.oil_g} g</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+        {saltG > 0 && (
+          <div className="kvItem">
+            <span className="kvKey">Sel</span>
+            <span className="kvVal">{saltG} g</span>
+          </div>
+        )}
+
+        {honeyG > 0 && (
+          <div className="kvItem">
+            <span className="kvKey">Miel</span>
+            <span className="kvVal">{honeyG} g</span>
+          </div>
+        )}
+
+        {oilG > 0 && (
+          <div className="kvItem">
+            <span className="kvKey">Huile</span>
+            <span className="kvVal">{oilG} g</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+})}
             </div>
           ) : (
             <div className="card" style={{ marginTop: 10 }}>

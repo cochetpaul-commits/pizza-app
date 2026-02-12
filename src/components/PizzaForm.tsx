@@ -1,6 +1,6 @@
 "use client";
 import { offerToCpu } from "@/lib/offerPricing";
-
+import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -212,17 +212,20 @@ export default function PizzaForm(props: { pizzaId?: string }) {
 
   const costs = useMemo(() => {
     const toppings = rows.reduce((acc, r) => {
-      if (!r.ingredient_id) return acc;
-      const ing = ingredients.find((x) => x.id === r.ingredient_id);
-      const cpuObj = (priceByIngredient as any)[r.ingredient_id];
-      const u = normalizeUnit(r.unit);
-      const cpu = n2(
-        (u === "g" ? cpuObj?.g : u === "ml" ? cpuObj?.ml : u === "pcs" ? cpuObj?.pcs : undefined) ??
-          (ing as any)?.cost_per_unit
-      );
-      const qty = typeof r.qty === "number" ? r.qty : n2(r.qty);
-      return acc + n2(qty) * cpu;
-    }, 0);
+  if (!r.ingredient_id) return acc;
+
+  const ing = ingredients.find((x) => x.id === r.ingredient_id) ?? null;
+  const cpuObj = r.ingredient_id ? priceByIngredient[r.ingredient_id] : undefined;
+
+  const u = normalizeUnit(r.unit);
+  const cpuFromOffers = u === "g" ? cpuObj?.g : u === "ml" ? cpuObj?.ml : u === "pcs" ? cpuObj?.pcs : undefined;
+  const cpuFromIndex = ing?.cost_per_unit ?? null;
+
+  const cpu = n2(cpuFromOffers ?? cpuFromIndex);
+  const qty = typeof r.qty === "number" ? r.qty : n2(r.qty);
+
+  return acc + n2(qty) * cpu;
+}, 0);
 
     const totalCost = n2(dough?.total_cost);
     const yieldGrams = n2(dough?.yield_grams);
@@ -235,7 +238,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
       total: round2(toppings + doughCost),
       doughCpuG,
     };
-  }, [rows, ingredients, dough, ballWeightNum]);
+  }, [rows, ingredients, priceByIngredient, dough, ballWeightNum]);
 
   const weightTotalGrams = useMemo(() => {
     const w = n2(ballWeightNum) + n2(ingredientWeightGrams);
@@ -882,7 +885,13 @@ export default function PizzaForm(props: { pizzaId?: string }) {
               }}
             >
               {photoPreview ? (
-                <img src={photoPreview} alt="pizza" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <Image
+  src={photoPreview}
+  alt="pizza"
+  fill
+  sizes="(max-width: 980px) 100vw, 480px"
+  style={{ objectFit: "cover" }}
+/>
               ) : (
                 <div style={{ color: theme.muted, fontWeight: 900 }}>Clique pour ajouter une photo</div>
               )}

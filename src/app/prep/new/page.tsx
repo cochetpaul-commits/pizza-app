@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 type Ingredient = { id: string; name: string };
+type PgError = { code?: string; message?: string };
+type InsertedId = { id: string };
 
 function makeAutoName() {
   const now = new Date();
@@ -20,7 +22,7 @@ export default function NewPrepRecipePage() {
 
   const [state, setState] = useState<{
     status: "loading" | "CREATING" | "ERROR";
-    error?: any;
+    error?: unknown;
   }>({ status: "loading" });
 
   useEffect(() => {
@@ -50,20 +52,27 @@ export default function NewPrepRecipePage() {
         if (!first?.id) throw new Error("Aucun ingrédient actif. Ajoute au moins 1 ingrédient dans l’index.");
 
         // 3) Créer la recette pivot (valeurs par défaut)
-        const basePayload: any = {
+          const basePayload: Record<string, unknown> = {
           name: makeAutoName(), // évite les collisions si contrainte unique
           pivot_ingredient_id: first.id,
           pivot_unit: "g",
         };
 
-        let { data, error: eIns } = await supabase.from("prep_recipes").insert(basePayload).select("id").single();
+                let { data, error: eIns } = await supabase
+          .from("prep_recipes")
+          .insert(basePayload)
+          .select("id")
+          .single<InsertedId>();
 
-        // Si collision unique -> 2e essai avec un autre nom
-        if (eIns && (eIns as any).code === "23505") {
-          const retryPayload = { ...basePayload, name: makeAutoName() };
-          const retry = await supabase.from("prep_recipes").insert(retryPayload).select("id").single();
-          data = retry.data as any;
-          eIns = retry.error as any;
+        if (eIns && (eIns as PgError).code === "23505") {
+          const retryPayload: Record<string, unknown> = { ...basePayload, name: makeAutoName() };
+          const retry = await supabase
+            .from("prep_recipes")
+            .insert(retryPayload)
+            .select("id")
+            .single<InsertedId>();
+          data = retry.data;
+          eIns = retry.error;
         }
 
         if (eIns) throw eIns;
@@ -81,10 +90,11 @@ export default function NewPrepRecipePage() {
             window.location.href = url;
           }
         }, 400);
-      } catch (e: any) {
+            } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "Erreur création";
         setState({
           status: "ERROR",
-          error: { message: e?.message ?? "Erreur création", details: e },
+          error: { message: msg, details: e },
         });
       }
     };

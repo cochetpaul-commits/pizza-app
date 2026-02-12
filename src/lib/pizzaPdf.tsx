@@ -193,10 +193,10 @@ export function PizzaPdfDocument({ data }: { data: PizzaPdfData }) {
             </View>
           </View>
 
-          {/* RIGHT */}
           <View style={styles.headerRight}>
-            {data.photoUrl ? <Image src={data.photoUrl} style={styles.photo} /> : null}
-          </View>
+  {/* eslint-disable-next-line jsx-a11y/alt-text */}
+  {data.photoUrl ? <Image src={data.photoUrl} style={styles.photo} /> : null}
+</View>
         </View>
 
         {/* AVANT FOUR */}

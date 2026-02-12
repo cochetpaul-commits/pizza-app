@@ -1,7 +1,7 @@
 "use client";
-import { offerToCpu } from "@/lib/offerPricing";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { offerToCpu } from "@/lib/offerPricing";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
@@ -119,7 +119,7 @@ export default function PrepRecipeDetailPage() {
 
   const [newIngredientId, setNewIngredientId] = useState<string>("");
   const [newQtyForThisPivot, setNewQtyForThisPivot] = useState<string>("");
-  const [newUnit, setNewUnit] = useState<"g" | "ml" | "pc">("g");
+
   const [adding, setAdding] = useState(false);
 
   const pivotAmountNum = useMemo(() => {
@@ -132,14 +132,17 @@ export default function PrepRecipeDetailPage() {
     return ingredients.find((x) => x.id === recipe.pivot_ingredient_id) ?? null;
   }, [recipe, ingredients]);
 
-  const pickCpu = (iid: string, unit: "g" | "ml" | "pc", fallbackCostPerUnit?: number | null) => {
-    const m = iid ? priceByIngredient[iid] : undefined;
-    const fromOffers =
-      unit === "g" ? m?.g : unit === "ml" ? m?.ml : unit === "pc" ? m?.pcs : undefined;
+    const pickCpu = useCallback(
+    (iid: string, unit: "g" | "ml" | "pc", fallbackCostPerUnit?: number | null) => {
+      const m = iid ? priceByIngredient[iid] : undefined;
+      const fromOffers =
+        unit === "g" ? m?.g : unit === "ml" ? m?.ml : unit === "pc" ? m?.pcs : undefined;
 
-    const cpu = n2(fromOffers ?? fallbackCostPerUnit);
-    return cpu > 0 ? cpu : 0;
-  };
+      const cpu = n2(fromOffers ?? fallbackCostPerUnit);
+      return cpu;
+    },
+    [priceByIngredient]
+  );
 
   const computed: Computed = useMemo(() => {
     if (!recipe) {
@@ -171,9 +174,9 @@ export default function PrepRecipeDetailPage() {
     const costPerKg = recipe.pivot_unit === "g" && totalQty > 0 ? totalCost / (totalQty / 1000) : 0;
 
     return { rows, pivotCost, linesCost, totalCost, totalQty, costPerKg };
-  }, [recipe, lines, pivotAmountNum, pivotIngredient, priceByIngredient]);
+    }, [recipe, lines, pivotAmountNum, pivotIngredient, pickCpu]);
 
-  const load = async () => {
+    const load = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -192,7 +195,7 @@ export default function PrepRecipeDetailPage() {
 
       const rr = r as PrepRecipe;
       setRecipe(rr);
-      setNewUnit(rr.pivot_unit);
+ 
 
       const { data: ing, error: eI } = await supabase
         .from("ingredients")
@@ -206,15 +209,16 @@ export default function PrepRecipeDetailPage() {
 
       const { data: offers, error: offErr } = await supabase.from("v_latest_offers").select("ingredient_id, unit, unit_price");
       if (offErr) {
-        setError(offErr as any);
+        setError({ message: getErrMessage(offErr, "Erreur offers"), details: offErr });
         return;
       }
 
       const priceMap: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
-      (offers ?? []).forEach((o: any) => {
-        const iid = String(o.ingredient_id ?? "");
+      (offers ?? []).forEach((o: unknown) => {
+        const oo = getObj(o) ?? {};
+        const iid = String(oo["ingredient_id"] ?? "");
         if (!iid) return;
-        const cpu = offerToCpu(o.unit, o.unit_price);
+        const cpu = offerToCpu(String(oo["unit"] ?? ""), oo["unit_price"]);
         if (!priceMap[iid]) priceMap[iid] = {};
         priceMap[iid] = { ...priceMap[iid], ...cpu };
       });
@@ -253,12 +257,12 @@ export default function PrepRecipeDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+    }, [id]);
 
   useEffect(() => {
     if (!id) return;
     void load();
-  }, [id]);
+    }, [id, load]);
 
   const saveRecipe = async () => {
     if (!recipe) return;
@@ -341,7 +345,7 @@ export default function PrepRecipeDetailPage() {
       const defaultUnit = recipe.pivot_unit;
       const unitLabel = recipe.pivot_unit;
 
-      const ingredientPayload: any = {
+      const ingredientPayload: Record<string, unknown> = {
         name,
         category: "autre",
         is_active: true,

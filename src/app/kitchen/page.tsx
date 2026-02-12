@@ -28,7 +28,7 @@ export default function KitchenPage() {
   const [state, setState] = useState<{
     status: "loading" | "NOT_LOGGED" | "OK" | "ERROR";
     recipes?: KitchenRecipeRow[];
-    error?: any;
+    error?: unknown;
   }>({ status: "loading" });
 
   const load = async () => {
@@ -56,8 +56,17 @@ export default function KitchenPage() {
     setState({ status: "OK", recipes: (data ?? []) as KitchenRecipeRow[] });
   };
 
-  useEffect(() => {
-    void load();
+    useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      if (cancelled) return;
+      await load();
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const del = async (id: string) => {

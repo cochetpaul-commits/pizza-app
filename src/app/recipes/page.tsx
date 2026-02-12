@@ -13,6 +13,10 @@ type RecipeRow = {
   created_at: string;
   user_id: string;
 };
+type CreateErr = { message: string; details?: unknown };
+type PgError = { code?: string; message?: string };
+type InsertedId = { id: string };
+type FlourMixItem = { name: string; percent: number };
 
 export default function RecipesPage() {
   const router = useRouter();
@@ -20,11 +24,11 @@ export default function RecipesPage() {
   const [state, setState] = useState<{
     status: "loading" | "NOT_LOGGED" | "OK" | "ERROR";
     recipes?: RecipeRow[];
-    error?: any;
+    error?: unknown;
   }>({ status: "loading" });
 
   const [creatingNew, setCreatingNew] = useState(false);
-  const [createError, setCreateError] = useState<any>(null);
+  const [createError, setCreateError] = useState<CreateErr | null>(null);
 
   const load = async () => {
     const { data: auth } = await supabase.auth.getUser();
@@ -47,8 +51,16 @@ export default function RecipesPage() {
   };
 
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false;
+
+    (async () => {
+      if (cancelled) return;
+      await load();
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const createNewRecipe = async () => {
@@ -62,7 +74,7 @@ export default function RecipesPage() {
       const now = new Date();
       const autoName = `Empâtement ${now.toLocaleDateString("fr-FR")} ${now.toLocaleTimeString("fr-FR").slice(0, 5)}`;
 
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         name: autoName,
         type: "biga",
         hydration_total: 65,
@@ -72,19 +84,20 @@ export default function RecipesPage() {
         flour_mix: [
           { name: "Tipo 00", percent: 80 },
           { name: "Tipo 1", percent: 20 },
-        ],
+        ] satisfies FlourMixItem[],
         yeast_percent: 0,
         biga_yeast_percent: 0,
       };
 
-      const { data, error } = await supabase.from("recipes").insert(payload).select("id").single();
+      const { data, error } = await supabase.from("recipes").insert(payload).select("id").single<InsertedId>();
       if (error) throw error;
       if (!data?.id) throw new Error("ID manquant après création");
 
       router.push(`/recipes/${data.id}`);
       router.refresh();
-    } catch (e: any) {
-      setCreateError({ message: e?.message ?? "Erreur création", details: e });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : (e as PgError)?.message ?? "Erreur création";
+      setCreateError({ message: msg, details: e });
     } finally {
       setCreatingNew(false);
     }

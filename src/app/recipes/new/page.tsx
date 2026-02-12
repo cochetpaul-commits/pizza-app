@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 type DoughType = "direct" | "biga" | "focaccia";
+type PgError = { code?: string; message?: string };
+type InsertedId = { id: string };
 
 function makeAutoName() {
   const now = new Date();
@@ -20,7 +22,7 @@ export default function NewRecipePage() {
   const didRunRef = useRef(false);
   const [state, setState] = useState<{
     status: "CREATING" | "ERROR";
-    error?: any;
+    error?: unknown;
     createdId?: string;
   }>({ status: "CREATING" });
 
@@ -54,7 +56,7 @@ Maturation : 24 h à 4°C
 Remise T° : 2 h
 Cuisson : __`;
 
-        const basePayload: any = {
+        const basePayload: Record<string, unknown> = {
           // IMPORTANT : nom unique (contrainte DB)
           name: makeAutoName(),
           type,
@@ -81,18 +83,25 @@ Cuisson : __`;
         };
 
         // 1er essai
-        let { data, error: insertErr } = await supabase.from("recipes").insert(basePayload).select("id").single();
+                let { data, error: insertErr } = await supabase
+          .from("recipes")
+          .insert(basePayload)
+          .select("id")
+          .single<InsertedId>();
 
-        // Si collision unique -> 2e essai avec un autre nom
-        if (insertErr && (insertErr as any).code === "23505") {
-          const retryPayload = { ...basePayload, name: makeAutoName() };
-          const retry = await supabase.from("recipes").insert(retryPayload).select("id").single();
+        if (insertErr && (insertErr as PgError).code === "23505") {
+          const retryPayload: Record<string, unknown> = { ...basePayload, name: makeAutoName() };
+          const retry = await supabase
+            .from("recipes")
+            .insert(retryPayload)
+            .select("id")
+            .single<InsertedId>();
           data = retry.data;
           insertErr = retry.error;
         }
 
         if (insertErr) throw insertErr;
-        const newId = (data as any)?.id as string | undefined;
+        const newId = data?.id;
         if (!newId) throw new Error("ID manquant après création");
 
         // stocke l'id (utile si on doit afficher un fallback)
@@ -109,10 +118,11 @@ Cuisson : __`;
             window.location.assign(`/recipes/${newId}`);
           }
         }, 800);
-      } catch (e: any) {
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "Erreur création";
         setState({
           status: "ERROR",
-          error: { message: e?.message ?? "Erreur création", details: e },
+          error: { message: msg, details: e },
         });
       }
     };

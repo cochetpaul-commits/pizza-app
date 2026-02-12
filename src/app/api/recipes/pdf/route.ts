@@ -26,7 +26,7 @@ function slugify(s: string) {
     .slice(0, 60);
 }
 
-function toNum(v: any, fallback: number) {
+function toNum(v: unknown, fallback: number) {
   const n = typeof v === "string" ? Number(v) : Number(v);
   return Number.isFinite(n) ? n : fallback;
 }
@@ -70,12 +70,15 @@ export async function POST(req: Request) {
 
     const typeRaw = String(recipe.type ?? "direct").toLowerCase();
     const type =
-      typeRaw === "direct" || typeRaw === "biga" || typeRaw === "focaccia" ? typeRaw : "direct";
+      (typeRaw === "direct" || typeRaw === "biga" || typeRaw === "focaccia" ? typeRaw : "direct") as
+        | "direct"
+        | "biga"
+        | "focaccia";
 
     const flour_mix = Array.isArray(recipe.flour_mix) ? recipe.flour_mix : [];
 
     const calc = calculerPate({
-      type: type as any,
+      type,
       nbPatons,
       poidsPaton,
       recipe:
@@ -103,7 +106,7 @@ export async function POST(req: Request) {
 
     const data: RecipePdfData = {
       name: recipe.name ?? "Empâtement",
-      type: type as any,
+      type,
 
       hydration_total: recipe.hydration_total ?? null,
       salt_percent: recipe.salt_percent ?? null,
@@ -137,16 +140,17 @@ export async function POST(req: Request) {
 
     const pdfBody = new Uint8Array(pdfBuffer);
 
-    return new NextResponse(pdfBody, {
+       return new NextResponse(pdfBody, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${filename}"`,
       },
     });
-  } catch (e) {
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : typeof e === "string" ? e : String(e);
     return NextResponse.json(
-      { message: "Erreur génération PDF", details: String((e as Error)?.message ?? e) },
+      { message: "Erreur génération PDF", details: msg },
       { status: 500 }
     );
   }
