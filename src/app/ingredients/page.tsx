@@ -247,7 +247,7 @@ export default function IngredientsPage() {
   });
 
   const [newName, setNewName] = useState("");
-  const [newCategory, setNewCategory] = useState<Category>("autre");
+  const [newCategory, setNewCategory] = useState<Category>("preparation");
   const [newSupplierId, setNewSupplierId] = useState<string>("");
 
   const [priceKind, setPriceKind] = useState<PriceKind>("unit");
