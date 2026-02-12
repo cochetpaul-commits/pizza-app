@@ -621,7 +621,7 @@ type SupplierOfferPayload = {
       return;
     }
 
-    const supplier_id = normalizeSupplierId(newSupplierId);
+    const supplier_id = newCategory === "preparation" ? null : (normalizeSupplierId(newSupplierId) || null);
 
     const baseIngredient: IngredientUpsert = {
       name,
@@ -659,7 +659,13 @@ type SupplierOfferPayload = {
       const offerPayload = buildOfferFromCreate(ingredient_id, userId);
       if (!offerPayload) return;
 
-      const dPrev = await supabase.from("supplier_offers").update({ is_active: false }).eq("ingredient_id", ingredient_id).eq("supplier_id", supplier_id).eq("is_active", true);
+      const dPrev = await supabase
+        .from("supplier_offers")
+        .update({ is_active: false })
+        .eq("ingredient_id", ingredient_id)
+        .eq("supplier_id", supplier_id)
+        .eq("is_active", true);
+
       if (dPrev.error) {
         alert(dPrev.error.message);
         return;
@@ -668,7 +674,13 @@ type SupplierOfferPayload = {
       let off = await supabase.from("supplier_offers").insert(offerPayload);
 
       if (off.error && (off.error as { code?: string }).code === "23505") {
-        const dPrev2 = await supabase.from("supplier_offers").update({ is_active: false }).eq("ingredient_id", ingredient_id).eq("supplier_id", supplier_id).eq("is_active", true);
+        const dPrev2 = await supabase
+          .from("supplier_offers")
+          .update({ is_active: false })
+          .eq("ingredient_id", ingredient_id)
+          .eq("supplier_id", supplier_id)
+          .eq("is_active", true);
+
         if (dPrev2.error) {
           alert(dPrev2.error.message);
           return;
@@ -683,7 +695,7 @@ type SupplierOfferPayload = {
     }
 
     setNewName("");
-    setNewCategory("autre");
+    setNewCategory("preparation");
     setNewSupplierId("");
     setPriceKind("unit");
     resetCreatePriceBlocks();
