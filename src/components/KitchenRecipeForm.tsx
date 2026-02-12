@@ -7,6 +7,22 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import type { Ingredient } from "@/lib/types";
 
+type VatRate = 0.055 | 0.1 | 0.2;
+
+const VAT_OPTIONS: Array<{ label: string; value: VatRate }> = [
+  { label: "5,5%", value: 0.055 },
+  { label: "10%", value: 0.1 },
+  { label: "20%", value: 0.2 },
+];
+
+function toVatRate(v: unknown): VatRate {
+  const n = typeof v === "number" ? v : Number(String(v).replace(",", "."));
+  if (n === 0.055) return 0.055;
+  if (n === 0.1) return 0.1;
+  if (n === 0.2) return 0.2;
+  return 0.1;
+}
+
 type KitchenRecipeRowDB = {
   id: string;
   user_id: string;
@@ -130,7 +146,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     category: string;
     yield_grams: string;
     portions_count: string;
-    vat_rate: string;
+    vat_rate: VatRate;
     margin_rate: string;
     notes: string;
     procedure: string;
@@ -213,9 +229,9 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
   }, [form?.portions_count]);
 
   const vatPct = useMemo(() => {
-    const n = Number(String(form?.vat_rate ?? "").replace(",", "."));
-    return Number.isFinite(n) && n >= 0 ? n : 0;
-  }, [form?.vat_rate]);
+  const r = toVatRate(form?.vat_rate);
+  return r * 100;
+}, [form?.vat_rate]);
 
   const marginPct = useMemo(() => {
     const n = Number(String(form?.margin_rate ?? "").replace(",", "."));
@@ -347,7 +363,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
         category: "plat_cuisine",
         yield_grams: "1000",
         portions_count: "1",
-        vat_rate: "10",
+        vat_rate: 0.1,
         margin_rate: "60",
         notes: "",
         procedure: "",
@@ -388,7 +404,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       category: String(rr.category ?? "plat_cuisine"),
       yield_grams: String(rr.yield_grams ?? 1000),
       portions_count: String(rr.portions_count ?? 1),
-      vat_rate: String(rr.vat_rate ?? 10),
+      vat_rate: toVatRate(rr.vat_rate),
       margin_rate: String(rr.margin_rate ?? 60),
       notes: String(rr.notes ?? ""),
       procedure: String(rr.procedure ?? ""),
@@ -586,7 +602,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       category: form.category || "plat_cuisine",
       yield_grams: round0(yieldGramsNum),
       portions_count: round0(portionsNum),
-      vat_rate: round2(vatPct),
+      vat_rate: form.vat_rate,
       margin_rate: round2(marginPct),
       notes: form.notes?.trim() || null,
       procedure: form.procedure?.trim() || null,
@@ -928,11 +944,17 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
           <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
             <div style={metricBox}>
               <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 6 }}>TVA vente (%)</div>
-              <select style={{ ...input, height: 40, fontWeight: 950 }} value={form.vat_rate} onChange={(e) => setForm((p) => (p ? { ...p, vat_rate: e.target.value } : p))}>
-                <option value="5.5">5,5</option>
-                <option value="10">10</option>
-                <option value="20">20</option>
-              </select>
+              <select
+  style={{ ...input, height: 40, fontWeight: 950 }}
+  value={String(form.vat_rate)}
+  onChange={(e) => setForm((p) => (p ? { ...p, vat_rate: toVatRate(e.target.value) } : p))}
+>
+  {VAT_OPTIONS.map((o) => (
+    <option key={o.value} value={String(o.value)}>
+      {o.label.replace("%", "").replace(".", ",")}
+    </option>
+  ))}
+</select>
             </div>
 
             <div style={metricBox}>
