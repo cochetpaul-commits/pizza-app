@@ -704,7 +704,9 @@ type SupplierOfferPayload = {
 
   function startEdit(x: Ingredient) {
     const off = offersByIngredientId.get(x.id);
-    const supplierId = off?.supplier_id ?? (x.supplier_id ?? "");
+
+    const isPrep = x.category === "preparation";
+    const supplierId = isPrep ? "" : (off?.supplier_id ?? (x.supplier_id ?? ""));
 
     setEditingId(x.id);
     setEdit({
@@ -713,8 +715,8 @@ type SupplierOfferPayload = {
       is_active: x.is_active,
       supplierId,
 
-      useOffer: true,
-      priceKind: off?.price_kind ?? "unit",
+      useOffer: isPrep ? false : true,
+      priceKind: isPrep ? "unit" : (off?.price_kind ?? "unit"),
 
       unit: (off?.unit ?? "kg") as "kg" | "l" | "pc",
       unitPrice: off?.unit_price != null ? String(off.unit_price) : "",
@@ -732,12 +734,11 @@ type SupplierOfferPayload = {
       packPieceWeightG: off?.piece_weight_g != null ? String(off.piece_weight_g) : "",
     });
   }
-
   function buildOfferFromEdit(ingredient_id: string, uid: string): OfferPayload | null {
     if (!edit) return null;
     if (!edit.useOffer) return null;
 
-    const supplier_id = normalizeSupplierId(edit.supplierId);
+     const supplier_id = edit.category === "preparation" ? null : (normalizeSupplierId(edit.supplierId) || null);
     if (!supplier_id) {
       alert("Fournisseur obligatoire pour l'offre.");
       return null;
@@ -1300,28 +1301,30 @@ type SupplierOfferPayload = {
                             </div>
                           ) : null}
 
-                          <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-                            <button className="btn" onClick={() => setIngredientStatus(x.id, "to_check")}>
-                              À contrôler
-                            </button>
+                          {st !== "validated" ? (
+                            <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                              <button className="btn" onClick={() => setIngredientStatus(x.id, "to_check")}>
+                                À contrôler
+                              </button>
 
-                            <button
-                              className="btn"
-                              disabled={!canValidate}
-                              onClick={() => {
-                                if (!canValidate) return;
-                                setIngredientStatus(x.id, "validated");
-                              }}
-                              style={!canValidate ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
-                              title={!canValidate ? "Ajoute un prix (offre fournisseur ou legacy) avant de valider." : ""}
-                            >
-                              Valider
-                            </button>
+                              <button
+                                className="btn"
+                                disabled={!canValidate}
+                                onClick={() => {
+                                  if (!canValidate) return;
+                                  setIngredientStatus(x.id, "validated");
+                                }}
+                                style={!canValidate ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
+                                title={!canValidate ? "Ajoute un prix (offre fournisseur ou legacy) avant de valider." : ""}
+                              >
+                                Valider
+                              </button>
 
-                            <button className="btn" onClick={() => setIngredientStatus(x.id, "unknown")}>
-                              Incompris
-                            </button>
-                          </div>
+                              <button className="btn" onClick={() => setIngredientStatus(x.id, "unknown")}>
+                                Incompris
+                              </button>
+                            </div>
+                          ) : null}
                         </>
                       );
                     })()}
@@ -1369,13 +1372,14 @@ type SupplierOfferPayload = {
                   <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #eee", display: "grid", gap: 10 }}>
                     <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10 }}>
                       <input style={input} value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
-                      <select style={select} value={edit.category} onChange={(e) => setEdit({ ...edit, category: e.target.value as Category })}>
+                                            <select style={select} value={edit.category} onChange={(e) => setEdit({ ...edit, category: e.target.value as Category })}>
                         {CATEGORIES.map((c) => (
                           <option key={c} value={c}>
                             {c}
                           </option>
                         ))}
                       </select>
+
                       <select style={select} value={edit.supplierId} onChange={(e) => setEdit({ ...edit, supplierId: e.target.value })}>
                         <option value="">—</option>
                         {suppliers
