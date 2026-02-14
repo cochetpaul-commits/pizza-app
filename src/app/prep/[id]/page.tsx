@@ -2,14 +2,15 @@
 
 import { offerToCpu } from "@/lib/offerPricing";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
+import { SmartSelect } from "@/components/SmartSelect";
 import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
 
 type Ingredient = {
   id: string;
   name: string;
-  cost_per_unit: number | null; // €/g (ou €/ml ou €/pc) — colonne DB (fallback)
+  cost_per_unit: number | null;
   is_active?: boolean;
   category?: string | null;
 };
@@ -20,6 +21,7 @@ type PrepRecipe = {
   pivot_ingredient_id: string;
   pivot_unit: "g" | "ml" | "pc";
   output_ingredient_id?: string | null;
+  created_at?: string;
 };
 
 type Line = {
@@ -31,7 +33,7 @@ type Line = {
   sort_order: number;
 
   ingredient_name?: string;
-  ingredient_cost_per_unit?: number | null; // fallback DB
+  ingredient_cost_per_unit?: number | null;
 };
 
 type ComputedRow = Line & {
@@ -64,11 +66,6 @@ function round2(v: number) {
   return Math.round(x * 100) / 100;
 }
 
-function round0(v: number) {
-  const x = n2(v);
-  return Math.round(x);
-}
-
 function fmtMoney(v: number) {
   const x = n2(v);
   return x.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -76,7 +73,7 @@ function fmtMoney(v: number) {
 
 function fmtKg(v: number) {
   const x = n2(v);
-  return x.toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + " €/kg";
+  return x.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €/kg";
 }
 
 function getErrMessage(e: unknown, fallback: string) {
@@ -100,8 +97,32 @@ function getObj(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
 }
 
+function offerToEurPerKgFromRow(cpu: { g?: number; ml?: number; pcs?: number }, oo: Record<string, unknown>): number | null {
+  const density = typeof oo["density_kg_per_l"] === "number" ? (oo["density_kg_per_l"] as number) : null; // kg/L
+  const pieceG = typeof oo["piece_weight_g"] === "number" ? (oo["piece_weight_g"] as number) : null; // g
+
+  const g = typeof cpu.g === "number" ? cpu.g : null; // €/g
+  const ml = typeof cpu.ml === "number" ? cpu.ml : null; // €/ml
+  const pcs = typeof cpu.pcs === "number" ? cpu.pcs : null; // €/pc
+
+  if (g && g > 0) return g * 1000;
+
+  if (ml && ml > 0) {
+    if (!density || density <= 0) return null;
+    // €/ml -> €/L -> €/kg
+    const eurPerL = ml * 1000;
+    return eurPerL / density;
+  }
+
+  if (pcs && pcs > 0) {
+    if (!pieceG || pieceG <= 0) return null;
+    return pcs / (pieceG / 1000);
+  }
+
+  return null;
+}
+
 export default function PrepRecipeDetailPage() {
-  const router = useRouter();
   const params = useParams();
   const id = String(params?.id ?? "");
 
@@ -112,32 +133,38 @@ export default function PrepRecipeDetailPage() {
 
   const [recipe, setRecipe] = useState<PrepRecipe | null>(null);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, { g?: number; ml?: number; pcs?: number }>>({});
+  const [offerInfoByIngredient, setOfferInfoByIngredient] = useState<
+    Record<string, { supplier?: string | null; eurPerKg?: number | null }>
+  >({});
+
   const [lines, setLines] = useState<Line[]>([]);
 
-  const [pivotAmount, setPivotAmount] = useState<string>("300");
-
+  const [pivotAmount, setPivotAmount] = useState<string>("");
+  const [uiPivotId, setUiPivotId] = useState<string>("");
   const [newIngredientId, setNewIngredientId] = useState<string>("");
   const [newQtyForThisPivot, setNewQtyForThisPivot] = useState<string>("");
 
   const [adding, setAdding] = useState(false);
 
   const pivotAmountNum = useMemo(() => {
-    const v = Number(String(pivotAmount).replace(",", "."));
+    const raw = String(pivotAmount).trim();
+    if (!raw) return 0;
+    const v = Number(raw.replace(",", "."));
     return Number.isFinite(v) && v > 0 ? v : 0;
   }, [pivotAmount]);
 
   const pivotIngredient = useMemo(() => {
     if (!recipe) return null;
+    if (!recipe.pivot_ingredient_id) return null;
     return ingredients.find((x) => x.id === recipe.pivot_ingredient_id) ?? null;
   }, [recipe, ingredients]);
 
-    const pickCpu = useCallback(
+  const pickCpu = useCallback(
     (iid: string, unit: "g" | "ml" | "pc", fallbackCostPerUnit?: number | null) => {
       const m = iid ? priceByIngredient[iid] : undefined;
-      const fromOffers =
-        unit === "g" ? m?.g : unit === "ml" ? m?.ml : unit === "pc" ? m?.pcs : undefined;
-
+      const fromOffers = unit === "g" ? m?.g : unit === "ml" ? m?.ml : unit === "pc" ? m?.pcs : undefined;
       const cpu = n2(fromOffers ?? fallbackCostPerUnit);
       return cpu;
     },
@@ -145,11 +172,10 @@ export default function PrepRecipeDetailPage() {
   );
 
   const computed: Computed = useMemo(() => {
-    if (!recipe) {
-      return { rows: [], pivotCost: 0, linesCost: 0, totalCost: 0, totalQty: 0, costPerKg: 0 };
-    }
+    if (!recipe) return { rows: [], pivotCost: 0, linesCost: 0, totalCost: 0, totalQty: 0, costPerKg: 0 };
 
-    const pivotCpu = pivotIngredient ? pickCpu(pivotIngredient.id, recipe.pivot_unit, pivotIngredient.cost_per_unit) : 0;
+    const pivotCpu =
+      pivotIngredient && pivotAmountNum > 0 ? pickCpu(pivotIngredient.id, recipe.pivot_unit, pivotIngredient.cost_per_unit) : 0;
     const pivotCost = pivotCpu > 0 && pivotAmountNum > 0 ? pivotCpu * pivotAmountNum : 0;
 
     const rows: ComputedRow[] = (lines ?? [])
@@ -157,26 +183,31 @@ export default function PrepRecipeDetailPage() {
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       .map((l) => {
         const qty = pivotAmountNum > 0 ? n2(l.amount_per_1_pivot) * pivotAmountNum : 0;
-
         const cpuPicked = pickCpu(String(l.ingredient_id ?? ""), l.unit ?? "g", l.ingredient_cost_per_unit ?? null);
         const cpu = cpuPicked > 0 ? cpuPicked : null;
-
         const cost = cpu != null ? cpu * qty : 0;
-
         return { ...l, qty, cost, cpu };
       });
 
     const linesCost = rows.reduce((acc, r) => acc + n2(r.cost), 0);
     const totalCost = pivotCost + linesCost;
 
-    const totalQty = pivotAmountNum + rows.reduce((acc, r) => acc + n2(r.qty), 0);
+    const totalQty = (pivotAmountNum > 0 ? pivotAmountNum : 0) + rows.reduce((acc, r) => acc + n2(r.qty), 0);
 
     const costPerKg = recipe.pivot_unit === "g" && totalQty > 0 ? totalCost / (totalQty / 1000) : 0;
 
     return { rows, pivotCost, linesCost, totalCost, totalQty, costPerKg };
-    }, [recipe, lines, pivotAmountNum, pivotIngredient, pickCpu]);
+  }, [recipe, lines, pivotAmountNum, pivotIngredient, pickCpu]);
 
-    const load = useCallback(async () => {
+  const isDraft = useMemo(() => {
+    if (!recipe) return true;
+    const nameBlank = !String(recipe.name ?? "").trim();
+    const noLines = (lines ?? []).length === 0;
+    const noOutput = !recipe.output_ingredient_id;
+    return nameBlank && noLines && noOutput;
+  }, [recipe, lines]);
+
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -186,7 +217,7 @@ export default function PrepRecipeDetailPage() {
 
       const { data: r, error: eR } = await supabase
         .from("prep_recipes")
-        .select("id,name,pivot_ingredient_id,pivot_unit,output_ingredient_id")
+        .select("id,name,pivot_ingredient_id,pivot_unit,output_ingredient_id,created_at")
         .eq("id", id)
         .single();
 
@@ -195,7 +226,6 @@ export default function PrepRecipeDetailPage() {
 
       const rr = r as PrepRecipe;
       setRecipe(rr);
- 
 
       const { data: ing, error: eI } = await supabase
         .from("ingredients")
@@ -207,22 +237,75 @@ export default function PrepRecipeDetailPage() {
       const ingList = (ing ?? []) as Ingredient[];
       setIngredients(ingList);
 
-      const { data: offers, error: offErr } = await supabase.from("v_latest_offers").select("ingredient_id, unit, unit_price");
+            const { data: offers, error: offErr } = await supabase
+        .from("v_latest_offers")
+        .select(
+          "ingredient_id,supplier_id,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g"
+        );
+
       if (offErr) {
         setError({ message: getErrMessage(offErr, "Erreur offers"), details: offErr });
         return;
       }
 
+      const supplierMap: Record<string, string> = {
+        B347: "METRO",
+        "0074": "MAEL",
+        B86F: "B86F",
+        CD44: "CD44",
+      };
+
       const priceMap: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
+      const infoMap: Record<string, { supplier?: string | null; eurPerKg?: number | null }> = {};
+
       (offers ?? []).forEach((o: unknown) => {
         const oo = getObj(o) ?? {};
         const iid = String(oo["ingredient_id"] ?? "");
         if (!iid) return;
-        const cpu = offerToCpu(String(oo["unit"] ?? ""), oo["unit_price"]);
+
+        const supplierId = String(oo["supplier_id"] ?? "");
+        const supplierCode = supplierId ? supplierId.slice(0, 4).toUpperCase() : "";
+        const supplier = supplierCode ? supplierMap[supplierCode] ?? supplierCode : null;
+
+        // 1) CPU depuis unit/unit_price
+        let cpu = offerToCpu(String(oo["unit"] ?? ""), oo["unit_price"]);
+
+        // 2) Fallback CPU depuis PACK si unit/unit_price pas utilisable
+        const emptyCpu = !cpu.g && !cpu.ml && !cpu.pcs;
+        const packPrice = typeof oo["pack_price"] === "number" ? (oo["pack_price"] as number) : Number(oo["pack_price"]);
+        const packTotalQty = typeof oo["pack_total_qty"] === "number" ? (oo["pack_total_qty"] as number) : Number(oo["pack_total_qty"]);
+        const packUnit = String(oo["pack_unit"] ?? "");
+        const packCount = typeof oo["pack_count"] === "number" ? (oo["pack_count"] as number) : Number(oo["pack_count"]);
+        const packEachQty = typeof oo["pack_each_qty"] === "number" ? (oo["pack_each_qty"] as number) : Number(oo["pack_each_qty"]);
+        const packEachUnit = String(oo["pack_each_unit"] ?? "");
+
+        if (emptyCpu && Number.isFinite(packPrice) && packPrice > 0) {
+          // pack_total_qty + pack_unit (ex: 17.45€ / 5 kg)
+          if (Number.isFinite(packTotalQty) && packTotalQty > 0 && packUnit) {
+            const perUnit = packPrice / packTotalQty;
+            cpu = offerToCpu(packUnit, perUnit);
+          }
+          // pack_count * pack_each_qty (ex: 27.11€ / (6 x 0.5 kg))
+          else if (Number.isFinite(packCount) && packCount > 0 && Number.isFinite(packEachQty) && packEachQty > 0 && packEachUnit) {
+            const totalQty = packCount * packEachQty;
+            const perUnit = packPrice / totalQty;
+            cpu = offerToCpu(packEachUnit, perUnit);
+          }
+        }
+
         if (!priceMap[iid]) priceMap[iid] = {};
         priceMap[iid] = { ...priceMap[iid], ...cpu };
+
+        const eurPerKg = offerToEurPerKgFromRow(priceMap[iid], oo);
+
+        infoMap[iid] = {
+          supplier,
+          eurPerKg: eurPerKg != null && Number.isFinite(eurPerKg) ? eurPerKg : null,
+        };
       });
+
       setPriceByIngredient(priceMap);
+      setOfferInfoByIngredient(infoMap);
 
       const { data: ln, error: eL } = await supabase
         .from("prep_recipe_lines")
@@ -235,7 +318,6 @@ export default function PrepRecipeDetailPage() {
       const mapped: Line[] = (ln ?? []).map((raw) => {
         const row = getObj(raw) ?? {};
         const ingObj = getObj(row["ingredients"]) ?? {};
-
         return {
           id: getString(row["id"]),
           prep_recipe_id: getString(row["prep_recipe_id"]),
@@ -247,33 +329,51 @@ export default function PrepRecipeDetailPage() {
           ingredient_cost_per_unit: typeof ingObj["cost_per_unit"] === "number" ? (ingObj["cost_per_unit"] as number) : null,
         };
       });
-
       setLines(mapped);
 
-      const firstOther = ingList.find((z) => z.id !== rr.pivot_ingredient_id) ?? ingList[0];
-      setNewIngredientId(firstOther?.id ?? "");
+      const draftNow = !String(rr.name ?? "").trim() && mapped.length === 0 && !rr.output_ingredient_id;
+      if (draftNow) {
+        setPivotAmount("");
+        setUiPivotId("");
+        setNewIngredientId("");
+        setNewQtyForThisPivot("");
+      } else {
+        setUiPivotId(rr.pivot_ingredient_id ?? "");
+      }
     } catch (e: unknown) {
       setError({ message: getErrMessage(e, "Erreur"), details: e });
     } finally {
       setLoading(false);
     }
-    }, [id]);
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
     void load();
-    }, [id, load]);
+  }, [id, load]);
+
+  const canSaveRecipe = useMemo(() => {
+    if (!recipe) return false;
+    const nameOk = !!String(recipe.name ?? "").trim();
+    const pivotOk = !!String(recipe.pivot_ingredient_id ?? "").trim();
+    return nameOk && pivotOk;
+  }, [recipe]);
 
   const saveRecipe = async () => {
     if (!recipe) return;
     if (saving) return;
+
+    if (!canSaveRecipe) {
+      setError({ message: "Renseigne au minimum : Nom + Pivot.", details: null });
+      return;
+    }
 
     setSaving(true);
     setError(null);
 
     try {
       const payload = {
-        name: recipe.name.trim() || "Sans nom",
+        name: String(recipe.name ?? "").trim(),
         pivot_ingredient_id: recipe.pivot_ingredient_id,
         pivot_unit: recipe.pivot_unit,
         updated_at: new Date().toISOString(),
@@ -301,17 +401,11 @@ export default function PrepRecipeDetailPage() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("NOT_LOGGED");
 
-      if (!pivotIngredient) {
-        throw new Error("Pivot introuvable.");
-      }
-      if (pivotAmountNum <= 0) {
-        throw new Error("Quantité pivot invalide.");
-      }
+      if (!pivotIngredient) throw new Error("Pivot introuvable.");
+      if (pivotAmountNum <= 0) throw new Error("Quantité pivot invalide.");
 
       const pivotCpu = pickCpu(pivotIngredient.id, recipe.pivot_unit, pivotIngredient.cost_per_unit);
-      if (pivotCpu <= 0) {
-        throw new Error("Pivot: coût manquant. Ajoute un prix (offers ou cost_per_unit).");
-      }
+      if (pivotCpu <= 0) throw new Error("Pivot: coût manquant. Ajoute un prix (offers ou cost_per_unit).");
 
       const pivotCost = pivotCpu * pivotAmountNum;
 
@@ -320,28 +414,19 @@ export default function PrepRecipeDetailPage() {
         const cpuPicked = pickCpu(String(l.ingredient_id ?? ""), l.unit ?? "g", l.ingredient_cost_per_unit ?? null);
         const cpu = cpuPicked > 0 ? cpuPicked : null;
         const cost = cpu != null ? cpu * qty : 0;
-        return { qty, cost, cpu, line: l };
+        return { qty, cost, cpu };
       });
 
       const missing = rows.find((r) => r.cpu == null);
-      if (missing) {
-        throw new Error("Impossible d’enregistrer: un ingrédient n’a pas de prix (offers ou cost_per_unit manquant).");
-      }
+      if (missing) throw new Error("Impossible d’enregistrer: un ingrédient n’a pas de prix.");
 
-      const linesCost = rows.reduce((acc, r) => acc + n2(r.cost), 0);
-      const totalCost = round2(pivotCost + linesCost);
+      const totalCost = round2(pivotCost + rows.reduce((acc, r) => acc + n2(r.cost), 0));
+      const totalQty = Math.round((pivotAmountNum > 0 ? pivotAmountNum : 0) + rows.reduce((acc, r) => acc + n2(r.qty), 0));
 
-      const totalQty = round0(pivotAmountNum + rows.reduce((acc, r) => acc + n2(r.qty), 0));
+      if (!Number.isFinite(totalCost) || totalCost <= 0) throw new Error("Impossible d’enregistrer: coût total invalide.");
+      if (!Number.isFinite(totalQty) || totalQty <= 0) throw new Error("Impossible d’enregistrer: quantité totale invalide.");
 
-      if (!Number.isFinite(totalCost) || totalCost <= 0) {
-        throw new Error("Impossible d’enregistrer: coût total invalide.");
-      }
-      if (!Number.isFinite(totalQty) || totalQty <= 0) {
-        throw new Error("Impossible d’enregistrer: quantité totale invalide.");
-      }
-
-      const name = (recipe.name?.trim() || "Recette pivot").slice(0, 120);
-
+      const name = (String(recipe.name ?? "").trim() || "Recette pivot").slice(0, 120);
       const defaultUnit = recipe.pivot_unit;
       const unitLabel = recipe.pivot_unit;
 
@@ -350,15 +435,12 @@ export default function PrepRecipeDetailPage() {
         category: "autre",
         is_active: true,
         default_unit: defaultUnit,
-
         purchase_price: totalCost,
         purchase_unit: totalQty,
         purchase_unit_label: unitLabel,
         purchase_unit_name: unitLabel,
-
         source_prep_recipe_id: recipe.id,
         source_prep_recipe_name: name,
-
         updated_at: new Date().toISOString(),
       };
 
@@ -393,6 +475,7 @@ export default function PrepRecipeDetailPage() {
 
   const addLine = async () => {
     if (!recipe) return;
+    if (!recipe.pivot_ingredient_id) return;
     if (!newIngredientId) return;
     if (newIngredientId === recipe.pivot_ingredient_id) return;
 
@@ -437,6 +520,7 @@ export default function PrepRecipeDetailPage() {
 
       setLines((p) => [...(p ?? []), added]);
       setNewQtyForThisPivot("");
+      setNewIngredientId("");
     } catch (e: unknown) {
       setError({ message: getErrMessage(e, "Erreur ajout ligne"), details: e });
     } finally {
@@ -459,6 +543,26 @@ export default function PrepRecipeDetailPage() {
     }
   };
 
+  const labelStyle: React.CSSProperties = { fontSize: 12, opacity: 0.75, marginBottom: 6 };
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    height: 44,
+    borderRadius: 10,
+    border: "1px solid rgba(0,0,0,0.12)",
+    padding: "0 12px",
+    fontSize: 16,
+    background: "rgba(255,255,255,0.65)",
+  };
+  const selectStyle: React.CSSProperties = { ...inputStyle, paddingRight: 34 };
+  const cardStyle: React.CSSProperties = { padding: 16 };
+  const kpiCard: React.CSSProperties = {
+    borderRadius: 12,
+    border: "1px solid rgba(0,0,0,0.10)",
+    padding: 12,
+    background: "rgba(255,255,255,0.55)",
+    minHeight: 70,
+  };
+
   if (loading) {
     return (
       <main className="container">
@@ -477,9 +581,6 @@ export default function PrepRecipeDetailPage() {
           <pre className="code" style={{ marginTop: 10 }}>
             {JSON.stringify(error, null, 2)}
           </pre>
-          <button className="btn" type="button" onClick={() => router.replace("/prep")}>
-            Retour
-          </button>
         </div>
       </main>
     );
@@ -490,70 +591,40 @@ export default function PrepRecipeDetailPage() {
       <main className="container">
         <TopNav title="Préparation" />
         <p className="muted">Recette introuvable.</p>
-        <button className="btn" type="button" onClick={() => router.replace("/prep")}>
-          Retour
-        </button>
       </main>
     );
   }
 
-  const labelStyle: React.CSSProperties = { fontSize: 12, opacity: 0.75, marginBottom: 6 };
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    height: 44,
-    borderRadius: 10,
-    border: "1px solid rgba(0,0,0,0.12)",
-    padding: "0 12px",
-    fontSize: 16,
-    background: "rgba(255,255,255,0.65)",
-  };
-
-  const selectStyle: React.CSSProperties = { ...inputStyle, paddingRight: 34 };
-
-  const bigTitleStyle: React.CSSProperties = {
-    fontSize: 28,
-    fontWeight: 800,
-    letterSpacing: 0.2,
-    textAlign: "center",
-    margin: 0,
-  };
-
-  const cardStyle: React.CSSProperties = { padding: 16 };
-
-  const kpiCard: React.CSSProperties = {
-    borderRadius: 12,
-    border: "1px solid rgba(0,0,0,0.10)",
-    padding: 12,
-    background: "rgba(255,255,255,0.55)",
-    minHeight: 70,
-  };
+  const pageTitle = isDraft ? "Nouvelle recette pivot" : String(recipe.name ?? "").trim() || "Recette pivot";
 
   return (
     <main className="container">
       <TopNav title="Préparation" />
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
-        <button className="btn" type="button" onClick={() => router.replace("/prep")}>
-          Retour
-        </button>
-
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button className="btn" type="button" onClick={saveAsIngredient} disabled={savingIndex}>
+          <button className="btn" type="button" onClick={saveAsIngredient} disabled={savingIndex || isDraft}>
             {savingIndex ? "Index…" : recipe.output_ingredient_id ? "Mettre à jour l’index" : "Enregistrer dans l’index"}
           </button>
 
-          <button className="btn btnPrimary" type="button" onClick={saveRecipe} disabled={saving}>
-            {saving ? "Sauvegarde…" : "Sauvegarder"}
+          <button className="btn btnPrimary" type="button" onClick={saveRecipe} disabled={saving || !canSaveRecipe}>
+            {saving ? "Sauvegarde…" : isDraft ? "Créer" : "Sauvegarder"}
           </button>
         </div>
       </div>
 
-      <div style={{ marginTop: 10 }}>
-        <h1 className="h1" style={bigTitleStyle}>
-          {recipe.name?.trim() ? recipe.name : "Recette pivot"}
+      <div style={{ marginTop: 10, textAlign: "center" }}>
+        <h1 className="h1" style={{ fontSize: 28, fontWeight: 900, margin: 0 }}>
+          {pageTitle}
         </h1>
-        <p className="muted" style={{ textAlign: "center", marginTop: 6 }}>
-          Tu saisis des quantités réelles pour {pivotAmountNum || 0} {recipe.pivot_unit} de pivot.
+        <p className="muted" style={{ marginTop: 6 }}>
+          {pivotAmountNum > 0 ? (
+            <>
+              Tu saisis des quantités réelles pour {pivotAmountNum} {recipe.pivot_unit} de pivot.
+            </>
+          ) : (
+            <>Choisis un pivot et saisis une quantité pivot.</>
+          )}
         </p>
       </div>
 
@@ -568,29 +639,35 @@ export default function PrepRecipeDetailPage() {
           <div style={labelStyle}>Nom de la recette</div>
           <input
             style={{ ...inputStyle, fontSize: 18, fontWeight: 700, textAlign: "center" }}
-            value={recipe.name}
+            value={recipe.name ?? ""}
             onChange={(e) => setRecipe((p) => (p ? { ...p, name: e.target.value } : p))}
-            placeholder="Nom de la recette"
+            placeholder="ex: Pesto verde"
           />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12, alignItems: "end" }}>
           <div>
             <div style={labelStyle}>Ingrédient pivot</div>
-            <select
-              style={selectStyle}
-              value={recipe.pivot_ingredient_id}
-              onChange={(e) => {
-                const v = e.target.value;
+            <SmartSelect
+              key={"pivot|" + uiPivotId + "|" + ingredients.length}
+              options={ingredients.map((i) => {
+                const meta = offerInfoByIngredient[i.id];
+                return {
+                  id: i.id,
+                  name: i.name,
+                  category: i.category,
+                  rightTop: meta?.supplier ?? null,
+                  rightBottom: meta?.eurPerKg ? fmtKg(meta.eurPerKg) : null,
+                };
+              })}
+              value={uiPivotId}
+              onChange={(v) => {
+                setUiPivotId(v);
                 setRecipe((p) => (p ? { ...p, pivot_ingredient_id: v } : p));
               }}
-            >
-              {ingredients.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name}
-                </option>
-              ))}
-            </select>
+              placeholder="Tape pour chercher…"
+              inputStyle={selectStyle}
+            />
           </div>
 
           <div>
@@ -600,44 +677,8 @@ export default function PrepRecipeDetailPage() {
               value={pivotAmount}
               onChange={(e) => setPivotAmount(e.target.value)}
               inputMode="decimal"
-              placeholder="300"
+              placeholder="ex: 300"
             />
-          </div>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginTop: 14 }}>
-          <div style={kpiCard}>
-            <div className="muted" style={{ fontSize: 12 }}>
-              Coût pivot
-            </div>
-            <div style={{ fontSize: 20, fontWeight: 900 }}>{fmtMoney(computed.pivotCost)}</div>
-          </div>
-
-          <div style={kpiCard}>
-            <div className="muted" style={{ fontSize: 12 }}>
-              Coût lignes
-            </div>
-            <div style={{ fontSize: 20, fontWeight: 900 }}>{fmtMoney(computed.linesCost)}</div>
-            <div className="muted" style={{ fontSize: 12 }}>
-              {computed.rows.length} ligne(s)
-            </div>
-          </div>
-
-          <div style={kpiCard}>
-            <div className="muted" style={{ fontSize: 12 }}>
-              Total
-            </div>
-            <div style={{ fontSize: 20, fontWeight: 900 }}>{fmtMoney(computed.totalCost)}</div>
-            <div className="muted" style={{ fontSize: 12 }}>
-              Total: {Math.round(computed.totalQty)} {recipe.pivot_unit}
-            </div>
-          </div>
-
-          <div style={kpiCard}>
-            <div className="muted" style={{ fontSize: 12 }}>
-              Coût / kg
-            </div>
-            <div style={{ fontSize: 22, fontWeight: 950 }}>{recipe.pivot_unit === "g" ? fmtKg(computed.costPerKg) : "—"}</div>
           </div>
         </div>
       </div>
@@ -648,15 +689,25 @@ export default function PrepRecipeDetailPage() {
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr auto", gap: 12, alignItems: "end" }}>
           <div>
             <div style={labelStyle}>Ingrédient</div>
-            <select style={selectStyle} value={newIngredientId} onChange={(e) => setNewIngredientId(e.target.value)}>
-              {ingredients
+            <SmartSelect
+              key={"line|" + newIngredientId + "|" + recipe.pivot_ingredient_id + "|" + ingredients.length}
+              options={ingredients
                 .filter((i) => i.id !== recipe.pivot_ingredient_id)
-                .map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.name}
-                  </option>
-                ))}
-            </select>
+                .map((i) => {
+                  const meta = offerInfoByIngredient[i.id];
+                  return {
+                    id: i.id,
+                    name: i.name,
+                    category: i.category,
+                    rightTop: meta?.supplier ?? null,
+                    rightBottom: meta?.eurPerKg ? fmtKg(meta.eurPerKg) : null,
+                  };
+                })}
+              value={newIngredientId}
+              onChange={(v) => setNewIngredientId(v)}
+              placeholder="Tape pour chercher…"
+              inputStyle={selectStyle}
+            />
           </div>
 
           <div>
@@ -670,7 +721,7 @@ export default function PrepRecipeDetailPage() {
             />
           </div>
 
-          <button className="btn btnPrimary" type="button" onClick={addLine} disabled={adding}>
+          <button className="btn btnPrimary" type="button" onClick={addLine} disabled={adding || !newIngredientId || pivotAmountNum <= 0}>
             {adding ? "Ajout…" : "Ajouter"}
           </button>
         </div>
@@ -735,7 +786,7 @@ export default function PrepRecipeDetailPage() {
               </div>
 
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 18, fontWeight: 900 }}>{Math.round(r.qty)} </div>
+                <div style={{ fontSize: 18, fontWeight: 900 }}>{Math.round(r.qty)}</div>
                 <div className="muted" style={{ fontSize: 12 }}>
                   {recipe.pivot_unit}
                 </div>
