@@ -496,7 +496,7 @@ export default function PrepRecipeDetailPage() {
           prep_recipe_id: recipe.id,
           ingredient_id: newIngredientId,
           amount_per_1_pivot: ratio,
-          unit: "g",
+          unit: recipe.pivot_unit,
           sort_order: nextSort,
         })
         .select("id,prep_recipe_id,ingredient_id,amount_per_1_pivot,unit,sort_order,ingredients(name,cost_per_unit)")
@@ -788,7 +788,7 @@ export default function PrepRecipeDetailPage() {
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 18, fontWeight: 900 }}>{Math.round(r.qty)}</div>
                 <div className="muted" style={{ fontSize: 12 }}>
-                  {recipe.pivot_unit}
+                  {r.unit}
                 </div>
               </div>
 
