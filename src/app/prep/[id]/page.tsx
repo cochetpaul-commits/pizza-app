@@ -473,9 +473,15 @@ export default function PrepRecipeDetailPage() {
     }
   };
 
-  const addLine = async () => {
+    const addLine = async () => {
     if (!recipe) return;
     if (!recipe.pivot_ingredient_id) return;
+
+    if (recipe.pivot_unit !== "g") {
+      setError({ message: "Règle: les recettes pivot sont en grammes. Mets le pivot en g.", details: null });
+      return;
+    }
+
     if (!newIngredientId) return;
     if (newIngredientId === recipe.pivot_ingredient_id) return;
 
@@ -496,7 +502,7 @@ export default function PrepRecipeDetailPage() {
           prep_recipe_id: recipe.id,
           ingredient_id: newIngredientId,
           amount_per_1_pivot: ratio,
-          unit: recipe.pivot_unit,
+          unit: "g",
           sort_order: nextSort,
         })
         .select("id,prep_recipe_id,ingredient_id,amount_per_1_pivot,unit,sort_order,ingredients(name,cost_per_unit)")
@@ -788,8 +794,8 @@ export default function PrepRecipeDetailPage() {
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 18, fontWeight: 900 }}>{Math.round(r.qty)}</div>
                 <div className="muted" style={{ fontSize: 12 }}>
-                  {r.unit}
-                </div>
+                 {r.unit}
+               </div>
               </div>
 
               <div style={{ textAlign: "right" }}>
