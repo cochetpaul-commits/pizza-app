@@ -109,7 +109,6 @@ function offerToEurPerKgFromRow(cpu: { g?: number; ml?: number; pcs?: number }, 
 
   if (ml && ml > 0) {
     if (!density || density <= 0) return null;
-    // €/ml -> €/L -> €/kg
     const eurPerL = ml * 1000;
     return eurPerL / density;
   }
@@ -145,6 +144,7 @@ export default function PrepRecipeDetailPage() {
   const [uiPivotId, setUiPivotId] = useState<string>("");
   const [newIngredientId, setNewIngredientId] = useState<string>("");
   const [newQtyForThisPivot, setNewQtyForThisPivot] = useState<string>("");
+  const [newLineUnit, setNewLineUnit] = useState<"g" | "ml" | "pc">("g");
 
   const [adding, setAdding] = useState(false);
 
@@ -237,7 +237,7 @@ export default function PrepRecipeDetailPage() {
       const ingList = (ing ?? []) as Ingredient[];
       setIngredients(ingList);
 
-            const { data: offers, error: offErr } = await supabase
+      const { data: offers, error: offErr } = await supabase
         .from("v_latest_offers")
         .select(
           "ingredient_id,supplier_id,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g"
@@ -267,10 +267,8 @@ export default function PrepRecipeDetailPage() {
         const supplierCode = supplierId ? supplierId.slice(0, 4).toUpperCase() : "";
         const supplier = supplierCode ? supplierMap[supplierCode] ?? supplierCode : null;
 
-        // 1) CPU depuis unit/unit_price
         let cpu = offerToCpu(String(oo["unit"] ?? ""), oo["unit_price"]);
 
-        // 2) Fallback CPU depuis PACK si unit/unit_price pas utilisable
         const emptyCpu = !cpu.g && !cpu.ml && !cpu.pcs;
         const packPrice = typeof oo["pack_price"] === "number" ? (oo["pack_price"] as number) : Number(oo["pack_price"]);
         const packTotalQty = typeof oo["pack_total_qty"] === "number" ? (oo["pack_total_qty"] as number) : Number(oo["pack_total_qty"]);
@@ -280,13 +278,10 @@ export default function PrepRecipeDetailPage() {
         const packEachUnit = String(oo["pack_each_unit"] ?? "");
 
         if (emptyCpu && Number.isFinite(packPrice) && packPrice > 0) {
-          // pack_total_qty + pack_unit (ex: 17.45€ / 5 kg)
           if (Number.isFinite(packTotalQty) && packTotalQty > 0 && packUnit) {
             const perUnit = packPrice / packTotalQty;
             cpu = offerToCpu(packUnit, perUnit);
-          }
-          // pack_count * pack_each_qty (ex: 27.11€ / (6 x 0.5 kg))
-          else if (Number.isFinite(packCount) && packCount > 0 && Number.isFinite(packEachQty) && packEachQty > 0 && packEachUnit) {
+          } else if (Number.isFinite(packCount) && packCount > 0 && Number.isFinite(packEachQty) && packEachQty > 0 && packEachUnit) {
             const totalQty = packCount * packEachQty;
             const perUnit = packPrice / totalQty;
             cpu = offerToCpu(packEachUnit, perUnit);
@@ -337,6 +332,7 @@ export default function PrepRecipeDetailPage() {
         setUiPivotId("");
         setNewIngredientId("");
         setNewQtyForThisPivot("");
+        setNewLineUnit("g");
       } else {
         setUiPivotId(rr.pivot_ingredient_id ?? "");
       }
@@ -473,14 +469,9 @@ export default function PrepRecipeDetailPage() {
     }
   };
 
-    const addLine = async () => {
+  const addLine = async () => {
     if (!recipe) return;
     if (!recipe.pivot_ingredient_id) return;
-
-    if (recipe.pivot_unit !== "g") {
-      setError({ message: "Règle: les recettes pivot sont en grammes. Mets le pivot en g.", details: null });
-      return;
-    }
 
     if (!newIngredientId) return;
     if (newIngredientId === recipe.pivot_ingredient_id) return;
@@ -502,7 +493,7 @@ export default function PrepRecipeDetailPage() {
           prep_recipe_id: recipe.id,
           ingredient_id: newIngredientId,
           amount_per_1_pivot: ratio,
-          unit: "g",
+          unit: newLineUnit,
           sort_order: nextSort,
         })
         .select("id,prep_recipe_id,ingredient_id,amount_per_1_pivot,unit,sort_order,ingredients(name,cost_per_unit)")
@@ -527,6 +518,7 @@ export default function PrepRecipeDetailPage() {
       setLines((p) => [...(p ?? []), added]);
       setNewQtyForThisPivot("");
       setNewIngredientId("");
+      setNewLineUnit("g");
     } catch (e: unknown) {
       setError({ message: getErrMessage(e, "Erreur ajout ligne"), details: e });
     } finally {
@@ -692,7 +684,7 @@ export default function PrepRecipeDetailPage() {
       <div className="card" style={{ ...cardStyle, marginTop: 12 }}>
         <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 10 }}>Ajouter une ligne</div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr auto", gap: 12, alignItems: "end" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 110px auto", gap: 12, alignItems: "end" }}>
           <div>
             <div style={labelStyle}>Ingrédient</div>
             <SmartSelect
@@ -717,7 +709,7 @@ export default function PrepRecipeDetailPage() {
           </div>
 
           <div>
-            <div style={labelStyle}>Quantité pour ce pivot ({recipe.pivot_unit})</div>
+            <div style={labelStyle}>Quantité ({newLineUnit})</div>
             <input
               style={{ ...inputStyle, fontSize: 18, fontWeight: 800, textAlign: "center" }}
               value={newQtyForThisPivot}
@@ -727,13 +719,26 @@ export default function PrepRecipeDetailPage() {
             />
           </div>
 
+          <div>
+            <div style={labelStyle}>Unité</div>
+            <select
+              style={selectStyle}
+              value={newLineUnit}
+              onChange={(e) => setNewLineUnit(e.target.value as "g" | "ml" | "pc")}
+            >
+              <option value="g">g</option>
+              <option value="ml">ml</option>
+              <option value="pc">pc</option>
+            </select>
+          </div>
+
           <button className="btn btnPrimary" type="button" onClick={addLine} disabled={adding || !newIngredientId || pivotAmountNum <= 0}>
             {adding ? "Ajout…" : "Ajouter"}
           </button>
         </div>
 
         <p className="muted" style={{ marginTop: 10, marginBottom: 0, fontSize: 12 }}>
-          Exemple: pivot = 300g. Tu saisis Parmesan = 200 → ratio stocké = 200/300.
+          Exemple: pivot = 300 (unité pivot). Tu saisis Parmesan = 200 (unité ligne) → ratio stocké = 200/300.
         </p>
       </div>
 
@@ -793,9 +798,7 @@ export default function PrepRecipeDetailPage() {
 
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 18, fontWeight: 900 }}>{Math.round(r.qty)}</div>
-                <div className="muted" style={{ fontSize: 12 }}>
-                 {r.unit}
-               </div>
+                <div className="muted" style={{ fontSize: 12 }}>{r.unit}</div>
               </div>
 
               <div style={{ textAlign: "right" }}>
