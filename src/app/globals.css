@@ -1,386 +1,202 @@
 /* src/app/globals.css */
 
-:root {
-  --bg0: #07070c;
-  --bg1: #0b0b13;
-  --card: rgba(255, 255, 255, 0.06);
-  --card2: rgba(255, 255, 255, 0.08);
-  --line: rgba(255, 255, 255, 0.10);
-  --text: rgba(255, 255, 255, 0.92);
-  --muted: rgba(255, 255, 255, 0.62);
+:root{
+  --bg: #f3eadc;
+  --bg2: #efe2d3;
 
-  --accent: #8b5cf6;      /* violet */
-  --accent2: #a78bfa;     /* violet clair */
-  --good: #22c55e;
-  --bad: #ef4444;
+  --surface: rgba(255,255,255,0.55);
+  --surface2: rgba(255,255,255,0.38);
 
-  --shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  --text: #2f3a33;
+  --muted: #6f6a61;
+
+  --border: rgba(217, 199, 182, 0.95);
+
+  --primary: #c97a5a;
+  --primary-hover: #b86a4c;
+  --primary-text: #ffffff;
+
+  --good: #1f9d55;
+  --bad: #d93f3f;
+
   --radius: 18px;
   --radius2: 14px;
+
+  --shadow: 0 10px 30px rgba(47, 58, 51, 0.10);
 }
 
-* {
-  box-sizing: border-box;
-}
+*{ box-sizing: border-box; }
 
-html,
-body {
+html, body{
   padding: 0;
   margin: 0;
+  min-height: 100%;
   color: var(--text);
   background:
-    radial-gradient(1200px 600px at 20% 0%, rgba(139, 92, 246, 0.18), transparent 60%),
-    radial-gradient(900px 500px at 85% 20%, rgba(167, 139, 250, 0.14), transparent 60%),
-    linear-gradient(180deg, var(--bg0), var(--bg1));
-  min-height: 100%;
+    radial-gradient(1200px 600px at 20% 0%, rgba(201, 122, 90, 0.18), transparent 60%),
+    radial-gradient(900px 500px at 85% 20%, rgba(111, 106, 97, 0.10), transparent 60%),
+    linear-gradient(180deg, var(--bg), var(--bg2));
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji",
     "Segoe UI Emoji";
 }
+/* selects : même look que les inputs (supprime le style natif) */
+select.input{
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
 
-a {
+  height: 44px;
+  border-radius: 14px;
+  padding: 0 42px 0 14px; /* place pour la flèche à droite */
+
+  border: 1px solid rgba(217, 199, 182, 0.95);
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text);
+
+  line-height: 44px;
+}
+
+/* flèche custom (discrète) */
+select.input{
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(47,58,51,0.55) 50%),
+    linear-gradient(135deg, rgba(47,58,51,0.55) 50%, transparent 50%);
+  background-position:
+    calc(100% - 20px) 18px,
+    calc(100% - 14px) 18px;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+/* options (sinon certaines plateformes te mettent un fond chelou) */
+select.input option{
+  color: #2f3a33;
+  background: #f3eadc;
+}
+
+a{
   color: inherit;
   text-decoration: none;
 }
 
-.container {
+.container{
   width: 100%;
   max-width: 980px;
   margin: 0 auto;
   padding: 26px 18px 70px;
 }
 
-.h1 {
+.h1{
   font-size: 34px;
   letter-spacing: -0.02em;
   margin: 0;
 }
 
-.h2 {
+.h2{
   font-size: 22px;
   letter-spacing: -0.01em;
   margin: 0;
 }
 
-.h3 {
+.h3{
   font-size: 16px;
   letter-spacing: -0.01em;
   margin: 0;
 }
 
-.muted {
+.muted{
   color: var(--muted);
   font-size: 13px;
 }
 
-.code {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--line);
+.code{
+  background: rgba(255,255,255,0.35);
+  border: 1px solid var(--border);
   padding: 12px;
   border-radius: 12px;
   overflow: auto;
   max-width: 100%;
 }
 
-/* --- Cards / Layout --- */
-
-.card {
-  background: linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.045));
-  border: 1px solid rgba(255,255,255,0.10);
+.card{
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 16px;
   box-shadow: var(--shadow);
   backdrop-filter: blur(10px);
 }
 
-.cardTitle {
-  font-weight: 700;
+.cardTitle{
+  font-weight: 800;
   font-size: 14px;
   margin: 0;
   letter-spacing: 0.01em;
 }
 
-.topbar {
+.topbar{
   display: flex;
   justify-content: space-between;
   gap: 12px;
 }
 
-/* --- Inputs --- */
-
 .input,
-select.input {
+select.input,
+textarea.input{
   width: 100%;
-  height: 44px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(217,199,182,0.95);
+  background: rgba(255,255,255,0.55);
   color: var(--text);
   padding: 0 14px;
   outline: none;
   transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
 
-.input::placeholder {
-  color: rgba(255, 255, 255, 0.38);
+.input{
+  height: 44px;
 }
 
-.input:focus,
-select.input:focus {
-  border-color: rgba(139, 92, 246, 0.65);
-  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.18);
-  background: rgba(255, 255, 255, 0.075);
+textarea.input{
+  padding: 12px 14px;
+  height: auto;
 }
 
-/* meilleure lisibilité des number */
-input[type="number"].input {
-  font-variant-numeric: tabular-nums;
+.input::placeholder{
+  color: rgba(47,58,51,0.45);
 }
 
-/* --- Buttons --- */
+.input:focus{
+  border-color: rgba(201,122,90,0.70);
+  box-shadow: 0 0 0 4px rgba(201,122,90,0.16);
+  background: rgba(255,255,255,0.72);
+}
 
-.btn {
-  height: 42px;
+.btn{
+  height: 44px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(217, 199, 182, 0.95);
+  background: rgba(255, 255, 255, 0.38);
   color: var(--text);
   padding: 0 14px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  font-weight: 800;
   transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
 }
 
-.btn:hover {
-  transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
+.btn:hover{
+  background: rgba(255, 255, 255, 0.55);
 }
 
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
+.btn:active{
+  transform: translateY(1px);
 }
 
-.btnPrimary {
-  border-color: rgba(139, 92, 246, 0.55);
-  background: linear-gradient(180deg, rgba(139,92,246,0.34), rgba(139,92,246,0.18));
-}
-
-.btnPrimary:hover {
-  border-color: rgba(167, 139, 250, 0.70);
-  background: linear-gradient(180deg, rgba(167,139,250,0.40), rgba(139,92,246,0.22));
-}
-
-.btnPrimary:active {
-  transform: translateY(0px);
-}
-
-/* --- KV list (Farine/Eau/Sel...) --- */
-
-.kv {
-  display: grid;
-  gap: 10px;
-  margin-top: 8px;
-}
-
-.kvItem {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.kvKey {
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 13px;
-}
-
-.kvVal {
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
-}
-
-/* --- Grid --- */
-
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
-@media (max-width: 860px) {
-  .grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* --- “Retour” link --- */
-
-a.muted:hover {
-  color: rgba(255, 255, 255, 0.82);
-}
-
-/* --- Section spacing helpers --- */
-
-.row {
-  width: 100%;
-}
-
-/* --- Small polish: selection --- */
-
-::selection {
-  background: rgba(139, 92, 246, 0.35);
-}
-
-/* --- Optional: reduce harshness on hr if you add later --- */
-hr {
-  border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.10);
-  margin: 14px 0;
-}
-/* === UX FIX : remove native number spinners === */
-
-/* Chrome, Safari, Edge */
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-/* Firefox */
-input[type="number"] {
-  -moz-appearance: textfield;
-}
-/* Inputs nb pâtons / grammage : texte blanc + plus lisible */
-.inputBigNumber {
-  color: #ffffff;
-  font-size: 17px;
-  font-weight: 600;
-}
-
-/* Enlever les flèches (spinners) des inputs type number */
-.inputBigNumber::-webkit-outer-spin-button,
-.inputBigNumber::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.inputBigNumber[type="number"] {
-  -moz-appearance: textfield; /* Firefox */
-  appearance: textfield;
-}
-/* Remove number input spinners (Chrome/Safari/Edge) */
-.noSpin::-webkit-outer-spin-button,
-.noSpin::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-/* Remove number input spinners (Firefox) */
-.noSpin[type="number"] {
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-/* Enlève les flèches (spin buttons) des inputs number */
-.noSpin::-webkit-outer-spin-button,
-.noSpin::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-.noSpin {
-  -moz-appearance: textfield;
-}
-/* Stepper inputs: texte blanc + plus lisible */
-.stepField {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 12px;
-  padding: 8px 12px;
-  min-width: 120px;
-}
-
-.stepInput {
-  width: 70px;
-  text-align: center;
-  border: none;
-  outline: none;
-  background: transparent;
-  color: #ffffff;
-  font-size: 17px;
-  font-weight: 600;
-}
-
-/* retire les mini-flèches des inputs number */
-.stepInput::-webkit-outer-spin-button,
-.stepInput::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-.stepInput[type="number"] {
-  -moz-appearance: textfield;
-}
-
-.stepSuffix {
-  margin-left: 8px;
-  color: rgba(255,255,255,0.7);
-  font-weight: 600;
-}
-
-.stepBtn {
-  width: 44px;
-  height: 40px;
-  border-radius: 12px;
-  padding: 0;
-}
-/* ===== ifratelligroup theme (warm / cream / terracotta) ===== */
-
-:root{
-  --bg: #f3eadc;           /* crème */
-  --card: #efe2d3;         /* crème + dense */
-  --text: #2f3a33;         /* vert très sombre */
-  --muted: #6f6a61;        /* taupe */
-  --border: #d9c7b6;       /* beige bord */
-  --primary: #c97a5a;      /* terracotta */
-  --primary-hover: #b86a4c;
-  --primary-text: #ffffff;
-}
-
-/* background global */
-html, body{
-  background: var(--bg);
-  color: var(--text);
-}
-
-/* cards plus “matière” */
-.card{
-  background: rgba(239, 226, 211, 0.72);
-  border: 1px solid rgba(217, 199, 182, 0.85);
-  box-shadow: 0 10px 30px rgba(47, 58, 51, 0.10);
-  backdrop-filter: blur(10px);
-}
-
-/* textes */
-.muted{ color: var(--muted); }
-
-/* boutons : centrage garanti */
-.btn{
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;  /* <-- centre le texte */
-  text-align: center;       /* <-- au cas où */
-  border: 1px solid rgba(217, 199, 182, 0.95);
-  background: rgba(255, 255, 255, 0.14);
-  color: var(--text);
-}
-
-/* bouton primaire terracotta */
 .btnPrimary{
   background: var(--primary);
   border-color: rgba(201, 122, 90, 0.95);
@@ -391,7 +207,85 @@ html, body{
   background: var(--primary-hover);
 }
 
-/* optionnel : rendre les gros boutons plus “cartes” */
-.btn.btnWide{
-  min-width: 220px;
+.btn:disabled{
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.kv{
+  display: grid;
+  gap: 8px;
+}
+
+.kvItem{
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(217,199,182,0.65);
+  background: rgba(255,255,255,0.35);
+  border-radius: 14px;
+}
+
+.kvKey{
+  color: rgba(47,58,51,0.75);
+  font-weight: 800;
+}
+
+.kvVal{
+  color: rgba(47,58,51,0.92);
+  font-weight: 900;
+}
+
+.grid{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 840px){
+  .grid{ grid-template-columns: 1fr; }
+}
+
+.errorBox{
+  border: 1px solid rgba(217, 63, 63, 0.35);
+  background: rgba(217, 63, 63, 0.08);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.stepperBlock{
+  margin-top: 14px;
+}
+
+.stepPrimary .stepInput{
+  background: rgba(201,122,90,0.18);
+  border-color: rgba(201,122,90,0.55);
+}
+
+.stepPrimary .stepInput:focus{
+  box-shadow: 0 0 0 4px rgba(201,122,90,0.20);
+}
+
+.stepInput::-webkit-outer-spin-button,
+.stepInput::-webkit-inner-spin-button{
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.stepInput[type="number"]{
+  -moz-appearance: textfield;
+}
+
+.stepSuffix{
+  margin-left: 8px;
+  color: rgba(47,58,51,0.65);
+  font-weight: 900;
+}
+
+.stepBtn{
+  width: 44px;
+  height: 40px;
+  border-radius: 12px;
+  padding: 0;
 }

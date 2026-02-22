@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -9,44 +9,11 @@ type PgError = { code?: string; message?: string };
 type InsertedId = { id: string };
 
 function makeAutoName() {
-  const now = new Date();
-  const d = now.toLocaleDateString("fr-FR");
-  const t = now.toLocaleTimeString("fr-FR").slice(0, 5).replace(":", "h");
-  const suffix = Math.random().toString(16).slice(2, 6).toUpperCase(); // 4 chars
-  return `Empâtement ${d} ${t} ${suffix}`;
+  const suffix = Math.random().toString(16).slice(2, 6).toUpperCase();
+  return `Empâtement ${suffix}`;
 }
 
-export default function NewRecipePage() {
-  const router = useRouter();
-
-  const didRunRef = useRef(false);
-  const [state, setState] = useState<{
-    status: "CREATING" | "ERROR";
-    error?: unknown;
-    createdId?: string;
-  }>({ status: "CREATING" });
-
-  useEffect(() => {
-    // IMPORTANT: en dev, React Strict Mode peut exécuter l'effet 2 fois.
-    // Ce guard empêche le double insert + navigation bancale.
-    if (didRunRef.current) return;
-    didRunRef.current = true;
-
-    const run = async () => {
-      try {
-        setState({ status: "CREATING" });
-
-        const { data: auth } = await supabase.auth.getUser();
-        if (!auth.user) throw new Error("NOT_LOGGED");
-
-        const flour_mix = [
-          { name: "Tipo 00", percent: 80 },
-          { name: "Tipo 1", percent: 20 },
-        ];
-
-        const type: DoughType = "biga";
-
-        const defaultProcedure = `Eau : 4°C
+const defaultProcedure = `Eau : 4°C
 Ordre : farine → 80% eau → frasage V1 3 min → ajout sel → V2 6 min → ajout huile 1 min
 Température pâte cible : 22–23°C
 Pointage : 20 min
@@ -56,112 +23,145 @@ Maturation : 24 h à 4°C
 Remise T° : 2 h
 Cuisson : __`;
 
-        const basePayload: Record<string, unknown> = {
-          // IMPORTANT : nom unique (contrainte DB)
-          name: makeAutoName(),
-          type,
+export default function NewRecipePage() {
+  const router = useRouter();
 
-          hydration_total: 65,
-          salt_percent: 2,
-          honey_percent: 0,
-          oil_percent: 0,
-          flour_mix,
+  const [name, setName] = useState("");
+  const [type, setType] = useState<DoughType>("biga");
+  const [ballsCount, setBallsCount] = useState(150);
+  const [ballWeight, setBallWeight] = useState(264);
+  const [procedure, setProcedure] = useState(defaultProcedure);
 
-          // DB yeast_percent NOT NULL
-          yeast_percent: 0,
-          biga_yeast_percent: 0,
+  const [state, setState] = useState<{ creating: boolean; error: string | null }>({ creating: false, error: null });
 
-          // DB NOT NULL
-          balls_count: 150,
-          ball_weight: 264,
+  const canCreate = useMemo(() => {
+    return !state.creating && ballsCount > 0 && ballWeight > 0;
+  }, [state.creating, ballsCount, ballWeight]);
 
-          // DB procedure NOT NULL (si tu as appliqué le SQL)
-          procedure: defaultProcedure,
+  const create = async () => {
+    if (!canCreate) return;
 
-          // Si la colonne existe
-          user_id: auth.user.id,
-        };
+    try {
+      setState({ creating: true, error: null });
 
-        // 1er essai
-                let { data, error: insertErr } = await supabase
-          .from("recipes")
-          .insert(basePayload)
-          .select("id")
-          .single<InsertedId>();
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error("NOT_LOGGED");
 
-        if (insertErr && (insertErr as PgError).code === "23505") {
-          const retryPayload: Record<string, unknown> = { ...basePayload, name: makeAutoName() };
-          const retry = await supabase
-            .from("recipes")
-            .insert(retryPayload)
-            .select("id")
-            .single<InsertedId>();
-          data = retry.data;
-          insertErr = retry.error;
-        }
+      const flour_mix = [
+        { name: "Tipo 00", percent: 80 },
+        { name: "Tipo 1", percent: 20 },
+      ];
 
-        if (insertErr) throw insertErr;
-        const newId = data?.id;
-        if (!newId) throw new Error("ID manquant après création");
+      const payload: Record<string, unknown> = {
+        name: (name ?? "").trim() || makeAutoName(),
+        type,
 
-        // stocke l'id (utile si on doit afficher un fallback)
-        setState({ status: "CREATING", createdId: newId });
+        hydration_total: 65,
+        salt_percent: 2,
+        honey_percent: 0,
+        oil_percent: 0,
+        flour_mix,
 
-        // Navigation "soft" + fallback "hard" si le routeur ne bouge pas
-        router.replace(`/recipes/${newId}`);
-        router.refresh();
+        yeast_percent: 0,
+        biga_yeast_percent: 0,
 
-        // Fallback: si après 800ms on est toujours là, on force la navigation.
-        window.setTimeout(() => {
-          // Si on est encore sur /recipes/new, on force.
-          if (window.location.pathname.includes("/recipes/new")) {
-            window.location.assign(`/recipes/${newId}`);
-          }
-        }, 800);
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "Erreur création";
-        setState({
-          status: "ERROR",
-          error: { message: msg, details: e },
-        });
+        balls_count: Math.max(1, Math.round(ballsCount)),
+        ball_weight: Math.max(1, Math.round(ballWeight)),
+
+        procedure: (procedure ?? "").toString(),
+
+        user_id: auth.user.id,
+      };
+
+      let { data, error: insertErr } = await supabase.from("recipes").insert(payload).select("id").single<InsertedId>();
+
+      if (insertErr && (insertErr as PgError).code === "23505") {
+        const retryPayload: Record<string, unknown> = { ...payload, name: makeAutoName() };
+        const retry = await supabase.from("recipes").insert(retryPayload).select("id").single<InsertedId>();
+        data = retry.data;
+        insertErr = retry.error;
       }
-    };
 
-    run();
-  }, [router]);
+      if (insertErr) throw insertErr;
 
-  if (state.status === "CREATING") {
-    return (
-      <main className="container">
-        <p className="muted">Création de l’empâtement…</p>
+      const newId = data?.id;
+      if (!newId) throw new Error("ID manquant après création");
 
-        <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-          <button className="btn" type="button" onClick={() => window.location.reload()}>
-            Recharger
-          </button>
-          <button className="btn" type="button" onClick={() => router.replace("/recipes")}>
-            Retour liste empâtements
-          </button>
-          {state.createdId ? (
-            <button className="btn btnPrimary" type="button" onClick={() => window.location.assign(`/recipes/${state.createdId}`)}>
-              Ouvrir l’empâtement
-            </button>
-          ) : null}
-        </div>
-      </main>
-    );
-  }
+      router.replace(`/recipes/${newId}`);
+      router.refresh();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "Erreur création";
+      setState({ creating: false, error: msg });
+    }
+  };
 
   return (
     <main className="container">
-      <h1 className="h1">Erreur</h1>
-      <pre className="code">{JSON.stringify(state.error ?? {}, null, 2)}</pre>
-      <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-        <button className="btn" type="button" onClick={() => router.replace("/recipes")}>
+      <h1 className="h1">Nouvel empâtement</h1>
+
+      {state.error ? (
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800 }}>Erreur</div>
+          <div className="muted" style={{ marginTop: 6 }}>
+            {state.error}
+          </div>
+        </div>
+      ) : null}
+
+      <div style={{ marginTop: 16 }}>
+        <div className="muted" style={{ marginBottom: 6 }}>
+          Nom (optionnel)
+        </div>
+        <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex : Biga hiver 65%" style={{ fontSize: 17, fontWeight: 600 }} />
+        <div className="muted" style={{ marginTop: 6 }}>
+          Si vide : un nom simple sera généré.
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="muted" style={{ marginBottom: 8 }}>
+          Type
+        </div>
+        <select className="input" value={type} onChange={(e) => setType(e.target.value as DoughType)}>
+          <option value="direct">direct</option>
+          <option value="biga">biga</option>
+          <option value="focaccia">focaccia</option>
+        </select>
+
+        <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "end" }}>
+          <div>
+            <div className="muted" style={{ marginBottom: 6 }}>
+              N. pâtons
+            </div>
+            <input className="input" inputMode="numeric" value={String(ballsCount)} onChange={(e) => setBallsCount(Number(e.target.value || 0))} />
+          </div>
+
+          <div>
+            <div className="muted" style={{ marginBottom: 6 }}>
+              Grammage pâton (g)
+            </div>
+            <input className="input" inputMode="numeric" value={String(ballWeight)} onChange={(e) => setBallWeight(Number(e.target.value || 0))} />
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="muted" style={{ marginBottom: 8 }}>
+          Procédure (protocole)
+        </div>
+        <textarea className="input" value={procedure} onChange={(e) => setProcedure(e.target.value)} rows={6} style={{ resize: "vertical", lineHeight: 1.35 }} />
+        <p className="muted" style={{ marginTop: 8 }}>
+          Conseil : court, actionnable, 6–10 lignes max.
+        </p>
+      </div>
+
+      <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+        <button className="btn" type="button" onClick={() => router.replace("/recipes")} disabled={state.creating}>
           Retour liste empâtements
         </button>
-        <button className="btn" type="button" onClick={() => window.location.reload()}>
-          Recharger
+
+        <button className="btn btnPrimary" type="button" onClick={create} disabled={!canCreate}>
+          {state.creating ? "Création…" : "Créer"}
         </button>
       </div>
     </main>

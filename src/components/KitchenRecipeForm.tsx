@@ -1,6 +1,6 @@
 "use client";
-import { offerToCpu } from "@/lib/offerPricing";
 
+import { offerRowToCpu } from "@/lib/offerPricing";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -52,12 +52,6 @@ type LineUI = {
   ingredient_cost_per_unit?: number | null;
 };
 type PgError = { code?: string; message?: string };
-
-type LatestOffer = {
-  ingredient_id?: unknown;
-  unit?: unknown;
-  unit_price?: unknown;
-};
 
 type DbLine = {
   id?: unknown;
@@ -330,31 +324,28 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     setNewIngredientId(ingList[0]?.id ?? "");
 
     const { data: offers, error: offErr } = await supabase
-      .from("v_latest_offers")
-      .select("ingredient_id, unit, unit_price");
+  .from("v_latest_offers")
+  .select("ingredient_id, unit, unit_price, pack_price, pack_total_qty, pack_unit, pack_count, pack_each_qty, pack_each_unit");
 
-    if (offErr) {
-      setStatus("ERROR");
-      setError(offErr);
-      return;
-    }
+if (offErr) {
+  setStatus("ERROR");
+  setError(offErr);
+  return;
+}
 
-    const priceMapCpu: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
+const priceMapCpu: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
 
-    (offers ?? []).forEach((o: unknown) => {
-      const row = getObj(o) as LatestOffer | null;
-      const iid = getString(row?.ingredient_id, "");
-      if (!iid) return;
+(offers ?? []).forEach((o: unknown) => {
+  const oo = getObj(o) ?? {};
+  const iid = getString(oo["ingredient_id"], "");
+  if (!iid) return;
 
-      const unit = getString(row?.unit, "");
-      const unitPrice = getNumber(row?.unit_price, 0);
+  const cpu = offerRowToCpu(oo);
+  if (!priceMapCpu[iid]) priceMapCpu[iid] = {};
+  priceMapCpu[iid] = { ...priceMapCpu[iid], ...cpu };
+});
 
-      const cpu = offerToCpu(unit, unitPrice);
-      if (!priceMapCpu[iid]) priceMapCpu[iid] = {};
-      priceMapCpu[iid] = { ...priceMapCpu[iid], ...cpu };
-    });
-
-    setPriceByIngredient(priceMapCpu);
+setPriceByIngredient(priceMapCpu);
 
 
     if (!isEdit) {
