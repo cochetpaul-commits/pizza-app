@@ -6,13 +6,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import type { Ingredient } from "@/lib/types";
+import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 
 type VatRate = 0.055 | 0.1 | 0.2;
 
-const VAT_OPTIONS: Array<{ label: string; value: VatRate }> = [
-  { label: "5,5%", value: 0.055 },
-  { label: "10%", value: 0.1 },
-  { label: "20%", value: 0.2 },
+const VAT_OPTIONS: SmartSelectOption[] = [
+  { id: "0.055", name: "TVA 5,5 %", category: "TVA", rightBottom: "5,5" },
+  { id: "0.1", name: "TVA 10 %", category: "TVA", rightBottom: "10" },
+  { id: "0.2", name: "TVA 20 %", category: "TVA", rightBottom: "20" },
 ];
 
 function toVatRate(v: unknown): VatRate {
@@ -51,6 +52,7 @@ type LineUI = {
   ingredient_name?: string;
   ingredient_cost_per_unit?: number | null;
 };
+
 type PgError = { code?: string; message?: string };
 
 type DbLine = {
@@ -97,7 +99,7 @@ function fmtMoney2(v: number) {
   return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
 function fmtKg3(v: number) {
-  return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + " €/kg";
+  return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €/kg";
 }
 function fmtPct1(v: number) {
   return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
@@ -116,12 +118,13 @@ function displayQtyInputValue(qty: number) {
   return n > 0 ? String(n) : "";
 }
 
-const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "preparation", label: "Préparation" },
-  { value: "plat_cuisine", label: "Plat cuisiné" },
-  { value: "dessert", label: "Dessert" },
-  { value: "autre", label: "Autre" },
+const CATEGORY_SMART_OPTIONS: SmartSelectOption[] = [
+  { id: "preparation", name: "Préparation", category: "Catégorie" },
+  { id: "plat_cuisine", name: "Plat cuisiné", category: "Catégorie" },
+  { id: "dessert", name: "Dessert", category: "Catégorie" },
+  { id: "autre", name: "Autre", category: "Catégorie" },
 ];
+
 
 export default function KitchenRecipeForm(props: { recipeId?: string }) {
   const router = useRouter();
@@ -133,6 +136,8 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, { g?: number; ml?: number; pcs?: number }>>({});
+  
+  const [supplierByIngredient, setSupplierByIngredient] = useState<Record<string, string | null>>({});
   const [lines, setLines] = useState<LineUI[]>([]);
 
   const [form, setForm] = useState<{
@@ -155,6 +160,36 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
   const [newIngredientId, setNewIngredientId] = useState<string>("");
   const [newQty, setNewQty] = useState<string>("");
   const [newUnit, setNewUnit] = useState<Unit>("g");
+
+  const ingredientOptions = useMemo<SmartSelectOption[]>(
+    () => {
+      const fmt = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const fmtPrice = (iid: string) => {
+        const m = priceByIngredient?.[iid];
+        if (m?.g && m.g > 0) return `${fmt(m.g * 1000)} €/kg`;
+        if (m?.ml && m.ml > 0) return `${fmt(m.ml * 1000)} €/L`;
+        if (m?.pcs && m.pcs > 0) return `${fmt(m.pcs)} €/pc`;
+        return "";
+      };
+      const fmtSupplier = (iid: string) => {
+        const x = supplierByIngredient?.[iid];
+        return x ? String(x) : "";
+      };
+      return (ingredients ?? []).map((i) => {
+        const price = fmtPrice(i.id);
+        const supp = fmtSupplier(i.id);
+
+        return {
+          id: i.id,
+          name: i.name,
+          category: i.category ? String(i.category) : "Ingrédient",
+          rightTop: supp || undefined,
+          rightBottom: price ? price : "prix manquant",
+        };
+      });
+    },
+    [ingredients, priceByIngredient, supplierByIngredient]
+  );
 
   const theme = {
     bg: "#f3eadc",
@@ -223,9 +258,9 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
   }, [form?.portions_count]);
 
   const vatPct = useMemo(() => {
-  const r = toVatRate(form?.vat_rate);
-  return r * 100;
-}, [form?.vat_rate]);
+    const r = toVatRate(form?.vat_rate);
+    return r * 100;
+  }, [form?.vat_rate]);
 
   const marginPct = useMemo(() => {
     const n = Number(String(form?.margin_rate ?? "").replace(",", "."));
@@ -246,14 +281,29 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     if (yieldTooHigh) return null;
     return (1 - yieldGramsNum / ingredientWeightGrams) * 100;
   }, [ingredientWeightGrams, yieldGramsNum, yieldTooHigh]);
+   
 
-  const computed = useMemo(() => {
-    const rows: ComputedLine[] = (lines ?? [])
+      const computed = useMemo(() => {
+      const resolveCpu = (iid: string, unit: Unit, fallbackCpu: unknown): number | null => {
+      const m = priceByIngredient[iid];
+      const fromOffers = unit === "ml" ? m?.ml : unit === "pc" ? m?.pcs : m?.g;
+      if (typeof fromOffers === "number" && fromOffers > 0) return fromOffers;
+
+      const fb = typeof fallbackCpu === "number" ? fallbackCpu : getNumber(fallbackCpu, 0);
+      if (fb > 0) return fb;
+
+      const ing = ingredients.find((x) => x.id === iid) ?? null;
+      const ingFb = getObj(ing)?.["cost_per_unit"];
+      const ingFbNum = typeof ingFb === "number" ? ingFb : getNumber(ingFb, 0);
+      return ingFbNum > 0 ? ingFbNum : null;
+    };
+
+      const rows: ComputedLine[] = (lines ?? [])
       .slice()
       .sort((a, b) => n2(a.sort_order) - n2(b.sort_order))
       .map((l) => {
         const qty = n2(l.qty);
-        const cpu = typeof l.ingredient_cost_per_unit === "number" ? l.ingredient_cost_per_unit : null;
+        const cpu = resolveCpu(l.ingredient_id, l.unit, l.ingredient_cost_per_unit);
         const cost = cpu != null ? cpu * qty : 0;
         return { ...l, qty, cpu, cost };
       });
@@ -271,7 +321,8 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       costPerKg,
       costPerPortion,
     };
-  }, [lines, yieldGramsNum, portionsNum]);
+  }, [lines, yieldGramsNum, portionsNum, priceByIngredient, ingredients]);
+
   const pricing = useMemo(() => {
     const m = Math.min(Math.max(marginPct, 0), 99.9) / 100;
     const v = Math.min(Math.max(vatPct, 0), 100) / 100;
@@ -321,41 +372,94 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
     const ingList = (ing ?? []) as Ingredient[];
     setIngredients(ingList);
-    setNewIngredientId(ingList[0]?.id ?? "");
+    setNewIngredientId("");
 
     const { data: offers, error: offErr } = await supabase
   .from("v_latest_offers")
-  .select("ingredient_id, unit, unit_price, pack_price, pack_total_qty, pack_unit, pack_count, pack_each_qty, pack_each_unit");
+  .select(
+    "ingredient_id,supplier_id,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g"
+  );
 
-if (offErr) {
-  setStatus("ERROR");
-  setError(offErr);
-  return;
+    if (offErr) {
+      setStatus("ERROR");
+      setError(offErr);
+      return;
+    }
+        const offersList: unknown[] = offers ?? [];
+
+    const supplierIds = Array.from(
+      new Set(
+        offersList
+          .map((o) => getString((getObj(o) ?? {})["supplier_id"], ""))
+          .filter((x) => x)
+      )
+    );
+
+    const supplierNameById: Record<string, string> = {};
+if (supplierIds.length) {
+  const { data: sups, error: supErr } = await supabase
+    .from("suppliers")
+    .select("id,name")
+    .in("id", supplierIds);
+
+  if (!supErr) {
+    (sups ?? []).forEach((s: unknown) => {
+      const so = getObj(s) ?? {};
+      const id = getString(so["id"], "");
+      const name = getString(so["name"], "").trim();
+      if (id && name) supplierNameById[id] = name;
+    });
+  }
 }
 
-const priceMapCpu: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
+    const supplierByIng: Record<string, string | null> = {};
 
-(offers ?? []).forEach((o: unknown) => {
-  const oo = getObj(o) ?? {};
-  const iid = getString(oo["ingredient_id"], "");
-  if (!iid) return;
+    const priceMapCpu: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
 
-  const cpu = offerRowToCpu(oo);
-  if (!priceMapCpu[iid]) priceMapCpu[iid] = {};
-  priceMapCpu[iid] = { ...priceMapCpu[iid], ...cpu };
-});
+    const supplierMap: Record<string, string> = {};
 
-setPriceByIngredient(priceMapCpu);
+    offersList.forEach((o: unknown) => {
+      const oo = getObj(o) ?? {};
+      const iid = getString(oo["ingredient_id"], "");
+            if (!iid) return;
+            if (supplierByIng[iid] == null) {
+        const sid = getString(oo["supplier_id"], "");
+        const name = sid ? supplierNameById[sid] : "";
+        supplierByIng[iid] = name ? name : (sid ? sid.slice(0, 4).toUpperCase() : null);
+      }
 
+      const cpu = offerRowToCpu(oo);
+      if (!priceMapCpu[iid]) priceMapCpu[iid] = {};
+      priceMapCpu[iid] = { ...priceMapCpu[iid], ...cpu };
+
+      if (!supplierMap[iid]) {
+        const candidates = [
+          oo["supplier_name"],
+          oo["supplier"],
+          oo["vendor_name"],
+          oo["vendor"],
+          oo["provider_name"],
+          oo["provider"],
+          oo["fournisseur"],
+          oo["fournisseur_nom"],
+          oo["seller_name"],
+          oo["seller"],
+        ];
+        const found = candidates.map((x) => (x == null ? "" : String(x).trim())).find((x) => x);
+        if (found) supplierMap[iid] = found;
+      }
+    });
+    setSupplierByIngredient(supplierByIng);
+    setPriceByIngredient(priceMapCpu);
 
     if (!isEdit) {
       setForm({
         name: "",
-        category: "plat_cuisine",
+        category: "",
         yield_grams: "1000",
         portions_count: "1",
         vat_rate: 0.1,
-        margin_rate: "60",
+        margin_rate: "75",
         notes: "",
         procedure: "",
         output_ingredient_id: null,
@@ -396,7 +500,7 @@ setPriceByIngredient(priceMapCpu);
       yield_grams: String(rr.yield_grams ?? 1000),
       portions_count: String(rr.portions_count ?? 1),
       vat_rate: toVatRate(rr.vat_rate),
-      margin_rate: String(rr.margin_rate ?? 60),
+      margin_rate: String(rr.margin_rate ?? 75),
       notes: String(rr.notes ?? ""),
       procedure: String(rr.procedure ?? ""),
       output_ingredient_id: rr.output_ingredient_id ?? null,
@@ -462,8 +566,9 @@ setPriceByIngredient(priceMapCpu);
     return () => {
       cancelled = true;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [recipeId, isEdit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recipeId, isEdit]);
+
   const updateLine = (id: string, patch: Partial<LineUI>) => {
     setLines((prev) => (prev ?? []).map((l) => (l.id === id ? { ...l, ...patch } : l)));
   };
@@ -486,7 +591,7 @@ setPriceByIngredient(priceMapCpu);
       unit: newUnit,
       sort_order: nextSort,
       ingredient_name: String(ingRow?.name ?? ""),
-            ingredient_cost_per_unit: (() => {
+      ingredient_cost_per_unit: (() => {
         const m = priceByIngredient[String(newIngredientId)];
         const u = String(newUnit ?? "g").toLowerCase();
         const fromOffers = u === "ml" ? m?.ml : u === "pc" || u === "pcs" ? m?.pcs : m?.g;
@@ -500,6 +605,7 @@ setPriceByIngredient(priceMapCpu);
 
     setLines((p) => [...(p ?? []), row]);
     setNewQty("");
+    setNewIngredientId("");
   };
 
   const delLine = (lineId: string) => {
@@ -547,9 +653,9 @@ setPriceByIngredient(priceMapCpu);
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 800);
     } catch (e: unknown) {
-  const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "";
-  setSaveError({ message: "Export PDF cuisine impossible", details: msg });
-  }
+      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "";
+      setSaveError({ message: "Export PDF cuisine impossible", details: msg });
+    }
   };
 
   const save = async () => {
@@ -562,6 +668,11 @@ setPriceByIngredient(priceMapCpu);
     const nm = form.name.trim();
     if (!nm) {
       setSaveError({ message: "Nom obligatoire" });
+      return;
+    }
+
+    if (!form.category) {
+      setSaveError({ message: "Catégorie obligatoire" });
       return;
     }
 
@@ -605,7 +716,11 @@ setPriceByIngredient(priceMapCpu);
 
     if (!id) {
       recipePayload.user_id = auth.user.id;
-      const { data, error: insErr } = await supabase.from("kitchen_recipes").insert(recipePayload).select("id").single<{ id: string }>();
+      const { data, error: insErr } = await supabase
+        .from("kitchen_recipes")
+        .insert(recipePayload)
+        .select("id")
+        .single<{ id: string }>();
       if (insErr) {
         setSaving(false);
         setSaveError(insErr);
@@ -666,7 +781,7 @@ setPriceByIngredient(priceMapCpu);
   const saveAsIngredient = async () => {
     if (!form) return;
     if (!recipeId) {
-      setSaveError({ message: "Sauvegarde d’abord la fiche avant enregistrement dans l’index." });
+      setSaveError({ message: "Sauvegarde d’abord la fiche avant enregistrement dans l???index." });
       return;
     }
     if (savingIndex) return;
@@ -683,7 +798,7 @@ setPriceByIngredient(priceMapCpu);
       const totalWeight = round0(yieldGramsNum);
       const name = (form.name.trim() || "Recette cuisine").slice(0, 120);
       const cpu = totalWeight > 0 ? totalCost / totalWeight : 0; // €/g
-      if (!(cpu > 0)) throw new Error("Coût/unité invalide (€/g).");
+      if (!(cpu > 0)) throw new Error("Coût/unité invalide (???/g).");
 
       const ingredientPayload: Record<string, unknown> = {
         name,
@@ -838,9 +953,7 @@ setPriceByIngredient(priceMapCpu);
               fontWeight: 800,
             }}
           >
-            {`Rendement (${round0(yieldGramsNum)} g) supérieur au poids ingrédients en g (${round0(
-              ingredientWeightGrams
-            )} g). Vérifie la saisie.`}
+            {`Rendement (${round0(yieldGramsNum)} g) supérieur au poids ingrédients en g (${round0(ingredientWeightGrams)} g). Vérifie la saisie.`}
           </div>
         ) : null}
 
@@ -863,13 +976,13 @@ setPriceByIngredient(priceMapCpu);
           <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <div>
               <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Catégorie</div>
-              <select style={input} value={form.category} onChange={(e) => setForm((p) => (p ? { ...p, category: e.target.value } : p))}>
-                {CATEGORY_OPTIONS.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
+              <SmartSelect
+                options={CATEGORY_SMART_OPTIONS}
+                value={form.category}
+                onChange={(v) => setForm((p) => (p ? { ...p, category: String(v ?? "") } : p))}
+                placeholder="Catégorie…"
+                inputStyle={input}
+              />
             </div>
 
             <div>
@@ -937,17 +1050,13 @@ setPriceByIngredient(priceMapCpu);
           <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
             <div style={metricBox}>
               <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 6 }}>TVA vente (%)</div>
-              <select
-  style={{ ...input, height: 40, fontWeight: 950 }}
-  value={String(form.vat_rate)}
-  onChange={(e) => setForm((p) => (p ? { ...p, vat_rate: toVatRate(e.target.value) } : p))}
->
-  {VAT_OPTIONS.map((o) => (
-    <option key={o.value} value={String(o.value)}>
-      {o.label.replace("%", "").replace(".", ",")}
-    </option>
-  ))}
-</select>
+              <SmartSelect
+                options={VAT_OPTIONS}
+                value={String(form.vat_rate)}
+                onChange={(v) => setForm((p) => (p ? { ...p, vat_rate: toVatRate(v) } : p))}
+                placeholder="TVA…"
+                inputStyle={{ ...input, height: 40, fontWeight: 950 }}
+              />
             </div>
 
             <div style={metricBox}>
@@ -972,7 +1081,7 @@ setPriceByIngredient(priceMapCpu);
             <div style={metricBox}>
               <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Prix conseillé / kg TTC</div>
               <div style={{ fontSize: 22, fontWeight: 950, marginTop: 2 }}>
-                {round3(pricing.kgTTC).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} €/kg
+                {round3(pricing.kgTTC).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/kg
               </div>
               <div style={{ color: theme.muted, fontSize: 12, marginTop: 2 }}>
                 TVA: {fmtPct1(pricing.vatPct)} · Marge: {fmtPct1(pricing.marginPct)}
@@ -983,13 +1092,13 @@ setPriceByIngredient(priceMapCpu);
           <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: 10, alignItems: "end" }}>
             <div>
               <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Ingrédient</div>
-              <select style={input} value={newIngredientId} onChange={(e) => setNewIngredientId(e.target.value)}>
-                {ingredients.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.name}
-                  </option>
-                ))}
-              </select>
+              <SmartSelect
+                options={ingredientOptions}
+                value={newIngredientId}
+                onChange={(v) => setNewIngredientId(String(v ?? ""))}
+                placeholder="Ingrédient…"
+                inputStyle={input}
+              />
             </div>
 
             <div>

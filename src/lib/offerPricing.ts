@@ -24,24 +24,24 @@ export function offerToCpu(unit: OfferUnit, unitPrice: unknown): CpuByUnit {
   if (u === "ml") return { ml: p };
 
   if (
-  u === "pc" ||
-  u === "pcs" ||
-  u === "pce" ||
-  u === "piece" ||
-  u === "pièce" ||
-  u === "pieces" ||
-  u === "pièces" ||
-  u === "un" ||
-  u === "u" ||
-  u === "unit" ||
-  u === "units" ||
-  u === "unite" ||
-  u === "unité" ||
-  u === "unites" ||
-  u === "unités"
-) {
-  return { pcs: p };
-}
+    u === "pc" ||
+    u === "pcs" ||
+    u === "pce" ||
+    u === "piece" ||
+    u === "pièce" ||
+    u === "pieces" ||
+    u === "pièces" ||
+    u === "un" ||
+    u === "u" ||
+    u === "unit" ||
+    u === "units" ||
+    u === "unite" ||
+    u === "unité" ||
+    u === "unites" ||
+    u === "unités"
+  ) {
+    return { pcs: p };
+  }
 
   return {};
 }
@@ -71,6 +71,26 @@ function cpuFromPack(row: Record<string, unknown>): CpuByUnit {
   return {};
 }
 
+function enrichCpuWithConversions(row: Record<string, unknown>, cpu: CpuByUnit): CpuByUnit {
+  const out: CpuByUnit = { ...cpu };
+
+  const pieceWeightG = n2(row["piece_weight_g"]);
+  if (out.pcs != null && !(out.g != null) && pieceWeightG > 0) {
+    out.g = out.pcs / pieceWeightG;
+  }
+
+  const densityKgPerL = n2(row["density_kg_per_l"]);
+  if (densityKgPerL > 0) {
+    if (out.g != null && !(out.ml != null)) {
+      out.ml = out.g * densityKgPerL;
+    } else if (out.ml != null && !(out.g != null)) {
+      out.g = out.ml / densityKgPerL;
+    }
+  }
+
+  return out;
+}
+
 export function offerRowToCpu(row: Record<string, unknown>): CpuByUnit {
   const unit = String(row["unit"] ?? "").trim().toLowerCase();
   const unitPrice = row["unit_price"];
@@ -79,13 +99,18 @@ export function offerRowToCpu(row: Record<string, unknown>): CpuByUnit {
 
   if (packUnits.has(unit)) {
     const fromPack = cpuFromPack(row);
-    const empty = !fromPack.g && !fromPack.ml && !fromPack.pcs;
-    return empty ? {} : fromPack;
+    const enriched = enrichCpuWithConversions(row, fromPack);
+    const empty = !enriched.g && !enriched.ml && !enriched.pcs;
+    return empty ? {} : enriched;
   }
 
   const direct = offerToCpu(unit, unitPrice);
-  const emptyDirect = !direct.g && !direct.ml && !direct.pcs;
-  if (!emptyDirect) return direct;
+  const enrichedDirect = enrichCpuWithConversions(row, direct);
+  const emptyDirect = !enrichedDirect.g && !enrichedDirect.ml && !enrichedDirect.pcs;
+  if (!emptyDirect) return enrichedDirect;
 
-  return cpuFromPack(row);
+  const fromPack = cpuFromPack(row);
+  const enrichedPack = enrichCpuWithConversions(row, fromPack);
+  const emptyPack = !enrichedPack.g && !enrichedPack.ml && !enrichedPack.pcs;
+  return emptyPack ? {} : enrichedPack;
 }
