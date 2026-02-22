@@ -1,5 +1,5 @@
 "use client";
-import { offerToCpu } from "@/lib/offerPricing";
+import { offerRowToCpu } from "@/lib/offerPricing";
 import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import PizzaIngredientList from "@/components/PizzaIngredientList";
 import type { Ingredient, PizzaIngredientRow, UnitType } from "@/lib/types";
+import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 
 type DoughRecipeRow = {
   id: string;
@@ -16,13 +17,6 @@ type DoughRecipeRow = {
   yield_grams: number | null;
   ball_weight: number | null;
 };
-
-type LatestOfferRow = {
-  ingredient_id: string;
-  unit: string;
-  unit_price: number;
-};
-
 
 type PizzaRowDB = {
   id: string;
@@ -44,7 +38,7 @@ type PizzaIngredientDBRow = {
 };
 
 function n2(v: unknown) {
-  const x = typeof v === "number" ? v : Number(v);
+  const x = typeof v === "number" ? v : Number(String(v).replace(",", "."));
   return Number.isFinite(x) ? x : 0;
 }
 
@@ -60,12 +54,13 @@ function fmtPct1(v: number) {
   return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
 }
 
-function fmtKg3(v: number) {
-  return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + " €/kg";
+function fmtKg2(v: number) {
+  return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €/kg";
 }
 
 function normalizeUnit(u: unknown): UnitType {
-  const s = String(u ?? "").trim();
+  const s = String(u ?? "").trim().toLowerCase();
+  if (s === "pc") return "pcs";
   const allowed: UnitType[] = ["g", "ml", "pcs", "pinch", "dash"];
   return allowed.includes(s as UnitType) ? (s as UnitType) : "g";
 }
@@ -142,6 +137,8 @@ export default function PizzaForm(props: { pizzaId?: string }) {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [rows, setRows] = useState<PizzaIngredientRow[]>([]);
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, { g?: number; ml?: number; pcs?: number }>>({});
+  const [supplierByIngredient, setSupplierByIngredient] = useState<Record<string, string | null>>({});
+  const [offerMetaByIngredient, setOfferMetaByIngredient] = useState<Record<string, { density_kg_per_l?: number | null; piece_weight_g?: number | null }>>({});
 
   const [form, setForm] = useState<{
     name: string;
@@ -153,7 +150,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
   const [ballWeightG, setBallWeightG] = useState<string>("264");
 
   const [vatRate, setVatRate] = useState<string>("10");
-  const [marginRate, setMarginRate] = useState<string>("60");
+  const [marginRate, setMarginRate] = useState<string>("75");
 
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
@@ -174,22 +171,65 @@ export default function PizzaForm(props: { pizzaId?: string }) {
     primaryText: "#fff",
   };
 
-  const rowsCount = useMemo(() => {
+    const rowsCount = useMemo(() => {
     const pre = rows.filter((r) => r.stage === "pre").length;
     const post = rows.filter((r) => r.stage === "post").length;
     return { pre, post, total: pre + post };
   }, [rows]);
-
-  const dough = useMemo(() => {
-    const id = form?.dough_recipe_id || "";
-    return recipes.find((r) => r.id === id) ?? null;
-  }, [recipes, form?.dough_recipe_id]);
 
   const ballWeightNum = useMemo(() => {
     const n = Number(String(ballWeightG).replace(",", "."));
     return Number.isFinite(n) && n > 0 ? n : 0;
   }, [ballWeightG]);
 
+  const dough = useMemo(() => {
+    const id = form?.dough_recipe_id || "";
+    return recipes.find((r) => r.id === id) ?? null;
+  }, [recipes, form?.dough_recipe_id]);
+
+  const doughBadge = useMemo(() => {
+    if (!dough) return null;
+
+    const totalCost = n2(dough.total_cost);
+    const yieldGrams = n2(dough.yield_grams);
+    const ballW = n2(dough.ball_weight);
+
+    const costPerKg = yieldGrams > 0 && totalCost > 0 ? totalCost / (yieldGrams / 1000) : 0;
+    const costPerBall = ballW > 0 && costPerKg > 0 ? costPerKg * (ballW / 1000) : 0;
+
+    if (costPerKg <= 0) return null;
+    return { costPerKg, costPerBall };
+  }, [dough]);
+
+    const vatOptions = useMemo<SmartSelectOption[]>(
+    () => [
+      { id: "5.5", name: "TVA 5,5 %", category: "TVA", rightBottom: "5,5" },
+      { id: "10", name: "TVA 10 %", category: "TVA", rightBottom: "10" },
+      { id: "20", name: "TVA 20 %", category: "TVA", rightBottom: "20" },
+    ],
+    []
+  );
+
+  const doughOptions = useMemo<SmartSelectOption[]>(() => {
+    return (recipes ?? []).map((r) => {
+      const totalCost = n2(r.total_cost);
+      const yieldGrams = n2(r.yield_grams);
+
+      const costPerKg = yieldGrams > 0 && totalCost > 0 ? totalCost / (yieldGrams / 1000) : 0;
+      const costPerBall = costPerKg > 0 && ballWeightNum > 0 ? costPerKg * (ballWeightNum / 1000) : 0;
+
+      const typeLabel = String(r.type ?? "—");
+      const top = costPerBall > 0 ? `${typeLabel} • ${fmtMoney(costPerBall)}/pâton` : typeLabel;
+
+      return {
+        id: String(r.id),
+        name: String(r.name ?? "—"),
+        category: typeLabel,
+        rightTop: top,
+        rightBottom: costPerKg > 0 ? fmtKg2(costPerKg) : "prix manquant",
+      };
+    });
+  }, [recipes, ballWeightNum]);
   const ingredientWeightGrams = useMemo(() => {
     return rows.reduce((acc, r) => {
       if (!r.ingredient_id) return acc;
@@ -210,26 +250,30 @@ export default function PizzaForm(props: { pizzaId?: string }) {
     return Number.isFinite(n) && n >= 0 ? n : 0;
   }, [marginRate]);
 
-  const costs = useMemo(() => {
+   const costs = useMemo(() => {
     const toppings = rows.reduce((acc, r) => {
-  if (!r.ingredient_id) return acc;
+      if (!r.ingredient_id) return acc;
 
-  const ing = ingredients.find((x) => x.id === r.ingredient_id) ?? null;
-  const cpuObj = r.ingredient_id ? priceByIngredient[r.ingredient_id] : undefined;
+      const ing = ingredients.find((x) => x.id === r.ingredient_id) ?? null;
+      const cpuObj = r.ingredient_id ? priceByIngredient[r.ingredient_id] : undefined;
 
-  const u = normalizeUnit(r.unit);
-  const cpuFromOffers = u === "g" ? cpuObj?.g : u === "ml" ? cpuObj?.ml : u === "pcs" ? cpuObj?.pcs : undefined;
-  const cpuFromIndex = ing?.cost_per_unit ?? null;
+      const u = normalizeUnit(r.unit);
+      const cpuFromOffers = u === "g" ? cpuObj?.g : u === "ml" ? cpuObj?.ml : u === "pcs" ? cpuObj?.pcs : undefined;
+      const cpuFromIndex = ing?.cost_per_unit ?? null;
 
-  const cpu = n2(cpuFromOffers ?? cpuFromIndex);
-  const qty = typeof r.qty === "number" ? r.qty : n2(r.qty);
+      const cpu = n2(cpuFromOffers ?? cpuFromIndex);
+      const qty = typeof r.qty === "number" ? r.qty : n2(r.qty);
 
-  return acc + n2(qty) * cpu;
-}, 0);
+      return acc + qty * cpu;
+    }, 0);
 
     const totalCost = n2(dough?.total_cost);
     const yieldGrams = n2(dough?.yield_grams);
-    const doughCpuG = yieldGrams > 0 ? totalCost / yieldGrams : 0;
+   const doughCostPerKg =
+  dough && "cost_per_kg" in dough
+    ? n2((dough as { cost_per_kg?: number | null }).cost_per_kg)
+    : 0;
+    const doughCpuG = doughCostPerKg > 0 ? doughCostPerKg / 1000 : yieldGrams > 0 ? totalCost / yieldGrams : 0;
     const doughCost = ballWeightNum > 0 ? doughCpuG * ballWeightNum : 0;
 
     return {
@@ -296,24 +340,50 @@ export default function PizzaForm(props: { pizzaId?: string }) {
       setIngredients((ing ?? []) as Ingredient[]);
  
       const { data: offers, error: offErr } = await supabase
-        .from("v_latest_offers")
-        .select("ingredient_id, unit_price, unit");
- 
-      if (offErr) {
-        setStatus("ERROR");
-        setError(offErr);
-        return;
-      }
- 
-      const priceMap: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
-      (offers ?? []).forEach((o: LatestOfferRow) => {
-        const id = String(o.ingredient_id ?? "");
-        if (!id) return;
-        const cpu = offerToCpu(o.unit, o.unit_price);
-        if (!priceMap[id]) priceMap[id] = {};
-        priceMap[id] = { ...priceMap[id], ...cpu };
-      });
-      setPriceByIngredient(priceMap);
+  .from("v_latest_offers")
+  .select("ingredient_id, supplier_id, unit, unit_price, pack_price, pack_total_qty, pack_unit, pack_count, pack_each_qty, pack_each_unit, density_kg_per_l, piece_weight_g");
+
+if (offErr) {
+  setStatus("ERROR");
+  setError(offErr);
+  return;
+}
+
+const supplierMap: Record<string, string> = {
+  B347: "METRO",
+  "0074": "MAEL",
+  B86F: "B86F",
+  CD44: "CD44",
+};
+
+const priceMap: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
+const metaMap: Record<string, { density_kg_per_l?: number | null; piece_weight_g?: number | null }> = {};
+const supplierByIngredient: Record<string, string | null> = {};
+
+(offers ?? []).forEach((o: unknown) => {
+  const oo = typeof o === "object" && o ? (o as Record<string, unknown>) : {};
+
+  const id = String(oo["ingredient_id"] ?? "");
+  if (!id) return;
+
+  const cpu = offerRowToCpu(oo);
+  if (!priceMap[id]) priceMap[id] = {};
+  priceMap[id] = { ...priceMap[id], ...cpu };
+
+  const densityVal = oo["density_kg_per_l"];
+  const pieceVal = oo["piece_weight_g"];
+  const density = typeof densityVal === "number" ? densityVal : null;
+  const pieceG = typeof pieceVal === "number" ? pieceVal : null;
+  metaMap[id] = { density_kg_per_l: density, piece_weight_g: pieceG };
+
+  const supplierId = String(oo["supplier_id"] ?? "");
+  const code = supplierId ? supplierId.slice(0, 4).toUpperCase() : "";
+  supplierByIngredient[id] = code ? (supplierMap[code] ?? code) : null;
+});
+
+setPriceByIngredient(priceMap);
+setOfferMetaByIngredient(metaMap);
+setSupplierByIngredient(supplierByIngredient);
 
       if (!isEdit) {
         setForm({ name: "", dough_recipe_id: "", notes: "", photo_url: "" });
@@ -321,7 +391,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
         setPhotoPreview(null);
         setBallWeightG("264");
         setVatRate("10");
-        setMarginRate("60");
+        setMarginRate("75");
         setStatus("OK");
         return;
       }
@@ -505,9 +575,14 @@ export default function PizzaForm(props: { pizzaId?: string }) {
     setSaveError(null);
     setSaveOk(false);
 
-    const nm = form.name.trim();
+        const nm = form.name.trim();
     if (!nm) {
       setSaveError({ message: "Nom obligatoire" });
+      return;
+    }
+
+    if (!form.dough_recipe_id) {
+      setSaveError({ message: "Empâtement obligatoire" });
       return;
     }
 
@@ -525,7 +600,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
 
     const payload = {
       name: nm,
-      dough_recipe_id: form.dough_recipe_id ? form.dough_recipe_id : null,
+      dough_recipe_id: form.dough_recipe_id,
       notes: form.notes?.trim() || null,
       photo_url: form.photo_url?.trim() || null,
       is_draft: false,
@@ -738,7 +813,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
                 </button>
               ) : null}
 
-              <button type="button" onClick={save} disabled={saving} style={btnPrimary}>
+              <button type="button" onClick={save} disabled={saving || !form.dough_recipe_id || !form.name.trim()} style={btnPrimary}>
                 {saving ? "Sauvegarde…" : saveOk ? "OK" : "Sauvegarder"}
               </button>
             </div>
@@ -780,18 +855,29 @@ export default function PizzaForm(props: { pizzaId?: string }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 160px", gap: 10, marginTop: 12 }}>
               <div>
                 <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Empâtement</div>
-                <select
-                  style={input}
-                  value={form.dough_recipe_id || ""}
-                  onChange={(e) => setForm((p) => (p ? { ...p, dough_recipe_id: e.target.value } : p))}
-                >
-                  <option value="">Aucun</option>
-                  {recipes.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {String(r.name ?? "—")} ({String(r.type ?? "—")})
-                    </option>
-                  ))}
-                </select>
+                <SmartSelect
+  options={doughOptions}
+  value={form.dough_recipe_id || ""}
+  onChange={(v) => setForm((p) => (p ? { ...p, dough_recipe_id: v } : p))}
+  placeholder="Sélectionner…"
+  inputStyle={input}
+/>
+{doughBadge && (
+  <div
+    style={{
+      marginTop: 8,
+      padding: "6px 10px",
+      background: "#f5f5f5",
+      borderRadius: 999,
+      fontSize: 13,
+      fontWeight: 700,
+      display: "inline-block",
+    }}
+  >
+    {fmtKg2(doughBadge.costPerKg)} •{" "}
+    {fmtMoney(doughBadge.costPerBall)}/pâton
+  </div>
+)}
               </div>
 
               <div>
@@ -808,11 +894,13 @@ export default function PizzaForm(props: { pizzaId?: string }) {
             <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div>
                 <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>TVA vente (%)</div>
-                <select style={input} value={vatRate} onChange={(e) => setVatRate(e.target.value)}>
-                  <option value="5.5">5,5</option>
-                  <option value="10">10</option>
-                  <option value="20">20</option>
-                </select>
+<SmartSelect
+  options={vatOptions}
+  value={vatRate}
+  onChange={(v) => setVatRate(v)}
+  placeholder="TVA…"
+  inputStyle={{ width: "100%" }}
+/>
               </div>
 
               <div>
@@ -849,7 +937,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
 
               <div style={metricBox}>
                 <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Coût / kg</div>
-                <div style={{ fontSize: 26, fontWeight: 950, marginTop: 2 }}>{fmtKg3(costPerKg)}</div>
+                <div style={{ fontSize: 26, fontWeight: 950, marginTop: 2 }}>{fmtKg2(costPerKg)}</div>
                 <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Poids total: {Math.round(weightTotalGrams)} g</div>
               </div>
             </div>
@@ -873,24 +961,25 @@ export default function PizzaForm(props: { pizzaId?: string }) {
             <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Photo</div>
 
             <div
-              style={{
-                border: `1px dashed ${theme.border}`,
-                borderRadius: 16,
-                height: 260,
-                background: "#fff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                overflow: "hidden",
-              }}
-            >
+  style={{
+    border: `1px dashed ${theme.border}`,
+    borderRadius: 16,
+    height: 260,
+    background: "#fff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    position: "relative",
+  }}
+>
               {photoPreview ? (
                 <Image
   src={photoPreview}
   alt="pizza"
   fill
   sizes="(max-width: 980px) 100vw, 480px"
-  style={{ objectFit: "cover" }}
+  style={{ objectFit: "contain", background: "#fff" }}
 />
               ) : (
                 <div style={{ color: theme.muted, fontWeight: 900 }}>Clique pour ajouter une photo</div>
@@ -913,7 +1002,15 @@ export default function PizzaForm(props: { pizzaId?: string }) {
             <div style={{ color: theme.muted, fontSize: 12, fontWeight: 900 }}>Ajoute ingrédients + quantités + unité</div>
           </div>
           <div style={{ marginTop: 10 }}>
-            <PizzaIngredientList stage="pre" ingredients={ingredients} rows={rows} onChange={setRows}  priceByIngredient={priceByIngredient} />
+            <PizzaIngredientList
+  stage="pre"
+  ingredients={ingredients}
+  rows={rows}
+  onChange={setRows}
+  priceByIngredient={priceByIngredient}
+  offerMetaByIngredient={offerMetaByIngredient}
+  supplierByIngredient={supplierByIngredient}
+/>
           </div>
         </div>
 
@@ -923,7 +1020,15 @@ export default function PizzaForm(props: { pizzaId?: string }) {
             <div style={{ color: theme.muted, fontSize: 12, fontWeight: 900 }}>Finition / sortie de four</div>
           </div>
           <div style={{ marginTop: 10 }}>
-            <PizzaIngredientList stage="post" ingredients={ingredients} rows={rows} onChange={setRows}  priceByIngredient={priceByIngredient} />
+            <PizzaIngredientList
+  stage="post"
+  ingredients={ingredients}
+  rows={rows}
+  onChange={setRows}
+  priceByIngredient={priceByIngredient}
+  offerMetaByIngredient={offerMetaByIngredient}
+  supplierByIngredient={supplierByIngredient}
+/>
           </div>
         </div>
 

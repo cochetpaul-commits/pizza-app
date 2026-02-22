@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Props = {
-  label: string;
-  value: string;
+  label?: string;
+  value: string; // on garde string pour ton modèle (ex: "65", "")
   onChange: (v: string) => void;
   step?: number;
   min?: number;
@@ -12,118 +12,91 @@ type Props = {
   suffix?: string;
 };
 
+function clamp(n: number, min?: number, max?: number) {
+  let x = n;
+  if (Number.isFinite(min as number)) x = Math.max(min as number, x);
+  if (Number.isFinite(max as number)) x = Math.min(max as number, x);
+  return x;
+}
+
 function toNumSafe(v: string, fallback: number) {
-  if (v === "" || v === "-" || v === "." || v === "-.") return fallback;
-  const n = Number(v);
+  const clean = (v ?? "").replace(",", ".").trim();
+  if (clean === "" || clean === "-" || clean === "." || clean === "-.") return fallback;
+  const n = Number(clean);
   return Number.isFinite(n) ? n : fallback;
 }
 
-function clamp(n: number, min: number, max: number) {
-  if (!Number.isFinite(n)) return min;
-  return Math.min(max, Math.max(min, n));
+function roundStep(n: number, step: number) {
+  if (!step || step <= 0) return n;
+  const p = 1 / step;
+  return Math.round(n * p) / p;
 }
 
-function decimalsFromStep(step: number) {
-  const s = String(step);
-  const i = s.indexOf(".");
-  return i === -1 ? 0 : s.length - i - 1;
-}
+export default function PercentStepper({ label, value, onChange, step = 0.1, min = 0, max = 100, suffix = "%" }: Props) {
+  const [draft, setDraft] = useState<string>(value ?? "");
 
-function formatByStep(n: number, step: number) {
-  const d = decimalsFromStep(step);
-  return d === 0 ? String(Math.round(n)) : n.toFixed(d);
-}
+  useEffect(() => {
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  setDraft(value ?? "");
+}, [value]);
 
-export default function PercentStepper({
-  label,
-  value,
-  onChange,
-  step = 0.1,
-  min = 0,
-  max = 120,
-  suffix = "%",
-}: Props) {
-  const num = useMemo(
-    () => clamp(toNumSafe(value, 0), min, max),
-    [value, min, max]
-  );
+  const current = useMemo(() => clamp(toNumSafe(value ?? "", 0), min, max), [value, min, max]);
 
-  const setNum = (n: number) => {
-    onChange(formatByStep(clamp(n, min, max), step));
+  const dec = () => {
+    const next = roundStep(clamp(current - step, min, max), step);
+    onChange(String(next));
   };
 
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 240px",
-        gap: 12,
-        alignItems: "center",
-        padding: "10px 0",
-        borderTop: "1px solid rgba(255,255,255,0.06)",
-      }}
-    >
-      <div className="muted">{label}</div>
+  const inc = () => {
+    const next = roundStep(clamp(current + step, min, max), step);
+    onChange(String(next));
+  };
 
-      <div
-        style={{
-          display: "flex",
-          gap: 10,
-          justifyContent: "flex-end",
-          alignItems: "center",
-        }}
-      >
-        <button
-          type="button"
-          className="btn"
-          style={{ width: 44, height: 44, borderRadius: 12 }}
-          onClick={() => setNum(num - step)}
-        >
-          −
+  const commit = () => {
+    const n = roundStep(clamp(toNumSafe(draft ?? "", current), min, max), step);
+    onChange(String(n));
+  };
+
+  const canDec = current > min;
+  const canInc = current < max;
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      {label ? (
+        <div className="muted" style={{ marginBottom: 6 }}>
+          {label}
+        </div>
+      ) : null}
+
+            <div style={{ display: "grid", gridTemplateColumns: "32px auto 32px", gap: 6, alignItems: "center" }}>
+        <button className="btn stepBtn" type="button" onClick={dec} disabled={!canDec}>
+          –
         </button>
 
-        <div
-          style={{
-            height: 44,
-            width: 140,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 10,
-            border: "1px solid rgba(255,255,255,0.14)",
-            borderRadius: 14,
-            padding: "0 14px",
-          }}
-        >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
           <input
-            className="noSpin"
-            type="number"
-            value={value ?? ""}
-            step={step}
-            onChange={(e) => onChange(e.target.value)}
-            onBlur={() => setNum(num)}
+            className="input stepInput"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                (e.currentTarget as HTMLInputElement).blur();
+              }
+            }}
+            inputMode="decimal"
             style={{
-              width: 70,
+              width: 64,
+              padding: "6px 8px",
               textAlign: "center",
-              border: "none",
-              outline: "none",
-              background: "transparent",
-              color: "#ffffff",
-              fontSize: 18,
-              fontWeight: 600,
+              fontWeight: 700,
+              fontSize: 14,
             }}
           />
-          <span className="muted" style={{ fontSize: 16, fontWeight: 600 }}>
-            {suffix}
-          </span>
+          {suffix ? <span className="stepSuffix">{suffix}</span> : null}
         </div>
 
-        <button
-          type="button"
-          className="btn"
-          style={{ width: 44, height: 44, borderRadius: 12 }}
-          onClick={() => setNum(num + step)}
-        >
+        <button className="btn stepBtn" type="button" onClick={inc} disabled={!canInc}>
           +
         </button>
       </div>

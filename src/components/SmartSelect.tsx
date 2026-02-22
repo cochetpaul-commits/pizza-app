@@ -24,9 +24,10 @@ export function SmartSelect(props: {
   onChange: (id: string) => void;
   placeholder?: string;
   inputStyle?: React.CSSProperties;
+  inputClassName?: string;
   menuMax?: number;
 }) {
-  const { options, value, onChange, placeholder = "Rechercher…", inputStyle, menuMax = 12 } = props;
+  const { options, value, onChange, placeholder = "Rechercher…", inputStyle, inputClassName = "input", menuMax = 12 } = props;
 
   const selected = useMemo(() => options.find((o) => o.id === value) ?? null, [options, value]);
 
@@ -87,6 +88,7 @@ export function SmartSelect(props: {
       <div style={{ position: "relative" }}>
         <input
           ref={inputRef}
+          className={inputClassName}
           style={inputStyle}
           placeholder={placeholder}
           value={q}
@@ -101,70 +103,98 @@ export function SmartSelect(props: {
       </div>
 
       {open && pos
-        ? createPortal(
-            <div
-              style={{
-                position: "fixed",
-                zIndex: 9999,
-                left: pos.left,
-                top: pos.top,
-                width: pos.width,
-                background: "white",
-                border: "1px solid rgba(0,0,0,0.12)",
-                borderRadius: 12,
-                overflow: "hidden",
-                boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
-              }}
-            >
-              {filtered.length ? (
-                filtered.map((o) => {
-                  const col = hashColor(String(o.category ?? "other"));
-                  return (
-                    <button
-                      key={o.id}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        onChange(o.id);
-                        setTyped("");
-                        setIsDirty(false);
-                        setOpen(false);
-                      }}
-                      style={{
-                        width: "100%",
-                        textAlign: "left",
-                        padding: "10px 12px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                        background: o.id === value ? "rgba(0,0,0,0.04)" : "white",
-                        border: "none",
-                        cursor: "pointer",
-                        fontSize: 14,
-                      }}
-                    >
-                      <span style={{ width: 10, height: 10, borderRadius: 999, background: col, flex: "0 0 auto" }} />
+  ? createPortal(
+      <div
+        style={{
+          position: "fixed",
+          zIndex: 9999,
+          left: pos.left,
+          top: pos.top,
+          width: pos.width,
+          overflow: "hidden",
+          padding: 6,
+          borderRadius: 14,
+          background: "white",
+          border: "1px solid rgba(0,0,0,0.10)",
+          boxShadow: "0 18px 38px rgba(0,0,0,0.14)",
+        }}
+      >
+        {filtered.length ? (
+          filtered.map((o) => {
+            const col = hashColor(String(o.category ?? "other"));
+            const isSelected = o.id === value;
 
-                      <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                        <div style={{ fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {o.name}
-                        </div>
-                      </div>
+            const isMissing = (o.rightBottom ?? "").toLowerCase().includes("manquant");
+            const badgeBg = isMissing ? "rgba(220, 38, 38, 0.10)" : "rgba(0,0,0,0.04)";
+            const badgeBorder = isMissing ? "rgba(220, 38, 38, 0.25)" : "rgba(0,0,0,0.10)";
+            const badgeText = isMissing ? "rgba(185, 28, 28, 0.95)" : "rgba(0,0,0,0.75)";
 
-                      <div style={{ flex: "0 0 auto", textAlign: "right", minWidth: 110 }}>
-                        {o.rightTop ? <div style={{ fontSize: 12, opacity: 0.8 }}>{o.rightTop}</div> : null}
-                        {o.rightBottom ? <div style={{ fontSize: 13, fontWeight: 800 }}>{o.rightBottom}</div> : null}
-                      </div>
-                    </button>
-                  );
-                })
-              ) : (
-                <div style={{ padding: 12, fontSize: 13, opacity: 0.7 }}>Aucun résultat</div>
-              )}
-            </div>,
-            document.body
-          )
-        : null}
+            return (
+              <button
+                key={o.id}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onChange(o.id);
+                  setTyped("");
+                  setIsDirty(false);
+                  setOpen(false);
+                }}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "10px 10px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  background: isSelected ? "rgba(0,0,0,0.04)" : "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  borderRadius: 12,
+                }}
+              >
+                <span style={{ width: 10, height: 10, borderRadius: 999, background: col, flex: "0 0 auto" }} />
+
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <div style={{ fontWeight: 900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {o.name}
+                  </div>
+                  {o.rightTop ? (
+                    <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {o.rightTop}
+                    </div>
+                  ) : null}
+                </div>
+
+                {o.rightBottom ? (
+                  <span
+                    style={{
+                      flex: "0 0 auto",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      padding: "6px 10px",
+                      borderRadius: 999,
+                      border: `1px solid ${badgeBorder}`,
+                      background: badgeBg,
+                      fontSize: 12,
+                      fontWeight: 950,
+                      color: badgeText,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {o.rightBottom}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })
+        ) : (
+          <div style={{ padding: 12, fontSize: 13, opacity: 0.7 }}>Aucun résultat</div>
+        )}
+      </div>,
+      document.body
+    )
+  : null}
     </>
   );
 }
