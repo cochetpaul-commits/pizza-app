@@ -153,8 +153,11 @@ export default function IngredientsPage() {
     else setSuppliers((supData ?? []) as Supplier[]);
 
     const { data: ingData, error: ingErr } = await supabase.from("ingredients").select("*").order("name", { ascending: true });
-    if (ingErr) alert(ingErr.message);
-    else setItems((ingData ?? []) as Ingredient[]);
+console.log("ingredients count:", ingData?.length, "error:", ingErr);
+console.log("MAEL ingredients:", ingData?.filter((x: { supplier_id?: string }) => x.supplier_id === '007483c2-0eff-4881-90ea-dd07100ff632'));
+if (ingErr) alert(ingErr.message);
+else setItems((ingData ?? []) as Ingredient[]);
+
 
     const { data: offData, error: offErr } = await supabase.from("v_latest_offers").select("*");
     if (offErr) alert(offErr.message);
