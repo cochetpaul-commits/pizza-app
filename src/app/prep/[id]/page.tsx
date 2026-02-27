@@ -390,7 +390,6 @@ export default function PrepRecipeDetailPage() {
             name: String(recipe.name ?? "").trim(),
             pivot_ingredient_id: recipe.pivot_ingredient_id,
             pivot_unit: recipe.pivot_unit,
-            user_id: auth.user.id,
           })
           .select("id")
           .single();
