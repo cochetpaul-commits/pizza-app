@@ -617,25 +617,20 @@ export default function RecipePage() {
         right={
           <>
             <button className="btn btnPrimary" type="button" onClick={saveRecipe} disabled={saveState.saving || pdfState.exporting}>
-  {saveState.saving ? "Sauvegarde…" : saveState.ok ? "OK" : "Sauvegarder"}
-              </button>
-
-            <button className="btn" type="button" onClick={exportPdf} disabled={saveState.saving || pdfState.exporting}>
-              {pdfState.exporting ? "PDF…" : pdfState.ok ? "OK" : "Télécharger (PDF)"}
+              {saveState.saving ? "Sauvegarde…" : saveState.ok ? "OK" : "Sauvegarder"}
             </button>
+            {!isNew && (
+              <button className="btn" type="button" onClick={exportPdf} disabled={saveState.saving || pdfState.exporting}>
+                {pdfState.exporting ? "PDF…" : pdfState.ok ? "OK" : "Télécharger (PDF)"}
+              </button>
+            )}
           </>
         }
       />
 
-      <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "end" }}>
-        <NumberStepper label="N. pâtons" value={nbPatons} onChange={(n) => setNbPatons(Math.max(1, n))} step={1} min={1} max={5000} />
-        <NumberStepper label="Grammage pâton" value={poidsPaton} onChange={(n) => setPoidsPaton(Math.max(1, n))} step={1} min={1} max={2000} suffix="g" />
-      </div>
-
+      {/* 1. Nom */}
       <div style={{ marginTop: 16 }}>
-        <div className="muted" style={{ marginBottom: 6 }}>
-          Nom de l'empâtement
-        </div>
+        <div className="muted" style={{ marginBottom: 6 }}>Nom de l'empâtement</div>
         <input
           className="input"
           value={form.name ?? ""}
@@ -645,73 +640,13 @@ export default function RecipePage() {
         />
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <div className="muted" style={{ marginBottom: 10 }}>
-          Coût (calcul auto depuis l'index ingrédients / offres)
-        </div>
-
-        {costing.missing.length > 0 ? (
-          <div className="errorBox" style={{ marginTop: 10 }}>
-            <div style={{ fontWeight: 800 }}>Prix manquant dans l'index</div>
-            <div className="muted" style={{ marginTop: 6 }}>À corriger dans "Ingrédients" / "Offres" :</div>
-            <div style={{ marginTop: 6, fontWeight: 800 }}>{costing.missing.join(" · ")}</div>
-          </div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 10 }}>
-            <div className="card" style={{ padding: 12 }}>
-              <div className="muted" style={{ fontSize: 12 }}>
-                Rendement
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 900 }}>{Math.round(costing.yieldGrams).toLocaleString("fr-FR")} g</div>
-            </div>
-            <div className="card" style={{ padding: 12 }}>
-              <div className="muted" style={{ fontSize: 12 }}>
-                Coût total
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtMoney2(costing.totalCost)}</div>
-            </div>
-            <div className="card" style={{ padding: 12 }}>
-              <div className="muted" style={{ fontSize: 12 }}>
-                Coût / kg
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtKg3(costing.costPerKg)}</div>
-            </div>
-            <div className="card" style={{ padding: 12 }}>
-              <div className="muted" style={{ fontSize: 12 }}>
-                Coût / pâton
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtMoney2(costing.costPerBall)}</div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="card" style={{ marginTop: 16 }}>
-        <div className="muted" style={{ marginBottom: 8 }}>
-          Procédure (protocole)
-        </div>
-
-        <textarea
-          className="input"
-          value={form.procedure ?? ""}
-          onChange={(e) => setForm((p) => (p ? { ...p, procedure: e.target.value } : p))}
-          placeholder="Ex : Eau froide 4°C. Mettre farine + eau au pétrin vitesse 1 (3 min), puis sel, puis vitesse 2 (6 min)…"
-          rows={6}
-          style={{ resize: "vertical", lineHeight: 1.35, height: "auto" }}
-        />
-        <p className="muted" style={{ marginTop: 8 }}>
-          Conseil : court, actionnable, 6–10 lignes max.
-        </p>
-      </div>
-
+      {/* 2. Type + paramètres + mix farines */}
       <div className="card" style={{ marginTop: 16 }}>
         {saveState.error ? <pre className="code" style={{ marginTop: 10 }}>{JSON.stringify(saveState.error, null, 2)}</pre> : null}
         {pdfState.error ? <pre className="code" style={{ marginTop: 10 }}>{JSON.stringify(pdfState.error, null, 2)}</pre> : null}
 
-        <div style={{ marginTop: 12 }}>
-          <div className="muted" style={{ marginBottom: 8 }}>
-            Type
-          </div>
+        <div>
+          <div className="muted" style={{ marginBottom: 8 }}>Type</div>
           <select className="input" value={form.type ?? "direct"} onChange={(e) => setForm((p) => (p ? { ...p, type: e.target.value as DoughType } : p))}>
             <option value="direct">direct</option>
             <option value="biga">biga</option>
@@ -724,54 +659,36 @@ export default function RecipePage() {
             label="Hydratation"
             value={clamp(toNumSafe(form.hydration_total ?? "", 65), 0, 120)}
             onChange={(n) => setForm((p) => (p ? { ...p, hydration_total: String(n) } : p))}
-            step={0.5}
-            min={0}
-            max={120}
-            suffix="%"
+            step={0.5} min={0} max={120} suffix="%"
           />
           <NumberStepper
             label="Sel"
             value={clamp(toNumSafe(form.salt_percent ?? "", 2), 0, 10)}
             onChange={(n) => setForm((p) => (p ? { ...p, salt_percent: String(n) } : p))}
-            step={0.1}
-            min={0}
-            max={10}
-            suffix="%"
+            step={0.1} min={0} max={10} suffix="%"
           />
           <NumberStepper
             label="Miel"
             value={clamp(toNumSafe(form.honey_percent ?? "", 0), 0, 20)}
             onChange={(n) => setForm((p) => (p ? { ...p, honey_percent: String(n) } : p))}
-            step={0.1}
-            min={0}
-            max={20}
-            suffix="%"
+            step={0.1} min={0} max={20} suffix="%"
           />
           <NumberStepper
             label="Huile"
             value={clamp(toNumSafe(form.oil_percent ?? "", 0), 0, 20)}
             onChange={(n) => setForm((p) => (p ? { ...p, oil_percent: String(n) } : p))}
-            step={0.1}
-            min={0}
-            max={20}
-            suffix="%"
+            step={0.1} min={0} max={20} suffix="%"
           />
           <NumberStepper
             label={isBiga ? "Levure (phase 2)" : "Levure"}
             value={clamp(toNumSafe(form.yeast_ui ?? "", 0), 0, 10)}
             onChange={(n) => setForm((p) => (p ? { ...p, yeast_ui: String(n) } : p))}
-            step={0.05}
-            min={0}
-            max={10}
-            suffix="%"
+            step={0.05} min={0} max={10} suffix="%"
           />
         </div>
 
         <div style={{ marginTop: 14 }}>
-          <div className="muted" style={{ marginBottom: 8 }}>
-            Mix farines (2)
-          </div>
-
+          <div className="muted" style={{ marginBottom: 8 }}>Mix farines (2)</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 200px 1fr 200px", gap: 12, alignItems: "center" }}>
             <SmartSelect
               options={flourOptions}
@@ -780,16 +697,11 @@ export default function RecipePage() {
               placeholder="Choisir farine A…"
               inputStyle={{ width: "100%" }}
             />
-
             <NumberStepper
               value={clamp(toNumSafe(form.flourA_percent ?? "", 80), 0, 100)}
               onChange={(n) => setForm((p) => (p ? { ...p, flourA_percent: String(n) } : p))}
-              step={1}
-              min={0}
-              max={100}
-              suffix="%"
+              step={1} min={0} max={100} suffix="%"
             />
-
             <SmartSelect
               options={flourOptions}
               value={form.flourB_id ?? ""}
@@ -797,21 +709,69 @@ export default function RecipePage() {
               placeholder="Choisir farine B…"
               inputStyle={{ width: "100%" }}
             />
-
             <NumberStepper
               value={clamp(toNumSafe(form.flourB_percent ?? "", 20), 0, 100)}
               onChange={(n) => setForm((p) => (p ? { ...p, flourB_percent: String(n) } : p))}
-              step={1}
-              min={0}
-              max={100}
-              suffix="%"
+              step={1} min={0} max={100} suffix="%"
             />
           </div>
-
           <p className="muted" style={{ marginTop: 8 }}>
             Total saisi : {Math.round(parsed.flourMixTotalRaw * 100) / 100}% • Total utilisé : {parsed.flourMixNorm.total}%
           </p>
         </div>
+      </div>
+
+      {/* 3. Pâtons / Grammage */}
+      <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "end" }}>
+        <NumberStepper label="N. pâtons" value={nbPatons} onChange={(n) => setNbPatons(Math.max(1, n))} step={1} min={1} max={5000} />
+        <NumberStepper label="Grammage pâton" value={poidsPaton} onChange={(n) => setPoidsPaton(Math.max(1, n))} step={1} min={1} max={2000} suffix="g" />
+      </div>
+
+      {/* 4. Procédure */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="muted" style={{ marginBottom: 8 }}>Procédure (protocole)</div>
+        <textarea
+          className="input"
+          value={form.procedure ?? ""}
+          onChange={(e) => setForm((p) => (p ? { ...p, procedure: e.target.value } : p))}
+          placeholder="Ex : Eau froide 4°C. Mettre farine + eau au pétrin vitesse 1 (3 min), puis sel, puis vitesse 2 (6 min)…"
+          rows={6}
+          style={{ resize: "vertical", lineHeight: 1.35, height: "auto" }}
+        />
+        <p className="muted" style={{ marginTop: 8 }}>Conseil : court, actionnable, 6–10 lignes max.</p>
+      </div>
+
+      {/* 5. Coût */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="muted" style={{ marginBottom: 10 }}>
+          Coût (calcul auto depuis l'index ingrédients / offres)
+        </div>
+        {costing.missing.length > 0 ? (
+          <div className="errorBox" style={{ marginTop: 10 }}>
+            <div style={{ fontWeight: 800 }}>Prix manquant dans l'index</div>
+            <div className="muted" style={{ marginTop: 6 }}>À corriger dans "Ingrédients" / "Offres" :</div>
+            <div style={{ marginTop: 6, fontWeight: 800 }}>{costing.missing.join(" · ")}</div>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 10 }}>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="muted" style={{ fontSize: 12 }}>Rendement</div>
+              <div style={{ fontSize: 22, fontWeight: 900 }}>{Math.round(costing.yieldGrams).toLocaleString("fr-FR")} g</div>
+            </div>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="muted" style={{ fontSize: 12 }}>Coût total</div>
+              <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtMoney2(costing.totalCost)}</div>
+            </div>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="muted" style={{ fontSize: 12 }}>Coût / kg</div>
+              <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtKg3(costing.costPerKg)}</div>
+            </div>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="muted" style={{ fontSize: 12 }}>Coût / pâton</div>
+              <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtMoney2(costing.costPerBall)}</div>
+            </div>
+          </div>
+        )}
       </div>
 
       {!isBiga && (
