@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import PizzaIngredientList from "@/components/PizzaIngredientList";
 import type { Ingredient, PizzaIngredientRow, UnitType } from "@/lib/types";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
+import { TopNav } from "@/components/TopNav";
 
 type DoughRecipeRow = {
   id: string;
@@ -528,7 +529,7 @@ setSupplierByIngredient(supplierByIngredient);
   const exportPdf = async () => {
     try {
       if (!pizzaId) {
-        setSaveError({ message: "Sauvegarde d’abord la pizza avant export PDF." });
+        setSaveError({ message: "Sauvegarde d'abord la pizza avant export PDF." });
         return;
       }
 
@@ -677,382 +678,267 @@ setSupplierByIngredient(supplierByIngredient);
 
   if (status === "loading") {
     return (
-      <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
-        <div style={{ maxWidth: 980, margin: "0 auto" }}>
-          <div style={{ color: theme.muted }}>Chargement…</div>
-        </div>
+      <main className="container">
+        <TopNav title="Pizza" subtitle="Chargement..." backHref="/pizzas" backLabel="Fiches pizza" />
+        <p className="muted">Chargement...</p>
       </main>
     );
   }
 
   if (status === "NOT_LOGGED") {
     return (
-      <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
-        <div style={{ maxWidth: 980, margin: "0 auto" }}>
-          <div style={{ color: theme.muted }}>NOT_LOGGED</div>
-          <Link
-            href="/login"
-            style={{
-              display: "inline-block",
-              marginTop: 12,
-              padding: "10px 14px",
-              borderRadius: 12,
-              background: theme.primary,
-              color: theme.primaryText,
-              textDecoration: "none",
-              fontWeight: 900,
-            }}
-          >
-            Aller sur /login
-          </Link>
-        </div>
+      <main className="container">
+        <TopNav title="Pizza" backHref="/pizzas" backLabel="Fiches pizza" />
+        <p className="muted">NOT_LOGGED</p>
+        <Link className="btn btnPrimary" href="/login" style={{ marginTop: 12, display: "inline-block" }}>
+          Aller sur /login
+        </Link>
       </main>
     );
   }
 
   if (status === "ERROR") {
     return (
-      <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
-        <div style={{ maxWidth: 980, margin: "0 auto" }}>
-          <Link href="/pizzas" style={{ color: theme.muted, textDecoration: "none" }}>
-            ← Retour
-          </Link>
-          <h1 style={{ marginTop: 14, marginBottom: 10 }}>Erreur</h1>
-          <pre
-            style={{
-              background: "#fff",
-              border: `1px solid ${theme.border}`,
-              borderRadius: 12,
-              padding: 12,
-              overflow: "auto",
-            }}
-          >
-            {JSON.stringify(error, null, 2)}
-          </pre>
-        </div>
+      <main className="container">
+        <TopNav title="Erreur" backHref="/pizzas" backLabel="Fiches pizza" />
+        <pre className="code" style={{ marginTop: 12 }}>{JSON.stringify(error, null, 2)}</pre>
       </main>
     );
   }
 
   if (!form) {
     return (
-      <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
-        <div style={{ maxWidth: 980, margin: "0 auto" }}>
-          <div style={{ color: theme.muted }}>Chargement…</div>
-        </div>
+      <main className="container">
+        <TopNav title="Pizza" subtitle="Chargement..." backHref="/pizzas" backLabel="Fiches pizza" />
+        <p className="muted">Chargement...</p>
       </main>
     );
   }
 
-  const card = {
-    background: theme.card,
-    border: `1px solid ${theme.border}`,
-    borderRadius: 16,
-    padding: 16,
-  } as const;
-
-  const input = {
-    width: "100%",
-    height: 44,
-    borderRadius: 12,
-    border: `1px solid ${theme.border}`,
-    padding: "0 12px",
-    fontSize: 16,
-    background: "#fff",
-    color: theme.text,
-  } as const;
-
-  const btn = {
-    height: 44,
-    padding: "0 14px",
-    borderRadius: 12,
-    border: `1px solid ${theme.border}`,
-    background: "#fff",
-    color: theme.text,
-    fontWeight: 900 as const,
-    cursor: "pointer",
-  };
-
-  const btnPrimary = {
-    ...btn,
-    background: theme.primary,
-    border: `1px solid ${theme.primary}`,
-    color: theme.primaryText,
-  };
-
-  const metricBox = {
-    background: "#fff",
-    border: `1px solid ${theme.border}`,
-    borderRadius: 14,
-    padding: 12,
-    minHeight: 82,
-  } as const;
+  const pageTitle = isEdit ? (form.name.trim() || "Pizza") : "Nouvelle pizza";
+  const pageSubtitle = isEdit ? "Fiche pizza" : "Non sauvegardee";
 
   return (
-    <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
-      <div style={{ maxWidth: 980, margin: "0 auto" }}>
-        <div style={{ marginTop: 12 }}>
-          <h1 style={{ margin: 0, fontSize: 34, letterSpacing: -0.4 }}>Créer une pizza</h1>
-          <div style={{ color: theme.muted, marginTop: 4 }}>Empâtement + ingrédients + notes</div>
-
-          <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-            <button type="button" onClick={() => router.push("/")} style={btn}>
-              Accueil
+    <main className="container">
+      <TopNav
+        title={pageTitle}
+        subtitle={pageSubtitle}
+        backHref="/pizzas"
+        backLabel="Fiches pizza"
+        right={
+          <>
+            <button
+              className="btn btnPrimary"
+              type="button"
+              onClick={save}
+              disabled={saving || !form.dough_recipe_id || !form.name.trim()}
+            >
+              {saving ? "Sauvegarde..." : saveOk ? "OK" : "Sauvegarder"}
             </button>
-
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
-              {isEdit ? (
-                <button type="button" onClick={exportPdf} disabled={saving} style={btn}>
-                  PDF
-                </button>
-              ) : null}
-
-              {isEdit ? (
-                <button type="button" onClick={del} disabled={saving} style={btn}>
-                  Supprimer
-                </button>
-              ) : null}
-
-              <button type="button" onClick={save} disabled={saving || !form.dough_recipe_id || !form.name.trim()} style={btnPrimary}>
-                {saving ? "Sauvegarde…" : saveOk ? "OK" : "Sauvegarder"}
+            {isEdit && (
+              <button className="btn" type="button" onClick={exportPdf} disabled={saving}>
+                PDF
               </button>
-            </div>
-          </div>
-        </div>
-
-        {saveError ? (
-          <pre
-            style={{
-              marginTop: 12,
-              background: "#fff",
-              border: `1px solid ${theme.border}`,
-              borderRadius: 12,
-              padding: 12,
-              overflow: "auto",
-            }}
-          >
-            {JSON.stringify(saveError, null, 2)}
-          </pre>
-        ) : null}
-
-        <div style={{ marginTop: 14, ...card }}>
-          <div style={{ fontWeight: 950, fontSize: 22, textAlign: "center" }}>{form.name.trim() ? form.name.trim() : "Pizza (à nommer)"}</div>
-          <div style={{ color: theme.muted, textAlign: "center", marginTop: 6, fontSize: 13 }}>
-            {rowsCount.pre} avant four · {rowsCount.post} après four · total {rowsCount.total}
-          </div>
-        </div>
-
-        <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 14 }}>
-          <div style={card}>
-            <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Nom de la pizza</div>
-            <input
-              style={{ ...input, fontSize: 20, fontWeight: 950 }}
-              placeholder="Ex : Margherita / Regina / Burrata…"
-              value={form.name}
-              onChange={(e) => setForm((p) => (p ? { ...p, name: e.target.value } : p))}
-            />
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 160px", gap: 10, marginTop: 12 }}>
-              <div>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Empâtement</div>
-                <SmartSelect
-  options={doughOptions}
-  value={form.dough_recipe_id || ""}
-  onChange={(v) => setForm((p) => (p ? { ...p, dough_recipe_id: v } : p))}
-  placeholder="Sélectionner…"
-  inputStyle={input}
-/>
-{doughBadge && (
-  <div
-    style={{
-      marginTop: 8,
-      padding: "6px 10px",
-      background: "#f5f5f5",
-      borderRadius: 999,
-      fontSize: 13,
-      fontWeight: 700,
-      display: "inline-block",
-    }}
-  >
-    {fmtKg2(doughBadge.costPerKg)} •{" "}
-    {fmtMoney(doughBadge.costPerBall)}/pâton
-  </div>
-)}
-              </div>
-
-              <div>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Poids pâton (g)</div>
-                <input
-                  style={{ ...input, textAlign: "center", fontWeight: 950 }}
-                  inputMode="decimal"
-                  value={ballWeightG}
-                  onChange={(e) => setBallWeightG(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>TVA vente (%)</div>
-<SmartSelect
-  options={vatOptions}
-  value={vatRate}
-  onChange={(v) => setVatRate(v)}
-  placeholder="TVA…"
-  inputStyle={{ width: "100%" }}
-/>
-              </div>
-
-              <div>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Marge (taux de marque %)</div>
-                <input
-                  style={{ ...input, textAlign: "center", fontWeight: 950 }}
-                  inputMode="decimal"
-                  value={marginRate}
-                  onChange={(e) => setMarginRate(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div style={metricBox}>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Coût empâtement</div>
-                <div style={{ fontSize: 26, fontWeight: 950, marginTop: 2 }}>{fmtMoney(costs.dough)}</div>
-                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Pâton: {Math.round(ballWeightNum)} g</div>
-              </div>
-
-              <div style={metricBox}>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Coût total</div>
-                <div style={{ fontSize: 26, fontWeight: 950, marginTop: 2 }}>{fmtMoney(costs.total)}</div>
-                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Toppings: {fmtMoney(costs.toppings)}</div>
-              </div>
-            </div>
-
-            <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div style={metricBox}>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Poids ingrédients (g)</div>
-                <div style={{ fontSize: 26, fontWeight: 950, marginTop: 2 }}>{Math.round(ingredientWeightGrams).toLocaleString("fr-FR")} g</div>
-                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Somme des lignes en “g”</div>
-              </div>
-
-              <div style={metricBox}>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Coût / kg</div>
-                <div style={{ fontSize: 26, fontWeight: 950, marginTop: 2 }}>{fmtKg2(costPerKg)}</div>
-                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Poids total: {Math.round(weightTotalGrams)} g</div>
-              </div>
-            </div>
-
-            <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div style={metricBox}>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Prix conseillé HT</div>
-                <div style={{ fontSize: 26, fontWeight: 950, marginTop: 2 }}>{fmtMoney(pricing.pvHT)}</div>
-                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>Marge: {fmtPct1(pricing.marginPct)}</div>
-              </div>
-
-              <div style={metricBox}>
-                <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900 }}>Prix conseillé TTC</div>
-                <div style={{ fontSize: 26, fontWeight: 950, marginTop: 2 }}>{fmtMoney(pricing.pvTTC)}</div>
-                <div style={{ color: theme.muted, fontSize: 12, marginTop: 4 }}>TVA: {fmtPct1(pricing.vatPct)}</div>
-              </div>
-            </div>
-          </div>
-
-          <div style={card}>
-            <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Photo</div>
-
-            <div
-  style={{
-    border: `1px dashed ${theme.border}`,
-    borderRadius: 16,
-    height: 260,
-    background: "#fff",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    position: "relative",
-  }}
->
-              {photoPreview ? (
-                <Image
-  src={photoPreview}
-  alt="pizza"
-  fill
-  sizes="(max-width: 980px) 100vw, 480px"
-  style={{ objectFit: "contain", background: "#fff" }}
-/>
-              ) : (
-                <div style={{ color: theme.muted, fontWeight: 900 }}>Clique pour ajouter une photo</div>
-              )}
-            </div>
-
-            <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
-              <input ref={fileRef} type="file" accept="image/*" onChange={onPickPhoto} disabled={photoUploading} />
-              <button type="button" onClick={clearPhoto} disabled={photoUploading || (!form.photo_url && !photoPreview)} style={btn}>
-                Retirer
+            )}
+            {isEdit && (
+              <button className="btn btnDanger" type="button" onClick={del} disabled={saving}>
+                Supprimer
               </button>
-              {photoUploading ? <span style={{ color: theme.muted, fontWeight: 900 }}>Upload…</span> : null}
-            </div>
-          </div>
-        </div>
+            )}
+          </>
+        }
+      />
 
-        <div style={{ marginTop: 14, ...card }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
-            <div style={{ fontSize: 16, fontWeight: 950 }}>Avant four</div>
-            <div style={{ color: theme.muted, fontSize: 12, fontWeight: 900 }}>Ajoute ingrédients + quantités + unité</div>
-          </div>
-          <div style={{ marginTop: 10 }}>
-            <PizzaIngredientList
-  stage="pre"
-  ingredients={ingredients}
-  rows={rows}
-  onChange={setRows}
-  priceByIngredient={priceByIngredient}
-  offerMetaByIngredient={offerMetaByIngredient}
-  supplierByIngredient={supplierByIngredient}
-/>
-          </div>
-        </div>
+      {saveError ? (
+        <pre className="code" style={{ marginTop: 10 }}>{JSON.stringify(saveError, null, 2)}</pre>
+      ) : null}
 
-        <div style={{ marginTop: 14, ...card }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
-            <div style={{ fontSize: 16, fontWeight: 950 }}>Après four</div>
-            <div style={{ color: theme.muted, fontSize: 12, fontWeight: 900 }}>Finition / sortie de four</div>
-          </div>
-          <div style={{ marginTop: 10 }}>
-            <PizzaIngredientList
-  stage="post"
-  ingredients={ingredients}
-  rows={rows}
-  onChange={setRows}
-  priceByIngredient={priceByIngredient}
-  offerMetaByIngredient={offerMetaByIngredient}
-  supplierByIngredient={supplierByIngredient}
-/>
-          </div>
-        </div>
-
-        <div style={{ marginTop: 14, ...card }}>
-          <div style={{ fontSize: 16, fontWeight: 950 }}>Note technique</div>
-          <textarea
-            style={{
-              ...input,
-              height: "auto",
-              minHeight: 140,
-              padding: 12,
-              lineHeight: 1.4,
-              marginTop: 10,
-              resize: "vertical",
-              fontWeight: 700,
-            }}
-            placeholder="Procédé, organisation, cuisson, gestes, finitions…"
-            value={form.notes}
-            onChange={(e) => setForm((p) => (p ? { ...p, notes: e.target.value } : p))}
-          />
-        </div>
-
-        <div style={{ height: 28 }} />
+      {/* 1. Nom */}
+      <div style={{ marginTop: 16 }}>
+        <div className="muted" style={{ marginBottom: 6 }}>Nom de la pizza</div>
+        <input
+          className="input"
+          value={form.name}
+          onChange={(e) => setForm((p) => (p ? { ...p, name: e.target.value } : p))}
+          placeholder="Ex : Margherita / Regina / Burrata..."
+          style={{ fontSize: 20, fontWeight: 950 }}
+        />
       </div>
+
+      {/* 2. Empatement + Poids paton */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 160px", gap: 12, alignItems: "end" }}>
+          <div>
+            <div className="muted" style={{ marginBottom: 6 }}>Empatement</div>
+            <SmartSelect
+              options={doughOptions}
+              value={form.dough_recipe_id || ""}
+              onChange={(v) => setForm((p) => (p ? { ...p, dough_recipe_id: v } : p))}
+              placeholder="Selectionnez un empatement..."
+              inputStyle={{ width: "100%" }}
+            />
+            {doughBadge && (
+              <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>
+                {fmtKg2(doughBadge.costPerKg)} {"\u2022"} {fmtMoney(doughBadge.costPerBall)}/paton
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="muted" style={{ marginBottom: 6 }}>Poids paton (g)</div>
+            <input
+              className="input"
+              inputMode="decimal"
+              value={ballWeightG}
+              onChange={(e) => setBallWeightG(e.target.value)}
+              style={{ textAlign: "center", fontWeight: 950 }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Avant four */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+          <div style={{ fontSize: 16, fontWeight: 950 }}>Avant four</div>
+          <div className="muted" style={{ fontSize: 12 }}>{rowsCount.pre} ingredient(s)</div>
+        </div>
+        <PizzaIngredientList
+          stage="pre"
+          ingredients={ingredients}
+          rows={rows}
+          onChange={setRows}
+          priceByIngredient={priceByIngredient}
+          offerMetaByIngredient={offerMetaByIngredient}
+          supplierByIngredient={supplierByIngredient}
+        />
+      </div>
+
+      {/* 4. Apres four */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+          <div style={{ fontSize: 16, fontWeight: 950 }}>Apres four</div>
+          <div className="muted" style={{ fontSize: 12 }}>{rowsCount.post} ingredient(s)</div>
+        </div>
+        <PizzaIngredientList
+          stage="post"
+          ingredients={ingredients}
+          rows={rows}
+          onChange={setRows}
+          priceByIngredient={priceByIngredient}
+          offerMetaByIngredient={offerMetaByIngredient}
+          supplierByIngredient={supplierByIngredient}
+        />
+      </div>
+
+      {/* 5. Pricing */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="muted" style={{ marginBottom: 10 }}>Pricing</div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div>
+            <div className="muted" style={{ marginBottom: 6, fontSize: 12 }}>TVA vente</div>
+            <SmartSelect
+              options={vatOptions}
+              value={vatRate}
+              onChange={(v) => setVatRate(v)}
+              placeholder="TVA..."
+              inputStyle={{ width: "100%" }}
+            />
+          </div>
+          <div>
+            <div className="muted" style={{ marginBottom: 6, fontSize: 12 }}>Marge (taux de marque %)</div>
+            <input
+              className="input"
+              inputMode="decimal"
+              value={marginRate}
+              onChange={(e) => setMarginRate(e.target.value)}
+              style={{ textAlign: "center", fontWeight: 950 }}
+            />
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 12 }}>
+          <div className="card" style={{ padding: 12 }}>
+            <div className="muted" style={{ fontSize: 12 }}>Cout total</div>
+            <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtMoney(costs.total)}</div>
+            <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
+              Pate {fmtMoney(costs.dough)} + garniture {fmtMoney(costs.toppings)}
+            </div>
+          </div>
+          <div className="card" style={{ padding: 12 }}>
+            <div className="muted" style={{ fontSize: 12 }}>Cout / kg</div>
+            <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtKg2(costPerKg)}</div>
+            <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>{Math.round(weightTotalGrams)} g total</div>
+          </div>
+          <div className="card" style={{ padding: 12 }}>
+            <div className="muted" style={{ fontSize: 12 }}>Prix conseille HT</div>
+            <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtMoney(pricing.pvHT)}</div>
+            <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>Marge {fmtPct1(pricing.marginPct)}</div>
+          </div>
+          <div className="card" style={{ padding: 12 }}>
+            <div className="muted" style={{ fontSize: 12 }}>Prix conseille TTC</div>
+            <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtMoney(pricing.pvTTC)}</div>
+            <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>TVA {fmtPct1(pricing.vatPct)}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* 6. Note technique */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="muted" style={{ marginBottom: 8 }}>Note technique</div>
+        <textarea
+          className="input"
+          value={form.notes}
+          onChange={(e) => setForm((p) => (p ? { ...p, notes: e.target.value } : p))}
+          placeholder="Procede, organisation, cuisson, gestes, finitions..."
+          rows={5}
+          style={{ resize: "vertical", lineHeight: 1.35, height: "auto" }}
+        />
+      </div>
+
+      {/* 7. Photo (pour PDF uniquement) */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="muted" style={{ marginBottom: 8 }}>Photo (pour export PDF uniquement)</div>
+        <div
+          style={{
+            border: "1px dashed #ccc",
+            borderRadius: 12,
+            height: 200,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+            position: "relative",
+            background: "#fafafa",
+          }}
+        >
+          {photoPreview ? (
+            <Image
+              src={photoPreview}
+              alt="pizza"
+              fill
+              sizes="(max-width: 980px) 100vw, 480px"
+              style={{ objectFit: "contain" }}
+            />
+          ) : (
+            <span className="muted">Aucune photo</span>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <input ref={fileRef} type="file" accept="image/*" onChange={onPickPhoto} disabled={photoUploading} />
+          <button
+            className="btn"
+            type="button"
+            onClick={clearPhoto}
+            disabled={photoUploading || (!form.photo_url && !photoPreview)}
+          >
+            Retirer
+          </button>
+          {photoUploading ? <span className="muted">Upload...</span> : null}
+        </div>
+      </div>
+
+      <div style={{ height: 28 }} />
     </main>
   );
 }

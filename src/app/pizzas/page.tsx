@@ -39,10 +39,10 @@ export default function PizzasPage() {
       }
 
       const { data, error } = await supabase
-  .from("pizza_recipes")
-  .select("id,name,dough_recipe_id,notes,created_at,user_id")
-  .eq("is_draft", false)
-  .order("created_at", { ascending: false });;
+        .from("pizza_recipes")
+        .select("id,name,dough_recipe_id,notes,created_at,user_id")
+        .eq("is_draft", false)
+        .order("created_at", { ascending: false });
 
       if (error) {
         setState({ status: "ERROR", error });
@@ -105,7 +105,15 @@ export default function PizzasPage() {
 
   return (
     <main className="container">
-      <TopNav title="Fiches pizza" subtitle={`${pizzas.length} fiche(s)`} />
+      <TopNav
+        title="Fiches pizza"
+        subtitle={`${pizzas.length} fiche(s)`}
+        actions={
+          <button className="btn btnPrimary" onClick={() => router.push("/pizzas/new")}>
+            Nouvelle pizza
+          </button>
+        }
+      />
 
       {pizzas.length === 0 ? (
         <p className="muted">Aucune fiche pizza créée.</p>
