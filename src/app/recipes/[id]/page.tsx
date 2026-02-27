@@ -2,7 +2,7 @@
 
 import { offerRowToCpu } from "@/lib/offerPricing";
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { calculerPate } from "@/lib/pateEngine";
 import { TopNav } from "@/components/TopNav";
@@ -12,6 +12,16 @@ import { SmartSelect } from "@/components/SmartSelect";
 function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 }
+
+const DEFAULT_PROCEDURE = `Eau : 4°C
+Ordre : farine → 80% eau → frasage V1 3 min → ajout sel → V2 6 min → ajout huile 1 min
+Température pâte cible : 22–23°C
+Pointage : 20 min
+Boulage : 264 g
+Bac : huilé léger / fermé
+Maturation : 24 h à 4°C
+Remise T° : 2 h
+Cuisson : __`;
 
 type DoughType = "direct" | "biga" | "focaccia";
 type FlourMixItem = { name: string; percent: number; ingredient_id?: string | null };
@@ -110,6 +120,8 @@ function bestMatchByAliases(ings: IngredientRow[], aliases: string[]) {
 export default function RecipePage() {
   const params = useParams();
   const id = (params?.id as string) || "";
+  const router = useRouter();
+  const isNew = id === "new";
 
   const [state, setState] = useState<{
     status: "loading" | "NOT_LOGGED" | "OK" | "ERROR";
@@ -267,7 +279,7 @@ export default function RecipePage() {
       const fromOffers = iid ? priceByIngredient[iid] : undefined;
 
       // On travaille en grammes dans la recette.
-      // Pour l’eau, l’offre est souvent en ml (≈ 1g).
+      // Pour l'eau, l'offre est souvent en ml (≈ 1g).
       const cpu = n2(fromOffers?.g ?? fromOffers?.ml ?? ing?.cost_per_unit);
       return cpu;
     };
@@ -328,7 +340,7 @@ export default function RecipePage() {
         return;
       }
 
-      if (!id || !isUuid(id)) {
+      if (!id || (!isNew && !isUuid(id))) {
         setState({ status: "ERROR", error: { message: "ID invalide (UUID attendu)" } });
         return;
       }
@@ -365,6 +377,25 @@ export default function RecipePage() {
         priceMap[iid] = { ...priceMap[iid], ...cpu };
       });
       setPriceByIngredient(priceMap);
+
+      if (isNew) {
+        setForm({
+          name: "",
+          type: "biga",
+          hydration_total: "65",
+          salt_percent: "2",
+          honey_percent: "0",
+          oil_percent: "0",
+          yeast_ui: "0",
+          flourA_id: "",
+          flourA_percent: "80",
+          flourB_id: "",
+          flourB_percent: "20",
+          procedure: DEFAULT_PROCEDURE,
+        });
+        setState({ status: "OK" });
+        return;
+      }
 
       const { data: recipe, error } = await supabase.from("recipes").select("*").eq("id", id).maybeSingle();
       if (error) {
@@ -421,7 +452,7 @@ export default function RecipePage() {
     if (!form) return;
 
     if (!form.name || !form.name.trim()) {
-      setSaveState({ saving: false, error: { message: "Le nom de l’empâtement est obligatoire" } });
+      setSaveState({ saving: false, error: { message: "Le nom de l'empâtement est obligatoire" } });
       return;
     }
 
@@ -471,13 +502,24 @@ export default function RecipePage() {
       payload.biga_yeast_percent = 0;
     }
 
+    if (isNew) {
+      const { data: authData } = await supabase.auth.getUser();
+      const uid = authData.user?.id ?? null;
+      const res = await supabase.from("recipes").insert({ ...payload, user_id: uid }).select("id").single();
+      if (res.error) { setSaveState({ saving: false, error: res.error }); return; }
+      const newId = res.data ? (res.data as Record<string, string>).id : null;
+      if (!newId) { setSaveState({ saving: false, error: { message: "ID manquant" } }); return; }
+      router.replace("/recipes/" + newId);
+      return;
+    }
+
     const { error } = await supabase.from("recipes").update(payload).eq("id", id);
     if (error) {
       setSaveState({ saving: false, error });
       return;
     }
 
-    // met à jour le titre “officiel” (r.name) uniquement après sauvegarde
+    // met à jour le titre "officiel" (r.name) uniquement après sauvegarde
     setState((p) => (p.status === "OK" && p.recipe ? { ...p, recipe: { ...p.recipe, name: form.name.trim(), type: form.type } } : p));
 
     setSaveState({ saving: false, ok: true });
@@ -555,7 +597,7 @@ export default function RecipePage() {
     );
   }
 
-  const r = state.recipe!;
+  const r = state.recipe ?? null;
   if (!form) {
     return (
       <main className="container">
@@ -568,9 +610,8 @@ export default function RecipePage() {
   return (
     <main className="container">
       <TopNav
-        // IMPORTANT: titre stable = nom en base (pas le champ en live)
-        title={r.name}
-        subtitle={`${r.type} • créée le ${new Date(r.created_at).toLocaleString()}`}
+        title={r ? r.name : (form.name.trim() || "Nouvel empâtement")}
+        subtitle={r ? `${r.type} • créée le ${new Date(r.created_at).toLocaleString()}` : "Nouvelle recette — non sauvegardée"}
         backHref="/recipes"
         backLabel="Liste empâtements"
         right={
@@ -593,7 +634,7 @@ export default function RecipePage() {
 
       <div style={{ marginTop: 16 }}>
         <div className="muted" style={{ marginBottom: 6 }}>
-          Nom de l’empâtement
+          Nom de l'empâtement
         </div>
         <input
           className="input"
@@ -606,13 +647,13 @@ export default function RecipePage() {
 
       <div className="card" style={{ marginTop: 16 }}>
         <div className="muted" style={{ marginBottom: 10 }}>
-          Coût (calcul auto depuis l’index ingrédients / offres)
+          Coût (calcul auto depuis l'index ingrédients / offres)
         </div>
 
         {costing.missing.length > 0 ? (
           <div className="errorBox" style={{ marginTop: 10 }}>
-            <div style={{ fontWeight: 800 }}>Prix manquant dans l’index</div>
-            <div className="muted" style={{ marginTop: 6 }}>À corriger dans “Ingrédients” / “Offres” :</div>
+            <div style={{ fontWeight: 800 }}>Prix manquant dans l'index</div>
+            <div className="muted" style={{ marginTop: 6 }}>À corriger dans "Ingrédients" / "Offres" :</div>
             <div style={{ marginTop: 6, fontWeight: 800 }}>{costing.missing.join(" · ")}</div>
           </div>
         ) : (
