@@ -100,7 +100,7 @@ export default function Home() {
             </p>
 
             <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap", justifyContent: "center" }}>
-              <Link className="btn btnPrimary btnWide" href="/recipes">
+              <Link className="btn btnPrimary btnWide" href="/recipes/new">
                 Créer empâtement
               </Link>
               <Link className="btn btnWide" href="/recipes">
