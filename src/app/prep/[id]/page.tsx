@@ -2,7 +2,7 @@
 
 import { offerToCpu } from "@/lib/offerPricing";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { SmartSelect } from "@/components/SmartSelect";
 import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
@@ -98,12 +98,12 @@ function getObj(v: unknown): Record<string, unknown> | null {
 }
 
 function offerToEurPerKgFromRow(cpu: { g?: number; ml?: number; pcs?: number }, oo: Record<string, unknown>): number | null {
-  const density = typeof oo["density_kg_per_l"] === "number" ? (oo["density_kg_per_l"] as number) : null; // kg/L
-  const pieceG = typeof oo["piece_weight_g"] === "number" ? (oo["piece_weight_g"] as number) : null; // g
+  const density = typeof oo["density_kg_per_l"] === "number" ? (oo["density_kg_per_l"] as number) : null;
+  const pieceG = typeof oo["piece_weight_g"] === "number" ? (oo["piece_weight_g"] as number) : null;
 
-  const g = typeof cpu.g === "number" ? cpu.g : null; // €/g
-  const ml = typeof cpu.ml === "number" ? cpu.ml : null; // €/ml
-  const pcs = typeof cpu.pcs === "number" ? cpu.pcs : null; // €/pc
+  const g = typeof cpu.g === "number" ? cpu.g : null;
+  const ml = typeof cpu.ml === "number" ? cpu.ml : null;
+  const pcs = typeof cpu.pcs === "number" ? cpu.pcs : null;
 
   if (g && g > 0) return g * 1000;
 
@@ -121,9 +121,19 @@ function offerToEurPerKgFromRow(cpu: { g?: number; ml?: number; pcs?: number }, 
   return null;
 }
 
+const DRAFT_RECIPE: PrepRecipe = {
+  id: "new",
+  name: "",
+  pivot_ingredient_id: "",
+  pivot_unit: "g",
+  output_ingredient_id: null,
+};
+
 export default function PrepRecipeDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = String(params?.id ?? "");
+  const isNew = id === "new";
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -215,17 +225,28 @@ export default function PrepRecipeDetailPage() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("NOT_LOGGED");
 
-      const { data: r, error: eR } = await supabase
-        .from("prep_recipes")
-        .select("id,name,pivot_ingredient_id,pivot_unit,output_ingredient_id,created_at")
-        .eq("id", id)
-        .single();
+      if (isNew) {
+        setRecipe({ ...DRAFT_RECIPE });
+        setLines([]);
+        setPivotAmount("");
+        setUiPivotId("");
+        setNewIngredientId("");
+        setNewQtyForThisPivot("");
+        setNewLineUnit("g");
+      } else {
+        const { data: r, error: eR } = await supabase
+          .from("prep_recipes")
+          .select("id,name,pivot_ingredient_id,pivot_unit,output_ingredient_id,created_at")
+          .eq("id", id)
+          .single();
 
-      if (eR) throw eR;
-      if (!r || typeof r !== "object" || !("id" in r)) throw new Error("Recette introuvable");
+        if (eR) throw eR;
+        if (!r || typeof r !== "object" || !("id" in r)) throw new Error("Recette introuvable");
 
-      const rr = r as PrepRecipe;
-      setRecipe(rr);
+        const rr = r as PrepRecipe;
+        setRecipe(rr);
+        setUiPivotId(rr.pivot_ingredient_id ?? "");
+      }
 
       const { data: ing, error: eI } = await supabase
         .from("ingredients")
@@ -302,46 +323,37 @@ export default function PrepRecipeDetailPage() {
       setPriceByIngredient(priceMap);
       setOfferInfoByIngredient(infoMap);
 
-      const { data: ln, error: eL } = await supabase
-        .from("prep_recipe_lines")
-        .select("id,prep_recipe_id,ingredient_id,amount_per_1_pivot,unit,sort_order,ingredients(name,cost_per_unit)")
-        .eq("prep_recipe_id", id)
-        .order("sort_order", { ascending: true });
+      if (!isNew) {
+        const { data: ln, error: eL } = await supabase
+          .from("prep_recipe_lines")
+          .select("id,prep_recipe_id,ingredient_id,amount_per_1_pivot,unit,sort_order,ingredients(name,cost_per_unit)")
+          .eq("prep_recipe_id", id)
+          .order("sort_order", { ascending: true });
 
-      if (eL) throw eL;
+        if (eL) throw eL;
 
-      const mapped: Line[] = (ln ?? []).map((raw) => {
-        const row = getObj(raw) ?? {};
-        const ingObj = getObj(row["ingredients"]) ?? {};
-        return {
-          id: getString(row["id"]),
-          prep_recipe_id: getString(row["prep_recipe_id"]),
-          ingredient_id: getString(row["ingredient_id"]),
-          amount_per_1_pivot: getNumber(row["amount_per_1_pivot"]),
-          unit: (getString(row["unit"], "g") as "g" | "ml" | "pc") ?? "g",
-          sort_order: getNumber(row["sort_order"], 0),
-          ingredient_name: getString(ingObj["name"]),
-          ingredient_cost_per_unit: typeof ingObj["cost_per_unit"] === "number" ? (ingObj["cost_per_unit"] as number) : null,
-        };
-      });
-      setLines(mapped);
-
-      const draftNow = !String(rr.name ?? "").trim() && mapped.length === 0 && !rr.output_ingredient_id;
-      if (draftNow) {
-        setPivotAmount("");
-        setUiPivotId("");
-        setNewIngredientId("");
-        setNewQtyForThisPivot("");
-        setNewLineUnit("g");
-      } else {
-        setUiPivotId(rr.pivot_ingredient_id ?? "");
+        const mapped: Line[] = (ln ?? []).map((raw) => {
+          const row = getObj(raw) ?? {};
+          const ingObj = getObj(row["ingredients"]) ?? {};
+          return {
+            id: getString(row["id"]),
+            prep_recipe_id: getString(row["prep_recipe_id"]),
+            ingredient_id: getString(row["ingredient_id"]),
+            amount_per_1_pivot: getNumber(row["amount_per_1_pivot"]),
+            unit: (getString(row["unit"], "g") as "g" | "ml" | "pc") ?? "g",
+            sort_order: getNumber(row["sort_order"], 0),
+            ingredient_name: getString(ingObj["name"]),
+            ingredient_cost_per_unit: typeof ingObj["cost_per_unit"] === "number" ? (ingObj["cost_per_unit"] as number) : null,
+          };
+        });
+        setLines(mapped);
       }
     } catch (e: unknown) {
       setError({ message: getErrMessage(e, "Erreur"), details: e });
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, isNew]);
 
   useEffect(() => {
     if (!id) return;
@@ -368,6 +380,27 @@ export default function PrepRecipeDetailPage() {
     setError(null);
 
     try {
+      if (isNew) {
+        const { data: auth } = await supabase.auth.getUser();
+        if (!auth.user) throw new Error("NOT_LOGGED");
+
+        const { data, error: eIns } = await supabase
+          .from("prep_recipes")
+          .insert({
+            name: String(recipe.name ?? "").trim(),
+            pivot_ingredient_id: recipe.pivot_ingredient_id,
+            pivot_unit: recipe.pivot_unit,
+            user_id: auth.user.id,
+          })
+          .select("id")
+          .single();
+
+        if (eIns) throw eIns;
+        const newId = (data as { id: string }).id;
+        router.replace(`/prep/${newId}`);
+        return;
+      }
+
       const payload = {
         name: String(recipe.name ?? "").trim(),
         pivot_ingredient_id: recipe.pivot_ingredient_id,
@@ -401,7 +434,7 @@ export default function PrepRecipeDetailPage() {
       if (pivotAmountNum <= 0) throw new Error("Quantité pivot invalide.");
 
       const pivotCpu = pickCpu(pivotIngredient.id, recipe.pivot_unit, pivotIngredient.cost_per_unit);
-      if (pivotCpu <= 0) throw new Error("Pivot: coût manquant. Ajoute un prix (offers ou cost_per_unit).");
+      if (pivotCpu <= 0) throw new Error("Pivot : coût manquant. Ajoute un prix (offers ou cost_per_unit).");
 
       const pivotCost = pivotCpu * pivotAmountNum;
 
@@ -414,13 +447,13 @@ export default function PrepRecipeDetailPage() {
       });
 
       const missing = rows.find((r) => r.cpu == null);
-      if (missing) throw new Error("Impossible d’enregistrer: un ingrédient n’a pas de prix.");
+      if (missing) throw new Error("Impossible d'enregistrer : un ingrédient n'a pas de prix.");
 
       const totalCost = round2(pivotCost + rows.reduce((acc, r) => acc + n2(r.cost), 0));
       const totalQty = Math.round((pivotAmountNum > 0 ? pivotAmountNum : 0) + rows.reduce((acc, r) => acc + n2(r.qty), 0));
 
-      if (!Number.isFinite(totalCost) || totalCost <= 0) throw new Error("Impossible d’enregistrer: coût total invalide.");
-      if (!Number.isFinite(totalQty) || totalQty <= 0) throw new Error("Impossible d’enregistrer: quantité totale invalide.");
+      if (!Number.isFinite(totalCost) || totalCost <= 0) throw new Error("Impossible d'enregistrer : coût total invalide.");
+      if (!Number.isFinite(totalQty) || totalQty <= 0) throw new Error("Impossible d'enregistrer : quantité totale invalide.");
 
       const name = (String(recipe.name ?? "").trim() || "Recette pivot").slice(0, 120);
       const defaultUnit = recipe.pivot_unit;
@@ -541,18 +574,6 @@ export default function PrepRecipeDetailPage() {
     }
   };
 
-  const labelStyle: React.CSSProperties = { fontSize: 12, opacity: 0.75, marginBottom: 6 };
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    height: 44,
-    borderRadius: 10,
-    border: "1px solid rgba(0,0,0,0.12)",
-    padding: "0 12px",
-    fontSize: 16,
-    background: "rgba(255,255,255,0.65)",
-  };
-  const selectStyle: React.CSSProperties = { ...inputStyle, paddingRight: 34 };
-  const cardStyle: React.CSSProperties = { padding: 16 };
   const kpiCard: React.CSSProperties = {
     borderRadius: 12,
     border: "1px solid rgba(0,0,0,0.10)",
@@ -564,7 +585,7 @@ export default function PrepRecipeDetailPage() {
   if (loading) {
     return (
       <main className="container">
-        <TopNav title="Préparation" />
+        <TopNav title="Préparation" backHref="/prep" backLabel="Retour" />
         <p className="muted">Chargement…</p>
       </main>
     );
@@ -573,7 +594,7 @@ export default function PrepRecipeDetailPage() {
   if (error && !recipe) {
     return (
       <main className="container">
-        <TopNav title="Préparation" />
+        <TopNav title="Préparation" backHref="/prep" backLabel="Retour" />
         <div style={{ marginTop: 12 }}>
           <p className="muted">Recette introuvable.</p>
           <pre className="code" style={{ marginTop: 10 }}>
@@ -587,44 +608,32 @@ export default function PrepRecipeDetailPage() {
   if (!recipe) {
     return (
       <main className="container">
-        <TopNav title="Préparation" />
+        <TopNav title="Préparation" backHref="/prep" backLabel="Retour" />
         <p className="muted">Recette introuvable.</p>
       </main>
     );
   }
 
-  const pageTitle = isDraft ? "Nouvelle recette pivot" : String(recipe.name ?? "").trim() || "Recette pivot";
+  const pageTitle = isNew
+    ? "Nouvelle recette pivot"
+    : String(recipe.name ?? "").trim() || "Recette pivot";
+
+  const topActions = (
+    <>
+      {!isNew && (
+        <button className="btn" type="button" onClick={saveAsIngredient} disabled={savingIndex || isDraft}>
+          {savingIndex ? "Index…" : recipe.output_ingredient_id ? "Mettre à jour l'index" : "Enregistrer dans l'index"}
+        </button>
+      )}
+      <button className="btn btnPrimary" type="button" onClick={saveRecipe} disabled={saving || !canSaveRecipe}>
+        {saving ? "Sauvegarde…" : isNew ? "Créer" : "Sauvegarder"}
+      </button>
+    </>
+  );
 
   return (
     <main className="container">
-      <TopNav title="Préparation" />
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button className="btn" type="button" onClick={saveAsIngredient} disabled={savingIndex || isDraft}>
-            {savingIndex ? "Index…" : recipe.output_ingredient_id ? "Mettre à jour l’index" : "Enregistrer dans l’index"}
-          </button>
-
-          <button className="btn btnPrimary" type="button" onClick={saveRecipe} disabled={saving || !canSaveRecipe}>
-            {saving ? "Sauvegarde…" : isDraft ? "Créer" : "Sauvegarder"}
-          </button>
-        </div>
-      </div>
-
-      <div style={{ marginTop: 10, textAlign: "center" }}>
-        <h1 className="h1" style={{ fontSize: 28, fontWeight: 900, margin: 0 }}>
-          {pageTitle}
-        </h1>
-        <p className="muted" style={{ marginTop: 6 }}>
-          {pivotAmountNum > 0 ? (
-            <>
-              Tu saisis des quantités réelles pour {pivotAmountNum} {recipe.pivot_unit} de pivot.
-            </>
-          ) : (
-            <>Choisis un pivot et saisis une quantité pivot.</>
-          )}
-        </p>
-      </div>
+      <TopNav title={pageTitle} backHref="/prep" backLabel="Retour" actions={topActions} />
 
       {error ? (
         <pre className="code" style={{ marginTop: 12 }}>
@@ -632,11 +641,13 @@ export default function PrepRecipeDetailPage() {
         </pre>
       ) : null}
 
-      <div className="card" style={{ ...cardStyle, marginTop: 12 }}>
+      {/* Nom + Pivot */}
+      <div className="card" style={{ marginTop: 12 }}>
         <div style={{ marginBottom: 12 }}>
-          <div style={labelStyle}>Nom de la recette</div>
+          <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Nom de la recette</div>
           <input
-            style={{ ...inputStyle, fontSize: 18, fontWeight: 700, textAlign: "center" }}
+            className="input"
+            style={{ fontSize: 18, fontWeight: 700, textAlign: "center" }}
             value={recipe.name ?? ""}
             onChange={(e) => setRecipe((p) => (p ? { ...p, name: e.target.value } : p))}
             placeholder="ex: Pesto verde"
@@ -645,7 +656,7 @@ export default function PrepRecipeDetailPage() {
 
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12, alignItems: "end" }}>
           <div>
-            <div style={labelStyle}>Ingrédient pivot</div>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Ingrédient pivot</div>
             <SmartSelect
               key={"pivot|" + uiPivotId + "|" + ingredients.length}
               options={ingredients.map((i) => {
@@ -664,14 +675,14 @@ export default function PrepRecipeDetailPage() {
                 setRecipe((p) => (p ? { ...p, pivot_ingredient_id: v } : p));
               }}
               placeholder="Tape pour chercher…"
-              inputStyle={selectStyle}
             />
           </div>
 
           <div>
-            <div style={labelStyle}>Quantité pivot ({recipe.pivot_unit})</div>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Quantité pivot ({recipe.pivot_unit})</div>
             <input
-              style={{ ...inputStyle, fontSize: 18, fontWeight: 800, textAlign: "center" }}
+              className="input"
+              style={{ fontSize: 18, fontWeight: 800, textAlign: "center" }}
               value={pivotAmount}
               onChange={(e) => setPivotAmount(e.target.value)}
               inputMode="decimal"
@@ -681,170 +692,179 @@ export default function PrepRecipeDetailPage() {
         </div>
       </div>
 
-      <div className="card" style={{ ...cardStyle, marginTop: 12 }}>
-        <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 10 }}>Ajouter une ligne</div>
+      {/* Ajouter une ligne — masqué si isNew */}
+      {!isNew && (
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 10 }}>Ajouter une ligne</div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 110px auto", gap: 12, alignItems: "end" }}>
-          <div>
-            <div style={labelStyle}>Ingrédient</div>
-            <SmartSelect
-              key={"line|" + newIngredientId + "|" + recipe.pivot_ingredient_id + "|" + ingredients.length}
-              options={ingredients
-                .filter((i) => i.id !== recipe.pivot_ingredient_id)
-                .map((i) => {
-                  const meta = offerInfoByIngredient[i.id];
-                  return {
-                    id: i.id,
-                    name: i.name,
-                    category: i.category,
-                    rightTop: meta?.supplier ?? null,
-                    rightBottom: meta?.eurPerKg ? fmtKg(meta.eurPerKg) : null,
-                  };
-                })}
-              value={newIngredientId}
-              onChange={(v) => setNewIngredientId(v)}
-              placeholder="Tape pour chercher…"
-              inputStyle={selectStyle}
-            />
-          </div>
+          {pivotAmountNum <= 0 && (
+            <p className="muted" style={{ marginBottom: 10, fontSize: 12 }}>
+              Saisis d'abord une quantité pivot pour pouvoir ajouter des lignes.
+            </p>
+          )}
 
-          <div>
-            <div style={labelStyle}>Quantité ({newLineUnit})</div>
-            <input
-              style={{ ...inputStyle, fontSize: 18, fontWeight: 800, textAlign: "center" }}
-              value={newQtyForThisPivot}
-              onChange={(e) => setNewQtyForThisPivot(e.target.value)}
-              inputMode="decimal"
-              placeholder="ex: 200"
-            />
-          </div>
-
-          <div>
-            <div style={labelStyle}>Unité</div>
-            <select
-              style={selectStyle}
-              value={newLineUnit}
-              onChange={(e) => setNewLineUnit(e.target.value as "g" | "ml" | "pc")}
-            >
-              <option value="g">g</option>
-              <option value="ml">ml</option>
-              <option value="pc">pc</option>
-            </select>
-          </div>
-
-          <button className="btn btnPrimary" type="button" onClick={addLine} disabled={adding || !newIngredientId || pivotAmountNum <= 0}>
-            {adding ? "Ajout…" : "Ajouter"}
-          </button>
-        </div>
-
-        <p className="muted" style={{ marginTop: 10, marginBottom: 0, fontSize: 12 }}>
-          Exemple: pivot = 300 (unité pivot). Tu saisis Parmesan = 200 (unité ligne) → ratio stocké = 200/300.
-        </p>
-      </div>
-
-      <div className="card" style={{ ...cardStyle, marginTop: 12 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 900 }}>Composition</div>
-            <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-              {computed.rows.length} ligne(s) — quantités calculées pour {pivotAmountNum || 0} {recipe.pivot_unit} de pivot
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 110px auto", gap: 12, alignItems: "end" }}>
+            <div>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Ingrédient</div>
+              <SmartSelect
+                key={"line|" + newIngredientId + "|" + recipe.pivot_ingredient_id + "|" + ingredients.length}
+                options={ingredients
+                  .filter((i) => i.id !== recipe.pivot_ingredient_id)
+                  .map((i) => {
+                    const meta = offerInfoByIngredient[i.id];
+                    return {
+                      id: i.id,
+                      name: i.name,
+                      category: i.category,
+                      rightTop: meta?.supplier ?? null,
+                      rightBottom: meta?.eurPerKg ? fmtKg(meta.eurPerKg) : null,
+                    };
+                  })}
+                value={newIngredientId}
+                onChange={(v) => setNewIngredientId(v)}
+                placeholder="Tape pour chercher…"
+              />
             </div>
-          </div>
 
-          <div style={{ fontSize: 14, fontWeight: 800 }}>
-            Coût / kg: <span style={{ fontSize: 18 }}>{recipe.pivot_unit === "g" ? fmtKg(computed.costPerKg) : "—"}</span>
-          </div>
-        </div>
-
-        <div
-          style={{
-            marginTop: 12,
-            display: "grid",
-            gridTemplateColumns: "2fr 1fr 1fr auto",
-            gap: 10,
-            padding: "10px 10px",
-            borderRadius: 10,
-            background: "rgba(0,0,0,0.03)",
-            fontSize: 12,
-            fontWeight: 800,
-            letterSpacing: 0.4,
-            textTransform: "uppercase",
-          }}
-        >
-          <div>Ingrédient</div>
-          <div style={{ textAlign: "right" }}>Quantité</div>
-          <div style={{ textAlign: "right" }}>Coût ligne</div>
-          <div />
-        </div>
-
-        <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-          {computed.rows.map((r) => (
-            <div
-              key={r.id}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "2fr 1fr 1fr auto",
-                gap: 10,
-                alignItems: "center",
-                padding: "12px 10px",
-                border: "1px solid rgba(0,0,0,0.10)",
-                borderRadius: 12,
-                background: "rgba(255,255,255,0.55)",
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 16, fontWeight: 900 }}>{r.ingredient_name ?? "—"}</div>
-              </div>
-
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 18, fontWeight: 900 }}>{Math.round(r.qty)}</div>
-                <div className="muted" style={{ fontSize: 12 }}>{r.unit}</div>
-              </div>
-
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 18, fontWeight: 950 }}>{fmtMoney(r.cost)}</div>
-              </div>
-
-              <button className="btn btnDanger" type="button" onClick={() => delLine(r.id)}>
-                Supprimer
-              </button>
+            <div>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Quantité ({newLineUnit})</div>
+              <input
+                className="input"
+                style={{ fontSize: 18, fontWeight: 800, textAlign: "center" }}
+                value={newQtyForThisPivot}
+                onChange={(e) => setNewQtyForThisPivot(e.target.value)}
+                inputMode="decimal"
+                placeholder="ex: 200"
+              />
             </div>
-          ))}
-        </div>
 
-        {computed.rows.length === 0 ? (
-          <p className="muted" style={{ marginTop: 12 }}>
-            Aucune ligne. Ajoute un ingrédient.
+            <div>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Unité</div>
+              <select
+                className="input"
+                value={newLineUnit}
+                onChange={(e) => setNewLineUnit(e.target.value as "g" | "ml" | "pc")}
+              >
+                <option value="g">g</option>
+                <option value="ml">ml</option>
+                <option value="pc">pc</option>
+              </select>
+            </div>
+
+            <button
+              className="btn btnPrimary"
+              type="button"
+              onClick={addLine}
+              disabled={adding || !newIngredientId || pivotAmountNum <= 0}
+            >
+              {adding ? "Ajout…" : "Ajouter"}
+            </button>
+          </div>
+
+          <p className="muted" style={{ marginTop: 10, marginBottom: 0, fontSize: 12 }}>
+            Exemple : pivot = 300 g. Tu saisis Parmesan = 200 g → ratio stocké = 200/300.
           </p>
-        ) : null}
+        </div>
+      )}
 
-        <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-          <div style={kpiCard}>
-            <div className="muted" style={{ fontSize: 12 }}>
-              Coût pivot
+      {/* Composition */}
+      {!isNew && (
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 900 }}>Composition</div>
+              <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                {computed.rows.length} ligne(s) — quantités calculées pour {pivotAmountNum || 0} {recipe.pivot_unit} de pivot
+              </div>
             </div>
-            <div style={{ fontSize: 18, fontWeight: 900 }}>{fmtMoney(computed.pivotCost)}</div>
+
+            <div style={{ fontSize: 14, fontWeight: 800 }}>
+              Coût / kg : <span style={{ fontSize: 18 }}>{recipe.pivot_unit === "g" ? fmtKg(computed.costPerKg) : "—"}</span>
+            </div>
           </div>
-          <div style={kpiCard}>
-            <div className="muted" style={{ fontSize: 12 }}>
-              Coût lignes
-            </div>
-            <div style={{ fontSize: 18, fontWeight: 900 }}>{fmtMoney(computed.linesCost)}</div>
+
+          <div
+            style={{
+              marginTop: 12,
+              display: "grid",
+              gridTemplateColumns: "2fr 1fr 1fr auto",
+              gap: 10,
+              padding: "10px 10px",
+              borderRadius: 10,
+              background: "rgba(0,0,0,0.03)",
+              fontSize: 12,
+              fontWeight: 800,
+              letterSpacing: 0.4,
+              textTransform: "uppercase",
+            }}
+          >
+            <div>Ingrédient</div>
+            <div style={{ textAlign: "right" }}>Quantité</div>
+            <div style={{ textAlign: "right" }}>Coût ligne</div>
+            <div />
           </div>
-          <div style={kpiCard}>
-            <div className="muted" style={{ fontSize: 12 }}>
-              Total
-            </div>
-            <div style={{ fontSize: 18, fontWeight: 900 }}>{fmtMoney(computed.totalCost)}</div>
+
+          <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+            {computed.rows.map((r) => (
+              <div
+                key={r.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "2fr 1fr 1fr auto",
+                  gap: 10,
+                  alignItems: "center",
+                  padding: "12px 10px",
+                  border: "1px solid rgba(0,0,0,0.10)",
+                  borderRadius: 12,
+                  background: "rgba(255,255,255,0.55)",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 900 }}>{r.ingredient_name ?? "—"}</div>
+                </div>
+
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 18, fontWeight: 900 }}>{Math.round(r.qty)}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>{r.unit}</div>
+                </div>
+
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 18, fontWeight: 950 }}>{fmtMoney(r.cost)}</div>
+                </div>
+
+                <button className="btn btnDanger" type="button" onClick={() => delLine(r.id)}>
+                  Supprimer
+                </button>
+              </div>
+            ))}
           </div>
-          <div style={kpiCard}>
-            <div className="muted" style={{ fontSize: 12 }}>
-              Coût / kg
+
+          {computed.rows.length === 0 ? (
+            <p className="muted" style={{ marginTop: 12 }}>
+              Aucune ligne. Ajoute un ingrédient ci-dessus.
+            </p>
+          ) : null}
+
+          <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+            <div style={kpiCard}>
+              <div className="muted" style={{ fontSize: 12 }}>Coût pivot</div>
+              <div style={{ fontSize: 18, fontWeight: 900 }}>{fmtMoney(computed.pivotCost)}</div>
             </div>
-            <div style={{ fontSize: 20, fontWeight: 950 }}>{recipe.pivot_unit === "g" ? fmtKg(computed.costPerKg) : "—"}</div>
+            <div style={kpiCard}>
+              <div className="muted" style={{ fontSize: 12 }}>Coût lignes</div>
+              <div style={{ fontSize: 18, fontWeight: 900 }}>{fmtMoney(computed.linesCost)}</div>
+            </div>
+            <div style={kpiCard}>
+              <div className="muted" style={{ fontSize: 12 }}>Total</div>
+              <div style={{ fontSize: 18, fontWeight: 900 }}>{fmtMoney(computed.totalCost)}</div>
+            </div>
+            <div style={kpiCard}>
+              <div className="muted" style={{ fontSize: 12 }}>Coût / kg</div>
+              <div style={{ fontSize: 20, fontWeight: 950 }}>{recipe.pivot_unit === "g" ? fmtKg(computed.costPerKg) : "—"}</div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </main>
   );
 }

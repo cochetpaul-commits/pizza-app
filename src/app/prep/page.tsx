@@ -41,7 +41,7 @@ export default function PrepRecipesPage() {
     setState({ status: "OK", rows: (data ?? []) as PrepRecipeRow[] });
   };
 
-    useEffect(() => {
+  useEffect(() => {
     let cancelled = false;
 
     (async () => {
@@ -70,9 +70,16 @@ export default function PrepRecipesPage() {
     }));
   };
 
+  const newAction = (
+    <button className="btn btnPrimary" onClick={() => router.push("/prep/new")}>
+      Nouvelle recette pivot
+    </button>
+  );
+
   if (state.status === "loading") {
     return (
       <main className="container">
+        <TopNav title="Recettes pivot" />
         <p className="muted">Chargement…</p>
       </main>
     );
@@ -81,6 +88,7 @@ export default function PrepRecipesPage() {
   if (state.status === "NOT_LOGGED") {
     return (
       <main className="container">
+        <TopNav title="Recettes pivot" />
         <p className="muted">NOT_LOGGED</p>
         <Link className="btn btnPrimary" href="/login">
           Aller sur /login
@@ -92,10 +100,7 @@ export default function PrepRecipesPage() {
   if (state.status === "ERROR") {
     return (
       <main className="container">
-        <TopNav title="Recettes pivot" />
-        <h1 className="h1" style={{ marginTop: 12 }}>
-          Recettes pivot (prep)
-        </h1>
+        <TopNav title="Recettes pivot" subtitle="Erreur" actions={newAction} />
         <pre className="errorBox">{JSON.stringify(state.error, null, 2)}</pre>
       </main>
     );
@@ -105,40 +110,23 @@ export default function PrepRecipesPage() {
 
   return (
     <main className="container">
-      <TopNav title="Recettes pivot" />
-
-      <div className="rowBetween" style={{ marginTop: 12 }}>
-        <div>
-          <h1 className="h1" style={{ margin: 0 }}>
-            Recettes pivot (prep)
-          </h1>
-          <p className="muted" style={{ marginTop: 6 }}>
-            Pesto, bolognaise, tiramisu, sauces… (basées sur un ingrédient pivot)
-          </p>
-        </div>
-
-        <button className="btn btnPrimary" onClick={() => router.push("/prep/new")}>
-          Nouvelle recette pivot
-        </button>
-      </div>
+      <TopNav
+        title="Recettes pivot"
+        subtitle={`${rows.length} recette(s)`}
+        actions={newAction}
+      />
 
       {rows.length === 0 ? (
-        <p className="muted" style={{ marginTop: 12 }}>
-          Aucune recette pivot créée.
-        </p>
+        <p className="muted">Aucune recette pivot créée.</p>
       ) : (
-        <div className="card" style={{ marginTop: 12 }}>
-          <div className="muted" style={{ marginBottom: 10 }}>
-            {rows.length} recette(s)
-          </div>
-
+        <div className="card">
           <div style={{ display: "grid", gap: 10 }}>
             {rows.map((r) => (
               <div key={r.id} className="listRow" style={{ alignItems: "center" }}>
                 <div style={{ cursor: "pointer" }} onClick={() => router.push(`/prep/${r.id}`)}>
                   <div style={{ fontWeight: 700, textTransform: "uppercase" }}>{r.name}</div>
                   <div className="muted" style={{ fontSize: 12 }}>
-                    pivot : {r.pivot_unit} • {new Date(r.created_at).toLocaleString("fr-FR")}
+                    pivot : {r.pivot_unit} • {new Date(r.created_at).toLocaleString("fr-FR")}
                   </div>
                 </div>
 
