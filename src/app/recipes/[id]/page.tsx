@@ -19,6 +19,7 @@ type FlourMixItem = { name: string; percent: number; ingredient_id?: string | nu
 type IngredientRow = {
   id: string;
   name: string | null;
+  category: string | null;
   cost_per_unit: number | null;
   is_active?: boolean | null;
 };
@@ -142,7 +143,7 @@ export default function RecipePage() {
 
   const flourOptions = useMemo(() => {
   return (ingredients ?? [])
-    .filter((i) => (i?.is_active ?? true) !== false)
+    .filter((i) => (i?.is_active ?? true) !== false && i?.category === "epicerie")
     .map((i) => {
       const iid = String(i.id);
       const cpuG = n2(priceByIngredient[iid]?.g ?? i.cost_per_unit);
@@ -334,7 +335,7 @@ export default function RecipePage() {
 
       const { data: ing, error: ingErr } = await supabase
         .from("ingredients")
-        .select("id,name,cost_per_unit,is_active")
+        .select("id,name,category,cost_per_unit,is_active")
         .order("name", { ascending: true });
 
       if (ingErr) {
@@ -393,10 +394,6 @@ export default function RecipePage() {
       setNbPatons(Math.max(1, n2(rrAny["balls_count"]) || 150));
       setPoidsPaton(Math.max(1, n2(rrAny["ball_weight"]) || 264));
 
-      // fallback farine si pas d'IDs dans flour_mix : on prend 2 premières farines dispo
-      const fallbackA = ingList[0]?.id ? String(ingList[0].id) : "";
-      const fallbackB = ingList[1]?.id ? String(ingList[1].id) : fallbackA;
-
       setForm({
         name: String(rr.name ?? ""),
         type,
@@ -405,9 +402,9 @@ export default function RecipePage() {
         honey_percent: String(rr.honey_percent ?? 0),
         oil_percent: String(rr.oil_percent ?? 0),
         yeast_ui: yeastUi,
-        flourA_id: aId || fallbackA,
+        flourA_id: aId,
         flourA_percent: String(aPct || 80),
-        flourB_id: bId || fallbackB,
+        flourB_id: bId,
         flourB_percent: String(bPct || 20),
         procedure: String(rr.procedure ?? ""),
       });
@@ -425,17 +422,6 @@ export default function RecipePage() {
 
     if (!form.name || !form.name.trim()) {
       setSaveState({ saving: false, error: { message: "Le nom de l’empâtement est obligatoire" } });
-      return;
-    }
-
-    if (costing.missing.length > 0) {
-      setSaveState({
-        saving: false,
-        error: {
-          message: "Coût empâtement impossible (prix manquant dans l’index ingrédients / offres).",
-          missing: costing.missing,
-        },
-      });
       return;
     }
 

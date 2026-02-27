@@ -48,8 +48,8 @@ export default function NewRecipePage() {
       if (!auth.user) throw new Error("NOT_LOGGED");
 
       const flour_mix = [
-        { name: "Tipo 00", percent: 80 },
-        { name: "Tipo 1", percent: 20 },
+        { name: "Tipo 00", percent: 80, ingredient_id: null },
+        { name: "Tipo 1", percent: 20, ingredient_id: null },
       ];
 
       const payload: Record<string, unknown> = {

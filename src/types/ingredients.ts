@@ -24,22 +24,22 @@ export type IngredientStatus = "to_check" | "validated" | "unknown";
 export type Tab = IngredientStatus | "all";
 
 export const CAT_COLORS: Record<Category, string> = {
-  cremerie: "#A16207",
-  fromage: "#92400E",
-  charcuterie: "#9A3412",
-  viande: "#7F1D1D",
-  maree: "#075985",
-  boisson: "#0F766E",
-  alcool: "#0E7490",
-  epicerie: "#4C1D95",
-  legume: "#3F6212",
-  fruit: "#B45309",
-  herbe: "#166534",
-  preparation: "#d5835f",
-  autre: "#111827",
-  recette: "#334155",
-  sauce: "#9F1239",
-  surgele: "#1D4ED8",
+  cremerie:    "#D97706", // ambre chaud
+  fromage:     "#B45309", // orange brun
+  charcuterie: "#DC2626", // rouge vif
+  viande:      "#991B1B", // rouge sombre
+  maree:       "#0284C7", // bleu ocean
+  boisson:     "#0D9488", // teal
+  alcool:      "#7C3AED", // violet
+  epicerie:    "#6D28D9", // indigo
+  legume:      "#16A34A", // vert vif
+  fruit:       "#EA580C", // orange vif
+  herbe:       "#15803D", // vert herbe
+  preparation: "#F97316", // orange
+  autre:       "#6B7280", // gris neutre
+  recette:     "#475569", // gris bleu
+  sauce:       "#E11D48", // rose rouge
+  surgele:     "#2563EB", // bleu vif
 };
 
 export type Supplier = {

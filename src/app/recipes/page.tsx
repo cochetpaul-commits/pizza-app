@@ -16,7 +16,7 @@ type RecipeRow = {
 type CreateErr = { message: string; details?: unknown };
 type PgError = { code?: string; message?: string };
 type InsertedId = { id: string };
-type FlourMixItem = { name: string; percent: number };
+type FlourMixItem = { name: string; percent: number; ingredient_id: string | null };
 
 export default function RecipesPage() {
   const router = useRouter();
@@ -82,11 +82,12 @@ export default function RecipesPage() {
         honey_percent: 0,
         oil_percent: 0,
         flour_mix: [
-          { name: "Tipo 00", percent: 80 },
-          { name: "Tipo 1", percent: 20 },
+          { name: "Tipo 00", percent: 80, ingredient_id: null },
+          { name: "Tipo 1", percent: 20, ingredient_id: null },
         ] satisfies FlourMixItem[],
         yeast_percent: 0,
         biga_yeast_percent: 0,
+        user_id: auth.user.id,
       };
 
       const { data, error } = await supabase.from("recipes").insert(payload).select("id").single<InsertedId>();
