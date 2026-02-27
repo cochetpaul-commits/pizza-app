@@ -640,7 +640,13 @@ export default function RecipePage() {
         />
       </div>
 
-      {/* 2. Type + paramètres + mix farines */}
+      {/* 2. Pâtons / Grammage */}
+      <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "end" }}>
+        <NumberStepper label="N. pâtons" value={nbPatons} onChange={(n) => setNbPatons(Math.max(1, n))} step={1} min={1} max={5000} />
+        <NumberStepper label="Grammage pâton" value={poidsPaton} onChange={(n) => setPoidsPaton(Math.max(1, n))} step={1} min={1} max={2000} suffix="g" />
+      </div>
+
+      {/* 3. Type + paramètres + mix farines */}
       <div className="card" style={{ marginTop: 16 }}>
         {saveState.error ? <pre className="code" style={{ marginTop: 10 }}>{JSON.stringify(saveState.error, null, 2)}</pre> : null}
         {pdfState.error ? <pre className="code" style={{ marginTop: 10 }}>{JSON.stringify(pdfState.error, null, 2)}</pre> : null}
@@ -721,59 +727,7 @@ export default function RecipePage() {
         </div>
       </div>
 
-      {/* 3. Pâtons / Grammage */}
-      <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "end" }}>
-        <NumberStepper label="N. pâtons" value={nbPatons} onChange={(n) => setNbPatons(Math.max(1, n))} step={1} min={1} max={5000} />
-        <NumberStepper label="Grammage pâton" value={poidsPaton} onChange={(n) => setPoidsPaton(Math.max(1, n))} step={1} min={1} max={2000} suffix="g" />
-      </div>
-
-      {/* 4. Procédure */}
-      <div className="card" style={{ marginTop: 16 }}>
-        <div className="muted" style={{ marginBottom: 8 }}>Procédure (protocole)</div>
-        <textarea
-          className="input"
-          value={form.procedure ?? ""}
-          onChange={(e) => setForm((p) => (p ? { ...p, procedure: e.target.value } : p))}
-          placeholder="Ex : Eau froide 4°C. Mettre farine + eau au pétrin vitesse 1 (3 min), puis sel, puis vitesse 2 (6 min)…"
-          rows={6}
-          style={{ resize: "vertical", lineHeight: 1.35, height: "auto" }}
-        />
-        <p className="muted" style={{ marginTop: 8 }}>Conseil : court, actionnable, 6–10 lignes max.</p>
-      </div>
-
-      {/* 5. Coût */}
-      <div className="card" style={{ marginTop: 16 }}>
-        <div className="muted" style={{ marginBottom: 10 }}>
-          Coût (calcul auto depuis l'index ingrédients / offres)
-        </div>
-        {costing.missing.length > 0 ? (
-          <div className="errorBox" style={{ marginTop: 10 }}>
-            <div style={{ fontWeight: 800 }}>Prix manquant dans l'index</div>
-            <div className="muted" style={{ marginTop: 6 }}>À corriger dans "Ingrédients" / "Offres" :</div>
-            <div style={{ marginTop: 6, fontWeight: 800 }}>{costing.missing.join(" · ")}</div>
-          </div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 10 }}>
-            <div className="card" style={{ padding: 12 }}>
-              <div className="muted" style={{ fontSize: 12 }}>Rendement</div>
-              <div style={{ fontSize: 22, fontWeight: 900 }}>{Math.round(costing.yieldGrams).toLocaleString("fr-FR")} g</div>
-            </div>
-            <div className="card" style={{ padding: 12 }}>
-              <div className="muted" style={{ fontSize: 12 }}>Coût total</div>
-              <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtMoney2(costing.totalCost)}</div>
-            </div>
-            <div className="card" style={{ padding: 12 }}>
-              <div className="muted" style={{ fontSize: 12 }}>Coût / kg</div>
-              <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtKg3(costing.costPerKg)}</div>
-            </div>
-            <div className="card" style={{ padding: 12 }}>
-              <div className="muted" style={{ fontSize: 12 }}>Coût / pâton</div>
-              <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtMoney2(costing.costPerBall)}</div>
-            </div>
-          </div>
-        )}
-      </div>
-
+      {/* 4. Quantités / Phases */}
       {!isBiga && (
         <div style={{ marginTop: 20 }}>
           <h2 className="h2">Quantités</h2>
@@ -880,6 +834,53 @@ export default function RecipePage() {
           )}
         </div>
       )}
+      {/* 5. Coût */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="muted" style={{ marginBottom: 10 }}>
+          Coût (calcul auto depuis l'index ingrédients / offres)
+        </div>
+        {costing.missing.length > 0 ? (
+          <div className="errorBox" style={{ marginTop: 10 }}>
+            <div style={{ fontWeight: 800 }}>Prix manquant dans l'index</div>
+            <div className="muted" style={{ marginTop: 6 }}>À corriger dans "Ingrédients" / "Offres" :</div>
+            <div style={{ marginTop: 6, fontWeight: 800 }}>{costing.missing.join(" · ")}</div>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 10 }}>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="muted" style={{ fontSize: 12 }}>Rendement</div>
+              <div style={{ fontSize: 22, fontWeight: 900 }}>{Math.round(costing.yieldGrams).toLocaleString("fr-FR")} g</div>
+            </div>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="muted" style={{ fontSize: 12 }}>Coût total</div>
+              <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtMoney2(costing.totalCost)}</div>
+            </div>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="muted" style={{ fontSize: 12 }}>Coût / kg</div>
+              <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtKg3(costing.costPerKg)}</div>
+            </div>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="muted" style={{ fontSize: 12 }}>Coût / pâton</div>
+              <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtMoney2(costing.costPerBall)}</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 6. Procédure */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="muted" style={{ marginBottom: 8 }}>Procédure (protocole)</div>
+        <textarea
+          className="input"
+          value={form.procedure ?? ""}
+          onChange={(e) => setForm((p) => (p ? { ...p, procedure: e.target.value } : p))}
+          placeholder="Ex : Eau froide 4°C. Mettre farine + eau au pétrin vitesse 1 (3 min), puis sel, puis vitesse 2 (6 min)…"
+          rows={6}
+          style={{ resize: "vertical", lineHeight: 1.35, height: "auto" }}
+        />
+        <p className="muted" style={{ marginTop: 8 }}>Conseil : court, actionnable, 6–10 lignes max.</p>
+      </div>
+
     </main>
   );
 }
