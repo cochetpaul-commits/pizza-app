@@ -67,7 +67,7 @@ export default function InvoicesHubPage() {
       </div>
 
       <p style={{ marginTop: "3rem", color: "#aaa", fontSize: "0.8rem" }}>
-        D'autres fournisseurs seront ajoutés ici au fur et à mesure.
+        D&apos;autres fournisseurs seront ajoutés ici au fur et à mesure.
       </p>
     </div>
   );

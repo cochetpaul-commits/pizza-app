@@ -611,7 +611,7 @@ export default function PrepRecipeDetailPage() {
 
         {pivotAmountNum <= 0 && (
           <p className="muted" style={{ marginBottom: 10, fontSize: 12 }}>
-            Saisis d'abord une quantité pivot pour pouvoir ajouter des lignes.
+            Saisis d&apos;abord une quantité pivot pour pouvoir ajouter des lignes.
           </p>
         )}
 

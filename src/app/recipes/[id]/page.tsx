@@ -630,7 +630,7 @@ export default function RecipePage() {
 
       {/* 1. Nom */}
       <div style={{ marginTop: 16 }}>
-        <div className="muted" style={{ marginBottom: 6 }}>Nom de l'empâtement</div>
+        <div className="muted" style={{ marginBottom: 6 }}>Nom de l&apos;empâtement</div>
         <input
           className="input"
           value={form.name ?? ""}
@@ -837,12 +837,12 @@ export default function RecipePage() {
       {/* 5. Coût */}
       <div className="card" style={{ marginTop: 16 }}>
         <div className="muted" style={{ marginBottom: 10 }}>
-          Coût (calcul auto depuis l'index ingrédients / offres)
+          Coût (calcul auto depuis l&apos;index ingrédients / offres)
         </div>
         {costing.missing.length > 0 ? (
           <div className="errorBox" style={{ marginTop: 10 }}>
-            <div style={{ fontWeight: 800 }}>Prix manquant dans l'index</div>
-            <div className="muted" style={{ marginTop: 6 }}>À corriger dans "Ingrédients" / "Offres" :</div>
+            <div style={{ fontWeight: 800 }}>Prix manquant dans l&apos;index</div>
+            <div className="muted" style={{ marginTop: 6 }}>À corriger dans &quot;Ingrédients&quot; / &quot;Offres&quot; :</div>
             <div style={{ marginTop: 6, fontWeight: 800 }}>{costing.missing.join(" · ")}</div>
           </div>
         ) : (

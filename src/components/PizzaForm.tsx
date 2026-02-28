@@ -161,16 +161,6 @@ export default function PizzaForm(props: { pizzaId?: string }) {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
 
-  const theme = {
-    bg: "#f3eadc",
-    card: "#efe2d3",
-    text: "#2f3a33",
-    muted: "#6f6a61",
-    border: "#d9c7b6",
-    primary: "#c97a5a",
-    primaryHover: "#b86a4c",
-    primaryText: "#fff",
-  };
 
     const rowsCount = useMemo(() => {
     const pre = rows.filter((r) => r.stage === "pre").length;
