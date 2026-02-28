@@ -1,0 +1,446 @@
+import { NextResponse } from "next/server";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import * as os from "node:os";
+import * as path from "node:path";
+import * as fs from "node:fs/promises";
+import { createClient } from "@supabase/supabase-js";
+import { detectCategoryFromName } from "@/lib/invoices/categoryDetector";
+import { parseMetroInvoiceText, type ParsedInvoice } from "@/lib/invoices/metro";
+
+export const runtime = "nodejs";
+
+const execFileAsync = promisify(execFile);
+
+function toText(v: unknown): string {
+  return typeof v === "string" ? v : v == null ? "" : String(v);
+}
+
+async function pdfToTextWithPoppler(pdfBytes: Uint8Array): Promise<string> {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "pizzaapp-metro-"));
+  const pdfPath = path.join(dir, "invoice.pdf");
+
+  try {
+    await fs.writeFile(pdfPath, pdfBytes);
+    const { stdout } = await execFileAsync("pdftotext", ["-raw", pdfPath, "-"]);
+    return toText(stdout);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : toText(e);
+    if (String(msg).toLowerCase().includes("enoent")) {
+      throw new Error("pdftotext introuvable. Installe Poppler: brew install poppler");
+    }
+    throw new Error(`pdftotext échec: ${msg}`);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => null);
+  }
+}
+
+function ddmmyyyyToIsoDate(s: string | null): string | null {
+  if (!s) return null;
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return null;
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+function getEnv(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing env: ${name}`);
+  return v;
+}
+
+function notesWithTax(base: string | null, taxRate: number | null): string | null {
+  const parts: string[] = [];
+  if (base) parts.push(base);
+  if (taxRate != null) parts.push(`TVA=${taxRate}`);
+  return parts.length ? parts.join(" | ") : null;
+}
+
+function toOfferUnit(u: "pc" | "kg" | "l" | null): "pc" | "kg" | "l" | null {
+  if (u === "pc") return "pc";
+  if (u === "kg") return "kg";
+  if (u === "l") return "l";
+  return null;
+}
+
+
+export async function POST(req: Request) {
+  try {
+    const form = await req.formData();
+    const file = form.get("file");
+    const mode = String(form.get("mode") ?? "preview"); // "preview" | "commit"
+
+    if (!(file instanceof File)) {
+      return NextResponse.json({ ok: false, error: "Fichier manquant (field: file)." }, { status: 400 });
+    }
+
+    const name = file.name || "";
+    if (!name.toLowerCase().endsWith(".pdf")) {
+      return NextResponse.json({ ok: false, error: "Seuls les .pdf sont supportés sur METRO." }, { status: 400 });
+    }
+
+    const ab = await file.arrayBuffer();
+    const bytes = new Uint8Array(ab);
+
+    const text = await pdfToTextWithPoppler(bytes);
+    const payload: ParsedInvoice = parseMetroInvoiceText(text);
+
+    const url = getEnv("NEXT_PUBLIC_SUPABASE_URL");
+    const anon = getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+    const supabase = createClient(url, anon, {
+      global: { headers: { Authorization: req.headers.get("authorization") ?? "" } },
+    });
+
+    const { data: auth, error: authErr } = await supabase.auth.getUser();
+    if (authErr) return NextResponse.json({ ok: false, error: authErr.message }, { status: 401 });
+
+    const userId = auth?.user?.id ?? null;
+    if (!userId) return NextResponse.json({ ok: false, error: "Non authentifié (Supabase user manquant)." }, { status: 401 });
+
+    const supplierName = "METRO";
+
+    const { data: supRows, error: supErr } = await supabase
+      .from("suppliers")
+      .upsert({ user_id: userId, name: supplierName, is_active: true }, { onConflict: "user_id,name" })
+      .select("id")
+      .limit(1);
+
+    if (supErr) throw new Error(supErr.message);
+
+    const supplierId = (supRows?.[0]?.id as string | undefined) ?? null;
+    if (!supplierId) throw new Error("Supplier MAEL: id manquant");
+
+    const invoiceNumber = payload.invoice_number ?? null;
+    const invoiceDateIso = ddmmyyyyToIsoDate(payload.invoice_date);
+
+    let invoiceId: string | null = null;
+    let invoiceAlreadyImported = false;
+
+    if (invoiceNumber) {
+      const { data: existing, error: exErr } = await supabase
+        .from("supplier_invoices")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("supplier_id", supplierId)
+        .eq("invoice_number", invoiceNumber)
+        .limit(1);
+
+      if (exErr) throw new Error(exErr.message);
+
+      if (existing && existing.length > 0) {
+        invoiceId = existing[0].id as string;
+        invoiceAlreadyImported = true;
+      }
+    }
+
+    // On garantit qu'on a un invoiceId (même en preview)
+    if (!invoiceId) {
+      const { data: invRows, error: invErr } = await supabase
+        .from("supplier_invoices")
+        .insert({
+          user_id: userId,
+          supplier_id: supplierId,
+          supplier_name: supplierName,
+          invoice_number: invoiceNumber,
+          invoice_date: invoiceDateIso,
+          total_ht: payload.total_ht,
+          total_ttc: payload.total_ttc,
+          currency: "EUR",
+          source_file_name: name,
+          raw_text: text,
+          parsed_json: payload,
+        })
+        .select("id")
+        .limit(1);
+
+      if (invErr) throw new Error(invErr.message);
+
+      invoiceId = (invRows?.[0]?.id as string | undefined) ?? null;
+      if (!invoiceId) throw new Error("Insert invoice: id manquant");
+    }
+
+    // IMPORTANT : on garantit aussi l'insertion des lignes (même si invoice déjà existante)
+    {
+      const { data: cntRows, error: cntErr } = await supabase
+        .from("supplier_invoice_lines")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("invoice_id", invoiceId);
+
+      if (cntErr) throw new Error(cntErr.message);
+
+      const alreadyLines = (cntRows as unknown) as null;
+      void alreadyLines;
+
+      const count = (cntErr as unknown) as null;
+      void count;
+
+      const { count: linesCount } = await supabase
+        .from("supplier_invoice_lines")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("invoice_id", invoiceId);
+
+      if ((linesCount ?? 0) === 0) {
+        const lineInserts = payload.lines.map((l) => ({
+          user_id: userId,
+          invoice_id: invoiceId,
+          supplier_id: supplierId,
+          sku: l.sku,
+          name: l.name,
+          quantity: l.quantity,
+          unit: l.unit,
+          unit_price: l.unit_price,
+          total_price: l.total_price,
+          notes: notesWithTax(l.notes, l.tax_rate),
+        }));
+
+        if (lineInserts.length) {
+          const { error: linesErr } = await supabase.from("supplier_invoice_lines").insert(lineInserts);
+          if (linesErr) throw new Error(linesErr.message);
+        }
+      }
+    }
+
+    // PREVIEW : on ne touche pas l'index ingrédients/offres
+    if (mode !== "commit") {
+      return NextResponse.json({
+        ok: true,
+        kind: "metro",
+        filename: name,
+        bytes: bytes.byteLength,
+        invoice: { id: invoiceId, already_imported: invoiceAlreadyImported },
+        inserted: { supplier_id: supplierId, ingredients_upserted: 0, offers_inserted: 0 },
+        parsed: payload,
+      });
+    }
+
+    // COMMIT : import dans l'index (ingrédients + offres)
+    const { data: catRows, error: catErr } = await supabase
+      .from("ingredients")
+      .select("category")
+      .eq("user_id", userId)
+      .limit(1);
+
+    if (catErr) throw new Error(catErr.message);
+    const fallbackCategory = (catRows?.[0]?.category as string | undefined) ?? "autre";
+
+    const statusNote = `import ${supplierName}${invoiceNumber ? " " + invoiceNumber : ""}${payload.invoice_date ? " " + payload.invoice_date : ""}`.trim();
+
+let ingCreated = 0;
+let offersInserted = 0;
+
+const lines = (payload.lines ?? []).filter((l) => (l.name ?? "").trim().length > 0);
+
+if (lines.length) {
+  const skus = Array.from(
+    new Set(
+      lines
+        .map((l) => (l.sku ?? "").trim())
+        .filter((s) => s.length > 0)
+    )
+  );
+
+  const names = Array.from(new Set(lines.map((l) => (l.name ?? "").trim()).filter((s) => s.length > 0)));
+
+  const skuToIngId = new Map<string, string>();
+  if (skus.length) {
+    const { data: bySku, error: eSku } = await supabase
+      .from("ingredients")
+      .select("id,supplier_sku")
+      .eq("user_id", userId)
+      .eq("supplier_id", supplierId)
+      .in("supplier_sku", skus);
+
+    if (eSku) throw new Error(eSku.message);
+
+    for (const r of (bySku ?? []) as Array<{ id: string; supplier_sku: string | null }>) {
+      const k = String(r.supplier_sku ?? "").trim();
+      if (k) skuToIngId.set(k, r.id);
+    }
+  }
+
+  const nameToIngId = new Map<string, string>();
+  if (names.length) {
+    const { data: byName, error: eName } = await supabase
+      .from("ingredients")
+      .select("id,name")
+      .eq("user_id", userId)
+      .in("name", names);
+
+    if (eName) throw new Error(eName.message);
+
+    for (const r of (byName ?? []) as Array<{ id: string; name: string }>) {
+      nameToIngId.set((r.name ?? "").trim().toLowerCase(), r.id);
+    }
+  }
+
+  const toCreate: Array<Record<string, unknown>> = [];
+  for (const l of lines) {
+    const sku = (l.sku ?? "").trim();
+    const nm = (l.name ?? "").trim();
+    if (!nm) continue;
+
+    const already =
+      (sku && skuToIngId.has(sku)) || nameToIngId.has(nm.toLowerCase());
+
+    if (already) continue;
+
+    toCreate.push({
+      user_id: userId,
+      name: nm,
+      category: (detectCategoryFromName(nm) ?? fallbackCategory) as import("@/types/ingredients").Category,
+      allergens: null,
+      is_active: true,
+      default_unit: "g",
+      supplier: supplierName,
+      supplier_id: supplierId,
+      default_supplier_id: supplierId,
+      supplier_sku: sku || null,
+      status: "to_check",
+      status_note: statusNote,
+    });
+  }
+
+  if (toCreate.length) {
+  let created = 0;
+  for (const row of toCreate) {
+    const ins = await supabase.from("ingredients").insert(row);
+    if (!ins.error) {
+      created++;
+    } else if ((ins.error as { code?: string }).code !== "23505") {
+      throw new Error(ins.error.message);
+    } else {
+      console.log("skip duplicate:", row.name);
+    }
+  }
+  ingCreated = created;
+}
+
+
+
+  if (skus.length) {
+    const { data: bySku2, error: eSku2 } = await supabase
+      .from("ingredients")
+      .select("id,supplier_sku")
+      .eq("user_id", userId)
+      .eq("supplier_id", supplierId)
+      .in("supplier_sku", skus);
+
+    if (eSku2) throw new Error(eSku2.message);
+
+    for (const r of (bySku2 ?? []) as Array<{ id: string; supplier_sku: string | null }>) {
+      const k = String(r.supplier_sku ?? "").trim();
+      if (k) skuToIngId.set(k, r.id);
+    }
+  }
+
+  if (names.length) {
+    const { data: byName2, error: eName2 } = await supabase
+      .from("ingredients")
+      .select("id,name")
+      .eq("user_id", userId)
+      .in("name", names);
+
+    if (eName2) throw new Error(eName2.message);
+
+    for (const r of (byName2 ?? []) as Array<{ id: string; name: string }>) {
+      nameToIngId.set((r.name ?? "").trim().toLowerCase(), r.id);
+    }
+  }
+
+  const offerCandidates = lines
+    .map((l) => {
+      const sku = (l.sku ?? "").trim();
+      const nm = (l.name ?? "").trim();
+      const ingId =
+        (sku && skuToIngId.get(sku)) ||
+        nameToIngId.get(nm.toLowerCase()) ||
+        null;
+
+      const u = toOfferUnit(l.unit);
+      const p = l.unit_price;
+
+      if (!ingId) return null;
+      if (!u) return null;
+      if (!(p != null && Number.isFinite(p) && p > 0)) return null;
+
+      return {
+        user_id: userId,
+        ingredient_id: ingId,
+        supplier_id: supplierId,
+        supplier_sku: l.sku,
+        supplier_label: l.name,
+        price_kind: "unit",
+        unit: u,
+        unit_price: p,
+        price: p,
+        currency: "EUR",
+        is_active: true,
+        piece_weight_g: l.unit === "pc" ? (l.piece_weight_g ?? null) : null,
+        density_kg_per_l: null,
+      };
+    })
+    .filter(Boolean) as Array<Record<string, unknown>>;
+
+  const offerByIngredient = new Map<string, Record<string, unknown>>();
+  for (const o of offerCandidates) {
+    const k = String(o.ingredient_id);
+    offerByIngredient.set(k, o);
+  }
+
+  const offerRows = Array.from(offerByIngredient.values());
+
+  if (offerRows.length) {
+    const ingredientIds = Array.from(new Set(offerRows.map((x) => String(x.ingredient_id))));
+
+    const dPrev = await supabase
+      .from("supplier_offers")
+      .update({ is_active: false })
+      .eq("supplier_id", supplierId)
+      .in("ingredient_id", ingredientIds)
+      .eq("is_active", true);
+
+    if (dPrev.error) throw new Error(dPrev.error.message);
+
+    for (const row of offerRows) {
+      const ingId = String(row.ingredient_id);
+
+      let r = await supabase.from("supplier_offers").insert(row);
+
+      if (r.error && (r.error as { code?: string }).code === "23505") {
+        const d2 = await supabase
+          .from("supplier_offers")
+          .update({ is_active: false })
+          .eq("supplier_id", supplierId)
+          .eq("ingredient_id", ingId)
+          .eq("is_active", true);
+
+        if (d2.error) throw new Error(d2.error.message);
+
+        r = await supabase.from("supplier_offers").insert(row);
+      }
+
+      if (r.error) throw new Error(r.error.message);
+      offersInserted += 1;
+    }
+  }
+}
+
+    return NextResponse.json({
+      ok: true,
+      kind: "metro",
+      filename: name,
+      bytes: bytes.byteLength,
+      invoice: { id: invoiceId, already_imported: invoiceAlreadyImported },
+      inserted: {
+  supplier_id: supplierId,
+  ingredients_created: ingCreated,
+  offers_inserted: offersInserted,
+},
+      parsed: payload,
+    });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e || "Erreur import");
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}

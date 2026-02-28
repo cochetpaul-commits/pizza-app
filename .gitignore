@@ -18,7 +18,3 @@ _backup_src/
 supabase/remote_schema_live.sql
 scripts/
 src/app/dashboard/
-src/app/invoices/
-src/app/api/invoices/
-src/lib/invoice/
-src/lib/invoices/
