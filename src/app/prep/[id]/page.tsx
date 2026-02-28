@@ -20,6 +20,7 @@ type PrepRecipe = {
   name: string;
   pivot_ingredient_id: string;
   pivot_unit: "g" | "ml" | "pc";
+  pivot_amount?: number | null;
   output_ingredient_id?: string | null;
   created_at?: string;
 };
@@ -193,7 +194,7 @@ export default function PrepRecipeDetailPage() {
 
       const { data: r, error: eR } = await supabase
         .from("prep_recipes")
-        .select("id,name,pivot_ingredient_id,pivot_unit,output_ingredient_id,created_at")
+        .select("id,name,pivot_ingredient_id,pivot_unit,pivot_amount,output_ingredient_id,created_at")
         .eq("id", id)
         .single();
 
@@ -203,6 +204,9 @@ export default function PrepRecipeDetailPage() {
       const rr = r as PrepRecipe;
       setRecipe(rr);
       setUiPivotId(rr.pivot_ingredient_id ?? "");
+      if (rr.pivot_amount != null && rr.pivot_amount > 0) {
+        setPivotAmount(String(rr.pivot_amount));
+      }
 
       const { data: ing, error: eI } = await supabase
         .from("ingredients")
@@ -319,6 +323,7 @@ export default function PrepRecipeDetailPage() {
         name: String(recipe.name ?? "").trim(),
         pivot_ingredient_id: recipe.pivot_ingredient_id,
         pivot_unit: recipe.pivot_unit,
+        pivot_amount: pivotAmountNum > 0 ? pivotAmountNum : null,
         updated_at: new Date().toISOString(),
       };
 

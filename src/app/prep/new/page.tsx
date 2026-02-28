@@ -19,23 +19,9 @@ export default function NewPrepRecipePage() {
         const { data: auth } = await supabase.auth.getUser();
         if (!auth.user) throw new Error("NOT_LOGGED");
 
-        const { data: ing } = await supabase
-          .from("ingredients")
-          .select("id")
-          .eq("is_active", true)
-          .order("name", { ascending: true })
-          .limit(1);
-
-        const firstId = ((ing ?? []) as { id: string }[])[0]?.id ?? null;
-        if (!firstId) {
-          throw new Error(
-            "Ajoute au moins un ingrédient actif dans l'index avant de créer une recette pivot."
-          );
-        }
-
         const { data, error: eIns } = await supabase
           .from("prep_recipes")
-          .insert({ name: "", pivot_ingredient_id: firstId, pivot_unit: "g" })
+          .insert({ name: "", pivot_unit: "g" })
           .select("id")
           .single();
 
