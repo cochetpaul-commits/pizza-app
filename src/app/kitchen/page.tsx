@@ -9,8 +9,12 @@ import { TopNav } from "@/components/TopNav";
 type KitchenRecipeRow = {
   id: string;
   name: string | null;
+  category: string | null;
   yield_grams: number | null;
   portions_count: number | null;
+  total_cost: number | null;
+  cost_per_kg: number | null;
+  cost_per_portion: number | null;
   created_at: string;
   updated_at: string;
   user_id: string;
@@ -44,7 +48,7 @@ export default function KitchenPage() {
 
     const { data, error } = await supabase
       .from("kitchen_recipes")
-      .select("id,name,yield_grams,portions_count,created_at,updated_at,user_id,is_draft")
+      .select("id,name,category,yield_grams,portions_count,total_cost,cost_per_kg,cost_per_portion,created_at,updated_at,user_id,is_draft")
       .eq("is_draft", false)
       .order("updated_at", { ascending: false });
 
@@ -140,13 +144,28 @@ export default function KitchenPage() {
             {recipes.map((r) => (
               <div key={r.id} className="listRow">
                 <div>
-                  <div style={{ fontWeight: 700, textTransform: "uppercase" }}>{displayName(r.name)}</div>
-                  <div className="muted" style={{ fontSize: 12 }}>
-                    {new Date(r.updated_at).toLocaleString("fr-FR")}
-                    {" · "}
-                    Rendement: {r.yield_grams ?? 0} g
-                    {" · "}
-                    Portions: {r.portions_count ?? 0}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ fontWeight: 700, textTransform: "uppercase" }}>{displayName(r.name)}</div>
+                    {r.category === "cocktail"
+                      ? r.total_cost != null && r.total_cost > 0 && (
+                          <div style={{ fontSize: 16, fontWeight: 800 }}>
+                            {r.total_cost.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                          </div>
+                        )
+                      : (r.cost_per_kg != null && r.cost_per_kg > 0) || (r.cost_per_portion != null && r.cost_per_portion > 0)
+                        ? (
+                          <div style={{ fontSize: 16, fontWeight: 800 }}>
+                            {r.cost_per_kg != null && r.cost_per_kg > 0
+                              ? `${r.cost_per_kg.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/kg`
+                              : null}
+                            {r.cost_per_kg != null && r.cost_per_kg > 0 && r.cost_per_portion != null && r.cost_per_portion > 0 ? " · " : null}
+                            {r.cost_per_portion != null && r.cost_per_portion > 0
+                              ? `${r.cost_per_portion.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/portion`
+                              : null}
+                          </div>
+                        )
+                        : null
+                    }
                   </div>
                 </div>
 

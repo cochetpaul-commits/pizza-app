@@ -14,6 +14,7 @@ type PizzaRow = {
   created_at: string;
   user_id: string;
   is_draft: boolean;
+  total_cost: number | null;
 };
 
 function displayName(name: string | null | undefined) {
@@ -40,7 +41,7 @@ export default function PizzasPage() {
 
       const { data, error } = await supabase
         .from("pizza_recipes")
-        .select("id,name,dough_recipe_id,notes,created_at,user_id")
+        .select("id,name,dough_recipe_id,notes,created_at,user_id,total_cost")
         .eq("is_draft", false)
         .order("created_at", { ascending: false });
 
@@ -123,9 +124,13 @@ export default function PizzasPage() {
             {pizzas.map((p) => (
               <div key={p.id} className="listRow">
                 <div>
-                  <div style={{ fontWeight: 700, textTransform: "uppercase" }}>{displayName(p.name)}</div>
-                  <div className="muted" style={{ fontSize: 12 }}>
-                    {new Date(p.created_at).toLocaleString("fr-FR")}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ fontWeight: 700, textTransform: "uppercase" }}>{displayName(p.name)}</div>
+                    {p.total_cost != null && p.total_cost > 0 && (
+                      <div style={{ fontSize: 16, fontWeight: 800 }}>
+                        {p.total_cost.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                      </div>
+                    )}
                   </div>
                 </div>
 

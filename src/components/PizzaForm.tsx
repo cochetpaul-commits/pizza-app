@@ -305,6 +305,24 @@ export default function PizzaForm(props: { pizzaId?: string }) {
     return { pvHT, pvTTC, vatPct, marginPct };
   }, [costs.total, vatPct, marginPct]);
 
+  const hasMissingPrices = useMemo(() => {
+    const missingTopping = rows.some((r) => {
+      if (!r.ingredient_id) return false;
+      const qty = typeof r.qty === "number" ? r.qty : n2(r.qty);
+      if (!(qty > 0)) return false;
+      const ing = ingredients.find((x) => x.id === r.ingredient_id) ?? null;
+      const cpuObj = priceByIngredient[r.ingredient_id];
+      const u = normalizeUnit(r.unit);
+      const cpu = n2(
+        (u === "g" ? cpuObj?.g : u === "ml" ? cpuObj?.ml : u === "pcs" ? cpuObj?.pcs : undefined)
+        ?? ing?.cost_per_unit
+      );
+      return !(cpu > 0);
+    });
+    const missingDough = !!form?.dough_recipe_id && costs.dough === 0;
+    return missingTopping || missingDough;
+  }, [rows, ingredients, priceByIngredient, form?.dough_recipe_id, costs.dough]);
+
   useEffect(() => {
     const run = async () => {
       setStatus("loading");
@@ -605,6 +623,7 @@ setSupplierByIngredient(supplierByIngredient);
       notes: form.notes?.trim() || null,
       photo_url: form.photo_url?.trim() || null,
       is_draft: false,
+      total_cost: round2(costs.total),
       updated_at: new Date().toISOString(),
     };
 
@@ -716,7 +735,10 @@ setSupplierByIngredient(supplierByIngredient);
   }
 
   const pageTitle = isEdit ? (form.name.trim() || "Pizza") : "Nouvelle pizza";
-  const pageSubtitle = isEdit ? "Fiche pizza" : "Non sauvegardee";
+  const costParts: string[] = [];
+  if (isEdit && costs.total > 0) costParts.push(`${fmtMoney(costs.total)} total`);
+  if (isEdit && hasMissingPrices) costParts.push("coût incomplet");
+  const pageSubtitle = !isEdit ? "Non sauvegardee" : costParts.length > 0 ? costParts.join(" · ") : "Fiche pizza";
 
   return (
     <main className="container">

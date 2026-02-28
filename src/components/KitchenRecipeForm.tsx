@@ -122,6 +122,7 @@ const CATEGORY_SMART_OPTIONS: SmartSelectOption[] = [
   { id: "preparation", name: "Préparation", category: "Catégorie" },
   { id: "plat_cuisine", name: "Plat cuisiné", category: "Catégorie" },
   { id: "dessert", name: "Dessert", category: "Catégorie" },
+  { id: "cocktail", name: "Cocktail", category: "Catégorie" },
   { id: "autre", name: "Autre", category: "Catégorie" },
 ];
 
@@ -712,6 +713,9 @@ if (supplierIds.length) {
       updated_at: new Date().toISOString(),
       is_active: true,
       is_draft: false,
+      total_cost: round2(computed.totalCost),
+      cost_per_kg: round2(computed.costPerKg),
+      cost_per_portion: round2(computed.costPerPortion),
     };
 
     if (!id) {
@@ -962,6 +966,20 @@ if (supplierIds.length) {
           <div style={{ color: theme.muted, textAlign: "center", marginTop: 6, fontSize: 13 }}>
             Rendement: {yieldGramsNum || 0} g · Portions: {portionsNum || 0}
           </div>
+          {(computed.totalCost > 0 || computed.missing) && (
+            <div style={{ textAlign: "center", marginTop: 6, fontSize: 13, fontWeight: 700 }}>
+              {form.category === "cocktail"
+                ? fmtMoney2(computed.totalCost)
+                : <>
+                    {computed.costPerKg > 0 ? fmtKg3(computed.costPerKg) : "—"}
+                    {portionsNum > 0 ? ` · ${fmtMoney2(computed.costPerPortion)} / portion` : null}
+                  </>
+              }
+              {computed.missing && (
+                <span style={{ color: theme.muted, fontWeight: 400, marginLeft: 6 }}>(coût incomplet)</span>
+              )}
+            </div>
+          )}
         </div>
 
         <div style={{ marginTop: 12, ...card }}>
