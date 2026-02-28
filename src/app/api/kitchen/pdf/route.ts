@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import React from "react";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { KitchenPdfDocument, type KitchenPdfData } from "@/lib/kitchenPdf";
+import fs from "fs";
+import path from "path";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,11 +32,23 @@ function n2(v: unknown) {
 function round2(v: number) {
   return Math.round(v * 100) / 100;
 }
+
+function readLogoBase64(): string | null {
+  try {
+    const logoPath = path.join(process.cwd(), "public", "logo.png");
+    const buf = fs.readFileSync(logoPath);
+    return `data:image/png;base64,${buf.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
 type KitchenRow = {
   id: string;
   name: string | null;
   category: string | null;
   yield_grams: number | null;
+  portions_count: number | null;
   notes: string | null;
   procedure: string | null;
 };
@@ -62,7 +76,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-        const body = (await req.json().catch(() => null)) as unknown;
+    const body = (await req.json().catch(() => null)) as unknown;
     const b = (body && typeof body === "object") ? (body as Record<string, unknown>) : {};
     const kitchenId = String(b.kitchenId ?? b.recipeId ?? b.id ?? "").trim();
     if (!kitchenId) {
@@ -76,11 +90,11 @@ export async function POST(req: Request) {
 
     const { data: recipe, error: rErr } = await supabase
       .from("kitchen_recipes")
-      .select("id,name,category,yield_grams,notes,procedure")
+      .select("id,name,category,yield_grams,portions_count,notes,procedure")
       .eq("id", kitchenId)
       .maybeSingle();
 
-        if (rErr) return NextResponse.json({ message: rErr.message, details: rErr.details ?? null }, { status: 500 });
+    if (rErr) return NextResponse.json({ message: rErr.message, details: rErr.details ?? null }, { status: 500 });
     if (!recipe) return NextResponse.json({ message: "Recette introuvable" }, { status: 404 });
 
     const rr = recipe as KitchenRow;
@@ -91,7 +105,7 @@ export async function POST(req: Request) {
       .eq("recipe_id", kitchenId)
       .order("sort_order", { ascending: true });
 
-        if (lErr) return NextResponse.json({ message: lErr.message, details: lErr.details ?? null }, { status: 500 });
+    if (lErr) return NextResponse.json({ message: lErr.message, details: lErr.details ?? null }, { status: 500 });
 
     const lineRows = ((ln ?? []) as LineRow[]).slice();
     const ingredientIds = Array.from(new Set(lineRows.map((r) => String(r.ingredient_id || "")).filter(Boolean)));
@@ -104,7 +118,7 @@ export async function POST(req: Request) {
         .select("id,name,cost_per_unit")
         .in("id", ingredientIds);
 
-           if (iErr) return NextResponse.json({ message: iErr.message, details: iErr.details ?? null }, { status: 500 });
+      if (iErr) return NextResponse.json({ message: iErr.message, details: iErr.details ?? null }, { status: 500 });
 
       for (const it of (ings ?? []) as IngRow[]) {
         ingMap.set(String(it.id), { name: it.name ?? null, cpu: n2(it.cost_per_unit) });
@@ -122,15 +136,22 @@ export async function POST(req: Request) {
     });
 
     const yieldG = n2(rr.yield_grams);
+    const portionsCount = rr.portions_count != null ? n2(rr.portions_count) : null;
     const totalCost = round2(rows.reduce((acc, r) => acc + n2(r.cost), 0));
     const costPerKg = yieldG > 0 ? round2(totalCost / (yieldG / 1000)) : null;
+    const costPerPortion = portionsCount != null && portionsCount > 0 ? round2(totalCost / portionsCount) : null;
 
     const exportedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
+    const logoBase64 = readLogoBase64();
 
     const data: KitchenPdfData = {
       recipeName: (rr.name ?? "Recette").toString(),
       category: rr.category ?? null,
       costPerKg,
+      costPerPortion,
+      totalCost,
+      portionsCount: portionsCount ?? null,
+      yieldGrams: yieldG > 0 ? yieldG : null,
       lines: rows.map((r) => ({
         name: r.name ?? null,
         qty: r.qty == null ? null : round2(r.qty),
@@ -139,6 +160,8 @@ export async function POST(req: Request) {
       notes: rr.notes ?? null,
       procedure: rr.procedure ?? null,
       exportedAt,
+      logoBase64,
+      photoUrl: null,
     };
 
     const documentElement = KitchenPdfDocument({ data }) as unknown as React.ReactElement<DocumentProps>;
@@ -158,8 +181,8 @@ export async function POST(req: Request) {
         "Cache-Control": "no-store",
       },
     });
-    } catch (e: unknown) {
-     const msg = e instanceof Error ? e.message : typeof e === "string" ? e : String(e);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : typeof e === "string" ? e : String(e);
     return NextResponse.json({ message: "Export PDF cuisine impossible", details: msg }, { status: 500 });
   }
 }

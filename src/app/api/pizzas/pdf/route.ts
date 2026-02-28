@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import React from "react";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { PizzaPdfDocument, type PizzaPdfData } from "@/lib/pizzaPdf";
+import fs from "fs";
+import path from "path";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +23,24 @@ function slugify(s: string) {
     .replace(/^-+|-+$/g, "")
     .slice(0, 60);
 }
+
+function readLogoBase64(): string | null {
+  try {
+    const logoPath = path.join(process.cwd(), "public", "logo.png");
+    const buf = fs.readFileSync(logoPath);
+    return `data:image/png;base64,${buf.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
+function extractStoragePath(url: string, bucket: string): string | null {
+  const marker = `/object/public/${bucket}/`;
+  const idx = url.indexOf(marker);
+  if (idx === -1) return null;
+  return decodeURIComponent(url.slice(idx + marker.length));
+}
+
 
 type PizzaRow = {
   id: string;
@@ -128,6 +148,21 @@ export async function POST(req: Request) {
       }));
 
     const exportedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
+    const logoBase64 = readLogoBase64();
+
+    // Pré-fetch de la photo en base64 — react-pdf ne peut pas fetcher les URLs Supabase
+    let photoUrl: string | null = null;
+    if (pizzaRow.photo_url) {
+      const storagePath = extractStoragePath(pizzaRow.photo_url, "pizza-photos");
+      if (storagePath) {
+        const { data: blob, error: dlErr } = await supabase.storage.from("pizza-photos").download(storagePath);
+        if (!dlErr && blob) {
+          const buf = Buffer.from(await blob.arrayBuffer());
+          const mime = blob.type && blob.type !== "application/octet-stream" ? blob.type : "image/jpeg";
+          photoUrl = `data:${mime};base64,${buf.toString("base64")}`;
+        }
+      }
+    }
 
     const data: PizzaPdfData = {
       pizzaName: (pizzaRow.name ?? "Pizza").toString(),
@@ -137,7 +172,8 @@ export async function POST(req: Request) {
       pre,
       post,
       exportedAt,
-      photoUrl: pizzaRow.photo_url ?? null,
+      photoUrl,
+      logoBase64,
     };
 
     const documentElement = PizzaPdfDocument({ data }) as unknown as React.ReactElement<DocumentProps>;
