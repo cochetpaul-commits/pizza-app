@@ -15,6 +15,7 @@ export const CATEGORIES = [
   "recette",
   "sauce",
   "surgele",
+  "emballage",
 ] as const;
 
 export type Category = (typeof CATEGORIES)[number];
@@ -24,22 +25,23 @@ export type IngredientStatus = "to_check" | "validated" | "unknown";
 export type Tab = IngredientStatus | "all";
 
 export const CAT_COLORS: Record<Category, string> = {
-  cremerie:    "#D97706", // ambre chaud
-  fromage:     "#B45309", // orange brun
+  cremerie:    "#D97706", // ambre orange
+  fromage:     "#CA8A04", // jaune doré (distinct de l'ambre)
   charcuterie: "#DC2626", // rouge vif
-  viande:      "#991B1B", // rouge sombre
-  maree:       "#0284C7", // bleu ocean
+  viande:      "#991B1B", // rouge sombre/marron
+  maree:       "#0284C7", // bleu ciel
   boisson:     "#0D9488", // teal
   alcool:      "#7C3AED", // violet
-  epicerie:    "#6D28D9", // indigo
+  epicerie:    "#1E40AF", // bleu marine (distinct du violet et du bleu ciel)
   legume:      "#16A34A", // vert vif
-  fruit:       "#EA580C", // orange vif
-  herbe:       "#15803D", // vert herbe
-  preparation: "#F97316", // orange
+  fruit:       "#EA580C", // orange vif (distinct de l'ambre)
+  herbe:       "#4D7C0F", // vert olive (distinct du vert vif)
+  preparation: "#C026D3", // magenta/fuchsia
+  sauce:       "#9D174D", // rose foncé/bordeaux
+  surgele:     "#0891B2", // cyan (distinct du bleu ciel et marine)
+  recette:     "#1E293B", // ardoise très sombre
+  emballage:   "#78716C", // gris chaud
   autre:       "#6B7280", // gris neutre
-  recette:     "#475569", // gris bleu
-  sauce:       "#E11D48", // rose rouge
-  surgele:     "#2563EB", // bleu vif
 };
 
 export type Supplier = {

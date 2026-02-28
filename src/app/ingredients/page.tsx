@@ -31,6 +31,46 @@ import {
 
 type OfferPayload = Record<string, unknown>;
 
+const CAT_LABELS: Record<Category, string> = {
+  cremerie:    "Crémerie",
+  fromage:     "Fromages",
+  charcuterie: "Charcuterie",
+  viande:      "Viandes",
+  maree:       "Marée",
+  boisson:     "Boissons",
+  alcool:      "Alcools",
+  epicerie:    "Épicerie",
+  legume:      "Légumes",
+  fruit:       "Fruits",
+  herbe:       "Herbes & aromates",
+  preparation: "Préparations",
+  sauce:       "Sauces",
+  surgele:     "Surgelés",
+  recette:     "Recettes",
+  emballage:   "Emballages",
+  autre:       "Autre",
+};
+
+const CAT_EMOJIS: Record<Category, string> = {
+  cremerie:    "🥛",
+  fromage:     "🧀",
+  charcuterie: "🥓",
+  viande:      "🥩",
+  maree:       "🐟",
+  boisson:     "🫗",
+  alcool:      "🍷",
+  epicerie:    "🫙",
+  legume:      "🥦",
+  fruit:       "🍎",
+  herbe:       "🌿",
+  preparation: "🍳",
+  sauce:       "🫒",
+  surgele:     "❄️",
+  recette:     "📝",
+  emballage:   "📦",
+  autre:       "📌",
+};
+
 function statusLabel(s: IngredientStatus): string {
   if (s === "validated") return "validé";
   if (s === "unknown") return "incompris";
@@ -144,6 +184,35 @@ export default function IngredientsPage() {
     if (!qq) return base;
     return base.filter((x) => (x.name ?? "").toLowerCase().includes(qq));
   }, [items, q, tab, filterCategory, filterSupplier, includeNoOffer, offersByIngredientId]);
+
+  const grouped = useMemo(() => {
+    const byCategory = new Map<Category, Ingredient[]>();
+    for (const cat of CATEGORIES) byCategory.set(cat, []);
+    for (const x of filtered) byCategory.get(x.category)?.push(x);
+    for (const arr of byCategory.values()) arr.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", "fr"));
+    return CATEGORIES.map((cat) => ({ cat, items: byCategory.get(cat) ?? [] })).filter((g) => g.items.length > 0);
+  }, [filtered]);
+
+  const [collapsedCats, setCollapsedCats] = useState<Set<Category>>(new Set());
+
+  const allCollapsed = grouped.length > 0 && collapsedCats.size >= grouped.length;
+
+  function toggleAll() {
+    if (allCollapsed) {
+      setCollapsedCats(new Set());
+    } else {
+      setCollapsedCats(new Set(grouped.map((g) => g.cat)));
+    }
+  }
+
+  function toggleCat(cat: Category) {
+    setCollapsedCats((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  }
 
   async function load() {
     setLoading(true);
@@ -1245,13 +1314,49 @@ type SupplierOfferPayload = {
         </form>
       </div>
 
-      <input style={{ ...input, marginTop: 12 }} placeholder="Rechercher..." value={q} onChange={(e) => setQ(e.target.value)} />
+      <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
+        <input style={{ ...input, flex: 1 }} placeholder="Rechercher..." value={q} onChange={(e) => setQ(e.target.value)} />
+        <button
+          className="btn"
+          onClick={toggleAll}
+          style={{ whiteSpace: "nowrap", height: 44, padding: "0 14px" }}
+        >
+          {allCollapsed ? "Tout déplier" : "Tout replier"}
+        </button>
+      </div>
 
-      <div className="card" style={{ ...cardPad, marginTop: 12 }}>
-        {loading ? <div className="muted">Chargement…</div> : null}
+      {loading ? <div className="muted" style={{ marginTop: 12 }}>Chargement…</div> : null}
 
-        <div style={{ display: "grid", gap: 10 }}>
-          {filtered.map((x) => {
+      {grouped.map(({ cat, items: catItems }) => {
+        const isCollapsed = collapsedCats.has(cat);
+        return (
+          <div key={cat} style={{ marginTop: 14 }}>
+            <button
+              onClick={() => toggleCat(cat)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                width: "100%",
+                padding: "8px 14px",
+                background: "rgba(0,0,0,0.04)",
+                border: "1px solid rgba(0,0,0,0.08)",
+                borderRadius: 10,
+                cursor: "pointer",
+                textAlign: "left",
+                fontFamily: "inherit",
+              }}
+            >
+              <span style={{ fontSize: 18 }}>{CAT_EMOJIS[cat]}</span>
+              <span style={{ fontWeight: 800, color: CAT_COLORS[cat], fontSize: 14 }}>{CAT_LABELS[cat]}</span>
+              <span style={{ color: "#999", fontSize: 13 }}>({catItems.length})</span>
+              <span style={{ marginLeft: "auto", fontSize: 12, color: "#666" }}>{isCollapsed ? "▶" : "▼"}</span>
+            </button>
+
+            {!isCollapsed && (
+              <div className="card" style={{ ...cardPad, marginTop: 6 }}>
+                <div style={{ display: "grid", gap: 10 }}>
+                  {catItems.map((x) => {
             const isEditing = editingId === x.id;
             const offer = offersByIngredientId.get(x.id);
 
@@ -1493,11 +1598,15 @@ type SupplierOfferPayload = {
                     )}
                   </div>
                 )}
+                  </div>
+                );
+              })}
+                </div>
               </div>
-            );
-          })}
-        </div>
-      </div>
+            )}
+          </div>
+        );
+      })}
 
       <div className="muted" style={{ marginTop: 10, fontSize: 12 }}>
         User: {userId ? userId : "non connecté"}
