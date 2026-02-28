@@ -35,7 +35,7 @@ const RULES: Rule[] = [
 // "cream" = cream cheese (abréviations Metro)
 { keywords: ["lait", "beurre", "creme", "crème", "cream", "yaourt", "yogurt", "oeuf", "levure", "kefir"], category: "cremerie" },
 // Boisson
-{ keywords: ["jus", "nectar", "sirop", "cafe", "café", "the", "thé", "lait de coco", "boisson", "eau minérale", "eau plate", "eau gazeuse"], category: "boisson" },
+{ keywords: ["jus", "nectar", "sirop", "cafe", "café", "the", "thé", "lait de coco", "boisson", "eau minérale", "eau plate", "eau gazeuse", "eau"], category: "boisson" },
 // Alcool
 { keywords: ["vin", "biere", "bière", "champagne", "prosecco", "amaretto", "whisky", "vodka", "rhum", "liqueur", "alcool", "spiritueux", "cognac", "calvados", "gin", "grappa"], category: "alcool" },
 // Sauce
@@ -65,11 +65,12 @@ const METRO_SECTIONS: { pattern: RegExp; category: Category }[] = [
 ];
 
 export function detectCategoryFromName(name: string): Category {
-  // Normalise les apostrophes → espace pour que "d'oeuf" → "d oeuf" → " oeuf" matche.
+  // Normalise :
+  //  - apostrophes → espace : "d'oeuf" → " oeuf" matche
+  //  - * → espace : Metro préfixe les produits sous froid de "*" (*SAUMON → saumon)
   // Préfixe espace : évite les faux positifs de sous-chaîne
-  // ex: "moule" dans "semoule", "gin" dans "origin", "eau" dans "anneaux"
-  // " " + kw gère aussi les pluriels ("fruit" → "fruits") et traits d'union ("chou-fleur")
-  const lower = " " + name.toLowerCase().replace(/['\u2019\u2018]/g, " ");
+  // ex: "moule" dans "semoule", "gin" dans "origin"
+  const lower = " " + name.toLowerCase().replace(/['\u2019\u2018*]/g, " ");
   for (const rule of RULES) {
     for (const kw of rule.keywords) {
       if (lower.includes(" " + kw)) return rule.category;
