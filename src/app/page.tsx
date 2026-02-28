@@ -40,9 +40,8 @@ export default function Home() {
         <div />
 
         <div style={{ textAlign: "center" }}>
-          <h1 className="h1" style={{ margin: 0, letterSpacing: 0.2 }}>
-            ifratelligroup
-          </h1>
+          <img src="/logo.png" alt="iFratelliGroup" style={{ width: 220, height: "auto", mixBlendMode: "multiply" }} />
+            
           <p className="muted" style={{ marginTop: 6, marginBottom: 0 }}>
             Dashboard
           </p>
@@ -169,12 +168,9 @@ export default function Home() {
             </p>
 
             <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap", justifyContent: "center" }}>
-              <Link className="btn btnWide" href="/invoices/mael">
-                Import MAEL
-              </Link>
-              <Link className="btn btnPrimary btnWide" href="/invoices/metro">
-                Import METRO
-              </Link>
+              <Link className="btn btnPrimary btnWide" href="/invoices">
+  Import factures
+</Link>
             </div>
           </div>
 

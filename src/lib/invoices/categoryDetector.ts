@@ -2,35 +2,50 @@ import type { Category } from "@/types/ingredients";
 
 type Rule = { keywords: string[]; category: Category };
 
+// Ordre important : la première règle qui matche gagne.
+// Stratégie :
+//  - Marée AVANT viande_core : "filet de sole" → maree, pas viande.
+//  - viande_core (mots sans ambiguïté) AVANT légume : évite "CHAIR PORC/VEAU TOMATE" → légume.
+//  - Légume/herbe/fruit AVANT viande_generic ("filet", "tartare"…) :
+//      évite "COURG FILET" → viande, "LIME FILET4" → viande, "TARTARE LEGUMES" → viande.
+//  - Herbe AVANT fruit : évite "thym citron" → fruit.
+//  - Matching : lower.includes(" " + kw) — préfixe espace pour éviter les faux positifs
+//      ("moule" dans "semoule", "gin" dans "origin", "eau" dans "anneaux").
 const RULES: Rule[] = [
 // Fromages
-{ keywords: ["mozzarella", "burrata", "parmesan", "reggiano", "ricotta", "mascarpone", "fontina", "taleggio", "provolone", "pecorino", "gorgonzola", "cheddar", "brie", "camembert", "comté", "emmental", "gruyere", "reblochon", "roquefort", "fromage"], category: "fromage" },
+{ keywords: ["mozzarella", "burrata", "burrat", "parmesan", "reggiano", "ricotta", "mascarpone", "fontina", "taleggio", "provolone", "pecorino", "gorgonzola", "gorgon", "cheddar", "brie", "camembert", "comté", "emmental", "gruyere", "reblochon", "roquefort", "fromage", "chevre", "chèvre", "babybel", "feta"], category: "fromage" },
 // Charcuterie
 { keywords: ["jambon", "pancetta", "speck", "nduja", "guanciale", "spianata", "coppa", "bresaola", "salami", "saucisson", "mortadelle", "prosciutto", "lardo", "chorizo", "involtini"], category: "charcuterie" },
-// Viande
-{ keywords: ["boeuf", "veau", "porc", "poulet", "agneau", "dinde", "canard", "lapin", "steak", "entrecote", "filet", "lomo", "tartare", "haché", "hache", "boucherie"], category: "viande" },
-// Marée
-{ keywords: ["saumon", "anchois", "thon", "cabillaud", "dorade", "bar", "sole", "crevette", "homard", "langoustine", "moule", "huitre", "coquille", "poulpe", "seiche", "poisson", "maree", "merlu", "truite"], category: "maree" },
-// Légumes
-{ keywords: ["aubergine", "courgette", "poivron", "champignon", "oignon", "tomate", "roquette", "épinard", "epinard", "salade", "laitue", "carotte", "brocoli", "chou", "fenouil", "céleri", "celeri", "asperge", "artichaut", "poireau", "pois", "haricot", "frite", "patate", "pomme de terre"], category: "legume" },
-// Fruits
-{ keywords: ["framboise", "fraise", "myrtille", "cerise", "abricot", "peche", "pêche", "mangue", "ananas", "citron", "orange", "pomme", "poire", "raisin", "figue", "fruit"], category: "fruit" },
-// Herbes
+// Marée (avant viande pour éviter "filet de sole" → viande)
+{ keywords: ["saumon", "anchois", "thon", "cabillaud", "dorade", "bar", "sole", "crevette", "crevet", "homard", "langoustine", "moule", "huitre", "coquille", "poulpe", "seiche", "encornet", "poisson", "maree", "merlu", "truite", "calamar", "calmar"], category: "maree" },
+// Viande — mots sans ambiguïté (avant légume pour "CHAIR PORC/VEAU TOMATE" → viande, pas légume)
+{ keywords: ["boeuf", "veau", "porc", "poulet", "volaille", "agneau", "dinde", "canard", "lapin", "gigot", "chair", "plt", "egrene", "égrené"], category: "viande" },
+// Légumes (avant viande_generic "filet"/"tartare" : "COURG FILET", "TARTARE LEGUMES" → légume)
+// "champig" et non "champ" pour éviter "champagne" → légume
+{ keywords: ["aubergine", "auberg", "courgette", "courg", "poivron", "champignon", "champig", "oignon", "tomate", "roquette", "épinard", "epinard", "salade", "laitue", "carotte", "brocoli", "chou", "fenouil", "céleri", "celeri", "asperge", "artichaut", "poireau", "pois", "haricot", "frite", "patate", "pomme de terre", "pdt", "echalote", "échalote", "echalion", "échalion", "concombre", "butternut", "endive", "chataigne", "châtaigne", "soja", "edamame", "legume", "légume"], category: "legume" },
+// Herbes (avant fruit pour éviter "thym citron" → fruit)
 { keywords: ["basilic", "romarin", "persil", "thym", "origan", "ciboulette", "coriandre", "menthe", "sauge", "estragon", "laurier", "herbe"], category: "herbe" },
+// Fruits (avant viande_generic "filet" : "LIME FILET4" → fruit, pas viande)
+// "citr" = préfixe citron/citrus (abréviations Metro)
+{ keywords: ["framboise", "fraise", "myrtille", "cerise", "abricot", "peche", "pêche", "mangue", "ananas", "citron", "citr", "orange", "pomme", "poire", "raisin", "figue", "lime", "fruit"], category: "fruit" },
+// Viande — mots génériques (après légume/fruit pour éviter les faux positifs)
+// "flt" = abréviation Metro pour "filet de poulet"
+{ keywords: ["steak", "entrecote", "filet", "flt", "lomo", "tartare", "haché", "hache", "boucherie", "chipolata", "saucisse", "osso bucco"], category: "viande" },
 // Crémerie
-{ keywords: ["lait", "beurre", "creme", "crème", "yaourt", "yogurt", "oeuf", "blanc oeuf", "jaune oeuf", "levure", "kefir"], category: "cremerie" },
+// "cream" = cream cheese (abréviations Metro)
+{ keywords: ["lait", "beurre", "creme", "crème", "cream", "yaourt", "yogurt", "oeuf", "levure", "kefir"], category: "cremerie" },
 // Boisson
-{ keywords: ["eau", "jus", "nectar", "sirop", "cafe", "café", "the", "thé", "lait de coco", "boisson"], category: "boisson" },
+{ keywords: ["jus", "nectar", "sirop", "cafe", "café", "the", "thé", "lait de coco", "boisson", "eau minérale", "eau plate", "eau gazeuse"], category: "boisson" },
 // Alcool
-{ keywords: ["vin", "biere", "bière", "champagne", "prosecco", "amaretto", "whisky", "vodka", "rhum", "gin", "liqueur", "alcool", "spiritueux", "cognac", "calvados"], category: "alcool" },
+{ keywords: ["vin", "biere", "bière", "champagne", "prosecco", "amaretto", "whisky", "vodka", "rhum", "liqueur", "alcool", "spiritueux", "cognac", "calvados", "gin", "grappa"], category: "alcool" },
 // Sauce
 { keywords: ["sauce", "ketchup", "mayonnaise", "moutarde", "vinaigre", "tabasco", "pesto", "tapenade", "coulis", "pulpe", "concentré", "concentre", "truffe"], category: "sauce" },
 // Surgelé
 { keywords: ["surgelé", "surgele", "congelé", "congele", "surgeles"], category: "surgele" },
 // Emballage
-{ keywords: ["sac", "sachet", "barquette", "emballage", "couvercle", "film", "gant", "boite", "conteneur", "kebab"], category: "emballage" },
-// Épicerie (sucré/salé)
-{ keywords: ["aragostine", "farine", "sucre", "sel", "poivre", "huile", "pates", "pâtes", "riz", "quinoa", "lentille", "pois chiche", "chapelure", "panure", "levure chimique", "bicarbonate", "miel", "confiture", "nutella", "chocolat", "cacao", "vanille", "cannelle", "curry", "paprika", "cumin", "noix", "amande", "noisette", "pignon", "raisin sec", "olive", "câpre", "capre", "cornichon", "anchois", "sardine", "thon en boite", "conserve", "bouillon", "fond", "demi glace", "nescafe", "cafe soluble", "cereale", "muesli", "granola", "biscuit", "cookie", "crackers", "pain", "brioche", "foccacia", "mafaldine", "orecchiette", "tagliatelle", "lasagne", "gnocchi", "coquillette", "couscous", "semoule", "polenta"], category: "epicerie" },
+{ keywords: ["sachet", "barquette", "emballage", "couvercle", "film", "gant", "conteneur"], category: "emballage" },
+// Épicerie (sucré/salé — en dernier car mots génériques)
+{ keywords: ["aragostine", "farine", "sucre", "sel", "poivre", "huile", "pates", "pâtes", "riz", "quinoa", "lentille", "pois chiche", "chapelure", "panure", "levure chimique", "bicarbonate", "miel", "confiture", "nutella", "chocolat", "cacao", "vanille", "cannelle", "curry", "paprika", "cumin", "noix", "amande", "noisette", "pignon", "raisin sec", "olive", "câpre", "capre", "cornichon", "sardine", "thon en boite", "conserve", "bouillon", "demi glace", "nescafe", "cafe soluble", "cereale", "muesli", "granola", "biscuit", "cookie", "crackers", "pain", "brioche", "foccacia", "mafaldine", "orecchiette", "tagliatelle", "lasagne", "gnocchi", "coquillette", "couscous", "semoule", "polenta"], category: "epicerie" },
 ];
 
 // Sections Metro → catégorie
@@ -50,18 +65,22 @@ const METRO_SECTIONS: { pattern: RegExp; category: Category }[] = [
 ];
 
 export function detectCategoryFromName(name: string): Category {
-const lower = name.toLowerCase();
-for (const rule of RULES) {
-for (const kw of rule.keywords) {
-if (lower.includes(kw)) return rule.category;
-}
-}
-return "autre";
+  // Normalise les apostrophes → espace pour que "d'oeuf" → "d oeuf" → " oeuf" matche.
+  // Préfixe espace : évite les faux positifs de sous-chaîne
+  // ex: "moule" dans "semoule", "gin" dans "origin", "eau" dans "anneaux"
+  // " " + kw gère aussi les pluriels ("fruit" → "fruits") et traits d'union ("chou-fleur")
+  const lower = " " + name.toLowerCase().replace(/['\u2019\u2018]/g, " ");
+  for (const rule of RULES) {
+    for (const kw of rule.keywords) {
+      if (lower.includes(" " + kw)) return rule.category;
+    }
+  }
+  return "autre";
 }
 
 export function detectCategoryFromMetroSection(sectionText: string): Category | null {
-for (const s of METRO_SECTIONS) {
-if (s.pattern.test(sectionText)) return s.category;
-}
-return null;
+  for (const s of METRO_SECTIONS) {
+    if (s.pattern.test(sectionText)) return s.category;
+  }
+  return null;
 }
