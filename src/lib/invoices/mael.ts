@@ -1,4 +1,4 @@
-import { extractVolumeFromName } from "./utils";
+import { extractVolumeFromName, extractWeightGFromName } from "./utils";
 
 type ParsedLine = {
   sku: string | null;
@@ -53,20 +53,6 @@ function stripTrailingUnitCount(s: string): string {
     .trim();
 }
 
-function extractWeightGFromName(name: string): number | null {
-  // ex: "1 kg", "1,5 kg", "500 g", "2 x 500 g", "10 x 100 g x 2"
-  const kgMatch = name.match(/(\d+(?:[.,]\d+)?)\s*kg\b/i);
-  if (kgMatch) {
-    const kg = parseFrenchNumber(kgMatch[1]);
-    if (kg != null) return Math.round(kg * 1000);
-  }
-  const gMatch = name.match(/(\d+(?:[.,]\d+)?)\s*g\b/i);
-  if (gMatch) {
-    const g = parseFrenchNumber(gMatch[1]);
-    if (g != null) return Math.round(g);
-  }
-  return null;
-}
 
 function extractMeta(text: string): Pick<ParsedInvoice, "invoice_number" | "invoice_date" | "total_ht" | "total_ttc"> {
   const invoiceMatch = text.match(/Facture\s*N[°º]\s*([A-Z0-9]+)/i);

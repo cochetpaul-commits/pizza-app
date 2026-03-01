@@ -29,7 +29,9 @@ import {
   parseNum,
   fmtQty,
 } from "@/lib/offers";
-import { extractVolumeFromName } from "@/lib/invoices/utils";
+import { extractVolumeFromName, extractWeightGFromName, detectUnitFromName } from "@/lib/invoices/utils";
+import { detectAllergensFromName } from "@/lib/invoices/allergenDetector";
+import { detectCategoryFromName } from "@/lib/invoices/categoryDetector";
 
 type OfferPayload = Record<string, unknown>;
 
@@ -368,6 +370,27 @@ else setItems((ingData ?? []) as Ingredient[]);
     pieceVolumeMl: string;
   } | null>(null);
 
+  function handleNewNameChange(value: string) {
+    setNewName(value);
+    if (!value.trim()) return;
+
+    // Catégorie
+    const detectedCat = detectCategoryFromName(value);
+    if (detectedCat !== "autre") setNewCategory(detectedCat);
+
+    // Unité
+    const detectedUnit = detectUnitFromName(value);
+    setNewUnit(detectedUnit);
+
+    // Volume pièce (bouteilles)
+    const vol = extractVolumeFromName(value);
+    if (vol != null) setNewPieceVolumeMl(String(vol));
+
+    // Poids pièce
+    const weightG = extractWeightGFromName(value);
+    if (weightG != null) setNewPieceWeightG(String(weightG));
+  }
+
   function resetCreatePriceBlocks() {
     setNewUnit("kg");
     setNewUnitPrice("");
@@ -697,7 +720,7 @@ type SupplierOfferPayload = {
     const baseIngredient: IngredientUpsert = {
       name,
       category: newCategory,
-      allergens: null,
+      allergens: detectAllergensFromName(name).length ? detectAllergensFromName(name) : null,
       is_active: true,
       default_unit: "g",
 
@@ -1110,7 +1133,7 @@ type SupplierOfferPayload = {
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
             <div>
               <div style={label}>Ingrédient</div>
-              <input style={input} placeholder="Ex: Huile d'olive" value={newName} onChange={(e) => setNewName(e.target.value)} />
+              <input style={input} placeholder="Ex: Huile d'olive" value={newName} onChange={(e) => handleNewNameChange(e.target.value)} />
             </div>
             <div>
               <div style={label}>Catégorie</div>

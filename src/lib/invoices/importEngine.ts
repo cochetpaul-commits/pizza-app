@@ -5,6 +5,7 @@ import * as path from "node:path";
 import * as fs from "node:fs/promises";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { detectCategoryFromName, normalizeIngredientName } from "@/lib/invoices/categoryDetector";
+import { detectAllergensFromName } from "@/lib/invoices/allergenDetector";
 import type { Category } from "@/types/ingredients";
 
 const execFileAsync = promisify(execFile);
@@ -287,11 +288,13 @@ export async function runImport(options: {
         pieceVolumeMl = 750;
       }
 
+      const allergens = detectAllergensFromName(nm);
+
       toCreate.push({
         user_id: userId,
         name: nm,
         category: cat,
-        allergens: null,
+        allergens: allergens.length ? allergens : null,
         is_active: true,
         default_unit: defaultUnit,
         supplier: supplierName,
