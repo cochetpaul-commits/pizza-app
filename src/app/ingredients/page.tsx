@@ -29,6 +29,7 @@ import {
   parseNum,
   fmtQty,
 } from "@/lib/offers";
+import { extractVolumeFromName } from "@/lib/invoices/utils";
 
 type OfferPayload = Record<string, unknown>;
 
@@ -330,6 +331,7 @@ else setItems((ingData ?? []) as Ingredient[]);
 
   const [newDensity, setNewDensity] = useState("1.0");
   const [newPieceWeightG, setNewPieceWeightG] = useState("");
+  const [newPieceVolumeMl, setNewPieceVolumeMl] = useState("");
 
   const [packTotalQty, setPackTotalQty] = useState("");
   const [packPrice, setPackPrice] = useState("");
@@ -363,6 +365,7 @@ else setItems((ingData ?? []) as Ingredient[]);
     packEachQty: string;
     packEachUnit: "kg" | "l" | "pc";
     packPieceWeightG: string;
+    pieceVolumeMl: string;
   } | null>(null);
 
   function resetCreatePriceBlocks() {
@@ -370,6 +373,7 @@ else setItems((ingData ?? []) as Ingredient[]);
     setNewUnitPrice("");
     setNewDensity("1.0");
     setNewPieceWeightG("");
+    setNewPieceVolumeMl("");
 
     setPackTotalQty("");
     setPackPrice("");
@@ -388,23 +392,21 @@ else setItems((ingData ?? []) as Ingredient[]);
     if (p != null && p > 0) {
       if (newUnit === "pc") {
         const pw = parseNum(newPieceWeightG);
-        if (pw != null && pw > 0) {
-          d = {
-            ingredient_id: "",
-            supplier_id: "",
-            price_kind: "unit",
-            unit: "pc",
-            unit_price: p,
-            pack_price: null,
-            pack_total_qty: null,
-            pack_unit: null,
-            pack_count: null,
-            pack_each_qty: null,
-            pack_each_unit: null,
-            density_kg_per_l: null,
-            piece_weight_g: pw,
-          };
-        }
+        d = {
+          ingredient_id: "",
+          supplier_id: "",
+          price_kind: "unit",
+          unit: "pc",
+          unit_price: p,
+          pack_price: null,
+          pack_total_qty: null,
+          pack_unit: null,
+          pack_count: null,
+          pack_each_qty: null,
+          pack_each_unit: null,
+          density_kg_per_l: null,
+          piece_weight_g: pw ?? null,
+        };
       } else if (newUnit === "l") {
         const dens = parseNum(newDensity);
         if (dens != null && dens > 0) {
@@ -551,9 +553,9 @@ else setItems((ingData ?? []) as Ingredient[]);
   }
 
   if (!d) return "";
-  const line = fmtOfferPriceLine(d);
+  const line = fmtOfferPriceLine(d, { piece_volume_ml: parseNum(newPieceVolumeMl) });
   return `${line.main} • ${line.sub}`;
-}, [priceKind, newUnit, newUnitPrice, newDensity, newPieceWeightG, packPrice, packTotalQty, packCount, packEachQty, packEachUnit, packPieceWeightG]);
+}, [priceKind, newUnit, newUnitPrice, newDensity, newPieceWeightG, newPieceVolumeMl, packPrice, packTotalQty, packCount, packEachQty, packEachUnit, packPieceWeightG]);
 
 type SupplierOfferPayload = {
   user_id: string;
@@ -599,11 +601,7 @@ type SupplierOfferPayload = {
       }
 
       if (newUnit === "pc") {
-        const pw = parseNum(newPieceWeightG);
-        if (pw == null || pw <= 0) {
-          alert("Poids pièce obligatoire (g).");
-          return null;
-        }
+        const pw = parseNum(newPieceWeightG) ?? null;
         return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "pc", unit_price: p, price: p, piece_weight_g: pw, density_kg_per_l: null, is_active: true };
       }
 
@@ -710,7 +708,14 @@ type SupplierOfferPayload = {
 
       density_g_per_ml: 1.0,
       piece_weight_g: null,
-      piece_volume_ml: null,
+      piece_volume_ml: (() => {
+        const fromForm = parseNum(newPieceVolumeMl);
+        if (fromForm != null && fromForm > 0) return fromForm;
+        const fromName = extractVolumeFromName(name);
+        if (fromName != null) return fromName;
+        if (newCategory === "alcool" || newCategory === "boisson") return 750;
+        return null;
+      })(),
 
       supplier_id,
     };
@@ -796,6 +801,7 @@ type SupplierOfferPayload = {
 
       density: off?.density_kg_per_l != null ? String(off.density_kg_per_l) : "1.0",
       pieceWeightG: off?.piece_weight_g != null ? String(off.piece_weight_g) : "",
+      pieceVolumeMl: x.piece_volume_ml != null ? String(x.piece_volume_ml) : "",
 
       packTotalQty: off?.pack_total_qty != null ? String(off.pack_total_qty) : "",
       packPrice: off?.pack_price != null ? String(off.pack_price) : "",
@@ -830,11 +836,7 @@ type SupplierOfferPayload = {
       }
 
       if (edit.unit === "pc") {
-        const pw = parseNum(edit.pieceWeightG);
-        if (pw == null || pw <= 0) {
-          alert("Poids pièce obligatoire (g).");
-          return null;
-        }
+        const pw = parseNum(edit.pieceWeightG) ?? null;
         return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "pc", unit_price: p, price: p, piece_weight_g: pw, density_kg_per_l: null, is_active: true };
       }
 
@@ -936,7 +938,7 @@ type SupplierOfferPayload = {
       piece_weight_g: (edit.unit === "pc" ? parseNum(edit.pieceWeightG) : null) ?? (edit.packEachUnit === "pc" ? parseNum(edit.packPieceWeightG) : null),
     };
 
-    const line = fmtOfferPriceLine(d);
+    const line = fmtOfferPriceLine(d, { piece_volume_ml: parseNum(edit.pieceVolumeMl) });
     return `${line.main} • ${line.sub}`;
   }, [edit]);
 
@@ -956,6 +958,7 @@ type SupplierOfferPayload = {
       category: edit.category,
       is_active: edit.is_active,
       supplier_id,
+      piece_volume_ml: parseNum(edit.pieceVolumeMl) ?? null,
     };
 
     const u1 = await supabase.from("ingredients").update(up).eq("id", editingId);
@@ -1208,10 +1211,16 @@ type SupplierOfferPayload = {
         )}
 
         {newUnit === "pc" && (
-          <div>
-            <div style={label}>Poids d&apos;une pièce (g)</div>
-            <input style={input} placeholder="Ex: 125" inputMode="decimal" value={newPieceWeightG} onChange={(e) => setNewPieceWeightG(e.target.value)} />
-          </div>
+          <>
+            <div>
+              <div style={label}>Poids d&apos;une pièce (g)</div>
+              <input style={input} placeholder="Ex: 125" inputMode="decimal" value={newPieceWeightG} onChange={(e) => setNewPieceWeightG(e.target.value)} />
+            </div>
+            <div>
+              <div style={label}>Volume pièce (ml)</div>
+              <input style={input} placeholder="ex: 700 pour 70cl" inputMode="decimal" value={newPieceVolumeMl} onChange={(e) => setNewPieceVolumeMl(e.target.value)} />
+            </div>
+          </>
         )}
       </>
     )}
@@ -1543,6 +1552,8 @@ type SupplierOfferPayload = {
                             {edit.unit === "l" && <input style={input} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => setEdit({ ...edit, density: e.target.value })} />}
 
                             {edit.unit === "pc" && <input style={input} placeholder="Poids pièce (g)" value={edit.pieceWeightG} onChange={(e) => setEdit({ ...edit, pieceWeightG: e.target.value })} />}
+
+                            {edit.unit === "pc" && <input style={input} placeholder="Volume pièce (ml)" value={edit.pieceVolumeMl} onChange={(e) => setEdit({ ...edit, pieceVolumeMl: e.target.value })} />}
 
                             <div className="muted" style={{ fontSize: 12 }}>
                               {previewEditPack ? previewEditPack : "—"}
