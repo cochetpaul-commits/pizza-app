@@ -186,8 +186,23 @@ export async function POST(req: Request) {
 
     const totalCost = round2(lines.reduce((acc, l) => acc + n2(l.cost), 0));
 
-    // react-pdf (Node.js) peut fetcher les URLs publiques directement
-    const photoUrl: string | null = cr.image_url ?? null;
+    // Photo en base64 — MIME forcé depuis l'extension (Supabase renvoie parfois octet-stream)
+    let photoUrl: string | null = null;
+    if (cr.image_url) {
+      try {
+        const res = await fetch(cr.image_url, { redirect: "follow" });
+        if (res.ok) {
+          const buf = Buffer.from(await res.arrayBuffer());
+          if (buf.length > 0) {
+            const ext = (cr.image_url.split(".").pop() ?? "jpg").toLowerCase().split("?")[0];
+            const mime = ext === "png" ? "image/png" : ext === "gif" ? "image/gif" : "image/jpeg";
+            photoUrl = `data:${mime};base64,${buf.toString("base64")}`;
+          }
+        }
+      } catch {
+        // photo non critique
+      }
+    }
 
     const exportedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
     const logoBase64 = readLogoBase64();
