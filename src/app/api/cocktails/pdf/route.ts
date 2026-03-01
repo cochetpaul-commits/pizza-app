@@ -186,23 +186,8 @@ export async function POST(req: Request) {
 
     const totalCost = round2(lines.reduce((acc, l) => acc + n2(l.cost), 0));
 
-    // Fetch photo as base64 via HTTP (plus fiable que le SDK storage pour react-pdf)
-    let photoUrl: string | null = null;
-    if (cr.image_url) {
-      try {
-        const res = await fetch(cr.image_url);
-        if (res.ok) {
-          const ct = res.headers.get("content-type") ?? "";
-          const mime = ct.startsWith("image/") ? ct.split(";")[0].trim() : "image/jpeg";
-          const buf = Buffer.from(await res.arrayBuffer());
-          if (buf.length > 0) {
-            photoUrl = `data:${mime};base64,${buf.toString("base64")}`;
-          }
-        }
-      } catch {
-        // photo non critique — on génère le PDF sans
-      }
-    }
+    // react-pdf (Node.js) peut fetcher les URLs publiques directement
+    const photoUrl: string | null = cr.image_url ?? null;
 
     const exportedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
     const logoBase64 = readLogoBase64();
