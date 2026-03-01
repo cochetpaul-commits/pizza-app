@@ -5,6 +5,7 @@ import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { PizzaPdfDocument, type PizzaPdfData } from "@/lib/pizzaPdf";
 import fs from "fs";
 import path from "path";
+import { POLE_COLORS } from "@/lib/poleColors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -174,6 +175,7 @@ export async function POST(req: Request) {
       exportedAt,
       photoUrl,
       logoBase64,
+      accentColor: POLE_COLORS.pizza,
     };
 
     const documentElement = PizzaPdfDocument({ data }) as unknown as React.ReactElement<DocumentProps>;

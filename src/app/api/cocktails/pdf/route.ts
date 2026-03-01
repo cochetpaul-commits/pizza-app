@@ -6,6 +6,7 @@ import { CocktailPdfDocument, type CocktailPdfData } from "@/lib/cocktailPdf";
 import { offerRowToCpu } from "@/lib/offerPricing";
 import fs from "fs";
 import path from "path";
+import { POLE_COLORS } from "@/lib/poleColors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -224,6 +225,7 @@ export async function POST(req: Request) {
       exportedAt,
       logoBase64,
       photoUrl,
+      accentColor: POLE_COLORS.cocktail,
     };
 
     const documentElement = CocktailPdfDocument({ data }) as unknown as React.ReactElement<DocumentProps>;

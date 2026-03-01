@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
+import { POLE_COLORS } from "@/lib/poleColors";
 
 type KitchenRecipeRow = {
   id: string;
@@ -139,7 +140,7 @@ export default function KitchenPage() {
           Aucune fiche cuisine créée.
         </p>
       ) : (
-        <div className="card" style={{ marginTop: 12 }}>
+        <div className="card" style={{ marginTop: 12, borderLeft: `4px solid ${POLE_COLORS.cuisine}` }}>
           <div style={{ display: "grid", gap: 10 }}>
             {recipes.map((r) => (
               <div key={r.id} className="listRow">

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
+import { POLE_COLORS } from "@/lib/poleColors";
 
 type CocktailRow = {
   id: string;
@@ -111,7 +112,7 @@ export default function CocktailsPage() {
       {cocktails.length === 0 ? (
         <p className="muted" style={{ marginTop: 12 }}>Aucun cocktail créé.</p>
       ) : (
-        <div className="card" style={{ marginTop: 12 }}>
+        <div className="card" style={{ marginTop: 12, borderLeft: `4px solid ${POLE_COLORS.cocktail}` }}>
           <div style={{ display: "grid", gap: 10 }}>
             {cocktails.map((c) => (
               <div key={c.id} className="listRow">

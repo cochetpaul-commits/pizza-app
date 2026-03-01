@@ -21,16 +21,17 @@ export type CocktailPdfData = {
   exportedAt: string;
   logoBase64: string | null;
   photoUrl: string | null;
+  accentColor?: string;
 };
 
-const ROUGE = "#8B1A1A";
+const DEFAULT_ACCENT = "#8B1A1A";
 const BG = "#FAF7F2";
 const TEXT = "#1A1A1A";
 const MUTED = "#777777";
 const BORDER = "#CBBFA8";
 const SOFT = "#EDE7D9";
 
-const styles = StyleSheet.create({
+function createStyles(ROUGE: string) { return StyleSheet.create({
   page: {
     padding: 32,
     paddingBottom: 50,
@@ -233,7 +234,7 @@ const styles = StyleSheet.create({
     borderTopColor: BORDER,
     paddingTop: 5,
   },
-});
+}); }
 
 const ALLERGENS = [
   "Gluten",
@@ -275,6 +276,7 @@ function fmtMoney(v: number | null) {
 }
 
 export function CocktailPdfDocument({ data }: { data: CocktailPdfData }) {
+  const styles = createStyles(data.accentColor ?? DEFAULT_ACCENT);
   const typeLabel = data.type ? (TYPE_LABELS[data.type] ?? data.type) : "—";
   const glassLabel = data.glass ? (GLASS_LABELS[data.glass] ?? data.glass) : "—";
 

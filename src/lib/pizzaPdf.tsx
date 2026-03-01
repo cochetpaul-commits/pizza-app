@@ -18,16 +18,17 @@ export type PizzaPdfData = {
   photoUrl: string | null;
   exportedAt: string;
   logoBase64: string | null;
+  accentColor?: string;
 };
 
-const ROUGE = "#8B1A1A";
+const DEFAULT_ACCENT = "#8B1A1A";
 const BG = "#FAF7F2";
 const TEXT = "#1A1A1A";
 const MUTED = "#777777";
 const BORDER = "#CBBFA8";
 const SOFT = "#EDE7D9";
 
-const styles = StyleSheet.create({
+function createStyles(ROUGE: string) { return StyleSheet.create({
   page: {
     padding: 32,
     paddingBottom: 50,
@@ -223,7 +224,7 @@ const styles = StyleSheet.create({
     borderTopColor: BORDER,
     paddingTop: 5,
   },
-});
+}); }
 
 const ALLERGENS = [
   "Gluten",
@@ -242,7 +243,9 @@ const ALLERGENS = [
   "Anhydride sulfureux",
 ];
 
-function IngredientsTable({ items }: { items: PdfIngredient[] }) {
+type PizzaStyles = ReturnType<typeof createStyles>;
+
+function IngredientsTable({ items, styles }: { items: PdfIngredient[]; styles: PizzaStyles }) {
   if (items.length === 0) return null;
   return (
     <View>
@@ -266,6 +269,7 @@ function IngredientsTable({ items }: { items: PdfIngredient[] }) {
 }
 
 export function PizzaPdfDocument({ data }: { data: PizzaPdfData }) {
+  const styles = createStyles(data.accentColor ?? DEFAULT_ACCENT);
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -312,13 +316,13 @@ export function PizzaPdfDocument({ data }: { data: PizzaPdfData }) {
 
         {/* AVANT FOUR */}
         <Text style={styles.sectionTitle}>Ingrédients avant four</Text>
-        <IngredientsTable items={data.pre} />
+        <IngredientsTable items={data.pre} styles={styles} />
 
         {/* APRES FOUR */}
         {data.post.length > 0 && (
           <View>
             <Text style={styles.sectionTitle}>Ingrédients après cuisson</Text>
-            <IngredientsTable items={data.post} />
+            <IngredientsTable items={data.post} styles={styles} />
           </View>
         )}
 

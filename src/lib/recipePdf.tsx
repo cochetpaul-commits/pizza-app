@@ -43,19 +43,20 @@ export type RecipePdfData = {
   phases: RecipePdfPhase[];
   warnings: string[];
 
-  // ✅ nouveau champ (optionnel pour ne pas casser si l’API ne l’envoie pas encore)
+  // ✅ nouveau champ (optionnel pour ne pas casser si l'API ne l'envoie pas encore)
   procedure?: string | null;
 
   exportedAt: string;
+  accentColor?: string;
 };
 
-const TERRACOTTA = "#B45A3C";
+const DEFAULT_ACCENT = "#B45A3C";
 const TEXT = "#111111";
 const MUTED = "#555555";
 const BORDER = "#E6E6E6";
 const SOFT = "#FAFAFA";
 
-const styles = StyleSheet.create({
+function createStyles(TERRACOTTA: string) { return StyleSheet.create({
   page: { padding: 22, fontSize: 10, fontFamily: "Helvetica", color: TEXT },
 
   header: {
@@ -145,7 +146,9 @@ const styles = StyleSheet.create({
     color: MUTED,
     fontSize: 8,
   },
-});
+}); }
+
+type RecipeStyles = ReturnType<typeof createStyles>;
 
 function fmtPct(n: number | null) {
   if (n === null || !Number.isFinite(n)) return "—";
@@ -161,7 +164,7 @@ function isNonZeroG(n: number | null | undefined) {
   return Math.round(n) !== 0;
 }
 
-function Line({ left, right, last }: { left: string; right: string; last?: boolean }) {
+function Line({ left, right, last, styles }: { left: string; right: string; last?: boolean; styles: RecipeStyles }) {
   return (
     <View style={[styles.line, ...(last ? [{ borderBottomWidth: 0 }] : [])]}>
       <Text style={styles.k}>{left}</Text>
@@ -170,13 +173,13 @@ function Line({ left, right, last }: { left: string; right: string; last?: boole
   );
 }
 
-function PhaseRows({ p }: { p: RecipePdfPhase }) {
+function PhaseRows({ p, styles }: { p: RecipePdfPhase; styles: RecipeStyles }) {
   const rows: Array<{ k: string; v: string }> = [
     { k: "Farine", v: fmtG(p.flour_g) },
     { k: "Eau", v: fmtG(p.water_g) },
   ];
 
-  // On n’affiche pas les 0
+  // On n'affiche pas les 0
   if (isNonZeroG(p.salt_g)) rows.push({ k: "Sel", v: fmtG(p.salt_g) });
   if (isNonZeroG(p.honey_g)) rows.push({ k: "Miel", v: fmtG(p.honey_g) });
   if (isNonZeroG(p.oil_g)) rows.push({ k: "Huile", v: fmtG(p.oil_g) });
@@ -195,7 +198,7 @@ function PhaseRows({ p }: { p: RecipePdfPhase }) {
 }
 
 function normalizeProcedure(raw: string) {
-  // nettoie un peu sans “casser” le contenu
+  // nettoie un peu sans "casser" le contenu
   return raw
     .replace(/\r\n/g, "\n")
     .replace(/[ \t]+\n/g, "\n")
@@ -205,6 +208,7 @@ function normalizeProcedure(raw: string) {
 
 export function RecipePdfDocument(props: { data: RecipePdfData }) {
   const d = props.data;
+  const styles = createStyles(d.accentColor ?? DEFAULT_ACCENT);
   const flourMix = Array.isArray(d.flour_mix) ? d.flour_mix : [];
   const type = (d.type ?? "").toLowerCase();
   const isBiga = type === "biga";
@@ -264,7 +268,7 @@ const totals = (d.totals ?? {}) as Totals;
       </Text>
 
       <Text style={styles.subtitle}>
-        Fiche technique d’empâtement — paramètres, quantités et phases
+        Fiche technique d'empâtement — paramètres, quantités et phases
       </Text>
 
       <View style={{ marginTop: 8, gap: 4 }}>
@@ -349,15 +353,15 @@ const totals = (d.totals ?? {}) as Totals;
 
           <View style={styles.grid}>
             <View style={styles.col}>
-              <Line left="Hydratation totale" right={fmtPct(d.hydration_total)} />
-              <Line left="Sel" right={fmtPct(d.salt_percent)} />
-              <Line left="Miel" right={fmtPct(d.honey_percent)} last />
+              <Line left="Hydratation totale" right={fmtPct(d.hydration_total)} styles={styles} />
+              <Line left="Sel" right={fmtPct(d.salt_percent)} styles={styles} />
+              <Line left="Miel" right={fmtPct(d.honey_percent)} last styles={styles} />
             </View>
 
             <View style={styles.col}>
-              <Line left="Huile" right={fmtPct(d.oil_percent)} />
-              <Line left={yeastLabel} right={fmtPct(yeastValue)} />
-              <Line left="Notes" right="—" last />
+              <Line left="Huile" right={fmtPct(d.oil_percent)} styles={styles} />
+              <Line left={yeastLabel} right={fmtPct(yeastValue)} styles={styles} />
+              <Line left="Notes" right="—" last styles={styles} />
             </View>
           </View>
         </View>
@@ -372,13 +376,13 @@ const totals = (d.totals ?? {}) as Totals;
           <View style={styles.grid}>
             <View style={styles.col}>
               {leftRows.map((r, idx) => (
-                <Line key={`L-${r.k}`} left={r.k} right={r.v} last={idx === leftRows.length - 1} />
+                <Line key={`L-${r.k}`} left={r.k} right={r.v} last={idx === leftRows.length - 1} styles={styles} />
               ))}
             </View>
 
             <View style={styles.col}>
               {rightRows.map((r, idx) => (
-                <Line key={`R-${r.k}`} left={r.k} right={r.v} last={idx === rightRows.length - 1} />
+                <Line key={`R-${r.k}`} left={r.k} right={r.v} last={idx === rightRows.length - 1} styles={styles} />
               ))}
             </View>
           </View>
@@ -395,12 +399,12 @@ const totals = (d.totals ?? {}) as Totals;
             <View style={styles.phaseGrid}>
               <View style={styles.phaseCard}>
                 <Text style={styles.phaseTitle}>{p1?.name ?? "Phase 1"}</Text>
-                {p1 ? <PhaseRows p={p1} /> : null}
+                {p1 ? <PhaseRows p={p1} styles={styles} /> : null}
               </View>
 
               <View style={styles.phaseCard}>
                 <Text style={styles.phaseTitle}>{p2?.name ?? "Phase 2"}</Text>
-                {p2 ? <PhaseRows p={p2} /> : null}
+                {p2 ? <PhaseRows p={p2} styles={styles} /> : null}
               </View>
             </View>
           </View>
@@ -415,7 +419,7 @@ const totals = (d.totals ?? {}) as Totals;
 
             <View style={styles.phaseCardFull}>
               <Text style={styles.phaseTitle}>{pSingle.name || "Empâtement unique"}</Text>
-              <PhaseRows p={pSingle} />
+              <PhaseRows p={pSingle} styles={styles} />
             </View>
           </View>
         ) : null}

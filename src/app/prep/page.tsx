@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
+import { POLE_COLORS } from "@/lib/poleColors";
 
 type PrepRecipeRow = {
   id: string;
@@ -119,7 +120,7 @@ export default function PrepRecipesPage() {
       {rows.length === 0 ? (
         <p className="muted">Aucune recette pivot créée.</p>
       ) : (
-        <div className="card">
+        <div className="card" style={{ borderLeft: `4px solid ${POLE_COLORS.pivot}` }}>
           <div style={{ display: "grid", gap: 10 }}>
             {rows.map((r) => (
               <div key={r.id} className="listRow" style={{ alignItems: "center" }}>

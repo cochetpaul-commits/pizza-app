@@ -5,6 +5,7 @@ import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { KitchenPdfDocument, type KitchenPdfData } from "@/lib/kitchenPdf";
 import fs from "fs";
 import path from "path";
+import { POLE_COLORS } from "@/lib/poleColors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -162,6 +163,7 @@ export async function POST(req: Request) {
       exportedAt,
       logoBase64,
       photoUrl: null,
+      accentColor: POLE_COLORS.cuisine,
     };
 
     const documentElement = KitchenPdfDocument({ data }) as unknown as React.ReactElement<DocumentProps>;

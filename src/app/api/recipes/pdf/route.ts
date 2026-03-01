@@ -4,6 +4,7 @@ import React from "react";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { RecipePdfDocument, type RecipePdfData } from "@/lib/recipePdf";
 import { calculerPate } from "@/lib/pateEngine";
+import { POLE_COLORS } from "@/lib/poleColors";
 
 function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
@@ -128,6 +129,7 @@ export async function POST(req: Request) {
       totals: calc.totals,
       phases: calc.phases,
       warnings: calc.warnings ?? [],
+      accentColor: POLE_COLORS["empâtement"],
     };
 
     // ✅ Fix TypeScript: renderToBuffer attend ReactElement<DocumentProps>

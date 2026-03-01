@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
+import { POLE_COLORS } from "@/lib/poleColors";
 
 type PizzaRow = {
   id: string;
@@ -119,7 +120,7 @@ export default function PizzasPage() {
       {pizzas.length === 0 ? (
         <p className="muted">Aucune fiche pizza créée.</p>
       ) : (
-        <div className="card" style={{ marginTop: 12 }}>
+        <div className="card" style={{ marginTop: 12, borderLeft: `4px solid ${POLE_COLORS.pizza}` }}>
           <div style={{ display: "grid", gap: 10 }}>
             {pizzas.map((p) => (
               <div key={p.id} className="listRow">
