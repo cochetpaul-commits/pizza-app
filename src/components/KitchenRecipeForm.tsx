@@ -1,8 +1,10 @@
 "use client";
 
 import { offerRowToCpu } from "@/lib/offerPricing";
+import { compressImage } from "@/lib/compressImage";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import type { Ingredient } from "@/lib/types";
@@ -38,6 +40,7 @@ type KitchenRecipeRowDB = {
   output_ingredient_id: string | null;
   is_active: boolean | null;
   is_draft: boolean | null;
+  photo_url: string | null;
 };
 
 type Unit = "g" | "ml" | "pc";
@@ -157,6 +160,12 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
   const [saveOk, setSaveOk] = useState(false);
   const [saveError, setSaveError] = useState<unknown>(null);
   const [savingIndex, setSavingIndex] = useState(false);
+
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const [newIngredientId, setNewIngredientId] = useState<string>("");
   const [newQty, setNewQty] = useState<string>("");
@@ -478,7 +487,7 @@ if (supplierIds.length) {
 
     const { data: r, error: rErr } = await supabase
       .from("kitchen_recipes")
-      .select("id,user_id,name,category,yield_grams,portions_count,vat_rate,margin_rate,notes,procedure,output_ingredient_id,is_active,is_draft")
+      .select("id,user_id,name,category,yield_grams,portions_count,vat_rate,margin_rate,notes,procedure,output_ingredient_id,is_active,is_draft,photo_url")
       .eq("id", recipeId)
       .maybeSingle();
 
@@ -506,6 +515,8 @@ if (supplierIds.length) {
       procedure: String(rr.procedure ?? ""),
       output_ingredient_id: rr.output_ingredient_id ?? null,
     });
+    setPhotoUrl(rr.photo_url ?? null);
+    setPhotoPreview(rr.photo_url ?? null);
 
     const { data: ln, error: lErr } = await supabase
       .from("kitchen_recipe_lines")
@@ -615,6 +626,57 @@ if (supplierIds.length) {
     setLines((p) => (p ?? []).filter((x) => x.id !== lineId));
   };
 
+  async function uploadPhoto(file: File) {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) throw new Error("NOT_LOGGED");
+
+    const uid = auth.user.id;
+    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    const storagePath = recipeId ? `${uid}/kitchen/${recipeId}.jpg` : `${uid}/kitchen/${ts}.jpg`;
+
+    const blob = await compressImage(file);
+
+    setPhotoUploading(true);
+    const { error: upErr } = await supabase.storage
+      .from("recipe-images")
+      .upload(storagePath, blob, { upsert: true, contentType: "image/jpeg" });
+
+    if (upErr) {
+      setPhotoUploading(false);
+      throw new Error(upErr.message);
+    }
+
+    const { data: pub } = supabase.storage.from("recipe-images").getPublicUrl(storagePath);
+    setPhotoUploading(false);
+    return pub.publicUrl;
+  }
+
+  async function onPickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    setPhotoError(null);
+    try {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      const local = URL.createObjectURL(f);
+      setPhotoPreview(local);
+      const url = await uploadPhoto(f);
+      URL.revokeObjectURL(local);
+      setPhotoPreview(url);
+      setPhotoUrl(url);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setPhotoError(`Upload échoué : ${msg}`);
+      setPhotoPreview(photoUrl);
+    } finally {
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  function clearPhoto() {
+    setPhotoPreview(null);
+    setPhotoUrl(null);
+    setPhotoError(null);
+  }
+
   const exportPdf = async () => {
     try {
       if (!recipeId) {
@@ -710,6 +772,7 @@ if (supplierIds.length) {
       notes: form.notes?.trim() || null,
       procedure: form.procedure?.trim() || null,
       output_ingredient_id: form.output_ingredient_id ?? null,
+      photo_url: photoUrl || null,
       updated_at: new Date().toISOString(),
       is_active: true,
       is_draft: false,
@@ -900,7 +963,7 @@ if (supplierIds.length) {
     return (
       <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
         <div style={{ maxWidth: 980, margin: "0 auto" }}>
-          <Link href="/kitchen" style={{ color: theme.muted, textDecoration: "none", fontWeight: 900 }}>
+          <Link href="/recettes?tab=cuisine" style={{ color: theme.muted, textDecoration: "none", fontWeight: 900 }}>
             ← Retour
           </Link>
           <h1 style={{ marginTop: 14, marginBottom: 10 }}>Erreur</h1>
@@ -1196,6 +1259,40 @@ if (supplierIds.length) {
             ))}
 
             {computed.rows.length === 0 ? <div style={{ color: theme.muted, fontWeight: 900 }}>Aucune ligne</div> : null}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 12, ...card }}>
+          <div style={{ fontSize: 16, fontWeight: 950, marginBottom: 10 }}>Photo</div>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+            {photoPreview ? (
+              <Image
+                src={photoPreview}
+                alt="Photo recette"
+                width={120}
+                height={120}
+                style={{ borderRadius: 8, objectFit: "cover", border: `1px solid ${theme.border}` }}
+                unoptimized
+              />
+            ) : (
+              <div style={{
+                width: 120, height: 120, borderRadius: 8,
+                border: `1px dashed ${theme.border}`, background: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 12, color: theme.muted,
+              }}>Photo</div>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <input ref={fileRef} type="file" accept="image/*" onChange={onPickPhoto} disabled={photoUploading} />
+              {photoPreview && (
+                <button type="button" onClick={clearPhoto} disabled={photoUploading}
+                  style={{ ...btn, color: "#c0392b", borderColor: "#c0392b" }}>
+                  Supprimer photo
+                </button>
+              )}
+              {photoUploading && <span style={{ color: theme.muted, fontSize: 13 }}>Upload en cours…</span>}
+              {photoError && <span style={{ color: "#c0392b", fontSize: 12 }}>{photoError}</span>}
+            </div>
           </div>
         </div>
 

@@ -84,7 +84,7 @@ export default function Home() {
               <Link className="btn btnPrimary btnWide" href="/pizzas/new">
                 Créer pizza
               </Link>
-              <Link className="btn btnWide" href="/pizzas">
+              <Link className="btn btnWide" href="/recettes?tab=pizza">
                 Fiches recettes
               </Link>
             </div>
@@ -99,10 +99,10 @@ export default function Home() {
             </p>
 
             <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap", justifyContent: "center" }}>
-              <Link className="btn btnPrimary btnWide" href="/recipes/new">
+              <Link className="btn btnPrimary btnWide" href="/recettes?tab=empatement">
                 Créer empâtement
               </Link>
-              <Link className="btn btnWide" href="/recipes">
+              <Link className="btn btnWide" href="/recettes?tab=empatement">
                 Fiches techniques
               </Link>
             </div>
@@ -120,7 +120,7 @@ export default function Home() {
               <Link className="btn btnPrimary btnWide" href="/prep/new">
                 Créer recette pivot
               </Link>
-              <Link className="btn btnWide" href="/prep">
+              <Link className="btn btnWide" href="/recettes?tab=pivot">
                 Recettes pivot
               </Link>
             </div>
@@ -138,7 +138,7 @@ export default function Home() {
               <Link className="btn btnPrimary btnWide" href="/kitchen/new">
                 Créer fiche cuisine
               </Link>
-              <Link className="btn btnWide" href="/kitchen">
+              <Link className="btn btnWide" href="/recettes?tab=cuisine">
                 Fiches cuisine
               </Link>
             </div>
@@ -156,7 +156,7 @@ export default function Home() {
               <Link className="btn btnPrimary btnWide" href="/cocktails/new">
                 Créer cocktail
               </Link>
-              <Link className="btn btnWide" href="/cocktails">
+              <Link className="btn btnWide" href="/recettes?tab=cocktail">
                 Fiches cocktails
               </Link>
             </div>

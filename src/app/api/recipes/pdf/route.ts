@@ -5,6 +5,8 @@ import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { RecipePdfDocument, type RecipePdfData } from "@/lib/recipePdf";
 import { calculerPate } from "@/lib/pateEngine";
 import { POLE_COLORS } from "@/lib/poleColors";
+import fs from "fs";
+import path from "path";
 
 function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
@@ -25,6 +27,15 @@ function slugify(s: string) {
     .replace(/[^a-z0-9]+/gi, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60);
+}
+
+function readLogoBase64(): string | null {
+  try {
+    const buf = fs.readFileSync(path.join(process.cwd(), "public", "logo.png"));
+    return `data:image/png;base64,${buf.toString("base64")}`;
+  } catch {
+    return null;
+  }
 }
 
 function toNum(v: unknown, fallback: number) {
@@ -104,32 +115,22 @@ export async function POST(req: Request) {
     });
 
     const exportedAt = new Date().toISOString();
+    const logoBase64 = readLogoBase64();
 
     const data: RecipePdfData = {
       name: recipe.name ?? "Empâtement",
       type,
-
-      hydration_total: recipe.hydration_total ?? null,
-      salt_percent: recipe.salt_percent ?? null,
-      honey_percent: recipe.honey_percent ?? null,
-      oil_percent: recipe.oil_percent ?? null,
-
-      yeast_percent: recipe.yeast_percent ?? null,
-      biga_yeast_percent: recipe.biga_yeast_percent ?? null,
-
-      flour_mix,
-
-      // ✅ NEW
-      procedure: recipe.procedure ?? "",
-
       nbPatons,
       poidsPaton,
-      exportedAt,
-
-      totals: calc.totals,
       phases: calc.phases,
-      warnings: calc.warnings ?? [],
+      flour_mix,
+      procedure: recipe.procedure ?? "",
+      logoBase64,
       accentColor: POLE_COLORS["empâtement"],
+      // legacy — gardés pour backward compat
+      exportedAt,
+      totals: calc.totals,
+      warnings: calc.warnings ?? [],
     };
 
     // ✅ Fix TypeScript: renderToBuffer attend ReactElement<DocumentProps>

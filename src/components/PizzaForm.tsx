@@ -1,5 +1,6 @@
 "use client";
 import { offerRowToCpu } from "@/lib/offerPricing";
+import { compressImage } from "@/lib/compressImage";
 import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -115,15 +116,6 @@ function validateRows(rows: PizzaIngredientRow[]) {
   }
 
   return { ok: true as const };
-}
-
-function slugify(s: string) {
-  return s
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gi, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
 }
 
 export default function PizzaForm(props: { pizzaId?: string }) {
@@ -483,25 +475,23 @@ setSupplierByIngredient(supplierByIngredient);
     if (!auth.user) throw new Error("NOT_LOGGED");
 
     const uid = auth.user.id;
-    const baseName = slugify(form?.name?.trim() || "pizza");
     const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    const storagePath = pizzaId ? `${uid}/pizzas/${pizzaId}.jpg` : `${uid}/pizzas/${ts}.jpg`;
 
-    const folder = pizzaId ? pizzaId : `tmp-${ts}`;
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    const path = `${uid}/${folder}/${ts}-${baseName}.${ext}`;
+    const blob = await compressImage(file);
 
     setPhotoUploading(true);
 
     const { error: upErr } = await supabase.storage
-      .from("pizza-photos")
-      .upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
+      .from("recipe-images")
+      .upload(storagePath, blob, { upsert: true, contentType: "image/jpeg" });
 
     if (upErr) {
       setPhotoUploading(false);
       throw new Error(upErr.message);
     }
 
-    const { data: pub } = supabase.storage.from("pizza-photos").getPublicUrl(path);
+    const { data: pub } = supabase.storage.from("recipe-images").getPublicUrl(storagePath);
     setPhotoUploading(false);
 
     return pub.publicUrl;

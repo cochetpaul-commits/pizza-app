@@ -1,8 +1,10 @@
 "use client";
 
 import { offerRowToCpu } from "@/lib/offerPricing";
+import { compressImage } from "@/lib/compressImage";
 import { formatLiquidQtyParts } from "@/lib/formatUnit";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import { SmartSelect } from "@/components/SmartSelect";
 import { supabase } from "@/lib/supabaseClient";
@@ -23,6 +25,7 @@ type PrepRecipe = {
   pivot_unit: "g" | "ml" | "pc";
   pivot_amount?: number | null;
   output_ingredient_id?: string | null;
+  photo_url?: string | null;
   created_at?: string;
 };
 
@@ -126,6 +129,11 @@ export default function PrepRecipeDetailPage() {
 
   const [adding, setAdding] = useState(false);
 
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
   const pivotAmountNum = useMemo(() => {
     const raw = String(pivotAmount).trim();
     if (!raw) return 0;
@@ -195,7 +203,7 @@ export default function PrepRecipeDetailPage() {
 
       const { data: r, error: eR } = await supabase
         .from("prep_recipes")
-        .select("id,name,pivot_ingredient_id,pivot_unit,pivot_amount,output_ingredient_id,created_at")
+        .select("id,name,pivot_ingredient_id,pivot_unit,pivot_amount,output_ingredient_id,photo_url,created_at")
         .eq("id", id)
         .single();
 
@@ -208,6 +216,7 @@ export default function PrepRecipeDetailPage() {
       if (rr.pivot_amount != null && rr.pivot_amount > 0) {
         setPivotAmount(String(rr.pivot_amount));
       }
+      setPhotoPreview(rr.photo_url ?? null);
 
       const { data: ing, error: eI } = await supabase
         .from("ingredients")
@@ -307,6 +316,51 @@ export default function PrepRecipeDetailPage() {
     return nameOk && pivotOk;
   }, [recipe]);
 
+  async function uploadPhoto(file: File) {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) throw new Error("NOT_LOGGED");
+    const uid = auth.user.id;
+    const storagePath = `${uid}/prep/${id}.jpg`;
+    const blob = await compressImage(file);
+    setPhotoUploading(true);
+    const { error: upErr } = await supabase.storage
+      .from("recipe-images")
+      .upload(storagePath, blob, { upsert: true, contentType: "image/jpeg" });
+    if (upErr) {
+      setPhotoUploading(false);
+      throw new Error(upErr.message);
+    }
+    const { data: pub } = supabase.storage.from("recipe-images").getPublicUrl(storagePath);
+    setPhotoUploading(false);
+    return pub.publicUrl;
+  }
+
+  async function onPickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    setPhotoError(null);
+    try {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      const local = URL.createObjectURL(f);
+      setPhotoPreview(local);
+      const url = await uploadPhoto(f);
+      URL.revokeObjectURL(local);
+      setPhotoPreview(url);
+      setRecipe((p) => (p ? { ...p, photo_url: url } : p));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setPhotoError(`Upload échoué : ${msg}`);
+      setPhotoPreview(recipe?.photo_url ?? null);
+    } finally {
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  function clearPhoto() {
+    setPhotoPreview(null);
+    setPhotoError(null);
+    setRecipe((p) => (p ? { ...p, photo_url: null } : p));
+  }
+
   const saveRecipe = async () => {
     if (!recipe) return;
     if (saving) return;
@@ -325,6 +379,7 @@ export default function PrepRecipeDetailPage() {
         pivot_ingredient_id: recipe.pivot_ingredient_id,
         pivot_unit: recipe.pivot_unit,
         pivot_amount: pivotAmountNum > 0 ? pivotAmountNum : null,
+        photo_url: recipe.photo_url ?? null,
         updated_at: new Date().toISOString(),
       };
 
@@ -602,6 +657,40 @@ export default function PrepRecipeDetailPage() {
               inputMode="decimal"
               placeholder="ex: 300"
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Photo */}
+      <div className="card" style={{ marginTop: 12 }}>
+        <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 10 }}>Photo</div>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+          {photoPreview ? (
+            <Image
+              src={photoPreview}
+              alt="Photo recette"
+              width={120}
+              height={120}
+              style={{ borderRadius: 8, objectFit: "cover", border: "1px solid #ccc" }}
+              unoptimized
+            />
+          ) : (
+            <div style={{
+              width: 120, height: 120, borderRadius: 8,
+              border: "1px dashed #ccc", background: "#f5f5f5",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 12, color: "#999",
+            }}>Photo</div>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <input ref={fileRef} type="file" accept="image/*" onChange={onPickPhoto} disabled={photoUploading} />
+            {photoPreview && (
+              <button className="btn btnDanger" type="button" onClick={clearPhoto} disabled={photoUploading}>
+                Supprimer photo
+              </button>
+            )}
+            {photoUploading && <span className="muted">Upload en cours…</span>}
+            {photoError && <span style={{ color: "red", fontSize: 12 }}>{photoError}</span>}
           </div>
         </div>
       </div>

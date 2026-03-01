@@ -1,6 +1,7 @@
 "use client";
 
 import { offerRowToCpu } from "@/lib/offerPricing";
+import { compressImage } from "@/lib/compressImage";
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -75,15 +76,6 @@ function round2(v: number) {
 
 function tmpId() {
   return `tmp-${Math.random().toString(36).slice(2)}`;
-}
-
-function slugify(s: string) {
-  return s
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gi, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
 }
 
 function fmtMoney(v: number) {
@@ -337,16 +329,15 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
     if (!auth.user) throw new Error("NOT_LOGGED");
 
     const uid = auth.user.id;
-    const baseName = slugify(form.name.trim() || "cocktail");
     const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-    const folder = cocktailId ? cocktailId : `tmp-${ts}`;
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    const storagePath = `${uid}/${folder}/${ts}-${baseName}.${ext}`;
+    const storagePath = cocktailId ? `${uid}/cocktails/${cocktailId}.jpg` : `${uid}/cocktails/${ts}.jpg`;
+
+    const blob = await compressImage(file);
 
     setPhotoUploading(true);
     const { error: upErr } = await supabase.storage
       .from("recipe-images")
-      .upload(storagePath, file, { upsert: true, contentType: file.type || "image/jpeg" });
+      .upload(storagePath, blob, { upsert: true, contentType: "image/jpeg" });
 
     if (upErr) {
       setPhotoUploading(false);
@@ -514,7 +505,7 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
     <main className="container">
       {/* NAV */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-        <Link href="/cocktails" style={{ fontSize: 13, opacity: 0.6 }}>← Cocktails</Link>
+        <Link href="/recettes?tab=cocktail" style={{ fontSize: 13, opacity: 0.6 }}>← Cocktails</Link>
         <Link href="/" style={{ fontSize: 13, opacity: 0.6 }}>Accueil</Link>
       </div>
 

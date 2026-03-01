@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import React from "react";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { KitchenPdfDocument, type KitchenPdfData } from "@/lib/kitchenPdf";
+import { photoToBase64 } from "@/lib/photoToBase64";
 import fs from "fs";
 import path from "path";
 import { POLE_COLORS } from "@/lib/poleColors";
@@ -52,6 +53,7 @@ type KitchenRow = {
   portions_count: number | null;
   notes: string | null;
   procedure: string | null;
+  photo_url: string | null;
 };
 
 type LineRow = {
@@ -91,7 +93,7 @@ export async function POST(req: Request) {
 
     const { data: recipe, error: rErr } = await supabase
       .from("kitchen_recipes")
-      .select("id,name,category,yield_grams,portions_count,notes,procedure")
+      .select("id,name,category,yield_grams,portions_count,notes,procedure,photo_url")
       .eq("id", kitchenId)
       .maybeSingle();
 
@@ -144,6 +146,7 @@ export async function POST(req: Request) {
 
     const exportedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
     const logoBase64 = readLogoBase64();
+    const photoUrl = rr.photo_url ? await photoToBase64(supabase, rr.photo_url) : null;
 
     const data: KitchenPdfData = {
       recipeName: (rr.name ?? "Recette").toString(),
@@ -162,7 +165,7 @@ export async function POST(req: Request) {
       procedure: rr.procedure ?? null,
       exportedAt,
       logoBase64,
-      photoUrl: null,
+      photoUrl,
       accentColor: POLE_COLORS.cuisine,
     };
 

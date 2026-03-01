@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import React from "react";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { PizzaPdfDocument, type PizzaPdfData } from "@/lib/pizzaPdf";
+import { photoToBase64 } from "@/lib/photoToBase64";
 import fs from "fs";
 import path from "path";
 import { POLE_COLORS } from "@/lib/poleColors";
@@ -34,14 +35,6 @@ function readLogoBase64(): string | null {
     return null;
   }
 }
-
-function extractStoragePath(url: string, bucket: string): string | null {
-  const marker = `/object/public/${bucket}/`;
-  const idx = url.indexOf(marker);
-  if (idx === -1) return null;
-  return decodeURIComponent(url.slice(idx + marker.length));
-}
-
 
 type PizzaRow = {
   id: string;
@@ -151,19 +144,8 @@ export async function POST(req: Request) {
     const exportedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
     const logoBase64 = readLogoBase64();
 
-    // Pré-fetch de la photo en base64 — react-pdf ne peut pas fetcher les URLs Supabase
-    let photoUrl: string | null = null;
-    if (pizzaRow.photo_url) {
-      const storagePath = extractStoragePath(pizzaRow.photo_url, "pizza-photos");
-      if (storagePath) {
-        const { data: blob, error: dlErr } = await supabase.storage.from("pizza-photos").download(storagePath);
-        if (!dlErr && blob) {
-          const buf = Buffer.from(await blob.arrayBuffer());
-          const mime = blob.type && blob.type !== "application/octet-stream" ? blob.type : "image/jpeg";
-          photoUrl = `data:${mime};base64,${buf.toString("base64")}`;
-        }
-      }
-    }
+    // Photo en base64 — via SDK Storage (supporte pizza-photos et recipe-images)
+    const photoUrl = pizzaRow.photo_url ? await photoToBase64(supabase, pizzaRow.photo_url) : null;
 
     const data: PizzaPdfData = {
       pizzaName: (pizzaRow.name ?? "Pizza").toString(),
