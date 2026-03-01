@@ -1,3 +1,5 @@
+import { extractVolumeFromName } from "./utils";
+
 type ParsedLine = {
   sku: string | null;
   name: string;
@@ -8,6 +10,7 @@ type ParsedLine = {
   tax_rate: number | null;
   notes: string | null;
   piece_weight_g: number | null;
+  piece_volume_ml: number | null;
 };
 
 export type ParsedInvoice = {
@@ -35,8 +38,6 @@ function parseFrenchNumber(s: string): number | null {
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
 }
-
-
 
 function extractWeightGFromName(name: string): number | null {
   // ex: "1 kg", "1,5 kg", "500 g", "2 x 500 g", "10 x 100 g x 2"
@@ -66,7 +67,6 @@ function extractMeta(text: string): Pick<ParsedInvoice, "invoice_number" | "invo
   };
 }
 
-
 function parseLines(text: string): ParsedLine[] {
   const rows = text.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
   const tmp: ParsedLine[] = [];
@@ -77,19 +77,47 @@ function parseLines(text: string): ParsedLine[] {
     if (!lineMatch) {
       const vapMatch = r.match(/^\d{8,13}\s+(\d{7})\s+(.+?)\s+([\d,]+)\s+([\d,]+)\s+(\d+)\s+\d+\s+([\d,]+)\s+([ABD])\b/i);
       if (vapMatch) {
-        tmp.push({ sku: vapMatch[1], name: vapMatch[2].trim(), quantity: parseFrenchNumber(vapMatch[5]), unit: "kg", unit_price: parseFrenchNumber(vapMatch[4]), total_price: parseFrenchNumber(vapMatch[6]), tax_rate: taxMap[vapMatch[7].toUpperCase()] ?? null, notes: "VAP=" + vapMatch[3], piece_weight_g: null });
+        // VAP = vente au poids, prix réel par kg
+        tmp.push({ sku: vapMatch[1], name: vapMatch[2].trim(), quantity: parseFrenchNumber(vapMatch[5]), unit: "kg", unit_price: parseFrenchNumber(vapMatch[4]), total_price: parseFrenchNumber(vapMatch[6]), tax_rate: taxMap[vapMatch[7].toUpperCase()] ?? null, notes: "VAP=" + vapMatch[3], piece_weight_g: null, piece_volume_ml: null });
       }
       continue;
     }
+
     const name = lineMatch[2].trim();
-    let unit = "pc";
-    if (/\b\d+(?:[.,]\d+)?\s*kg\b/i.test(name)) unit = "kg";
-    else if (/\b\d+(?:[.,]\d+)?\s*(?:cl|ml|l)\b/i.test(name)) unit = "l";
-    tmp.push({ sku: lineMatch[1], name, quantity: parseFrenchNumber(lineMatch[4]), unit: unit as "pc" | "kg" | "l" | null, unit_price: parseFrenchNumber(lineMatch[3]), total_price: parseFrenchNumber(lineMatch[5]), tax_rate: taxMap[lineMatch[6].toUpperCase()] ?? null, notes: null, piece_weight_g: unit === "pc" ? extractWeightGFromName(name) : null });
+
+    // Déterminer unité et volumes/poids
+    let unit: "pc" | "kg" = "pc";
+    let pieceWeightG: number | null = null;
+    let pieceVolumeMl: number | null = null;
+
+    if (/\b\d+(?:[.,]\d+)?\s*kg\b/i.test(name)) {
+      // Prix au kg (vrac ou produit facturé au kg)
+      unit = "kg";
+    } else {
+      // Bouteilles / contenants : extraire le volume, garder unit="pc"
+      // Le prix facturé est TOUJOURS par unité (par bouteille), jamais par litre
+      pieceVolumeMl = extractVolumeFromName(name);
+      if (pieceVolumeMl == null) {
+        pieceWeightG = extractWeightGFromName(name);
+      }
+    }
+
+    tmp.push({
+      sku: lineMatch[1],
+      name,
+      quantity: parseFrenchNumber(lineMatch[4]),
+      unit,
+      unit_price: parseFrenchNumber(lineMatch[3]),
+      total_price: parseFrenchNumber(lineMatch[5]),
+      tax_rate: taxMap[lineMatch[6].toUpperCase()] ?? null,
+      notes: null,
+      piece_weight_g: pieceWeightG,
+      piece_volume_ml: pieceVolumeMl,
+    });
   }
 
-  const seen = new Set();
-  const out = [];
+  const seen = new Set<string>();
+  const out: ParsedLine[] = [];
   for (const l of tmp) {
     const key = [l.sku ?? "", l.name, l.quantity ?? "", l.unit ?? "", l.unit_price ?? "", l.total_price ?? ""].join("|");
     if (seen.has(key)) continue;

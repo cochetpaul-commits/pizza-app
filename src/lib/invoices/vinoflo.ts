@@ -1,3 +1,5 @@
+import { extractVolumeFromName } from "./utils";
+
 type ParsedLine = {
   sku: string | null;
   name: string;
@@ -8,6 +10,7 @@ type ParsedLine = {
   tax_rate: number | null;
   notes: string | null;
   piece_weight_g: number | null;
+  piece_volume_ml: number | null;
 };
 
 export type ParsedInvoice = {
@@ -103,6 +106,7 @@ function parseLines(text: string): ParsedLine[] {
           tax_rate: 20,
           notes: isAlcoholTax(name) ? "taxe_alcool" : null,
           piece_weight_g: null,
+          piece_volume_ml: extractVolumeFromName(name),
         });
       }
       continue;
@@ -130,6 +134,7 @@ function parseLines(text: string): ParsedLine[] {
       tax_rate: 20,
       notes: isAlcoholTax(name) ? "taxe_alcool" : null,
       piece_weight_g: null,
+      piece_volume_ml: extractVolumeFromName(name),
     });
   }
 

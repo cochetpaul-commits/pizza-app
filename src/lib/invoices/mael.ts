@@ -1,3 +1,5 @@
+import { extractVolumeFromName } from "./utils";
+
 type ParsedLine = {
   sku: string | null;
   name: string;
@@ -8,6 +10,7 @@ type ParsedLine = {
   tax_rate: number | null;
   notes: string | null;
   piece_weight_g: number | null;
+  piece_volume_ml: number | null;
 };
 
 export type ParsedInvoice = {
@@ -82,7 +85,7 @@ function extractMeta(text: string): Pick<ParsedInvoice, "invoice_number" | "invo
 
 function normalizeLineHead(
   headRaw: string
-): { name: string; qty: number | null; unit: "pc" | "kg" | "l" | null; notes: string | null } {
+): { name: string; qty: number | null; unit: "pc" | "kg" | "l" | null; notes: string | null; piece_volume_ml: number | null } {
   let head = cleanName(headRaw);
 
   const varKg = head.match(/(\d+(?:[.,]\d+)?)\s*kg~\s*$/i);
@@ -90,7 +93,7 @@ function normalizeLineHead(
     const q = parseFrenchNumber(varKg[1]);
     head = head.replace(/\s*\d+(?:[.,]\d+)?\s*kg~\s*$/i, "").trim();
     head = stripTrailingUnitCount(head);
-    return { name: head, qty: q, unit: "kg", notes: "poids variable" };
+    return { name: head, qty: q, unit: "kg", notes: "poids variable", piece_volume_ml: null };
   }
 
   const varL = head.match(/(\d+(?:[.,]\d+)?)\s*l~\s*$/i);
@@ -98,17 +101,24 @@ function normalizeLineHead(
     const q = parseFrenchNumber(varL[1]);
     head = head.replace(/\s*\d+(?:[.,]\d+)?\s*l~\s*$/i, "").trim();
     head = stripTrailingUnitCount(head);
-    return { name: head, qty: q, unit: "l", notes: "volume variable" };
+    return { name: head, qty: q, unit: "l", notes: "volume variable", piece_volume_ml: null };
   }
 
+  // Compter les unités (ex: "10 U", "6 PCS")
   const uMatch = head.match(/\b(\d+(?:[.,]\d+)?)\s*(U|PIECE|PCS?)\b\s*$/i);
+  let qty: number | null = null;
   if (uMatch) {
-    const q = parseFrenchNumber(uMatch[1]);
+    qty = parseFrenchNumber(uMatch[1]);
     head = stripTrailingUnitCount(head);
-    return { name: head, qty: q, unit: "pc", notes: null };
   }
 
-  return { name: head, qty: null, unit: null, notes: null };
+  // Détecter un volume fixe dans le nom (ex: "AMARETTO 70CL", "BIERE 33CL")
+  const volMl = extractVolumeFromName(head);
+  if (volMl != null) {
+    return { name: head, qty, unit: "pc", notes: null, piece_volume_ml: volMl };
+  }
+
+  return { name: head, qty, unit: uMatch ? "pc" : null, notes: null, piece_volume_ml: null };
 }
 
 function parseLines(text: string): ParsedLine[] {
@@ -136,6 +146,8 @@ function parseLines(text: string): ParsedLine[] {
     const headRaw = rest.slice(0, Math.max(0, rest.length - tail[0].length)).trim();
     const norm = normalizeLineHead(headRaw);
 
+    const volMl = norm.piece_volume_ml;
+
     tmp.push({
       sku,
       name: norm.name,
@@ -145,7 +157,9 @@ function parseLines(text: string): ParsedLine[] {
       total_price: totalPrice,
       tax_rate: taxRate,
       notes: norm.notes,
-      piece_weight_g: norm.unit === "pc" ? extractWeightGFromName(norm.name) : null,
+      // piece_weight_g seulement si c'est une pièce sans volume connu
+      piece_weight_g: (norm.unit === "pc" && volMl == null) ? extractWeightGFromName(norm.name) : null,
+      piece_volume_ml: volMl,
     });
   }
 

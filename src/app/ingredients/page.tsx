@@ -22,6 +22,7 @@ import {
 import {
   fmtLegacyPriceLine,
   fmtOfferPriceLine,
+  fmtVolume,
   legacyHasPrice,
   normalizeSupplierId,
   offerHasPrice,
@@ -1360,7 +1361,7 @@ type SupplierOfferPayload = {
             const isEditing = editingId === x.id;
             const offer = offersByIngredientId.get(x.id);
 
-            const price = offer ? fmtOfferPriceLine(offer) : fmtLegacyPriceLine(x);
+            const price = offer ? fmtOfferPriceLine(offer, { piece_volume_ml: x.piece_volume_ml }) : fmtLegacyPriceLine(x);
 
             const supplierIdForDisplay = offer?.supplier_id ?? x.supplier_id;
             const supplierName = supplierIdForDisplay ? suppliersMap.get(supplierIdForDisplay)?.name : null;
@@ -1439,12 +1440,14 @@ type SupplierOfferPayload = {
                   </div>
 
                   <div>
-                    <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>Densité / Poids</div>
+                    <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>Densité / Poids / Vol.</div>
                     <div style={{ fontWeight: 600 }}>
                       {offer?.density_kg_per_l != null
                         ? `${fmtQty(offer.density_kg_per_l)} kg/L`
                         : offer?.piece_weight_g != null
                         ? `${fmtQty(offer.piece_weight_g)} g/pc`
+                        : x.piece_volume_ml != null
+                        ? fmtVolume(x.piece_volume_ml) + "/pc"
                         : x.purchase_unit_name === "l"
                         ? `${x.density_g_per_ml ?? 1} kg/L`
                         : x.piece_weight_g

@@ -64,6 +64,22 @@ const METRO_SECTIONS: { pattern: RegExp; category: Category }[] = [
 { pattern: /TRAITEUR/i, category: "charcuterie" },
 ];
 
+/**
+ * Normalise un nom d'ingrédient pour comparaison insensible aux guillemets,
+ * accents et espaces multiples. Utilisé pour éviter les doublons à l'import.
+ */
+export function normalizeIngredientName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[«»""‟„‹›]/g, '"')
+    .replace(/['\u2019\u2018\u201b]/g, "'")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9"'\s%/]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function detectCategoryFromName(name: string): Category {
   // Normalise :
   //  - apostrophes → espace : "d'oeuf" → " oeuf" matche

@@ -8,6 +8,7 @@ type ParsedLine = {
   tax_rate: number | null;
   notes: string | null;
   piece_weight_g: number | null;
+  piece_volume_ml: number | null;
 };
 
 export type ParsedInvoice = {
@@ -224,6 +225,7 @@ function parseLines(text: string): ParsedLine[] {
         tax_rate: null,
         notes: "RUPTURE",
         piece_weight_g: null,
+        piece_volume_ml: null,
       });
       continue;
     }
@@ -233,6 +235,9 @@ function parseLines(text: string): ParsedLine[] {
     const tva = tvaValues[i] ?? null;
     const total = totals[i] ?? null;
     const tax_rate = tva === 1 ? 5.5 : tva === 2 ? 20.0 : null;
+    // containerValues[i] est en cl → convertir en ml
+    const clVal = containerValues[i] ?? null;
+    const pieceVolumeMl = clVal != null ? clVal * 10 : null;
 
     lines.push({
       sku,
@@ -244,6 +249,7 @@ function parseLines(text: string): ParsedLine[] {
       tax_rate,
       notes: null,
       piece_weight_g: null,
+      piece_volume_ml: pieceVolumeMl,
     });
   }
 

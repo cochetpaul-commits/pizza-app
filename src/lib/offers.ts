@@ -66,14 +66,34 @@ export function fmtLegacyPriceLine(x: Ingredient): { main: string; sub: string }
         const eurPerKg = (x.purchase_price / w) * 1000;
         return { main, sub: `≈ ${fmtMoney(eurPerKg)} €/kg • ${fmtQty(w)} g/pc` };
       }
-      return { main, sub: "poids pièce: —" };
+      const volMl = x.piece_volume_ml;
+      if (volMl != null && volMl > 0 && x.purchase_price != null) {
+        if (volMl >= 1000) {
+          const eurPerL = (x.purchase_price / volMl) * 1000;
+          return { main: `${fmtMoney(eurPerL)} € /L`, sub: `${main} · ${fmtVolume(volMl)}/pc` };
+        } else {
+          const eurPerCl = (x.purchase_price / volMl) * 10;
+          return { main, sub: `${fmtMoney(eurPerCl)} €/cl · ${fmtVolume(volMl)}/pc` };
+        }
+      }
+      return { main, sub: "offre fournisseur" };
     }
   }
 
   return { main: "—", sub: "prix non renseigné" };
 }
 
-export function fmtOfferPriceLine(o: LatestOffer): { main: string; sub: string } {
+/** Formate un volume en ml en affichage lisible (cl si < 1L, sinon L). */
+export function fmtVolume(ml: number): string {
+  if (ml < 1000) return `${Math.round(ml / 10)} cl`;
+  const l = ml / 1000;
+  return `${fmtQty(l)} L`;
+}
+
+export function fmtOfferPriceLine(
+  o: LatestOffer,
+  extras?: { piece_volume_ml?: number | null }
+): { main: string; sub: string } {
   const pk = o.price_kind;
 
   if (pk === "unit") {
@@ -87,10 +107,33 @@ export function fmtOfferPriceLine(o: LatestOffer): { main: string; sub: string }
     if (o.unit === "pc" && o.unit_price != null) {
       const pw = n2(o.piece_weight_g);
       if (pw > 0) {
+        // Produit pesé (ex: coquillettes 500g) → afficher €/kg
         const eurPerKg = (o.unit_price / pw) * 1000;
         return { main: `${fmtMoney(eurPerKg)} € /kg`, sub: `offre: ${fmtMoney(o.unit_price)} €/pc • ${fmtQty(pw)} g/pc` };
       }
-      return { main: `${fmtMoney(o.unit_price)} €/pc`, sub: "poids pièce: —" };
+
+      const volMl = extras?.piece_volume_ml ?? null;
+      if (volMl != null && volMl > 0) {
+        // Bouteille / contenant : afficher €/pc + €/cl (ou €/L si >= 1L)
+        if (volMl >= 1000) {
+          // Ex: huile 1L → main = €/L, sub = €/pc
+          const eurPerL = (o.unit_price / volMl) * 1000;
+          return {
+            main: `${fmtMoney(eurPerL)} € /L`,
+            sub: `${fmtMoney(o.unit_price)} €/pc · ${fmtVolume(volMl)}/pc`,
+          };
+        } else {
+          // Ex: amaretto 70cl → main = €/pc, sub = €/cl
+          const eurPerCl = (o.unit_price / volMl) * 10;
+          return {
+            main: `${fmtMoney(o.unit_price)} €/pc`,
+            sub: `${fmtMoney(eurPerCl)} €/cl · ${fmtVolume(volMl)}/pc`,
+          };
+        }
+      }
+
+      // Pièce sans poids ni volume (ex: emballage, article divers)
+      return { main: `${fmtMoney(o.unit_price)} €/pc`, sub: "offre fournisseur" };
     }
 
     return { main: "—", sub: "offre incomplète" };
