@@ -1,6 +1,7 @@
 "use client";
 
 import { offerRowToCpu } from "@/lib/offerPricing";
+import { formatLiquidQtyParts } from "@/lib/formatUnit";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { SmartSelect } from "@/components/SmartSelect";
@@ -715,38 +716,41 @@ export default function PrepRecipeDetailPage() {
         </div>
 
         <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-          {computed.rows.map((r) => (
-            <div
-              key={r.id}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "2fr 1fr 1fr auto",
-                gap: 10,
-                alignItems: "center",
-                padding: "12px 10px",
-                border: "1px solid rgba(0,0,0,0.10)",
-                borderRadius: 12,
-                background: "rgba(255,255,255,0.55)",
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 16, fontWeight: 900 }}>{r.ingredient_name ?? "—"}</div>
-              </div>
+          {computed.rows.map((r) => {
+            const [qStr, uStr] = formatLiquidQtyParts(r.qty, r.unit);
+            return (
+              <div
+                key={r.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "2fr 1fr 1fr auto",
+                  gap: 10,
+                  alignItems: "center",
+                  padding: "12px 10px",
+                  border: "1px solid rgba(0,0,0,0.10)",
+                  borderRadius: 12,
+                  background: "rgba(255,255,255,0.55)",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 900 }}>{r.ingredient_name ?? "—"}</div>
+                </div>
 
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 18, fontWeight: 900 }}>{Math.round(r.qty)}</div>
-                <div className="muted" style={{ fontSize: 12 }}>{r.unit}</div>
-              </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 18, fontWeight: 900 }}>{qStr}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>{uStr}</div>
+                </div>
 
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 18, fontWeight: 950 }}>{fmtMoney(r.cost)}</div>
-              </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 18, fontWeight: 950 }}>{fmtMoney(r.cost)}</div>
+                </div>
 
-              <button className="btn btnDanger" type="button" onClick={() => delLine(r.id)}>
-                Supprimer
-              </button>
-            </div>
-          ))}
+                <button className="btn btnDanger" type="button" onClick={() => delLine(r.id)}>
+                  Supprimer
+                </button>
+              </div>
+            );
+          })}
         </div>
 
         {computed.rows.length === 0 ? (

@@ -1,5 +1,6 @@
 import React from "react";
 import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
+import { formatLiquidQtyParts } from "@/lib/formatUnit";
 
 type PdfLine = {
   name: string | null;
@@ -269,19 +270,6 @@ function fmtKg(v: number | null) {
   return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €/kg";
 }
 
-function displayQty(qty: number | null, unit: string | null, isCocktail: boolean): string {
-  if (qty == null) return "";
-  if (isCocktail && unit === "ml") {
-    const cl = qty / 10;
-    return cl === Math.floor(cl) ? String(cl) : cl.toFixed(1);
-  }
-  return String(qty);
-}
-
-function displayUnit(unit: string | null, isCocktail: boolean): string {
-  if (isCocktail && unit === "ml") return "cl";
-  return unit ?? "";
-}
 
 export function KitchenPdfDocument({ data }: { data: KitchenPdfData }) {
   const isCocktail = data.category === "cocktail";
@@ -354,15 +342,18 @@ export function KitchenPdfDocument({ data }: { data: KitchenPdfData }) {
         <View style={styles.tableHeader}>
           <Text style={[styles.th, styles.colIngredient]}>Ingrédient</Text>
           <Text style={[styles.th, styles.colQty]}>Qté</Text>
-          <Text style={[styles.th, styles.colUnit]}>{isCocktail ? "cl" : "Unité"}</Text>
+          <Text style={[styles.th, styles.colUnit]}>Unité</Text>
         </View>
-        {data.lines.map((i, idx) => (
-          <View key={idx} style={[styles.row, idx % 2 === 1 ? styles.rowEven : {}]}>
-            <Text style={styles.colIngredient}>{i.name ?? "—"}</Text>
-            <Text style={styles.colQty}>{displayQty(i.qty, i.unit, isCocktail)}</Text>
-            <Text style={styles.colUnit}>{displayUnit(i.unit, isCocktail)}</Text>
-          </View>
-        ))}
+        {data.lines.map((i, idx) => {
+          const [qStr, uStr] = formatLiquidQtyParts(i.qty, i.unit);
+          return (
+            <View key={idx} style={[styles.row, idx % 2 === 1 ? styles.rowEven : {}]}>
+              <Text style={styles.colIngredient}>{i.name ?? "—"}</Text>
+              <Text style={styles.colQty}>{qStr}</Text>
+              <Text style={styles.colUnit}>{uStr}</Text>
+            </View>
+          );
+        })}
 
         {/* PROCÉDÉ */}
         <Text style={styles.sectionTitle}>Procédé</Text>

@@ -83,11 +83,16 @@ export function fmtLegacyPriceLine(x: Ingredient): { main: string; sub: string }
   return { main: "—", sub: "prix non renseigné" };
 }
 
-/** Formate un volume en ml en affichage lisible (cl si < 1L, sinon L). */
+/**
+ * Formate un volume en ml :
+ *   ≥ 1000 ml → L   ex: 1500 → "1,5 L"
+ *   100–999ml → cl  ex: 700  → "70 cl"
+ *   < 100 ml  → ml  ex: 50   → "50 ml"
+ */
 export function fmtVolume(ml: number): string {
-  if (ml < 1000) return `${Math.round(ml / 10)} cl`;
-  const l = ml / 1000;
-  return `${fmtQty(l)} L`;
+  if (ml >= 1000) return `${fmtQty(ml / 1000)} L`;
+  if (ml >= 100) return `${fmtQty(ml / 10)} cl`;
+  return `${fmtQty(ml)} ml`;
 }
 
 export function fmtOfferPriceLine(

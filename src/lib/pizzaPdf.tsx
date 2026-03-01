@@ -1,5 +1,6 @@
 import React from "react";
 import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
+import { formatLiquidQtyParts } from "@/lib/formatUnit";
 
 type PdfIngredient = {
   name: string | null;
@@ -250,13 +251,16 @@ function IngredientsTable({ items }: { items: PdfIngredient[] }) {
         <Text style={[styles.th, styles.colQty]}>Qté</Text>
         <Text style={[styles.th, styles.colUnit]}>Unité</Text>
       </View>
-      {items.map((i, idx) => (
-        <View key={idx} style={[styles.row, idx % 2 === 1 ? styles.rowEven : {}]}>
-          <Text style={styles.colIngredient}>{i.name ?? "—"}</Text>
-          <Text style={styles.colQty}>{i.qty != null ? String(i.qty) : ""}</Text>
-          <Text style={styles.colUnit}>{i.unit ?? ""}</Text>
-        </View>
-      ))}
+      {items.map((i, idx) => {
+        const [qStr, uStr] = formatLiquidQtyParts(i.qty, i.unit);
+        return (
+          <View key={idx} style={[styles.row, idx % 2 === 1 ? styles.rowEven : {}]}>
+            <Text style={styles.colIngredient}>{i.name ?? "—"}</Text>
+            <Text style={styles.colQty}>{qStr}</Text>
+            <Text style={styles.colUnit}>{uStr}</Text>
+          </View>
+        );
+      })}
     </View>
   );
 }
