@@ -60,7 +60,7 @@ type Form = {
   image_url: string;
 };
 
-type PgError = { code?: string; message?: string };
+type PgError = { code?: string; message?: string; details?: string };
 
 /* ── helpers ──────────────────────────────────────────────────── */
 
@@ -88,6 +88,11 @@ function slugify(s: string) {
 
 function fmtMoney(v: number) {
   return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function parseQty(s: string): number | null {
+  const n = parseFloat(s.replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 /* ── constants ────────────────────────────────────────────────── */
@@ -138,27 +143,23 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
   });
   const [lines, setLines] = useState<LineUI[]>([]);
 
-  // ingredient index
   const [ingredients, setIngredients] = useState<IngRow[]>([]);
-  // offer pricing map: ingredient_id → CpuByUnit
   const [priceMap, setPriceMap] = useState<Record<string, { ml?: number; g?: number; pcs?: number }>>({});
 
-  // new line inputs
   const [newIngId, setNewIngId] = useState("");
   const [newQty, setNewQty] = useState("");
   const [newUnit, setNewUnit] = useState<CocktailUnit>("cl");
 
-  // photo
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  // save state
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
   const [saveError, setSaveError] = useState<PgError | null>(null);
 
-  /* ── derived pricing ──────────────────────────────────────── */
+  /* ── pricing ──────────────────────────────────────────────── */
 
   const ingByVol = useMemo(() => {
     const m = new Map<string, number | null>();
@@ -166,21 +167,15 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
     return m;
   }, [ingredients]);
 
-  function getCpuMl(iid: string) {
-    const cpu = priceMap[iid];
-    if (!cpu) return null;
-    if (cpu.ml != null) return cpu.ml;
-    if (cpu.pcs != null) {
-      const pvm = ingByVol.get(iid) ?? null;
-      if (pvm != null && pvm > 0) return cpu.pcs / pvm;
-    }
-    return null;
-  }
-
   function computeLineCost(iid: string, qty: number, unit: CocktailUnit): number | null {
     const cpu = priceMap[iid];
     if (!cpu) return null;
-    const cpuMl = getCpuMl(iid);
+
+    let cpuMl = cpu.ml;
+    if (cpuMl == null && cpu.pcs != null) {
+      const pvm = ingByVol.get(iid) ?? null;
+      if (pvm != null && pvm > 0) cpuMl = cpu.pcs / pvm;
+    }
 
     if (unit === "cl" && cpuMl != null) return round2(qty * 10 * cpuMl);
     if (unit === "ml" && cpuMl != null) return round2(qty * cpuMl);
@@ -191,23 +186,20 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
 
   const totalCost = useMemo(() => {
     const sum = lines.reduce((acc, l) => {
-      const q = parseFloat(l.qty);
-      if (!Number.isFinite(q) || q <= 0) return acc;
-      const c = computeLineCost(l.ingredient_id, q, l.unit);
-      return acc + n2(c);
+      const q = parseQty(l.qty);
+      if (q == null) return acc;
+      return acc + n2(computeLineCost(l.ingredient_id, q, l.unit));
     }, 0);
     return round2(sum);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines, priceMap, ingByVol]);
 
-  /* ── ingredient options for SmartSelect ──────────────────── */
+  /* ── ingredient options ───────────────────────────────────── */
 
-  const ingOptions: SmartSelectOption[] = useMemo(() => {
-    return ingredients.map((i) => ({
-      id: i.id,
-      name: i.name ?? "",
-    }));
-  }, [ingredients]);
+  const ingOptions: SmartSelectOption[] = useMemo(
+    () => ingredients.map((i) => ({ id: i.id, name: i.name ?? "" })),
+    [ingredients]
+  );
 
   /* ── load ─────────────────────────────────────────────────── */
 
@@ -219,7 +211,6 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
       return;
     }
 
-    // Load all ingredients (for SmartSelect + piece_volume_ml)
     const { data: ings, error: iErr } = await supabase
       .from("ingredients")
       .select("id,name,piece_volume_ml")
@@ -230,7 +221,6 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
     const ingList = (ings ?? []) as IngRow[];
     setIngredients(ingList);
 
-    // Load all offers for pricing
     const { data: offers } = await supabase.from("v_latest_offers").select("*");
     const pm: Record<string, { ml?: number; g?: number; pcs?: number }> = {};
     for (const o of (offers ?? []) as Record<string, unknown>[]) {
@@ -239,12 +229,8 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
     }
     setPriceMap(pm);
 
-    if (!isEdit) {
-      setStatus("OK");
-      return;
-    }
+    if (!isEdit) { setStatus("OK"); return; }
 
-    // Load cocktail
     const { data: cocktail, error: cErr } = await supabase
       .from("cocktails")
       .select("id,user_id,name,type,glass,garnish,steps,sell_price,image_url")
@@ -266,7 +252,6 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
     });
     setPhotoPreview(c.image_url ?? null);
 
-    // Load lines
     const { data: ln, error: lErr } = await supabase
       .from("cocktail_ingredients")
       .select("id,cocktail_id,ingredient_id,qty,unit,sort_order")
@@ -297,10 +282,7 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      if (cancelled) return;
-      await load();
-    })();
+    (async () => { if (!cancelled) await load(); })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cocktailId, isEdit]);
@@ -309,8 +291,8 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
 
   const addLine = () => {
     if (!newIngId) return;
-    const q = parseFloat(newQty);
-    if (!Number.isFinite(q) || q <= 0) return;
+    const q = parseQty(newQty);
+    if (q == null) return;
 
     const ingRow = ingredients.find((x) => x.id === newIngId);
     const nextSort = lines.length ? Math.max(...lines.map((l) => l.sort_order)) + 1 : 0;
@@ -336,10 +318,8 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
       prev.map((l) => {
         if (l.id !== id) return l;
         const updated = { ...l, ...patch };
-        const q = parseFloat(updated.qty);
-        updated.cost = Number.isFinite(q) && q > 0
-          ? computeLineCost(updated.ingredient_id, q, updated.unit)
-          : null;
+        const q = parseQty(updated.qty);
+        updated.cost = q != null ? computeLineCost(updated.ingredient_id, q, updated.unit) : null;
         return updated;
       })
     );
@@ -368,7 +348,10 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
       .from("recipe-images")
       .upload(storagePath, file, { upsert: true, contentType: file.type || "image/jpeg" });
 
-    if (upErr) { setPhotoUploading(false); throw new Error(upErr.message); }
+    if (upErr) {
+      setPhotoUploading(false);
+      throw new Error(upErr.message);
+    }
 
     const { data: pub } = supabase.storage.from("recipe-images").getPublicUrl(storagePath);
     setPhotoUploading(false);
@@ -376,6 +359,7 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
   }
 
   async function onPickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    setPhotoError(null);
     try {
       const f = e.target.files?.[0];
       if (!f) return;
@@ -385,8 +369,9 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
       URL.revokeObjectURL(local);
       setPhotoPreview(url);
       setForm((p) => ({ ...p, image_url: url }));
-    } catch {
-      setSaveError({ message: "Upload photo impossible" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setPhotoError(`Upload échoué : ${msg}`);
       setPhotoPreview(form.image_url || null);
     } finally {
       if (fileRef.current) fileRef.current.value = "";
@@ -395,6 +380,7 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
 
   function clearPhoto() {
     setPhotoPreview(null);
+    setPhotoError(null);
     setForm((p) => ({ ...p, image_url: "" }));
   }
 
@@ -403,20 +389,16 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
   const exportPdf = async () => {
     try {
       if (!cocktailId) {
-        setSaveError({ message: "PDF : sauvegarde d'abord le cocktail (il faut un ID)." });
+        setSaveError({ message: "PDF : sauvegarde d'abord le cocktail." });
         return;
       }
-
       const { data: session } = await supabase.auth.getSession();
       const token = session.session?.access_token;
       if (!token) throw new Error("Token manquant");
 
       const res = await fetch("/api/cocktails/pdf", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ cocktailId }),
       });
 
@@ -429,18 +411,14 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
       const cd = res.headers.get("content-disposition") || "";
       const match = cd.match(/filename="([^"]+)"/);
       const filename = match?.[1] || "cocktail.pdf";
-
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 800);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      setSaveError({ message: "Export PDF impossible", details: msg } as PgError & { details?: string });
+      setSaveError({ message: "Export PDF impossible", details: msg });
     }
   };
 
@@ -455,21 +433,18 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
     if (!nm) { setSaveError({ message: "Nom obligatoire" }); return; }
 
     const { data: auth, error: authErr } = await supabase.auth.getUser();
-    if (authErr || !auth.user) {
-      setSaveError(authErr ?? { message: "NOT_LOGGED" });
-      return;
-    }
+    if (authErr || !auth.user) { setSaveError(authErr ?? { message: "NOT_LOGGED" }); return; }
 
     setSaving(true);
 
-    const sp = parseFloat(form.sell_price);
+    const sp = parseQty(form.sell_price);
     const payload: Record<string, unknown> = {
       name: nm,
       type: form.type || null,
       glass: form.glass || null,
       garnish: form.garnish.trim() || null,
       steps: form.steps.trim() || null,
-      sell_price: Number.isFinite(sp) && sp > 0 ? sp : null,
+      sell_price: sp,
       image_url: form.image_url.trim() || null,
       total_cost: totalCost > 0 ? totalCost : null,
       updated_at: new Date().toISOString(),
@@ -481,11 +456,7 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
     if (!id) {
       payload.user_id = auth.user.id;
       const { data, error: insErr } = await supabase
-        .from("cocktails")
-        .insert(payload)
-        .select("id")
-        .single<{ id: string }>();
-
+        .from("cocktails").insert(payload).select("id").single<{ id: string }>();
       if (insErr) { setSaving(false); setSaveError(insErr); return; }
       id = data?.id;
       if (!id) { setSaving(false); setSaveError({ message: "ID manquant après création" }); return; }
@@ -494,17 +465,16 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
       if (updErr) { setSaving(false); setSaveError(updErr); return; }
     }
 
-    // Replace lines
     const { error: delErr } = await supabase.from("cocktail_ingredients").delete().eq("cocktail_id", id);
     if (delErr) { setSaving(false); setSaveError(delErr); return; }
 
     const cleaned = lines
-      .filter((l) => l.ingredient_id && parseFloat(l.qty) > 0)
+      .filter((l) => l.ingredient_id && parseQty(l.qty) != null)
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((l, idx) => ({
         cocktail_id: id,
         ingredient_id: l.ingredient_id,
-        qty: parseFloat(l.qty),
+        qty: parseQty(l.qty),
         unit: l.unit,
         sort_order: idx,
       }));
@@ -517,18 +487,13 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
     setSaving(false);
     setSaveOk(true);
     setTimeout(() => setSaveOk(false), 900);
-
     if (!cocktailId) router.replace(`/cocktails/${id}`);
   };
 
   /* ── render ───────────────────────────────────────────────── */
 
   if (status === "loading") {
-    return (
-      <main className="container">
-        <p className="muted">Chargement…</p>
-      </main>
-    );
+    return <main className="container"><p className="muted">Chargement…</p></main>;
   }
 
   if (status === "ERROR") {
@@ -539,10 +504,11 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
     );
   }
 
-  const sellPriceNum = parseFloat(form.sell_price);
-  const margin = totalCost > 0 && Number.isFinite(sellPriceNum) && sellPriceNum > 0
-    ? round2(((sellPriceNum - totalCost) / sellPriceNum) * 100)
-    : null;
+  const sellPriceNum = parseQty(form.sell_price);
+  const margin =
+    totalCost > 0 && sellPriceNum != null && sellPriceNum > totalCost
+      ? round2(((sellPriceNum - totalCost) / sellPriceNum) * 100)
+      : null;
 
   return (
     <main className="container">
@@ -556,7 +522,7 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
         {isEdit ? (form.name || "Cocktail") : "Nouveau cocktail"}
       </h1>
 
-      {/* FORM */}
+      {/* 1. NOM + TYPE + VERRE + PRIX */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div style={{ gridColumn: "1 / -1" }}>
@@ -571,49 +537,181 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
 
           <div>
             <label className="label">Type</label>
-            <select
-              className="input"
-              value={form.type}
-              onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}
-            >
+            <select className="input" value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}>
               {TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
 
           <div>
             <label className="label">Verre</label>
-            <select
-              className="input"
-              value={form.glass}
-              onChange={(e) => setForm((p) => ({ ...p, glass: e.target.value }))}
-            >
+            <select className="input" value={form.glass} onChange={(e) => setForm((p) => ({ ...p, glass: e.target.value }))}>
               {GLASS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-          </div>
-
-          <div>
-            <label className="label">Garniture</label>
-            <input
-              className="input"
-              value={form.garnish}
-              onChange={(e) => setForm((p) => ({ ...p, garnish: e.target.value }))}
-              placeholder="ex: rondelle citron, feuille menthe…"
-            />
           </div>
 
           <div>
             <label className="label">Prix de vente (€)</label>
             <input
               className="input"
-              type="number"
-              step="0.5"
-              min="0"
+              type="text"
+              inputMode="decimal"
               value={form.sell_price}
               onChange={(e) => setForm((p) => ({ ...p, sell_price: e.target.value }))}
-              placeholder="ex: 12.00"
+              placeholder="ex: 12"
+              style={{ MozAppearance: "textfield" } as React.CSSProperties}
             />
           </div>
+        </div>
+      </div>
 
+      {/* 2. COMPOSITION */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="cardTitle">Composition</div>
+
+        {lines.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "3fr 100px 70px 90px auto",
+              gap: 6,
+              padding: "4px 0",
+              fontSize: 11, fontWeight: 700, color: "#777",
+              textTransform: "uppercase", letterSpacing: 0.4,
+              borderBottom: "1px solid #ddd", marginBottom: 4,
+            }}>
+              <div>Ingrédient</div>
+              <div style={{ textAlign: "right" }}>Quantité</div>
+              <div style={{ textAlign: "right" }}>Unité</div>
+              <div style={{ textAlign: "right" }}>Coût</div>
+              <div />
+            </div>
+
+            {lines.map((l) => {
+              const q = parseQty(l.qty);
+              const fmtQ = q != null ? formatLiquidQty(q, l.unit === "pc" || l.unit === "g" ? l.unit : l.unit) : l.qty;
+              return (
+                <div key={l.id} style={{
+                  display: "grid",
+                  gridTemplateColumns: "3fr 100px 70px 90px auto",
+                  gap: 6, alignItems: "center",
+                  padding: "4px 0", borderBottom: "1px solid #f0f0f0",
+                }}>
+                  <div style={{ fontSize: 13 }}>{l.ingredient_name || <span className="muted">—</span>}</div>
+                  <input
+                    className="input"
+                    type="text"
+                    inputMode="decimal"
+                    value={l.qty}
+                    onChange={(e) => updateLine(l.id, { qty: e.target.value })}
+                    placeholder={fmtQ}
+                    style={{ textAlign: "right", padding: "4px 6px", fontSize: 13 }}
+                  />
+                  <select
+                    className="input"
+                    value={l.unit}
+                    onChange={(e) => updateLine(l.id, { unit: e.target.value as CocktailUnit })}
+                    style={{ padding: "4px 6px", fontSize: 13 }}
+                  >
+                    {UNIT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                  <div style={{ textAlign: "right", fontSize: 13, color: l.cost != null ? "#1a1a1a" : "#ccc" }}>
+                    {l.cost != null ? `${fmtMoney(l.cost)} €` : "—"}
+                  </div>
+                  <button
+                    className="btn btnDanger" type="button" onClick={() => delLine(l.id)}
+                    style={{ padding: "3px 10px", fontSize: 12 }}
+                  >×</button>
+                </div>
+              );
+            })}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8, fontWeight: 700, fontSize: 14 }}>
+              <span className="muted">Coût matière</span>
+              <span>{totalCost > 0 ? `${fmtMoney(totalCost)} €` : "—"}</span>
+              {margin != null && (
+                <span className="muted" style={{ fontWeight: 400 }}>· marge {fmtMoney(margin)} %</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Ajouter une ligne */}
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+          <div style={{ flex: 3, minWidth: 160 }}>
+            <label className="label" style={{ fontSize: 11 }}>Ingrédient</label>
+            <SmartSelect options={ingOptions} value={newIngId} onChange={setNewIngId} placeholder="Chercher…" menuMax={10} />
+          </div>
+          <div style={{ width: 80 }}>
+            <label className="label" style={{ fontSize: 11 }}>Quantité</label>
+            <input
+              className="input"
+              type="text"
+              inputMode="decimal"
+              value={newQty}
+              onChange={(e) => setNewQty(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addLine()}
+              placeholder="4"
+              style={{ textAlign: "right" }}
+            />
+          </div>
+          <div style={{ width: 70 }}>
+            <label className="label" style={{ fontSize: 11 }}>Unité</label>
+            <select className="input" value={newUnit} onChange={(e) => setNewUnit(e.target.value as CocktailUnit)}>
+              {UNIT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <button className="btn btnPrimary" type="button" onClick={addLine} style={{ alignSelf: "flex-end" }}>
+            Ajouter
+          </button>
+        </div>
+
+        {newIngId && (() => {
+          const q = parseQty(newQty);
+          if (q == null) return null;
+          const c = computeLineCost(newIngId, q, newUnit);
+          const fmtQ = formatLiquidQty(q, newUnit === "pc" || newUnit === "g" ? newUnit : newUnit);
+          if (c == null) return <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>Pas de prix ({fmtQ})</div>;
+          return <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>Coût estimé : {fmtMoney(c)} € pour {fmtQ}</div>;
+        })()}
+      </div>
+
+      {/* 3. PHOTO */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="cardTitle">Photo</div>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+          {photoPreview ? (
+            <Image
+              src={photoPreview}
+              alt="Photo cocktail"
+              width={120}
+              height={120}
+              style={{ borderRadius: 8, objectFit: "cover", border: "1px solid #ccc" }}
+              unoptimized
+            />
+          ) : (
+            <div style={{
+              width: 120, height: 120, borderRadius: 8,
+              border: "1px dashed #ccc", background: "#f5f5f5",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 12, color: "#999",
+            }}>Photo</div>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <input ref={fileRef} type="file" accept="image/*" onChange={onPickPhoto} disabled={photoUploading} />
+            {photoPreview ? (
+              <button className="btn btnDanger" type="button" onClick={clearPhoto} disabled={photoUploading}>
+                Supprimer photo
+              </button>
+            ) : null}
+            {photoUploading && <span className="muted">Upload en cours…</span>}
+            {photoError && <span style={{ color: "red", fontSize: 12 }}>{photoError}</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* 4. PROCÉDÉ + GARNITURE */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div style={{ gridColumn: "1 / -1" }}>
             <label className="label">Procédé / étapes</label>
             <textarea
@@ -625,181 +723,16 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
               style={{ resize: "vertical" }}
             />
           </div>
-        </div>
-      </div>
-
-      {/* PHOTO */}
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="cardTitle">Photo</div>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-          {photoPreview ? (
-            <Image
-              src={photoPreview}
-              alt="Photo cocktail"
-              width={120}
-              height={120}
-              style={{ borderRadius: 8, objectFit: "cover", border: "1px solid #ccc" }}
-            />
-          ) : (
-            <div style={{
-              width: 120, height: 120, borderRadius: 8,
-              border: "1px dashed #ccc", background: "#f5f5f5",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 12, color: "#999",
-            }}>
-              Photo
-            </div>
-          )}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <input ref={fileRef} type="file" accept="image/*" onChange={onPickPhoto} disabled={photoUploading} />
-            {photoPreview ? (
-              <button className="btn btnDanger" type="button" onClick={clearPhoto} disabled={photoUploading}>
-                Supprimer photo
-              </button>
-            ) : null}
-            {photoUploading ? <span className="muted">Upload…</span> : null}
-          </div>
-        </div>
-      </div>
-
-      {/* COMPOSITION */}
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="cardTitle">Composition</div>
-
-        {/* Existing lines */}
-        {lines.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "3fr 80px 70px 80px auto",
-              gap: 6,
-              padding: "4px 0",
-              fontSize: 11,
-              fontWeight: 700,
-              color: "#777",
-              textTransform: "uppercase",
-              letterSpacing: 0.4,
-              borderBottom: "1px solid #ddd",
-              marginBottom: 4,
-            }}>
-              <div>Ingrédient</div>
-              <div style={{ textAlign: "right" }}>Qté</div>
-              <div style={{ textAlign: "right" }}>Unité</div>
-              <div style={{ textAlign: "right" }}>Coût</div>
-              <div />
-            </div>
-            {lines.map((l) => (
-              <div key={l.id} style={{
-                display: "grid",
-                gridTemplateColumns: "3fr 80px 70px 80px auto",
-                gap: 6,
-                alignItems: "center",
-                padding: "4px 0",
-                borderBottom: "1px solid #f0f0f0",
-              }}>
-                <div style={{ fontSize: 13 }}>
-                  {l.ingredient_name || <span className="muted">—</span>}
-                </div>
-                <input
-                  className="input"
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value={l.qty}
-                  onChange={(e) => updateLine(l.id, { qty: e.target.value })}
-                  style={{ textAlign: "right", padding: "4px 6px", fontSize: 13 }}
-                />
-                <select
-                  className="input"
-                  value={l.unit}
-                  onChange={(e) => updateLine(l.id, { unit: e.target.value as CocktailUnit })}
-                  style={{ padding: "4px 6px", fontSize: 13 }}
-                >
-                  {UNIT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-                <div style={{ textAlign: "right", fontSize: 13, color: l.cost != null ? "#1a1a1a" : "#ccc" }}>
-                  {l.cost != null ? `${fmtMoney(l.cost)} €` : "—"}
-                </div>
-                <button
-                  className="btn btnDanger"
-                  type="button"
-                  onClick={() => delLine(l.id)}
-                  style={{ padding: "3px 10px", fontSize: 12 }}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-
-            {/* Total */}
-            <div style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: 8,
-              marginTop: 8,
-              fontWeight: 700,
-              fontSize: 14,
-            }}>
-              <span className="muted">Coût matière</span>
-              <span>{totalCost > 0 ? `${fmtMoney(totalCost)} €` : "—"}</span>
-              {margin != null && (
-                <span className="muted" style={{ fontWeight: 400 }}>
-                  · marge {fmtMoney(margin)} %
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Add line */}
-        <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div style={{ flex: 3, minWidth: 160 }}>
-            <label className="label" style={{ fontSize: 11 }}>Ingrédient</label>
-            <SmartSelect
-              options={ingOptions}
-              value={newIngId}
-              onChange={setNewIngId}
-              placeholder="Chercher un ingrédient…"
-              menuMax={10}
-            />
-          </div>
-          <div style={{ width: 80 }}>
-            <label className="label" style={{ fontSize: 11 }}>Quantité</label>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label className="label">Garniture</label>
             <input
               className="input"
-              type="number"
-              min="0"
-              step="0.5"
-              value={newQty}
-              onChange={(e) => setNewQty(e.target.value)}
-              placeholder="4"
-              style={{ textAlign: "right" }}
+              value={form.garnish}
+              onChange={(e) => setForm((p) => ({ ...p, garnish: e.target.value }))}
+              placeholder="ex: rondelle citron, feuille menthe…"
             />
           </div>
-          <div style={{ width: 70 }}>
-            <label className="label" style={{ fontSize: 11 }}>Unité</label>
-            <select
-              className="input"
-              value={newUnit}
-              onChange={(e) => setNewUnit(e.target.value as CocktailUnit)}
-            >
-              {UNIT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
-          <button className="btn btnPrimary" type="button" onClick={addLine} style={{ alignSelf: "flex-end" }}>
-            Ajouter
-          </button>
         </div>
-
-        {/* Preview of new line cost */}
-        {newIngId && (() => {
-          const q = parseFloat(newQty);
-          if (!Number.isFinite(q) || q <= 0) return null;
-          const c = computeLineCost(newIngId, q, newUnit);
-          const fmtQ = formatLiquidQty(q, newUnit === "pc" || newUnit === "g" ? newUnit : newUnit);
-          if (c == null) return <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>Pas de prix pour cet ingrédient ({fmtQ})</div>;
-          return <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>Coût estimé : {fmtMoney(c)} € pour {fmtQ}</div>;
-        })()}
       </div>
 
       {/* ACTIONS */}
@@ -807,21 +740,15 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
         <button className="btn btnPrimary" type="button" onClick={save} disabled={saving}>
           {saving ? "Enregistrement…" : isEdit ? "Mettre à jour" : "Créer le cocktail"}
         </button>
-
         {isEdit && (
           <button className="btn" type="button" onClick={exportPdf}>
             Exporter PDF
           </button>
         )}
-
         {saveOk && <span style={{ color: "green", fontWeight: 600 }}>✓ Enregistré</span>}
-
         {saveError && (
           <div className="errorBox" style={{ marginTop: 0 }}>
-            {saveError.message}
-            {"details" in saveError && (saveError as { details?: string }).details
-              ? ` — ${(saveError as { details?: string }).details}`
-              : ""}
+            {saveError.message}{saveError.details ? ` — ${saveError.details}` : ""}
           </div>
         )}
       </div>
