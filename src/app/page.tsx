@@ -146,6 +146,24 @@ export default function Home() {
 
           <div className="card" style={{ paddingTop: 18 }}>
             <p className="cardTitle" style={{ textAlign: "center", marginBottom: 6, letterSpacing: 1 }}>
+              COCKTAILS
+            </p>
+            <p className="muted" style={{ marginTop: 0, textAlign: "center" }}>
+              Fiches cocktails avec calcul de coût
+            </p>
+
+            <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap", justifyContent: "center" }}>
+              <Link className="btn btnPrimary btnWide" href="/cocktails/new">
+                Créer cocktail
+              </Link>
+              <Link className="btn btnWide" href="/cocktails">
+                Fiches cocktails
+              </Link>
+            </div>
+          </div>
+
+          <div className="card" style={{ paddingTop: 18 }}>
+            <p className="cardTitle" style={{ textAlign: "center", marginBottom: 6, letterSpacing: 1 }}>
               INGRÉDIENTS
             </p>
             <p className="muted" style={{ marginTop: 0, textAlign: "center" }}>
