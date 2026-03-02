@@ -32,6 +32,7 @@ import {
 import { extractVolumeFromName, extractWeightGFromName, detectUnitFromName } from "@/lib/invoices/utils";
 import { detectAllergensFromName } from "@/lib/invoices/allergenDetector";
 import { detectCategoryFromName } from "@/lib/invoices/categoryDetector";
+import { PriceAlertsPanel } from "@/components/PriceAlertsPanel";
 
 type OfferPayload = Record<string, unknown>;
 
@@ -1065,6 +1066,7 @@ type SupplierOfferPayload = {
         </div>
       </div>
 
+      {userId && <PriceAlertsPanel userId={userId} />}
       <div style={{ marginTop: 12 }}>
         <div role="tablist" aria-label="Filtre statut ingrédients" style={tabsWrap}>
           <button role="tab" aria-selected={tab === "to_check"} style={tabBtn(tab === "to_check")} onClick={() => setTab("to_check")}>

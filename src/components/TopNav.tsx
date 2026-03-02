@@ -4,12 +4,9 @@ import React from "react";
 type TopNavProps = {
   title: string;
   subtitle?: string;
-
   actions?: React.ReactNode;
   right?: React.ReactNode;
-
   showHome?: boolean;
-
   backHref?: string;
   backLabel?: string;
 };
@@ -27,36 +24,86 @@ export function TopNav({
 
   return (
     <div style={wrap}>
+
+      {/* ── Barre nav ── */}
+      <div style={barRow}>
+        <div style={barLeft}>
+          {backHref && (
+            <Link href={backHref} style={navBtn}>
+              ← {backLabel ?? "Retour"}
+            </Link>
+          )}
+          {showHome && (
+            <Link href="/" style={navBtn}>
+              Accueil
+            </Link>
+          )}
+        </div>
+
+        {/* Actions à droite (Nouvelle pizza, Rafraîchir…) */}
+        {rightNode && (
+          <div style={barRight}>{rightNode}</div>
+        )}
+      </div>
+
+      {/* ── Titre ── */}
       <div style={headRow}>
         <div>
           <h1 style={h1}>{title}</h1>
-          {subtitle ? <div style={sub}>{subtitle}</div> : null}
+          {subtitle && <div style={sub}>{subtitle}</div>}
         </div>
       </div>
 
-      <div style={barRow}>
-        <div style={barLeft}>
-          {backHref ? (
-            <Link href={backHref} style={homeBtn}>
-              {backLabel ? backLabel : "Retour"}
-            </Link>
-          ) : null}
-
-          {showHome ? (
-            <Link href="/" style={homeBtn}>
-              Accueil
-            </Link>
-          ) : null}
-        </div>
-
-        <div style={barRight}>{rightNode}</div>
-      </div>
     </div>
   );
 }
 
+/* ── Styles ── */
+
 const wrap: React.CSSProperties = {
-  marginBottom: 18,
+  marginBottom: 20,
+};
+
+const barRow: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  marginBottom: 14,
+};
+
+const barLeft: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  flexWrap: "wrap",
+};
+
+const barRight: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  flexWrap: "wrap",
+  justifyContent: "flex-end",
+};
+
+/* Boutons nav (Accueil, Retour, Index…) */
+const navBtn: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  height: 34,
+  padding: "0 12px",
+  borderRadius: 10,
+  border: "1.5px solid rgba(217,199,182,0.95)",
+  textDecoration: "none",
+  color: "#6f6a61",
+  fontSize: 13,
+  fontWeight: 600,
+  background: "rgba(255,255,255,0.50)",
+  backdropFilter: "blur(6px)",
+  transition: "border-color 0.12s, color 0.12s",
+  whiteSpace: "nowrap" as const,
 };
 
 const headRow: React.CSSProperties = {
@@ -68,51 +115,14 @@ const headRow: React.CSSProperties = {
 
 const h1: React.CSSProperties = {
   margin: 0,
-  fontSize: 44,
-  lineHeight: 1.05,
+  fontSize: 32,
+  lineHeight: 1.1,
   fontWeight: 800,
-  letterSpacing: -0.5,
+  letterSpacing: -0.4,
 };
 
 const sub: React.CSSProperties = {
-  marginTop: 6,
-  fontSize: 14,
-  opacity: 0.7,
-};
-
-const barRow: React.CSSProperties = {
-  marginTop: 14,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
-};
-
-const barLeft: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 10,
-};
-
-const barRight: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "flex-end",
-  gap: 10,
-};
-
-const homeBtn: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  height: 34,
-  padding: "0 14px",
-  borderRadius: 999,
-  border: "1px solid rgba(0,0,0,0.18)",
-  textDecoration: "none",
-  color: "inherit",
-  fontSize: 14,
-  fontWeight: 600,
-  background: "rgba(255,255,255,0.55)",
-  backdropFilter: "blur(6px)",
+  marginTop: 4,
+  fontSize: 13,
+  color: "#6f6a61",
 };

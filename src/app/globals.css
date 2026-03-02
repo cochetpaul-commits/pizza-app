@@ -289,3 +289,29 @@ textarea.input{
   border-radius: 12px;
   padding: 0;
 }
+
+/* ─────────────────────────────────────────────
+   PATCH BOUTONS — harmonisation 34px
+   Ajouter à la fin de src/app/globals.css
+   ───────────────────────────────────────────── */
+
+/* Boutons action compacts (Nouvelle pizza, Rafraîchir…) */
+.btn {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+/* Danger (Supprimer) — discret, rouge au hover */
+.btnDanger {
+  background: rgba(255,255,255,0.50);
+  border-color: rgba(217,199,182,0.95);
+  color: #9a8f84;
+}
+
+.btnDanger:hover {
+  background: rgba(217,63,63,0.08);
+  border-color: rgba(217,63,63,0.5);
+  color: #d93f3f;
+}

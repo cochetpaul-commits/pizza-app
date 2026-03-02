@@ -20,11 +20,11 @@ type DS<T>       = { status: "idle" | "loading" | "ok" | "error"; data?: T; erro
 // --- Config ---------------------------------------------------------------
 
 const TABS = [
-  { id: "pizza",      label: "🍕 Pizza",        color: POLE_COLORS.pizza },
-  { id: "empatement", label: "🥖 Empâtement",   color: POLE_COLORS["empâtement"] },
-  { id: "cuisine",    label: "🍳 Cuisine",       color: POLE_COLORS.cuisine },
-  { id: "pivot",      label: "🫙 Préparations",  color: POLE_COLORS.pivot },
-  { id: "cocktail",   label: "🍹 Cocktail",      color: POLE_COLORS.cocktail },
+  { id: "pizza",      label: "Pizza",       color: POLE_COLORS.pizza },
+  { id: "empatement", label: "Empâtement",  color: POLE_COLORS["empâtement"] },
+  { id: "cuisine",    label: "Cuisine",      color: POLE_COLORS.cuisine },
+  { id: "pivot",      label: "Préparations", color: POLE_COLORS.pivot },
+  { id: "cocktail",   label: "Cocktail",     color: POLE_COLORS.cocktail },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
@@ -37,7 +37,127 @@ function fmtMoney(v: number) {
   return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// --- Inner component (needs Suspense for useSearchParams) -----------------
+// --- Shared row component ------------------------------------------------
+
+function RecipeRow({
+  name,
+  cost,
+  costLabel,
+  color,
+  onOpen,
+  onDelete,
+  sub,
+}: {
+  name: string;
+  cost?: string | null;
+  costLabel?: string;
+  color: string;
+  onOpen: () => void;
+  onDelete: () => void;
+  sub?: string;
+}) {
+  return (
+    <div
+      onClick={onOpen}
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr auto auto",
+        alignItems: "center",
+        gap: 12,
+        padding: "12px 14px",
+        borderRadius: 12,
+        background: "rgba(255,255,255,0.45)",
+        border: "1px solid rgba(217,199,182,0.5)",
+        cursor: "pointer",
+        transition: "background 0.12s",
+      }}
+      onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.75)")}
+      onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.45)")}
+    >
+      {/* Nom + sous-titre */}
+      <div>
+        <div style={{
+          fontWeight: 700,
+          fontSize: 13,
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+          color: "#2f3a33",
+        }}>
+          {name}
+        </div>
+        {sub && (
+          <div style={{ fontSize: 11, color: "#6f6a61", marginTop: 2 }}>{sub}</div>
+        )}
+      </div>
+
+      {/* Coût mis en valeur */}
+      {cost && (
+        <div style={{
+          fontSize: 17,
+          fontWeight: 800,
+          color,
+          whiteSpace: "nowrap",
+          letterSpacing: "-0.3px",
+        }}>
+          {cost}{costLabel ? <span style={{ fontSize: 11, fontWeight: 500, color: "#6f6a61", marginLeft: 3 }}>{costLabel}</span> : null}
+        </div>
+      )}
+
+      {/* Icônes actions */}
+      <div style={{ display: "flex", gap: 6 }} onClick={e => e.stopPropagation()}>
+        {/* Ouvrir → */}
+        <button
+          onClick={onOpen}
+          title="Ouvrir"
+          style={{
+            width: 34, height: 34,
+            borderRadius: 10,
+            border: `1.5px solid ${color}`,
+            background: color,
+            color: "#fff",
+            fontSize: 16,
+            cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "opacity 0.12s",
+          }}
+          onMouseEnter={e => (e.currentTarget.style.opacity = "0.8")}
+          onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
+        >
+          →
+        </button>
+
+        {/* Supprimer ✕ */}
+        <button
+          onClick={onDelete}
+          title="Supprimer"
+          style={{
+            width: 34, height: 34,
+            borderRadius: 10,
+            border: "1.5px solid rgba(217,199,182,0.95)",
+            background: "rgba(255,255,255,0.5)",
+            color: "#9a8f84",
+            fontSize: 13,
+            cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "border-color 0.12s, color 0.12s",
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = "#d93f3f";
+            e.currentTarget.style.color = "#d93f3f";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = "rgba(217,199,182,0.95)";
+            e.currentTarget.style.color = "#9a8f84";
+          }}
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// --- Inner component -----------------------------------------------------
 
 function RecettesInner() {
   const router  = useRouter();
@@ -58,14 +178,12 @@ function RecettesInner() {
 
   const loaded = useRef<Set<TabId>>(new Set());
 
-  // Auth check
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setAuthState(data.user ? "ok" : "notlogged");
     });
   }, []);
 
-  // Load functions (stable — only depend on their own state setter)
   const loadPizza = useCallback(async () => {
     setPizzaDs({ status: "loading" });
     const { data, error } = await supabase
@@ -116,7 +234,6 @@ function RecettesInner() {
     else if (tab === "cocktail")   loadCocktail();
   }, [loadPizza, loadEmp, loadCuisine, loadPivot, loadCocktail]);
 
-  // Load current tab when auth ready or tab changes
   useEffect(() => {
     if (authState !== "ok") return;
     maybeLoad(activeTab);
@@ -127,7 +244,6 @@ function RecettesInner() {
     maybeLoad(activeTab);
   }, [activeTab, maybeLoad]);
 
-  // Create empâtement (inline)
   const createEmp = async () => {
     setEmpCreateErr(null);
     setCreatingEmp(true);
@@ -155,7 +271,6 @@ function RecettesInner() {
     }
   };
 
-  // Delete functions
   const delPizza = async (id: string) => {
     if (!window.confirm("Supprimer cette fiche pizza ?")) return;
     const { error } = await supabase.from("pizza_recipes").delete().eq("id", id);
@@ -191,8 +306,6 @@ function RecettesInner() {
     setCocktailDs(p => ({ ...p, data: (p.data ?? []).filter(x => x.id !== id) }));
   };
 
-  // ---- Early returns -----
-
   if (authState === "loading") {
     return <main className="container"><TopNav title="Recettes" subtitle="Chargement…" /></main>;
   }
@@ -205,10 +318,8 @@ function RecettesInner() {
     );
   }
 
-  // ---- Derived values -----
-
   const activeColor = TABS.find(t => t.id === activeTab)!.color;
-  const activeDs    = activeTab === "pizza" ? pizzaDs
+  const activeDs    = activeTab === "pizza"      ? pizzaDs
     : activeTab === "empatement" ? empDs
     : activeTab === "cuisine"    ? cuisineDs
     : activeTab === "pivot"      ? pivotDs
@@ -231,29 +342,55 @@ function RecettesInner() {
     return <Link className="btn btnPrimary" href="/cocktails/new">Nouveau cocktail</Link>;
   })();
 
-  // ---- Render -----
-
   return (
     <main className="container">
       <TopNav title="Recettes" subtitle={subtitle} />
 
-      {/* Tab bar */}
-      <div style={{ display: "flex", borderBottom: "2px solid #e5e5e5", marginBottom: 16, flexWrap: "wrap" }}>
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => router.push(`/recettes?tab=${tab.id}`)}
-            style={{
-              padding: "10px 16px", background: "none", cursor: "pointer", fontSize: 14,
-              fontWeight: activeTab === tab.id ? 700 : 400,
-              color: activeTab === tab.id ? tab.color : "#555",
-              borderWidth: "0 0 3px 0", borderStyle: "solid",
-              borderColor: activeTab === tab.id ? tab.color : "transparent",
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* ── Tab bar — Option D ── */}
+      <div style={{
+        display: "flex",
+        borderBottom: "1px solid rgba(217,199,182,0.95)",
+        marginBottom: 16,
+        overflowX: "auto",
+        scrollbarWidth: "none",
+      }}>
+        {TABS.map((tab, i) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => router.push(`/recettes?tab=${tab.id}`)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                padding: "12px 18px",
+                background: "none",
+                border: "none",
+                borderBottom: isActive ? `2px solid ${tab.color}` : "2px solid transparent",
+                marginBottom: -1,
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: isActive ? 700 : 500,
+                color: isActive ? tab.color : "#6f6a61",
+                whiteSpace: "nowrap",
+                transition: "color 0.15s",
+                flexShrink: 0,
+                borderRight: i < TABS.length - 1 ? "1px solid rgba(217,199,182,0.5)" : "none",
+              }}
+            >
+              <span style={{
+                width: 7, height: 7,
+                borderRadius: "50%",
+                background: tab.color,
+                opacity: isActive ? 1 : 0,
+                transition: "opacity 0.15s",
+                flexShrink: 0,
+              }} />
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Actions */}
@@ -264,169 +401,96 @@ function RecettesInner() {
 
       {empCreateErr && <p style={{ color: "red", marginBottom: 12 }}>{empCreateErr}</p>}
 
-      {/* Loading / error states */}
       {activeDs.status === "loading" && <p className="muted">Chargement…</p>}
       {activeDs.status === "error" && (
         <pre className="errorBox">{JSON.stringify(activeDs.error, null, 2)}</pre>
       )}
 
-      {/* ---- Pizza ---- */}
-      {activeTab === "pizza" && pizzaDs.status === "ok" && (
-        (pizzaDs.data ?? []).length === 0
-          ? <p className="muted">Aucune fiche pizza créée.</p>
-          : (
-            <div className="card" style={{ borderLeft: `4px solid ${activeColor}` }}>
-              <div style={{ display: "grid", gap: 10 }}>
-                {(pizzaDs.data ?? []).map(p => (
-                  <div key={p.id} className="listRow">
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ fontWeight: 700, textTransform: "uppercase" }}>{p.name ?? "Pizza"}</div>
-                      {p.total_cost != null && p.total_cost > 0 && (
-                        <div style={{ fontSize: 16, fontWeight: 800 }}>{fmtMoney(p.total_cost)} €</div>
-                      )}
-                    </div>
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <button className="btn btnPrimary" onClick={() => router.push(`/pizzas/${p.id}`)}>Ouvrir</button>
-                      <button className="btn btnDanger" onClick={() => delPizza(p.id)}>Supprimer</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
+      {/* ── Wrapper carte avec liseré couleur ── */}
+      {activeDs.status === "ok" && (activeDs.data ?? []).length === 0 && (
+        <p className="muted">Aucune fiche créée.</p>
       )}
 
-      {/* ---- Empâtement ---- */}
-      {activeTab === "empatement" && empDs.status === "ok" && (
-        (empDs.data ?? []).length === 0
-          ? <p className="muted">Aucun empâtement créé.</p>
-          : (
-            <div className="card" style={{ borderLeft: `4px solid ${activeColor}` }}>
-              <div style={{ display: "grid", gap: 10 }}>
-                {(empDs.data ?? []).map(r => (
-                  <div key={r.id} className="listRow" style={{ alignItems: "center" }}>
-                    <div style={{ cursor: "pointer" }} onClick={() => router.push(`/recipes/${r.id}`)}>
-                      <div style={{ fontWeight: 700, textTransform: "uppercase" }}>{r.name}</div>
-                      <div className="muted" style={{ fontSize: 12 }}>
-                        {r.type} • {new Date(r.created_at).toLocaleString("fr-FR")}
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <button className="btn btnPrimary" onClick={() => router.push(`/recipes/${r.id}`)}>Ouvrir</button>
-                      <button className="btn btnDanger" onClick={() => delEmp(r.id, r.name)}>Supprimer</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
-      )}
+      {activeDs.status === "ok" && (activeDs.data ?? []).length > 0 && (
+        <div className="card" style={{ borderLeft: `4px solid ${activeColor}`, padding: 10 }}>
+          <div style={{ display: "grid", gap: 8 }}>
 
-      {/* ---- Cuisine ---- */}
-      {activeTab === "cuisine" && cuisineDs.status === "ok" && (
-        (cuisineDs.data ?? []).length === 0
-          ? <p className="muted">Aucune fiche cuisine créée.</p>
-          : (
-            <div className="card" style={{ borderLeft: `4px solid ${activeColor}` }}>
-              <div style={{ display: "grid", gap: 10 }}>
-                {(cuisineDs.data ?? []).map(r => (
-                  <div key={r.id} className="listRow">
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                      <div style={{ fontWeight: 700, textTransform: "uppercase" }}>{r.name ?? "Recette"}</div>
-                      {r.category === "cocktail"
-                        ? r.total_cost != null && r.total_cost > 0 && (
-                            <div style={{ fontSize: 16, fontWeight: 800 }}>{fmtMoney(r.total_cost)} €</div>
-                          )
-                        : (r.cost_per_kg != null && r.cost_per_kg > 0) || (r.cost_per_portion != null && r.cost_per_portion > 0)
-                          ? (
-                            <div style={{ fontSize: 16, fontWeight: 800 }}>
-                              {r.cost_per_kg != null && r.cost_per_kg > 0 ? `${fmtMoney(r.cost_per_kg)} €/kg` : null}
-                              {r.cost_per_kg != null && r.cost_per_kg > 0 && r.cost_per_portion != null && r.cost_per_portion > 0 ? " · " : null}
-                              {r.cost_per_portion != null && r.cost_per_portion > 0 ? `${fmtMoney(r.cost_per_portion)} €/portion` : null}
-                            </div>
-                          )
-                          : null
-                      }
-                    </div>
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <button className="btn btnPrimary" onClick={() => router.push(`/kitchen/${r.id}`)}>Ouvrir</button>
-                      <button className="btn btnDanger" onClick={() => delCuisine(r.id)}>Supprimer</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
-      )}
+            {/* ---- Pizza ---- */}
+            {activeTab === "pizza" && (pizzaDs.data ?? []).map(p => (
+              <RecipeRow
+                key={p.id}
+                name={p.name ?? "Pizza"}
+                cost={p.total_cost != null && p.total_cost > 0 ? fmtMoney(p.total_cost) + " €" : undefined}
+                color={activeColor}
+                onOpen={() => router.push(`/pizzas/${p.id}`)}
+                onDelete={() => delPizza(p.id)}
+              />
+            ))}
 
-      {/* ---- Préparations (pivot) ---- */}
-      {activeTab === "pivot" && pivotDs.status === "ok" && (
-        (pivotDs.data ?? []).length === 0
-          ? <p className="muted">Aucune recette pivot créée.</p>
-          : (
-            <div className="card" style={{ borderLeft: `4px solid ${activeColor}` }}>
-              <div style={{ display: "grid", gap: 10 }}>
-                {(pivotDs.data ?? []).map(r => (
-                  <div key={r.id} className="listRow" style={{ alignItems: "center" }}>
-                    <div style={{ cursor: "pointer" }} onClick={() => router.push(`/prep/${r.id}`)}>
-                      <div style={{ fontWeight: 700, textTransform: "uppercase" }}>{r.name}</div>
-                      <div className="muted" style={{ fontSize: 12 }}>
-                        pivot : {r.pivot_unit} • {new Date(r.created_at).toLocaleString("fr-FR")}
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <button className="btn btnPrimary" onClick={() => router.push(`/prep/${r.id}`)}>Ouvrir</button>
-                      <button className="btn btnDanger" onClick={() => delPivot(r.id, r.name)}>Supprimer</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
-      )}
+            {/* ---- Empâtement ---- */}
+            {activeTab === "empatement" && (empDs.data ?? []).map(r => (
+              <RecipeRow
+                key={r.id}
+                name={r.name}
+                sub={`${r.type} · ${new Date(r.created_at).toLocaleDateString("fr-FR")}`}
+                color={activeColor}
+                onOpen={() => router.push(`/recipes/${r.id}`)}
+                onDelete={() => delEmp(r.id, r.name)}
+              />
+            ))}
 
-      {/* ---- Cocktail ---- */}
-      {activeTab === "cocktail" && cocktailDs.status === "ok" && (
-        (cocktailDs.data ?? []).length === 0
-          ? <p className="muted">Aucun cocktail créé.</p>
-          : (
-            <div className="card" style={{ borderLeft: `4px solid ${activeColor}` }}>
-              <div style={{ display: "grid", gap: 10 }}>
-                {(cocktailDs.data ?? []).map(c => (
-                  <div key={c.id} className="listRow">
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                      <div style={{ fontWeight: 700, textTransform: "uppercase" }}>{c.name ?? "Cocktail"}</div>
-                      {c.type && (
-                        <div style={{ fontSize: 12, color: "#777", fontWeight: 500 }}>
-                          {COCKTAIL_TYPE_LABELS[c.type] ?? c.type}
-                        </div>
-                      )}
-                      {c.total_cost != null && c.total_cost > 0 && (
-                        <div style={{ fontSize: 15, fontWeight: 800 }}>
-                          {fmtMoney(c.total_cost)} €
-                          {c.sell_price != null && c.sell_price > 0 && (
-                            <span style={{ fontSize: 12, fontWeight: 400, color: "#777", marginLeft: 6 }}>
-                              · vente {fmtMoney(c.sell_price)} €
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <button className="btn btnPrimary" onClick={() => router.push(`/cocktails/${c.id}`)}>Ouvrir</button>
-                      <button className="btn btnDanger" onClick={() => delCocktail(c.id)}>Supprimer</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
+            {/* ---- Cuisine ---- */}
+            {activeTab === "cuisine" && (cuisineDs.data ?? []).map(r => {
+              const hasCpkg = r.cost_per_kg != null && r.cost_per_kg > 0;
+              const hasCportion = r.cost_per_portion != null && r.cost_per_portion > 0;
+              const cost = hasCpkg
+                ? fmtMoney(r.cost_per_kg!) + " €"
+                : hasCportion ? fmtMoney(r.cost_per_portion!) + " €" : undefined;
+              const costLabel = hasCpkg ? "/kg" : hasCportion ? "/portion" : undefined;
+              return (
+                <RecipeRow
+                  key={r.id}
+                  name={r.name ?? "Recette"}
+                  cost={cost}
+                  costLabel={costLabel}
+                  color={activeColor}
+                  onOpen={() => router.push(`/kitchen/${r.id}`)}
+                  onDelete={() => delCuisine(r.id)}
+                />
+              );
+            })}
+
+            {/* ---- Préparations ---- */}
+            {activeTab === "pivot" && (pivotDs.data ?? []).map(r => (
+              <RecipeRow
+                key={r.id}
+                name={r.name}
+                sub={`pivot · ${r.pivot_unit} · ${new Date(r.created_at).toLocaleDateString("fr-FR")}`}
+                color={activeColor}
+                onOpen={() => router.push(`/prep/${r.id}`)}
+                onDelete={() => delPivot(r.id, r.name)}
+              />
+            ))}
+
+            {/* ---- Cocktail ---- */}
+            {activeTab === "cocktail" && (cocktailDs.data ?? []).map(c => (
+              <RecipeRow
+                key={c.id}
+                name={c.name ?? "Cocktail"}
+                sub={c.type ? COCKTAIL_TYPE_LABELS[c.type] ?? c.type : undefined}
+                cost={c.total_cost != null && c.total_cost > 0 ? fmtMoney(c.total_cost) + " €" : undefined}
+                color={activeColor}
+                onOpen={() => router.push(`/cocktails/${c.id}`)}
+                onDelete={() => delCocktail(c.id)}
+              />
+            ))}
+
+          </div>
+        </div>
       )}
     </main>
   );
 }
-
-// --- Export (Suspense required for useSearchParams in App Router) ----------
 
 export default function RecettesPage() {
   return (
