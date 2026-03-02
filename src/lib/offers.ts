@@ -20,7 +20,7 @@ export function n2(x: unknown): number {
 }
 
 export function fmtQty(x: number): string {
-  const s = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 3 }).format(x); return s.replace(",", ".");
+  return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 3, useGrouping: false }).format(x);
 }
 
 export function fmtMoney(x: number): string {
