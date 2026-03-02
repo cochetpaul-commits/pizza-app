@@ -271,7 +271,7 @@ export async function runImport(options: {
     const toCreate: Array<Record<string, unknown>> = [];
     for (const l of lines) {
       const sku = (l.sku ?? "").trim();
-      const nm = (l.name ?? "").trim();
+      const nm = (l.name ?? "").trim().toUpperCase();
       if (!nm) continue;
 
       const already =
@@ -357,7 +357,7 @@ export async function runImport(options: {
     const offerCandidates = lines
       .map((l) => {
         const sku = (l.sku ?? "").trim();
-        const nm = (l.name ?? "").trim();
+        const nm = (l.name ?? "").trim().toUpperCase();
         const ingId =
           (sku && skuToIngId.get(sku)) ||
           nameToIngId.get(nm.toLowerCase()) ||
