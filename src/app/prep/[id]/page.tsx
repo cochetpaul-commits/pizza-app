@@ -441,7 +441,6 @@ export default function PrepRecipeDetailPage() {
         purchase_unit: totalQty,
         purchase_unit_label: recipe.pivot_unit,
         purchase_unit_name: recipe.pivot_unit,
-        cost_per_unit: totalCost / totalQty,
         source_prep_recipe_id: recipe.id,
         source_prep_recipe_name: name,
         updated_at: new Date().toISOString(),

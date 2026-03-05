@@ -9,10 +9,10 @@ import { POLE_COLORS } from "@/lib/poleColors";
 
 // --- Types ---------------------------------------------------------------
 
-type PizzaRow    = { id: string; name: string | null; total_cost: number | null };
+type PizzaRow    = { id: string; name: string | null; total_cost: number | null; establishments: string[] | null };
 type EmpRow      = { id: string; name: string; type: string; created_at: string };
-type KitchenRow  = { id: string; name: string | null; category: string | null; total_cost: number | null; cost_per_kg: number | null; cost_per_portion: number | null };
-type PrepRow     = { id: string; name: string; pivot_unit: string; created_at: string };
+type KitchenRow  = { id: string; name: string | null; category: string | null; total_cost: number | null; cost_per_kg: number | null; cost_per_portion: number | null; establishments: string[] | null };
+type PrepRow     = { id: string; name: string; pivot_unit: string; created_at: string; output_ingredient_id: string | null; ingredients?: Array<{ cost_per_unit: number | null }> | { cost_per_unit: number | null } | null };
 type CocktailRow = { id: string; name: string | null; type: string | null; total_cost: number | null; sell_price: number | null };
 type FlourMixItem = { name: string; percent: number; ingredient_id: string | null };
 type DS<T>       = { status: "idle" | "loading" | "ok" | "error"; data?: T; error?: unknown };
@@ -38,6 +38,17 @@ function fmtMoney(v: number) {
 }
 
 // --- Shared row component ------------------------------------------------
+
+
+function estabBadgeText(establishments: string[] | null): string | undefined {
+  const e = establishments ?? ["bellomio", "piccola"];
+  const bm = e.includes("bellomio");
+  const pm = e.includes("piccola");
+  if (bm && pm) return undefined;
+  if (bm) return "Bello Mio";
+  if (pm) return "Piccola Mia";
+  return undefined;
+}
 
 function RecipeRow({
   name,
@@ -170,6 +181,8 @@ function RecettesInner() {
   const [pizzaDs,    setPizzaDs]    = useState<DS<PizzaRow[]>>({ status: "idle" });
   const [empDs,      setEmpDs]      = useState<DS<EmpRow[]>>({ status: "idle" });
   const [cuisineDs,  setCuisineDs]  = useState<DS<KitchenRow[]>>({ status: "idle" });
+  const [filterCuisineEstab, setFilterCuisineEstab] = useState<"all" | "bellomio" | "piccola">("all");
+  const [collapsedCuisineCats, setCollapsedCuisineCats] = useState<Set<string>>(new Set());
   const [pivotDs,    setPivotDs]    = useState<DS<PrepRow[]>>({ status: "idle" });
   const [cocktailDs, setCocktailDs] = useState<DS<CocktailRow[]>>({ status: "idle" });
 
@@ -187,7 +200,7 @@ function RecettesInner() {
   const loadPizza = useCallback(async () => {
     setPizzaDs({ status: "loading" });
     const { data, error } = await supabase
-      .from("pizza_recipes").select("id,name,total_cost")
+      .from("pizza_recipes").select("id,name,total_cost,establishments")
       .eq("is_draft", false).order("created_at", { ascending: false });
     setPizzaDs(error ? { status: "error", error } : { status: "ok", data: (data ?? []) as PizzaRow[] });
   }, []);
@@ -203,7 +216,7 @@ function RecettesInner() {
   const loadCuisine = useCallback(async () => {
     setCuisineDs({ status: "loading" });
     const { data, error } = await supabase
-      .from("kitchen_recipes").select("id,name,category,total_cost,cost_per_kg,cost_per_portion")
+      .from("kitchen_recipes").select("id,name,category,total_cost,cost_per_kg,cost_per_portion,establishments")
       .eq("is_draft", false).order("updated_at", { ascending: false });
     setCuisineDs(error ? { status: "error", error } : { status: "ok", data: (data ?? []) as KitchenRow[] });
   }, []);
@@ -211,7 +224,7 @@ function RecettesInner() {
   const loadPivot = useCallback(async () => {
     setPivotDs({ status: "loading" });
     const { data, error } = await supabase
-      .from("prep_recipes").select("id,name,pivot_unit,created_at")
+      .from("prep_recipes").select("id,name,pivot_unit,created_at,output_ingredient_id,ingredients!prep_recipes_output_ingredient_fk(cost_per_unit)")
       .order("created_at", { ascending: false });
     setPivotDs(error ? { status: "error", error } : { status: "ok", data: (data ?? []) as PrepRow[] });
   }, []);
@@ -420,6 +433,7 @@ function RecettesInner() {
               <RecipeRow
                 key={p.id}
                 name={p.name ?? "Pizza"}
+                sub={estabBadgeText(p.establishments)}
                 cost={p.total_cost != null && p.total_cost > 0 ? fmtMoney(p.total_cost) + " €" : undefined}
                 color={activeColor}
                 onOpen={() => router.push(`/pizzas/${p.id}`)}
@@ -440,25 +454,57 @@ function RecettesInner() {
             ))}
 
             {/* ---- Cuisine ---- */}
-            {activeTab === "cuisine" && (cuisineDs.data ?? []).map(r => {
-              const hasCpkg = r.cost_per_kg != null && r.cost_per_kg > 0;
-              const hasCportion = r.cost_per_portion != null && r.cost_per_portion > 0;
-              const cost = hasCpkg
-                ? fmtMoney(r.cost_per_kg!) + " €"
-                : hasCportion ? fmtMoney(r.cost_per_portion!) + " €" : undefined;
-              const costLabel = hasCpkg ? "/kg" : hasCportion ? "/portion" : undefined;
-              return (
-                <RecipeRow
-                  key={r.id}
-                  name={r.name ?? "Recette"}
-                  cost={cost}
-                  costLabel={costLabel}
-                  color={activeColor}
-                  onOpen={() => router.push(`/kitchen/${r.id}`)}
-                  onDelete={() => delCuisine(r.id)}
-                />
-              );
-            })}
+            {activeTab === "cuisine" && (() => {
+              const CUISINE_CATS: Record<string, string> = {
+                preparation: "Préparation", plat_cuisine: "Plat cuisiné", dessert: "Dessert",
+                cocktail: "Cocktail", autre: "Autre",
+              };
+              const allRows = (cuisineDs.data ?? [])
+                .filter(r => filterCuisineEstab === "all" || (r.establishments ?? ["bellomio","piccola"]).includes(filterCuisineEstab))
+                .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", "fr"));
+              const byCategory = allRows.reduce((acc, r) => {
+                const cat = r.category ?? "autre";
+                if (!acc[cat]) acc[cat] = [];
+                acc[cat].push(r);
+                return acc;
+              }, {} as Record<string, KitchenRow[]>);
+              const catOrder = ["preparation","plat_cuisine","dessert","cocktail","autre"];
+              return <>
+                <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                  {(["all","bellomio","piccola"] as const).map(v => (
+                    <button key={v} onClick={() => setFilterCuisineEstab(v)}
+                      style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #d1d5db", cursor: "pointer", fontWeight: 700, fontSize: 12,
+                        background: filterCuisineEstab === v ? (v === "bellomio" ? "#8B1A1A" : v === "piccola" ? "#6B1B1B" : activeColor) : "#fff",
+                        color: filterCuisineEstab === v ? "#fff" : "#374151" }}>
+                      {v === "all" ? "Tous" : v === "bellomio" ? "Bello Mio" : "Piccola Mia"}
+                    </button>
+                  ))}
+                </div>
+                {catOrder.filter(cat => byCategory[cat]?.length > 0).map(cat => (
+                  <div key={cat} style={{ marginBottom: 16 }}>
+                    <button onClick={() => setCollapsedCuisineCats(prev => { const s = new Set(prev); s.has(cat) ? s.delete(cat) : s.add(cat); return s; })}
+                      style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", cursor: "pointer", padding: "4px 4px 6px", marginBottom: 2 }}>
+                      <span style={{ fontSize: 12, fontWeight: 900, color: activeColor, textTransform: "uppercase", letterSpacing: 1 }}>
+                        {CUISINE_CATS[cat] ?? cat} ({byCategory[cat].length})
+                      </span>
+                      <span style={{ fontSize: 14, color: activeColor }}>{collapsedCuisineCats.has(cat) ? "▶" : "▼"}</span>
+                    </button>
+                    {!collapsedCuisineCats.has(cat) && byCategory[cat].map(r => {
+                      const hasCpkg = r.cost_per_kg != null && r.cost_per_kg > 0;
+                      const hasCportion = r.cost_per_portion != null && r.cost_per_portion > 0;
+                      const cost = hasCpkg ? fmtMoney(r.cost_per_kg!) + " €" : hasCportion ? fmtMoney(r.cost_per_portion!) + " €" : undefined;
+                      const costLabel = hasCpkg ? "/kg" : hasCportion ? "/portion" : undefined;
+                      return (
+                        <RecipeRow key={r.id} name={r.name ?? "Recette"} sub={estabBadgeText(r.establishments)}
+                          cost={cost} costLabel={costLabel} color={activeColor}
+                          onOpen={() => router.push(`/kitchen/${r.id}`)} onDelete={() => delCuisine(r.id)} />
+                      );
+                    })}
+                  </div>
+                ))}
+                {allRows.length === 0 && <div className="muted">Aucune recette</div>}
+              </>;
+            })()}
 
             {/* ---- Préparations ---- */}
             {activeTab === "pivot" && (pivotDs.data ?? []).map(r => (
@@ -466,6 +512,7 @@ function RecettesInner() {
                 key={r.id}
                 name={r.name}
                 sub={`pivot · ${r.pivot_unit} · ${new Date(r.created_at).toLocaleDateString("fr-FR")}`}
+                cost={(() => { const cpu = Array.isArray(r.ingredients) ? r.ingredients[0]?.cost_per_unit : r.ingredients?.cost_per_unit; if (!cpu || cpu <= 0) return undefined; const cpkg = cpu * 1000; return cpkg.toLocaleString("fr-FR", {minimumFractionDigits:2,maximumFractionDigits:2}) + " €/kg"; })()}
                 color={activeColor}
                 onOpen={() => router.push(`/prep/${r.id}`)}
                 onDelete={() => delPivot(r.id, r.name)}

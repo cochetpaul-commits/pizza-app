@@ -101,6 +101,7 @@ export type LatestOffer = {
   piece_weight_g: number | null;
 
   updated_at?: string | null;
+  establishment?: "bellomio" | "piccola" | "both" | null;
 };
 
 export type IngredientUpsert = {

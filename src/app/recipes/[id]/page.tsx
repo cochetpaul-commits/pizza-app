@@ -573,7 +573,7 @@ export default function RecipePage() {
   if (state.status === "loading") {
     return (
       <main className="container">
-        <TopNav title="Empâtement" subtitle="Chargement…" backHref="/recipes" backLabel="Liste empâtements" />
+        <TopNav title="Empâtement" subtitle="Chargement…" backHref="/recipes" backLabel="← Retour" />
         <p className="muted">Chargement…</p>
       </main>
     );
@@ -591,7 +591,7 @@ export default function RecipePage() {
   if (state.status === "ERROR") {
     return (
       <main className="container">
-        <TopNav title="Empâtement" subtitle="Erreur" backHref="/recipes" backLabel="Liste empâtements" />
+        <TopNav title="Empâtement" subtitle="Erreur" backHref="/recipes" backLabel="← Retour" />
         <pre className="code">{JSON.stringify(state.error, null, 2)}</pre>
       </main>
     );
@@ -601,7 +601,7 @@ export default function RecipePage() {
   if (!form) {
     return (
       <main className="container">
-        <TopNav title={r?.name ?? "Empâtement"} subtitle="Chargement…" backHref="/recipes" backLabel="Liste empâtements" />
+        <TopNav title={r?.name ?? "Empâtement"} subtitle="Chargement…" backHref="/recipes" backLabel="← Retour" />
         <p className="muted">Chargement…</p>
       </main>
     );
@@ -613,7 +613,7 @@ export default function RecipePage() {
         title={r ? r.name : (form.name.trim() || "Nouvel empâtement")}
         subtitle={r ? `${r.type} • créée le ${new Date(r.created_at).toLocaleString()}` : "Nouvelle recette — non sauvegardée"}
         backHref="/recipes"
-        backLabel="Liste empâtements"
+        backLabel="← Retour"
         right={
           <>
             <button className="btn btnPrimary" type="button" onClick={saveRecipe} disabled={saveState.saving || pdfState.exporting}>

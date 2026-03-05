@@ -154,6 +154,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     notes: string;
     procedure: string;
     output_ingredient_id: string | null;
+    establishments: string[];
   } | null>(null);
 
   const [saving, setSaving] = useState(false);
@@ -473,6 +474,7 @@ if (supplierIds.length) {
         notes: "",
         procedure: "",
         output_ingredient_id: null,
+        establishments: ["bellomio", "piccola"],
       });
       setLines([]);
       setStatus("OK");
@@ -514,6 +516,7 @@ if (supplierIds.length) {
       notes: String(rr.notes ?? ""),
       procedure: String(rr.procedure ?? ""),
       output_ingredient_id: rr.output_ingredient_id ?? null,
+      establishments: Array.isArray((rr as unknown as {establishments?: string[]}).establishments) ? (rr as unknown as {establishments: string[]}).establishments : ["bellomio", "piccola"],
     });
     setPhotoUrl(rr.photo_url ?? null);
     setPhotoPreview(rr.photo_url ?? null);
@@ -773,6 +776,7 @@ if (supplierIds.length) {
       procedure: form.procedure?.trim() || null,
       output_ingredient_id: form.output_ingredient_id ?? null,
       photo_url: photoUrl || null,
+      establishments: form.establishments,
       updated_at: new Date().toISOString(),
       is_active: true,
       is_draft: false,
@@ -872,7 +876,6 @@ if (supplierIds.length) {
         category: "preparation",
         is_active: true,
         default_unit: "g",
-        cost_per_unit: cpu,
         purchase_price: totalCost,
         purchase_unit: totalWeight,
         purchase_unit_label: "g",
@@ -919,7 +922,7 @@ if (supplierIds.length) {
 
       await bindToRecipe(newId);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "";
+      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : JSON.stringify(e);
       setSaveError({ message: "Index impossible", details: msg });
     } finally {
       setSavingIndex(false);
@@ -979,9 +982,10 @@ if (supplierIds.length) {
     <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
       <div style={{ maxWidth: 980, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-          <Link href="/" style={{ color: theme.muted, textDecoration: "none", fontWeight: 900 }}>
-            Accueil
-          </Link>
+          <div style={{ display: "flex", gap: 12 }}>
+            <Link href="/recettes?tab=cuisine" style={{ color: theme.muted, textDecoration: "none", fontWeight: 900 }}>← Retour</Link>
+            <Link href="/" style={{ color: theme.muted, textDecoration: "none", fontWeight: 900 }}>Accueil</Link>
+          </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
             <button type="button" onClick={exportPdf} disabled={saving || !isEdit} style={btn}>
@@ -1252,9 +1256,22 @@ if (supplierIds.length) {
 
                 <div style={{ textAlign: "right", fontWeight: 950 }}>{fmtMoney2(n2(r.cost))}</div>
 
-                <button type="button" onClick={() => delLine(r.id)} style={btn}>
-                  Supprimer
-                </button>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    type="button"
+                    title="Modifier l'ingrédient"
+                    style={{ ...btn, fontSize: 16, padding: "0 10px" }}
+                    onClick={() => {
+                      const back = recipeId ? `/kitchen/${recipeId}` : `/kitchen/new`;
+                      router.push(`/ingredients?edit=${r.ingredient_id}&back=${encodeURIComponent(back)}`);
+                    }}
+                  >
+                    →
+                  </button>
+                  <button type="button" onClick={() => delLine(r.id)} style={btn}>
+                    Supprimer
+                  </button>
+                </div>
               </div>
             ))}
 
@@ -1293,6 +1310,19 @@ if (supplierIds.length) {
               {photoUploading && <span style={{ color: theme.muted, fontSize: 13 }}>Upload en cours…</span>}
               {photoError && <span style={{ color: "#c0392b", fontSize: 12 }}>{photoError}</span>}
             </div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 12, ...card }}>
+          <div style={{ fontSize: 16, fontWeight: 950, marginBottom: 10 }}>Disponible dans</div>
+          <div style={{ display: "flex", gap: 16 }}>
+            {([["bellomio", "Bello Mio"], ["piccola", "Piccola Mia"]] as const).map(([val, label]) => (
+              <label key={val} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 700 }}>
+                <input type="checkbox" checked={form.establishments.includes(val)}
+                  onChange={(e) => setForm((p) => p ? { ...p, establishments: e.target.checked ? [...p.establishments, val] : p.establishments.filter((x) => x !== val) } : p)} />
+                <span style={{ padding: "2px 8px", borderRadius: 4, background: val === "bellomio" ? "#8B1A1A" : "#6B1B1B", color: "#fff", fontSize: 12 }}>{label}</span>
+              </label>
+            ))}
           </div>
         </div>
 

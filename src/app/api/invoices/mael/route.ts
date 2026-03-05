@@ -16,6 +16,7 @@ export async function POST(req: Request) {
     const form = await req.formData();
     const file = form.get("file");
     const mode = String(form.get("mode") ?? "preview");
+    const establishment = (String(form.get("establishment") ?? "both")) as "bellomio" | "piccola" | "both";
 
     if (!(file instanceof File)) {
       return NextResponse.json({ ok: false, error: "Fichier manquant (field: file)." }, { status: 400 });
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
 
     const result = await runImport({
       supabase, userId, supplierName: "MAEL",
-      payload, sourceFileName: file.name, rawText: text, mode,
+      payload, sourceFileName: file.name, rawText: text, mode, establishment,
       defaultUnit: "g",
     });
 

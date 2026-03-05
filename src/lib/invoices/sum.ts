@@ -1,3 +1,4 @@
+import { extractWeightGFromName, extractVolumeFromName } from "./utils";
 type ParsedLine = {
   sku: string | null;
   name: string;
@@ -8,6 +9,7 @@ type ParsedLine = {
   tax_rate: number | null;
   notes: string | null;
   piece_weight_g: number | null;
+  piece_volume_ml: number | null;
 };
 
 export type ParsedInvoice = {
@@ -99,6 +101,7 @@ function parseLines(text: string): ParsedLine[] {
         tax_rate: null,
         notes: "RUPTURE",
         piece_weight_g: null,
+        piece_volume_ml: null,
       });
       i += 2;
       continue;
@@ -117,7 +120,8 @@ function parseLines(text: string): ParsedLine[] {
           total_price: null,
           tax_rate: null,
           notes: "RUPTURE",
-          piece_weight_g: null,
+          piece_weight_g: extractWeightGFromName(m[1].trim()),
+          piece_volume_ml: extractVolumeFromName(m[1].trim()),
         });
       }
       i++;
@@ -146,7 +150,8 @@ function parseLines(text: string): ParsedLine[] {
             total_price: total,
             tax_rate: 5.5,
             notes: null,
-            piece_weight_g: null,
+            piece_weight_g: extractWeightGFromName(name),
+            piece_volume_ml: extractVolumeFromName(name),
           });
         }
       }

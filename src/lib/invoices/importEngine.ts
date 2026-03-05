@@ -102,6 +102,7 @@ export async function runImport(options: {
   rawText: string;
   mode: string;
   defaultUnit?: "g" | "pc" | "kg" | "l";
+  establishment?: "bellomio" | "piccola" | "both";
   filterLine?: (l: ParsedLine) => boolean;
 }): Promise<ImportResult> {
   const {
@@ -113,6 +114,7 @@ export async function runImport(options: {
     rawText,
     mode,
     defaultUnit = "g",
+    establishment = "both",
     filterLine,
   } = options;
 
@@ -383,6 +385,7 @@ export async function runImport(options: {
           is_active: true,
           piece_weight_g: l.unit === "pc" ? (l.piece_weight_g ?? null) : null,
           density_kg_per_l: null,
+          establishment,
         };
       })
       .filter(Boolean) as Array<Record<string, unknown>>;

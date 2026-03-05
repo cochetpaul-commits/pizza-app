@@ -138,6 +138,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
     dough_recipe_id: string;
     notes: string;
     photo_url: string;
+    establishments: string[];
   } | null>(null);
 
   const [ballWeightG, setBallWeightG] = useState<string>("264");
@@ -387,7 +388,7 @@ setOfferMetaByIngredient(metaMap);
 setSupplierByIngredient(supplierByIngredient);
 
       if (!isEdit) {
-        setForm({ name: "", dough_recipe_id: "", notes: "", photo_url: "" });
+        setForm({ name: "", dough_recipe_id: "", notes: "", photo_url: "", establishments: ["bellomio", "piccola"] });
         setRows([]);
         setPhotoPreview(null);
         setBallWeightG("264");
@@ -440,6 +441,7 @@ setSupplierByIngredient(supplierByIngredient);
         dough_recipe_id: String(p.dough_recipe_id ?? ""),
         notes: String(p.notes ?? ""),
         photo_url: String(p.photo_url ?? ""),
+        establishments: Array.isArray((p as unknown as {establishments?: string[]}).establishments) ? (p as unknown as {establishments: string[]}).establishments : ["bellomio", "piccola"],
       });
 
       setPhotoPreview(p.photo_url ?? null);
@@ -602,6 +604,7 @@ setSupplierByIngredient(supplierByIngredient);
       dough_recipe_id: form.dough_recipe_id,
       notes: form.notes?.trim() || null,
       photo_url: form.photo_url?.trim() || null,
+      establishments: form.establishments,
       is_draft: false,
       total_cost: round2(costs.total),
       updated_at: new Date().toISOString(),
@@ -678,7 +681,7 @@ setSupplierByIngredient(supplierByIngredient);
   if (status === "loading") {
     return (
       <main className="container">
-        <TopNav title="Pizza" subtitle="Chargement..." backHref="/pizzas" backLabel="Fiches pizza" />
+        <TopNav title="Pizza" subtitle="Chargement..." backHref="/pizzas" backLabel="← Retour" />
         <p className="muted">Chargement...</p>
       </main>
     );
@@ -687,7 +690,7 @@ setSupplierByIngredient(supplierByIngredient);
   if (status === "NOT_LOGGED") {
     return (
       <main className="container">
-        <TopNav title="Pizza" backHref="/pizzas" backLabel="Fiches pizza" />
+        <TopNav title="Pizza" backHref="/pizzas" backLabel="← Retour" />
         <p className="muted">NOT_LOGGED</p>
         <Link className="btn btnPrimary" href="/login" style={{ marginTop: 12, display: "inline-block" }}>
           Aller sur /login
@@ -699,7 +702,7 @@ setSupplierByIngredient(supplierByIngredient);
   if (status === "ERROR") {
     return (
       <main className="container">
-        <TopNav title="Erreur" backHref="/pizzas" backLabel="Fiches pizza" />
+        <TopNav title="Erreur" backHref="/pizzas" backLabel="← Retour" />
         <pre className="code" style={{ marginTop: 12 }}>{JSON.stringify(error, null, 2)}</pre>
       </main>
     );
@@ -708,7 +711,7 @@ setSupplierByIngredient(supplierByIngredient);
   if (!form) {
     return (
       <main className="container">
-        <TopNav title="Pizza" subtitle="Chargement..." backHref="/pizzas" backLabel="Fiches pizza" />
+        <TopNav title="Pizza" subtitle="Chargement..." backHref="/pizzas" backLabel="← Retour" />
         <p className="muted">Chargement...</p>
       </main>
     );
@@ -726,7 +729,7 @@ setSupplierByIngredient(supplierByIngredient);
         title={pageTitle}
         subtitle={pageSubtitle}
         backHref="/pizzas"
-        backLabel="Fiches pizza"
+        backLabel="← Retour"
         right={
           <>
             <button
@@ -812,6 +815,7 @@ setSupplierByIngredient(supplierByIngredient);
           priceByIngredient={priceByIngredient}
           offerMetaByIngredient={offerMetaByIngredient}
           supplierByIngredient={supplierByIngredient}
+          currentPath={pizzaId ? `/pizzas/${pizzaId}` : `/pizzas/new`}
         />
       </div>
 
@@ -829,6 +833,7 @@ setSupplierByIngredient(supplierByIngredient);
           priceByIngredient={priceByIngredient}
           offerMetaByIngredient={offerMetaByIngredient}
           supplierByIngredient={supplierByIngredient}
+          currentPath={pizzaId ? `/pizzas/${pizzaId}` : `/pizzas/new`}
         />
       </div>
 
@@ -882,6 +887,20 @@ setSupplierByIngredient(supplierByIngredient);
             <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtMoney(pricing.pvTTC)}</div>
             <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>TVA {fmtPct1(pricing.vatPct)}</div>
           </div>
+        </div>
+      </div>
+
+      {/* Disponible dans */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="muted" style={{ marginBottom: 8 }}>Disponible dans :</div>
+        <div style={{ display: "flex", gap: 16 }}>
+          {([["bellomio", "Bello Mio"], ["piccola", "Piccola Mia"]] as const).map(([val, label]) => (
+            <label key={val} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 700 }}>
+              <input type="checkbox" checked={form.establishments.includes(val)}
+                onChange={(e) => setForm((p) => p ? { ...p, establishments: e.target.checked ? [...p.establishments, val] : p.establishments.filter((x) => x !== val) } : p)} />
+              <span style={{ padding: "2px 8px", borderRadius: 4, background: val === "bellomio" ? "#8B1A1A" : "#6B1B1B", color: "#fff", fontSize: 12 }}>{label}</span>
+            </label>
+          ))}
         </div>
       </div>
 

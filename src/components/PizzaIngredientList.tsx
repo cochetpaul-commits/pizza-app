@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import type { Ingredient, PizzaIngredientRow, UnitType } from "@/lib/types";
 import { SmartSelect } from "@/components/SmartSelect";
 
@@ -49,10 +50,12 @@ type Props = {
   priceByIngredient?: Record<string, CpuMap>;
   offerMetaByIngredient?: Record<string, OfferMeta>;
   supplierByIngredient?: Record<string, string | null>;
+  currentPath?: string;
 };
 
 export default function PizzaIngredientList(props: Props) {
-  const { stage, ingredients, rows, onChange, priceByIngredient, offerMetaByIngredient, supplierByIngredient } = props;
+  const { stage, ingredients, rows, onChange, priceByIngredient, offerMetaByIngredient, supplierByIngredient, currentPath } = props;
+  const router = useRouter();
 
   const stageRows = useMemo(() => {
     return ((rows ?? []) as Row[])
@@ -303,9 +306,22 @@ export default function PizzaIngredientList(props: Props) {
                   —
                 </button>
               ) : (
-                <button type="button" onClick={() => delRow(rowId)} style={btn}>
-                  Supprimer
-                </button>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    type="button"
+                    title="Modifier l'ingrédient"
+                    style={{ ...btn, fontSize: 16, padding: "0 10px" }}
+                    onClick={() => {
+                      const back = currentPath ?? "/pizzas/new";
+                      router.push(`/ingredients?edit=${r.ingredient_id}&back=${encodeURIComponent(back)}`);
+                    }}
+                  >
+                    →
+                  </button>
+                  <button type="button" onClick={() => delRow(rowId)} style={btn}>
+                    Supprimer
+                  </button>
+                </div>
               )}
             </div>
           );

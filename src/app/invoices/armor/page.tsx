@@ -43,6 +43,7 @@ export default function ArmorInvoicePage() {
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [commitResult, setCommitResult] = useState<PreviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [establishment, setEstablishment] = useState<"bellomio" | "piccola" | "both">("both");
 
   async function getAuthHeader(): Promise<string> {
     const raw = localStorage.getItem(
@@ -93,6 +94,7 @@ export default function ArmorInvoicePage() {
       const form = new FormData();
       form.append("file", file);
       form.append("mode", "commit");
+      form.append("establishment", establishment);
       const auth = await getAuthHeader();
       const res = await fetch("/api/invoices/armor", {
         method: "POST",
@@ -150,6 +152,21 @@ export default function ArmorInvoicePage() {
         }}
         onClick={() => fileInputRef.current?.click()}
       >
+      {/* Establishment selector */}
+      <div style={{ margin: "1rem 0", padding: "1rem", background: "#f9f9f9", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: "#374151" }}>Cet import concerne :</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {(["bellomio", "piccola", "both"] as const).map((v) => (
+            <button key={v} onClick={() => setEstablishment(v)}
+              style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #d1d5db", cursor: "pointer", fontWeight: 700, fontSize: 13,
+                background: establishment === v ? (v === "bellomio" ? "#8B1A1A" : v === "piccola" ? "#6B1B1B" : "#6B7280") : "#fff",
+                color: establishment === v ? "#fff" : "#374151" }}>
+              {v === "bellomio" ? "Bello Mio" : v === "piccola" ? "Piccola Mia" : "Les deux"}
+            </button>
+          ))}
+        </div>
+      </div>
+
         <input
           ref={fileInputRef}
           type="file"

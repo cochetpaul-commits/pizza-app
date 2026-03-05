@@ -505,7 +505,7 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
     <main className="container">
       {/* NAV */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-        <Link href="/recettes?tab=cocktail" style={{ fontSize: 13, opacity: 0.6 }}>← Cocktails</Link>
+        <Link href="/recettes?tab=cocktail" style={{ fontSize: 13, opacity: 0.6 }}>← Retour</Link>
         <Link href="/" style={{ fontSize: 13, opacity: 0.6 }}>Accueil</Link>
       </div>
 
@@ -608,10 +608,21 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
                   <div style={{ textAlign: "right", fontSize: 13, color: l.cost != null ? "#1a1a1a" : "#ccc" }}>
                     {l.cost != null ? `${fmtMoney(l.cost)} €` : "—"}
                   </div>
-                  <button
-                    className="btn btnDanger" type="button" onClick={() => delLine(l.id)}
-                    style={{ padding: "3px 10px", fontSize: 12 }}
-                  >×</button>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button
+                      className="btn" type="button"
+                      title="Modifier l'ingrédient"
+                      style={{ padding: "3px 10px", fontSize: 14 }}
+                      onClick={() => {
+                        const back = cocktailId ? `/cocktails/${cocktailId}` : `/cocktails/new`;
+                        router.push(`/ingredients?edit=${l.ingredient_id}&back=${encodeURIComponent(back)}`);
+                      }}
+                    >→</button>
+                    <button
+                      className="btn btnDanger" type="button" onClick={() => delLine(l.id)}
+                      style={{ padding: "3px 10px", fontSize: 12 }}
+                    >×</button>
+                  </div>
                 </div>
               );
             })}

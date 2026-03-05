@@ -185,17 +185,33 @@ export default function Home() {
           </div>
 
           {/* ─── PILOTAGE ─── */}
-          <div className="card" style={{ borderLeft: "4px solid #D1D5DB", opacity: 0.6 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div className="card" style={{ borderLeft: "4px solid #92400E" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
               <div>
-                <p className="cardTitle" style={{ marginBottom: 4, letterSpacing: 1, color: "#9CA3AF" }}>PILOTAGE</p>
-                <p className="muted" style={{ margin: 0, fontSize: 13 }}>Dashboard · Alertes prix · Inventaire · Fiche de production</p>
+                <p className="cardTitle" style={{ marginBottom: 4, letterSpacing: 1, color: "#92400E" }}>PILOTAGE</p>
+                <p className="muted" style={{ margin: 0, fontSize: 12 }}>Mercuriale · Prix Épicerie · Inventaire</p>
               </div>
-              <span style={{
-                background: "#F3F4F6", color: "#9CA3AF", fontSize: 10, fontWeight: 700,
-                padding: "3px 8px", borderRadius: 10, letterSpacing: 0.5,
-                textTransform: "uppercase", marginLeft: 12, flexShrink: 0,
-              }}>Bientôt</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 4 }}>
+              <Link href="/mercuriale" style={{ textDecoration: "none", color: "inherit" }}>
+                <div style={{ border: "1px solid #E8E0D0", borderLeft: "4px solid #92400E", borderRadius: 8, padding: "12px 14px", cursor: "pointer", background: "#fff", height: "100%" }}>
+                  <p className="cardTitle" style={{ marginBottom: 3, fontSize: 11, letterSpacing: 1, color: "#92400E" }}>MERCURIALE</p>
+                  <p className="muted" style={{ margin: "0 0 12px", fontSize: 12 }}>Prix fournisseurs · PDF</p>
+                  <span className="btn btnPrimary" style={{ fontSize: 12, padding: "5px 14px", background: "#92400E", borderColor: "#92400E" }}>Ouvrir →</span>
+                </div>
+              </Link>
+              <Link href="/epicerie" style={{ textDecoration: "none", color: "inherit" }}>
+                <div style={{ border: "1px solid #E8E0D0", borderLeft: "4px solid #1E40AF", borderRadius: 8, padding: "12px 14px", cursor: "pointer", background: "#fff", height: "100%" }}>
+                  <p className="cardTitle" style={{ marginBottom: 3, fontSize: 11, letterSpacing: 1, color: "#1E40AF" }}>PRIX ÉPICERIE</p>
+                  <p className="muted" style={{ margin: "0 0 12px", fontSize: 12 }}>Calcul prix de vente · CSV</p>
+                  <span className="btn btnPrimary" style={{ fontSize: 12, padding: "5px 14px", background: "#1E40AF", borderColor: "#1E40AF" }}>Ouvrir →</span>
+                </div>
+              </Link>
+              <div style={{ border: "1px solid #E8E0D0", borderLeft: "4px solid #D1D5DB", borderRadius: 8, padding: "12px 14px", background: "#fff", opacity: 0.45 }}>
+                <p className="cardTitle" style={{ marginBottom: 3, fontSize: 11, letterSpacing: 1, color: "#9CA3AF" }}>INVENTAIRE</p>
+                <p className="muted" style={{ margin: "0 0 12px", fontSize: 12 }}>Saisie des stocks · Valorisation</p>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 10, background: "#F3F4F6", color: "#9CA3AF", letterSpacing: 0.5, textTransform: "uppercase" as const }}>Bientôt</span>
+              </div>
             </div>
           </div>
 
