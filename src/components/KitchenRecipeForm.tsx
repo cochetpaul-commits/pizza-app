@@ -168,6 +168,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
+  const qtyRef = useRef<HTMLInputElement | null>(null);
   const [newIngredientId, setNewIngredientId] = useState<string>("");
   const [newQty, setNewQty] = useState<string>("");
   const [newUnit, setNewUnit] = useState<Unit>("g");
@@ -196,6 +197,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
           category: i.category ? String(i.category) : "Ingrédient",
           rightTop: supp || undefined,
           rightBottom: price ? price : "prix manquant",
+          isPreparation: i.category === "preparation" || i.category === "recette",
         };
       });
     },
@@ -1190,6 +1192,7 @@ if (supplierIds.length) {
                 options={ingredientOptions}
                 value={newIngredientId}
                 onChange={(v) => setNewIngredientId(String(v ?? ""))}
+                onAfterSelect={() => qtyRef.current?.focus()}
                 placeholder="Ingrédient…"
                 inputStyle={input}
               />
@@ -1198,6 +1201,7 @@ if (supplierIds.length) {
             <div>
               <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Qté</div>
               <input
+                ref={qtyRef}
                 style={{ ...input, textAlign: "center", fontWeight: 950 }}
                 inputMode="decimal"
                 value={newQty}

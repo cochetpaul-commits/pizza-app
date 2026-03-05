@@ -227,6 +227,7 @@ export default function PizzaIngredientList(props: Props) {
         category: (i as unknown as { category?: string | null })?.category ?? null,
         rightTop: supplierByIngredient?.[id] ?? null,
         rightBottom: eurPerKg ? fmtKg2(eurPerKg) : null,
+        isPreparation: (i as unknown as { category?: string | null })?.category === "preparation" || (i as unknown as { category?: string | null })?.category === "recette",
       };
     });
   }, [ingredients, supplierByIngredient, eurPerKgFromCpu]);
@@ -268,12 +269,14 @@ export default function PizzaIngredientList(props: Props) {
                   options={options}
                   value={String(r.ingredient_id ?? "")}
                   onChange={(v) => updateRow(rowId, { ingredient_id: v })}
+                  onAfterSelect={() => { const el = document.getElementById(`qty-${rowId}`); if (el) (el as HTMLInputElement).focus(); }}
                   placeholder="Tape pour chercher…"
-                  inputStyle={{ ...input, height: 36, fontWeight: 950 }}
+                  inputStyle={{ ...input, height: 36, fontWeight: 950, fontSize: 16 }}
                 />
               )}
 
               <input
+                id={`qty-${rowId}`}
                 style={{ ...input, height: 36, textAlign: "center", fontWeight: 950 }}
                 inputMode="decimal"
                 value={r.qty === "" ? "" : String(r.qty)}
