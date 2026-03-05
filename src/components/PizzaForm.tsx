@@ -331,7 +331,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
 
       const { data: ing, error: ingErr } = await supabase
         .from("ingredients")
-        .select("id,name,category,allergens,is_active,cost_per_unit")
+        .select("id,name,category,allergens,is_active,cost_per_unit,piece_weight_g,piece_volume_ml")
         .order("name", { ascending: true });
 
       if (ingErr) {
@@ -351,39 +351,65 @@ if (offErr) {
   return;
 }
 
-const supplierMap: Record<string, string> = {
-  B347: "METRO",
-  "0074": "MAEL",
-  B86F: "B86F",
-  CD44: "CD44",
-};
+// Charger les noms fournisseurs dynamiquement
+      const supplierIds = Array.from(new Set(
+        (offers ?? []).map((o: unknown) => {
+          const oo = typeof o === "object" && o ? (o as Record<string, unknown>) : {};
+          return String(oo["supplier_id"] ?? "");
+        }).filter(Boolean)
+      ));
+      const supplierNameById: Record<string, string> = {};
+      if (supplierIds.length) {
+        const { data: sups } = await supabase.from("suppliers").select("id,name").in("id", supplierIds);
+        (sups ?? []).forEach((s: unknown) => {
+          const so = typeof s === "object" && s ? (s as Record<string, unknown>) : {};
+          const sid = String(so["id"] ?? "");
+          const sname = String(so["name"] ?? "").trim();
+          if (sid && sname) supplierNameById[sid] = sname;
+        });
+      }
 
-const priceMap: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
-const metaMap: Record<string, { density_kg_per_l?: number | null; piece_weight_g?: number | null }> = {};
-const supplierByIngredient: Record<string, string | null> = {};
+      const priceMap: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
+      const metaMap: Record<string, { density_kg_per_l?: number | null; piece_weight_g?: number | null }> = {};
+      const supplierByIngredient: Record<string, string | null> = {};
 
-(offers ?? []).forEach((o: unknown) => {
-  const oo = typeof o === "object" && o ? (o as Record<string, unknown>) : {};
+      (offers ?? []).forEach((o: unknown) => {
+        const oo = typeof o === "object" && o ? (o as Record<string, unknown>) : {};
+        const id = String(oo["ingredient_id"] ?? "");
+        if (!id) return;
+        const cpu = offerRowToCpu(oo);
+        if (!priceMap[id]) priceMap[id] = {};
+        priceMap[id] = { ...priceMap[id], ...cpu };
+        const densityVal = oo["density_kg_per_l"];
+        const pieceVal = oo["piece_weight_g"];
+        metaMap[id] = {
+          density_kg_per_l: typeof densityVal === "number" ? densityVal : null,
+          piece_weight_g: typeof pieceVal === "number" ? pieceVal : null,
+        };
+        const supplierId = String(oo["supplier_id"] ?? "");
+        supplierByIngredient[id] = supplierId ? (supplierNameById[supplierId] ?? supplierId.slice(0, 6)) : null;
+      });
 
-  const id = String(oo["ingredient_id"] ?? "");
-  if (!id) return;
-
-  const cpu = offerRowToCpu(oo);
-  if (!priceMap[id]) priceMap[id] = {};
-  priceMap[id] = { ...priceMap[id], ...cpu };
-
-  const densityVal = oo["density_kg_per_l"];
-  const pieceVal = oo["piece_weight_g"];
-  const density = typeof densityVal === "number" ? densityVal : null;
-  const pieceG = typeof pieceVal === "number" ? pieceVal : null;
-  metaMap[id] = { density_kg_per_l: density, piece_weight_g: pieceG };
-
-  const supplierId = String(oo["supplier_id"] ?? "");
-  const code = supplierId ? supplierId.slice(0, 4).toUpperCase() : "";
-  supplierByIngredient[id] = code ? (supplierMap[code] ?? code) : null;
-});
-
-setPriceByIngredient(priceMap);
+// Fallback cost_per_unit + piece_weight_g depuis l'ingrédient
+      (ing ?? []).forEach((ingredient: unknown) => {
+        const io = ingredient as Record<string, unknown>;
+        const iid = String(io["id"] ?? "");
+        if (!iid) return;
+        // Fallback prix
+        if (!priceMap[iid] || (!priceMap[iid].g && !priceMap[iid].ml && !priceMap[iid].pcs)) {
+          const cpu = typeof io["cost_per_unit"] === "number" ? io["cost_per_unit"] : 0;
+          if (cpu > 0) priceMap[iid] = { g: cpu };
+        }
+        // Fallback piece_weight_g pour conversion €/pc → €/kg
+        if (!metaMap[iid] || !metaMap[iid].piece_weight_g) {
+          const pwg = typeof io["piece_weight_g"] === "number" ? io["piece_weight_g"] : null;
+          const pvm = typeof io["piece_volume_ml"] === "number" ? io["piece_volume_ml"] : null;
+          if (pwg || pvm) {
+            metaMap[iid] = { ...metaMap[iid], piece_weight_g: pwg };
+          }
+        }
+      });
+      setPriceByIngredient(priceMap);
 setOfferMetaByIngredient(metaMap);
 setSupplierByIngredient(supplierByIngredient);
 
@@ -780,7 +806,7 @@ setSupplierByIngredient(supplierByIngredient);
               value={form.dough_recipe_id || ""}
               onChange={(v) => setForm((p) => (p ? { ...p, dough_recipe_id: v } : p))}
               placeholder="Selectionnez un empatement..."
-              inputStyle={{ width: "100%" }}
+              inputStyle={{ width: "100%", fontSize: 16 }}
             />
             {doughBadge && (
               <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>

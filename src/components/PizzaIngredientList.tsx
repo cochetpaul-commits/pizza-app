@@ -226,7 +226,19 @@ export default function PizzaIngredientList(props: Props) {
         name: String(i.name ?? ""),
         category: (i as unknown as { category?: string | null })?.category ?? null,
         rightTop: supplierByIngredient?.[id] ?? null,
-        rightBottom: eurPerKg ? fmtKg2(eurPerKg) : null,
+        rightBottom: (() => {
+          const cpu = priceByIngredient?.[id];
+          if (!cpu) return null;
+          if (typeof cpu.g === "number" && cpu.g > 0) return fmtKg2(cpu.g * 1000);
+          const meta = offerMetaByIngredient?.[id] ?? {};
+          const pieceG = typeof meta.piece_weight_g === "number" ? meta.piece_weight_g : null;
+          if (typeof cpu.pcs === "number" && cpu.pcs > 0) {
+            if (pieceG && pieceG > 0) return fmtKg2(cpu.pcs / (pieceG / 1000));
+            return `${cpu.pcs.toFixed(2)} €/pc`;
+          }
+          if (typeof cpu.ml === "number" && cpu.ml > 0) return `${(cpu.ml * 1000).toFixed(2)} €/L`;
+          return null;
+        })(),
         isPreparation: (i as unknown as { category?: string | null })?.category === "preparation" || (i as unknown as { category?: string | null })?.category === "recette",
       };
     });

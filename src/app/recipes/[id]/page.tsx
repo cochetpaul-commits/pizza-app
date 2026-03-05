@@ -701,7 +701,7 @@ export default function RecipePage() {
               value={form.flourA_id ?? ""}
               onChange={(v) => setForm((p) => (p ? { ...p, flourA_id: v } : p))}
               placeholder="Choisir farine A…"
-              inputStyle={{ width: "100%" }}
+              inputStyle={{ width: "100%", fontSize: 16 }}
             />
             <NumberStepper
               value={clamp(toNumSafe(form.flourA_percent ?? "", 80), 0, 100)}
@@ -713,7 +713,7 @@ export default function RecipePage() {
               value={form.flourB_id ?? ""}
               onChange={(v) => setForm((p) => (p ? { ...p, flourB_id: v } : p))}
               placeholder="Choisir farine B…"
-              inputStyle={{ width: "100%" }}
+              inputStyle={{ width: "100%", fontSize: 16 }}
             />
             <NumberStepper
               value={clamp(toNumSafe(form.flourB_percent ?? "", 20), 0, 100)}

@@ -189,8 +189,22 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
   /* ── ingredient options ───────────────────────────────────── */
 
   const ingOptions: SmartSelectOption[] = useMemo(
-    () => ingredients.map((i) => ({ id: i.id, name: i.name ?? "" })),
-    [ingredients]
+    () => ingredients.map((i) => {
+      const cpu = priceMap[i.id];
+      const priceLabel = cpu?.ml ? `${(cpu.ml * 100).toFixed(2)} €/cl`
+        : cpu?.g ? `${(cpu.g * 1000).toFixed(2)} €/kg`
+        : cpu?.pcs ? `${cpu.pcs.toFixed(2)} €/pc`
+        : (i as unknown as {cost_per_unit?: number}).cost_per_unit ? `${((i as unknown as {cost_per_unit: number}).cost_per_unit).toFixed(2)} €/u`
+        : null;
+      return {
+        id: i.id,
+        name: i.name ?? "",
+        category: (i as unknown as {category?: string}).category ?? null,
+        rightBottom: priceLabel,
+        isPreparation: (i as unknown as {category?: string}).category === "preparation" || (i as unknown as {category?: string}).category === "recette",
+      };
+    }),
+    [ingredients, priceMap]
   );
 
   /* ── load ─────────────────────────────────────────────────── */
@@ -205,7 +219,7 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
 
     const { data: ings, error: iErr } = await supabase
       .from("ingredients")
-      .select("id,name,piece_volume_ml")
+      .select("id,name,piece_volume_ml,category")
       .eq("is_active", true)
       .order("name", { ascending: true });
 
@@ -641,7 +655,7 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
         <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
           <div style={{ flex: 3, minWidth: 160 }}>
             <label className="label" style={{ fontSize: 11 }}>Ingrédient</label>
-            <SmartSelect options={ingOptions} value={newIngId} onChange={setNewIngId} placeholder="Chercher…" menuMax={10} />
+            <SmartSelect options={ingOptions} value={newIngId} onChange={setNewIngId} onAfterSelect={() => { const el = document.querySelector('input[placeholder="4"]'); if (el) (el as HTMLInputElement).focus(); }} placeholder="Chercher…" menuMax={10} inputStyle={{ fontSize: 16 }} />
           </div>
           <div style={{ width: 80 }}>
             <label className="label" style={{ fontSize: 11 }}>Quantité</label>

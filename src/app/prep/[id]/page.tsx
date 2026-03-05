@@ -271,6 +271,18 @@ export default function PrepRecipeDetailPage() {
         };
       });
 
+      // Fallback cost_per_unit pour les préparations sans offre fournisseur
+      ingList.forEach((ing: unknown) => {
+        const io = (ing as Record<string, unknown>) ?? {};
+        const iid = getString(io["id"] as unknown, "");
+        if (!iid) return;
+        if (priceMap[iid] && (priceMap[iid].g || priceMap[iid].ml || priceMap[iid].pcs)) return;
+        const cpu = getNumber(io["cost_per_unit"] as unknown, 0);
+        if (cpu > 0) {
+          priceMap[iid] = { g: cpu };
+          infoMap[iid] = { supplier: "maison", eurPerKg: cpu * 1000 };
+        }
+      });
       setPriceByIngredient(priceMap);
       setOfferInfoByIngredient(infoMap);
 
@@ -635,6 +647,7 @@ export default function PrepRecipeDetailPage() {
                   category: i.category,
                   rightTop: meta?.supplier ?? null,
                   rightBottom: meta?.eurPerKg ? fmtKg(meta.eurPerKg) : null,
+                  isPreparation: i.category === "preparation" || i.category === "recette",
                 };
               })}
               value={uiPivotId}
