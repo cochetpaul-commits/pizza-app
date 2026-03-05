@@ -220,7 +220,7 @@ export default function PrepRecipeDetailPage() {
 
       const { data: ing, error: eI } = await supabase
         .from("ingredients")
-        .select("id,name,cost_per_unit,is_active,category")
+        .select("id,name,cost_per_unit,is_active,category,piece_weight_g,piece_volume_ml")
         .eq("is_active", true)
         .order("name");
 
@@ -239,12 +239,20 @@ export default function PrepRecipeDetailPage() {
         return;
       }
 
-      const supplierMap: Record<string, string> = {
-        B347: "METRO",
-        "0074": "MAEL",
-        B86F: "B86F",
-        CD44: "CD44",
-      };
+      // Charger noms fournisseurs dynamiquement
+      const supplierIds = Array.from(new Set(
+        (offers ?? []).map((o: unknown) => getString((getObj(o) ?? {})["supplier_id"] as unknown, "")).filter(Boolean)
+      ));
+      const supplierNameById: Record<string, string> = {};
+      if (supplierIds.length) {
+        const { data: sups } = await supabase.from("suppliers").select("id,name").in("id", supplierIds);
+        (sups ?? []).forEach((s: unknown) => {
+          const so = getObj(s) ?? {};
+          const sid = getString(so["id"] as unknown, "");
+          const sname = getString(so["name"] as unknown, "").trim();
+          if (sid && sname) supplierNameById[sid] = sname;
+        });
+      }
 
       const priceMap: Record<string, { g?: number; ml?: number; pcs?: number }> = {};
       const infoMap: Record<string, { supplier?: string | null; eurPerKg?: number | null }> = {};
@@ -255,8 +263,7 @@ export default function PrepRecipeDetailPage() {
         if (!iid) return;
 
         const supplierId = String(oo["supplier_id"] ?? "");
-        const supplierCode = supplierId ? supplierId.slice(0, 4).toUpperCase() : "";
-        const supplier = supplierCode ? supplierMap[supplierCode] ?? supplierCode : null;
+        const supplier = supplierId ? (supplierNameById[supplierId] ?? supplierId.slice(0, 6)) : null;
 
         const cpu = offerRowToCpu(oo);
         if (!cpu.g && !cpu.ml && !cpu.pcs) return;
@@ -264,23 +271,36 @@ export default function PrepRecipeDetailPage() {
         if (!priceMap[iid]) priceMap[iid] = {};
         priceMap[iid] = { ...priceMap[iid], ...cpu };
 
-        const eurPerKg = priceMap[iid].g ? (priceMap[iid].g as number) * 1000 : null;
+        const cpuMap = priceMap[iid];
+        const oo2 = getObj(o) ?? {};
+        const pieceG = typeof oo2["piece_weight_g"] === "number" ? oo2["piece_weight_g"] as number : null;
+        const eurPerKg = cpuMap.g ? cpuMap.g * 1000
+          : cpuMap.pcs && pieceG && pieceG > 0 ? (cpuMap.pcs / (pieceG / 1000))
+          : cpuMap.ml ? cpuMap.ml * 1000
+          : null;
         infoMap[iid] = {
           supplier,
           eurPerKg: eurPerKg != null && Number.isFinite(eurPerKg) ? eurPerKg : null,
         };
       });
 
-      // Fallback cost_per_unit pour les préparations sans offre fournisseur
+      // Fallback cost_per_unit + piece_weight_g depuis ingrédient
       ingList.forEach((ing: unknown) => {
         const io = (ing as Record<string, unknown>) ?? {};
         const iid = getString(io["id"] as unknown, "");
         if (!iid) return;
-        if (priceMap[iid] && (priceMap[iid].g || priceMap[iid].ml || priceMap[iid].pcs)) return;
-        const cpu = getNumber(io["cost_per_unit"] as unknown, 0);
-        if (cpu > 0) {
-          priceMap[iid] = { g: cpu };
-          infoMap[iid] = { supplier: "maison", eurPerKg: cpu * 1000 };
+        const pwg = typeof io["piece_weight_g"] === "number" ? io["piece_weight_g"] as number : null;
+        // Fallback prix
+        if (!priceMap[iid] || (!priceMap[iid].g && !priceMap[iid].ml && !priceMap[iid].pcs)) {
+          const cpu = getNumber(io["cost_per_unit"] as unknown, 0);
+          if (cpu > 0) {
+            priceMap[iid] = { g: cpu };
+            infoMap[iid] = { supplier: "maison", eurPerKg: cpu * 1000 };
+          }
+        }
+        // Recalcul eurPerKg pour les €/pc avec piece_weight_g
+        if (priceMap[iid]?.pcs && pwg && pwg > 0 && (!infoMap[iid]?.eurPerKg)) {
+          infoMap[iid] = { ...infoMap[iid], eurPerKg: (priceMap[iid].pcs as number) / (pwg / 1000) };
         }
       });
       setPriceByIngredient(priceMap);
@@ -641,12 +661,19 @@ export default function PrepRecipeDetailPage() {
               key={"pivot|" + uiPivotId + "|" + ingredients.length}
               options={ingredients.map((i) => {
                 const meta = offerInfoByIngredient[i.id];
+                const cpu = priceByIngredient[i.id];
+                const pwg = (i as unknown as {piece_weight_g?: number}).piece_weight_g;
+                const priceLabel = meta?.eurPerKg ? fmtKg(meta.eurPerKg)
+                  : cpu?.pcs && pwg && pwg > 0 ? fmtKg(cpu.pcs / (pwg / 1000))
+                  : cpu?.pcs ? `${cpu.pcs.toFixed(2)} €/pc`
+                  : cpu?.ml ? `${(cpu.ml * 1000).toFixed(2)} €/L`
+                  : null;
                 return {
                   id: i.id,
                   name: i.name,
                   category: i.category,
                   rightTop: meta?.supplier ?? null,
-                  rightBottom: meta?.eurPerKg ? fmtKg(meta.eurPerKg) : null,
+                  rightBottom: priceLabel,
                   isPreparation: i.category === "preparation" || i.category === "recette",
                 };
               })}
