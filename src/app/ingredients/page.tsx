@@ -328,6 +328,7 @@ function IngredientsPageInner() {
   };
   const select: CSSProperties = { ...input, paddingRight: 34 };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const tabBtn = (active: boolean): CSSProperties => ({
     height: 36,
     padding: "0 12px",

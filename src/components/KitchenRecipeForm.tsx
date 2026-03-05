@@ -460,6 +460,15 @@ if (supplierIds.length) {
         if (found) supplierMap[iid] = found;
       }
     });
+    // Fallback cost_per_unit pour les préparations maison sans offre fournisseur
+    ingList.forEach((ing: unknown) => {
+      const io = getObj(ing) ?? {};
+      const iid = getString(io["id"], "");
+      if (!iid) return;
+      if (priceMapCpu[iid] && (priceMapCpu[iid].g || priceMapCpu[iid].ml || priceMapCpu[iid].pcs)) return;
+      const cpu = getNumber(io["cost_per_unit"], 0);
+      if (cpu > 0) priceMapCpu[iid] = { g: cpu };
+    });
     setSupplierByIngredient(supplierByIng);
     setPriceByIngredient(priceMapCpu);
 
