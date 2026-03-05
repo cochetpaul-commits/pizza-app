@@ -1,0 +1,6 @@
+{
+  "name": "Pizza App",
+  "short_name": "Pizza",
+  "start_url": "/",
+  "display": "standalone"
+}
