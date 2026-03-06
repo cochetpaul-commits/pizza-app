@@ -948,7 +948,8 @@ function IngredientsPageInner() {
         </div>
       </div>
 
-      <div style={{ marginTop: 12 }}>
+      {/* ── Sticky filter bar ── */}
+      <div style={{ position: "sticky", top: 44, zIndex: 40, background: "#FAF7F2", margin: "0 -16px", padding: "8px 16px 0", borderBottom: "1px solid #e5e7eb" }}>
         <div role="tablist" aria-label="Filtre statut ingrédients" style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
           {([
             ["all", `Tous (${counts.all})`],
@@ -969,63 +970,64 @@ function IngredientsPageInner() {
               background: tab === ("variations" as Tab) ? "#92400E" : "#fff",
               color: tab === ("variations" as Tab) ? "#fff" : "#92400E",
               boxShadow: tab === ("variations" as Tab) ? "0 2px 6px rgba(146,64,14,0.25)" : "0 1px 3px rgba(0,0,0,0.08)",
-            }}>Variations prix {counts.to_check > 0 ? "" : ""}</button>
+            }}>Variations prix</button>
           )}
         </div>
+
+        {tab !== ("variations" as Tab) && (
+          <>
+            <div className="card" style={{ padding: "12px 16px", marginTop: 8, boxShadow: "none" }}>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+                <div>
+                  <div style={label}>Catégorie</div>
+                  <select style={select} value={filterCategory} onChange={(e) => setFilterCategory((e.target.value as "all" | Category))}>
+                    <option value="all">Tous</option>
+                    {CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div style={label}>Fournisseur</div>
+                  <select style={select} value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)}>
+                    <option value="all">Tous</option>
+                    {suppliers.filter((s) => s.is_active).map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div style={label}>Établissement</div>
+                  <select style={select} value={filterEstablishment} onChange={(e) => setFilterEstablishment(e.target.value as "all" | "bellomio" | "piccola" | "both")}>
+                    <option value="all">Tous</option>
+                    <option value="bellomio">Bello Mio</option>
+                    <option value="piccola">Piccola Mia</option>
+                    <option value="both">Les deux</option>
+                  </select>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 8, height: 44 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                    <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} />
+                    <span style={{ fontWeight: 800, fontSize: 12 }}>Inclure sans offre</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginTop: 8, marginBottom: 8, alignItems: "center" }}>
+              <input style={{ ...input, flex: 1 }} placeholder="Rechercher..." value={q} onChange={(e) => setQ(e.target.value)} />
+              <button className="btn" onClick={toggleAll} style={{ whiteSpace: "nowrap", height: 44, padding: "0 14px" }}>
+                {allCollapsed ? "Tout déplier" : "Tout replier"}
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {tab === ("variations" as Tab) && userId && <div style={{ marginTop: 12 }}><PriceAlertsPanel userId={userId} /></div>}
-
-      {tab !== ("variations" as Tab) && <div className="card" style={{ padding: 16, marginTop: 12 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, alignItems: "end" }}>
-          <div>
-            <div style={label}>Filtre catégorie</div>
-            <select style={select} value={filterCategory} onChange={(e) => setFilterCategory((e.target.value as "all" | Category))}>
-              <option value="all">Tous</option>
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <div style={label}>Filtre fournisseur</div>
-            <select style={select} value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)}>
-              <option value="all">Tous</option>
-              {suppliers.filter((s) => s.is_active).map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <div style={label}>Établissement</div>
-            <select style={select} value={filterEstablishment} onChange={(e) => setFilterEstablishment(e.target.value as "all" | "bellomio" | "piccola" | "both")}>
-              <option value="all">Tous</option>
-              <option value="bellomio">Bello Mio</option>
-              <option value="piccola">Piccola Mia</option>
-              <option value="both">Les deux</option>
-            </select>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 10, height: 44 }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} />
-              <span style={{ fontWeight: 800 }}>Inclure sans offre</span>
-            </label>
-            <span className="muted" style={{ fontSize: 12 }}>
-              (sinon: uniquement ceux avec une offre)
-            </span>
-          </div>
-        </div>
-      </div>}
-
-      {tab !== ("variations" as Tab) && <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
-        <input style={{ ...input, flex: 1 }} placeholder="Rechercher..." value={q} onChange={(e) => setQ(e.target.value)} />
-        <button className="btn" onClick={toggleAll} style={{ whiteSpace: "nowrap", height: 44, padding: "0 14px" }}>
-          {allCollapsed ? "Tout déplier" : "Tout replier"}
-        </button>
-      </div>}
 
       {tab !== ("variations" as Tab) && <div className="card" style={{ padding: 16, marginTop: 16 }}>
         <div style={{ fontWeight: 900, fontSize: 18 }}>Créer un ingrédient</div>
@@ -1283,7 +1285,9 @@ function IngredientsPageInner() {
 
                     return (
                       <div key={x.id} style={{ border: "1px solid rgba(0,0,0,0.1)", borderRadius: 12, padding: 12 }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: 12 }}>
+
+                        {/* ── Desktop layout (md+) ── */}
+                        <div className="hidden md:grid" style={{ gridTemplateColumns: "2fr 1fr 1fr auto", gap: 12 }}>
                           <div>
                             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                               <div style={{ fontWeight: 900, color: CAT_COLORS[x.category] }}>{x.name}</div>
@@ -1296,102 +1300,76 @@ function IngredientsPageInner() {
                               {offer ? " • offre" : ""}
                               {x.status_note ? ` • note: ${x.status_note}` : ""}
                             </div>
-
                             {(() => {
                               const hasPrice = offerHasPrice(offer) || legacyHasPrice(x);
                               const canValidate = hasPrice;
-
                               return (
                                 <>
-                                  {!hasPrice ? (
-                                    <div style={{ marginTop: 6 }}>
-                                      <span style={{
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: 6,
-                                        padding: "2px 8px",
-                                        borderRadius: 999,
-                                        fontSize: 12,
-                                        fontWeight: 800,
-                                        background: "rgba(220,38,38,0.10)",
-                                        color: "#DC2626",
-                                        border: "1px solid rgba(220,38,38,0.25)",
-                                      }}>
-                                        prix manquant
-                                      </span>
-                                    </div>
-                                  ) : null}
-
-                                  {st !== "validated" ? (
+                                  {!hasPrice && <div style={{ marginTop: 6 }}><span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "2px 8px", borderRadius: 999, fontSize: 12, fontWeight: 800, background: "rgba(220,38,38,0.10)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.25)" }}>prix manquant</span></div>}
+                                  {st !== "validated" && (
                                     <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-                                      <button className="btn" onClick={() => setIngredientStatus(x.id, "to_check")}>
-                                        À contrôler
-                                      </button>
-                                      <button
-                                        className="btn"
-                                        disabled={!canValidate}
-                                        onClick={() => { if (!canValidate) return; setIngredientStatus(x.id, "validated"); }}
-                                        style={!canValidate ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
-                                        title={!canValidate ? "Ajoute un prix (offre fournisseur ou legacy) avant de valider." : ""}
-                                      >
-                                        Valider
-                                      </button>
-                                      <button className="btn" onClick={() => setIngredientStatus(x.id, "unknown")}>
-                                        Incompris
-                                      </button>
+                                      <button className="btn" onClick={() => setIngredientStatus(x.id, "to_check")}>À contrôler</button>
+                                      <button className="btn" disabled={!canValidate} onClick={() => { if (!canValidate) return; setIngredientStatus(x.id, "validated"); }} style={!canValidate ? { opacity: 0.45, cursor: "not-allowed" } : undefined} title={!canValidate ? "Ajoute un prix avant de valider." : ""}>Valider</button>
+                                      <button className="btn" onClick={() => setIngredientStatus(x.id, "unknown")}>Incompris</button>
                                     </div>
-                                  ) : null}
+                                  )}
                                 </>
                               );
                             })()}
                           </div>
-
                           <div>
                             <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>Densité / Poids / Vol.</div>
                             <div style={{ fontWeight: 600 }}>
-                              {offer?.density_kg_per_l != null
-                                ? `${fmtQty(offer.density_kg_per_l)} kg/L`
-                                : offer?.piece_weight_g != null
-                                ? `${fmtQty(offer.piece_weight_g)} g/pc`
-                                : x.piece_volume_ml != null
-                                ? fmtVolume(x.piece_volume_ml) + "/pc"
-                                : x.purchase_unit_name === "l"
-                                ? `${x.density_g_per_ml ?? 1} kg/L`
-                                : x.piece_weight_g
-                                ? `${x.piece_weight_g} g/pc`
-                                : "—"}
+                              {offer?.density_kg_per_l != null ? `${fmtQty(offer.density_kg_per_l)} kg/L` : offer?.piece_weight_g != null ? `${fmtQty(offer.piece_weight_g)} g/pc` : x.piece_volume_ml != null ? fmtVolume(x.piece_volume_ml) + "/pc" : x.purchase_unit_name === "l" ? `${x.density_g_per_ml ?? 1} kg/L` : x.piece_weight_g ? `${x.piece_weight_g} g/pc` : "—"}
                             </div>
                           </div>
-
                           <div style={{ textAlign: "right" }}>
                             <div style={{ fontWeight: 950, fontSize: 18 }}>{price}</div>
                             <div className="muted" style={{ fontSize: 11 }}>{supplierName ?? (offer ? "offre" : "—")}</div>
                           </div>
-
                           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                            {!isEditing ? (
-                              <button
-                                className="btn btnPrimary"
-                                onClick={() => startEdit(x)}
-                                title="Contrôler / modifier"
-                                style={{ fontSize: 18, padding: "0 12px", height: 36 }}
-                              >
-                                →
-                              </button>
-                            ) : (
-                              <button className="btn btnPrimary" onClick={saveEdit}>
-                                OK
-                              </button>
-                            )}
-                            <button
-                              className="btn btnDanger"
-                              onClick={() => del(x.id, x.name)}
-                              title="Supprimer"
-                              style={{ fontSize: 16, padding: "0 12px", height: 36 }}
-                            >
-                              ✕
-                            </button>
+                            {!isEditing ? <button className="btn btnPrimary" onClick={() => startEdit(x)} title="Contrôler / modifier" style={{ fontSize: 18, padding: "0 12px", height: 36 }}>→</button> : <button className="btn btnPrimary" onClick={saveEdit}>OK</button>}
+                            <button className="btn btnDanger" onClick={() => del(x.id, x.name)} title="Supprimer" style={{ fontSize: 16, padding: "0 12px", height: 36 }}>✕</button>
                           </div>
+                        </div>
+
+                        {/* ── Mobile layout ── */}
+                        <div className="md:hidden">
+                          {/* Nom + badges */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <div style={{ fontWeight: 900, color: CAT_COLORS[x.category], flex: 1 }}>{x.name}</div>
+                            <span style={statusBadgeStyle(st)}>{statusLabel(st)}</span>
+                            <span style={{ fontSize: 10, fontWeight: 800, padding: "2px 6px", borderRadius: 4, background: estabBadge.bg, color: "#fff" }}>{estabBadge.label}</span>
+                          </div>
+                          {/* Fournisseur · Catégorie */}
+                          <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                            {supplierName ?? x.category}
+                            {x.status_note ? ` • ${x.status_note}` : ""}
+                          </div>
+                          {/* Prix + Densité */}
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 6 }}>
+                            <div style={{ fontWeight: 950, fontSize: 17 }}>{price}</div>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: "#6B6257" }}>
+                              {offer?.density_kg_per_l != null ? `${fmtQty(offer.density_kg_per_l)} kg/L` : offer?.piece_weight_g != null ? `${fmtQty(offer.piece_weight_g)} g/pc` : x.piece_volume_ml != null ? fmtVolume(x.piece_volume_ml) + "/pc" : x.purchase_unit_name === "l" ? `${x.density_g_per_ml ?? 1} kg/L` : x.piece_weight_g ? `${x.piece_weight_g} g/pc` : "—"}
+                            </div>
+                          </div>
+                          {/* Actions mobiles */}
+                          {(() => {
+                            const hasPrice = offerHasPrice(offer) || legacyHasPrice(x);
+                            const canValidate = hasPrice;
+                            return (
+                              <>
+                                {!hasPrice && <div style={{ marginTop: 4 }}><span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 800, background: "rgba(220,38,38,0.10)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.25)" }}>prix manquant</span></div>}
+                                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                                  {st !== "validated" && (
+                                    <button className="btn" style={{ flex: 1 }} disabled={!canValidate} onClick={() => { if (!canValidate) return; setIngredientStatus(x.id, "validated"); }} title={!canValidate ? "Ajoute un prix avant de valider." : ""}>Valider</button>
+                                  )}
+                                  {!isEditing ? <button className="btn btnPrimary" style={{ flex: 1 }} onClick={() => startEdit(x)}>Modifier</button> : <button className="btn btnPrimary" style={{ flex: 1 }} onClick={saveEdit}>OK</button>}
+                                  <button className="btn btnDanger" onClick={() => del(x.id, x.name)}>✕</button>
+                                </div>
+                              </>
+                            );
+                          })()}
                         </div>
 
                         {isEditing && edit && (

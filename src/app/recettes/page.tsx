@@ -72,10 +72,6 @@ function RecipeRow({
     <div
       onClick={onOpen}
       style={{
-        display: "grid",
-        gridTemplateColumns: "1fr auto auto",
-        alignItems: "center",
-        gap: 12,
         padding: "12px 14px",
         borderRadius: 12,
         background: "rgba(255,255,255,0.45)",
@@ -86,84 +82,64 @@ function RecipeRow({
       onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.75)")}
       onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.45)")}
     >
-      {/* Nom + sous-titre */}
-      <div>
-        <div style={{
-          fontWeight: 700,
-          fontSize: 13,
-          letterSpacing: "0.06em",
-          textTransform: "uppercase",
-          color: "#2f3a33",
-        }}>
-          {name}
+      {/* Layout responsive : flex-col mobile, grid desktop */}
+      <div className="flex items-start gap-3 md:grid md:items-center" style={{ gridTemplateColumns: "1fr auto auto" }}>
+        {/* Nom + sous-titre */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontWeight: 700, fontSize: 13,
+            letterSpacing: "0.06em", textTransform: "uppercase", color: "#2f3a33",
+          }}>
+            {name}
+          </div>
+          {/* Coût visible sous le nom sur mobile */}
+          {cost && (
+            <div className="md:hidden" style={{ fontSize: 15, fontWeight: 800, color, marginTop: 2, letterSpacing: "-0.3px" }}>
+              {cost}{costLabel ? <span style={{ fontSize: 11, fontWeight: 500, color: "#6f6a61", marginLeft: 3 }}>{costLabel}</span> : null}
+            </div>
+          )}
+          {sub && (
+            <div style={{ fontSize: 11, color: "#6f6a61", marginTop: 2 }}>{sub}</div>
+          )}
         </div>
-        {sub && (
-          <div style={{ fontSize: 11, color: "#6f6a61", marginTop: 2 }}>{sub}</div>
+
+        {/* Coût — desktop uniquement (colonne centrale) */}
+        {cost && (
+          <div className="hidden md:block" style={{ fontSize: 17, fontWeight: 800, color, whiteSpace: "nowrap", letterSpacing: "-0.3px" }}>
+            {cost}{costLabel ? <span style={{ fontSize: 11, fontWeight: 500, color: "#6f6a61", marginLeft: 3 }}>{costLabel}</span> : null}
+          </div>
         )}
-      </div>
 
-      {/* Coût mis en valeur */}
-      {cost && (
-        <div style={{
-          fontSize: 17,
-          fontWeight: 800,
-          color,
-          whiteSpace: "nowrap",
-          letterSpacing: "-0.3px",
-        }}>
-          {cost}{costLabel ? <span style={{ fontSize: 11, fontWeight: 500, color: "#6f6a61", marginLeft: 3 }}>{costLabel}</span> : null}
+        {/* Icônes actions */}
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+          <button
+            onClick={onOpen}
+            title="Ouvrir"
+            style={{
+              width: 34, height: 34, borderRadius: 10,
+              border: `1.5px solid ${color}`, background: color,
+              color: "#fff", fontSize: 16, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "opacity 0.12s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = "0.8")}
+            onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
+          >→</button>
+          <button
+            onClick={onDelete}
+            title="Supprimer"
+            style={{
+              width: 34, height: 34, borderRadius: 10,
+              border: "1.5px solid rgba(217,199,182,0.95)",
+              background: "rgba(255,255,255,0.5)", color: "#9a8f84",
+              fontSize: 13, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "border-color 0.12s, color 0.12s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "#d93f3f"; e.currentTarget.style.color = "#d93f3f"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(217,199,182,0.95)"; e.currentTarget.style.color = "#9a8f84"; }}
+          >✕</button>
         </div>
-      )}
-
-      {/* Icônes actions */}
-      <div style={{ display: "flex", gap: 6 }} onClick={e => e.stopPropagation()}>
-        {/* Ouvrir → */}
-        <button
-          onClick={onOpen}
-          title="Ouvrir"
-          style={{
-            width: 34, height: 34,
-            borderRadius: 10,
-            border: `1.5px solid ${color}`,
-            background: color,
-            color: "#fff",
-            fontSize: 16,
-            cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "opacity 0.12s",
-          }}
-          onMouseEnter={e => (e.currentTarget.style.opacity = "0.8")}
-          onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
-        >
-          →
-        </button>
-
-        {/* Supprimer ✕ */}
-        <button
-          onClick={onDelete}
-          title="Supprimer"
-          style={{
-            width: 34, height: 34,
-            borderRadius: 10,
-            border: "1.5px solid rgba(217,199,182,0.95)",
-            background: "rgba(255,255,255,0.5)",
-            color: "#9a8f84",
-            fontSize: 13,
-            cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "border-color 0.12s, color 0.12s",
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.borderColor = "#d93f3f";
-            e.currentTarget.style.color = "#d93f3f";
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.borderColor = "rgba(217,199,182,0.95)";
-            e.currentTarget.style.color = "#9a8f84";
-          }}
-        >
-          ✕
-        </button>
       </div>
     </div>
   );
@@ -353,15 +329,16 @@ function RecettesInner() {
     : count != null ? `${count} fiche(s)` : "";
 
   const createBtn = (() => {
+    const cls = "btn btnPrimary w-full md:w-auto";
     if (activeTab === "pizza")
-      return <Link className="btn btnPrimary" href="/pizzas/new">Nouvelle pizza</Link>;
+      return <Link className={cls} href="/pizzas/new">Nouvelle pizza</Link>;
     if (activeTab === "empatement")
-      return <button className="btn btnPrimary" onClick={createEmp} disabled={creatingEmp}>{creatingEmp ? "Création…" : "Nouvel empâtement"}</button>;
+      return <button className={cls} onClick={createEmp} disabled={creatingEmp}>{creatingEmp ? "Création…" : "Nouvel empâtement"}</button>;
     if (activeTab === "cuisine")
-      return <Link className="btn btnPrimary" href="/kitchen/new">Nouvelle fiche</Link>;
+      return <Link className={cls} href="/kitchen/new">Nouvelle fiche</Link>;
     if (activeTab === "pivot")
-      return <Link className="btn btnPrimary" href="/prep/new">Nouvelle recette pivot</Link>;
-    return <Link className="btn btnPrimary" href="/cocktails/new">Nouveau cocktail</Link>;
+      return <Link className={cls} href="/prep/new">Nouvelle recette pivot</Link>;
+    return <Link className={cls} href="/cocktails/new">Nouveau cocktail</Link>;
   })();
 
   return (
@@ -370,55 +347,41 @@ function RecettesInner() {
     <main className="container">
       <TopNav title="Recettes" subtitle={subtitle} />
 
-      {/* ── Tab bar — Option D ── */}
+      {/* ── Sticky tab bar ── */}
       <div style={{
-        display: "flex",
+        position: "sticky", top: 44, zIndex: 40,
+        background: "#FAF7F2", margin: "0 -18px",
         borderBottom: "1px solid rgba(217,199,182,0.95)",
         marginBottom: 16,
-        overflowX: "auto",
-        scrollbarWidth: "none",
       }}>
-        {TABS.map((tab, i) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => router.push(`/recettes?tab=${tab.id}`)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 7,
-                padding: "12px 18px",
-                background: "none",
-                border: "none",
-                borderBottom: isActive ? `2px solid ${tab.color}` : "2px solid transparent",
-                marginBottom: -1,
-                cursor: "pointer",
-                fontSize: 13,
-                fontWeight: isActive ? 700 : 500,
-                color: isActive ? tab.color : "#6f6a61",
-                whiteSpace: "nowrap",
-                transition: "color 0.15s",
-                flexShrink: 0,
-                borderRight: i < TABS.length - 1 ? "1px solid rgba(217,199,182,0.5)" : "none",
-              }}
-            >
-              <span style={{
-                width: 7, height: 7,
-                borderRadius: "50%",
-                background: tab.color,
-                opacity: isActive ? 1 : 0,
-                transition: "opacity 0.15s",
-                flexShrink: 0,
-              }} />
-              {tab.label}
-            </button>
-          );
-        })}
+        <div style={{ display: "flex", overflowX: "auto", scrollbarWidth: "none" }}>
+          {TABS.map((tab, i) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => router.push(`/recettes?tab=${tab.id}`)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 7,
+                  padding: "12px 18px", background: "none", border: "none",
+                  borderBottom: isActive ? `2px solid ${tab.color}` : "2px solid transparent",
+                  marginBottom: -1, cursor: "pointer", fontSize: 13,
+                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? tab.color : "#6f6a61",
+                  whiteSpace: "nowrap", transition: "color 0.15s", flexShrink: 0,
+                  borderRight: i < TABS.length - 1 ? "1px solid rgba(217,199,182,0.5)" : "none",
+                }}
+              >
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: tab.color, opacity: isActive ? 1 : 0, transition: "opacity 0.15s", flexShrink: 0 }} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Actions */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+      <div className="flex flex-col md:flex-row gap-2 md:gap-3 mb-4">
         {createBtn}
       </div>
 
