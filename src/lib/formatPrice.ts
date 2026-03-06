@@ -18,8 +18,9 @@ function fromOffer(ingredient: Pick<Ingredient, "piece_volume_ml">, o: LatestOff
       if (pw > 0) return `${fmtMoney((o.unit_price / pw) * 1000)} €/kg`;
       const volMl = ingredient.piece_volume_ml;
       if (volMl != null && volMl > 0) {
-        if (volMl >= 1000) return `${fmtMoney((o.unit_price / volMl) * 1000)} €/L`;
-        return `${fmtMoney(o.unit_price)} €/pc · ${fmtMoney((o.unit_price / volMl) * 10)} €/cl`;
+        const eurL = (o.unit_price / volMl) * 1000;
+        const eurCl = (o.unit_price / volMl) * 10;
+        return `${fmtMoney(o.unit_price)} €/pc · ${fmtMoney(eurL)} €/L · ${fmtMoney(eurCl)} €/cl`;
       }
       return `${fmtMoney(o.unit_price)} €/pc`;
     }
@@ -62,8 +63,9 @@ function fromLegacy(x: IngredientPriceFields): string {
       if (pw > 0 && x.purchase_price != null) return `${fmtMoney((x.purchase_price / pw) * 1000)} €/kg`;
       const volMl = x.piece_volume_ml;
       if (volMl != null && volMl > 0 && x.purchase_price != null) {
-        if (volMl >= 1000) return `${fmtMoney((x.purchase_price / volMl) * 1000)} €/L`;
-        return `${fmtMoney(x.purchase_price)} €/pc · ${fmtMoney((x.purchase_price / volMl) * 10)} €/cl`;
+        const eurL = (x.purchase_price / volMl) * 1000;
+        const eurCl = (x.purchase_price / volMl) * 10;
+        return `${fmtMoney(x.purchase_price)} €/pc · ${fmtMoney(eurL)} €/L · ${fmtMoney(eurCl)} €/cl`;
       }
       if (x.purchase_price != null) return `${fmtMoney(x.purchase_price)} €/pc`;
     }
@@ -109,11 +111,9 @@ export function formatCpuLabel(
     if (pw && pw > 0) {
       priceStr = `${fmtMoney((cpu.pcs / pw) * 1000)} €/kg`;
     } else if (vol && vol > 0) {
-      if (vol >= 1000) {
-        priceStr = `${fmtMoney((cpu.pcs / vol) * 1000)} €/L`;
-      } else {
-        priceStr = `${fmtMoney(cpu.pcs)} €/pc · ${fmtMoney((cpu.pcs / vol) * 10)} €/cl`;
-      }
+      const eurL = (cpu.pcs / vol) * 1000;
+      const eurCl = (cpu.pcs / vol) * 10;
+      priceStr = `${fmtMoney(eurL)} €/L · ${fmtMoney(eurCl)} €/cl`;
     } else {
       priceStr = `${fmtMoney(cpu.pcs)} €/pc`;
     }
