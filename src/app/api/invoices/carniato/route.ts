@@ -1,39 +1,15 @@
 import { NextResponse } from "next/server";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import * as os from "node:os";
-import * as path from "node:path";
-import * as fs from "node:fs/promises";
+import { pdfToText } from "@/lib/pdfToText";
 import { createClient } from "@supabase/supabase-js";
 import { detectCategoryFromName } from "@/lib/invoices/categoryDetector";
 import { parseCarniatoInvoiceText, type ParsedInvoice } from "@/lib/invoices/carniato";
 
 export const runtime = "nodejs";
 
-const execFileAsync = promisify(execFile);
-
 function toText(v: unknown): string {
   return typeof v === "string" ? v : v == null ? "" : String(v);
 }
 
-async function pdfToTextWithPoppler(pdfBytes: Uint8Array): Promise<string> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "pizzaapp-carniato-"));
-  const pdfPath = path.join(dir, "invoice.pdf");
-
-  try {
-    await fs.writeFile(pdfPath, pdfBytes);
-    const { stdout } = await execFileAsync("pdftotext", ["-raw", pdfPath, "-"]);
-    return toText(stdout);
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : toText(e);
-    if (String(msg).toLowerCase().includes("enoent")) {
-      throw new Error("pdftotext introuvable. Installe Poppler: brew install poppler");
-    }
-    throw new Error(`pdftotext échec: ${msg}`);
-  } finally {
-    await fs.rm(dir, { recursive: true, force: true }).catch(() => null);
-  }
-}
 
 function ddmmyyyyToIsoDate(s: string | null): string | null {
   if (!s) return null;
@@ -80,7 +56,7 @@ export async function POST(req: Request) {
     const ab = await file.arrayBuffer();
     const bytes = new Uint8Array(ab);
 
-    const text = await pdfToTextWithPoppler(bytes);
+    const text = await pdfToText(bytes);
     const payload: ParsedInvoice = parseCarniatoInvoiceText(text);
 
     const url = getEnv("NEXT_PUBLIC_SUPABASE_URL");
