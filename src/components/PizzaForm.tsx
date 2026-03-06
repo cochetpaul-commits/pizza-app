@@ -827,6 +827,20 @@ setPriceLabelByIngredient(priceLabelMap);
         />
       </div>
 
+      {/* Disponible dans */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="muted" style={{ marginBottom: 8 }}>Disponible dans :</div>
+        <div style={{ display: "flex", gap: 16 }}>
+          {([["bellomio", "Bello Mio"], ["piccola", "Piccola Mia"]] as const).map(([val, label]) => (
+            <label key={val} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 700 }}>
+              <input type="checkbox" checked={form.establishments.includes(val)}
+                onChange={(e) => setForm((p) => p ? { ...p, establishments: e.target.checked ? [...p.establishments, val] : p.establishments.filter((x) => x !== val) } : p)} />
+              <span style={{ padding: "2px 8px", borderRadius: 4, background: val === "bellomio" ? "#8B1A1A" : "#6B1B1B", color: "#fff", fontSize: 12 }}>{label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
       {/* 2. Empatement + Poids paton */}
       <div className="card" style={{ marginTop: 16 }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 160px", gap: 12, alignItems: "end" }}>
@@ -946,20 +960,6 @@ setPriceLabelByIngredient(priceLabelMap);
             <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtMoney(pricing.pvTTC)}</div>
             <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>TVA {fmtPct1(pricing.vatPct)}</div>
           </div>
-        </div>
-      </div>
-
-      {/* Disponible dans */}
-      <div className="card" style={{ marginTop: 16 }}>
-        <div className="muted" style={{ marginBottom: 8 }}>Disponible dans :</div>
-        <div style={{ display: "flex", gap: 16 }}>
-          {([["bellomio", "Bello Mio"], ["piccola", "Piccola Mia"]] as const).map(([val, label]) => (
-            <label key={val} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 700 }}>
-              <input type="checkbox" checked={form.establishments.includes(val)}
-                onChange={(e) => setForm((p) => p ? { ...p, establishments: e.target.checked ? [...p.establishments, val] : p.establishments.filter((x) => x !== val) } : p)} />
-              <span style={{ padding: "2px 8px", borderRadius: 4, background: val === "bellomio" ? "#8B1A1A" : "#6B1B1B", color: "#fff", fontSize: 12 }}>{label}</span>
-            </label>
-          ))}
         </div>
       </div>
 

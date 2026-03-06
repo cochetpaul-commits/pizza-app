@@ -1070,6 +1070,16 @@ if (supplierIds.length) {
             onChange={(e) => setForm((p) => (p ? { ...p, name: e.target.value } : p))}
           />
 
+          <div style={{ marginTop: 10, display: "flex", gap: 16 }}>
+            {([["bellomio", "Bello Mio"], ["piccola", "Piccola Mia"]] as const).map(([val, label]) => (
+              <label key={val} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 700 }}>
+                <input type="checkbox" checked={form.establishments.includes(val)}
+                  onChange={(e) => setForm((p) => p ? { ...p, establishments: e.target.checked ? [...p.establishments, val] : p.establishments.filter((x) => x !== val) } : p)} />
+                <span style={{ padding: "2px 8px", borderRadius: 4, background: val === "bellomio" ? "#8B1A1A" : "#6B1B1B", color: "#fff", fontSize: 12 }}>{label}</span>
+              </label>
+            ))}
+          </div>
+
           <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <div>
               <div style={{ fontSize: 12, color: theme.muted, fontWeight: 900, marginBottom: 8 }}>Catégorie</div>
@@ -1334,19 +1344,6 @@ if (supplierIds.length) {
               {photoUploading && <span style={{ color: theme.muted, fontSize: 13 }}>Upload en cours…</span>}
               {photoError && <span style={{ color: "#c0392b", fontSize: 12 }}>{photoError}</span>}
             </div>
-          </div>
-        </div>
-
-        <div style={{ marginTop: 12, ...card }}>
-          <div style={{ fontSize: 16, fontWeight: 950, marginBottom: 10 }}>Disponible dans</div>
-          <div style={{ display: "flex", gap: 16 }}>
-            {([["bellomio", "Bello Mio"], ["piccola", "Piccola Mia"]] as const).map(([val, label]) => (
-              <label key={val} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 700 }}>
-                <input type="checkbox" checked={form.establishments.includes(val)}
-                  onChange={(e) => setForm((p) => p ? { ...p, establishments: e.target.checked ? [...p.establishments, val] : p.establishments.filter((x) => x !== val) } : p)} />
-                <span style={{ padding: "2px 8px", borderRadius: 4, background: val === "bellomio" ? "#8B1A1A" : "#6B1B1B", color: "#fff", fontSize: 12 }}>{label}</span>
-              </label>
-            ))}
           </div>
         </div>
 
