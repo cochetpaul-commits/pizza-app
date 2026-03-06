@@ -178,7 +178,7 @@ export default function EpiceriePage() {
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "#1A1A1A" }}>Calcul Prix Épicerie</h1>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: 16, alignItems: "start" }}>
+        <div className="grid gap-4 items-start grid-cols-1 md:grid-cols-[380px_1fr]">
 
           {/* CATALOGUE */}
           <div style={{ ...card, position: "sticky", top: 16 }}>
