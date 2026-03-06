@@ -232,6 +232,7 @@ function IngredientsPageInner() {
     return next;
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   function toggleAll() {
     if (allCollapsed) {
@@ -929,8 +930,8 @@ function IngredientsPageInner() {
       backLabel="Retour"
       right={<>
         <button className="btn btnPrimary"
-          onClick={() => document.getElementById("create-form")?.scrollIntoView({ behavior: "smooth" })}>
-          + Ingrédient
+          onClick={() => setShowCreateForm(v => !v)}>
+          {showCreateForm ? "✕ Fermer" : "+ Ingrédient"}
         </button>
         <button className="btn" onClick={load}>Rafraîchir</button>
       </>}
@@ -1042,7 +1043,7 @@ function IngredientsPageInner() {
 
       {tab === ("variations" as Tab) && userId && <div className="mt-3"><PriceAlertsPanel userId={userId} /></div>}
 
-      {tab !== ("variations" as Tab) && <div id="create-form" className="card mt-4">
+      {tab !== ("variations" as Tab) && showCreateForm && <div className="mt-4" style={{ animation: "slideDown 0.2s ease-out", background: "rgba(250,247,242,0.85)", border: "1px solid rgba(217,199,182,0.75)", borderRadius: 14, padding: 16 }}>
         <div className="font-black text-[18px]">Créer un ingrédient</div>
 
         <form onSubmit={addIngredient} className="mt-3 grid gap-3">
@@ -1264,7 +1265,7 @@ function IngredientsPageInner() {
 
             {!isCollapsed && (
               <div className="card mt-1.5">
-                <div className="grid gap-2.5">
+                <div className="grid md:grid-cols-2 gap-2.5">
                   {catItems.map((x) => {
                     const isEditing = editingId === x.id;
                     const offer = offersByIngredientId.get(x.id);
@@ -1285,7 +1286,7 @@ function IngredientsPageInner() {
                     const canValidate = hasPrice;
 
                     return (
-                      <div key={x.id} className="border border-black/10 rounded-xl p-3">
+                      <div key={x.id} className="border border-black/10 rounded-xl p-3" style={{ background: "#FAF7F2" }}>
 
                         {/* ── Desktop layout (md+) ── */}
                         <div className="hidden md:grid gap-3" style={{ gridTemplateColumns: "2fr 1fr 1fr auto" }}>
