@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { Ingredient, PizzaIngredientRow, UnitType } from "@/lib/types";
 import { SmartSelect } from "@/components/SmartSelect";
@@ -14,9 +14,6 @@ function fmtMoney(v: number) {
   return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
 
-function fmtKg2(v: number) {
-  return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €/kg";
-}
 
 function tmpId() {
   return `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -54,7 +51,7 @@ type Props = {
 };
 
 export default function PizzaIngredientList(props: Props) {
-  const { stage, ingredients, rows, onChange, priceByIngredient, offerMetaByIngredient, supplierByIngredient, currentPath } = props;
+  const { stage, ingredients, rows, onChange, priceByIngredient, offerMetaByIngredient, currentPath } = props;
   const router = useRouter();
 
   const stageRows = useMemo(() => {
@@ -63,6 +60,11 @@ export default function PizzaIngredientList(props: Props) {
       .slice()
       .sort((a, b) => n2(a.sort_order) - n2(b.sort_order));
   }, [rows, stage]);
+
+  const ingredientById = useMemo(
+    () => new Map((ingredients ?? []).map((i) => [String(i.id), i])),
+    [ingredients]
+  );
 
   const card = {
     background: "#efe2d3",
@@ -173,8 +175,8 @@ export default function PizzaIngredientList(props: Props) {
   };
 
   const costPerUnit = (r: Row) => {
-    const ing = ingredients.find((x) => String(x.id) === String(r.ingredient_id)) ?? null;
     const id = String(r.ingredient_id ?? "");
+    const ing = ingredientById.get(id) ?? null;
     const unit = normalizeUnit(r.unit);
 
     const fromOffers = effectiveCpu(id, unit);
@@ -189,60 +191,18 @@ export default function PizzaIngredientList(props: Props) {
     return qty * costPerUnit(r);
   };
 
-  const eurPerKgFromCpu = useCallback(
-  (id: string) => {
-    const cpu = priceByIngredient?.[id];
-    if (!cpu) return null;
-
-    if (typeof cpu.g === "number" && cpu.g > 0) return cpu.g * 1000;
-
-    const meta = offerMetaByIngredient?.[id] ?? {};
-    const density = typeof meta.density_kg_per_l === "number" ? meta.density_kg_per_l : null;
-    const pieceG = typeof meta.piece_weight_g === "number" ? meta.piece_weight_g : null;
-
-    if (typeof cpu.ml === "number" && cpu.ml > 0) {
-      if (!density || density <= 0) return null;
-      const eurPerL = cpu.ml * 1000;
-      return eurPerL / density;
-    }
-
-    if (typeof cpu.pcs === "number" && cpu.pcs > 0) {
-      if (!pieceG || pieceG <= 0) return null;
-      return cpu.pcs / (pieceG / 1000);
-    }
-
-    return null;
-  },
-  [priceByIngredient, offerMetaByIngredient]
-);
-
   const options = useMemo(() => {
     return (ingredients ?? []).map((i) => {
       const id = String(i.id);
-      const eurPerKg = eurPerKgFromCpu(id);
-
+      const cat = (i as unknown as { category?: string | null })?.category ?? null;
       return {
         id,
         name: String(i.name ?? ""),
-        category: (i as unknown as { category?: string | null })?.category ?? null,
-        rightTop: supplierByIngredient?.[id] ?? null,
-        rightBottom: (() => {
-          const cpu = priceByIngredient?.[id];
-          if (!cpu) return null;
-          if (typeof cpu.g === "number" && cpu.g > 0) return fmtKg2(cpu.g * 1000);
-          const meta = offerMetaByIngredient?.[id] ?? {};
-          const pieceG = typeof meta.piece_weight_g === "number" ? meta.piece_weight_g : null;
-          if (typeof cpu.pcs === "number" && cpu.pcs > 0) {
-            if (pieceG && pieceG > 0) return fmtKg2(cpu.pcs / (pieceG / 1000));
-            return `${cpu.pcs.toFixed(2)} €/pc`;
-          }
-          if (typeof cpu.ml === "number" && cpu.ml > 0) return `${(cpu.ml * 1000).toFixed(2)} €/L`;
-          return null;
-        })(),
-        isPreparation: (i as unknown as { category?: string | null })?.category === "preparation" || (i as unknown as { category?: string | null })?.category === "recette",
+        category: cat,
+        isPreparation: cat === "preparation" || cat === "recette",
       };
     });
-  }, [ingredients, supplierByIngredient, eurPerKgFromCpu, priceByIngredient, offerMetaByIngredient]);
+  }, [ingredients]);
 
   return (
     <div style={{ ...card }}>
@@ -256,8 +216,6 @@ export default function PizzaIngredientList(props: Props) {
           const locked = Boolean(r?._locked);
           const rowId = typeof r.id === "string" ? r.id : "";
           if (!rowId) return null;
-
-          const gridCols = "2fr 110px 90px 110px auto";
 
           return (
             <div
@@ -277,7 +235,7 @@ export default function PizzaIngredientList(props: Props) {
                 <div style={{ fontWeight: 950 }}>{String(r?._label ?? "—")}</div>
               ) : (
                 <SmartSelect
-                  key={`row-ing-${rowId}-${String(r.ingredient_id ?? "")}-${options.length}`}
+                  key={rowId}
                   options={options}
                   value={String(r.ingredient_id ?? "")}
                   onChange={(v) => updateRow(rowId, { ingredient_id: v })}

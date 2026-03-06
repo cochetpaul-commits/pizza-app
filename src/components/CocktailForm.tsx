@@ -138,6 +138,11 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
   const [ingredients, setIngredients] = useState<IngRow[]>([]);
   const [priceMap, setPriceMap] = useState<Record<string, { ml?: number; g?: number; pcs?: number }>>({});
 
+  const ingredientById = useMemo(
+    () => new Map(ingredients.map((i) => [i.id, i])),
+    [ingredients]
+  );
+
   const [newIngId, setNewIngId] = useState("");
   const [newQty, setNewQty] = useState("");
   const [newUnit, setNewUnit] = useState<CocktailUnit>("cl");
@@ -190,21 +195,15 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
 
   const ingOptions: SmartSelectOption[] = useMemo(
     () => ingredients.map((i) => {
-      const cpu = priceMap[i.id];
-      const priceLabel = cpu?.ml ? `${(cpu.ml * 100).toFixed(2)} €/cl`
-        : cpu?.g ? `${(cpu.g * 1000).toFixed(2)} €/kg`
-        : cpu?.pcs ? `${cpu.pcs.toFixed(2)} €/pc`
-        : (i as unknown as {cost_per_unit?: number}).cost_per_unit ? `${((i as unknown as {cost_per_unit: number}).cost_per_unit).toFixed(2)} €/u`
-        : null;
+      const cat = (i as unknown as { category?: string }).category ?? null;
       return {
         id: i.id,
         name: i.name ?? "",
-        category: (i as unknown as {category?: string}).category ?? null,
-        rightBottom: priceLabel,
-        isPreparation: (i as unknown as {category?: string}).category === "preparation" || (i as unknown as {category?: string}).category === "recette",
+        category: cat,
+        isPreparation: cat === "preparation" || cat === "recette",
       };
     }),
-    [ingredients, priceMap]
+    [ingredients]
   );
 
   /* ── load ─────────────────────────────────────────────────── */
@@ -300,7 +299,7 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
     const q = parseQty(newQty);
     if (q == null) return;
 
-    const ingRow = ingredients.find((x) => x.id === newIngId);
+    const ingRow = ingredientById.get(newIngId);
     const nextSort = lines.length ? Math.max(...lines.map((l) => l.sort_order)) + 1 : 0;
 
     setLines((p) => [

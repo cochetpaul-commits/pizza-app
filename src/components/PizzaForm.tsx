@@ -129,6 +129,11 @@ export default function PizzaForm(props: { pizzaId?: string }) {
   const [recipes, setRecipes] = useState<DoughRecipeRow[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [rows, setRows] = useState<PizzaIngredientRow[]>([]);
+
+  const ingredientById = useMemo(
+    () => new Map((ingredients ?? []).map((i) => [String(i.id), i])),
+    [ingredients]
+  );
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, { g?: number; ml?: number; pcs?: number }>>({});
   const [supplierByIngredient, setSupplierByIngredient] = useState<Record<string, string | null>>({});
   const [offerMetaByIngredient, setOfferMetaByIngredient] = useState<Record<string, { density_kg_per_l?: number | null; piece_weight_g?: number | null }>>({});
@@ -238,7 +243,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
     const toppings = rows.reduce((acc, r) => {
       if (!r.ingredient_id) return acc;
 
-      const ing = ingredients.find((x) => x.id === r.ingredient_id) ?? null;
+      const ing = ingredientById.get(String(r.ingredient_id)) ?? null;
       const cpuObj = r.ingredient_id ? priceByIngredient[r.ingredient_id] : undefined;
 
       const u = normalizeUnit(r.unit);
@@ -266,7 +271,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
       total: round2(toppings + doughCost),
       doughCpuG,
     };
-  }, [rows, ingredients, priceByIngredient, dough, ballWeightNum]);
+  }, [rows, ingredientById, priceByIngredient, dough, ballWeightNum]);
 
   const weightTotalGrams = useMemo(() => {
     const w = n2(ballWeightNum) + n2(ingredientWeightGrams);
@@ -293,7 +298,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
       if (!r.ingredient_id) return false;
       const qty = typeof r.qty === "number" ? r.qty : n2(r.qty);
       if (!(qty > 0)) return false;
-      const ing = ingredients.find((x) => x.id === r.ingredient_id) ?? null;
+      const ing = ingredientById.get(String(r.ingredient_id)) ?? null;
       const cpuObj = priceByIngredient[r.ingredient_id];
       const u = normalizeUnit(r.unit);
       const cpu = n2(
@@ -304,7 +309,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
     });
     const missingDough = !!form?.dough_recipe_id && costs.dough === 0;
     return missingTopping || missingDough;
-  }, [rows, ingredients, priceByIngredient, form?.dough_recipe_id, costs.dough]);
+  }, [rows, ingredientById, priceByIngredient, form?.dough_recipe_id, costs.dough]);
 
   useEffect(() => {
     const run = async () => {

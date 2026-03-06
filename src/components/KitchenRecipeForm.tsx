@@ -141,8 +141,13 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, { g?: number; ml?: number; pcs?: number }>>({});
   
-  const [supplierByIngredient, setSupplierByIngredient] = useState<Record<string, string | null>>({});
+  const [, setSupplierByIngredient] = useState<Record<string, string | null>>({});
   const [lines, setLines] = useState<LineUI[]>([]);
+
+  const ingredientById = useMemo(
+    () => new Map((ingredients ?? []).map((i) => [i.id, i])),
+    [ingredients]
+  );
 
   const [form, setForm] = useState<{
     name: string;
@@ -174,34 +179,13 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
   const [newUnit, setNewUnit] = useState<Unit>("g");
 
   const ingredientOptions = useMemo<SmartSelectOption[]>(
-    () => {
-      const fmt = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      const fmtPrice = (iid: string) => {
-        const m = priceByIngredient?.[iid];
-        if (m?.g && m.g > 0) return `${fmt(m.g * 1000)} €/kg`;
-        if (m?.ml && m.ml > 0) return `${fmt(m.ml * 1000)} €/L`;
-        if (m?.pcs && m.pcs > 0) return `${fmt(m.pcs)} €/pc`;
-        return "";
-      };
-      const fmtSupplier = (iid: string) => {
-        const x = supplierByIngredient?.[iid];
-        return x ? String(x) : "";
-      };
-      return (ingredients ?? []).map((i) => {
-        const price = fmtPrice(i.id);
-        const supp = fmtSupplier(i.id);
-
-        return {
-          id: i.id,
-          name: i.name,
-          category: i.category ? String(i.category) : "Ingrédient",
-          rightTop: supp || undefined,
-          rightBottom: price ? price : "prix manquant",
-          isPreparation: i.category === "preparation" || i.category === "recette",
-        };
-      });
-    },
-    [ingredients, priceByIngredient, supplierByIngredient]
+    () => (ingredients ?? []).map((i) => ({
+      id: i.id,
+      name: i.name,
+      category: i.category ? String(i.category) : null,
+      isPreparation: i.category === "preparation" || i.category === "recette",
+    })),
+    [ingredients]
   );
 
   const theme = {
@@ -305,7 +289,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       const fb = typeof fallbackCpu === "number" ? fallbackCpu : getNumber(fallbackCpu, 0);
       if (fb > 0) return fb;
 
-      const ing = ingredients.find((x) => x.id === iid) ?? null;
+      const ing = ingredientById.get(iid) ?? null;
       const ingFb = getObj(ing)?.["cost_per_unit"];
       const ingFbNum = typeof ingFb === "number" ? ingFb : getNumber(ingFb, 0);
       return ingFbNum > 0 ? ingFbNum : null;
@@ -334,7 +318,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       costPerKg,
       costPerPortion,
     };
-  }, [lines, yieldGramsNum, portionsNum, priceByIngredient, ingredients]);
+  }, [lines, yieldGramsNum, portionsNum, priceByIngredient, ingredientById]);
 
   const pricing = useMemo(() => {
     const m = Math.min(Math.max(marginPct, 0), 99.9) / 100;
@@ -606,7 +590,7 @@ if (supplierIds.length) {
     const qty = parsePositiveNumber(newQty);
     if (qty == null) return;
 
-    const ingRow = ingredients.find((x) => x.id === newIngredientId) ?? null;
+    const ingRow = ingredientById.get(newIngredientId) ?? null;
     const nextSort = (lines?.length ? Math.max(...lines.map((l) => n2(l.sort_order))) : -1) + 1;
 
     const row: LineUI = {

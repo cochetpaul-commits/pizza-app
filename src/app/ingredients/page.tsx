@@ -21,7 +21,6 @@ import {
 } from "@/types/ingredients";
 
 import {
-  fmtLegacyPriceLine,
   fmtOfferPriceLine,
   fmtVolume,
   legacyHasPrice,
@@ -30,6 +29,7 @@ import {
   parseNum,
   fmtQty,
 } from "@/lib/offers";
+import { formatIngredientPrice } from "@/lib/formatPrice";
 import { extractVolumeFromName, extractWeightGFromName, detectUnitFromName } from "@/lib/invoices/utils";
 import { detectAllergensFromName } from "@/lib/invoices/allergenDetector";
 import { detectCategoryFromName } from "@/lib/invoices/categoryDetector";
@@ -1277,7 +1277,7 @@ function IngredientsPageInner() {
                     const isEditing = editingId === x.id;
                     const offer = offersByIngredientId.get(x.id);
 
-                    const price = offer ? fmtOfferPriceLine(offer, { piece_volume_ml: x.piece_volume_ml }) : fmtLegacyPriceLine(x);
+                    const price = formatIngredientPrice(x, offer ?? null);
                     const estab = offer?.establishment ?? "both";
                     const estabBadge = estab === "bellomio"
                       ? { label: "BM", bg: "#8B1A1A" }
@@ -1373,8 +1373,8 @@ function IngredientsPageInner() {
                           </div>
 
                           <div style={{ textAlign: "right" }}>
-                            <div style={{ fontWeight: 950, fontSize: 18 }}>{price.main}</div>
-                            <div className="muted" style={{ fontSize: 11 }}>{price.sub}</div>
+                            <div style={{ fontWeight: 950, fontSize: 18 }}>{price}</div>
+                            <div className="muted" style={{ fontSize: 11 }}>{supplierName ?? (offer ? "offre" : "—")}</div>
                           </div>
 
                           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>

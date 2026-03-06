@@ -115,7 +115,7 @@ export default function PrepRecipeDetailPage() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
 
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, { g?: number; ml?: number; pcs?: number }>>({});
-  const [offerInfoByIngredient, setOfferInfoByIngredient] = useState<
+  const [, setOfferInfoByIngredient] = useState<
     Record<string, { supplier?: string | null; eurPerKg?: number | null }>
   >({});
 
@@ -141,11 +141,16 @@ export default function PrepRecipeDetailPage() {
     return Number.isFinite(v) && v > 0 ? v : 0;
   }, [pivotAmount]);
 
+  const ingredientById = useMemo(
+    () => new Map(ingredients.map((i) => [i.id, i])),
+    [ingredients]
+  );
+
   const pivotIngredient = useMemo(() => {
     if (!recipe) return null;
     if (!recipe.pivot_ingredient_id) return null;
-    return ingredients.find((x) => x.id === recipe.pivot_ingredient_id) ?? null;
-  }, [recipe, ingredients]);
+    return ingredientById.get(recipe.pivot_ingredient_id) ?? null;
+  }, [recipe, ingredientById]);
 
   const pickCpu = useCallback(
     (iid: string, unit: "g" | "ml" | "pc", fallbackCostPerUnit?: number | null) => {
@@ -658,25 +663,13 @@ export default function PrepRecipeDetailPage() {
           <div>
             <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Ingrédient pivot</div>
             <SmartSelect
-              key={"pivot|" + uiPivotId + "|" + ingredients.length}
-              options={ingredients.map((i) => {
-                const meta = offerInfoByIngredient[i.id];
-                const cpu = priceByIngredient[i.id];
-                const pwg = (i as unknown as {piece_weight_g?: number}).piece_weight_g;
-                const priceLabel = meta?.eurPerKg ? fmtKg(meta.eurPerKg)
-                  : cpu?.pcs && pwg && pwg > 0 ? fmtKg(cpu.pcs / (pwg / 1000))
-                  : cpu?.pcs ? `${cpu.pcs.toFixed(2)} €/pc`
-                  : cpu?.ml ? `${(cpu.ml * 1000).toFixed(2)} €/L`
-                  : null;
-                return {
-                  id: i.id,
-                  name: i.name,
-                  category: i.category,
-                  rightTop: meta?.supplier ?? null,
-                  rightBottom: priceLabel,
-                  isPreparation: i.category === "preparation" || i.category === "recette",
-                };
-              })}
+              key={"pivot|" + uiPivotId}
+              options={ingredients.map((i) => ({
+                id: i.id,
+                name: i.name,
+                category: i.category,
+                isPreparation: i.category === "preparation" || i.category === "recette",
+              }))}
               value={uiPivotId}
               onChange={(v) => {
                 setUiPivotId(v);
@@ -748,19 +741,15 @@ export default function PrepRecipeDetailPage() {
           <div>
             <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Ingrédient</div>
             <SmartSelect
-              key={"line|" + newIngredientId + "|" + recipe.pivot_ingredient_id + "|" + ingredients.length}
+              key={"line|" + newIngredientId}
               options={ingredients
                 .filter((i) => i.id !== recipe.pivot_ingredient_id)
-                .map((i) => {
-                  const meta = offerInfoByIngredient[i.id];
-                  return {
-                    id: i.id,
-                    name: i.name,
-                    category: i.category,
-                    rightTop: meta?.supplier ?? null,
-                    rightBottom: meta?.eurPerKg ? fmtKg(meta.eurPerKg) : null,
-                  };
-                })}
+                .map((i) => ({
+                  id: i.id,
+                  name: i.name,
+                  category: i.category,
+                  isPreparation: i.category === "preparation" || i.category === "recette",
+                }))}
               value={newIngredientId}
               onChange={(v) => setNewIngredientId(v)}
               placeholder="Tape pour chercher…"
