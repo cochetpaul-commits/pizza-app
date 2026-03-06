@@ -242,7 +242,7 @@ export default function PizzaIngredientList(props: Props) {
         isPreparation: (i as unknown as { category?: string | null })?.category === "preparation" || (i as unknown as { category?: string | null })?.category === "recette",
       };
     });
-  }, [ingredients, supplierByIngredient, eurPerKgFromCpu]);
+  }, [ingredients, supplierByIngredient, eurPerKgFromCpu, priceByIngredient, offerMetaByIngredient]);
 
   return (
     <div style={{ ...card }}>

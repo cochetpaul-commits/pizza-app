@@ -27,7 +27,7 @@ type RawOffer = {
 };
 
 export async function fetchPriceAlerts(
-  supabase: SupabaseClient<any, any, any>,
+  supabase: SupabaseClient,
   userId: string,
   threshold = ALERT_THRESHOLD
 ): Promise<PriceAlert[]> {
