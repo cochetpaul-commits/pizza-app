@@ -88,6 +88,42 @@ export function formatIngredientPrice(
 }
 
 /**
+ * Compute a price label from simplified CPU data (used in recipe forms).
+ * cpu: { g: €/g, ml: €/ml, pcs: €/pcs }  meta: { piece_weight_g }
+ * Returns "SUPPLIER · 9,30 €/kg" or "Prix ND".
+ */
+export function formatCpuLabel(
+  cpu: { g?: number; ml?: number; pcs?: number },
+  meta: { density_kg_per_l?: number | null; piece_weight_g?: number | null },
+  pieceVolumeMl: number | null | undefined,
+  supplierName: string | null
+): string {
+  let priceStr: string;
+  if (cpu.g && cpu.g > 0) {
+    priceStr = `${fmtMoney(cpu.g * 1000)} €/kg`;
+  } else if (cpu.ml && cpu.ml > 0) {
+    priceStr = `${fmtMoney(cpu.ml * 1000)} €/L`;
+  } else if (cpu.pcs && cpu.pcs > 0) {
+    const pw = meta.piece_weight_g;
+    const vol = pieceVolumeMl;
+    if (pw && pw > 0) {
+      priceStr = `${fmtMoney((cpu.pcs / pw) * 1000)} €/kg`;
+    } else if (vol && vol > 0) {
+      if (vol >= 1000) {
+        priceStr = `${fmtMoney((cpu.pcs / vol) * 1000)} €/L`;
+      } else {
+        priceStr = `${fmtMoney(cpu.pcs)} €/pc · ${fmtMoney((cpu.pcs / vol) * 10)} €/cl`;
+      }
+    } else {
+      priceStr = `${fmtMoney(cpu.pcs)} €/pc`;
+    }
+  } else {
+    return "Prix ND";
+  }
+  return supplierName ? `${supplierName} · ${priceStr}` : priceStr;
+}
+
+/**
  * Returns "SUPPLIER · 9,30 €/kg" for SmartSelect or compact display.
  * Omits supplier prefix if supplierName is null/empty.
  */

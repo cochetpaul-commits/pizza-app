@@ -1,6 +1,7 @@
 "use client";
 
 import { offerRowToCpu } from "@/lib/offerPricing";
+import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
 import Link from "next/link";
 import Image from "next/image";
@@ -137,6 +138,7 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
 
   const [ingredients, setIngredients] = useState<IngRow[]>([]);
   const [priceMap, setPriceMap] = useState<Record<string, { ml?: number; g?: number; pcs?: number }>>({});
+  const [priceLabelByIngredient, setPriceLabelByIngredient] = useState<Record<string, string>>({});
 
   const ingredientById = useMemo(
     () => new Map(ingredients.map((i) => [i.id, i])),
@@ -201,9 +203,10 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
         name: i.name ?? "",
         category: cat,
         isPreparation: cat === "preparation" || cat === "recette",
+        rightTop: priceLabelByIngredient[i.id] ?? null,
       };
     }),
-    [ingredients]
+    [ingredients, priceLabelByIngredient]
   );
 
   /* ── load ─────────────────────────────────────────────────── */
@@ -227,12 +230,42 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
     setIngredients(ingList);
 
     const { data: offers } = await supabase.from("v_latest_offers").select("*");
+    const offerList = (offers ?? []) as Record<string, unknown>[];
+
+    // Charger noms fournisseurs
+    const supplierIds = Array.from(new Set(offerList.map((o) => String(o["supplier_id"] ?? "")).filter(Boolean)));
+    const supplierNameById: Record<string, string> = {};
+    if (supplierIds.length) {
+      const { data: sups } = await supabase.from("suppliers").select("id,name").in("id", supplierIds);
+      for (const s of (sups ?? []) as Record<string, unknown>[]) {
+        const sid = String(s["id"] ?? "");
+        const sname = String(s["name"] ?? "").trim();
+        if (sid && sname) supplierNameById[sid] = sname;
+      }
+    }
+
     const pm: Record<string, { ml?: number; g?: number; pcs?: number }> = {};
-    for (const o of (offers ?? []) as Record<string, unknown>[]) {
+    const metaM: Record<string, { density_kg_per_l?: number | null; piece_weight_g?: number | null }> = {};
+    const supplierByIng: Record<string, string | null> = {};
+    for (const o of offerList) {
       const iid = String(o["ingredient_id"] ?? "");
-      if (iid) pm[iid] = offerRowToCpu(o);
+      if (!iid) continue;
+      pm[iid] = offerRowToCpu(o);
+      metaM[iid] = {
+        density_kg_per_l: typeof o["density_kg_per_l"] === "number" ? (o["density_kg_per_l"] as number) : null,
+        piece_weight_g: typeof o["piece_weight_g"] === "number" ? (o["piece_weight_g"] as number) : null,
+      };
+      const sid = String(o["supplier_id"] ?? "");
+      supplierByIng[iid] = sid ? (supplierNameById[sid] ?? sid.slice(0, 6)) : null;
     }
     setPriceMap(pm);
+
+    // Labels prix pour SmartSelect
+    const priceLabelMap: Record<string, string> = {};
+    for (const i of ingList) {
+      priceLabelMap[i.id] = formatCpuLabel(pm[i.id] ?? {}, metaM[i.id] ?? {}, i.piece_volume_ml ?? null, supplierByIng[i.id] ?? null);
+    }
+    setPriceLabelByIngredient(priceLabelMap);
 
     if (!isEdit) { setStatus("OK"); return; }
 
@@ -600,7 +633,12 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
                   gap: 6, alignItems: "center",
                   padding: "4px 0", borderBottom: "1px solid #f0f0f0",
                 }}>
-                  <div style={{ fontSize: 13 }}>{l.ingredient_name || <span className="muted">—</span>}</div>
+                  <div>
+                    <div style={{ fontSize: 13 }}>{l.ingredient_name || <span className="muted">—</span>}</div>
+                    {priceLabelByIngredient[l.ingredient_id] ? (
+                      <div className="muted" style={{ fontSize: 11 }}>{priceLabelByIngredient[l.ingredient_id]}</div>
+                    ) : null}
+                  </div>
                   <input
                     className="input"
                     type="text"
@@ -655,6 +693,9 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
           <div style={{ flex: 3, minWidth: 160 }}>
             <label className="label" style={{ fontSize: 11 }}>Ingrédient</label>
             <SmartSelect options={ingOptions} value={newIngId} onChange={setNewIngId} onAfterSelect={() => { const el = document.querySelector('input[placeholder="4"]'); if (el) (el as HTMLInputElement).focus(); }} placeholder="Chercher…" menuMax={10} inputStyle={{ fontSize: 16 }} />
+            {newIngId && priceLabelByIngredient[newIngId] ? (
+              <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>{priceLabelByIngredient[newIngId]}</div>
+            ) : null}
           </div>
           <div style={{ width: 80 }}>
             <label className="label" style={{ fontSize: 11 }}>Quantité</label>

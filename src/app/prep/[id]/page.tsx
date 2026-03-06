@@ -1,6 +1,7 @@
 "use client";
 
 import { offerRowToCpu } from "@/lib/offerPricing";
+import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
 import { formatLiquidQtyParts } from "@/lib/formatUnit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -118,6 +119,7 @@ export default function PrepRecipeDetailPage() {
   const [, setOfferInfoByIngredient] = useState<
     Record<string, { supplier?: string | null; eurPerKg?: number | null }>
   >({});
+  const [priceLabelByIngredient, setPriceLabelByIngredient] = useState<Record<string, string>>({});
 
   const [lines, setLines] = useState<Line[]>([]);
 
@@ -151,6 +153,30 @@ export default function PrepRecipeDetailPage() {
     if (!recipe.pivot_ingredient_id) return null;
     return ingredientById.get(recipe.pivot_ingredient_id) ?? null;
   }, [recipe, ingredientById]);
+
+  const pivotOptions = useMemo(
+    () => ingredients.map((i) => ({
+      id: i.id,
+      name: i.name,
+      category: i.category ?? null,
+      isPreparation: i.category === "preparation" || i.category === "recette",
+      rightTop: priceLabelByIngredient[i.id] ?? null,
+    })),
+    [ingredients, priceLabelByIngredient]
+  );
+
+  const lineOptions = useMemo(
+    () => ingredients
+      .filter((i) => !recipe || i.id !== recipe.pivot_ingredient_id)
+      .map((i) => ({
+        id: i.id,
+        name: i.name,
+        category: i.category ?? null,
+        isPreparation: i.category === "preparation" || i.category === "recette",
+        rightTop: priceLabelByIngredient[i.id] ?? null,
+      })),
+    [ingredients, recipe, priceLabelByIngredient]
+  );
 
   const pickCpu = useCallback(
     (iid: string, unit: "g" | "ml" | "pc", fallbackCostPerUnit?: number | null) => {
@@ -310,6 +336,17 @@ export default function PrepRecipeDetailPage() {
       });
       setPriceByIngredient(priceMap);
       setOfferInfoByIngredient(infoMap);
+
+      // Labels prix pour SmartSelect
+      const priceLabelMap: Record<string, string> = {};
+      ingList.forEach((ing: unknown) => {
+        const io = (ing as Record<string, unknown>) ?? {};
+        const iid = getString(io["id"] as unknown, "");
+        if (!iid) return;
+        const pvm = typeof io["piece_volume_ml"] === "number" ? (io["piece_volume_ml"] as number) : null;
+        priceLabelMap[iid] = formatCpuLabel(priceMap[iid] ?? {}, {}, pvm, infoMap[iid]?.supplier ?? null);
+      });
+      setPriceLabelByIngredient(priceLabelMap);
 
       const { data: ln, error: eL } = await supabase
         .from("prep_recipe_lines")
@@ -664,12 +701,7 @@ export default function PrepRecipeDetailPage() {
             <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Ingrédient pivot</div>
             <SmartSelect
               key={"pivot|" + uiPivotId}
-              options={ingredients.map((i) => ({
-                id: i.id,
-                name: i.name,
-                category: i.category,
-                isPreparation: i.category === "preparation" || i.category === "recette",
-              }))}
+              options={pivotOptions}
               value={uiPivotId}
               onChange={(v) => {
                 setUiPivotId(v);
@@ -677,6 +709,9 @@ export default function PrepRecipeDetailPage() {
               }}
               placeholder="Tape pour chercher…"
             />
+            {uiPivotId && priceLabelByIngredient[uiPivotId] ? (
+              <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>{priceLabelByIngredient[uiPivotId]}</div>
+            ) : null}
           </div>
 
           <div>
@@ -742,18 +777,14 @@ export default function PrepRecipeDetailPage() {
             <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Ingrédient</div>
             <SmartSelect
               key={"line|" + newIngredientId}
-              options={ingredients
-                .filter((i) => i.id !== recipe.pivot_ingredient_id)
-                .map((i) => ({
-                  id: i.id,
-                  name: i.name,
-                  category: i.category,
-                  isPreparation: i.category === "preparation" || i.category === "recette",
-                }))}
+              options={lineOptions}
               value={newIngredientId}
               onChange={(v) => setNewIngredientId(v)}
               placeholder="Tape pour chercher…"
             />
+            {newIngredientId && priceLabelByIngredient[newIngredientId] ? (
+              <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>{priceLabelByIngredient[newIngredientId]}</div>
+            ) : null}
           </div>
 
           <div>
@@ -851,6 +882,9 @@ export default function PrepRecipeDetailPage() {
               >
                 <div>
                   <div style={{ fontSize: 16, fontWeight: 900 }}>{r.ingredient_name ?? "—"}</div>
+                  {r.ingredient_id && priceLabelByIngredient[r.ingredient_id] ? (
+                    <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>{priceLabelByIngredient[r.ingredient_id]}</div>
+                  ) : null}
                 </div>
 
                 <div style={{ textAlign: "right" }}>

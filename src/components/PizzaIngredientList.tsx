@@ -47,11 +47,12 @@ type Props = {
   priceByIngredient?: Record<string, CpuMap>;
   offerMetaByIngredient?: Record<string, OfferMeta>;
   supplierByIngredient?: Record<string, string | null>;
+  priceLabelByIngredient?: Record<string, string>;
   currentPath?: string;
 };
 
 export default function PizzaIngredientList(props: Props) {
-  const { stage, ingredients, rows, onChange, priceByIngredient, offerMetaByIngredient, currentPath } = props;
+  const { stage, ingredients, rows, onChange, priceByIngredient, offerMetaByIngredient, priceLabelByIngredient, currentPath } = props;
   const router = useRouter();
 
   const stageRows = useMemo(() => {
@@ -200,9 +201,10 @@ export default function PizzaIngredientList(props: Props) {
         name: String(i.name ?? ""),
         category: cat,
         isPreparation: cat === "preparation" || cat === "recette",
+        rightTop: priceLabelByIngredient?.[id] ?? null,
       };
     });
-  }, [ingredients]);
+  }, [ingredients, priceLabelByIngredient]);
 
   return (
     <div style={{ ...card }}>
@@ -234,15 +236,22 @@ export default function PizzaIngredientList(props: Props) {
               {locked ? (
                 <div style={{ fontWeight: 950 }}>{String(r?._label ?? "—")}</div>
               ) : (
-                <SmartSelect
-                  key={rowId}
-                  options={options}
-                  value={String(r.ingredient_id ?? "")}
-                  onChange={(v) => updateRow(rowId, { ingredient_id: v })}
-                  onAfterSelect={() => { const el = document.getElementById(`qty-${rowId}`); if (el) (el as HTMLInputElement).focus(); }}
-                  placeholder="Tape pour chercher…"
-                  inputStyle={{ ...input, height: 36, fontWeight: 950, fontSize: 16 }}
-                />
+                <div>
+                  <SmartSelect
+                    key={rowId}
+                    options={options}
+                    value={String(r.ingredient_id ?? "")}
+                    onChange={(v) => updateRow(rowId, { ingredient_id: v })}
+                    onAfterSelect={() => { const el = document.getElementById(`qty-${rowId}`); if (el) (el as HTMLInputElement).focus(); }}
+                    placeholder="Tape pour chercher…"
+                    inputStyle={{ ...input, height: 36, fontWeight: 950, fontSize: 16 }}
+                  />
+                  {r.ingredient_id && priceLabelByIngredient?.[r.ingredient_id] ? (
+                    <div style={{ fontSize: 11, color: "#6f6a61", marginTop: 3 }}>
+                      {priceLabelByIngredient[r.ingredient_id]}
+                    </div>
+                  ) : null}
+                </div>
               )}
 
               <input

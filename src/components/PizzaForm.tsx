@@ -1,5 +1,6 @@
 "use client";
 import { offerRowToCpu } from "@/lib/offerPricing";
+import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
 import Image from "next/image";
 import Link from "next/link";
@@ -137,6 +138,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, { g?: number; ml?: number; pcs?: number }>>({});
   const [supplierByIngredient, setSupplierByIngredient] = useState<Record<string, string | null>>({});
   const [offerMetaByIngredient, setOfferMetaByIngredient] = useState<Record<string, { density_kg_per_l?: number | null; piece_weight_g?: number | null }>>({});
+  const [priceLabelByIngredient, setPriceLabelByIngredient] = useState<Record<string, string>>({});;
 
   const [form, setForm] = useState<{
     name: string;
@@ -417,6 +419,17 @@ if (offErr) {
       setPriceByIngredient(priceMap);
 setOfferMetaByIngredient(metaMap);
 setSupplierByIngredient(supplierByIngredient);
+
+// Labels prix pour SmartSelect
+const priceLabelMap: Record<string, string> = {};
+(ing ?? []).forEach((ingredient: unknown) => {
+  const io = ingredient as Record<string, unknown>;
+  const iid = String(io["id"] ?? "");
+  if (!iid) return;
+  const pvm = typeof io["piece_volume_ml"] === "number" ? (io["piece_volume_ml"] as number) : null;
+  priceLabelMap[iid] = formatCpuLabel(priceMap[iid] ?? {}, metaMap[iid] ?? {}, pvm, supplierByIngredient[iid] ?? null);
+});
+setPriceLabelByIngredient(priceLabelMap);
 
       if (!isEdit) {
         setForm({ name: "", dough_recipe_id: "", notes: "", photo_url: "", establishments: ["bellomio", "piccola"] });
@@ -846,6 +859,7 @@ setSupplierByIngredient(supplierByIngredient);
           priceByIngredient={priceByIngredient}
           offerMetaByIngredient={offerMetaByIngredient}
           supplierByIngredient={supplierByIngredient}
+          priceLabelByIngredient={priceLabelByIngredient}
           currentPath={pizzaId ? `/pizzas/${pizzaId}` : `/pizzas/new`}
         />
       </div>
@@ -864,6 +878,7 @@ setSupplierByIngredient(supplierByIngredient);
           priceByIngredient={priceByIngredient}
           offerMetaByIngredient={offerMetaByIngredient}
           supplierByIngredient={supplierByIngredient}
+          priceLabelByIngredient={priceLabelByIngredient}
           currentPath={pizzaId ? `/pizzas/${pizzaId}` : `/pizzas/new`}
         />
       </div>

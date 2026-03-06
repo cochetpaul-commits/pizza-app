@@ -1,6 +1,7 @@
 "use client";
 
 import { offerRowToCpu } from "@/lib/offerPricing";
+import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
 import Link from "next/link";
 import Image from "next/image";
@@ -140,7 +141,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, { g?: number; ml?: number; pcs?: number }>>({});
-  
+  const [priceLabelByIngredient, setPriceLabelByIngredient] = useState<Record<string, string>>({});
   const [, setSupplierByIngredient] = useState<Record<string, string | null>>({});
   const [lines, setLines] = useState<LineUI[]>([]);
 
@@ -184,8 +185,9 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       name: i.name,
       category: i.category ? String(i.category) : null,
       isPreparation: i.category === "preparation" || i.category === "recette",
+      rightTop: priceLabelByIngredient[i.id] ?? null,
     })),
-    [ingredients]
+    [ingredients, priceLabelByIngredient]
   );
 
   const theme = {
@@ -358,7 +360,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
     const { data: ing, error: ingErr } = await supabase
       .from("ingredients")
-      .select("id,name,category,allergens,is_active,cost_per_unit")
+      .select("id,name,category,allergens,is_active,cost_per_unit,piece_volume_ml")
       .order("name", { ascending: true });
 
     if (ingErr) {
@@ -457,6 +459,17 @@ if (supplierIds.length) {
     });
     setSupplierByIngredient(supplierByIng);
     setPriceByIngredient(priceMapCpu);
+
+    // Labels prix pour SmartSelect
+    const priceLabelMap: Record<string, string> = {};
+    ingList.forEach((ing: unknown) => {
+      const io = getObj(ing) ?? {};
+      const iid = getString(io["id"], "");
+      if (!iid) return;
+      const pvm = typeof io["piece_volume_ml"] === "number" ? (io["piece_volume_ml"] as number) : null;
+      priceLabelMap[iid] = formatCpuLabel(priceMapCpu[iid] ?? {}, {}, pvm, supplierByIng[iid] ?? null);
+    });
+    setPriceLabelByIngredient(priceLabelMap);
 
     if (!isEdit) {
       setForm({
@@ -1180,6 +1193,11 @@ if (supplierIds.length) {
                 placeholder="Ingrédient…"
                 inputStyle={input}
               />
+              {newIngredientId && priceLabelByIngredient[newIngredientId] ? (
+                <div style={{ fontSize: 11, color: theme.muted, marginTop: 3 }}>
+                  {priceLabelByIngredient[newIngredientId]}
+                </div>
+              ) : null}
             </div>
 
             <div>
@@ -1229,7 +1247,12 @@ if (supplierIds.length) {
                   background: "#fff",
                 }}
               >
-                <div style={{ fontWeight: 950 }}>{r.ingredient_name ?? "—"}</div>
+                <div>
+                  <div style={{ fontWeight: 950 }}>{r.ingredient_name ?? "—"}</div>
+                  {priceLabelByIngredient[r.ingredient_id] ? (
+                    <div style={{ fontSize: 11, color: theme.muted, marginTop: 2 }}>{priceLabelByIngredient[r.ingredient_id]}</div>
+                  ) : null}
+                </div>
 
                 <input
                   style={{ ...input, height: 36, textAlign: "center", fontWeight: 950 }}
