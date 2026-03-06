@@ -218,6 +218,19 @@ function IngredientsPageInner() {
 
   const allCollapsed = grouped.length > 0 && collapsedCats.size >= grouped.length;
 
+  const filterActive = filterCategory !== "all" || filterSupplier !== "all" || filterEstablishment !== "all";
+
+  const [compactMode, setCompactMode] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("ingredients:compactMode") === "1";
+  });
+  const toggleCompact = () => setCompactMode(v => {
+    const next = !v;
+    localStorage.setItem("ingredients:compactMode", next ? "1" : "0");
+    return next;
+  });
+  const [showFilters, setShowFilters] = useState(false);
+
   function toggleAll() {
     if (allCollapsed) {
       setCollapsedCats(new Set());
@@ -301,7 +314,6 @@ function IngredientsPageInner() {
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     void load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -315,31 +327,6 @@ function IngredientsPageInner() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editParam, items]);
-
-  const cardPad: CSSProperties = { padding: 16 };
-  const label: CSSProperties = { fontSize: 12, opacity: 0.75, marginBottom: 6 };
-  const input: CSSProperties = {
-    width: "100%",
-    height: 44,
-    borderRadius: 10,
-    border: "1px solid rgba(0,0,0,0.12)",
-    padding: "0 12px",
-    fontSize: 16,
-    background: "rgba(255,255,255,0.65)",
-  };
-  const select: CSSProperties = { ...input, paddingRight: 34 };
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const tabBtn = (active: boolean): CSSProperties => ({
-    height: 36,
-    padding: "0 12px",
-    border: "none",
-    cursor: "pointer",
-    fontWeight: 900,
-    fontSize: 13,
-    background: active ? "rgba(17,24,39,0.92)" : "transparent",
-    color: active ? "white" : "rgba(17,24,39,0.8)",
-  });
 
   const [newName, setNewName] = useState("");
   const [newCategory, setNewCategory] = useState<Category>("preparation");
@@ -938,49 +925,58 @@ function IngredientsPageInner() {
     <NavBar
       backHref={backUrl ?? undefined}
       backLabel="Retour"
-      right={<button className="btn" onClick={load}>Rafraîchir</button>}
+      right={<>
+        <button className="btn btnPrimary"
+          onClick={() => document.getElementById("create-form")?.scrollIntoView({ behavior: "smooth" })}>
+          + Ingrédient
+        </button>
+        <button className="btn" onClick={load}>Rafraîchir</button>
+      </>}
     />
-    <main style={{ maxWidth: 1100, margin: "0 auto", padding: 16 }}>
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 26, fontWeight: 900 }}>Index ingrédients</div>
-        <div className="muted" style={{ marginTop: 2 }}>
+    <main className="max-w-[1100px] mx-auto p-4 safe-bottom">
+      <div className="mb-3">
+        <div className="text-[26px] font-black">Index ingrédients</div>
+        <div className="muted mt-0.5 hidden md:block">
           Gérez vos coûts au kg, au litre, à la pièce — et par fournisseur.
         </div>
       </div>
 
       {/* ── Sticky filter bar ── */}
-      <div style={{ position: "sticky", top: 44, zIndex: 40, background: "#FAF7F2", margin: "0 -16px", padding: "8px 16px 0", borderBottom: "1px solid #e5e7eb" }}>
-        <div role="tablist" aria-label="Filtre statut ingrédients" style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+      <div className="sticky top-[44px] z-40 bg-[#FAF7F2] -mx-4 px-4 pt-2 border-b border-gray-200">
+        <div role="tablist" aria-label="Filtre statut ingrédients" className="flex gap-1.5 flex-wrap items-center">
           {([
             ["all", `Tous (${counts.all})`],
             ["validated", `Validés (${counts.validated})`],
             ["to_check", `À contrôler (${counts.to_check})`],
             ["unknown", `Incompris (${counts.unknown})`],
           ] as const).map(([t, label]) => (
-            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} style={{
-              padding: "7px 16px", borderRadius: 8, border: "1px solid transparent", cursor: "pointer", fontWeight: 700, fontSize: 13, transition: "all 0.15s",
-              background: tab === t ? "#8B1A1A" : "#fff",
-              color: tab === t ? "#fff" : "#6B6257",
-              boxShadow: tab === t ? "0 2px 6px rgba(139,26,26,0.25)" : "0 1px 3px rgba(0,0,0,0.08)",
-            }}>{label}</button>
+            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+              className="py-[7px] px-4 rounded-lg border border-transparent cursor-pointer font-bold text-[13px] transition-all duration-150"
+              style={{
+                background: tab === t ? "#8B1A1A" : "#fff",
+                color: tab === t ? "#fff" : "#6B6257",
+                boxShadow: tab === t ? "0 2px 6px rgba(139,26,26,0.25)" : "0 1px 3px rgba(0,0,0,0.08)",
+              }}>{label}</button>
           ))}
           {userId && (
-            <button role="tab" aria-selected={tab === ("variations" as Tab)} onClick={() => setTab("variations" as Tab)} style={{
-              marginLeft: "auto", padding: "7px 16px", borderRadius: 8, border: "1px solid transparent", cursor: "pointer", fontWeight: 700, fontSize: 13, transition: "all 0.15s",
-              background: tab === ("variations" as Tab) ? "#92400E" : "#fff",
-              color: tab === ("variations" as Tab) ? "#fff" : "#92400E",
-              boxShadow: tab === ("variations" as Tab) ? "0 2px 6px rgba(146,64,14,0.25)" : "0 1px 3px rgba(0,0,0,0.08)",
-            }}>Variations prix</button>
+            <button role="tab" aria-selected={tab === ("variations" as Tab)} onClick={() => setTab("variations" as Tab)}
+              className="ml-auto py-[7px] px-4 rounded-lg border border-transparent cursor-pointer font-bold text-[13px] transition-all duration-150"
+              style={{
+                background: tab === ("variations" as Tab) ? "#92400E" : "#fff",
+                color: tab === ("variations" as Tab) ? "#fff" : "#92400E",
+                boxShadow: tab === ("variations" as Tab) ? "0 2px 6px rgba(146,64,14,0.25)" : "0 1px 3px rgba(0,0,0,0.08)",
+              }}>Variations prix</button>
           )}
         </div>
 
         {tab !== ("variations" as Tab) && (
           <>
-            <div className="card" style={{ padding: "12px 16px", marginTop: 8, boxShadow: "none" }}>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+            {/* Desktop : filtre grid (md+) */}
+            <div className="card !shadow-none !p-3 mt-2 hidden md:block">
+              <div className="grid grid-cols-4 gap-3 items-end">
                 <div>
-                  <div style={label}>Catégorie</div>
-                  <select style={select} value={filterCategory} onChange={(e) => setFilterCategory((e.target.value as "all" | Category))}>
+                  <div className="text-[12px] opacity-75 mb-1.5">Catégorie</div>
+                  <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={filterCategory} onChange={(e) => setFilterCategory((e.target.value as "all" | Category))}>
                     <option value="all">Tous</option>
                     {CATEGORIES.map((c) => (
                       <option key={c} value={c}>{c}</option>
@@ -989,8 +985,8 @@ function IngredientsPageInner() {
                 </div>
 
                 <div>
-                  <div style={label}>Fournisseur</div>
-                  <select style={select} value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)}>
+                  <div className="text-[12px] opacity-75 mb-1.5">Fournisseur</div>
+                  <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)}>
                     <option value="all">Tous</option>
                     {suppliers.filter((s) => s.is_active).map((s) => (
                       <option key={s.id} value={s.id}>{s.name}</option>
@@ -999,8 +995,8 @@ function IngredientsPageInner() {
                 </div>
 
                 <div>
-                  <div style={label}>Établissement</div>
-                  <select style={select} value={filterEstablishment} onChange={(e) => setFilterEstablishment(e.target.value as "all" | "bellomio" | "piccola" | "both")}>
+                  <div className="text-[12px] opacity-75 mb-1.5">Établissement</div>
+                  <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={filterEstablishment} onChange={(e) => setFilterEstablishment(e.target.value as "all" | "bellomio" | "piccola" | "both")}>
                     <option value="all">Tous</option>
                     <option value="bellomio">Bello Mio</option>
                     <option value="piccola">Piccola Mia</option>
@@ -1008,18 +1004,33 @@ function IngredientsPageInner() {
                   </select>
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: 8, height: 44 }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                <div className="flex items-center gap-2 h-[44px]">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} />
-                    <span style={{ fontWeight: 800, fontSize: 12 }}>Inclure sans offre</span>
+                    <span className="font-extrabold text-[12px]">Inclure sans offre</span>
                   </label>
                 </div>
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: 8, marginTop: 8, marginBottom: 8, alignItems: "center" }}>
-              <input style={{ ...input, flex: 1 }} placeholder="Rechercher..." value={q} onChange={(e) => setQ(e.target.value)} />
-              <button className="btn" onClick={toggleAll} style={{ whiteSpace: "nowrap", height: 44, padding: "0 14px" }}>
+            {/* Mobile : bouton "Filtres" + compact toggle */}
+            <div className="flex gap-2 mt-2 items-center md:hidden">
+              <button className="btn flex-1" onClick={() => setShowFilters(true)}>
+                Filtres {filterActive ? "●" : "▾"}
+              </button>
+              <button className="btn" onClick={toggleCompact}>
+                {compactMode ? "⊞" : "☰"}
+              </button>
+            </div>
+
+            <div className="flex gap-2 mt-2 mb-2 items-center">
+              <input
+                className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none flex-1"
+                placeholder="Rechercher..."
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+              <button className="btn" onClick={toggleAll} style={{ whiteSpace: "nowrap" }}>
                 {allCollapsed ? "Tout déplier" : "Tout replier"}
               </button>
             </div>
@@ -1027,20 +1038,20 @@ function IngredientsPageInner() {
         )}
       </div>
 
-      {tab === ("variations" as Tab) && userId && <div style={{ marginTop: 12 }}><PriceAlertsPanel userId={userId} /></div>}
+      {tab === ("variations" as Tab) && userId && <div className="mt-3"><PriceAlertsPanel userId={userId} /></div>}
 
-      {tab !== ("variations" as Tab) && <div className="card" style={{ padding: 16, marginTop: 16 }}>
-        <div style={{ fontWeight: 900, fontSize: 18 }}>Créer un ingrédient</div>
+      {tab !== ("variations" as Tab) && <div id="create-form" className="card mt-4">
+        <div className="font-black text-[18px]">Créer un ingrédient</div>
 
-        <form onSubmit={addIngredient} style={{ marginTop: 12, display: "grid", gap: 12 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
+        <form onSubmit={addIngredient} className="mt-3 grid gap-3">
+          <div className="grid gap-3" style={{ gridTemplateColumns: "2fr 1fr" }}>
             <div>
-              <div style={label}>Ingrédient</div>
-              <input style={input} placeholder="Ex: Huile d'olive" value={newName} onChange={(e) => handleNewNameChange(e.target.value)} />
+              <div className="text-[12px] opacity-75 mb-1.5">Ingrédient</div>
+              <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="Ex: Huile d'olive" value={newName} onChange={(e) => handleNewNameChange(e.target.value)} />
             </div>
             <div>
-              <div style={label}>Catégorie</div>
-              <select style={select} value={newCategory} onChange={(e) => {
+              <div className="text-[12px] opacity-75 mb-1.5">Catégorie</div>
+              <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={newCategory} onChange={(e) => {
                 const next = e.target.value as Category;
                 setNewCategory(next);
                 if (next === "preparation") {
@@ -1057,37 +1068,35 @@ function IngredientsPageInner() {
           </div>
 
           {newCategory !== "preparation" ? (
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
+            <div className="grid gap-3" style={{ gridTemplateColumns: "2fr 1fr" }}>
               <div>
-                <div style={label}>Fournisseur</div>
-                <select style={select} value={newSupplierId} onChange={(e) => setNewSupplierId(e.target.value)}>
+                <div className="text-[12px] opacity-75 mb-1.5">Fournisseur</div>
+                <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={newSupplierId} onChange={(e) => setNewSupplierId(e.target.value)}>
                   <option value="">—</option>
                   {suppliers.filter((s) => s.is_active).map((s) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               </div>
-              <div style={{ alignSelf: "end" }}>
-                <button className="btn btnPrimary" type="submit" style={{ height: 44, width: "100%" }}>
+              <div className="self-end">
+                <button className="btn btnPrimary w-full !h-[44px]" type="submit">
                   Ajouter
                 </button>
               </div>
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
-              <div style={{ alignSelf: "end" }}>
-                <button className="btn btnPrimary" type="submit" style={{ height: 44, width: "100%" }}>
-                  Ajouter
-                </button>
-              </div>
+            <div>
+              <button className="btn btnPrimary w-full !h-[44px]" type="submit">
+                Ajouter
+              </button>
             </div>
           )}
 
           {newCategory !== "preparation" ? (
             <>
               <div>
-                <div style={label}>Offre fournisseur</div>
-                <select style={select} value={priceKind} onChange={(e) => setPriceKind(e.target.value as PriceKind)}>
+                <div className="text-[12px] opacity-75 mb-1.5">Offre fournisseur</div>
+                <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={priceKind} onChange={(e) => setPriceKind(e.target.value as PriceKind)}>
                   <option value="unit">Unitaire (€/kg, €/L, €/pc)</option>
                   <option value="pack_simple">Pack simple (sac/caisse)</option>
                   <option value="pack_composed">Pack composé (ex: 8 × 1.5 L)</option>
@@ -1096,19 +1105,19 @@ function IngredientsPageInner() {
 
               {priceKind === "unit" && (
                 <>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "end" }}>
+                  <div className="grid grid-cols-2 gap-3 items-end">
                     <div>
-                      <div style={label}>Unité</div>
-                      <select style={select} value={newUnit} onChange={(e) => setNewUnit(e.target.value as "kg" | "l" | "pc")}>
+                      <div className="text-[12px] opacity-75 mb-1.5">Unité</div>
+                      <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={newUnit} onChange={(e) => setNewUnit(e.target.value as "kg" | "l" | "pc")}>
                         <option value="kg">Kilo (kg)</option>
                         <option value="l">Litre (L)</option>
                         <option value="pc">Pièce (pc)</option>
                       </select>
                     </div>
                     <div>
-                      <div style={label}>Prix</div>
+                      <div className="text-[12px] opacity-75 mb-1.5">Prix</div>
                       <input
-                        style={input}
+                        className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none"
                         placeholder={newUnit === "pc" ? "Ex: 1.79" : newUnit === "l" ? "Ex: 2.07" : "Ex: 12.50"}
                         inputMode="decimal"
                         value={newUnitPrice}
@@ -1119,20 +1128,20 @@ function IngredientsPageInner() {
 
                   {newUnit === "l" && (
                     <div>
-                      <div style={label}>Densité (kg/L)</div>
-                      <input style={input} value={newDensity} onChange={(e) => setNewDensity(e.target.value)} />
+                      <div className="text-[12px] opacity-75 mb-1.5">Densité (kg/L)</div>
+                      <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" value={newDensity} onChange={(e) => setNewDensity(e.target.value)} />
                     </div>
                   )}
 
                   {newUnit === "pc" && (
                     <>
                       <div>
-                        <div style={label}>Poids d&apos;une pièce (g)</div>
-                        <input style={input} placeholder="Ex: 125" inputMode="decimal" value={newPieceWeightG} onChange={(e) => setNewPieceWeightG(e.target.value)} />
+                        <div className="text-[12px] opacity-75 mb-1.5">Poids d&apos;une pièce (g)</div>
+                        <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="Ex: 125" inputMode="decimal" value={newPieceWeightG} onChange={(e) => setNewPieceWeightG(e.target.value)} />
                       </div>
                       <div>
-                        <div style={label}>Volume pièce (ml)</div>
-                        <input style={input} placeholder="ex: 700 pour 70cl" inputMode="decimal" value={newPieceVolumeMl} onChange={(e) => setNewPieceVolumeMl(e.target.value)} />
+                        <div className="text-[12px] opacity-75 mb-1.5">Volume pièce (ml)</div>
+                        <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="ex: 700 pour 70cl" inputMode="decimal" value={newPieceVolumeMl} onChange={(e) => setNewPieceVolumeMl(e.target.value)} />
                       </div>
                     </>
                   )}
@@ -1141,40 +1150,40 @@ function IngredientsPageInner() {
 
               {priceKind === "pack_simple" && (
                 <>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "end" }}>
+                  <div className="grid grid-cols-2 gap-3 items-end">
                     <div>
-                      <div style={label}>Unité pack</div>
-                      <select style={select} value={newUnit} onChange={(e) => setNewUnit(e.target.value as "kg" | "l" | "pc")}>
+                      <div className="text-[12px] opacity-75 mb-1.5">Unité pack</div>
+                      <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={newUnit} onChange={(e) => setNewUnit(e.target.value as "kg" | "l" | "pc")}>
                         <option value="kg">Kilo (kg)</option>
                         <option value="l">Litre (L)</option>
                       </select>
                     </div>
                     <div>
-                      <div style={label}>Prix du pack (€)</div>
-                      <input style={input} placeholder="Ex: 53.99" inputMode="decimal" value={packPrice} onChange={(e) => setPackPrice(e.target.value)} />
+                      <div className="text-[12px] opacity-75 mb-1.5">Prix du pack (€)</div>
+                      <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="Ex: 53.99" inputMode="decimal" value={packPrice} onChange={(e) => setPackPrice(e.target.value)} />
                     </div>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "end" }}>
+                  <div className="grid grid-cols-2 gap-3 items-end">
                     <div>
-                      <div style={label}>Quantité totale du pack ({newUnit === "kg" ? "kg" : "L"})</div>
+                      <div className="text-[12px] opacity-75 mb-1.5">Quantité totale du pack ({newUnit === "kg" ? "kg" : "L"})</div>
                       <input
-                        style={input}
+                        className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none"
                         placeholder={newUnit === "kg" ? "Ex: 25" : "Ex: 12"}
                         inputMode="decimal"
                         value={packTotalQty}
                         onChange={(e) => setPackTotalQty(e.target.value)}
                       />
                     </div>
-                    <div className="muted" style={{ fontSize: 12 }}>
+                    <div className="muted text-[12px]">
                       {previewCreatePack ? previewCreatePack : "—"}
                     </div>
                   </div>
 
                   {newUnit === "l" && (
                     <div>
-                      <div style={label}>Densité (kg/L)</div>
-                      <input style={input} value={newDensity} onChange={(e) => setNewDensity(e.target.value)} />
+                      <div className="text-[12px] opacity-75 mb-1.5">Densité (kg/L)</div>
+                      <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" value={newDensity} onChange={(e) => setNewDensity(e.target.value)} />
                     </div>
                   )}
                 </>
@@ -1182,21 +1191,21 @@ function IngredientsPageInner() {
 
               {priceKind === "pack_composed" && (
                 <>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "end" }}>
+                  <div className="grid grid-cols-2 gap-3 items-end">
                     <div>
-                      <div style={label}>Prix du pack (€)</div>
-                      <input style={input} placeholder="Ex: 18.56" inputMode="decimal" value={packPrice} onChange={(e) => setPackPrice(e.target.value)} />
+                      <div className="text-[12px] opacity-75 mb-1.5">Prix du pack (€)</div>
+                      <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="Ex: 18.56" inputMode="decimal" value={packPrice} onChange={(e) => setPackPrice(e.target.value)} />
                     </div>
                     <div>
-                      <div style={label}>Nombre d&apos;unités</div>
-                      <input style={input} placeholder="Ex: 8" inputMode="decimal" value={packCount} onChange={(e) => setPackCount(e.target.value)} />
+                      <div className="text-[12px] opacity-75 mb-1.5">Nombre d&apos;unités</div>
+                      <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="Ex: 8" inputMode="decimal" value={packCount} onChange={(e) => setPackCount(e.target.value)} />
                     </div>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "end" }}>
+                  <div className="grid grid-cols-2 gap-3 items-end">
                     <div>
-                      <div style={label}>Unité de chaque élément</div>
-                      <select style={select} value={packEachUnit} onChange={(e) => setPackEachUnit(e.target.value as "kg" | "l" | "pc")}>
+                      <div className="text-[12px] opacity-75 mb-1.5">Unité de chaque élément</div>
+                      <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={packEachUnit} onChange={(e) => setPackEachUnit(e.target.value as "kg" | "l" | "pc")}>
                         <option value="l">Litre (L)</option>
                         <option value="kg">Kilo (kg)</option>
                         <option value="pc">Pièce (pc)</option>
@@ -1205,9 +1214,9 @@ function IngredientsPageInner() {
 
                     {packEachUnit !== "pc" ? (
                       <div>
-                        <div style={label}>Quantité par élément ({packEachUnit === "kg" ? "kg" : "L"})</div>
+                        <div className="text-[12px] opacity-75 mb-1.5">Quantité par élément ({packEachUnit === "kg" ? "kg" : "L"})</div>
                         <input
-                          style={input}
+                          className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none"
                           placeholder={packEachUnit === "kg" ? "Ex: 1" : "Ex: 1.5"}
                           inputMode="decimal"
                           value={packEachQty}
@@ -1216,16 +1225,16 @@ function IngredientsPageInner() {
                       </div>
                     ) : (
                       <div>
-                        <div style={label}>Poids d&apos;une pièce (g)</div>
-                        <input style={input} placeholder="Ex: 125" inputMode="decimal" value={packPieceWeightG} onChange={(e) => setPackPieceWeightG(e.target.value)} />
+                        <div className="text-[12px] opacity-75 mb-1.5">Poids d&apos;une pièce (g)</div>
+                        <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="Ex: 125" inputMode="decimal" value={packPieceWeightG} onChange={(e) => setPackPieceWeightG(e.target.value)} />
                       </div>
                     )}
                   </div>
 
                   {packEachUnit === "l" && (
                     <div>
-                      <div style={label}>Densité (kg/L)</div>
-                      <input style={input} value={newDensity} onChange={(e) => setNewDensity(e.target.value)} />
+                      <div className="text-[12px] opacity-75 mb-1.5">Densité (kg/L)</div>
+                      <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" value={newDensity} onChange={(e) => setNewDensity(e.target.value)} />
                     </div>
                   )}
                 </>
@@ -1235,37 +1244,25 @@ function IngredientsPageInner() {
         </form>
       </div>}
 
-      {tab !== ("variations" as Tab) && loading && <div className="muted" style={{ marginTop: 12 }}>Chargement…</div>}
+      {tab !== ("variations" as Tab) && loading && <div className="muted mt-3">Chargement…</div>}
 
       {grouped.map(({ cat, items: catItems }) => {
         const isCollapsed = collapsedCats.has(cat);
         return (
-          <div key={cat} style={{ marginTop: 14 }}>
+          <div key={cat} className="mt-3.5">
             <button
               onClick={() => toggleCat(cat)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                width: "100%",
-                padding: "8px 14px",
-                background: "rgba(0,0,0,0.04)",
-                border: "1px solid rgba(0,0,0,0.08)",
-                borderRadius: 10,
-                cursor: "pointer",
-                textAlign: "left",
-                fontFamily: "inherit",
-              }}
+              className="flex items-center gap-2 w-full px-[14px] py-2 bg-black/[.04] border border-black/[.08] rounded-[10px] cursor-pointer text-left font-[inherit]"
             >
-              <span style={{ fontSize: 18 }}>{CAT_EMOJIS[cat]}</span>
-              <span style={{ fontWeight: 800, color: CAT_COLORS[cat], fontSize: 14 }}>{CAT_LABELS[cat]}</span>
-              <span style={{ color: "#999", fontSize: 13 }}>({catItems.length})</span>
-              <span style={{ marginLeft: "auto", fontSize: 12, color: "#666" }}>{isCollapsed ? "▶" : "▼"}</span>
+              <span className="text-[18px]">{CAT_EMOJIS[cat]}</span>
+              <span className="font-extrabold text-[14px]" style={{ color: CAT_COLORS[cat] }}>{CAT_LABELS[cat]}</span>
+              <span className="text-[13px] text-[#999]">({catItems.length})</span>
+              <span className="ml-auto text-[12px] text-[#666]">{isCollapsed ? "▶" : "▼"}</span>
             </button>
 
             {!isCollapsed && (
-              <div className="card" style={{ ...cardPad, marginTop: 6 }}>
-                <div style={{ display: "grid", gap: 10 }}>
+              <div className="card mt-1.5">
+                <div className="grid gap-2.5">
                   {catItems.map((x) => {
                     const isEditing = editingId === x.id;
                     const offer = offersByIngredientId.get(x.id);
@@ -1282,52 +1279,48 @@ function IngredientsPageInner() {
                     const supplierName = supplierIdForDisplay ? suppliersMap.get(supplierIdForDisplay)?.name : null;
 
                     const st = (x.status ?? "to_check") as IngredientStatus;
+                    const hasPrice = offerHasPrice(offer) || legacyHasPrice(x);
+                    const canValidate = hasPrice;
 
                     return (
-                      <div key={x.id} style={{ border: "1px solid rgba(0,0,0,0.1)", borderRadius: 12, padding: 12 }}>
+                      <div key={x.id} className="border border-black/10 rounded-xl p-3">
 
                         {/* ── Desktop layout (md+) ── */}
-                        <div className="hidden md:grid" style={{ gridTemplateColumns: "2fr 1fr 1fr auto", gap: 12 }}>
+                        <div className="hidden md:grid gap-3" style={{ gridTemplateColumns: "2fr 1fr 1fr auto" }}>
                           <div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                            <div className="flex items-center gap-2.5 flex-wrap">
                               <div style={{ fontWeight: 900, color: CAT_COLORS[x.category] }}>{x.name}</div>
                               <span style={statusBadgeStyle(st)}>{statusLabel(st)}</span>
-                              <span style={{ fontSize: 10, fontWeight: 800, padding: "2px 6px", borderRadius: 4, background: estabBadge.bg, color: "#fff" }}>{estabBadge.label}</span>
+                              <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded text-white" style={{ background: estabBadge.bg }}>{estabBadge.label}</span>
                             </div>
-                            <div className="muted" style={{ fontSize: 12 }}>
+                            <div className="muted text-[12px]">
                               {supplierName ? `Fournisseur: ${supplierName}` : x.category}
                               {x.source_prep_recipe_name ? ` • Pivot: ${x.source_prep_recipe_name}` : ""}
                               {offer ? " • offre" : ""}
                               {x.status_note ? ` • note: ${x.status_note}` : ""}
                             </div>
-                            {(() => {
-                              const hasPrice = offerHasPrice(offer) || legacyHasPrice(x);
-                              const canValidate = hasPrice;
-                              return (
-                                <>
-                                  {!hasPrice && <div style={{ marginTop: 6 }}><span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "2px 8px", borderRadius: 999, fontSize: 12, fontWeight: 800, background: "rgba(220,38,38,0.10)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.25)" }}>prix manquant</span></div>}
-                                  {st !== "validated" && (
-                                    <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-                                      <button className="btn" onClick={() => setIngredientStatus(x.id, "to_check")}>À contrôler</button>
-                                      <button className="btn" disabled={!canValidate} onClick={() => { if (!canValidate) return; setIngredientStatus(x.id, "validated"); }} style={!canValidate ? { opacity: 0.45, cursor: "not-allowed" } : undefined} title={!canValidate ? "Ajoute un prix avant de valider." : ""}>Valider</button>
-                                      <button className="btn" onClick={() => setIngredientStatus(x.id, "unknown")}>Incompris</button>
-                                    </div>
-                                  )}
-                                </>
-                              );
-                            })()}
+                            <>
+                              {!hasPrice && <div className="mt-1.5"><span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[12px] font-extrabold bg-red-600/10 text-red-600 border border-red-600/25">prix manquant</span></div>}
+                              {st !== "validated" && (
+                                <div className="flex gap-1.5 mt-2 flex-wrap">
+                                  <button className="btn" onClick={() => setIngredientStatus(x.id, "to_check")}>À contrôler</button>
+                                  <button className="btn" disabled={!canValidate} onClick={() => { if (!canValidate) return; setIngredientStatus(x.id, "validated"); }} style={!canValidate ? { opacity: 0.45, cursor: "not-allowed" } : undefined} title={!canValidate ? "Ajoute un prix avant de valider." : ""}>Valider</button>
+                                  <button className="btn" onClick={() => setIngredientStatus(x.id, "unknown")}>Incompris</button>
+                                </div>
+                              )}
+                            </>
                           </div>
                           <div>
-                            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>Densité / Poids / Vol.</div>
-                            <div style={{ fontWeight: 600 }}>
+                            <div className="text-[12px] opacity-75 mb-1.5">Densité / Poids / Vol.</div>
+                            <div className="font-semibold">
                               {offer?.density_kg_per_l != null ? `${fmtQty(offer.density_kg_per_l)} kg/L` : offer?.piece_weight_g != null ? `${fmtQty(offer.piece_weight_g)} g/pc` : x.piece_volume_ml != null ? fmtVolume(x.piece_volume_ml) + "/pc" : x.purchase_unit_name === "l" ? `${x.density_g_per_ml ?? 1} kg/L` : x.piece_weight_g ? `${x.piece_weight_g} g/pc` : "—"}
                             </div>
                           </div>
-                          <div style={{ textAlign: "right" }}>
-                            <div style={{ fontWeight: 950, fontSize: 18 }}>{price}</div>
-                            <div className="muted" style={{ fontSize: 11 }}>{supplierName ?? (offer ? "offre" : "—")}</div>
+                          <div className="text-right">
+                            <div className="text-[18px]" style={{ fontWeight: 950 }}>{price}</div>
+                            <div className="muted text-[11px]">{supplierName ?? (offer ? "offre" : "—")}</div>
                           </div>
-                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <div className="flex gap-1.5 items-center">
                             {!isEditing ? <button className="btn btnPrimary" onClick={() => startEdit(x)} title="Contrôler / modifier" style={{ fontSize: 18, padding: "0 12px", height: 36 }}>→</button> : <button className="btn btnPrimary" onClick={saveEdit}>OK</button>}
                             <button className="btn btnDanger" onClick={() => del(x.id, x.name)} title="Supprimer" style={{ fontSize: 16, padding: "0 12px", height: 36 }}>✕</button>
                           </div>
@@ -1335,53 +1328,55 @@ function IngredientsPageInner() {
 
                         {/* ── Mobile layout ── */}
                         <div className="md:hidden">
-                          {/* Nom + badges */}
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                            <div style={{ fontWeight: 900, color: CAT_COLORS[x.category], flex: 1 }}>{x.name}</div>
-                            <span style={statusBadgeStyle(st)}>{statusLabel(st)}</span>
-                            <span style={{ fontSize: 10, fontWeight: 800, padding: "2px 6px", borderRadius: 4, background: estabBadge.bg, color: "#fff" }}>{estabBadge.label}</span>
-                          </div>
-                          {/* Fournisseur · Catégorie */}
-                          <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-                            {supplierName ?? x.category}
-                            {x.status_note ? ` • ${x.status_note}` : ""}
-                          </div>
-                          {/* Prix + Densité */}
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 6 }}>
-                            <div style={{ fontWeight: 950, fontSize: 17 }}>{price}</div>
-                            <div style={{ fontWeight: 600, fontSize: 13, color: "#6B6257" }}>
-                              {offer?.density_kg_per_l != null ? `${fmtQty(offer.density_kg_per_l)} kg/L` : offer?.piece_weight_g != null ? `${fmtQty(offer.piece_weight_g)} g/pc` : x.piece_volume_ml != null ? fmtVolume(x.piece_volume_ml) + "/pc" : x.purchase_unit_name === "l" ? `${x.density_g_per_ml ?? 1} kg/L` : x.piece_weight_g ? `${x.piece_weight_g} g/pc` : "—"}
+                          {compactMode ? (
+                            // Compact : une ligne
+                            <div className="flex items-center gap-2">
+                              <div className="font-black flex-1 min-w-0 line-clamp-1" style={{ color: CAT_COLORS[x.category] }}>{x.name}</div>
+                              <div className="text-[14px] shrink-0" style={{ fontWeight: 950 }}>{price}</div>
+                              <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded text-white shrink-0" style={{ background: estabBadge.bg }}>{estabBadge.label}</span>
+                              {!isEditing
+                                ? <button className="btn btnPrimary shrink-0 !h-8 !px-2" onClick={() => startEdit(x)}>→</button>
+                                : <button className="btn btnPrimary shrink-0 !h-8 !px-2" onClick={saveEdit}>OK</button>}
+                              <button className="btn btnDanger shrink-0 !h-8 !px-2" onClick={() => del(x.id, x.name)}>✕</button>
                             </div>
-                          </div>
-                          {/* Actions mobiles */}
-                          {(() => {
-                            const hasPrice = offerHasPrice(offer) || legacyHasPrice(x);
-                            const canValidate = hasPrice;
-                            return (
-                              <>
-                                {!hasPrice && <div style={{ marginTop: 4 }}><span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 800, background: "rgba(220,38,38,0.10)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.25)" }}>prix manquant</span></div>}
-                                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                                  {st !== "validated" && (
-                                    <button className="btn" style={{ flex: 1 }} disabled={!canValidate} onClick={() => { if (!canValidate) return; setIngredientStatus(x.id, "validated"); }} title={!canValidate ? "Ajoute un prix avant de valider." : ""}>Valider</button>
-                                  )}
-                                  {!isEditing ? <button className="btn btnPrimary" style={{ flex: 1 }} onClick={() => startEdit(x)}>Modifier</button> : <button className="btn btnPrimary" style={{ flex: 1 }} onClick={saveEdit}>OK</button>}
-                                  <button className="btn btnDanger" onClick={() => del(x.id, x.name)}>✕</button>
-                                </div>
-                              </>
-                            );
-                          })()}
+                          ) : (
+                            // Full : carte améliorée
+                            <>
+                              {/* Ligne 1 : Nom + badges */}
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <div className="font-black flex-1 min-w-0 line-clamp-2 leading-tight" style={{ color: CAT_COLORS[x.category] }}>{x.name}</div>
+                                <span style={statusBadgeStyle(st)}>{statusLabel(st)}</span>
+                                <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded text-white" style={{ background: estabBadge.bg }}>{estabBadge.label}</span>
+                              </div>
+                              {/* Ligne 2 : Fournisseur · Prix */}
+                              <div className="flex justify-between items-baseline mt-2">
+                                <div className="muted text-[12px]">{supplierName ?? x.category}{x.status_note ? ` • ${x.status_note}` : ""}</div>
+                                <div className="text-[17px]" style={{ fontWeight: 950 }}>{price}</div>
+                              </div>
+                              {/* Prix manquant */}
+                              {!hasPrice && <div className="mt-1"><span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-red-600/10 text-red-600 border border-red-600/25">prix manquant</span></div>}
+                              {/* Ligne 3 : Actions */}
+                              <div className="flex gap-2 mt-2">
+                                {st !== "validated" && <button className="btn flex-1" disabled={!canValidate} onClick={() => { if (!canValidate) return; setIngredientStatus(x.id, "validated"); }} title={!canValidate ? "Ajoute un prix avant de valider." : ""}>Valider</button>}
+                                {!isEditing
+                                  ? <button className="btn btnPrimary flex-1" onClick={() => startEdit(x)}>Modifier</button>
+                                  : <button className="btn btnPrimary flex-1" onClick={saveEdit}>OK</button>}
+                                <button className="btn btnDanger" onClick={() => del(x.id, x.name)}>✕</button>
+                              </div>
+                            </>
+                          )}
                         </div>
 
                         {isEditing && edit && (
-                          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #eee", display: "grid", gap: 10 }}>
-                            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10 }}>
-                              <input style={input} value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
-                              <select style={select} value={edit.category} onChange={(e) => setEdit({ ...edit, category: e.target.value as Category })}>
+                          <div className="mt-3 pt-3 border-t border-gray-200 grid gap-2.5">
+                            <div className="grid gap-2.5" style={{ gridTemplateColumns: "2fr 1fr 1fr" }}>
+                              <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
+                              <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={edit.category} onChange={(e) => setEdit({ ...edit, category: e.target.value as Category })}>
                                 {CATEGORIES.map((c) => (
                                   <option key={c} value={c}>{c}</option>
                                 ))}
                               </select>
-                              <select style={select} value={edit.supplierId} onChange={(e) => setEdit({ ...edit, supplierId: e.target.value })}>
+                              <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={edit.supplierId} onChange={(e) => setEdit({ ...edit, supplierId: e.target.value })}>
                                 <option value="">—</option>
                                 {suppliers.filter((s) => s.is_active).map((s) => (
                                   <option key={s.id} value={s.id}>{s.name}</option>
@@ -1389,15 +1384,15 @@ function IngredientsPageInner() {
                               </select>
                             </div>
 
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, alignItems: "center" }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <span style={{ fontWeight: 800 }}>Offre fournisseur</span>
-                                <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div className="grid grid-cols-2 gap-2.5 items-center">
+                              <div className="flex items-center gap-2.5">
+                                <span className="font-extrabold">Offre fournisseur</span>
+                                <label className="flex items-center gap-2">
                                   <input type="checkbox" checked={edit.useOffer} onChange={(e) => setEdit({ ...edit, useOffer: e.target.checked })} />
                                   <span className="muted">recommandé</span>
                                 </label>
                               </div>
-                              <select style={select} value={edit.is_active ? "1" : "0"} onChange={(e) => setEdit({ ...edit, is_active: e.target.value === "1" })}>
+                              <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={edit.is_active ? "1" : "0"} onChange={(e) => setEdit({ ...edit, is_active: e.target.value === "1" })}>
                                 <option value="1">Actif</option>
                                 <option value="0">Inactif</option>
                               </select>
@@ -1406,8 +1401,8 @@ function IngredientsPageInner() {
                             {edit.useOffer && (
                               <>
                                 <div>
-                                  <div style={label}>Mode prix</div>
-                                  <select style={select} value={edit.priceKind} onChange={(e) => setEdit({ ...edit, priceKind: e.target.value as PriceKind })}>
+                                  <div className="text-[12px] opacity-75 mb-1.5">Mode prix</div>
+                                  <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={edit.priceKind} onChange={(e) => setEdit({ ...edit, priceKind: e.target.value as PriceKind })}>
                                     <option value="unit">Unitaire</option>
                                     <option value="pack_simple">Pack</option>
                                     <option value="pack_composed">Pack composé</option>
@@ -1416,56 +1411,56 @@ function IngredientsPageInner() {
 
                                 {edit.priceKind === "unit" && (
                                   <>
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                                      <input style={input} placeholder="Prix unitaire" value={edit.unitPrice} onChange={(e) => setEdit({ ...edit, unitPrice: e.target.value })} />
-                                      <select style={select} value={edit.unit} onChange={(e) => setEdit({ ...edit, unit: e.target.value as "kg" | "l" | "pc" })}>
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                      <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="Prix unitaire" value={edit.unitPrice} onChange={(e) => setEdit({ ...edit, unitPrice: e.target.value })} />
+                                      <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={edit.unit} onChange={(e) => setEdit({ ...edit, unit: e.target.value as "kg" | "l" | "pc" })}>
                                         <option value="kg">kg</option>
                                         <option value="l">L</option>
                                         <option value="pc">pc</option>
                                       </select>
                                     </div>
-                                    {edit.unit === "l" && <input style={input} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => setEdit({ ...edit, density: e.target.value })} />}
-                                    {edit.unit === "pc" && <input style={input} placeholder="Poids pièce (g)" value={edit.pieceWeightG} onChange={(e) => setEdit({ ...edit, pieceWeightG: e.target.value })} />}
-                                    {edit.unit === "pc" && <input style={input} placeholder="Volume pièce (ml)" value={edit.pieceVolumeMl} onChange={(e) => setEdit({ ...edit, pieceVolumeMl: e.target.value })} />}
-                                    <div className="muted" style={{ fontSize: 12 }}>{previewEditPack ? previewEditPack : "—"}</div>
+                                    {edit.unit === "l" && <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => setEdit({ ...edit, density: e.target.value })} />}
+                                    {edit.unit === "pc" && <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="Poids pièce (g)" value={edit.pieceWeightG} onChange={(e) => setEdit({ ...edit, pieceWeightG: e.target.value })} />}
+                                    {edit.unit === "pc" && <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="Volume pièce (ml)" value={edit.pieceVolumeMl} onChange={(e) => setEdit({ ...edit, pieceVolumeMl: e.target.value })} />}
+                                    <div className="muted text-[12px]">{previewEditPack ? previewEditPack : "—"}</div>
                                   </>
                                 )}
 
                                 {edit.priceKind === "pack_simple" && (
                                   <>
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                                      <input style={input} placeholder="Prix pack (€)" value={edit.packPrice} onChange={(e) => setEdit({ ...edit, packPrice: e.target.value })} />
-                                      <input style={input} placeholder="Quantité totale (kg/L)" value={edit.packTotalQty} onChange={(e) => setEdit({ ...edit, packTotalQty: e.target.value })} />
-                                      <select style={select} value={edit.packUnit} onChange={(e) => setEdit({ ...edit, packUnit: e.target.value as "kg" | "l" })}>
+                                    <div className="grid grid-cols-3 gap-2.5">
+                                      <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="Prix pack (€)" value={edit.packPrice} onChange={(e) => setEdit({ ...edit, packPrice: e.target.value })} />
+                                      <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="Quantité totale (kg/L)" value={edit.packTotalQty} onChange={(e) => setEdit({ ...edit, packTotalQty: e.target.value })} />
+                                      <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={edit.packUnit} onChange={(e) => setEdit({ ...edit, packUnit: e.target.value as "kg" | "l" })}>
                                         <option value="kg">kg</option>
                                         <option value="l">L</option>
                                       </select>
                                     </div>
-                                    {edit.packUnit === "l" && <input style={input} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => setEdit({ ...edit, density: e.target.value })} />}
-                                    <div className="muted" style={{ fontSize: 12 }}>{previewEditPack ? previewEditPack : "—"}</div>
+                                    {edit.packUnit === "l" && <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => setEdit({ ...edit, density: e.target.value })} />}
+                                    <div className="muted text-[12px]">{previewEditPack ? previewEditPack : "—"}</div>
                                   </>
                                 )}
 
                                 {edit.priceKind === "pack_composed" && (
                                   <>
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                                      <input style={input} placeholder="Prix pack (€)" value={edit.packPrice} onChange={(e) => setEdit({ ...edit, packPrice: e.target.value })} />
-                                      <input style={input} placeholder="Nombre d'unités (ex: 8)" value={edit.packCount} onChange={(e) => setEdit({ ...edit, packCount: e.target.value })} />
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                      <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="Prix pack (€)" value={edit.packPrice} onChange={(e) => setEdit({ ...edit, packPrice: e.target.value })} />
+                                      <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="Nombre d'unités (ex: 8)" value={edit.packCount} onChange={(e) => setEdit({ ...edit, packCount: e.target.value })} />
                                     </div>
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                                      <select style={select} value={edit.packEachUnit} onChange={(e) => setEdit({ ...edit, packEachUnit: e.target.value as "kg" | "l" | "pc" })}>
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                      <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={edit.packEachUnit} onChange={(e) => setEdit({ ...edit, packEachUnit: e.target.value as "kg" | "l" | "pc" })}>
                                         <option value="l">L</option>
                                         <option value="kg">kg</option>
                                         <option value="pc">pc</option>
                                       </select>
                                       {edit.packEachUnit !== "pc" ? (
-                                        <input style={input} placeholder="Quantité par unité (ex: 1.5)" value={edit.packEachQty} onChange={(e) => setEdit({ ...edit, packEachQty: e.target.value })} />
+                                        <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="Quantité par unité (ex: 1.5)" value={edit.packEachQty} onChange={(e) => setEdit({ ...edit, packEachQty: e.target.value })} />
                                       ) : (
-                                        <input style={input} placeholder="Poids pièce (g)" value={edit.packPieceWeightG} onChange={(e) => setEdit({ ...edit, packPieceWeightG: e.target.value })} />
+                                        <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="Poids pièce (g)" value={edit.packPieceWeightG} onChange={(e) => setEdit({ ...edit, packPieceWeightG: e.target.value })} />
                                       )}
                                     </div>
-                                    {edit.packEachUnit === "l" && <input style={input} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => setEdit({ ...edit, density: e.target.value })} />}
-                                    <div className="muted" style={{ fontSize: 12 }}>{previewEditPack ? previewEditPack : "—"}</div>
+                                    {edit.packEachUnit === "l" && <input className="w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none" placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => setEdit({ ...edit, density: e.target.value })} />}
+                                    <div className="muted text-[12px]">{previewEditPack ? previewEditPack : "—"}</div>
                                   </>
                                 )}
                               </>
@@ -1482,10 +1477,62 @@ function IngredientsPageInner() {
         );
       })}
 
-      <div className="muted" style={{ marginTop: 10, fontSize: 12 }}>
+      <div className="muted mt-2.5 text-[12px]">
         User: {userId ? userId : "non connecté"}
       </div>
     </main>
+
+    {/* ── Bottom sheet filtres (mobile) ── */}
+    {showFilters && (
+      <>
+        <div className="fixed inset-0 z-[60] bg-black/40" onClick={() => setShowFilters(false)} />
+        <div className="fixed bottom-0 left-0 right-0 z-[61] bg-[#FAF7F2] rounded-t-[20px] p-5 safe-bottom"
+          style={{ animation: "slideUp 0.25s ease-out" }}>
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-[17px] font-black">Filtres</span>
+            <button className="btn" onClick={() => setShowFilters(false)}>✕ Fermer</button>
+          </div>
+          <div className="grid gap-3">
+            <div>
+              <div className="text-[12px] opacity-75 mb-1.5">Catégorie</div>
+              <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value as "all" | Category)}>
+                <option value="all">Tous</option>
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <div className="text-[12px] opacity-75 mb-1.5">Fournisseur</div>
+              <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)}>
+                <option value="all">Tous</option>
+                {suppliers.filter((s) => s.is_active).map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <div className="text-[12px] opacity-75 mb-1.5">Établissement</div>
+              <select className="w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65" value={filterEstablishment} onChange={(e) => setFilterEstablishment(e.target.value as "all" | "bellomio" | "piccola" | "both")}>
+                <option value="all">Tous</option>
+                <option value="bellomio">Bello Mio</option>
+                <option value="piccola">Piccola Mia</option>
+                <option value="both">Les deux</option>
+              </select>
+            </div>
+            <div>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} />
+                <span className="font-extrabold text-[12px]">Inclure sans offre</span>
+              </label>
+            </div>
+          </div>
+          <button className="btn btnPrimary w-full !h-[44px] mt-4" onClick={() => setShowFilters(false)}>
+            Appliquer
+          </button>
+        </div>
+      </>
+    )}
     </>
   );
 }

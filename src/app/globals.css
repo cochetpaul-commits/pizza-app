@@ -326,3 +326,12 @@ textarea.input{
     --pil-grid-cols: 1fr;
   }
 }
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
