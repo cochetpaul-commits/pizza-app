@@ -315,3 +315,13 @@ textarea.input{
   border-color: rgba(217,63,63,0.5);
   color: #d93f3f;
 }
+:root {
+  --pil-grid-cols: 2fr 110px 90px 110px auto;
+}
+
+/* Mobile (iPhone) */
+@media (max-width: 640px) {
+  :root {
+    --pil-grid-cols: 1fr;
+  }
+}

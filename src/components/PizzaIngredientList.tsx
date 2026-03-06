@@ -264,7 +264,7 @@ export default function PizzaIngredientList(props: Props) {
               key={rowId}
               style={{
                 display: "grid",
-                gridTemplateColumns: gridCols,
+                gridTemplateColumns: "var(--pil-grid-cols, 2fr 110px 90px 110px auto)",
                 gap: 10,
                 alignItems: "center",
                 padding: "10px 10px",
