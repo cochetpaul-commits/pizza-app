@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { NavBar } from "@/components/NavBar";
 import { supabase } from "@/lib/supabaseClient";
 import { CATEGORIES, CAT_COLORS, type Category } from "@/types/ingredients";
 import { offerRowToCpu } from "@/lib/offerPricing";
@@ -68,7 +68,6 @@ function StepInput({ value, onChange, step = 0.1, min = 0.1, decimals = 1 }: { v
 }
 
 export default function EpiceriePage() {
-  const router = useRouter();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [offers, setOffers] = useState<Record<string, string>>({});
@@ -170,11 +169,12 @@ export default function EpiceriePage() {
   const sel = { padding: "7px 10px", borderRadius: 8, border: "1px solid #E8E0D0", fontSize: 13, background: "#fff", color: "#1A1A1A" };
 
   return (
+    <>
+    <NavBar />
     <main style={{ minHeight: "100vh", background: "#FAF7F2", padding: 16, fontFamily: "inherit" }}>
       <div style={{ maxWidth: 1400, margin: "0 auto" }}>
 
-        <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 20 }}>
-          <button onClick={() => router.push("/")} style={btnSecondary}>← Accueil</button>
+        <div style={{ marginBottom: 20 }}>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "#1A1A1A" }}>Calcul Prix Épicerie</h1>
         </div>
 
@@ -337,5 +337,6 @@ export default function EpiceriePage() {
         </div>
       </div>
     </main>
+    </>
   );
 }

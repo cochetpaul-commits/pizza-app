@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { NavBar } from "@/components/NavBar";
 
 type InvoiceLine = {
   sku?: string | null;
@@ -35,7 +36,6 @@ type PreviewResult = {
 };
 
 export default function CozigouInvoicePage() {
-  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [file, setFile] = useState<File | null>(null);
@@ -114,27 +114,9 @@ export default function CozigouInvoicePage() {
   const parsed = preview?.parsed;
 
   return (
+    <>
+    <NavBar backHref="/invoices" backLabel="Factures" right={<Link href="/ingredients" className="btn">≡ Index ingrédients</Link>} />
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "2rem", fontFamily: "sans-serif" }}>
-      <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.5rem" }}>
-        <button
-          onClick={() => router.push("/")}
-          style={{ background: "transparent", border: "1px solid #ccc", borderRadius: 6, padding: "0.4rem 1rem", fontSize: "0.875rem", cursor: "pointer" }}
-        >
-          ↩ Accueil
-        </button>
-        <button
-          onClick={() => router.push("/invoices")}
-          style={{ background: "transparent", border: "1px solid #ccc", borderRadius: 6, padding: "0.4rem 1rem", fontSize: "0.875rem", cursor: "pointer" }}
-        >
-          ← Factures
-        </button>
-        <button
-          onClick={() => router.push("/ingredients")}
-          style={{ background: "transparent", border: "1px solid #ccc", borderRadius: 6, padding: "0.4rem 1rem", fontSize: "0.875rem", cursor: "pointer" }}
-        >
-          ≡ Index ingrédients
-        </button>
-      </div>
 
       <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1.5rem" }}>
         Import factures COZIGOU
@@ -296,6 +278,7 @@ export default function CozigouInvoicePage() {
         </div>
       )}
     </div>
+    </>
   );
 }
 

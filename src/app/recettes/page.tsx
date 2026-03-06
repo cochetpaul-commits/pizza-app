@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
+import { NavBar } from "@/components/NavBar";
 import { POLE_COLORS } from "@/lib/poleColors";
 
 // --- Types ---------------------------------------------------------------
@@ -320,14 +321,22 @@ function RecettesInner() {
   };
 
   if (authState === "loading") {
-    return <main className="container"><TopNav title="Recettes" subtitle="Chargement…" /></main>;
+    return (
+      <>
+        <NavBar />
+        <main className="container"><TopNav title="Recettes" subtitle="Chargement…" /></main>
+      </>
+    );
   }
   if (authState === "notlogged") {
     return (
-      <main className="container">
-        <TopNav title="Recettes" />
-        <Link className="btn btnPrimary" href="/login">Se connecter</Link>
-      </main>
+      <>
+        <NavBar />
+        <main className="container">
+          <TopNav title="Recettes" />
+          <Link className="btn btnPrimary" href="/login">Se connecter</Link>
+        </main>
+      </>
     );
   }
 
@@ -356,6 +365,8 @@ function RecettesInner() {
   })();
 
   return (
+    <>
+    <NavBar right={<button className="btn" onClick={refresh}>Rafraîchir</button>} />
     <main className="container">
       <TopNav title="Recettes" subtitle={subtitle} />
 
@@ -409,7 +420,6 @@ function RecettesInner() {
       {/* Actions */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         {createBtn}
-        <button className="btn" onClick={refresh}>Rafraîchir</button>
       </div>
 
       {empCreateErr && <p style={{ color: "red", marginBottom: 12 }}>{empCreateErr}</p>}
@@ -536,6 +546,7 @@ function RecettesInner() {
         </div>
       )}
     </main>
+    </>
   );
 }
 
@@ -543,9 +554,12 @@ export default function RecettesPage() {
   return (
     <Suspense
       fallback={
-        <main className="container">
-          <TopNav title="Recettes" subtitle="Chargement…" />
-        </main>
+        <>
+          <NavBar />
+          <main className="container">
+            <TopNav title="Recettes" subtitle="Chargement…" />
+          </main>
+        </>
       }
     >
       <RecettesInner />

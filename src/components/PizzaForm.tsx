@@ -11,6 +11,7 @@ import PizzaIngredientList from "@/components/PizzaIngredientList";
 import type { Ingredient, PizzaIngredientRow, UnitType } from "@/lib/types";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { TopNav } from "@/components/TopNav";
+import { NavBar } from "@/components/NavBar";
 
 type DoughRecipeRow = {
   id: string;
@@ -724,40 +725,52 @@ setPriceLabelByIngredient(priceLabelMap);
 
   if (status === "loading") {
     return (
-      <main className="container">
-        <TopNav title="Pizza" subtitle="Chargement..." backHref="/pizzas" backLabel="← Retour" />
-        <p className="muted">Chargement...</p>
-      </main>
+      <>
+        <NavBar backHref="/recettes?tab=pizza" backLabel="Fiches pizza" />
+        <main className="container">
+          <TopNav title="Pizza" subtitle="Chargement..." />
+          <p className="muted">Chargement...</p>
+        </main>
+      </>
     );
   }
 
   if (status === "NOT_LOGGED") {
     return (
-      <main className="container">
-        <TopNav title="Pizza" backHref="/pizzas" backLabel="← Retour" />
-        <p className="muted">NOT_LOGGED</p>
-        <Link className="btn btnPrimary" href="/login" style={{ marginTop: 12, display: "inline-block" }}>
-          Aller sur /login
-        </Link>
-      </main>
+      <>
+        <NavBar backHref="/recettes?tab=pizza" backLabel="Fiches pizza" />
+        <main className="container">
+          <TopNav title="Pizza" />
+          <p className="muted">NOT_LOGGED</p>
+          <Link className="btn btnPrimary" href="/login" style={{ marginTop: 12, display: "inline-block" }}>
+            Aller sur /login
+          </Link>
+        </main>
+      </>
     );
   }
 
   if (status === "ERROR") {
     return (
-      <main className="container">
-        <TopNav title="Erreur" backHref="/pizzas" backLabel="← Retour" />
-        <pre className="code" style={{ marginTop: 12 }}>{JSON.stringify(error, null, 2)}</pre>
-      </main>
+      <>
+        <NavBar backHref="/recettes?tab=pizza" backLabel="Fiches pizza" />
+        <main className="container">
+          <TopNav title="Erreur" />
+          <pre className="code" style={{ marginTop: 12 }}>{JSON.stringify(error, null, 2)}</pre>
+        </main>
+      </>
     );
   }
 
   if (!form) {
     return (
-      <main className="container">
-        <TopNav title="Pizza" subtitle="Chargement..." backHref="/pizzas" backLabel="← Retour" />
-        <p className="muted">Chargement...</p>
-      </main>
+      <>
+        <NavBar backHref="/recettes?tab=pizza" backLabel="Fiches pizza" />
+        <main className="container">
+          <TopNav title="Pizza" subtitle="Chargement..." />
+          <p className="muted">Chargement...</p>
+        </main>
+      </>
     );
   }
 
@@ -768,12 +781,10 @@ setPriceLabelByIngredient(priceLabelMap);
   const pageSubtitle = !isEdit ? "Non sauvegardee" : costParts.length > 0 ? costParts.join(" · ") : "Fiche pizza";
 
   return (
-    <main className="container">
-      <TopNav
-        title={pageTitle}
-        subtitle={pageSubtitle}
-        backHref="/pizzas"
-        backLabel="← Retour"
+    <>
+      <NavBar
+        backHref="/recettes?tab=pizza"
+        backLabel="Fiches pizza"
         right={
           <>
             <button
@@ -797,6 +808,8 @@ setPriceLabelByIngredient(priceLabelMap);
           </>
         }
       />
+      <main className="container">
+        <TopNav title={pageTitle} subtitle={pageSubtitle} />
 
       {saveError ? (
         <pre className="code" style={{ marginTop: 10 }}>{JSON.stringify(saveError, null, 2)}</pre>
@@ -1007,5 +1020,6 @@ setPriceLabelByIngredient(priceLabelMap);
 
       <div style={{ height: 28 }} />
     </main>
+    </>
   );
 }

@@ -10,6 +10,7 @@ import { useParams } from "next/navigation";
 import { SmartSelect } from "@/components/SmartSelect";
 import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
+import { NavBar } from "@/components/NavBar";
 
 type Ingredient = {
   id: string;
@@ -630,33 +631,42 @@ export default function PrepRecipeDetailPage() {
 
   if (loading) {
     return (
-      <main className="container">
-        <TopNav title="Préparation" backHref="/prep" backLabel="Retour" />
-        <p className="muted">Chargement…</p>
-      </main>
+      <>
+        <NavBar backHref="/recettes?tab=pivot" backLabel="Préparations" />
+        <main className="container">
+          <TopNav title="Préparation" />
+          <p className="muted">Chargement…</p>
+        </main>
+      </>
     );
   }
 
   if (error && !recipe) {
     return (
-      <main className="container">
-        <TopNav title="Préparation" backHref="/prep" backLabel="Retour" />
-        <div style={{ marginTop: 12 }}>
-          <p className="muted">Recette introuvable.</p>
-          <pre className="code" style={{ marginTop: 10 }}>
-            {JSON.stringify(error, null, 2)}
-          </pre>
-        </div>
-      </main>
+      <>
+        <NavBar backHref="/recettes?tab=pivot" backLabel="Préparations" />
+        <main className="container">
+          <TopNav title="Préparation" />
+          <div style={{ marginTop: 12 }}>
+            <p className="muted">Recette introuvable.</p>
+            <pre className="code" style={{ marginTop: 10 }}>
+              {JSON.stringify(error, null, 2)}
+            </pre>
+          </div>
+        </main>
+      </>
     );
   }
 
   if (!recipe) {
     return (
-      <main className="container">
-        <TopNav title="Préparation" backHref="/prep" backLabel="Retour" />
-        <p className="muted">Recette introuvable.</p>
-      </main>
+      <>
+        <NavBar backHref="/recettes?tab=pivot" backLabel="Préparations" />
+        <main className="container">
+          <TopNav title="Préparation" />
+          <p className="muted">Recette introuvable.</p>
+        </main>
+      </>
     );
   }
 
@@ -674,8 +684,10 @@ export default function PrepRecipeDetailPage() {
   );
 
   return (
+    <>
+    <NavBar backHref="/recettes?tab=pivot" backLabel="Préparations" right={topActions} />
     <main className="container">
-      <TopNav title={pageTitle} backHref="/prep" backLabel="Retour" actions={topActions} />
+      <TopNav title={pageTitle} />
 
       {error ? (
         <pre className="code" style={{ marginTop: 12 }}>
@@ -930,5 +942,6 @@ export default function PrepRecipeDetailPage() {
         </div>
       </div>
     </main>
+    </>
   );
 }

@@ -34,6 +34,7 @@ import { extractVolumeFromName, extractWeightGFromName, detectUnitFromName } fro
 import { detectAllergensFromName } from "@/lib/invoices/allergenDetector";
 import { detectCategoryFromName } from "@/lib/invoices/categoryDetector";
 import { PriceAlertsPanel } from "@/components/PriceAlertsPanel";
+import { NavBar } from "@/components/NavBar";
 
 type OfferPayload = Record<string, unknown>;
 
@@ -933,27 +934,17 @@ function IngredientsPageInner() {
   }
 
   return (
+    <>
+    <NavBar
+      backHref={backUrl ?? undefined}
+      backLabel="Retour"
+      right={<button className="btn" onClick={load}>Rafraîchir</button>}
+    />
     <main style={{ maxWidth: 1100, margin: "0 auto", padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 26, fontWeight: 900 }}>Index ingrédients</div>
-          <div className="muted" style={{ marginTop: 2 }}>
-            Gérez vos coûts au kg, au litre, à la pièce — et par fournisseur.
-          </div>
-        </div>
-
-        <div style={{ display: "flex", gap: 8 }}>
-          {backUrl && (
-            <button className="btn" onClick={() => router.push(backUrl)}>
-              ← Retour
-            </button>
-          )}
-          <button className="btn" onClick={() => router.push("/")}>
-            Accueil
-          </button>
-          <button className="btn" onClick={load}>
-            Rafraîchir
-          </button>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 26, fontWeight: 900 }}>Index ingrédients</div>
+        <div className="muted" style={{ marginTop: 2 }}>
+          Gérez vos coûts au kg, au litre, à la pièce — et par fournisseur.
         </div>
       </div>
 
@@ -1517,6 +1508,7 @@ function IngredientsPageInner() {
         User: {userId ? userId : "non connecté"}
       </div>
     </main>
+    </>
   );
 }
 

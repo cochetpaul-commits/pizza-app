@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
+import { NavBar } from "@/components/NavBar";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -36,6 +37,8 @@ export default function LoginPage() {
   };
 
   return (
+    <>
+    <NavBar />
     <main className="container">
       <TopNav title="Connexion" subtitle="Accès réservé" />
 
@@ -76,5 +79,6 @@ export default function LoginPage() {
         ) : null}
       </div>
     </main>
+    </>
   );
 }

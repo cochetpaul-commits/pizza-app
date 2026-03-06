@@ -4,6 +4,7 @@ import { offerRowToCpu } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
 import Link from "next/link";
+import { NavBar } from "@/components/NavBar";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -530,14 +531,22 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
   /* ── render ───────────────────────────────────────────────── */
 
   if (status === "loading") {
-    return <main className="container"><p className="muted">Chargement…</p></main>;
+    return (
+      <>
+        <NavBar backHref="/recettes?tab=cocktail" backLabel="Cocktails" />
+        <main className="container"><p className="muted">Chargement…</p></main>
+      </>
+    );
   }
 
   if (status === "ERROR") {
     return (
-      <main className="container">
-        <pre className="errorBox">{JSON.stringify(error, null, 2)}</pre>
-      </main>
+      <>
+        <NavBar backHref="/recettes?tab=cocktail" backLabel="Cocktails" />
+        <main className="container">
+          <pre className="errorBox">{JSON.stringify(error, null, 2)}</pre>
+        </main>
+      </>
     );
   }
 
@@ -548,13 +557,24 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
       : null;
 
   return (
+    <>
+    <NavBar
+      backHref="/recettes?tab=cocktail"
+      backLabel="Cocktails"
+      right={
+        <>
+          <button className="btn btnPrimary" type="button" onClick={save} disabled={saving}>
+            {saving ? "Enregistrement…" : isEdit ? "Mettre à jour" : "Créer le cocktail"}
+          </button>
+          {isEdit && (
+            <button className="btn" type="button" onClick={exportPdf}>
+              PDF
+            </button>
+          )}
+        </>
+      }
+    />
     <main className="container">
-      {/* NAV */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-        <Link href="/recettes?tab=cocktail" style={{ fontSize: 13, opacity: 0.6 }}>← Retour</Link>
-        <Link href="/" style={{ fontSize: 13, opacity: 0.6 }}>Accueil</Link>
-      </div>
-
       <h1 style={{ margin: "0 0 16px", fontSize: 36, fontWeight: 800 }}>
         {isEdit ? (form.name || "Cocktail") : "Nouveau cocktail"}
       </h1>
@@ -791,23 +811,13 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
         </div>
       </div>
 
-      {/* ACTIONS */}
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <button className="btn btnPrimary" type="button" onClick={save} disabled={saving}>
-          {saving ? "Enregistrement…" : isEdit ? "Mettre à jour" : "Créer le cocktail"}
-        </button>
-        {isEdit && (
-          <button className="btn" type="button" onClick={exportPdf}>
-            Exporter PDF
-          </button>
-        )}
-        {saveOk && <span style={{ color: "green", fontWeight: 600 }}>✓ Enregistré</span>}
-        {saveError && (
-          <div className="errorBox" style={{ marginTop: 0 }}>
-            {saveError.message}{saveError.details ? ` — ${saveError.details}` : ""}
-          </div>
-        )}
-      </div>
+      {saveOk && <div style={{ marginTop: 8, color: "green", fontWeight: 600 }}>✓ Enregistré</div>}
+      {saveError && (
+        <div className="errorBox" style={{ marginTop: 8 }}>
+          {saveError.message}{saveError.details ? ` — ${saveError.details}` : ""}
+        </div>
+      )}
     </main>
+    </>
   );
 }

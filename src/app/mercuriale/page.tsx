@@ -1,13 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { NavBar } from "@/components/NavBar";
 import { supabase } from "@/lib/supabaseClient";
 
 type Supplier = { id: string; name: string };
 
 export default function MercurialePage() {
-  const router = useRouter();
   const [groupBy, setGroupBy] = useState<"category" | "supplier" | "alpha">("category");
   const [establishment, setEstablishment] = useState<"all" | "bellomio" | "piccola">("all");
   const [filterSupplier, setFilterSupplier] = useState<string>("all");
@@ -68,13 +67,10 @@ export default function MercurialePage() {
   };
 
   return (
+    <>
+    <NavBar />
     <main style={{ maxWidth: 600, margin: "0 auto", padding: "2rem" }}>
-      <div style={{ display: "flex", gap: 12, marginBottom: 24, alignItems: "center" }}>
-        <button onClick={() => router.push("/")} style={{ background: "none", border: "1px solid #d1d5db", borderRadius: 8, padding: "6px 14px", cursor: "pointer", fontWeight: 700 }}>
-          ← Accueil
-        </button>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900 }}>Mercuriale des prix</h1>
-      </div>
+      <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, marginBottom: 24 }}>Mercuriale des prix</h1>
 
       <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 20, marginBottom: 12 }}>
         <div style={{ fontWeight: 700, marginBottom: 10, color: "#374151", fontSize: 13 }}>Établissement</div>
@@ -109,5 +105,6 @@ export default function MercurialePage() {
         {loading ? "Génération en cours…" : "⬇ Télécharger la mercuriale PDF"}
       </button>
     </main>
+    </>
   );
 }

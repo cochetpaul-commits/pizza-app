@@ -4,6 +4,7 @@ import { offerRowToCpu } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
 import Link from "next/link";
+import { NavBar } from "@/components/NavBar";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -939,77 +940,80 @@ if (supplierIds.length) {
 
   if (status === "loading") {
     return (
-      <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
-        <div style={{ maxWidth: 980, margin: "0 auto", color: theme.muted }}>Chargement…</div>
-      </main>
+      <>
+        <NavBar backHref="/recettes?tab=cuisine" backLabel="Cuisine" />
+        <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
+          <div style={{ maxWidth: 980, margin: "0 auto", color: theme.muted }}>Chargement…</div>
+        </main>
+      </>
     );
   }
 
   if (status === "NOT_LOGGED") {
     return (
-      <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
-        <div style={{ maxWidth: 980, margin: "0 auto" }}>
-          <div style={{ color: theme.muted }}>NOT_LOGGED</div>
-          <Link
-            href="/login"
-            style={{
-              display: "inline-block",
-              marginTop: 12,
-              padding: "10px 14px",
-              borderRadius: 12,
-              background: theme.primary,
-              color: theme.primaryText,
-              textDecoration: "none",
-              fontWeight: 900,
-            }}
-          >
-            Aller sur /login
-          </Link>
-        </div>
-      </main>
+      <>
+        <NavBar backHref="/recettes?tab=cuisine" backLabel="Cuisine" />
+        <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
+          <div style={{ maxWidth: 980, margin: "0 auto" }}>
+            <div style={{ color: theme.muted }}>NOT_LOGGED</div>
+            <Link
+              href="/login"
+              style={{
+                display: "inline-block",
+                marginTop: 12,
+                padding: "10px 14px",
+                borderRadius: 12,
+                background: theme.primary,
+                color: theme.primaryText,
+                textDecoration: "none",
+                fontWeight: 900,
+              }}
+            >
+              Aller sur /login
+            </Link>
+          </div>
+        </main>
+      </>
     );
   }
 
   if (status === "ERROR" || !form) {
     return (
-      <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
-        <div style={{ maxWidth: 980, margin: "0 auto" }}>
-          <Link href="/recettes?tab=cuisine" style={{ color: theme.muted, textDecoration: "none", fontWeight: 900 }}>
-            ← Retour
-          </Link>
-          <h1 style={{ marginTop: 14, marginBottom: 10 }}>Erreur</h1>
-          <pre style={{ background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, overflow: "auto" }}>
-            {JSON.stringify(error, null, 2)}
-          </pre>
-        </div>
-      </main>
+      <>
+        <NavBar backHref="/recettes?tab=cuisine" backLabel="Cuisine" />
+        <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
+          <div style={{ maxWidth: 980, margin: "0 auto" }}>
+            <h1 style={{ marginTop: 14, marginBottom: 10 }}>Erreur</h1>
+            <pre style={{ background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, overflow: "auto" }}>
+              {JSON.stringify(error, null, 2)}
+            </pre>
+          </div>
+        </main>
+      </>
     );
   }
 
   return (
-    <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
-      <div style={{ maxWidth: 980, margin: "0 auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-          <div style={{ display: "flex", gap: 12 }}>
-            <Link href="/recettes?tab=cuisine" style={{ color: theme.muted, textDecoration: "none", fontWeight: 900 }}>← Retour</Link>
-            <Link href="/" style={{ color: theme.muted, textDecoration: "none", fontWeight: 900 }}>Accueil</Link>
-          </div>
-
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+    <>
+      <NavBar
+        backHref="/recettes?tab=cuisine"
+        backLabel="Cuisine"
+        right={
+          <>
             <button type="button" onClick={exportPdf} disabled={saving || !isEdit} style={btn}>
               PDF
             </button>
-
             <button type="button" onClick={saveAsIngredient} disabled={savingIndex || saving || !isEdit} style={btn}>
               {savingIndex ? "Index…" : form.output_ingredient_id ? "MAJ index" : "Index"}
             </button>
-
             <button type="button" onClick={save} disabled={saving} style={btnPrimary}>
               {saving ? "Sauvegarde…" : saveOk ? "OK" : "Sauvegarder"}
             </button>
-          </div>
-        </div>
-
+          </>
+        }
+      />
+      <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
+      <div style={{ maxWidth: 980, margin: "0 auto" }}>
         <div style={{ marginTop: 10 }}>
           <h1 style={{ margin: 0, fontSize: 30, letterSpacing: -0.4 }}>Fiche cuisine</h1>
           <div style={{ color: theme.muted, marginTop: 4 }}>Ingrédients + rendement + portions + TVA + marge + prix</div>
@@ -1367,5 +1371,6 @@ if (supplierIds.length) {
         <div style={{ height: 28 }} />
       </div>
     </main>
+    </>
   );
 }
