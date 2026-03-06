@@ -48,6 +48,10 @@ export type Supplier = {
   id: string;
   name: string;
   is_active: boolean;
+  email?: string | null;
+  phone?: string | null;
+  contact_name?: string | null;
+  notes?: string | null;
 };
 
 export type Ingredient = {

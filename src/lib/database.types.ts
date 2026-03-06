@@ -13,18 +13,33 @@ export interface Database {
         Row: {
           id: string;
           name: string | null;
+          is_active?: boolean;
+          email?: string | null;
+          phone?: string | null;
+          contact_name?: string | null;
+          notes?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Insert: {
           id?: string;
           name?: string | null;
+          is_active?: boolean;
+          email?: string | null;
+          phone?: string | null;
+          contact_name?: string | null;
+          notes?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
           name?: string | null;
+          is_active?: boolean;
+          email?: string | null;
+          phone?: string | null;
+          contact_name?: string | null;
+          notes?: string | null;
           created_at?: string;
           updated_at?: string;
         };

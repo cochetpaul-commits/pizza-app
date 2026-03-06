@@ -119,7 +119,7 @@ export default function Home() {
             </div>
           </Link>
 
-          {/* ─── CATALOGUE + FACTURES ─── */}
+          {/* ─── GESTION ─── */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
 
             {/* CATALOGUE */}
@@ -192,6 +192,21 @@ export default function Home() {
               </div>
             </Link>
           </div>
+
+          {/* FOURNISSEURS */}
+          <Link href="/fournisseurs" style={{ textDecoration: "none", color: "inherit" }}>
+            <div className="card" style={{ borderLeft: "4px solid #7C3AED", cursor: "pointer" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <p className="cardTitle" style={{ marginBottom: 3, letterSpacing: 1, color: "#7C3AED" }}>FOURNISSEURS</p>
+                  <p className="muted" style={{ margin: 0, fontSize: 11 }}>Fiches · Coordonnées · Historique imports</p>
+                </div>
+                <span className="btn" style={{ fontSize: 12, background: "#7C3AED", borderColor: "#7C3AED", color: "#fff", flexShrink: 0, marginLeft: 12 }}>
+                  Voir →
+                </span>
+              </div>
+            </div>
+          </Link>
 
           {/* ─── PILOTAGE ─── */}
           <div className="card" style={{ borderLeft: "4px solid #92400E" }}>

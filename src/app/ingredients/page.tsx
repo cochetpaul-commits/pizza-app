@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, Suspense } from "react";
 import type { CSSProperties } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
@@ -140,10 +141,11 @@ function IngredientsPageInner() {
   const searchParams = useSearchParams();
   const backUrl = searchParams.get("back");
   const editParam = searchParams.get("edit");
+  const supplierParam = searchParams.get("supplier");
 
   const [tab, setTab] = useState<Tab>("all");
   const [filterCategory, setFilterCategory] = useState<"all" | Category>("all");
-  const [filterSupplier, setFilterSupplier] = useState<"all" | string>("all");
+  const [filterSupplier, setFilterSupplier] = useState<"all" | string>(supplierParam ?? "all");
   const [includeNoOffer, setIncludeNoOffer] = useState(true);
   const [filterEstablishment, setFilterEstablishment] = useState<"all" | "bellomio" | "piccola" | "both">("all");
 
@@ -1294,7 +1296,11 @@ function IngredientsPageInner() {
                               <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded text-white" style={{ background: estabBadge.bg }}>{estabBadge.label}</span>
                             </div>
                             <div className="muted text-[12px]">
-                              {supplierName ? `Fournisseur: ${supplierName}` : x.category}
+                              {supplierName && supplierIdForDisplay ? (
+                                <Link href={`/fournisseurs/${supplierIdForDisplay}`} style={{ color: "inherit", textDecoration: "underline dotted", textUnderlineOffset: 2 }}>
+                                  {supplierName}
+                                </Link>
+                              ) : x.category}
                               {x.source_prep_recipe_name ? ` • Pivot: ${x.source_prep_recipe_name}` : ""}
                               {offer ? " • offre" : ""}
                               {x.status_note ? ` • note: ${x.status_note}` : ""}
@@ -1318,7 +1324,13 @@ function IngredientsPageInner() {
                           </div>
                           <div className="text-right">
                             <div className="text-[18px]" style={{ fontWeight: 950 }}>{price}</div>
-                            <div className="muted text-[11px]">{supplierName ?? (offer ? "offre" : "—")}</div>
+                            <div className="muted text-[11px]">
+                              {supplierName && supplierIdForDisplay ? (
+                                <Link href={`/fournisseurs/${supplierIdForDisplay}`} style={{ color: "inherit", textDecoration: "underline dotted", textUnderlineOffset: 2 }}>
+                                  {supplierName}
+                                </Link>
+                              ) : (offer ? "offre" : "—")}
+                            </div>
                           </div>
                           <div className="flex gap-1.5 items-center">
                             {!isEditing ? <button className="btn btnPrimary" onClick={() => startEdit(x)} title="Contrôler / modifier" style={{ fontSize: 18, padding: "0 12px", height: 36 }}>→</button> : <button className="btn btnPrimary" onClick={saveEdit}>OK</button>}
@@ -1350,7 +1362,14 @@ function IngredientsPageInner() {
                               </div>
                               {/* Ligne 2 : Fournisseur · Prix */}
                               <div className="flex justify-between items-baseline mt-2">
-                                <div className="muted text-[12px]">{supplierName ?? x.category}{x.status_note ? ` • ${x.status_note}` : ""}</div>
+                                <div className="muted text-[12px]">
+                                  {supplierName && supplierIdForDisplay ? (
+                                    <Link href={`/fournisseurs/${supplierIdForDisplay}`} style={{ color: "inherit", textDecoration: "underline dotted", textUnderlineOffset: 2 }}>
+                                      {supplierName}
+                                    </Link>
+                                  ) : x.category}
+                                  {x.status_note ? ` • ${x.status_note}` : ""}
+                                </div>
                                 <div className="text-[17px]" style={{ fontWeight: 950 }}>{price}</div>
                               </div>
                               {/* Prix manquant */}
