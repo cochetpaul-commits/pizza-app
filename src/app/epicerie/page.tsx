@@ -181,7 +181,7 @@ export default function EpiceriePage() {
         <div className="grid gap-4 items-start grid-cols-1 md:grid-cols-[380px_1fr]">
 
           {/* CATALOGUE */}
-          <div style={{ ...card, position: "sticky", top: 16 }}>
+          <div className="md:sticky md:top-4" style={{ ...card }}>
             <div style={{ fontWeight: 900, fontSize: 14, marginBottom: 12, color: "#8B1A1A", letterSpacing: 0.5, textTransform: "uppercase" }}>Catalogue</div>
 
             <input placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)}
@@ -199,7 +199,7 @@ export default function EpiceriePage() {
             </div>
 
             {loading ? <div style={{ color: "#9CA3AF", fontSize: 13, textAlign: "center", padding: 20 }}>Chargement…</div> : (
-              <div style={{ maxHeight: "calc(100vh - 300px)", overflowY: "auto" }}>
+              <div style={{ maxHeight: "clamp(240px, calc(100vh - 300px), 600px)", overflowY: "auto" }}>
                 {filtered.length === 0 && <div style={{ color: "#9CA3AF", fontSize: 13, textAlign: "center", padding: 20 }}>Aucun produit</div>}
                 {filtered.map(ing => {
                   const inCalc = lines.some(l => l.id === ing.id);
@@ -271,8 +271,8 @@ export default function EpiceriePage() {
                 <div style={{ fontWeight: 700 }}>Ajoutez des produits depuis le catalogue</div>
               </div>
             ) : (
-              <div style={{ ...card, overflow: "hidden", padding: 0 }}>
-                <div style={{ overflowX: "auto" }}>
+              <div style={{ ...card, padding: 0, borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                     <thead>
                       <tr style={{ background: "#FAF7F2", borderBottom: "2px solid #E8E0D0" }}>

@@ -91,7 +91,7 @@ export default function MercurialePage() {
 
       <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 20, marginBottom: 16 }}>
         <div style={{ fontWeight: 700, marginBottom: 10, color: "#374151", fontSize: 13 }}>Grouper par</div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {([["category", "Catégorie"], ["supplier", "Fournisseur"], ["alpha", "Alphabétique"]] as const).map(([v, label]) => (
             <button key={v} onClick={() => setGroupBy(v)} style={btnStyle(groupBy === v, "#92400E")}>{label}</button>
           ))}
