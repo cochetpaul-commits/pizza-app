@@ -930,10 +930,16 @@ function IngredientsPageInner() {
       backLabel="Retour"
       right={<>
         <button className="btn btnPrimary"
-          onClick={() => setShowCreateForm(v => !v)}>
+          onClick={() => {
+            setShowCreateForm(v => {
+              const next = !v;
+              if (next) setTimeout(() => document.getElementById("create-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+              return next;
+            });
+          }}>
           {showCreateForm ? "✕ Fermer" : "+ Ingrédient"}
         </button>
-        <button className="btn" onClick={load}>Rafraîchir</button>
+        <button className="btn hidden md:inline-flex" onClick={load}>Rafraîchir</button>
       </>}
     />
     <main className="max-w-[1100px] mx-auto p-4 safe-bottom">
@@ -1043,7 +1049,7 @@ function IngredientsPageInner() {
 
       {tab === ("variations" as Tab) && userId && <div className="mt-3"><PriceAlertsPanel userId={userId} /></div>}
 
-      {tab !== ("variations" as Tab) && showCreateForm && <div className="mt-4" style={{ animation: "slideDown 0.2s ease-out", background: "rgba(250,247,242,0.85)", border: "1px solid rgba(217,199,182,0.75)", borderRadius: 14, padding: 16 }}>
+      {tab !== ("variations" as Tab) && showCreateForm && <div id="create-form" className="card mt-4" style={{ animation: "slideDown 0.2s ease-out" }}>
         <div className="font-black text-[18px]">Créer un ingrédient</div>
 
         <form onSubmit={addIngredient} className="mt-3 grid gap-3">

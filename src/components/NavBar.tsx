@@ -46,7 +46,6 @@ const inner: React.CSSProperties = {
   padding: "0 12px",
   height: 44,
   minWidth: 0,
-  overflow: "hidden",
 };
 
 const leftStyle: React.CSSProperties = {
