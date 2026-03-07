@@ -445,7 +445,7 @@ export default function RecipePage() {
     };
 
     run();
-  }, [id]);
+  }, [id, isNew]);
 
   const saveRecipe = async () => {
     // IMPORTANT: aucun autosave ici. Cette fonction ne doit être appelée QUE par le bouton.

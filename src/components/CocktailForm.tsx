@@ -3,7 +3,6 @@
 import { offerRowToCpu } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
-import Link from "next/link";
 import { NavBar } from "@/components/NavBar";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";

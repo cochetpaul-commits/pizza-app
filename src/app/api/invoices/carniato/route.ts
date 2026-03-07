@@ -6,11 +6,6 @@ import { parseCarniatoInvoiceText, type ParsedInvoice } from "@/lib/invoices/car
 
 export const runtime = "nodejs";
 
-function toText(v: unknown): string {
-  return typeof v === "string" ? v : v == null ? "" : String(v);
-}
-
-
 function ddmmyyyyToIsoDate(s: string | null): string | null {
   if (!s) return null;
   const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);

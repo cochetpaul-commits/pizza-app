@@ -470,7 +470,7 @@ function RecettesInner() {
                 </div>
                 {catOrder.filter(cat => byCategory[cat]?.length > 0).map(cat => (
                   <div key={cat} style={{ marginBottom: 16 }}>
-                    <button onClick={() => setCollapsedCuisineCats(prev => { const s = new Set(prev); s.has(cat) ? s.delete(cat) : s.add(cat); return s; })}
+                    <button onClick={() => setCollapsedCuisineCats(prev => { const s = new Set(prev); if (s.has(cat)) s.delete(cat); else s.add(cat); return s; })}
                       style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", cursor: "pointer", padding: "4px 4px 6px", marginBottom: 2 }}>
                       <span style={{ fontSize: 12, fontWeight: 900, color: activeColor, textTransform: "uppercase", letterSpacing: 1 }}>
                         {CUISINE_CATS[cat] ?? cat} ({byCategory[cat].length})

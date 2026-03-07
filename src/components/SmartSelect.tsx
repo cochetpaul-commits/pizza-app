@@ -31,7 +31,6 @@ export function useSmartSelectCache(cacheKey: string, loader: () => Promise<Smar
       setOptions(cached.options);
       return;
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     loader().then((opts) => {
       optionsCache.set(cacheKey, { options: opts, ts: Date.now() });
