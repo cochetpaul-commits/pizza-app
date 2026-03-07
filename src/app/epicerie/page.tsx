@@ -171,7 +171,7 @@ export default function EpiceriePage() {
   return (
     <>
     <NavBar />
-    <main style={{ minHeight: "100vh", background: "#FAF7F2", padding: 16, fontFamily: "inherit", overflowX: "hidden" as const, width: "100%" }}>
+    <main style={{ minHeight: "100vh", background: "#FAF7F2", padding: 16, fontFamily: "inherit", overflowX: "hidden" as const, maxWidth: "100vw", position: "relative", boxSizing: "border-box" }}>
       <div style={{ maxWidth: 1400, margin: "0 auto", width: "100%" }}>
 
         <div style={{ marginBottom: 20 }}>
@@ -232,32 +232,36 @@ export default function EpiceriePage() {
           </div>
 
           {/* CALCULATEUR */}
-          <div style={{ maxWidth: "100%", overflow: "hidden" }}>
+          <div style={{ maxWidth: "100%", overflow: "hidden", minWidth: 0 }}>
             {/* Réglages globaux */}
             <div style={{ ...card, marginBottom: 12 }}>
               <div style={{ fontWeight: 900, fontSize: 14, marginBottom: 12, color: "#8B1A1A", letterSpacing: 0.5, textTransform: "uppercase" }}>Réglages globaux</div>
-              <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-end" }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#9B8E7E", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Coefficient</div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <StepInput value={globalCoeff} onChange={setGlobalCoeff} step={0.1} min={1} decimals={1} />
-                    <button onClick={applyGlobalCoeff} style={btnPrimary}>Appliquer</button>
+              <div style={{ display: "grid", gap: 12 }}>
+                {/* Ligne 1 : Coeff · TVA · Arrondi */}
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#9B8E7E", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Coefficient</div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <StepInput value={globalCoeff} onChange={setGlobalCoeff} step={0.1} min={1} decimals={1} />
+                      <button onClick={applyGlobalCoeff} style={btnPrimary}>Appliquer</button>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#9B8E7E", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>TVA</div>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                      {TVA_OPTIONS.map(t => <button key={t} onClick={() => setGlobalTva(t)} style={btnGhost(globalTva === t)}>{t}%</button>)}
+                      <button onClick={applyGlobalTva} style={btnPrimary}>Appliquer</button>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#9B8E7E", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Arrondi</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {ROUND_OPTIONS.map(r => <button key={r} onClick={() => { setRoundStep(r); setLines(prev => applyRound(prev, r)); }} style={btnGhost(roundStep === r)}>{r === 1 ? "1€" : r + "€"}</button>)}
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#9B8E7E", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>TVA</div>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    {TVA_OPTIONS.map(t => <button key={t} onClick={() => setGlobalTva(t)} style={btnGhost(globalTva === t)}>{t}%</button>)}
-                    <button onClick={applyGlobalTva} style={btnPrimary}>Appliquer</button>
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#9B8E7E", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Arrondi</div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    {ROUND_OPTIONS.map(r => <button key={r} onClick={() => { setRoundStep(r); setLines(prev => applyRound(prev, r)); }} style={btnGhost(roundStep === r)}>{r === 1 ? "1€" : r + "€"}</button>)}
-                  </div>
-                </div>
-                <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "flex-end" }}>
+                {/* Ligne 2 : Actions (toujours sur leur propre ligne) */}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                   <button onClick={() => setLines([])} disabled={lines.length === 0} style={{ ...btnSecondary, borderColor: "#DC2626", color: "#DC2626", opacity: lines.length === 0 ? 0.4 : 1 }}>🗑 Effacer</button>
                   <button onClick={copyPrices} disabled={lines.length === 0} style={{ ...btnSecondary, opacity: lines.length === 0 ? 0.4 : 1 }}>📋 Copier</button>
                   <button onClick={exportCsv} disabled={lines.length === 0} style={{ ...btnPrimary, opacity: lines.length === 0 ? 0.4 : 1 }}>⬇ CSV</button>
