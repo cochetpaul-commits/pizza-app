@@ -6,6 +6,8 @@ export const ABERRANT_THRESHOLD = 0.50;
 export interface PriceAlert {
   ingredient_id: string;
   ingredient_name: string;
+  ingredient_category?: string;
+  supplier_id: string;
   supplier_label: string;
   supplier_name: string;
   old_price: number;
@@ -29,14 +31,17 @@ type RawOffer = {
 export async function fetchPriceAlerts(
   supabase: SupabaseClient,
   userId: string,
-  threshold = ALERT_THRESHOLD
+  threshold = ALERT_THRESHOLD,
+  since?: string // ISO date string — only alerts where the active offer was created after this date
 ): Promise<PriceAlert[]> {
-  const { data: active, error: e1 } = await supabase
+  let q = supabase
     .from("supplier_offers")
     .select("ingredient_id, supplier_id, unit, unit_price, supplier_label, created_at")
     .eq("user_id", userId)
     .eq("is_active", true)
     .not("unit_price", "is", null);
+  if (since) q = q.gte("created_at", since);
+  const { data: active, error: e1 } = await q;
 
   if (e1) throw new Error(e1.message);
   if (!active?.length) return [];
@@ -62,15 +67,15 @@ export async function fetchPriceAlerts(
 
   const { data: ingredients, error: e3 } = await supabase
     .from("ingredients")
-    .select("id, name, supplier")
+    .select("id, name, supplier, category")
     .eq("user_id", userId)
     .in("id", ingredientIds);
 
   if (e3) throw new Error(e3.message);
 
-  const ingMap = new Map<string, { name: string; supplier: string }>();
-  for (const i of (ingredients ?? []) as Array<{ id: string; name: string; supplier: string }>) {
-    ingMap.set(i.id, { name: i.name, supplier: i.supplier ?? "—" });
+  const ingMap = new Map<string, { name: string; supplier: string; category?: string }>();
+  for (const i of (ingredients ?? []) as Array<{ id: string; name: string; supplier: string; category?: string }>) {
+    ingMap.set(i.id, { name: i.name, supplier: i.supplier ?? "—", category: i.category });
   }
 
   const supplierIds = [...new Set((active as RawOffer[]).map(r => r.supplier_id))];
@@ -98,17 +103,19 @@ export async function fetchPriceAlerts(
     const ing = ingMap.get(curr.ingredient_id);
 
     alerts.push({
-      ingredient_id:   curr.ingredient_id,
-      ingredient_name: ing?.name ?? curr.ingredient_id,
-      supplier_label:  curr.supplier_label ?? prev.supplier_label ?? "—",
-      supplier_name:   supMap.get(curr.supplier_id) ?? ing?.supplier ?? "—",
-      old_price:       prev.unit_price,
-      new_price:       curr.unit_price,
-      unit:            curr.unit,
-      change_pct:      changePct,
-      direction:       changePct > 0 ? "up" : "down",
-      aberrant:        Math.abs(changePct) > ABERRANT_THRESHOLD,
-      new_offer_date:  curr.created_at,
+      ingredient_id:        curr.ingredient_id,
+      ingredient_name:      ing?.name ?? curr.ingredient_id,
+      ingredient_category:  ing?.category,
+      supplier_id:          curr.supplier_id,
+      supplier_label:       curr.supplier_label ?? prev.supplier_label ?? "—",
+      supplier_name:        supMap.get(curr.supplier_id) ?? ing?.supplier ?? "—",
+      old_price:            prev.unit_price,
+      new_price:            curr.unit_price,
+      unit:                 curr.unit,
+      change_pct:           changePct,
+      direction:            changePct > 0 ? "up" : "down",
+      aberrant:             Math.abs(changePct) > ABERRANT_THRESHOLD,
+      new_offer_date:       curr.created_at,
     });
   }
 

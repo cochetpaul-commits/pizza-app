@@ -36,6 +36,7 @@ import { detectAllergensFromName } from "@/lib/invoices/allergenDetector";
 import { detectCategoryFromName } from "@/lib/invoices/categoryDetector";
 import { PriceAlertsPanel } from "@/components/PriceAlertsPanel";
 import { NavBar } from "@/components/NavBar";
+import { fetchPriceAlerts, type PriceAlert } from "@/lib/priceAlerts";
 
 type OfferPayload = Record<string, unknown>;
 
@@ -233,6 +234,7 @@ function IngredientsPageInner() {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [alertMap, setAlertMap] = useState<Map<string, PriceAlert>>(new Map());
 
   function toggleAll() {
     if (allCollapsed) {
@@ -267,6 +269,17 @@ function IngredientsPageInner() {
     const { data: offData, error: offErr } = await supabase.from("v_latest_offers").select("*");
     if (offErr) alert(offErr.message);
     else setOffers((offData ?? []) as LatestOffer[]);
+
+    // Price alerts badges
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const alerts = await fetchPriceAlerts(supabase, user.id, 0.05);
+        const map = new Map<string, PriceAlert>();
+        for (const a of alerts) map.set(a.ingredient_id, a);
+        setAlertMap(map);
+      }
+    } catch { /* silent */ }
 
     setLoading(false);
   }
@@ -1301,6 +1314,7 @@ function IngredientsPageInner() {
                               <div style={{ fontWeight: 900, color: CAT_COLORS[x.category] }}>{x.name}</div>
                               <span style={statusBadgeStyle(st)}>{statusLabel(st)}</span>
                               <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded text-white" style={{ background: estabBadge.bg }}>{estabBadge.label}</span>
+                              {alertMap.has(x.id) && (() => { const a = alertMap.get(x.id)!; return <span style={{ fontSize: 11, fontWeight: 800, color: a.direction === "up" ? "#DC2626" : "#16A34A", background: a.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)", border: `1px solid ${a.direction === "up" ? "rgba(220,38,38,0.30)" : "rgba(22,163,74,0.30)"}`, borderRadius: 8, padding: "1px 6px" }}>{a.direction === "up" ? "↑" : "↓"} {(Math.abs(a.change_pct) * 100).toFixed(0)} %</span>; })()}
                             </div>
                             <div className="muted text-[12px]">
                               {supplierName && supplierIdForDisplay ? (
@@ -1352,6 +1366,7 @@ function IngredientsPageInner() {
                             <div className="flex items-center gap-2">
                               <div className="font-black flex-1 min-w-0 line-clamp-1" style={{ color: CAT_COLORS[x.category] }}>{x.name}</div>
                               <div className="text-[14px] shrink-0" style={{ fontWeight: 950 }}>{price}</div>
+                              {alertMap.has(x.id) && (() => { const a = alertMap.get(x.id)!; return <span style={{ fontSize: 10, fontWeight: 800, color: a.direction === "up" ? "#DC2626" : "#16A34A", background: a.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)", border: `1px solid ${a.direction === "up" ? "rgba(220,38,38,0.30)" : "rgba(22,163,74,0.30)"}`, borderRadius: 6, padding: "1px 5px", flexShrink: 0 }}>{a.direction === "up" ? "↑" : "↓"}</span>; })()}
                               <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded text-white shrink-0" style={{ background: estabBadge.bg }}>{estabBadge.label}</span>
                               {!isEditing
                                 ? <button className="btn btnPrimary shrink-0 !h-8 !px-2" onClick={() => startEdit(x)}>→</button>
@@ -1366,6 +1381,7 @@ function IngredientsPageInner() {
                                 <div className="font-black flex-1 min-w-0 line-clamp-2 leading-tight" style={{ color: CAT_COLORS[x.category] }}>{x.name}</div>
                                 <span style={statusBadgeStyle(st)}>{statusLabel(st)}</span>
                                 <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded text-white" style={{ background: estabBadge.bg }}>{estabBadge.label}</span>
+                                {alertMap.has(x.id) && (() => { const a = alertMap.get(x.id)!; return <span style={{ fontSize: 11, fontWeight: 800, color: a.direction === "up" ? "#DC2626" : "#16A34A", background: a.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)", border: `1px solid ${a.direction === "up" ? "rgba(220,38,38,0.30)" : "rgba(22,163,74,0.30)"}`, borderRadius: 8, padding: "1px 6px" }}>{a.direction === "up" ? "↑" : "↓"} {(Math.abs(a.change_pct) * 100).toFixed(0)} %</span>; })()}
                               </div>
                               {/* Ligne 2 : Fournisseur · Prix */}
                               <div className="flex justify-between items-baseline mt-2">

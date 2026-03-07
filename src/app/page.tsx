@@ -158,16 +158,6 @@ export default function Home() {
               <div className="card" style={{ borderLeft: "4px solid #5C7A4E", height: "100%", cursor: "pointer" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <p className="cardTitle" style={{ marginBottom: 3, letterSpacing: 1, color: "#5C7A4E" }}>FACTURES</p>
-                  {counts && counts.priceAlerts > 0 && (
-                    <span style={{
-                      background: "rgba(220,38,38,0.10)", color: "#DC2626",
-                      border: "1px solid rgba(220,38,38,0.25)", borderRadius: 8,
-                      fontSize: 10, fontWeight: 700, padding: "2px 6px",
-                      whiteSpace: "nowrap", flexShrink: 0, marginLeft: 6,
-                    }}>
-                      ↑ {counts.priceAlerts}
-                    </span>
-                  )}
                 </div>
                 <p className="muted" style={{ margin: 0, fontSize: 11 }}>Import MAEL · METRO</p>
                 {counts && (
@@ -212,9 +202,9 @@ export default function Home() {
           <div className="card" style={{ borderLeft: "4px solid #92400E" }}>
             <div style={{ marginBottom: 10 }}>
               <p className="cardTitle" style={{ marginBottom: 2, letterSpacing: 1, color: "#92400E" }}>PILOTAGE</p>
-              <p className="muted" style={{ margin: 0, fontSize: 11 }}>Mercuriale · Prix Épicerie · Inventaire</p>
+              <p className="muted" style={{ margin: 0, fontSize: 11 }}>Mercuriale · Épicerie · Variations · Alertes</p>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <Link href="/mercuriale" style={{ textDecoration: "none", color: "inherit" }}>
                 <div style={{ border: "1px solid #E8E0D0", borderLeft: "4px solid #92400E", borderRadius: 8, padding: "10px 10px", cursor: "pointer", background: "#fff", height: "100%" }}>
                   <p className="cardTitle" style={{ marginBottom: 2, fontSize: 10, letterSpacing: 1, color: "#92400E" }}>MERCURIALE</p>
@@ -229,11 +219,29 @@ export default function Home() {
                   <span className="btn btnPrimary" style={{ fontSize: 11, padding: "4px 10px", background: "#1E40AF", borderColor: "#1E40AF" }}>Ouvrir →</span>
                 </div>
               </Link>
-              <div style={{ border: "1px solid #E8E0D0", borderLeft: "4px solid #D1D5DB", borderRadius: 8, padding: "10px 10px", background: "#fff", opacity: 0.45 }}>
-                <p className="cardTitle" style={{ marginBottom: 2, fontSize: 10, letterSpacing: 1, color: "#9CA3AF" }}>INVENTAIRE</p>
-                <p className="muted" style={{ margin: "0 0 8px", fontSize: 11 }}>Stocks · Valeur</p>
-                <span style={{ fontSize: 9, fontWeight: 700, padding: "3px 7px", borderRadius: 10, background: "#F3F4F6", color: "#9CA3AF", letterSpacing: 0.5, textTransform: "uppercase" as const }}>Bientôt</span>
-              </div>
+              <Link href="/variations-prix" style={{ textDecoration: "none", color: "inherit" }}>
+                <div style={{ border: "1px solid #E8E0D0", borderLeft: "4px solid #6B7280", borderRadius: 8, padding: "10px 10px", cursor: "pointer", background: "#fff", height: "100%" }}>
+                  <p className="cardTitle" style={{ marginBottom: 2, fontSize: 10, letterSpacing: 1, color: "#6B7280" }}>VARIATIONS</p>
+                  <p className="muted" style={{ margin: "0 0 8px", fontSize: 11 }}>Hausses · Baisses · Graph</p>
+                  <span className="btn btnPrimary" style={{ fontSize: 11, padding: "4px 10px", background: "#6B7280", borderColor: "#6B7280" }}>Voir →</span>
+                </div>
+              </Link>
+              <Link href="/alertes-prix" style={{ textDecoration: "none", color: "inherit" }}>
+                <div style={{ border: "1px solid #E8E0D0", borderLeft: "4px solid #DC2626", borderRadius: 8, padding: "10px 10px", cursor: "pointer", background: "#fff", height: "100%" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <p className="cardTitle" style={{ marginBottom: 2, fontSize: 10, letterSpacing: 1, color: "#DC2626" }}>ALERTES PRIX</p>
+                    {counts && counts.priceAlerts > 0 && (
+                      <span style={{ fontSize: 10, fontWeight: 900, background: "rgba(220,38,38,0.10)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.30)", borderRadius: 8, padding: "1px 6px", marginLeft: 4 }}>
+                        {counts.priceAlerts}
+                      </span>
+                    )}
+                  </div>
+                  <p className="muted" style={{ margin: "0 0 8px", fontSize: 11 }}>Hausses · Veille 30 j</p>
+                  <span className="btn btnPrimary" style={{ fontSize: 11, padding: "4px 10px", background: "#DC2626", borderColor: "#DC2626" }}>
+                    {counts && counts.priceAlerts > 0 ? `${counts.priceAlerts} alerte${counts.priceAlerts > 1 ? "s" : ""} →` : "Voir →"}
+                  </span>
+                </div>
+              </Link>
             </div>
           </div>
 
