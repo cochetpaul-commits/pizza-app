@@ -360,38 +360,29 @@ function RecettesInner() {
         borderBottom: "1px solid rgba(217,199,182,0.95)",
         marginBottom: 16,
       }}>
-        <div style={{ position: "relative" }}>
-          <div ref={tabScrollRef} className="tab-scroll" style={{ display: "flex", overflowX: "auto", scrollbarWidth: "none" }}>
-            {TABS.map((tab, i) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  data-tab={tab.id}
-                  onClick={() => router.push(`/recettes?tab=${tab.id}`)}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 6,
-                    padding: "10px 14px", background: "none", border: "none",
-                    borderBottom: isActive ? `2px solid ${tab.color}` : "2px solid transparent",
-                    marginBottom: -1, cursor: "pointer", fontSize: 12,
-                    fontWeight: isActive ? 700 : 500,
-                    color: isActive ? tab.color : "#6f6a61",
-                    whiteSpace: "nowrap", transition: "color 0.15s", flexShrink: 0,
-                    borderRight: i < TABS.length - 1 ? "1px solid rgba(217,199,182,0.5)" : "none",
-                  }}
-                >
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: tab.color, opacity: isActive ? 1 : 0, transition: "opacity 0.15s", flexShrink: 0 }} />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-          {/* Gradient fade → indique qu'il y a des onglets à droite */}
-          <div style={{
-            position: "absolute", right: 0, top: 0, bottom: 0, width: 40,
-            background: "linear-gradient(to right, transparent, #FAF7F2)",
-            pointerEvents: "none",
-          }} />
+        <div ref={tabScrollRef} className="tab-scroll" style={{ display: "flex", scrollbarWidth: "none" }}>
+          {TABS.map((tab, i) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                data-tab={tab.id}
+                onClick={() => router.push(`/recettes?tab=${tab.id}`)}
+                style={{
+                  padding: "8px 8px", background: "none", border: "none",
+                  borderBottom: isActive ? `2px solid ${tab.color}` : "2px solid transparent",
+                  marginBottom: -1, cursor: "pointer", fontSize: 11,
+                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? tab.color : "#6f6a61",
+                  whiteSpace: "nowrap", transition: "color 0.15s",
+                  borderRight: i < TABS.length - 1 ? "1px solid rgba(217,199,182,0.5)" : "none",
+                  textAlign: "center" as const,
+                }}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 

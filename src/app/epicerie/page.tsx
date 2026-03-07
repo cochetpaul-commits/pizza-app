@@ -171,17 +171,17 @@ export default function EpiceriePage() {
   return (
     <>
     <NavBar />
-    <main style={{ minHeight: "100vh", background: "#FAF7F2", padding: 16, fontFamily: "inherit" }}>
-      <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+    <main style={{ minHeight: "100vh", background: "#FAF7F2", padding: 16, fontFamily: "inherit", overflowX: "hidden" as const, width: "100%" }}>
+      <div style={{ maxWidth: 1400, margin: "0 auto", width: "100%" }}>
 
         <div style={{ marginBottom: 20 }}>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "#1A1A1A" }}>Calcul Prix Épicerie</h1>
         </div>
 
-        <div className="grid gap-4 items-start grid-cols-1 md:grid-cols-[380px_1fr]">
+        <div className="epicerie-grid">
 
           {/* CATALOGUE */}
-          <div className="md:sticky md:top-4" style={{ ...card }}>
+          <div className="md:sticky md:top-4" style={{ ...card, maxWidth: "100%", overflow: "hidden" }}>
             <div style={{ fontWeight: 900, fontSize: 14, marginBottom: 12, color: "#8B1A1A", letterSpacing: 0.5, textTransform: "uppercase" }}>Catalogue</div>
 
             <input placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)}
@@ -232,7 +232,7 @@ export default function EpiceriePage() {
           </div>
 
           {/* CALCULATEUR */}
-          <div>
+          <div style={{ maxWidth: "100%", overflow: "hidden" }}>
             {/* Réglages globaux */}
             <div style={{ ...card, marginBottom: 12 }}>
               <div style={{ fontWeight: 900, fontSize: 14, marginBottom: 12, color: "#8B1A1A", letterSpacing: 0.5, textTransform: "uppercase" }}>Réglages globaux</div>

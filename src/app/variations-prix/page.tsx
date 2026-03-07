@@ -286,7 +286,7 @@ export default function VariationsPrixPage() {
             ) : (
               <div style={{ display: "grid", gap: 8 }}>
                 {sorted.map((a, i) => (
-                  <Link key={i} href={`/ingredients/${a.ingredient_id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                  <Link key={i} href={`/ingredients/${a.ingredient_id}?from=variations-prix`} style={{ textDecoration: "none", color: "inherit" }}>
                     <div className="card" style={{ padding: "12px 14px", cursor: "pointer" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                         <div style={{ minWidth: 0 }}>

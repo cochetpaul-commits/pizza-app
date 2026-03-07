@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { Suspense, useState, useEffect, useMemo } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { NavBar } from "@/components/NavBar";
 import { supabase } from "@/lib/supabaseClient";
 import {
@@ -40,9 +41,15 @@ function fmtPrice(v: number, unit: string) {
   return `${v.toFixed(2)} €/${unit}`;
 }
 
-export default function IngredientDetailPage() {
+function IngredientDetailInner() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params.id as string;
+  const fromVariations = searchParams.get("from") === "variations-prix";
+
+  const variationsBtn = fromVariations
+    ? <Link href="/variations-prix" className="btn">← Variations prix</Link>
+    : undefined;
 
   const [ingredient, setIngredient] = useState<Ingredient | null>(null);
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -148,14 +155,14 @@ export default function IngredientDetailPage() {
 
   if (loading) return (
     <>
-      <NavBar backHref="/ingredients" />
+      <NavBar backHref="/ingredients" right={variationsBtn} />
       <main className="container"><div className="card" style={{ textAlign: "center", padding: 40, color: "var(--muted)" }}>Chargement…</div></main>
     </>
   );
 
   if (error || !ingredient) return (
     <>
-      <NavBar backHref="/ingredients" />
+      <NavBar backHref="/ingredients" right={variationsBtn} />
       <main className="container">
         <div className="errorBox">{error ?? "Ingrédient introuvable"}</div>
       </main>
@@ -164,7 +171,7 @@ export default function IngredientDetailPage() {
 
   return (
     <>
-      <NavBar backHref="/ingredients" backLabel="Ingrédients" />
+      <NavBar backHref="/ingredients" backLabel="Ingrédients" right={variationsBtn} />
       <main className="container safe-bottom">
 
         {/* ── Header ── */}
@@ -306,5 +313,20 @@ export default function IngredientDetailPage() {
 
       </main>
     </>
+  );
+}
+
+export default function IngredientDetailPage() {
+  return (
+    <Suspense fallback={
+      <>
+        <NavBar backHref="/ingredients" />
+        <main className="container">
+          <div className="card" style={{ textAlign: "center", padding: 40, color: "var(--muted)" }}>Chargement…</div>
+        </main>
+      </>
+    }>
+      <IngredientDetailInner />
+    </Suspense>
   );
 }

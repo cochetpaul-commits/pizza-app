@@ -355,6 +355,22 @@ nav .btn {
 /* Masquer la scrollbar sur la barre d'onglets recettes */
 .tab-scroll::-webkit-scrollbar { display: none; }
 
+/* Epicerie: deux colonnes desktop, une colonne mobile */
+.epicerie-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (min-width: 768px) {
+  .epicerie-grid {
+    grid-template-columns: 380px 1fr;
+    align-items: start;
+  }
+}
+
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 16px);
 }
