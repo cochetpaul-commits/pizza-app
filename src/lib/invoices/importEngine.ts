@@ -400,28 +400,50 @@ export async function runImport(options: {
     if (offerRows.length) {
       const ingredientIds = Array.from(new Set(offerRows.map((x) => String(x.ingredient_id))));
 
-      const dPrev = await supabase
-        .from("supplier_offers")
-        .update({ is_active: false })
-        .eq("supplier_id", supplierId)
-        .in("ingredient_id", ingredientIds)
-        .eq("is_active", true);
+      // Fetch validated ingredients — their active offers must NOT be touched
+      const validatedIds = new Set<string>();
+      const { data: statusRows } = await supabase
+        .from("ingredients")
+        .select("id")
+        .in("id", ingredientIds)
+        .eq("status", "validated");
+      for (const r of (statusRows ?? []) as Array<{ id: string }>) {
+        validatedIds.add(r.id);
+      }
 
-      if (dPrev.error) throw new Error(dPrev.error.message);
+      // Only deactivate previous offers for NON-validated ingredients
+      const mutableIds = ingredientIds.filter((id) => !validatedIds.has(id));
+      if (mutableIds.length) {
+        const dPrev = await supabase
+          .from("supplier_offers")
+          .update({ is_active: false })
+          .eq("supplier_id", supplierId)
+          .in("ingredient_id", mutableIds)
+          .eq("is_active", true);
+
+        if (dPrev.error) throw new Error(dPrev.error.message);
+      }
 
       for (const row of offerRows) {
         const ingId = String(row.ingredient_id);
+        const isValidated = validatedIds.has(ingId);
+
+        // Validated → insert as history only (inactive)
+        if (isValidated) row.is_active = false;
+
         let r = await supabase.from("supplier_offers").insert(row);
 
         if (r.error && (r.error as { code?: string }).code === "23505") {
-          const d2 = await supabase
-            .from("supplier_offers")
-            .update({ is_active: false })
-            .eq("supplier_id", supplierId)
-            .eq("ingredient_id", ingId)
-            .eq("is_active", true);
+          if (!isValidated) {
+            const d2 = await supabase
+              .from("supplier_offers")
+              .update({ is_active: false })
+              .eq("supplier_id", supplierId)
+              .eq("ingredient_id", ingId)
+              .eq("is_active", true);
 
-          if (d2.error) throw new Error(d2.error.message);
+            if (d2.error) throw new Error(d2.error.message);
+          }
           r = await supabase.from("supplier_offers").insert(row);
         }
 

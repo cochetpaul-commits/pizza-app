@@ -937,11 +937,9 @@ function IngredientsPageInner() {
       </>}
     />
     <main className="max-w-[1100px] mx-auto p-4 safe-bottom">
-      <div className="mb-3">
-        <div className="text-[26px] font-black">Index ingrédients</div>
-        <div className="muted mt-0.5 hidden md:block">
-          Gérez vos coûts au kg, au litre, à la pièce — et par fournisseur.
-        </div>
+      <div style={{ marginBottom: 12 }}>
+        <h1 className="h1">Index ingrédients</h1>
+        <p className="muted" style={{ marginTop: 4 }}>Gérez vos coûts au kg, au litre, à la pièce — et par fournisseur.</p>
       </div>
 
       {/* ── Sticky filter bar ── */}
@@ -1272,10 +1270,10 @@ function IngredientsPageInner() {
                     const price = formatIngredientPrice(x, offer ?? null);
                     const estab = offer?.establishment ?? "both";
                     const estabBadge = estab === "bellomio"
-                      ? { label: "BM", bg: "#8B1A1A" }
+                      ? { label: "BM", bg: "#FEF2F2", color: "#8B1A1A" }
                       : estab === "piccola"
-                      ? { label: "PM", bg: "#6B1B1B" }
-                      : { label: "BM·PM", bg: "#6B7280" };
+                      ? { label: "PM", bg: "#F5F3FF", color: "#6B21A8" }
+                      : { label: "BM·PM", bg: "#F3F4F6", color: "#6B7280" };
 
                     const supplierIdForDisplay = offer?.supplier_id ?? x.supplier_id;
                     const supplierName = supplierIdForDisplay ? suppliersMap.get(supplierIdForDisplay)?.name : null;
@@ -1293,7 +1291,7 @@ function IngredientsPageInner() {
                             <div className="flex items-center gap-2.5 flex-wrap">
                               <div style={{ fontWeight: 900, color: CAT_COLORS[x.category] }}>{x.name}</div>
                               <span style={statusBadgeStyle(st)}>{statusLabel(st)}</span>
-                              <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded text-white" style={{ background: estabBadge.bg }}>{estabBadge.label}</span>
+                              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: estabBadge.bg, color: estabBadge.color }}>{estabBadge.label}</span>
                               {alertMap.has(x.id) && (() => { const a = alertMap.get(x.id)!; return <span style={{ fontSize: 11, fontWeight: 800, color: a.direction === "up" ? "#DC2626" : "#16A34A", background: a.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)", border: `1px solid ${a.direction === "up" ? "rgba(220,38,38,0.30)" : "rgba(22,163,74,0.30)"}`, borderRadius: 8, padding: "1px 6px" }}>{a.direction === "up" ? "↑" : "↓"} {(Math.abs(a.change_pct) * 100).toFixed(0)} %</span>; })()}
                             </div>
                             <div className="muted text-[12px]">
@@ -1356,7 +1354,7 @@ function IngredientsPageInner() {
                               <div className="font-black flex-1 min-w-0 line-clamp-1" style={{ color: CAT_COLORS[x.category] }}>{x.name}</div>
                               <div className="text-[14px] shrink-0" style={{ fontWeight: 950 }}>{price}</div>
                               {alertMap.has(x.id) && (() => { const a = alertMap.get(x.id)!; return <span style={{ fontSize: 10, fontWeight: 800, color: a.direction === "up" ? "#DC2626" : "#16A34A", background: a.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)", border: `1px solid ${a.direction === "up" ? "rgba(220,38,38,0.30)" : "rgba(22,163,74,0.30)"}`, borderRadius: 6, padding: "1px 5px", flexShrink: 0 }}>{a.direction === "up" ? "↑" : "↓"}</span>; })()}
-                              <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded text-white shrink-0" style={{ background: estabBadge.bg }}>{estabBadge.label}</span>
+                              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: estabBadge.bg, color: estabBadge.color, flexShrink: 0 }}>{estabBadge.label}</span>
                               {!isEditing
                                 ? <button className="btn btnPrimary shrink-0 !h-8 !px-2" onClick={() => startEdit(x)}>→</button>
                                 : <button className="btn btnPrimary shrink-0 !h-8 !px-2" onClick={saveEdit}>OK</button>}
@@ -1369,7 +1367,7 @@ function IngredientsPageInner() {
                               <div className="flex items-center gap-2 flex-wrap">
                                 <div className="font-black flex-1 min-w-0 line-clamp-2 leading-tight" style={{ color: CAT_COLORS[x.category] }}>{x.name}</div>
                                 <span style={statusBadgeStyle(st)}>{statusLabel(st)}</span>
-                                <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded text-white" style={{ background: estabBadge.bg }}>{estabBadge.label}</span>
+                                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: estabBadge.bg, color: estabBadge.color }}>{estabBadge.label}</span>
                                 {alertMap.has(x.id) && (() => { const a = alertMap.get(x.id)!; return <span style={{ fontSize: 11, fontWeight: 800, color: a.direction === "up" ? "#DC2626" : "#16A34A", background: a.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)", border: `1px solid ${a.direction === "up" ? "rgba(220,38,38,0.30)" : "rgba(22,163,74,0.30)"}`, borderRadius: 8, padding: "1px 6px" }}>{a.direction === "up" ? "↑" : "↓"} {(Math.abs(a.change_pct) * 100).toFixed(0)} %</span>; })()}
                               </div>
                               {/* Ligne 2 : Fournisseur · Prix */}

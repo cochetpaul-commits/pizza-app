@@ -314,24 +314,27 @@ export async function POST(req: Request) {
 
       if (offerRows.length) {
         const ingredientIds = Array.from(new Set(offerRows.map((x) => String(x.ingredient_id))));
-        const dPrev = await supabase
-          .from("supplier_offers")
-          .update({ is_active: false })
-          .eq("supplier_id", supplierId)
-          .in("ingredient_id", ingredientIds)
-          .eq("is_active", true);
-        if (dPrev.error) throw new Error(dPrev.error.message);
+
+        const validatedIds = new Set<string>();
+        const { data: stRows } = await supabase.from("ingredients").select("id").in("id", ingredientIds).eq("status", "validated");
+        for (const r of (stRows ?? []) as Array<{ id: string }>) validatedIds.add(r.id);
+
+        const mutableIds = ingredientIds.filter((id) => !validatedIds.has(id));
+        if (mutableIds.length) {
+          const dPrev = await supabase.from("supplier_offers").update({ is_active: false }).eq("supplier_id", supplierId).in("ingredient_id", mutableIds).eq("is_active", true);
+          if (dPrev.error) throw new Error(dPrev.error.message);
+        }
 
         for (const row of offerRows) {
           const ingId = String(row.ingredient_id);
+          const isValidated = validatedIds.has(ingId);
+          if (isValidated) row.is_active = false;
+
           let r = await supabase.from("supplier_offers").insert(row);
           if (r.error && (r.error as { code?: string }).code === "23505") {
-            await supabase
-              .from("supplier_offers")
-              .update({ is_active: false })
-              .eq("supplier_id", supplierId)
-              .eq("ingredient_id", ingId)
-              .eq("is_active", true);
+            if (!isValidated) {
+              await supabase.from("supplier_offers").update({ is_active: false }).eq("supplier_id", supplierId).eq("ingredient_id", ingId).eq("is_active", true);
+            }
             r = await supabase.from("supplier_offers").insert(row);
           }
           if (r.error) throw new Error(r.error.message);

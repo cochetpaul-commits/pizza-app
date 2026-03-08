@@ -202,7 +202,7 @@ export default function Home() {
           <div className="card" style={{ borderLeft: "4px solid #92400E" }}>
             <div style={{ marginBottom: 10 }}>
               <p className="cardTitle" style={{ marginBottom: 2, letterSpacing: 1, color: "#92400E" }}>PILOTAGE</p>
-              <p className="muted" style={{ margin: 0, fontSize: 11 }}>Mercuriale · Épicerie · Variations · Alertes</p>
+              <p className="muted" style={{ margin: 0, fontSize: 11 }}>Mercuriale · Épicerie · Variations & Alertes</p>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <Link href="/mercuriale" style={{ textDecoration: "none", color: "inherit" }}>
@@ -219,27 +219,24 @@ export default function Home() {
                   <span className="btn btnPrimary" style={{ fontSize: 11, padding: "4px 10px", background: "#1E40AF", borderColor: "#1E40AF" }}>Ouvrir →</span>
                 </div>
               </Link>
-              <Link href="/variations-prix" style={{ textDecoration: "none", color: "inherit" }}>
-                <div style={{ border: "1px solid #E8E0D0", borderLeft: "4px solid #6B7280", borderRadius: 8, padding: "10px 10px", cursor: "pointer", background: "#fff", height: "100%" }}>
-                  <p className="cardTitle" style={{ marginBottom: 2, fontSize: 10, letterSpacing: 1, color: "#6B7280" }}>VARIATIONS</p>
-                  <p className="muted" style={{ margin: "0 0 8px", fontSize: 11 }}>Hausses · Baisses · Graph</p>
-                  <span className="btn btnPrimary" style={{ fontSize: 11, padding: "4px 10px", background: "#6B7280", borderColor: "#6B7280" }}>Voir →</span>
-                </div>
-              </Link>
-              <Link href="/alertes-prix" style={{ textDecoration: "none", color: "inherit" }}>
-                <div style={{ border: "1px solid #E8E0D0", borderLeft: "4px solid #DC2626", borderRadius: 8, padding: "10px 10px", cursor: "pointer", background: "#fff", height: "100%" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <p className="cardTitle" style={{ marginBottom: 2, fontSize: 10, letterSpacing: 1, color: "#DC2626" }}>ALERTES PRIX</p>
-                    {counts && counts.priceAlerts > 0 && (
-                      <span style={{ fontSize: 10, fontWeight: 900, background: "rgba(220,38,38,0.10)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.30)", borderRadius: 8, padding: "1px 6px", marginLeft: 4 }}>
-                        {counts.priceAlerts}
+              <Link href="/variations-prix" style={{ textDecoration: "none", color: "inherit", gridColumn: "1 / -1" }}>
+                <div style={{ border: "1px solid #E8E0D0", borderLeft: "4px solid #DC2626", borderRadius: 8, padding: "10px 12px", cursor: "pointer", background: "#fff" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <p className="cardTitle" style={{ marginBottom: 2, fontSize: 10, letterSpacing: 1, color: "#DC2626" }}>VARIATIONS & ALERTES</p>
+                      <p className="muted" style={{ margin: 0, fontSize: 11 }}>Historique · Hausses & baisses · Veille 30 j</p>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, marginLeft: 12 }}>
+                      {counts && counts.priceAlerts > 0 && (
+                        <span style={{ fontSize: 10, fontWeight: 900, background: "rgba(220,38,38,0.10)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.30)", borderRadius: 8, padding: "2px 7px" }}>
+                          {counts.priceAlerts}
+                        </span>
+                      )}
+                      <span className="btn btnPrimary" style={{ fontSize: 11, padding: "4px 10px", background: "#DC2626", borderColor: "#DC2626" }}>
+                        Voir →
                       </span>
-                    )}
+                    </div>
                   </div>
-                  <p className="muted" style={{ margin: "0 0 8px", fontSize: 11 }}>Hausses · Veille 30 j</p>
-                  <span className="btn btnPrimary" style={{ fontSize: 11, padding: "4px 10px", background: "#DC2626", borderColor: "#DC2626" }}>
-                    {counts && counts.priceAlerts > 0 ? `${counts.priceAlerts} alerte${counts.priceAlerts > 1 ? "s" : ""} →` : "Voir →"}
-                  </span>
                 </div>
               </Link>
             </div>

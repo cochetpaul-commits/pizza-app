@@ -1,8 +1,8 @@
 export const POLE_COLORS = {
   pizza:        "#8B1A1A",  // rouge
-  cocktail:     "#D97706",  // ambre
+  cocktail:     "#0E7490",  // teal
   cuisine:      "#166534",  // vert
-  "empâtement": "#EA580C",  // orange
+  "empâtement": "#B45309",  // ambre-brun
   pivot:        "#6D28D9",  // violet
 } as const;
 

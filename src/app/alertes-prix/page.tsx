@@ -49,7 +49,7 @@ export default function AleretesPrixPage() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Non connecté");
         const all = await fetchPriceAlerts(supabase, user.id, ALERT_THRESHOLD);
-        setAlerts(all.filter(a => a.direction === "up"));
+        setAlerts(all);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -76,16 +76,19 @@ export default function AleretesPrixPage() {
 
   const now = new Date().toISOString();
 
-  const { active, snoozedList } = useMemo(() => {
-    const active: PriceAlert[] = [];
+  const { activeUp, activeDown, snoozedList } = useMemo(() => {
+    const activeUp: PriceAlert[] = [];
+    const activeDown: PriceAlert[] = [];
     const snoozedList: PriceAlert[] = [];
     for (const a of alerts) {
       const until = snoozed[snoozeKey(a)];
       if (until && until > now) snoozedList.push(a);
-      else active.push(a);
+      else if (a.direction === "up") activeUp.push(a);
+      else activeDown.push(a);
     }
-    return { active, snoozedList };
+    return { activeUp, activeDown, snoozedList };
   }, [alerts, snoozed, now]);
+  const active = [...activeUp, ...activeDown];
 
   return (
     <>
@@ -108,7 +111,7 @@ export default function AleretesPrixPage() {
               </span>
             )}
           </h1>
-          <p className="muted" style={{ marginTop: 4 }}>Hausses de prix détectées depuis les factures importées</p>
+          <p className="muted" style={{ marginTop: 4 }}>Hausses et baisses détectées depuis les factures importées</p>
         </div>
 
         {error && <div className="errorBox" style={{ marginBottom: 16 }}>{error}</div>}
@@ -117,23 +120,41 @@ export default function AleretesPrixPage() {
           <div className="card" style={{ textAlign: "center", padding: 40, color: "var(--muted)" }}>Chargement…</div>
         ) : (
           <>
-            {active.length === 0 && (
+            {active.length === 0 && snoozedList.length === 0 && (
               <div className="card" style={{ textAlign: "center", padding: 40 }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
-                <div style={{ fontWeight: 800 }}>Aucune hausse active</div>
-                <p className="muted" style={{ marginTop: 6 }}>
-                  {snoozedList.length > 0 ? `${snoozedList.length} alerte(s) en veille.` : "Tous les prix sont stables."}
-                </p>
+                <div style={{ fontWeight: 800 }}>Aucune alerte active</div>
+                <p className="muted" style={{ marginTop: 6 }}>Tous les prix sont stables.</p>
               </div>
             )}
 
-            {active.map((a, i) => (
-              <AlertCard key={i} alert={a} onSnooze={() => snooze(a)} onNavigate={`/ingredients/${a.ingredient_id}`} />
-            ))}
+            {/* Hausses */}
+            {activeUp.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 900, color: "#DC2626", letterSpacing: 1, textTransform: "uppercase", marginBottom: 10, borderBottom: "2px solid rgba(220,38,38,0.2)", paddingBottom: 6 }}>
+                  Hausses ({activeUp.length})
+                </div>
+                {activeUp.map((a, i) => (
+                  <AlertCard key={i} alert={a} onSnooze={() => snooze(a)} onNavigate={`/ingredients/${a.ingredient_id}`} />
+                ))}
+              </div>
+            )}
 
-            {/* Snoozed section */}
+            {/* Baisses */}
+            {activeDown.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 900, color: "#16A34A", letterSpacing: 1, textTransform: "uppercase", marginBottom: 10, borderBottom: "2px solid rgba(22,163,74,0.2)", paddingBottom: 6 }}>
+                  Baisses ({activeDown.length})
+                </div>
+                {activeDown.map((a, i) => (
+                  <AlertCard key={i} alert={a} onSnooze={() => snooze(a)} onNavigate={`/ingredients/${a.ingredient_id}`} />
+                ))}
+              </div>
+            )}
+
+            {/* Snoozed */}
             {snoozedList.length > 0 && (
-              <div style={{ marginTop: 20 }}>
+              <div style={{ marginTop: 4 }}>
                 <button
                   onClick={() => setShowSnoozed(v => !v)}
                   style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 13, fontWeight: 700, opacity: 0.6, display: "flex", alignItems: "center", gap: 6 }}
@@ -169,7 +190,7 @@ function AlertCard({
     <div className="card" style={{
       padding: "12px 14px", marginBottom: 8,
       opacity: snoozed ? 0.55 : 1,
-      borderLeft: snoozed ? "4px solid #D1D5DB" : a.aberrant ? "4px solid #EA580C" : "4px solid #DC2626",
+      borderLeft: snoozed ? "4px solid #D1D5DB" : a.aberrant ? "4px solid #EA580C" : a.direction === "down" ? "4px solid #16A34A" : "4px solid #DC2626",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
         <div style={{ minWidth: 0 }}>
@@ -198,10 +219,12 @@ function AlertCard({
           <span style={{
             display: "inline-flex", alignItems: "center", gap: 4,
             padding: "4px 10px", borderRadius: 999,
-            background: "rgba(220,38,38,0.10)", color: "#DC2626",
-            border: "1px solid rgba(220,38,38,0.25)", fontWeight: 800, fontSize: 14,
+            background: a.direction === "down" ? "rgba(22,163,74,0.10)" : "rgba(220,38,38,0.10)",
+            color: a.direction === "down" ? "#16A34A" : "#DC2626",
+            border: a.direction === "down" ? "1px solid rgba(22,163,74,0.25)" : "1px solid rgba(220,38,38,0.25)",
+            fontWeight: 800, fontSize: 14,
           }}>
-            ↑ {fmtPct(a.change_pct)}
+            {a.direction === "down" ? "↓" : "↑"} {fmtPct(Math.abs(a.change_pct))}
           </span>
           {!snoozed && onSnooze && (
             <button

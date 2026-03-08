@@ -1,308 +1,389 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
-import { TopNav } from "@/components/TopNav";
 import { NavBar } from "@/components/NavBar";
-import { POLE_COLORS } from "@/lib/poleColors";
+import { TopNav } from "@/components/TopNav";
+import { EstabBadge } from "@/components/EstabBadge";
 
-// --- Types ---------------------------------------------------------------
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-type PizzaRow    = { id: string; name: string | null; total_cost: number | null; establishments: string[] | null };
-type EmpRow      = { id: string; name: string; type: string; created_at: string };
-type KitchenRow  = { id: string; name: string | null; category: string | null; total_cost: number | null; cost_per_kg: number | null; cost_per_portion: number | null; establishments: string[] | null };
-type PrepRow     = { id: string; name: string; pivot_unit: string; created_at: string; output_ingredient_id: string | null; ingredients?: Array<{ cost_per_unit: number | null }> | { cost_per_unit: number | null } | null };
-type CocktailRow = { id: string; name: string | null; type: string | null; total_cost: number | null; sell_price: number | null };
-type FlourMixItem = { name: string; percent: number; ingredient_id: string | null };
-type DS<T>       = { status: "idle" | "loading" | "ok" | "error"; data?: T; error?: unknown };
-
-// --- Config ---------------------------------------------------------------
-
-const TABS = [
-  { id: "pizza",      label: "Pizza",       color: POLE_COLORS.pizza },
-  { id: "empatement", label: "Empâtement",  color: POLE_COLORS["empâtement"] },
-  { id: "cuisine",    label: "Cuisine",      color: POLE_COLORS.cuisine },
-  { id: "pivot",      label: "Préparations", color: POLE_COLORS.pivot },
-  { id: "cocktail",   label: "Cocktail",     color: POLE_COLORS.cocktail },
-] as const;
-type TabId = (typeof TABS)[number]["id"];
-
-const COCKTAIL_TYPE_LABELS: Record<string, string> = {
-  long_drink: "Long drink", short_drink: "Short drink",
-  shot: "Shot", mocktail: "Mocktail", signature: "Signature",
+type PizzaRow = {
+  id: string; name: string | null;
+  total_cost: number | null;
+  margin_rate: number | null; vat_rate: number | null;
+  establishments: string[] | null;
+  pivot_ingredient_id: string | null;
+};
+type KitchenRow = {
+  id: string; name: string | null; category: string | null;
+  total_cost: number | null; cost_per_kg: number | null;
+  cost_per_portion: number | null;
+  margin_rate: number | null; vat_rate: number | null;
+  establishments: string[] | null;
+  pivot_ingredient_id: string | null;
+};
+type CocktailRow = {
+  id: string; name: string | null; type: string | null;
+  total_cost: number | null; sell_price: number | null;
+  establishments: string[] | null;
+  pivot_ingredient_id: string | null;
+};
+type EmpRow = {
+  id: string; name: string; type: string; created_at: string;
+  pivot_ingredient_id: string | null;
 };
 
-function fmtMoney(v: number) {
+type EstabFilter = "all" | "bellomio" | "piccola";
+type SortDir = "asc" | "desc";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const PIZZA_COLOR    = "#8B1A1A";  // rouge
+const CUISINE_COLOR  = "#166534";  // vert
+const COCKTAIL_COLOR = "#0E7490";  // teal
+const EMP_COLOR      = "#B45309";  // ambre-brun
+
+const CUISINE_CATS = [
+  { id: "preparation",    label: "Préparation" },
+  { id: "entree",         label: "Entrée" },
+  { id: "plat_cuisine",   label: "Plat cuisiné" },
+  { id: "accompagnement", label: "Accompagnement" },
+  { id: "sauce",          label: "Sauce" },
+  { id: "dessert",        label: "Dessert" },
+  { id: "autre",          label: "Autre" },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmt(v: number) {
   return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// --- Shared row component ------------------------------------------------
-
-
-function estabBadgeText(establishments: string[] | null): string | undefined {
-  const e = establishments ?? ["bellomio", "piccola"];
-  const bm = e.includes("bellomio");
-  const pm = e.includes("piccola");
-  if (bm && pm) return undefined;
-  if (bm) return "Bello Mio";
-  if (pm) return "Piccola Mia";
-  return undefined;
+function matchesEstab(est: string[] | null, filter: EstabFilter): boolean {
+  if (filter === "all") return true;
+  return (est ?? ["bellomio", "piccola"]).includes(filter);
 }
 
-function RecipeRow({
-  name,
-  cost,
-  costLabel,
-  color,
-  onOpen,
-  onDelete,
-  sub,
+function matchesSearch(name: string | null, q: string): boolean {
+  if (!q) return true;
+  return (name ?? "").toLowerCase().includes(q.toLowerCase());
+}
+
+/**
+ * margin_rate stored as % (e.g. 75), vat_rate stored as % for pizza (e.g. 10)
+ * or as decimal for kitchen (e.g. 0.1).
+ * Normalization: if value >= 1 → treat as %, divide by 100.
+ */
+function normRate(r: number | null): number {
+  if (r == null) return 0;
+  return r >= 1 ? r / 100 : r;
+}
+
+function pvTTCPizza(r: PizzaRow): number | null {
+  const cost = r.total_cost;
+  if (!cost || cost <= 0) return null;
+  const m = normRate(r.margin_rate);   // margin_rate % e.g. 60 → 0.6
+  const v = normRate(r.vat_rate);      // vat_rate %   e.g. 10 → 0.1
+  if (m <= 0 || m >= 1) return null;
+  return cost / (1 - m) * (1 + v);
+}
+
+function pvTTCKitchen(r: KitchenRow): number | null {
+  const cost = r.cost_per_portion ?? r.cost_per_kg;
+  if (!cost || cost <= 0) return null;
+  const mr = r.margin_rate ?? 0;
+  const m = mr >= 1 ? mr / 100 : mr;  // stored as % (e.g. 75) or possibly decimal
+  const vr = r.vat_rate ?? 0.1;
+  const v = vr >= 1 ? vr / 100 : vr;
+  if (m <= 0 || m >= 1) return null;
+  return cost / (1 - m) * (1 + v);
+}
+
+// ─── Shared UI ────────────────────────────────────────────────────────────────
+
+function RecipeCard({
+  name, href, color, establishments, prodHref,
+  cost, costLabel, pv, pvLabel,
 }: {
-  name: string;
-  cost?: string | null;
-  costLabel?: string;
-  color: string;
-  onOpen: () => void;
-  onDelete: () => void;
-  sub?: string;
+  name: string; href: string; color: string;
+  establishments?: string[] | null; prodHref?: string;
+  cost?: number | null; costLabel?: string;
+  pv?: number | null; pvLabel?: string;
 }) {
+  const router = useRouter();
+  const estabs = establishments;
+  const showBM = estabs != null && estabs.length > 0 && estabs.includes("bellomio") && !estabs.includes("piccola");
+  const showPM = estabs != null && estabs.length > 0 && estabs.includes("piccola") && !estabs.includes("bellomio");
+  const showUnassigned = !estabs || estabs.length === 0;
+  const hasBadge = showBM || showPM || showUnassigned;
   return (
     <div
-      onClick={onOpen}
+      role="button"
+      tabIndex={0}
+      onClick={() => router.push(href)}
+      onKeyDown={ev => ev.key === "Enter" && router.push(href)}
       style={{
-        padding: "12px 14px",
-        borderRadius: 12,
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        padding: "11px 14px", borderRadius: 12,
         background: "rgba(255,255,255,0.45)",
         border: "1px solid rgba(217,199,182,0.5)",
-        cursor: "pointer",
-        transition: "background 0.12s",
+        cursor: "pointer", transition: "background 0.12s",
+        marginBottom: 6,
       }}
       onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.75)")}
       onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.45)")}
     >
-      {/* Layout responsive : flex-col mobile, grid desktop */}
-      <div className="flex items-start gap-3 md:grid md:items-center" style={{ gridTemplateColumns: "1fr auto auto" }}>
-        {/* Nom + sous-titre */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontWeight: 700, fontSize: 13,
-            letterSpacing: "0.06em", textTransform: "uppercase", color: "#2f3a33",
-          }}>
-            {name}
-          </div>
-          {/* Coût visible sous le nom sur mobile */}
-          {cost && (
-            <div className="md:hidden" style={{ fontSize: 15, fontWeight: 800, color, marginTop: 2, letterSpacing: "-0.3px" }}>
-              {cost}{costLabel ? <span style={{ fontSize: 11, fontWeight: 500, color: "#6f6a61", marginLeft: 3 }}>{costLabel}</span> : null}
-            </div>
-          )}
-          {sub && (
-            <div style={{ fontSize: 11, color: "#6f6a61", marginTop: 2 }}>{sub}</div>
-          )}
+      <div style={{ flex: 1, minWidth: 0, paddingRight: 10 }}>
+        <div style={{
+          fontWeight: 700, fontSize: 13,
+          textTransform: "uppercase", letterSpacing: "0.05em", color: "#2f3a33",
+        }}>
+          {name}
         </div>
-
-        {/* Coût — desktop uniquement (colonne centrale) */}
-        {cost && (
-          <div className="hidden md:block" style={{ fontSize: 17, fontWeight: 800, color, whiteSpace: "nowrap", letterSpacing: "-0.3px" }}>
-            {cost}{costLabel ? <span style={{ fontSize: 11, fontWeight: 500, color: "#6f6a61", marginLeft: 3 }}>{costLabel}</span> : null}
+        {hasBadge && (
+          <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
+            {showBM && <EstabBadge estab="bellomio" />}
+            {showPM && <EstabBadge estab="piccola" />}
+            {showUnassigned && (
+              <span style={{
+                display: "inline-flex", alignItems: "center",
+                padding: "2px 9px", borderRadius: 4,
+                fontSize: 11, fontWeight: 600, background: "#F3F4F6", color: "#9CA3AF",
+              }}>Non assigné</span>
+            )}
           </div>
         )}
-
-        {/* Icônes actions */}
-        <div style={{ display: "flex", gap: 6, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+        {prodHref && (
           <button
-            onClick={onOpen}
-            title="Ouvrir"
+            type="button"
+            onClick={ev => { ev.stopPropagation(); router.push(prodHref); }}
             style={{
-              width: 34, height: 34, borderRadius: 10,
-              border: `1.5px solid ${color}`, background: color,
-              color: "#fff", fontSize: 16, cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "opacity 0.12s",
+              padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+              border: "1.5px solid #166534",
+              background: "rgba(22,101,52,0.08)", color: "#166534",
+              cursor: "pointer", whiteSpace: "nowrap",
             }}
-            onMouseEnter={e => (e.currentTarget.style.opacity = "0.8")}
-            onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
-          >→</button>
-          <button
-            onClick={onDelete}
-            title="Supprimer"
-            style={{
-              width: 34, height: 34, borderRadius: 10,
-              border: "1.5px solid rgba(217,199,182,0.95)",
-              background: "rgba(255,255,255,0.5)", color: "#9a8f84",
-              fontSize: 13, cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "border-color 0.12s, color 0.12s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = "#d93f3f"; e.currentTarget.style.color = "#d93f3f"; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(217,199,182,0.95)"; e.currentTarget.style.color = "#9a8f84"; }}
-          >✕</button>
-        </div>
+          >
+            Production
+          </button>
+        )}
+        {cost != null && cost > 0 && (
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#9a8f84", whiteSpace: "nowrap" }}>
+            {fmt(cost)} €{costLabel && <span style={{ fontSize: 10, marginLeft: 2 }}>{costLabel}</span>}
+          </div>
+        )}
+        {pv != null && pv > 0 && (
+          <div style={{ fontSize: 15, fontWeight: 900, color, whiteSpace: "nowrap" }}>
+            {fmt(pv)} €{pvLabel && <span style={{ fontSize: 10, fontWeight: 500, marginLeft: 2 }}>{pvLabel}</span>}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// --- Inner component -----------------------------------------------------
+// Fully controlled collapsible section
+function Section({
+  title, color, count, open, onToggle, newHref, children,
+}: {
+  title: string; color: string; count: number;
+  open: boolean; onToggle: () => void;
+  newHref?: string;
+  children: React.ReactNode;
+}) {
+  const router = useRouter();
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10,
+        padding: "6px 0 8px", borderBottom: `2px solid ${color}`, marginBottom: 12,
+      }}>
+        {newHref && (
+          <button
+            type="button"
+            onClick={() => router.push(newHref)}
+            aria-label={`Nouvelle ${title.toLowerCase()}`}
+            style={{
+              width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: color, border: "none", cursor: "pointer",
+              color: "#fff", fontSize: 18, fontWeight: 700, lineHeight: 1,
+            }}
+          >+</button>
+        )}
+        <button
+          type="button"
+          onClick={onToggle}
+          style={{
+            flex: 1, display: "flex", justifyContent: "space-between", alignItems: "center",
+            background: "none", border: "none", cursor: "pointer", padding: 0,
+          }}
+        >
+          <span style={{ fontSize: 14, fontWeight: 900, color, textTransform: "uppercase", letterSpacing: 1 }}>
+            {title}
+            <span style={{ fontWeight: 500, fontSize: 12, marginLeft: 6, color: "#6f6a61" }}>({count})</span>
+          </span>
+          <span style={{ fontSize: 12, color, fontWeight: 700 }}>{open ? "▲" : "▼"}</span>
+        </button>
+      </div>
+      {open && children}
+    </div>
+  );
+}
+
+// Fully controlled collapsible subsection
+function SubSection({
+  title, color, count, open, onToggle, children,
+}: {
+  title: string; color: string; count: number;
+  open: boolean; onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        style={{
+          width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
+          background: "none", border: "none", cursor: "pointer",
+          padding: "8px 4px 9px", borderBottom: `1px solid rgba(22,101,52,0.2)`, marginBottom: 8,
+        }}
+      >
+        <span style={{ fontSize: 14, fontWeight: 800, color, letterSpacing: 0.5 }}>
+          {title}
+          <span style={{ fontWeight: 500, marginLeft: 4 }}>({count})</span>
+        </span>
+        <span style={{ fontSize: 11, color }}>{open ? "▲" : "▼"}</span>
+      </button>
+      {open && children}
+    </div>
+  );
+}
+
+// ─── Main inner component ─────────────────────────────────────────────────────
 
 function RecettesInner() {
-  const router  = useRouter();
-  const params  = useSearchParams();
-  const rawTab  = params.get("tab") ?? "pizza";
-  const activeTab: TabId = TABS.some(t => t.id === rawTab) ? (rawTab as TabId) : "pizza";
+  const [authOk, setAuthOk] = useState<boolean | null>(null);
+  const [pizzas,    setPizzas]    = useState<PizzaRow[]>([]);
+  const [kitchens,  setKitchens]  = useState<KitchenRow[]>([]);
+  const [cocktails, setCocktails] = useState<CocktailRow[]>([]);
+  const [emps,      setEmps]      = useState<EmpRow[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [loadErrors, setLoadErrors] = useState<string[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const [authState, setAuthState] = useState<"loading" | "ok" | "notlogged">("loading");
+  const [q, setQ]         = useState("");
+  const [estab, setEstab] = useState<EstabFilter>("all");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
-  const [pizzaDs,    setPizzaDs]    = useState<DS<PizzaRow[]>>({ status: "idle" });
-  const [empDs,      setEmpDs]      = useState<DS<EmpRow[]>>({ status: "idle" });
-  const [cuisineDs,  setCuisineDs]  = useState<DS<KitchenRow[]>>({ status: "idle" });
-  const [filterCuisineEstab, setFilterCuisineEstab] = useState<"all" | "bellomio" | "piccola">("all");
-  const [collapsedCuisineCats, setCollapsedCuisineCats] = useState<Set<string>>(new Set());
-  const [pivotDs,    setPivotDs]    = useState<DS<PrepRow[]>>({ status: "idle" });
-  const [cocktailDs, setCocktailDs] = useState<DS<CocktailRow[]>>({ status: "idle" });
+  // ── Sections open state (fully controlled for expand/collapse all) ──
+  const [allExpanded, setAllExpanded] = useState(false);
+  const [secOpen, setSecOpen] = useState({ pizza: false, cuisine: false, cocktail: false, empatement: false });
+  const [subOpen, setSubOpen] = useState<Record<string, boolean>>(
+    Object.fromEntries(CUISINE_CATS.map(c => [c.id, false]))
+  );
 
-  const [creatingEmp,  setCreatingEmp]  = useState(false);
-  const [empCreateErr, setEmpCreateErr] = useState<string | null>(null);
+  function handleExpandToggle(on: boolean) {
+    setAllExpanded(on);
+    setSecOpen({ pizza: on, cuisine: on, cocktail: on, empatement: on });
+    setSubOpen(Object.fromEntries(CUISINE_CATS.map(c => [c.id, on])));
+  }
+  function toggleSec(k: keyof typeof secOpen) {
+    setSecOpen(s => ({ ...s, [k]: !s[k] }));
+  }
+  function toggleSub(id: string) {
+    setSubOpen(s => ({ ...s, [id]: !s[id] }));
+  }
 
-  const loaded = useRef<Set<TabId>>(new Set());
-  const tabScrollRef = useRef<HTMLDivElement>(null);
+  // Refresh depuis un event handler (bouton) — setState ici est OK (pas dans un effect)
+  function refresh() { setLoading(true); setRefreshKey(k => k + 1); }
 
   useEffect(() => {
-    const el = tabScrollRef.current?.querySelector(`[data-tab="${activeTab}"]`) as HTMLElement | null;
-    el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-  }, [activeTab]);
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setAuthState(data.user ? "ok" : "notlogged");
+    // Toutes les setState sont dans des callbacks async → pas de cascades
+    supabase.auth.getSession().then(({ data: sessionData }) => {
+      if (!sessionData.session) { setAuthOk(false); setLoading(false); return; }
+      setAuthOk(true);
+      Promise.all([
+        supabase.from("pizza_recipes")
+          .select("id,name,total_cost,margin_rate,vat_rate,establishments,pivot_ingredient_id")
+          .eq("is_draft", false),
+        supabase.from("kitchen_recipes")
+          .select("id,name,category,total_cost,cost_per_kg,cost_per_portion,margin_rate,vat_rate,establishments,pivot_ingredient_id")
+          .eq("is_draft", false),
+        supabase.from("cocktails")
+          .select("id,name,type,total_cost,sell_price,establishments,pivot_ingredient_id")
+          .eq("is_draft", false),
+        supabase.from("recipes")
+          .select("id,name,type,created_at,pivot_ingredient_id")
+          .order("created_at", { ascending: false }),
+      ]).then(([p, k, c, e]) => {
+        const errs: string[] = [];
+        if (p.error) errs.push(`Pizza : ${p.error.message ?? JSON.stringify(p.error)}`);
+        if (k.error) errs.push(`Cuisine : ${k.error.message ?? JSON.stringify(k.error)}`);
+        if (c.error) errs.push(`Cocktail : ${c.error.message ?? JSON.stringify(c.error)}`);
+        if (e.error) errs.push(`Empâtement : ${e.error.message ?? JSON.stringify(e.error)}`);
+        setLoadErrors(errs);
+        setPizzas((p.data ?? []) as PizzaRow[]);
+        setKitchens((k.data ?? []) as KitchenRow[]);
+        setCocktails((c.data ?? []) as CocktailRow[]);
+        setEmps((e.data ?? []) as EmpRow[]);
+        setLoading(false);
+      });
     });
-  }, []);
+  }, [refreshKey]);
 
-  const loadPizza = useCallback(async () => {
-    setPizzaDs({ status: "loading" });
-    const { data, error } = await supabase
-      .from("pizza_recipes").select("id,name,total_cost,establishments")
-      .eq("is_draft", false).order("created_at", { ascending: false });
-    setPizzaDs(error ? { status: "error", error } : { status: "ok", data: (data ?? []) as PizzaRow[] });
-  }, []);
+  // ── Filtered + sorted data ──
+  const filteredPizzas = useMemo(() =>
+    pizzas
+      .filter(r => matchesEstab(r.establishments, estab) && matchesSearch(r.name, q))
+      .sort((a, b) => {
+        const ca = a.total_cost ?? Infinity, cb = b.total_cost ?? Infinity;
+        return sortDir === "asc" ? ca - cb : cb - ca;
+      }),
+    [pizzas, estab, q, sortDir]);
 
-  const loadEmp = useCallback(async () => {
-    setEmpDs({ status: "loading" });
-    const { data, error } = await supabase
-      .from("recipes").select("id,name,type,created_at")
-      .order("created_at", { ascending: false });
-    setEmpDs(error ? { status: "error", error } : { status: "ok", data: (data ?? []) as EmpRow[] });
-  }, []);
+  const filteredKitchens = useMemo(() =>
+    kitchens
+      .filter(r => matchesEstab(r.establishments, estab) && matchesSearch(r.name, q))
+      .sort((a, b) => {
+        const ca = a.cost_per_portion ?? a.cost_per_kg ?? Infinity;
+        const cb = b.cost_per_portion ?? b.cost_per_kg ?? Infinity;
+        return sortDir === "asc" ? ca - cb : cb - ca;
+      }),
+    [kitchens, estab, q, sortDir]);
 
-  const loadCuisine = useCallback(async () => {
-    setCuisineDs({ status: "loading" });
-    const { data, error } = await supabase
-      .from("kitchen_recipes").select("id,name,category,total_cost,cost_per_kg,cost_per_portion,establishments")
-      .eq("is_draft", false).order("updated_at", { ascending: false });
-    setCuisineDs(error ? { status: "error", error } : { status: "ok", data: (data ?? []) as KitchenRow[] });
-  }, []);
+  const filteredCocktails = useMemo(() =>
+    cocktails
+      .filter(r => matchesEstab(r.establishments, estab) && matchesSearch(r.name, q))
+      .sort((a, b) => {
+        const ca = a.total_cost ?? Infinity, cb = b.total_cost ?? Infinity;
+        return sortDir === "asc" ? ca - cb : cb - ca;
+      }),
+    [cocktails, estab, q, sortDir]);
 
-  const loadPivot = useCallback(async () => {
-    setPivotDs({ status: "loading" });
-    const { data, error } = await supabase
-      .from("prep_recipes").select("id,name,pivot_unit,created_at,output_ingredient_id,ingredients!prep_recipes_output_ingredient_fk(cost_per_unit)")
-      .order("created_at", { ascending: false });
-    setPivotDs(error ? { status: "error", error } : { status: "ok", data: (data ?? []) as PrepRow[] });
-  }, []);
+  const filteredEmps = useMemo(() =>
+    emps.filter(r => matchesSearch(r.name, q)),
+    [emps, q]);
 
-  const loadCocktail = useCallback(async () => {
-    setCocktailDs({ status: "loading" });
-    const { data, error } = await supabase
-      .from("cocktails").select("id,name,type,total_cost,sell_price")
-      .eq("is_draft", false).order("updated_at", { ascending: false });
-    setCocktailDs(error ? { status: "error", error } : { status: "ok", data: (data ?? []) as CocktailRow[] });
-  }, []);
-
-  const maybeLoad = useCallback((tab: TabId) => {
-    if (loaded.current.has(tab)) return;
-    loaded.current.add(tab);
-    if      (tab === "pizza")      loadPizza();
-    else if (tab === "empatement") loadEmp();
-    else if (tab === "cuisine")    loadCuisine();
-    else if (tab === "pivot")      loadPivot();
-    else if (tab === "cocktail")   loadCocktail();
-  }, [loadPizza, loadEmp, loadCuisine, loadPivot, loadCocktail]);
-
-  useEffect(() => {
-    if (authState !== "ok") return;
-    maybeLoad(activeTab);
-  }, [activeTab, authState, maybeLoad]);
-
-  const refresh = useCallback(() => {
-    loaded.current.delete(activeTab);
-    maybeLoad(activeTab);
-  }, [activeTab, maybeLoad]);
-
-  const createEmp = async () => {
-    setEmpCreateErr(null);
-    setCreatingEmp(true);
-    try {
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData.user) throw new Error("NOT_LOGGED");
-      const now = new Date();
-      const payload: Record<string, unknown> = {
-        name: `Empâtement ${now.toLocaleDateString("fr-FR")} ${now.toLocaleTimeString("fr-FR").slice(0, 5)}`,
-        type: "biga", hydration_total: 65, salt_percent: 2,
-        honey_percent: 0, oil_percent: 0,
-        flour_mix: [
-          { name: "Tipo 00", percent: 80, ingredient_id: null },
-          { name: "Tipo 1",  percent: 20, ingredient_id: null },
-        ] satisfies FlourMixItem[],
-        yeast_percent: 0, biga_yeast_percent: 0, user_id: authData.user.id,
-      };
-      const { data, error } = await supabase.from("recipes").insert(payload).select("id").single<{ id: string }>();
-      if (error) throw error;
-      router.push(`/recipes/${data.id}`);
-    } catch (e: unknown) {
-      setEmpCreateErr(e instanceof Error ? e.message : "Erreur création");
-    } finally {
-      setCreatingEmp(false);
+  const kitchenByCat = useMemo(() => {
+    const map: Record<string, KitchenRow[]> = {};
+    for (const r of filteredKitchens) {
+      const cat = r.category ?? "autre";
+      if (!map[cat]) map[cat] = [];
+      map[cat].push(r);
     }
-  };
+    return map;
+  }, [filteredKitchens]);
 
-  const delPizza = async (id: string) => {
-    if (!window.confirm("Supprimer cette fiche pizza ?")) return;
-    const { error } = await supabase.from("pizza_recipes").delete().eq("id", id);
-    if (error) { setPizzaDs(p => ({ ...p, status: "error", error })); return; }
-    setPizzaDs(p => ({ ...p, data: (p.data ?? []).filter(x => x.id !== id) }));
-  };
+  const totalCount = filteredPizzas.length + filteredKitchens.length + filteredCocktails.length + filteredEmps.length;
 
-  const delEmp = async (id: string, name: string) => {
-    if (!window.confirm(`Supprimer cet empâtement ?\n\n${name}`)) return;
-    const { error } = await supabase.from("recipes").delete().eq("id", id);
-    if (error) { setEmpDs(p => ({ ...p, status: "error", error })); return; }
-    setEmpDs(p => ({ ...p, data: (p.data ?? []).filter(x => x.id !== id) }));
-  };
-
-  const delCuisine = async (id: string) => {
-    if (!window.confirm("Supprimer cette fiche cuisine ?")) return;
-    const { error } = await supabase.from("kitchen_recipes").delete().eq("id", id);
-    if (error) { setCuisineDs(p => ({ ...p, status: "error", error })); return; }
-    setCuisineDs(p => ({ ...p, data: (p.data ?? []).filter(x => x.id !== id) }));
-  };
-
-  const delPivot = async (id: string, name: string) => {
-    if (!window.confirm(`Supprimer cette recette pivot ?\n\n${name}`)) return;
-    const { error } = await supabase.from("prep_recipes").delete().eq("id", id);
-    if (error) { setPivotDs(p => ({ ...p, status: "error", error })); return; }
-    setPivotDs(p => ({ ...p, data: (p.data ?? []).filter(x => x.id !== id) }));
-  };
-
-  const delCocktail = async (id: string) => {
-    if (!window.confirm("Supprimer ce cocktail ?")) return;
-    const { error } = await supabase.from("cocktails").delete().eq("id", id);
-    if (error) { setCocktailDs(p => ({ ...p, status: "error", error })); return; }
-    setCocktailDs(p => ({ ...p, data: (p.data ?? []).filter(x => x.id !== id) }));
-  };
-
-  if (authState === "loading") {
+  if (authOk === null || loading) {
     return (
       <>
         <NavBar />
@@ -310,7 +391,7 @@ function RecettesInner() {
       </>
     );
   }
-  if (authState === "notlogged") {
+  if (!authOk) {
     return (
       <>
         <NavBar />
@@ -322,202 +403,203 @@ function RecettesInner() {
     );
   }
 
-  const activeColor = TABS.find(t => t.id === activeTab)!.color;
-  const activeDs    = activeTab === "pizza"      ? pizzaDs
-    : activeTab === "empatement" ? empDs
-    : activeTab === "cuisine"    ? cuisineDs
-    : activeTab === "pivot"      ? pivotDs
-    : cocktailDs;
-
-  const count    = activeDs.data?.length;
-  const subtitle = activeDs.status === "loading" ? "Chargement…"
-    : activeDs.status === "error" ? "Erreur"
-    : count != null ? `${count} fiche(s)` : "";
-
-  const createBtn = (() => {
-    const cls = "btn btnPrimary w-full md:w-auto";
-    if (activeTab === "pizza")
-      return <Link className={cls} href="/pizzas/new">Nouvelle pizza</Link>;
-    if (activeTab === "empatement")
-      return <button className={cls} onClick={createEmp} disabled={creatingEmp}>{creatingEmp ? "Création…" : "Nouvel empâtement"}</button>;
-    if (activeTab === "cuisine")
-      return <Link className={cls} href="/kitchen/new">Nouvelle fiche</Link>;
-    if (activeTab === "pivot")
-      return <Link className={cls} href="/prep/new">Nouvelle recette pivot</Link>;
-    return <Link className={cls} href="/cocktails/new">Nouveau cocktail</Link>;
-  })();
-
   return (
     <>
-    <NavBar right={<button className="btn" onClick={refresh}>Rafraîchir</button>} />
-    <main className="container">
-      <TopNav title="Recettes" subtitle={subtitle} />
+      <NavBar right={
+        <button className="btn" onClick={refresh} disabled={loading} style={{ fontSize: 12 }}>
+          {loading ? "…" : "↻"}
+        </button>
+      } />
+      <main className="container" style={{ paddingBottom: 40 }}>
+        <TopNav title="Recettes" subtitle={loading ? "Chargement…" : `${totalCount} fiche(s)`} />
 
-      {/* ── Sticky tab bar ── */}
-      <div style={{
-        position: "sticky", top: 44, zIndex: 40,
-        background: "#FAF7F2", margin: "0 -18px",
-        borderBottom: "1px solid rgba(217,199,182,0.95)",
-        marginBottom: 16,
-      }}>
-        <div ref={tabScrollRef} className="tab-scroll" style={{ display: "flex", scrollbarWidth: "none" }}>
-          {TABS.map((tab, i) => {
-            const isActive = activeTab === tab.id;
-            return (
+        {/* ── Erreurs de chargement ── */}
+        {loadErrors.length > 0 && (
+          <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, background: "#FEF2F2", border: "1px solid rgba(139,26,26,0.2)", fontSize: 13 }}>
+            <strong style={{ color: "#8B1A1A" }}>Erreurs de chargement :</strong>
+            {loadErrors.map(e => <div key={e} style={{ color: "#8B1A1A", marginTop: 4 }}>{e}</div>)}
+          </div>
+        )}
+
+        {/* ── Filtres ── */}
+        <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+          <input
+            className="input"
+            type="search"
+            placeholder="Rechercher une recette…"
+            value={q}
+            onChange={e => setQ(e.target.value)}
+          />
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            {/* Établissement */}
+            {(["all", "bellomio", "piccola"] as EstabFilter[]).map(v => (
               <button
-                key={tab.id}
-                data-tab={tab.id}
-                onClick={() => router.push(`/recettes?tab=${tab.id}`)}
+                key={v} type="button"
+                onClick={() => setEstab(v)}
                 style={{
-                  padding: "8px 8px", background: "none", border: "none",
-                  borderBottom: isActive ? `2px solid ${tab.color}` : "2px solid transparent",
-                  marginBottom: -1, cursor: "pointer", fontSize: 11,
-                  fontWeight: isActive ? 700 : 500,
-                  color: isActive ? tab.color : "#6f6a61",
-                  whiteSpace: "nowrap", transition: "color 0.15s",
-                  borderRight: i < TABS.length - 1 ? "1px solid rgba(217,199,182,0.5)" : "none",
-                  textAlign: "center" as const,
+                  padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                  border: "1.5px solid",
+                  borderColor: estab === v ? "#8B1A1A" : "rgba(217,199,182,0.9)",
+                  background: estab === v ? "rgba(139,26,26,0.08)" : "rgba(255,255,255,0.7)",
+                  color: estab === v ? "#8B1A1A" : "#6f6a61",
+                  cursor: "pointer",
                 }}
               >
-                {tab.label}
+                {v === "all" ? "Tous" : v === "bellomio" ? "Bello Mio" : "Piccola Mia"}
               </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex flex-col md:flex-row gap-2 md:gap-3 mb-4">
-        {createBtn}
-      </div>
-
-      {empCreateErr && <p style={{ color: "red", marginBottom: 12 }}>{empCreateErr}</p>}
-
-      {activeDs.status === "loading" && <p className="muted">Chargement…</p>}
-      {activeDs.status === "error" && (
-        <pre className="errorBox">{JSON.stringify(activeDs.error, null, 2)}</pre>
-      )}
-
-      {/* ── Wrapper carte avec liseré couleur ── */}
-      {activeDs.status === "ok" && (activeDs.data ?? []).length === 0 && (
-        <p className="muted">Aucune fiche créée.</p>
-      )}
-
-      {activeDs.status === "ok" && (activeDs.data ?? []).length > 0 && (
-        <div className="card" style={{ borderLeft: `4px solid ${activeColor}`, padding: 10 }}>
-          <div style={{ display: "grid", gap: 8 }}>
-
-            {/* ---- Pizza ---- */}
-            {activeTab === "pizza" && (pizzaDs.data ?? []).map(p => (
-              <RecipeRow
-                key={p.id}
-                name={p.name ?? "Pizza"}
-                sub={estabBadgeText(p.establishments)}
-                cost={p.total_cost != null && p.total_cost > 0 ? fmtMoney(p.total_cost) + " €" : undefined}
-                color={activeColor}
-                onOpen={() => router.push(`/pizzas/${p.id}`)}
-                onDelete={() => delPizza(p.id)}
-              />
             ))}
 
-            {/* ---- Empâtement ---- */}
-            {activeTab === "empatement" && (empDs.data ?? []).map(r => (
-              <RecipeRow
-                key={r.id}
-                name={r.name}
-                sub={`${r.type} · ${new Date(r.created_at).toLocaleDateString("fr-FR")}`}
-                color={activeColor}
-                onOpen={() => router.push(`/recipes/${r.id}`)}
-                onDelete={() => delEmp(r.id, r.name)}
-              />
-            ))}
+            {/* Sort */}
+            <button
+              type="button" onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
+              style={{
+                padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                border: "1.5px solid rgba(217,199,182,0.9)",
+                background: "rgba(255,255,255,0.7)", color: "#6f6a61",
+                cursor: "pointer",
+              }}
+            >
+              Coût {sortDir === "asc" ? "▲" : "▼"}
+            </button>
 
-            {/* ---- Cuisine ---- */}
-            {activeTab === "cuisine" && (() => {
-              const CUISINE_CATS: Record<string, string> = {
-                preparation: "Préparation", plat_cuisine: "Plat cuisiné", dessert: "Dessert",
-                cocktail: "Cocktail", autre: "Autre",
-              };
-              const allRows = (cuisineDs.data ?? [])
-                .filter(r => filterCuisineEstab === "all" || (r.establishments ?? ["bellomio","piccola"]).includes(filterCuisineEstab))
-                .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", "fr"));
-              const byCategory = allRows.reduce((acc, r) => {
-                const cat = r.category ?? "autre";
-                if (!acc[cat]) acc[cat] = [];
-                acc[cat].push(r);
-                return acc;
-              }, {} as Record<string, KitchenRow[]>);
-              const catOrder = ["preparation","plat_cuisine","dessert","cocktail","autre"];
-              return <>
-                <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                  {(["all","bellomio","piccola"] as const).map(v => (
-                    <button key={v} onClick={() => setFilterCuisineEstab(v)}
-                      style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #d1d5db", cursor: "pointer", fontWeight: 700, fontSize: 12,
-                        background: filterCuisineEstab === v ? (v === "bellomio" ? "#8B1A1A" : v === "piccola" ? "#6B1B1B" : activeColor) : "#fff",
-                        color: filterCuisineEstab === v ? "#fff" : "#374151" }}>
-                      {v === "all" ? "Tous" : v === "bellomio" ? "Bello Mio" : "Piccola Mia"}
-                    </button>
-                  ))}
-                </div>
-                {catOrder.filter(cat => byCategory[cat]?.length > 0).map(cat => (
-                  <div key={cat} style={{ marginBottom: 16 }}>
-                    <button onClick={() => setCollapsedCuisineCats(prev => { const s = new Set(prev); if (s.has(cat)) s.delete(cat); else s.add(cat); return s; })}
-                      style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", cursor: "pointer", padding: "4px 4px 6px", marginBottom: 2 }}>
-                      <span style={{ fontSize: 12, fontWeight: 900, color: activeColor, textTransform: "uppercase", letterSpacing: 1 }}>
-                        {CUISINE_CATS[cat] ?? cat} ({byCategory[cat].length})
-                      </span>
-                      <span style={{ fontSize: 14, color: activeColor }}>{collapsedCuisineCats.has(cat) ? "▶" : "▼"}</span>
-                    </button>
-                    {!collapsedCuisineCats.has(cat) && byCategory[cat].map(r => {
-                      const hasCpkg = r.cost_per_kg != null && r.cost_per_kg > 0;
-                      const hasCportion = r.cost_per_portion != null && r.cost_per_portion > 0;
-                      const cost = hasCpkg ? fmtMoney(r.cost_per_kg!) + " €" : hasCportion ? fmtMoney(r.cost_per_portion!) + " €" : undefined;
-                      const costLabel = hasCpkg ? "/kg" : hasCportion ? "/portion" : undefined;
-                      return (
-                        <RecipeRow key={r.id} name={r.name ?? "Recette"} sub={estabBadgeText(r.establishments)}
-                          cost={cost} costLabel={costLabel} color={activeColor}
-                          onOpen={() => router.push(`/kitchen/${r.id}`)} onDelete={() => delCuisine(r.id)} />
-                      );
-                    })}
-                  </div>
-                ))}
-                {allRows.length === 0 && <div className="muted">Aucune recette</div>}
-              </>;
-            })()}
-
-            {/* ---- Préparations ---- */}
-            {activeTab === "pivot" && (pivotDs.data ?? []).map(r => (
-              <RecipeRow
-                key={r.id}
-                name={r.name}
-                sub={`pivot · ${r.pivot_unit} · ${new Date(r.created_at).toLocaleDateString("fr-FR")}`}
-                cost={(() => { const cpu = Array.isArray(r.ingredients) ? r.ingredients[0]?.cost_per_unit : r.ingredients?.cost_per_unit; if (!cpu || cpu <= 0) return undefined; const cpkg = cpu * 1000; return cpkg.toLocaleString("fr-FR", {minimumFractionDigits:2,maximumFractionDigits:2}) + " €/kg"; })()}
-                color={activeColor}
-                onOpen={() => router.push(`/prep/${r.id}`)}
-                onDelete={() => delPivot(r.id, r.name)}
-              />
-            ))}
-
-            {/* ---- Cocktail ---- */}
-            {activeTab === "cocktail" && (cocktailDs.data ?? []).map(c => (
-              <RecipeRow
-                key={c.id}
-                name={c.name ?? "Cocktail"}
-                sub={c.type ? COCKTAIL_TYPE_LABELS[c.type] ?? c.type : undefined}
-                cost={c.total_cost != null && c.total_cost > 0 ? fmtMoney(c.total_cost) + " €" : undefined}
-                color={activeColor}
-                onOpen={() => router.push(`/cocktails/${c.id}`)}
-                onDelete={() => delCocktail(c.id)}
-              />
-            ))}
-
+            {/* Toggle tout déplier / replier */}
+            <button
+              type="button"
+              onClick={() => handleExpandToggle(!allExpanded)}
+              style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 7, background: "none", border: "none", cursor: "pointer", padding: 0 }}
+              aria-label={allExpanded ? "Tout replier" : "Tout déplier"}
+            >
+              <span style={{ fontSize: 11, fontWeight: 600, color: "#6f6a61" }}>
+                {allExpanded ? "Replier" : "Déplier"}
+              </span>
+              {/* Switch pill */}
+              <span style={{
+                display: "inline-flex", alignItems: "center",
+                width: 38, height: 22, borderRadius: 11,
+                background: allExpanded ? "#8B1A1A" : "rgba(217,199,182,0.9)",
+                transition: "background 0.2s", flexShrink: 0, padding: "0 3px",
+                justifyContent: allExpanded ? "flex-end" : "flex-start",
+              }}>
+                <span style={{
+                  width: 16, height: 16, borderRadius: "50%",
+                  background: "#fff",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
+                  transition: "all 0.2s",
+                  display: "block",
+                }} />
+              </span>
+            </button>
           </div>
         </div>
-      )}
-    </main>
+
+        {totalCount === 0 && !loading && (
+          <p className="muted">Aucune recette trouvée.</p>
+        )}
+
+        {/* ── Pizza ── */}
+        <Section
+            title="Pizza" color={PIZZA_COLOR} count={filteredPizzas.length}
+            open={secOpen.pizza} onToggle={() => toggleSec("pizza")}
+            newHref="/recettes/new/pizza"
+          >
+            {filteredPizzas.map(r => {
+              const pv = pvTTCPizza(r);
+              return (
+                <RecipeCard
+                  key={r.id}
+                  name={r.name ?? "Pizza"}
+                  href={`/recettes/pizza/${r.id}`}
+                  prodHref={r.pivot_ingredient_id ? `/recettes/pizza/${r.id}?mode=production` : undefined}
+                  color={PIZZA_COLOR}
+                  establishments={r.establishments}
+                  cost={r.total_cost}
+                  pv={pv}
+                  pvLabel="TTC"
+                />
+              );
+            })}
+          </Section>
+
+        {/* ── Cuisine ── */}
+          <Section
+            title="Cuisine" color={CUISINE_COLOR} count={filteredKitchens.length}
+            open={secOpen.cuisine} onToggle={() => toggleSec("cuisine")}
+            newHref="/recettes/new/cuisine"
+          >
+            {CUISINE_CATS.filter(cat => (kitchenByCat[cat.id]?.length ?? 0) > 0).map(cat => (
+              <SubSection
+                key={cat.id}
+                title={cat.label} color={CUISINE_COLOR}
+                count={kitchenByCat[cat.id].length}
+                open={subOpen[cat.id] ?? true}
+                onToggle={() => toggleSub(cat.id)}
+              >
+                {kitchenByCat[cat.id].map(r => {
+                  const hasPortion = r.cost_per_portion != null && r.cost_per_portion > 0;
+                  const hasKg = r.cost_per_kg != null && r.cost_per_kg > 0;
+                  const pv = pvTTCKitchen(r);
+                  return (
+                    <RecipeCard
+                      key={r.id}
+                      name={r.name ?? "Recette"}
+                      href={`/recettes/cuisine/${r.id}`}
+                      prodHref={r.pivot_ingredient_id ? `/recettes/cuisine/${r.id}?mode=production` : undefined}
+                      color={CUISINE_COLOR}
+                      establishments={r.establishments}
+                      cost={hasPortion ? r.cost_per_portion! : hasKg ? r.cost_per_kg! : null}
+                      costLabel={hasPortion ? "/portion" : hasKg ? "/kg" : undefined}
+                      pv={pv}
+                      pvLabel={hasPortion ? "TTC/portion" : hasKg ? "TTC/kg" : undefined}
+                    />
+                  );
+                })}
+              </SubSection>
+            ))}
+          </Section>
+
+        {/* ── Cocktail ── */}
+          <Section
+            title="Cocktail" color={COCKTAIL_COLOR} count={filteredCocktails.length}
+            open={secOpen.cocktail} onToggle={() => toggleSec("cocktail")}
+            newHref="/recettes/new/cocktail"
+          >
+            {filteredCocktails.map(r => (
+              <RecipeCard
+                key={r.id}
+                name={r.name ?? "Cocktail"}
+                href={`/recettes/cocktail/${r.id}`}
+                prodHref={r.pivot_ingredient_id ? `/recettes/cocktail/${r.id}?mode=production` : undefined}
+                color={COCKTAIL_COLOR}
+                establishments={r.establishments}
+                cost={r.total_cost}
+                pv={r.sell_price}
+                pvLabel="TTC"
+              />
+            ))}
+          </Section>
+
+        {/* ── Empâtement ── */}
+          <Section
+            title="Empâtement" color={EMP_COLOR} count={filteredEmps.length}
+            open={secOpen.empatement} onToggle={() => toggleSec("empatement")}
+            newHref="/recettes/new/empatement"
+          >
+            {filteredEmps.map(r => (
+              <RecipeCard
+                key={r.id}
+                name={r.name}
+                href={`/recettes/empatement/${r.id}`}
+                prodHref={r.pivot_ingredient_id ? `/recettes/empatement/${r.id}?mode=production` : undefined}
+                color={EMP_COLOR}
+              />
+            ))}
+          </Section>
+      </main>
     </>
   );
 }
+
+// ─── Export ───────────────────────────────────────────────────────────────────
 
 export default function RecettesPage() {
   return (
@@ -525,9 +607,7 @@ export default function RecettesPage() {
       fallback={
         <>
           <NavBar />
-          <main className="container">
-            <TopNav title="Recettes" subtitle="Chargement…" />
-          </main>
+          <main className="container"><TopNav title="Recettes" subtitle="Chargement…" /></main>
         </>
       }
     >

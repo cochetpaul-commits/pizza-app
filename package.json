@@ -12,6 +12,7 @@
     "clean": "rm -rf .next node_modules/.cache"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
     "@react-pdf/renderer": "^4.3.2",
     "@supabase/supabase-js": "^2.89.0",
     "dotenv": "^17.3.1",

@@ -67,6 +67,8 @@ export type Ingredient = {
 
   supplier_id: string | null;
   source_prep_recipe_name?: string | null;
+  source?: string | null;
+  recipe_id?: string | null;
 
   status?: IngredientStatus | null;
   status_note?: string | null;

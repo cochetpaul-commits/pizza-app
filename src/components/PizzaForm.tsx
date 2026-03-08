@@ -347,7 +347,7 @@ export default function PizzaForm(props: { pizzaId?: string }) {
 
       const { data: ing, error: ingErr } = await supabase
         .from("ingredients")
-        .select("id,name,category,allergens,is_active,cost_per_unit,piece_weight_g,piece_volume_ml")
+        .select("id,name,category,allergens,is_active,cost_per_unit,piece_weight_g,piece_volume_ml,purchase_price,purchase_unit")
         .order("name", { ascending: true });
 
       if (ingErr) {
@@ -413,8 +413,13 @@ if (offErr) {
         if (!iid) return;
         // Fallback prix
         if (!priceMap[iid] || (!priceMap[iid].g && !priceMap[iid].ml && !priceMap[iid].pcs)) {
-          const cpu = typeof io["cost_per_unit"] === "number" ? io["cost_per_unit"] : 0;
-          if (cpu > 0) priceMap[iid] = { g: cpu };
+          let cpu = typeof io["cost_per_unit"] === "number" ? io["cost_per_unit"] : 0;
+          if (!(cpu > 0)) {
+            const pp = typeof io["purchase_price"] === "number" ? io["purchase_price"] : 0;
+            const pu = typeof io["purchase_unit"] === "number" ? io["purchase_unit"] : 0;
+            if (pp > 0 && pu > 0) cpu = pp / pu;
+          }
+          if (cpu > 0) { priceMap[iid] = { g: cpu }; supplierByIngredient[iid] = "maison"; }
         }
         // Fallback piece_weight_g pour conversion €/pc → €/kg
         if (!metaMap[iid] || !metaMap[iid].piece_weight_g) {
@@ -425,6 +430,56 @@ if (offErr) {
           }
         }
       });
+      // Fallback 2 : kitchen_recipes + prep_recipes → coût/g (par output_ingredient_id OU par nom)
+      const ingNameToId: Record<string, string> = {};
+      const missingIngIds = new Set<string>();
+      (ing ?? []).forEach((ingredient: unknown) => {
+        const io = ingredient as Record<string, unknown>;
+        const iid = String(io["id"] ?? "");
+        if (!iid) return;
+        if (priceMap[iid] && (priceMap[iid].g || priceMap[iid].ml || priceMap[iid].pcs)) return;
+        missingIngIds.add(iid);
+        const iname = String(io["name"] ?? "").toUpperCase().trim();
+        if (iname) ingNameToId[iname] = iid;
+      });
+      if (missingIngIds.size > 0) {
+        const [{ data: krAll }, { data: prAll }] = await Promise.all([
+          supabase.from("kitchen_recipes").select("name,output_ingredient_id,total_cost,yield_grams,cost_per_kg"),
+          supabase.from("prep_recipes").select("name,output_ingredient_id,total_cost,yield_grams"),
+        ]);
+        for (const kr of (krAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; total_cost: number | null; yield_grams: number | null; cost_per_kg: number | null }>) {
+          let cpuG = 0;
+          if (kr.cost_per_kg && kr.cost_per_kg > 0) cpuG = kr.cost_per_kg / 1000;
+          else if (kr.total_cost && kr.total_cost > 0 && kr.yield_grams && kr.yield_grams > 0) cpuG = kr.total_cost / kr.yield_grams;
+          if (cpuG <= 0) continue;
+          if (kr.output_ingredient_id && missingIngIds.has(kr.output_ingredient_id)) {
+            priceMap[kr.output_ingredient_id] = { g: cpuG };
+            supplierByIngredient[kr.output_ingredient_id] = "maison";
+            missingIngIds.delete(kr.output_ingredient_id);
+          }
+          const nk = (kr.name ?? "").toUpperCase().trim();
+          if (nk && ingNameToId[nk] && missingIngIds.has(ingNameToId[nk])) {
+            priceMap[ingNameToId[nk]] = { g: cpuG };
+            supplierByIngredient[ingNameToId[nk]] = "maison";
+            missingIngIds.delete(ingNameToId[nk]);
+          }
+        }
+        for (const pr of (prAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; total_cost: number | null; yield_grams: number | null }>) {
+          if (!pr.total_cost || pr.total_cost <= 0 || !pr.yield_grams || pr.yield_grams <= 0) continue;
+          const cpuG = pr.total_cost / pr.yield_grams;
+          if (pr.output_ingredient_id && missingIngIds.has(pr.output_ingredient_id)) {
+            priceMap[pr.output_ingredient_id] = { g: cpuG };
+            supplierByIngredient[pr.output_ingredient_id] = "maison";
+            missingIngIds.delete(pr.output_ingredient_id);
+          }
+          const nk = (pr.name ?? "").toUpperCase().trim();
+          if (nk && ingNameToId[nk] && missingIngIds.has(ingNameToId[nk])) {
+            priceMap[ingNameToId[nk]] = { g: cpuG };
+            supplierByIngredient[ingNameToId[nk]] = "maison";
+            missingIngIds.delete(ingNameToId[nk]);
+          }
+        }
+      }
       setPriceByIngredient(priceMap);
 setOfferMetaByIngredient(metaMap);
 setSupplierByIngredient(supplierByIngredient);

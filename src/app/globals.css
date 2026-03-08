@@ -276,6 +276,16 @@ textarea.input{
   margin: 0;
 }
 
+/* Pivot input (Mode Production) — no spinners */
+.pivotInput::-webkit-outer-spin-button,
+.pivotInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.pivotInput[type="number"] {
+  -moz-appearance: textfield;
+}
+
 .stepInput[type="number"]{
   -moz-appearance: textfield;
 }

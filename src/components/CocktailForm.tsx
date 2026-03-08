@@ -254,7 +254,7 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
 
     const { data: ings, error: iErr } = await supabase
       .from("ingredients")
-      .select("id,name,piece_volume_ml,category")
+      .select("id,name,piece_volume_ml,category,cost_per_unit,purchase_price,purchase_unit")
       .eq("is_active", true)
       .order("name", { ascending: true });
 
@@ -290,6 +290,65 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
       };
       const sid = String(o["supplier_id"] ?? "");
       supplierByIng[iid] = sid ? (supplierNameById[sid] ?? sid.slice(0, 6)) : null;
+    }
+    // Fallback : cost_per_unit ou purchase_price/purchase_unit (recettes maison)
+    for (const i of ingList) {
+      if (pm[i.id] && (pm[i.id].g || pm[i.id].ml || pm[i.id].pcs)) continue;
+      const io = i as unknown as Record<string, unknown>;
+      let cpu = typeof io["cost_per_unit"] === "number" ? (io["cost_per_unit"] as number) : 0;
+      if (!(cpu > 0)) {
+        const pp = typeof io["purchase_price"] === "number" ? (io["purchase_price"] as number) : 0;
+        const pu = typeof io["purchase_unit"] === "number" ? (io["purchase_unit"] as number) : 0;
+        if (pp > 0 && pu > 0) cpu = pp / pu;
+      }
+      if (cpu > 0) { pm[i.id] = { g: cpu }; supplierByIng[i.id] = "maison"; }
+    }
+    // Fallback 2 : kitchen_recipes + prep_recipes → coût/g (par output_ingredient_id OU par nom)
+    const ingNameToId: Record<string, string> = {};
+    const missingIngIds = new Set<string>();
+    for (const i of ingList) {
+      if (pm[i.id] && (pm[i.id].g || pm[i.id].ml || pm[i.id].pcs)) continue;
+      missingIngIds.add(i.id);
+      const nk = (i.name ?? "").toUpperCase().trim();
+      if (nk) ingNameToId[nk] = i.id;
+    }
+    if (missingIngIds.size > 0) {
+      const [{ data: krAll }, { data: prAll }] = await Promise.all([
+        supabase.from("kitchen_recipes").select("name,output_ingredient_id,total_cost,yield_grams,cost_per_kg"),
+        supabase.from("prep_recipes").select("name,output_ingredient_id,total_cost,yield_grams"),
+      ]);
+      for (const kr of (krAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; total_cost: number | null; yield_grams: number | null; cost_per_kg: number | null }>) {
+        let cpuG = 0;
+        if (kr.cost_per_kg && kr.cost_per_kg > 0) cpuG = kr.cost_per_kg / 1000;
+        else if (kr.total_cost && kr.total_cost > 0 && kr.yield_grams && kr.yield_grams > 0) cpuG = kr.total_cost / kr.yield_grams;
+        if (cpuG <= 0) continue;
+        if (kr.output_ingredient_id && missingIngIds.has(kr.output_ingredient_id)) {
+          pm[kr.output_ingredient_id] = { g: cpuG };
+          supplierByIng[kr.output_ingredient_id] = "maison";
+          missingIngIds.delete(kr.output_ingredient_id);
+        }
+        const nk = (kr.name ?? "").toUpperCase().trim();
+        if (nk && ingNameToId[nk] && missingIngIds.has(ingNameToId[nk])) {
+          pm[ingNameToId[nk]] = { g: cpuG };
+          supplierByIng[ingNameToId[nk]] = "maison";
+          missingIngIds.delete(ingNameToId[nk]);
+        }
+      }
+      for (const pr of (prAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; total_cost: number | null; yield_grams: number | null }>) {
+        if (!pr.total_cost || pr.total_cost <= 0 || !pr.yield_grams || pr.yield_grams <= 0) continue;
+        const cpuG = pr.total_cost / pr.yield_grams;
+        if (pr.output_ingredient_id && missingIngIds.has(pr.output_ingredient_id)) {
+          pm[pr.output_ingredient_id] = { g: cpuG };
+          supplierByIng[pr.output_ingredient_id] = "maison";
+          missingIngIds.delete(pr.output_ingredient_id);
+        }
+        const nk = (pr.name ?? "").toUpperCase().trim();
+        if (nk && ingNameToId[nk] && missingIngIds.has(ingNameToId[nk])) {
+          pm[ingNameToId[nk]] = { g: cpuG };
+          supplierByIng[ingNameToId[nk]] = "maison";
+          missingIngIds.delete(ingNameToId[nk]);
+        }
+      }
     }
     setPriceMap(pm);
 
