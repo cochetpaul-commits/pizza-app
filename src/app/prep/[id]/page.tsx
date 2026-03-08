@@ -11,6 +11,8 @@ import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
 import { NavBar } from "@/components/NavBar";
+import { AllergenBadges } from "@/components/AllergenBadges";
+import { parseAllergens, mergeAllergens } from "@/lib/allergens";
 
 type Ingredient = {
   id: string;
@@ -18,6 +20,7 @@ type Ingredient = {
   cost_per_unit: number | null;
   is_active?: boolean;
   category?: string | null;
+  allergens?: string | null;
 };
 
 type PrepRecipe = {
@@ -162,6 +165,11 @@ export default function PrepRecipeDetailPage() {
     [ingredients]
   );
 
+  const prepAllergens = useMemo(
+    () => mergeAllergens(lines.map(l => parseAllergens(ingredientById.get(l.ingredient_id)?.allergens))),
+    [lines, ingredientById]
+  );
+
   const pivotIngredient = useMemo(() => {
     if (!recipe) return null;
     if (!recipe.pivot_ingredient_id) return null;
@@ -173,7 +181,7 @@ export default function PrepRecipeDetailPage() {
       id: i.id,
       name: i.name,
       category: i.category ?? null,
-      isPreparation: i.category === "preparation" || i.category === "recette",
+      isPreparation: i.category === "preparation",
       rightTop: priceLabelByIngredient[i.id] ?? null,
     })),
     [ingredients, priceLabelByIngredient]
@@ -186,7 +194,7 @@ export default function PrepRecipeDetailPage() {
         id: i.id,
         name: i.name,
         category: i.category ?? null,
-        isPreparation: i.category === "preparation" || i.category === "recette",
+        isPreparation: i.category === "preparation",
         rightTop: priceLabelByIngredient[i.id] ?? null,
       })),
     [ingredients, recipe, priceLabelByIngredient]
@@ -285,7 +293,7 @@ export default function PrepRecipeDetailPage() {
 
       const { data: ing, error: eI } = await supabase
         .from("ingredients")
-        .select("id,name,cost_per_unit,is_active,category,piece_weight_g,piece_volume_ml")
+        .select("id,name,cost_per_unit,is_active,category,piece_weight_g,piece_volume_ml,allergens")
         .eq("is_active", true)
         .order("name");
 
@@ -1013,6 +1021,12 @@ export default function PrepRecipeDetailPage() {
           </div>
         </div>
       </div>
+      {/* Allergènes */}
+      <div className="card" style={{ marginTop: 12, marginBottom: 12 }}>
+        <div className="muted" style={{ marginBottom: 8 }}>Allergènes</div>
+        <AllergenBadges allergens={prepAllergens} />
+      </div>
+
     </main>
     </>
   );

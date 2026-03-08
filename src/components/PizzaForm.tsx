@@ -12,6 +12,8 @@ import type { Ingredient, PizzaIngredientRow, UnitType } from "@/lib/types";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { TopNav } from "@/components/TopNav";
 import { NavBar } from "@/components/NavBar";
+import { AllergenBadges } from "@/components/AllergenBadges";
+import { parseAllergens, mergeAllergens } from "@/lib/allergens";
 
 type DoughRecipeRow = {
   id: string;
@@ -136,6 +138,12 @@ export default function PizzaForm(props: { pizzaId?: string }) {
     () => new Map((ingredients ?? []).map((i) => [String(i.id), i])),
     [ingredients]
   );
+
+  const recipeAllergens = useMemo(
+    () => mergeAllergens(rows.map(r => parseAllergens(ingredientById.get(r.ingredient_id)?.allergens))),
+    [rows, ingredientById]
+  );
+
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, { g?: number; ml?: number; pcs?: number }>>({});
   const [supplierByIngredient, setSupplierByIngredient] = useState<Record<string, string | null>>({});
   const [offerMetaByIngredient, setOfferMetaByIngredient] = useState<Record<string, { density_kg_per_l?: number | null; piece_weight_g?: number | null }>>({});
@@ -976,7 +984,13 @@ setPriceLabelByIngredient(priceLabelMap);
         />
       </div>
 
-      {/* 7. Photo (pour PDF uniquement) */}
+      {/* 7. Allergènes */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="muted" style={{ marginBottom: 8 }}>Allergènes</div>
+        <AllergenBadges allergens={recipeAllergens} />
+      </div>
+
+      {/* 8. Photo (pour PDF uniquement) */}
       <div className="card" style={{ marginTop: 16 }}>
         <div className="muted" style={{ marginBottom: 8 }}>Photo (pour export PDF uniquement)</div>
         <div

@@ -11,6 +11,8 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import type { Ingredient } from "@/lib/types";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
+import { AllergenBadges } from "@/components/AllergenBadges";
+import { parseAllergens, mergeAllergens } from "@/lib/allergens";
 
 type VatRate = 0.055 | 0.1 | 0.2;
 
@@ -151,6 +153,11 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     [ingredients]
   );
 
+  const recipeAllergens = useMemo(
+    () => mergeAllergens((lines ?? []).map(l => parseAllergens(ingredientById.get(l.ingredient_id)?.allergens))),
+    [lines, ingredientById]
+  );
+
   const [form, setForm] = useState<{
     name: string;
     category: string;
@@ -185,7 +192,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
       id: i.id,
       name: i.name,
       category: i.category ? String(i.category) : null,
-      isPreparation: i.category === "preparation" || i.category === "recette",
+      isPreparation: i.category === "preparation",
       rightTop: priceLabelByIngredient[i.id] ?? null,
     })),
     [ingredients, priceLabelByIngredient]
@@ -1363,6 +1370,11 @@ if (supplierIds.length) {
             value={form.procedure}
             onChange={(e) => setForm((p) => (p ? { ...p, procedure: e.target.value } : p))}
           />
+        </div>
+
+        <div style={{ marginTop: 12, ...card }}>
+          <div style={{ fontSize: 16, fontWeight: 950, marginBottom: 10 }}>Allergènes</div>
+          <AllergenBadges allergens={recipeAllergens} />
         </div>
 
         <div style={{ height: 28 }} />
