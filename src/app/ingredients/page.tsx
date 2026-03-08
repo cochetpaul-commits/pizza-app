@@ -58,22 +58,6 @@ const CAT_LABELS: Record<Category, string> = {
   autre:              "Autre",
 };
 
-const CAT_EMOJIS: Record<Category, string> = {
-  cremerie_fromage:   "🧀",
-  charcuterie_viande: "🥩",
-  maree:              "🐟",
-  alcool_spiritueux:  "🍷",
-  boisson:            "🫗",
-  legumes_herbes:     "🥦",
-  fruit:              "🍎",
-  epicerie_salee:     "🫙",
-  epicerie_sucree:    "🍯",
-  preparation:        "🍳",
-  sauce:              "🫒",
-  antipasti:          "🫒",
-  emballage:          "📦",
-  autre:              "📌",
-};
 
 function statusLabel(s: IngredientStatus): string {
   if (s === "validated") return "validé";
@@ -1273,7 +1257,6 @@ function IngredientsPageInner() {
               onClick={() => toggleCat(cat)}
               className="flex items-center gap-2 w-full px-[14px] py-2 bg-black/[.04] border border-black/[.08] rounded-[10px] cursor-pointer text-left font-[inherit]"
             >
-              <span className="text-[18px]">{CAT_EMOJIS[cat]}</span>
               <span className="font-extrabold text-[14px]" style={{ color: CAT_COLORS[cat] }}>{CAT_LABELS[cat]}</span>
               <span className="text-[13px] text-[#999]">({catItems.length})</span>
               <span className="ml-auto text-[12px] text-[#666]">{isCollapsed ? "▶" : "▼"}</span>

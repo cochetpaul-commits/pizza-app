@@ -235,7 +235,7 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
         id: i.id,
         name: i.name ?? "",
         category: cat,
-        isPreparation: cat === "preparation" || cat === "recette",
+        isPreparation: cat === "preparation",
         rightTop: priceLabelByIngredient[i.id] ?? null,
       };
     }),

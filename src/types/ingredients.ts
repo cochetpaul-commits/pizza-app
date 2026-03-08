@@ -1,21 +1,18 @@
 export const CATEGORIES = [
-  "cremerie",
-  "fromage",
-  "charcuterie",
-  "viande",
+  "cremerie_fromage",
+  "charcuterie_viande",
   "maree",
+  "alcool_spiritueux",
   "boisson",
-  "alcool",
-  "epicerie",
-  "legume",
+  "legumes_herbes",
   "fruit",
-  "herbe",
+  "epicerie_salee",
+  "epicerie_sucree",
   "preparation",
-  "autre",
-  "recette",
   "sauce",
-  "surgele",
+  "antipasti",
   "emballage",
+  "autre",
 ] as const;
 
 export type Category = (typeof CATEGORIES)[number];
@@ -25,23 +22,20 @@ export type IngredientStatus = "to_check" | "validated" | "unknown";
 export type Tab = IngredientStatus | "all";
 
 export const CAT_COLORS: Record<Category, string> = {
-  cremerie:    "#D97706", // ambre orange
-  fromage:     "#CA8A04", // jaune doré (distinct de l'ambre)
-  charcuterie: "#DC2626", // rouge vif
-  viande:      "#991B1B", // rouge sombre/marron
-  maree:       "#0284C7", // bleu ciel
-  boisson:     "#0D9488", // teal
-  alcool:      "#7C3AED", // violet
-  epicerie:    "#1E40AF", // bleu marine (distinct du violet et du bleu ciel)
-  legume:      "#16A34A", // vert vif
-  fruit:       "#EA580C", // orange vif (distinct de l'ambre)
-  herbe:       "#4D7C0F", // vert olive (distinct du vert vif)
-  preparation: "#C026D3", // magenta/fuchsia
-  sauce:       "#9D174D", // rose foncé/bordeaux
-  surgele:     "#0891B2", // cyan (distinct du bleu ciel et marine)
-  recette:     "#1E293B", // ardoise très sombre
-  emballage:   "#78716C", // gris chaud
-  autre:       "#6B7280", // gris neutre
+  cremerie_fromage:   "#D97706", // ambre orange
+  charcuterie_viande: "#DC2626", // rouge vif
+  maree:              "#0284C7", // bleu ciel
+  alcool_spiritueux:  "#7C3AED", // violet
+  boisson:            "#0D9488", // teal
+  legumes_herbes:     "#16A34A", // vert vif
+  fruit:              "#EA580C", // orange vif
+  epicerie_salee:     "#1E40AF", // bleu marine
+  epicerie_sucree:    "#92400E", // brun
+  preparation:        "#C026D3", // magenta/fuchsia
+  sauce:              "#9D174D", // rose foncé/bordeaux
+  antipasti:          "#CA8A04", // jaune doré
+  emballage:          "#78716C", // gris chaud
+  autre:              "#6B7280", // gris neutre
 };
 
 export type Supplier = {

@@ -169,7 +169,7 @@ export default function RecipePage() {
 
   const flourOptions = useMemo(() => {
   return (ingredients ?? [])
-    .filter((i) => (i?.is_active ?? true) !== false && i?.category === "epicerie")
+    .filter((i) => (i?.is_active ?? true) !== false && i?.category === "epicerie_salee" || i?.category === "epicerie_sucree")
     .map((i) => {
       const iid = String(i.id);
       const cpuG = n2(priceByIngredient[iid]?.g ?? i.cost_per_unit);

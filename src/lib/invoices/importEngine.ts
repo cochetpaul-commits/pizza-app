@@ -286,7 +286,7 @@ export async function runImport(options: {
 
       // piece_volume_ml : valeur parsée, ou 750ml par défaut pour les boissons/alcools
       let pieceVolumeMl: number | null = l.piece_volume_ml ?? null;
-      if (pieceVolumeMl == null && l.unit === "pc" && (cat === "alcool" || cat === "boisson")) {
+      if (pieceVolumeMl == null && l.unit === "pc" && (cat === "alcool_spiritueux" || cat === "boisson")) {
         pieceVolumeMl = 750;
       }
 

@@ -49,12 +49,15 @@ const styles = StyleSheet.create({
 });
 
 const CAT_LABELS: Record<string, string> = {
-  viande: "Viande", poisson: "Poisson", legume: "Légume", fromage: "Fromage",
-  charcuterie: "Charcuterie", epicerie: "Épicerie", boisson: "Boisson",
-  alcool: "Alcool", preparation: "Préparation", autre: "Autre",
+  cremerie_fromage: "Crémerie / Fromage", charcuterie_viande: "Charcuterie / Viande",
+  maree: "Marée", alcool_spiritueux: "Alcool / Spiritueux", boisson: "Boissons",
+  legumes_herbes: "Légumes / Herbes", fruit: "Fruits",
+  epicerie_salee: "Épicerie Salée", epicerie_sucree: "Épicerie Sucrée",
+  preparation: "Préparation", sauce: "Sauce", antipasti: "Antipasti",
+  emballage: "Emballage", autre: "Autre",
 };
 
-const CAT_ORDER = ["cremerie","fromage","charcuterie","viande","maree","boisson","alcool","epicerie","legume","fruit","herbe","preparation","sauce","surgele","recette","emballage","autre"];
+const CAT_ORDER = ["cremerie_fromage","charcuterie_viande","maree","alcool_spiritueux","boisson","legumes_herbes","fruit","epicerie_salee","epicerie_sucree","preparation","sauce","antipasti","emballage","autre"];
 
 function groupRows(rows: MercurialeRow[], groupBy: "category" | "supplier" | "alpha") {
   const sorted = [...rows].sort((a, b) => {

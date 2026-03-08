@@ -200,7 +200,7 @@ export default function PizzaIngredientList(props: Props) {
         id,
         name: String(i.name ?? ""),
         category: cat,
-        isPreparation: cat === "preparation" || cat === "recette",
+        isPreparation: cat === "preparation",
         rightTop: priceLabelByIngredient?.[id] ?? null,
       };
     });

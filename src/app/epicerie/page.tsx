@@ -36,6 +36,15 @@ type CalcLine = {
   pieceQtyOverride: number | null;
 };
 
+const CAT_LABELS: Record<Category, string> = {
+  cremerie_fromage: "Crémerie / Fromage", charcuterie_viande: "Charcuterie / Viande",
+  maree: "Marée", alcool_spiritueux: "Alcool / Spiritueux", boisson: "Boissons",
+  legumes_herbes: "Légumes / Herbes", fruit: "Fruits",
+  epicerie_salee: "Épicerie Salée", epicerie_sucree: "Épicerie Sucrée",
+  preparation: "Préparation", sauce: "Sauce", antipasti: "Antipasti",
+  emballage: "Emballage", autre: "Autre",
+};
+
 const TVA_OPTIONS = [5.5, 10, 20];
 const ROUND_OPTIONS = [0.05, 0.10, 0.50, 1.0];
 
@@ -194,7 +203,7 @@ export default function EpiceriePage() {
               </select>
               <select style={{ ...sel, width: "100%" }} value={filterCat} onChange={e => setFilterCat(e.target.value as "all" | Category)}>
                 <option value="all">Toutes catégories</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                {CATEGORIES.map(c => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
               </select>
             </div>
 
