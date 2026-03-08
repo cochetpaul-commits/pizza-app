@@ -1,6 +1,7 @@
 import React from "react";
 import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import { formatLiquidQtyParts } from "@/lib/formatUnit";
+import { ALLERGENS } from "@/lib/allergens";
 
 type PdfLine = {
   name: string | null;
@@ -23,6 +24,7 @@ export type KitchenPdfData = {
   logoBase64: string | null;
   photoUrl: string | null;
   accentColor?: string;
+  allergens?: string[];
 };
 
 const DEFAULT_ACCENT = "#8B1A1A";
@@ -217,7 +219,20 @@ function createStyles(ROUGE: string) { return StyleSheet.create({
   },
   allergenLabel: {
     fontSize: 8,
-    color: TEXT,
+    color: MUTED,
+  },
+  allergenCheckPresent: {
+    width: 10,
+    height: 10,
+    borderWidth: 1,
+    borderColor: "#DC2626",
+    borderRadius: 2,
+    backgroundColor: "#DC2626",
+  },
+  allergenLabelPresent: {
+    fontSize: 8,
+    color: "#DC2626",
+    fontWeight: "bold",
   },
 
   /* FOOTER */
@@ -236,22 +251,6 @@ function createStyles(ROUGE: string) { return StyleSheet.create({
   },
 }); }
 
-const ALLERGENS = [
-  "Gluten",
-  "Crustacés",
-  "Œufs",
-  "Poisson",
-  "Arachides",
-  "Soja",
-  "Lait",
-  "Fruits à coque",
-  "Céleri",
-  "Moutarde",
-  "Graines sésame",
-  "Lupin",
-  "Mollusques",
-  "Anhydride sulfureux",
-];
 
 const CATEGORY_LABELS: Record<string, string> = {
   cocktail: "Cocktail",
@@ -366,12 +365,15 @@ export function KitchenPdfDocument({ data }: { data: KitchenPdfData }) {
         {/* ALLERGÈNES */}
         <Text style={styles.sectionTitle}>Allergènes</Text>
         <View style={styles.allergenGrid}>
-          {ALLERGENS.map((a) => (
-            <View key={a} style={styles.allergenItem}>
-              <View style={styles.allergenCheck} />
-              <Text style={styles.allergenLabel}>{a}</Text>
-            </View>
-          ))}
+          {ALLERGENS.map((a) => {
+            const present = (data.allergens ?? []).includes(a);
+            return (
+              <View key={a} style={styles.allergenItem}>
+                <View style={present ? styles.allergenCheckPresent : styles.allergenCheck} />
+                <Text style={present ? styles.allergenLabelPresent : styles.allergenLabel}>{a}</Text>
+              </View>
+            );
+          })}
         </View>
 
         {/* FOOTER */}

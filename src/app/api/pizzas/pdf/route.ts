@@ -7,6 +7,7 @@ import { photoToBase64 } from "@/lib/photoToBase64";
 import fs from "fs";
 import path from "path";
 import { POLE_COLORS } from "@/lib/poleColors";
+import { parseAllergens, mergeAllergens } from "@/lib/allergens";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,7 +55,7 @@ type PiRow = {
   sort_order: number | null;
 };
 
-type IngRow = { id: string; name: string | null };
+type IngRow = { id: string; name: string | null; allergens: unknown };
 
 export async function POST(req: Request) {
   try {
@@ -117,11 +118,15 @@ export async function POST(req: Request) {
 
     const ingredientIds = Array.from(new Set(piRows.map((r) => r.ingredient_id)));
     const ingMap = new Map<string, string | null>();
+    const ingAllergens: string[][] = [];
 
     if (ingredientIds.length) {
-      const { data: ings, error: iErr } = await supabase.from("ingredients").select("id,name").in("id", ingredientIds);
+      const { data: ings, error: iErr } = await supabase.from("ingredients").select("id,name,allergens").in("id", ingredientIds);
       if (!iErr && ings) {
-        for (const it of ings as IngRow[]) ingMap.set(it.id, it.name ?? null);
+        for (const it of ings as IngRow[]) {
+          ingMap.set(it.id, it.name ?? null);
+          ingAllergens.push(parseAllergens(it.allergens));
+        }
       }
     }
 
@@ -158,6 +163,7 @@ export async function POST(req: Request) {
       photoUrl,
       logoBase64,
       accentColor: POLE_COLORS.pizza,
+      allergens: mergeAllergens(ingAllergens),
     };
 
     const documentElement = PizzaPdfDocument({ data }) as unknown as React.ReactElement<DocumentProps>;

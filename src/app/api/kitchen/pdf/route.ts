@@ -7,6 +7,7 @@ import { photoToBase64 } from "@/lib/photoToBase64";
 import fs from "fs";
 import path from "path";
 import { POLE_COLORS } from "@/lib/poleColors";
+import { parseAllergens, mergeAllergens } from "@/lib/allergens";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,6 +68,7 @@ type IngRow = {
   id: string;
   name: string | null;
   cost_per_unit: number | null;
+  allergens: unknown;
 };
 
 export async function POST(req: Request) {
@@ -114,17 +116,19 @@ export async function POST(req: Request) {
     const ingredientIds = Array.from(new Set(lineRows.map((r) => String(r.ingredient_id || "")).filter(Boolean)));
 
     const ingMap = new Map<string, { name: string | null; cpu: number }>();
+    const ingAllergens: string[][] = [];
 
     if (ingredientIds.length) {
       const { data: ings, error: iErr } = await supabase
         .from("ingredients")
-        .select("id,name,cost_per_unit")
+        .select("id,name,cost_per_unit,allergens")
         .in("id", ingredientIds);
 
       if (iErr) return NextResponse.json({ message: iErr.message, details: iErr.details ?? null }, { status: 500 });
 
       for (const it of (ings ?? []) as IngRow[]) {
         ingMap.set(String(it.id), { name: it.name ?? null, cpu: n2(it.cost_per_unit) });
+        ingAllergens.push(parseAllergens(it.allergens));
       }
     }
 
@@ -167,6 +171,7 @@ export async function POST(req: Request) {
       logoBase64,
       photoUrl,
       accentColor: POLE_COLORS.cuisine,
+      allergens: mergeAllergens(ingAllergens),
     };
 
     const documentElement = KitchenPdfDocument({ data }) as unknown as React.ReactElement<DocumentProps>;
