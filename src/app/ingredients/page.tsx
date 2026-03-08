@@ -37,47 +37,42 @@ import { detectCategoryFromName } from "@/lib/invoices/categoryDetector";
 import { PriceAlertsPanel } from "@/components/PriceAlertsPanel";
 import { NavBar } from "@/components/NavBar";
 import { fetchPriceAlerts, type PriceAlert } from "@/lib/priceAlerts";
+import { ALLERGENS, ALLERGEN_SHORT, parseAllergens } from "@/lib/allergens";
 
 type OfferPayload = Record<string, unknown>;
 
 const CAT_LABELS: Record<Category, string> = {
-  cremerie:    "Crémerie",
-  fromage:     "Fromages",
-  charcuterie: "Charcuterie",
-  viande:      "Viandes",
-  maree:       "Marée",
-  boisson:     "Boissons",
-  alcool:      "Alcools",
-  epicerie:    "Épicerie",
-  legume:      "Légumes",
-  fruit:       "Fruits",
-  herbe:       "Herbes & aromates",
-  preparation: "Préparations",
-  sauce:       "Sauces",
-  surgele:     "Surgelés",
-  recette:     "Recettes",
-  emballage:   "Emballages",
-  autre:       "Autre",
+  cremerie_fromage:   "Crémerie / Fromage",
+  charcuterie_viande: "Charcuterie / Viande",
+  maree:              "Marée",
+  alcool_spiritueux:  "Alcool / Spiritueux",
+  boisson:            "Boissons",
+  legumes_herbes:     "Légumes / Herbes",
+  fruit:              "Fruits",
+  epicerie_salee:     "Épicerie Salée",
+  epicerie_sucree:    "Épicerie Sucrée",
+  preparation:        "Préparation",
+  sauce:              "Sauce",
+  antipasti:          "Antipasti",
+  emballage:          "Emballage",
+  autre:              "Autre",
 };
 
 const CAT_EMOJIS: Record<Category, string> = {
-  cremerie:    "🥛",
-  fromage:     "🧀",
-  charcuterie: "🥓",
-  viande:      "🥩",
-  maree:       "🐟",
-  boisson:     "🫗",
-  alcool:      "🍷",
-  epicerie:    "🫙",
-  legume:      "🥦",
-  fruit:       "🍎",
-  herbe:       "🌿",
-  preparation: "🍳",
-  sauce:       "🫒",
-  surgele:     "❄️",
-  recette:     "📝",
-  emballage:   "📦",
-  autre:       "📌",
+  cremerie_fromage:   "🧀",
+  charcuterie_viande: "🥩",
+  maree:              "🐟",
+  alcool_spiritueux:  "🍷",
+  boisson:            "🫗",
+  legumes_herbes:     "🥦",
+  fruit:              "🍎",
+  epicerie_salee:     "🫙",
+  epicerie_sucree:    "🍯",
+  preparation:        "🍳",
+  sauce:              "🫒",
+  antipasti:          "🫒",
+  emballage:          "📦",
+  autre:              "📌",
 };
 
 function statusLabel(s: IngredientStatus): string {
@@ -384,6 +379,7 @@ function IngredientsPageInner() {
     packEachUnit: "kg" | "l" | "pc";
     packPieceWeightG: string;
     pieceVolumeMl: string;
+    allergens: string[];
   } | null>(null);
 
   function handleNewNameChange(value: string) {
@@ -705,7 +701,7 @@ function IngredientsPageInner() {
         if (fromForm != null && fromForm > 0) return fromForm;
         const fromName = extractVolumeFromName(name);
         if (fromName != null) return fromName;
-        if (newCategory === "alcool" || newCategory === "boisson") return 750;
+        if (newCategory === "alcool_spiritueux" || newCategory === "boisson") return 750;
         return null;
       })(),
       supplier_id,
@@ -782,6 +778,7 @@ function IngredientsPageInner() {
       packEachQty: off?.pack_each_qty != null ? String(off.pack_each_qty) : "",
       packEachUnit: (off?.pack_each_unit ?? "l") as "kg" | "l" | "pc",
       packPieceWeightG: off?.piece_weight_g != null ? String(off.piece_weight_g) : "",
+      allergens: parseAllergens(x.allergens),
     });
   }
 
@@ -887,6 +884,7 @@ function IngredientsPageInner() {
       is_active: edit.is_active,
       supplier_id,
       piece_volume_ml: parseNum(edit.pieceVolumeMl) ?? null,
+      allergens: edit.allergens.length ? edit.allergens : null,
     };
 
     const u1 = await supabase.from("ingredients").update(up).eq("id", editingId);
@@ -1326,6 +1324,15 @@ function IngredientsPageInner() {
                               {x.status_note ? ` • note: ${x.status_note}` : ""}
                             </div>
                             <>
+                              {(() => { const alg = parseAllergens(x.allergens); return alg.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {alg.map(a => (
+                                    <span key={a} title={a} style={{ fontSize: 9, fontWeight: 800, padding: "1px 5px", borderRadius: 5, background: "rgba(220,38,38,0.08)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.20)" }}>
+                                      {ALLERGEN_SHORT[a as keyof typeof ALLERGEN_SHORT] ?? a}
+                                    </span>
+                                  ))}
+                                </div>
+                              ); })()}
                               {!hasPrice && <div className="mt-1.5"><span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[12px] font-extrabold bg-red-600/10 text-red-600 border border-red-600/25">prix manquant</span></div>}
                               {st !== "validated" && (
                                 <div className="flex gap-1.5 mt-2 flex-wrap">
@@ -1394,6 +1401,16 @@ function IngredientsPageInner() {
                                 </div>
                                 <div className="text-[17px]" style={{ fontWeight: 950 }}>{price}</div>
                               </div>
+                              {/* Allergènes */}
+                              {(() => { const alg = parseAllergens(x.allergens); return alg.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {alg.map(a => (
+                                    <span key={a} title={a} style={{ fontSize: 9, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "rgba(220,38,38,0.08)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.18)" }}>
+                                      {ALLERGEN_SHORT[a as keyof typeof ALLERGEN_SHORT] ?? a}
+                                    </span>
+                                  ))}
+                                </div>
+                              ); })()}
                               {/* Prix manquant */}
                               {!hasPrice && <div className="mt-1"><span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-red-600/10 text-red-600 border border-red-600/25">prix manquant</span></div>}
                               {/* Ligne 3 : Actions */}
@@ -1506,6 +1523,41 @@ function IngredientsPageInner() {
                                 )}
                               </>
                             )}
+
+                            {/* ── Allergènes ── */}
+                            <div className="pt-1">
+                              <div className="text-[11px] font-extrabold opacity-60 mb-2 uppercase tracking-wide">Allergènes</div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {ALLERGENS.map(a => {
+                                  const checked = edit.allergens.includes(a);
+                                  return (
+                                    <label key={a}
+                                      title={a}
+                                      style={{
+                                        display: "inline-flex", alignItems: "center", gap: 4,
+                                        padding: "3px 8px", borderRadius: 8, cursor: "pointer",
+                                        fontSize: 11, fontWeight: 800,
+                                        background: checked ? "rgba(220,38,38,0.12)" : "rgba(0,0,0,0.04)",
+                                        border: `1px solid ${checked ? "rgba(220,38,38,0.35)" : "rgba(0,0,0,0.10)"}`,
+                                        color: checked ? "#DC2626" : "#6B6257",
+                                        transition: "all 120ms",
+                                      }}>
+                                      <input type="checkbox" checked={checked} style={{ margin: 0 }}
+                                        onChange={() => setEdit({
+                                          ...edit,
+                                          allergens: checked
+                                            ? edit.allergens.filter(v => v !== a)
+                                            : [...edit.allergens, a],
+                                        })} />
+                                      {ALLERGEN_SHORT[a]}
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                              <div className="muted text-[10px] mt-1">
+                                {edit.allergens.length === 0 ? "Aucun allergène" : edit.allergens.join(" · ")}
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
