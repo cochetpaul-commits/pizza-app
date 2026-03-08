@@ -88,6 +88,16 @@ function parseQty(s: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+function fmtPct1(v: number) {
+  return v.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
+}
+
+const VAT_OPTIONS_COCKTAIL: SmartSelectOption[] = [
+  { id: "5.5", name: "TVA 5,5 %", category: "TVA", rightBottom: "5,5" },
+  { id: "10", name: "TVA 10 %", category: "TVA", rightBottom: "10" },
+  { id: "20", name: "TVA 20 %", category: "TVA", rightBottom: "20" },
+];
+
 /* ── constants ────────────────────────────────────────────────── */
 
 const TYPE_OPTIONS = [
@@ -158,6 +168,9 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
   const [saveOk, setSaveOk] = useState(false);
   const [saveError, setSaveError] = useState<PgError | null>(null);
 
+  const [vatRate, setVatRate] = useState<string>("20");
+  const [marginRateCocktail, setMarginRateCocktail] = useState<string>("80");
+
   /* ── pricing ──────────────────────────────────────────────── */
 
   const ingByVol = useMemo(() => {
@@ -192,6 +205,26 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
     return round2(sum);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines, priceMap, ingByVol]);
+
+  const vatPct = useMemo(() => {
+    const n = Number(String(vatRate).replace(",", "."));
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  }, [vatRate]);
+
+  const marginPctNum = useMemo(() => {
+    const n = Number(String(marginRateCocktail).replace(",", "."));
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  }, [marginRateCocktail]);
+
+  const pricing = useMemo(() => {
+    const m = Math.min(Math.max(marginPctNum, 0), 99.9) / 100;
+    const v = Math.min(Math.max(vatPct, 0), 100) / 100;
+
+    const pvHT = totalCost > 0 && m < 1 ? totalCost / (1 - m) : 0;
+    const pvTTC = pvHT > 0 ? pvHT * (1 + v) : 0;
+
+    return { pvHT, pvTTC, vatPct, marginPct: marginPctNum };
+  }, [totalCost, vatPct, marginPctNum]);
 
   /* ── ingredient options ───────────────────────────────────── */
 
@@ -748,6 +781,55 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
           if (c == null) return <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>Pas de prix ({fmtQ})</div>;
           return <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>Coût estimé : {fmtMoney(c)} € pour {fmtQ}</div>;
         })()}
+      </div>
+
+      {/* 2b. TVA / MARGE / PRIX CONSEILLÉ */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="cardTitle" style={{ marginBottom: 10 }}>Pricing</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div>
+            <div className="muted" style={{ marginBottom: 6, fontSize: 12 }}>TVA vente</div>
+            <SmartSelect
+              options={VAT_OPTIONS_COCKTAIL}
+              value={vatRate}
+              onChange={(v) => setVatRate(v)}
+              placeholder="TVA…"
+              inputStyle={{ width: "100%" }}
+            />
+          </div>
+          <div>
+            <div className="muted" style={{ marginBottom: 6, fontSize: 12 }}>Marge (taux de marque %)</div>
+            <input
+              className="input"
+              inputMode="decimal"
+              value={marginRateCocktail}
+              onChange={(e) => setMarginRateCocktail(e.target.value)}
+              style={{ textAlign: "center", fontWeight: 950 }}
+            />
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 12 }}>
+          <div className="card" style={{ padding: 12 }}>
+            <div className="muted" style={{ fontSize: 12 }}>Coût matière</div>
+            <div style={{ fontSize: 22, fontWeight: 900 }}>{totalCost > 0 ? `${fmtMoney(totalCost)} €` : "—"}</div>
+          </div>
+          <div className="card" style={{ padding: 12 }}>
+            <div className="muted" style={{ fontSize: 12 }}>Prix conseillé HT</div>
+            <div style={{ fontSize: 22, fontWeight: 900 }}>{pricing.pvHT > 0 ? `${fmtMoney(pricing.pvHT)} €` : "—"}</div>
+            <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>Marge {fmtPct1(pricing.marginPct)}</div>
+          </div>
+          <div className="card" style={{ padding: 12 }}>
+            <div className="muted" style={{ fontSize: 12 }}>Prix conseillé TTC</div>
+            <div style={{ fontSize: 22, fontWeight: 900 }}>{pricing.pvTTC > 0 ? `${fmtMoney(pricing.pvTTC)} €` : "—"}</div>
+            <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>TVA {fmtPct1(pricing.vatPct)}</div>
+          </div>
+          <div className="card" style={{ padding: 12 }}>
+            <div className="muted" style={{ fontSize: 12 }}>Prix de vente</div>
+            <div style={{ fontSize: 22, fontWeight: 900 }}>{sellPriceNum != null ? `${fmtMoney(sellPriceNum)} €` : "—"}</div>
+            {margin != null && <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>Marge réelle {fmtMoney(margin)} %</div>}
+          </div>
+        </div>
       </div>
 
       {/* 3. PHOTO */}

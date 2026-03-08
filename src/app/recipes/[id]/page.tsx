@@ -8,7 +8,7 @@ import { calculerPate } from "@/lib/pateEngine";
 import { TopNav } from "@/components/TopNav";
 import { NavBar } from "@/components/NavBar";
 import NumberStepper from "@/components/NumberStepper";
-import { SmartSelect } from "@/components/SmartSelect";
+import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 
 function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
@@ -93,6 +93,16 @@ function fmtKg3(v: number) {
   return n2(v).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + " €/kg";
 }
 
+function fmtPct1(v: number) {
+  return v.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
+}
+
+const VAT_OPTIONS: SmartSelectOption[] = [
+  { id: "5.5", name: "TVA 5,5 %", category: "TVA", rightBottom: "5,5" },
+  { id: "10", name: "TVA 10 %", category: "TVA", rightBottom: "10" },
+  { id: "20", name: "TVA 20 %", category: "TVA", rightBottom: "20" },
+];
+
 function keyName(s: string) {
   return (s ?? "")
     .toString()
@@ -153,6 +163,9 @@ export default function RecipePage() {
 
   const [saveState, setSaveState] = useState<{ saving: boolean; error?: unknown; ok?: boolean }>({ saving: false });
   const [pdfState, setPdfState] = useState<{ exporting: boolean; error?: unknown; ok?: boolean }>({ exporting: false });
+
+  const [vatRate, setVatRate] = useState<string>("10");
+  const [marginRate, setMarginRate] = useState<string>("75");
 
   const flourOptions = useMemo(() => {
   return (ingredients ?? [])
@@ -332,6 +345,29 @@ export default function RecipePage() {
     form?.flourB_percent,
     nbPatons,
   ]);
+
+  const vatPct = useMemo(() => {
+    const n = Number(String(vatRate).replace(",", "."));
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  }, [vatRate]);
+
+  const marginPctNum = useMemo(() => {
+    const n = Number(String(marginRate).replace(",", "."));
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  }, [marginRate]);
+
+  const pricing = useMemo(() => {
+    const m = Math.min(Math.max(marginPctNum, 0), 99.9) / 100;
+    const v = Math.min(Math.max(vatPct, 0), 100) / 100;
+
+    const pvKgHT = costing.costPerKg > 0 && m < 1 ? costing.costPerKg / (1 - m) : 0;
+    const pvKgTTC = pvKgHT > 0 ? pvKgHT * (1 + v) : 0;
+
+    const pvBallHT = costing.costPerBall > 0 && m < 1 ? costing.costPerBall / (1 - m) : 0;
+    const pvBallTTC = pvBallHT > 0 ? pvBallHT * (1 + v) : 0;
+
+    return { pvKgHT, pvKgTTC, pvBallHT, pvBallTTC, vatPct, marginPct: marginPctNum };
+  }, [costing.costPerKg, costing.costPerBall, vatPct, marginPctNum]);
 
   useEffect(() => {
     const run = async () => {
@@ -878,6 +914,47 @@ export default function RecipePage() {
             <div className="card" style={{ padding: 12 }}>
               <div className="muted" style={{ fontSize: 12 }}>Coût / pâton</div>
               <div style={{ fontSize: 22, fontWeight: 900 }}>{fmtMoney2(costing.costPerBall)}</div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TVA / Marge / Prix conseillé ── */}
+        {costing.missing.length === 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 12 }}>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="muted" style={{ fontSize: 12, fontWeight: 900, marginBottom: 6 }}>TVA vente</div>
+              <SmartSelect
+                options={VAT_OPTIONS}
+                value={vatRate}
+                onChange={(v) => setVatRate(v)}
+                placeholder="TVA…"
+                inputStyle={{ width: "100%", height: 40, fontWeight: 950, borderRadius: 10, textAlign: "center" }}
+              />
+            </div>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="muted" style={{ fontSize: 12, fontWeight: 900, marginBottom: 6 }}>Marge (taux de marque %)</div>
+              <input
+                className="input"
+                inputMode="decimal"
+                value={marginRate}
+                onChange={(e) => setMarginRate(e.target.value)}
+                style={{ height: 40, textAlign: "center", fontWeight: 950 }}
+              />
+              <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>PV HT = Coût / (1 - marge)</div>
+            </div>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="muted" style={{ fontSize: 12, fontWeight: 900 }}>Prix conseillé HT / kg</div>
+              <div style={{ fontSize: 22, fontWeight: 950, marginTop: 2 }}>
+                {pricing.pvKgHT > 0 ? n2(pricing.pvKgHT).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €/kg" : "—"}
+              </div>
+              <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>Marge {fmtPct1(pricing.marginPct)}</div>
+            </div>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="muted" style={{ fontSize: 12, fontWeight: 900 }}>Prix conseillé TTC / pâton</div>
+              <div style={{ fontSize: 22, fontWeight: 950, marginTop: 2 }}>
+                {pricing.pvBallTTC > 0 ? fmtMoney2(pricing.pvBallTTC) : "—"}
+              </div>
+              <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>TVA {fmtPct1(pricing.vatPct)}</div>
             </div>
           </div>
         )}
