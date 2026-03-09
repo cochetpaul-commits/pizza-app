@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback, Suspense } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef, Suspense } from "react";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
-import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { supabase } from "@/lib/supabaseClient";
 import { useDebounce } from "@/lib/useDebounce";
 import { useIngredientsData } from "@/lib/useIngredientsData";
@@ -37,6 +36,8 @@ import { detectCategoryFromName } from "@/lib/invoices/categoryDetector";
 import { PriceAlertsPanel } from "@/components/PriceAlertsPanel";
 import { parseAllergens } from "@/lib/allergens";
 import { CategoryHeader, IngredientRow, type EditState } from "@/components/IngredientRow";
+import DuplicatePanel from "@/components/DuplicatePanel";
+import { detectDuplicates, type DuplicatePair } from "@/lib/duplicateDetection";
 
 type OfferPayload = Record<string, unknown>;
 
@@ -49,23 +50,7 @@ const iCls = "w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text
 const sCls = "w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65";
 const lCls = "text-[12px] opacity-75 mb-1.5";
 
-// ─── Flat list types for virtualisation ────────────────────────────────────
-type VirtualRow =
-  | { type: "header"; cat: Category; count: number }
-  | { type: "item"; item: Ingredient };
-
 // ─── Skeleton loader ──────────────────────────────────────────────────────
-function SkeletonRow({ wide }: { wide?: boolean }) {
-  return (
-    <div style={{ padding: wide ? "10px 16px" : "12px 14px", display: "flex", gap: 12, alignItems: "center", borderBottom: "1px solid #e5ddd0" }}>
-      <div style={{ height: 12, borderRadius: 4, background: "#e5ddd0", width: "35%", animation: "pulse 1.5s ease-in-out infinite" }} />
-      {wide && <div style={{ height: 12, borderRadius: 4, background: "#e5ddd0", width: "12%", animation: "pulse 1.5s ease-in-out infinite", animationDelay: "0.2s" }} />}
-      {wide && <div style={{ height: 12, borderRadius: 4, background: "#e5ddd0", width: "15%", animation: "pulse 1.5s ease-in-out infinite", animationDelay: "0.4s" }} />}
-      <div style={{ height: 12, borderRadius: 4, background: "#e5ddd0", width: "10%", animation: "pulse 1.5s ease-in-out infinite", animationDelay: "0.3s" }} />
-    </div>
-  );
-}
-
 function SkeletonCategoryHeader() {
   return (
     <div style={{ padding: "7px 16px", background: "#f5f0e8", borderBottom: "1px solid #e5ddd0", display: "flex", alignItems: "center", gap: 10 }}>
@@ -91,9 +76,9 @@ function SkeletonTable() {
 function IngredientsPageInner() {
   const router = useRouter();
 
-  const { items, suppliers, offers, alertMap, loading, error: dataError, mutate } = useIngredientsData();
   const [q, setQ] = useState("");
   const debouncedQ = useDebounce(q, 300);
+  const { items, suppliers, offers, alertMap, loading, loadingMore, hasMore, loadMore, error: dataError, mutate } = useIngredientsData(debouncedQ);
 
   const [session, setSession] = useState<Session | null>(null);
 
@@ -147,7 +132,7 @@ function IngredientsPageInner() {
   }, [items]);
 
   const filtered = useMemo(() => {
-    const qq = debouncedQ.trim().toLowerCase();
+    // Text search is server-side (handled by useIngredientsData). Only apply remaining client-side filters.
     let base = items;
     if (tab !== "all") base = base.filter((x) => ((x.status ?? "to_check") as IngredientStatus) === tab);
     if (filterCategory !== "all") base = base.filter((x) => x.category === filterCategory);
@@ -166,9 +151,8 @@ function IngredientsPageInner() {
         return supplierForFilter != null && supplierForFilter === filterSupplier;
       });
     }
-    if (!qq) return base;
-    return base.filter((x) => (x.name ?? "").toLowerCase().includes(qq));
-  }, [items, debouncedQ, tab, filterCategory, filterSupplier, filterEstablishment, includeNoOffer, offersByIngredientId]);
+    return base;
+  }, [items, tab, filterCategory, filterSupplier, filterEstablishment, includeNoOffer, offersByIngredientId]);
 
   const grouped = useMemo(() => {
     const byCategory = new Map<Category, Ingredient[]>();
@@ -203,6 +187,16 @@ function IngredientsPageInner() {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showDuplicates, setShowDuplicates] = useState(false);
+  const [ignoreKeys, setIgnoreKeys] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("ingredient-duplicate-ignores") ?? "[]")); }
+    catch { return new Set(); }
+  });
+
+  const duplicatePairs = useMemo<DuplicatePair[]>(
+    () => detectDuplicates(items, offersByIngredientId, ignoreKeys),
+    [items, offersByIngredientId, ignoreKeys]
+  );
 
   // ─── Stable callbacks ────────────────────────────────────────────────────
   const toggleAll = useCallback(() => {
@@ -524,6 +518,7 @@ function IngredientsPageInner() {
     setEditingId(null); setEdit(null);
     if (backUrl) { router.push(backUrl); return; }
     await mutate();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingId, edit, userId, backUrl, router, mutate]);
 
   const del = useCallback(async (id: string, name: string) => {
@@ -547,34 +542,19 @@ function IngredientsPageInner() {
     setEdit(prev => prev ? { ...prev, importName: next.trim() } : prev);
   }, []);
 
-  // ─── Flat list for virtualisation ────────────────────────────────────────
-  const flatList = useMemo(() => {
-    const result: VirtualRow[] = [];
-    for (const { cat, items: catItems } of grouped) {
-      result.push({ type: "header", cat, count: catItems.length });
-      if (!collapsedCats.has(cat)) {
-        for (const item of catItems) result.push({ type: "item", item });
-      }
-    }
-    return result;
-  }, [grouped, collapsedCats]);
+  // ─── Infinite scroll sentinel ────────────────────────────────────────────
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  // ─── Window virtualizer ──────────────────────────────────────────────────
-  const virtualizer = useWindowVirtualizer({
-    count: flatList.length,
-    estimateSize: (index) => {
-      const row = flatList[index];
-      if (row.type === "header") return 40;
-      if (editingId === row.item.id) return 450;
-      return compactMode ? 50 : 100;
-    },
-    overscan: 10,
-  });
-
-  // Re-measure when editingId or compactMode changes
   useEffect(() => {
-    virtualizer.measure();
-  }, [editingId, compactMode, virtualizer]);
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMore(); },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMore]);
 
   // ?edit=<id> scroll to item
   useEffect(() => {
@@ -583,12 +563,9 @@ function IngredientsPageInner() {
     if (target) {
       startEdit(target);
       setTab("all");
-      // Wait for flatList to include the item, then scroll
+      setCollapsedCats((prev) => { const n = new Set(prev); n.delete(target.category); return n; });
       requestAnimationFrame(() => {
-        const idx = flatList.findIndex(r => r.type === "item" && r.item.id === editParam);
-        if (idx >= 0) {
-          virtualizer.scrollToIndex(idx, { align: "center" });
-        }
+        document.getElementById(`ing-${editParam}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -608,11 +585,18 @@ function IngredientsPageInner() {
   ] as const;
 
   const headerBtnStyle: CSSProperties = {
-    height: 32, padding: "0 14px", borderRadius: 8, fontSize: 13, fontWeight: 600,
-    cursor: "pointer", border: "1px solid #e5ddd0", background: "white", color: "#1a1a1a",
+    height: 34, padding: "0 14px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+    cursor: "pointer", border: "1.5px solid #e5ddd0", background: "white", color: "#1a1a1a",
+    display: "inline-flex", alignItems: "center",
   };
 
-  const virtualItems = virtualizer.getVirtualItems();
+  // Shared select style — appearance:none is required for Chrome/Safari to respect border/radius
+  const selStyle: CSSProperties = {
+    appearance: "none", WebkitAppearance: "none",
+    borderRadius: 10, border: "1.5px solid #e5ddd0",
+    padding: "8px 14px", fontSize: 13,
+    background: "white", color: "#1a1a1a", cursor: "pointer",
+  };
 
   return (
     <div style={{ background: "#f5f0e8", minHeight: "100vh" }}>
@@ -622,7 +606,7 @@ function IngredientsPageInner() {
       ══════════════════════════════════════════════ */}
       <header style={{
         position: "sticky", top: 0, zIndex: 50,
-        background: "#ffffff", borderBottom: "1px solid #e5ddd0",
+        background: "#ffffff", borderBottom: "1.5px solid #e5ddd0",
         height: 56, display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 20px", boxSizing: "border-box",
       }}>
@@ -631,23 +615,27 @@ function IngredientsPageInner() {
           <Link href={backUrl ?? "/"} style={{ color: "#999", fontSize: 13, textDecoration: "none", flexShrink: 0, fontWeight: 500 }}>
             ← {backUrl ? "Retour" : "Accueil"}
           </Link>
-          <span style={{ fontFamily: "'DM Serif Display', Georgia, 'Times New Roman', serif", fontSize: 18, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <span style={{ fontFamily: "var(--font-dm-serif-display), 'DM Serif Display', Georgia, serif", fontSize: 22, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             Index ingrédients
           </span>
         </div>
 
         {/* Right */}
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0, marginLeft: 12 }}>
-          {/* Variations (desktop) */}
-          {userId && (
-            <button
-              onClick={() => setTab(isVariations ? "all" : "variations" as Tab)}
-              className="hidden md:inline-flex"
-              style={{ ...headerBtnStyle, color: isVariations ? "#8B1A1A" : "#1a1a1a", borderColor: isVariations ? "#8B1A1A" : "#e5ddd0" }}
-            >Variations prix</button>
-          )}
           {/* Rafraîchir (desktop) */}
           <button onClick={reload} className="hidden md:inline-flex" style={headerBtnStyle}>Rafraîchir</button>
+          {/* Doublons */}
+          <button onClick={() => setShowDuplicates(true)} style={headerBtnStyle}>
+            Doublons
+            {duplicatePairs.length > 0 && (
+              <span style={{
+                background: "#8B1A1A", color: "white", borderRadius: 10,
+                fontSize: 10, padding: "1px 6px", marginLeft: 5,
+              }}>
+                {duplicatePairs.length}
+              </span>
+            )}
+          </button>
           {/* + Ingrédient */}
           <button
             onClick={() => {
@@ -657,12 +645,9 @@ function IngredientsPageInner() {
                 return next;
               });
             }}
-            style={{ background: "#8B1A1A", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13 }}
+            style={{ background: "#8B1A1A", color: "white", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 13, padding: "8px 16px", whiteSpace: "nowrap" }}
           >
-            <span className="hidden md:inline" style={{ padding: "0 14px", lineHeight: "32px", display: "inline-block" }}>
-              {showCreateForm ? "✕ Fermer" : "+ Ingrédient"}
-            </span>
-            <span className="md:hidden" style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, borderRadius: "50%" }}>+</span>
+            {showCreateForm ? "✕ Fermer" : "+ Ingrédient"}
           </button>
         </div>
       </header>
@@ -670,22 +655,10 @@ function IngredientsPageInner() {
       {/* ══════════════════════════════════════════════
           TOOLBAR
       ══════════════════════════════════════════════ */}
-      <div style={{ position: "sticky", top: 56, zIndex: 40, background: "#faf7f2", borderBottom: "1px solid #e5ddd0" }}>
+      <div style={{ position: "sticky", top: 56, zIndex: 40, background: "white", borderBottom: "1px solid #e5ddd0" }}>
 
-        {/* Desktop tabs — pill */}
-        <div className="hidden md:flex" style={{ padding: "10px 20px 0", gap: 6, alignItems: "center" }}>
-          {TABS_MAIN.map(({ t, label, count }) => (
-            <button key={t} onClick={() => setTab(t)} style={{
-              height: 32, padding: "0 14px", borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: "pointer",
-              border: tab === t ? "1px solid #8B1A1A" : "1px solid #e5ddd0",
-              background: tab === t ? "#8B1A1A" : "white",
-              color: tab === t ? "white" : "#666",
-            }}>{label} ({count})</button>
-          ))}
-        </div>
-
-        {/* Mobile tabs — underline scrollable */}
-        <div className="md:hidden" style={{ overflowX: "auto", display: "flex", background: "white", borderBottom: "1px solid #e5ddd0" }}>
+        {/* Tabs — underline scrollable (all sizes) */}
+        <div style={{ overflowX: "auto", display: "flex", background: "white", borderBottom: "1px solid #e5ddd0" }}>
           {TABS_MAIN.map(({ t, label, count }) => (
             <button key={t} onClick={() => setTab(t)} style={{
               flexShrink: 0, padding: "10px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer",
@@ -708,31 +681,28 @@ function IngredientsPageInner() {
           <>
             {/* Desktop filter row */}
             <div className="hidden md:grid" style={{ gridTemplateColumns: "1fr 1fr 1fr auto auto auto", gap: 8, padding: "10px 20px" }}>
-              <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value as "all" | Category)}
-                style={{ height: 34, borderRadius: 8, border: "1px solid #e5ddd0", padding: "0 10px", fontSize: 12, background: "white", color: "#1a1a1a" }}>
+              <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value as "all" | Category)} style={selStyle}>
                 <option value="all">Toutes catégories</option>
                 {CATEGORIES.map((c) => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
               </select>
-              <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)}
-                style={{ height: 34, borderRadius: 8, border: "1px solid #e5ddd0", padding: "0 10px", fontSize: 12, background: "white", color: "#1a1a1a" }}>
+              <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)} style={selStyle}>
                 <option value="all">Tous fournisseurs</option>
                 {suppliers.filter((s) => s.is_active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
-              <select value={filterEstablishment} onChange={(e) => setFilterEstablishment(e.target.value as "all" | "bellomio" | "piccola" | "both")}
-                style={{ height: 34, borderRadius: 8, border: "1px solid #e5ddd0", padding: "0 10px", fontSize: 12, background: "white", color: "#1a1a1a" }}>
+              <select value={filterEstablishment} onChange={(e) => setFilterEstablishment(e.target.value as "all" | "bellomio" | "piccola" | "both")} style={selStyle}>
                 <option value="all">Tous établissements</option>
                 <option value="bellomio">Bello Mio</option>
                 <option value="piccola">Piccola Mia</option>
                 <option value="both">Les deux</option>
               </select>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} />
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} style={{ accentColor: "#8B1A1A" }} />
                 Sans offre
               </label>
-              <button onClick={toggleAll} style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid #e5ddd0", background: "white", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+              <button onClick={toggleAll} style={{ padding: "8px 14px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {allCollapsed ? "Tout déplier" : "Tout replier"}
               </button>
-              <button onClick={reload} style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid #e5ddd0", background: "white", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              <button onClick={reload} style={{ padding: "8px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "white", fontSize: 14, cursor: "pointer" }}>
                 ↺
               </button>
             </div>
@@ -743,13 +713,13 @@ function IngredientsPageInner() {
                 placeholder="Rechercher un ingrédient…"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                style={{ flex: 1, height: 34, borderRadius: 8, border: "1px solid #e5ddd0", padding: "0 12px", fontSize: 13, background: "white", outline: "none", color: "#1a1a1a" }}
+                style={{ flex: 1, borderRadius: 10, border: "1.5px solid #e5ddd0", padding: "10px 16px", fontSize: 13, background: "white", outline: "none", color: "#1a1a1a" }}
               />
               {/* Mobile only: Filtres + compact */}
-              <button className="md:hidden" onClick={() => setShowFilters(true)} style={{ height: 34, padding: "0 14px", borderRadius: 8, border: "1px solid #e5ddd0", background: "white", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+              <button className="md:hidden" onClick={() => setShowFilters(true)} style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 Filtres{filterActive ? " ●" : ""}
               </button>
-              <button className="md:hidden" onClick={toggleCompact} style={{ height: 34, padding: "0 10px", borderRadius: 8, border: "1px solid #e5ddd0", background: "white", fontSize: 14, cursor: "pointer" }}>
+              <button className="md:hidden" onClick={toggleCompact} style={{ padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "white", fontSize: 14, cursor: "pointer" }}>
                 {compactMode ? "⊞" : "☰"}
               </button>
             </div>
@@ -760,7 +730,7 @@ function IngredientsPageInner() {
       {/* ══════════════════════════════════════════════
           MAIN
       ══════════════════════════════════════════════ */}
-      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "0 20px 60px", boxSizing: "border-box" }}>
+      <main style={{ padding: "0 20px 60px", boxSizing: "border-box" }}>
 
         {/* Variations panel */}
         {isVariations && userId && (
@@ -876,89 +846,69 @@ function IngredientsPageInner() {
                 {/* Desktop thead */}
                 <div className="hidden md:flex" style={{ background: "#ede6d9", padding: "8px 16px", alignItems: "center", gap: 8, borderBottom: "1px solid #e5ddd0" }}>
                   {[
-                    { label: "Désignation", flex: "2.5" },
+                    { label: "Désignation", flex: "3" },
                     { label: "Prix", flex: "1" },
                     { label: "Conditionnement", flex: "1" },
-                    { label: "Statut", flex: "0.8" },
-                    { label: "Fournisseur", flex: "0.8" },
+                    { label: "Statut", flex: "1" },
+                    { label: "Fournisseur", flex: "1" },
                   ].map(({ label, flex }) => (
                     <div key={label} style={{ flex, fontSize: 10, fontWeight: 700, color: "#999999", textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
                   ))}
                   <div style={{ width: 80, fontSize: 10, fontWeight: 700, color: "#999999", textTransform: "uppercase", letterSpacing: 1 }}>Actions</div>
                 </div>
 
-                {/* Virtualised rows */}
-                <div style={{ position: "relative", width: "100%", height: virtualizer.getTotalSize() }}>
-                  {virtualItems.map((virtualRow) => {
-                    const row = flatList[virtualRow.index];
-                    if (row.type === "header") {
+                {/* Rows */}
+                {grouped.map(({ cat, items: catItems }) => (
+                  <div key={cat}>
+                    <CategoryHeader
+                      cat={cat}
+                      count={catItems.length}
+                      isCollapsed={collapsedCats.has(cat)}
+                      onToggle={toggleCat}
+                    />
+                    {!collapsedCats.has(cat) && catItems.map((x) => {
+                      const offer = offersByIngredientId.get(x.id);
+                      const supplierIdForDisplay = offer?.supplier_id ?? x.supplier_id ?? null;
+                      const supplierName = supplierIdForDisplay ? suppliersMap.get(supplierIdForDisplay)?.name ?? null : null;
                       return (
-                        <div
-                          key={`header-${row.cat}`}
-                          data-index={virtualRow.index}
-                          ref={virtualizer.measureElement}
-                          style={{
-                            position: "absolute",
-                            top: 0,
-                            left: 0,
-                            width: "100%",
-                            transform: `translateY(${virtualRow.start}px)`,
-                          }}
-                        >
-                          <CategoryHeader
-                            cat={row.cat}
-                            count={row.count}
-                            isCollapsed={collapsedCats.has(row.cat)}
-                            onToggle={toggleCat}
+                        <div key={x.id} id={`ing-${x.id}`}>
+                          <IngredientRow
+                            item={x}
+                            offer={offer}
+                            supplierName={supplierName}
+                            supplierIdForDisplay={supplierIdForDisplay}
+                            alert={alertMap.get(x.id)}
+                            isEditing={editingId === x.id}
+                            compactMode={compactMode}
+                            edit={editingId === x.id ? edit : null}
+                            suppliers={suppliers}
+                            previewEditPack={editingId === x.id ? previewEditPack : ""}
+                            onStartEdit={startEdit}
+                            onSaveEdit={saveEdit}
+                            onDelete={del}
+                            onSetStatus={setIngredientStatus}
+                            onEditChange={onEditChange}
+                            onEditImportName={onEditImportName}
                           />
                         </div>
                       );
-                    }
-                    const x = row.item;
-                    const offer = offersByIngredientId.get(x.id);
-                    const supplierIdForDisplay = offer?.supplier_id ?? x.supplier_id ?? null;
-                    const supplierName = supplierIdForDisplay ? suppliersMap.get(supplierIdForDisplay)?.name ?? null : null;
-                    return (
-                      <div
-                        key={x.id}
-                        data-index={virtualRow.index}
-                        ref={virtualizer.measureElement}
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          width: "100%",
-                          transform: `translateY(${virtualRow.start}px)`,
-                        }}
-                      >
-                        <IngredientRow
-                          item={x}
-                          offer={offer}
-                          supplierName={supplierName}
-                          supplierIdForDisplay={supplierIdForDisplay}
-                          alert={alertMap.get(x.id)}
-                          isEditing={editingId === x.id}
-                          compactMode={compactMode}
-                          edit={editingId === x.id ? edit : null}
-                          suppliers={suppliers}
-                          previewEditPack={editingId === x.id ? previewEditPack : ""}
-                          onStartEdit={startEdit}
-                          onSaveEdit={saveEdit}
-                          onDelete={del}
-                          onSetStatus={setIngredientStatus}
-                          onEditChange={onEditChange}
-                          onEditImportName={onEditImportName}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
+                    })}
+                  </div>
+                ))}
 
                 {grouped.length === 0 && !loading && (
                   <div style={{ padding: "40px 20px", textAlign: "center", color: "#999", fontSize: 14 }}>
                     Aucun ingrédient trouvé.
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Infinite scroll sentinel */}
+            {hasMore && <div ref={sentinelRef} style={{ height: 1 }} />}
+            {loadingMore && (
+              <div style={{ padding: "16px 0", textAlign: "center", fontSize: 13, color: "#888" }}>
+                Chargement…
               </div>
             )}
 
@@ -972,6 +922,25 @@ function IngredientsPageInner() {
       {/* ══════════════════════════════════════════════
           BOTTOM SHEET — Filtres mobile
       ══════════════════════════════════════════════ */}
+      {/* ══════════════════════════════════════════════
+          DUPLICATE PANEL
+      ══════════════════════════════════════════════ */}
+      {showDuplicates && (
+        <DuplicatePanel
+          pairs={duplicatePairs}
+          offersByIngredientId={offersByIngredientId}
+          suppliers={suppliers}
+          onClose={() => setShowDuplicates(false)}
+          onMerged={() => { setShowDuplicates(false); mutate(); }}
+          onIgnore={(key) => {
+            const next = new Set(ignoreKeys);
+            next.add(key);
+            setIgnoreKeys(next);
+            localStorage.setItem("ingredient-duplicate-ignores", JSON.stringify([...next]));
+          }}
+        />
+      )}
+
       {showFilters && (
         <>
           <div style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.4)" }} onClick={() => setShowFilters(false)} />
@@ -982,19 +951,19 @@ function IngredientsPageInner() {
             </div>
             <div style={{ display: "grid", gap: 12 }}>
               <div><div style={{ fontSize: 12, color: "#999", marginBottom: 6 }}>Catégorie</div>
-                <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value as "all" | Category)} style={{ width: "100%", height: 44, borderRadius: 10, border: "1px solid #e5ddd0", padding: "0 12px", fontSize: 14, background: "white" }}>
+                <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value as "all" | Category)} style={{ ...selStyle, width: "100%", padding: "12px 14px", fontSize: 14 }}>
                   <option value="all">Tous</option>
                   {CATEGORIES.map((c) => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
                 </select>
               </div>
               <div><div style={{ fontSize: 12, color: "#999", marginBottom: 6 }}>Fournisseur</div>
-                <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)} style={{ width: "100%", height: 44, borderRadius: 10, border: "1px solid #e5ddd0", padding: "0 12px", fontSize: 14, background: "white" }}>
+                <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)} style={{ ...selStyle, width: "100%", padding: "12px 14px", fontSize: 14 }}>
                   <option value="all">Tous</option>
                   {suppliers.filter((s) => s.is_active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
               <div><div style={{ fontSize: 12, color: "#999", marginBottom: 6 }}>Établissement</div>
-                <select value={filterEstablishment} onChange={(e) => setFilterEstablishment(e.target.value as "all" | "bellomio" | "piccola" | "both")} style={{ width: "100%", height: 44, borderRadius: 10, border: "1px solid #e5ddd0", padding: "0 12px", fontSize: 14, background: "white" }}>
+                <select value={filterEstablishment} onChange={(e) => setFilterEstablishment(e.target.value as "all" | "bellomio" | "piccola" | "both")} style={{ ...selStyle, width: "100%", padding: "12px 14px", fontSize: 14 }}>
                   <option value="all">Tous</option>
                   <option value="bellomio">Bello Mio</option>
                   <option value="piccola">Piccola Mia</option>
@@ -1002,7 +971,7 @@ function IngredientsPageInner() {
                 </select>
               </div>
               <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} />
+                <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} style={{ accentColor: "#8B1A1A" }} />
                 Inclure sans offre
               </label>
             </div>

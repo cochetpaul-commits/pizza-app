@@ -9,6 +9,7 @@
     "build:clean": "npm run clean && next build",
     "start": "next start",
     "lint": "eslint",
+    "build:check": "eslint src/ --ext .ts,.tsx --max-warnings 0 && next build",
     "clean": "rm -rf .next node_modules/.cache"
   },
   "dependencies": {

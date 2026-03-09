@@ -13,11 +13,9 @@ import {
   type Supplier,
 } from "@/types/ingredients";
 import {
-  fmtOfferPriceLine,
   fmtVolume,
   legacyHasPrice,
   offerHasPrice,
-  parseNum,
   fmtQty,
 } from "@/lib/offers";
 import { formatIngredientPrice } from "@/lib/formatPrice";
@@ -62,8 +60,8 @@ export const CategoryHeader = React.memo(function CategoryHeader({
       }}
     >
       <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAT_COLORS[cat], flexShrink: 0 }} />
-      <span style={{ fontWeight: 800, fontSize: 11, textTransform: "uppercase", letterSpacing: 1.5, color: "#1a1a1a" }}>{CAT_LABELS[cat]}</span>
-      <span style={{ fontSize: 11, color: "#999" }}>({count})</span>
+      <span style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: 1.5, color: "#1a1a1a" }}>{CAT_LABELS[cat]}</span>
+      <span style={{ fontSize: 12, fontWeight: 400, color: "#999" }}>({count})</span>
       <span style={{ marginLeft: "auto", fontSize: 10, color: "#999" }}>{isCollapsed ? "▶" : "▼"}</span>
     </button>
   );
@@ -132,9 +130,9 @@ export const IngredientRow = React.memo(function IngredientRow({
         onMouseLeave={e => (e.currentTarget.style.background = "white")}
       >
         {/* Désignation */}
-        <div style={{ flex: 2.5, minWidth: 0 }}>
+        <div style={{ flex: 3, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <span style={{ fontWeight: 700, fontSize: 12, textTransform: "uppercase", color: CAT_COLORS[x.category], letterSpacing: 0.3 }}>{x.name}</span>
+            <span style={{ fontWeight: 600, fontSize: 13, color: CAT_COLORS[x.category] }}>{x.name}</span>
             {alert && (
               <span style={{ fontSize: 10, fontWeight: 800, padding: "1px 5px", borderRadius: 6, color: alert.direction === "up" ? "#DC2626" : "#16A34A", background: alert.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)", border: `1px solid ${alert.direction === "up" ? "rgba(220,38,38,0.30)" : "rgba(22,163,74,0.30)"}` }}>
                 {alert.direction === "up" ? "↑" : "↓"} {(Math.abs(alert.change_pct) * 100).toFixed(0)}%
@@ -167,19 +165,19 @@ export const IngredientRow = React.memo(function IngredientRow({
 
         {/* Prix */}
         <div style={{ flex: 1 }}>
-          <span style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>{price}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{price}</span>
         </div>
 
         {/* Conditionnement */}
         <div style={{ flex: 1, fontSize: 12, color: "#666" }}>{condInfo}</div>
 
         {/* Statut */}
-        <div style={{ flex: 0.8 }}>
+        <div style={{ flex: 1 }}>
           <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 999, background: sb.bg, color: sb.color }}>{sb.label}</span>
         </div>
 
         {/* Fournisseur */}
-        <div style={{ flex: 0.8, fontSize: 12, color: "#666", display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, fontSize: 12, color: "#666", display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
           {supplierName && supplierIdForDisplay ? (
             <Link href={`/fournisseurs/${supplierIdForDisplay}`} style={{ color: "inherit", textDecoration: "underline dotted", textUnderlineOffset: 2 }}>{supplierName}</Link>
           ) : "—"}
@@ -202,8 +200,8 @@ export const IngredientRow = React.memo(function IngredientRow({
       >
         {compactMode ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ fontWeight: 800, fontSize: 11, textTransform: "uppercase", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: CAT_COLORS[x.category] }}>{x.name}</div>
-            <span style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 14, fontWeight: 700, flexShrink: 0 }}>{price}</span>
+            <div style={{ fontWeight: 600, fontSize: 13, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: CAT_COLORS[x.category] }}>{x.name}</div>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", flexShrink: 0 }}>{price}</span>
             {alert && <span style={{ fontSize: 10, color: alert.direction === "up" ? "#DC2626" : "#16A34A", flexShrink: 0 }}>{alert.direction === "up" ? "↑" : "↓"}</span>}
             {!isEditing
               ? <button onClick={() => onStartEdit(x)} style={{ ...BTN_ACTION, background: "#8B1A1A", color: "white", fontWeight: 700 }}>→</button>
@@ -214,7 +212,7 @@ export const IngredientRow = React.memo(function IngredientRow({
           <>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 800, fontSize: 11, textTransform: "uppercase", color: CAT_COLORS[x.category], letterSpacing: 0.3 }}>{x.name}</div>
+                <div style={{ fontWeight: 600, fontSize: 13, color: CAT_COLORS[x.category] }}>{x.name}</div>
                 <div style={{ fontSize: 10, color: "#999999", marginTop: 2 }}>
                   {supplierName || CAT_LABELS[x.category]}
                   {x.status_note ? ` · ${x.status_note}` : ""}
@@ -230,7 +228,7 @@ export const IngredientRow = React.memo(function IngredientRow({
                 )}
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>{price}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{price}</div>
                 <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 999, background: sb.bg, color: sb.color, display: "inline-block", marginTop: 3 }}>{sb.label}</span>
                 {alert && <div style={{ fontSize: 10, fontWeight: 800, color: alert.direction === "up" ? "#DC2626" : "#16A34A", marginTop: 2 }}>{alert.direction === "up" ? "↑" : "↓"} {(Math.abs(alert.change_pct) * 100).toFixed(0)}%</div>}
               </div>
