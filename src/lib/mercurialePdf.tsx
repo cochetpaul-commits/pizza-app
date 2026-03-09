@@ -48,14 +48,7 @@ const styles = StyleSheet.create({
   footerText: { fontSize: 7, color: MUTED },
 });
 
-const CAT_LABELS: Record<string, string> = {
-  cremerie_fromage: "Crémerie / Fromage", charcuterie_viande: "Charcuterie / Viande",
-  maree: "Marée", alcool_spiritueux: "Alcool / Spiritueux", boisson: "Boissons",
-  legumes_herbes: "Légumes / Herbes", fruit: "Fruits",
-  epicerie_salee: "Épicerie Salée", epicerie_sucree: "Épicerie Sucrée",
-  preparation: "Préparation", sauce: "Sauce", antipasti: "Antipasti",
-  emballage: "Emballage", autre: "Autre",
-};
+import { CAT_LABELS } from "@/types/ingredients";
 
 const CAT_ORDER = ["cremerie_fromage","charcuterie_viande","maree","alcool_spiritueux","boisson","legumes_herbes","fruit","epicerie_salee","epicerie_sucree","preparation","sauce","antipasti","emballage","autre"];
 
@@ -71,7 +64,7 @@ function groupRows(rows: MercurialeRow[], groupBy: "category" | "supplier" | "al
   if (groupBy === "alpha") return { "A → Z": sorted };
   const map: Record<string, MercurialeRow[]> = {};
   for (const r of sorted) {
-    const k = (groupBy === "category" ? CAT_LABELS[r.category] ?? r.category : r.supplier) ?? "—";
+    const k = (groupBy === "category" ? (CAT_LABELS as Record<string, string>)[r.category] ?? r.category : r.supplier) ?? "—";
     if (!map[k]) map[k] = [];
     map[k].push(r);
   }

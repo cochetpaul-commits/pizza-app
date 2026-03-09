@@ -349,6 +349,11 @@ textarea.input{
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
 /* NavBar: masquer "← Accueil" quand un bouton retour secondaire est présent */
 @media (max-width: 479px) {
   .nav-home-hide-mobile { display: none; }

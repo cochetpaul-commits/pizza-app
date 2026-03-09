@@ -59,6 +59,8 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
 
+  const [sellPrice, setSellPrice] = useState<number | "">("");
+
   // Dough recipes
   const [doughRecipes, setDoughRecipes] = useState<DoughRecipeRow[]>([]);
 
@@ -286,6 +288,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
             if (mr >= 1) setMarginRate(String(Math.round(mr)));
             else if (mr > 0) setMarginRate(String(Math.round(mr * 100)));
           }
+          if (p.sell_price != null) setSellPrice(Number(p.sell_price));
           setPivotIngredientId(String(p.pivot_ingredient_id ?? "") || null);
         }
         if (pLines) {
@@ -353,6 +356,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         total_cost: totalCost > 0 ? totalCost : null,
         vat_rate: vatRate,
         margin_rate,
+        sell_price: sellPrice !== "" ? Number(sellPrice) : null,
         is_draft: false,
       };
 
@@ -671,6 +675,8 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                 onVatChange={setVatRate}
                 marginRate={marginRate}
                 onMarginChange={setMarginRate}
+                sellPrice={sellPrice}
+                onSellPriceChange={setSellPrice}
                 accentColor={ACCENT}
               />
             </div>

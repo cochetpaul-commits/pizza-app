@@ -44,6 +44,8 @@ interface Props {
   onVatChange: (v: number) => void;
   marginRate: string;
   onMarginChange: (v: string) => void;
+  sellPrice?: number | "";
+  onSellPriceChange?: (v: number | "") => void;
   accentColor?: string;
 }
 
@@ -55,6 +57,8 @@ export function PricingBlock({
   onVatChange,
   marginRate,
   onMarginChange,
+  sellPrice,
+  onSellPriceChange,
   accentColor = "#8B1A1A",
 }: Props) {
   const marginPctNum = (() => {
@@ -68,6 +72,13 @@ export function PricingBlock({
   const pvKgTTC = pvKgHT ? pvKgHT * (1 + vatRate) : null;
   const pvPortionHT = costPerPortion && costPerPortion > 0 && m < 1 ? costPerPortion / (1 - m) : null;
   const pvPortionTTC = pvPortionHT ? pvPortionHT * (1 + vatRate) : null;
+
+  // Effective sell price: manual > PV conseillé
+  const sp = typeof sellPrice === "number" && sellPrice > 0 ? sellPrice : null;
+  const effectivePrice = sp ?? pvPortionTTC;
+  const isConseille = sp == null && pvPortionTTC != null;
+  const margeBrute = effectivePrice != null && costPerPortion && costPerPortion > 0 ? effectivePrice - costPerPortion : null;
+  const foodCostPct = effectivePrice != null && costPerPortion && costPerPortion > 0 ? (costPerPortion / effectivePrice) * 100 : null;
 
   return (
     <>
@@ -112,11 +123,12 @@ export function PricingBlock({
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
         <div style={kpiCard}>
-          <div style={kpiLabel}>PV conseillé / {portionLabel} TTC</div>
-          <div style={{ ...kpiValue, color: accentColor }}>
-            {pvPortionTTC ? fmtMoney(pvPortionTTC) + " €" : "—"}
+          <div style={kpiLabel}>Prix TTC / {portionLabel}</div>
+          <div style={{ ...kpiValue, color: accentColor, fontStyle: isConseille ? "italic" : "normal" }}>
+            {effectivePrice ? fmtMoney(effectivePrice) + " €" : "—"}
+            {isConseille && <span style={{ fontSize: 11, fontWeight: 500, marginLeft: 4, color: "#6f6a61" }}>(conseillé)</span>}
           </div>
         </div>
         <div style={kpiCard}>
@@ -126,6 +138,46 @@ export function PricingBlock({
           </div>
         </div>
       </div>
+
+      {onSellPriceChange && (
+        <>
+          <div style={{ borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 14, marginBottom: 14 }}>
+            <label className="label">Prix de vente TTC (€)</label>
+            <input
+              className="input" type="number" min={0} step={0.5}
+              value={sellPrice ?? ""}
+              onChange={e => onSellPriceChange(e.target.value === "" ? "" : Number(e.target.value))}
+              placeholder="ex: 12.00"
+              style={{ maxWidth: 160, fontWeight: 700 }}
+            />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={kpiCard}>
+              <div style={kpiLabel}>Marge brute</div>
+              <div style={{
+                ...kpiValue,
+                fontStyle: isConseille ? "italic" : "normal",
+                color: margeBrute != null && !isConseille && margeBrute > 0 ? "#166534" : margeBrute != null && !isConseille && margeBrute < 0 ? "#DC2626" : "#2d2d2d",
+              }}>
+                {margeBrute != null ? fmtMoney(margeBrute) + " €" : "—"}
+                {margeBrute != null && isConseille && <span style={{ fontSize: 11, fontWeight: 500, marginLeft: 4, color: "#6f6a61" }}>(conseillé)</span>}
+              </div>
+            </div>
+            <div style={kpiCard}>
+              <div style={kpiLabel}>Food cost</div>
+              <div style={{
+                ...kpiValue,
+                fontStyle: isConseille ? "italic" : "normal",
+                color: foodCostPct != null && !isConseille ? (foodCostPct <= 30 ? "#166534" : foodCostPct > 35 ? "#DC2626" : "#92400e") : "#2d2d2d",
+              }}>
+                {foodCostPct != null ? fmtMoney(foodCostPct) + " %" : "—"}
+                {foodCostPct != null && isConseille && <span style={{ fontSize: 11, fontWeight: 500, marginLeft: 4, color: "#6f6a61" }}>(conseillé)</span>}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }

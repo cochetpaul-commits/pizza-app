@@ -580,16 +580,6 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                   </div>
                 </div>
 
-                <div>
-                  <label className="label">Prix de vente TTC (€)</label>
-                  <input
-                    className="input" type="number" min={0} step={0.5}
-                    value={sellPrice}
-                    onChange={e => setSellPrice(e.target.value === "" ? "" : Number(e.target.value))}
-                    placeholder="ex: 9.50"
-                    style={{ maxWidth: 140 }}
-                  />
-                </div>
               </div>
             </div>
 
@@ -643,6 +633,8 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                 onVatChange={setVatRate}
                 marginRate={marginRate}
                 onMarginChange={setMarginRate}
+                sellPrice={sellPrice}
+                onSellPriceChange={setSellPrice}
                 accentColor={ACCENT}
               />
             </div>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { NavBar } from "@/components/NavBar";
 import { supabase } from "@/lib/supabaseClient";
-import { CATEGORIES, CAT_COLORS, type Category } from "@/types/ingredients";
+import { CATEGORIES, CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingredients";
 import { offerRowToCpu } from "@/lib/offerPricing";
 
 type Ingredient = {
@@ -36,14 +36,6 @@ type CalcLine = {
   pieceQtyOverride: number | null;
 };
 
-const CAT_LABELS: Record<Category, string> = {
-  cremerie_fromage: "Crémerie / Fromage", charcuterie_viande: "Charcuterie / Viande",
-  maree: "Marée", alcool_spiritueux: "Alcool / Spiritueux", boisson: "Boissons",
-  legumes_herbes: "Légumes / Herbes", fruit: "Fruits",
-  epicerie_salee: "Épicerie Salée", epicerie_sucree: "Épicerie Sucrée",
-  preparation: "Préparation", sauce: "Sauce", antipasti: "Antipasti",
-  emballage: "Emballage", autre: "Autre",
-};
 
 const TVA_OPTIONS = [5.5, 10, 20];
 const ROUND_OPTIONS = [0.05, 0.10, 0.50, 1.0];

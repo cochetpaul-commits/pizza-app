@@ -69,6 +69,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
   // Pricing — marginRate as string "75" = 75%
   const [vatRate, setVatRate] = useState(0.1);
   const [marginRate, setMarginRate] = useState("75");
+  const [sellPrice, setSellPrice] = useState<number | "">("");
 
   // Production mode
   const [prodMode, setProdMode] = useState(initialProdMode ?? false);
@@ -257,6 +258,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
             if (mr >= 1) setMarginRate(String(Math.round(mr)));
             else if (mr > 0) setMarginRate(String(Math.round(mr * 100)));
           }
+          if (r.sell_price != null) setSellPrice(Number(r.sell_price));
           if (r.procedure) {
             try { setSteps(JSON.parse(String(r.procedure)) as string[]); } catch { setSteps([]); }
           }
@@ -330,6 +332,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
         total_cost: totalCostRounded > 0 ? totalCostRounded : null,
         cost_per_kg: costPerKg,
         cost_per_portion: costPerPortion,
+        sell_price: sellPrice !== "" ? Number(sellPrice) : null,
         photo_url: photoUrl || null,
         procedure: steps.length > 0 ? JSON.stringify(steps) : null,
         is_draft: false,
@@ -777,6 +780,8 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                 onVatChange={setVatRate}
                 marginRate={marginRate}
                 onMarginChange={setMarginRate}
+                sellPrice={sellPrice}
+                onSellPriceChange={setSellPrice}
                 accentColor="#8B1A1A"
               />
             </div>

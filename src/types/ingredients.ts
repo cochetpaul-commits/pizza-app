@@ -21,6 +21,23 @@ export type PriceKind = "unit" | "pack_simple" | "pack_composed";
 export type IngredientStatus = "to_check" | "validated" | "unknown";
 export type Tab = IngredientStatus | "all";
 
+export const CAT_LABELS: Record<Category, string> = {
+  cremerie_fromage:   "Crémerie / Fromage",
+  charcuterie_viande: "Charcuterie / Viande",
+  maree:              "Marée",
+  alcool_spiritueux:  "Alcool / Spiritueux",
+  boisson:            "Boissons",
+  legumes_herbes:     "Légumes / Herbes",
+  fruit:              "Fruits",
+  epicerie_salee:     "Épicerie Salée",
+  epicerie_sucree:    "Épicerie Sucrée",
+  preparation:        "Préparation",
+  sauce:              "Sauce",
+  antipasti:          "Antipasti",
+  emballage:          "Emballage",
+  autre:              "Autre",
+};
+
 export const CAT_COLORS: Record<Category, string> = {
   cremerie_fromage:   "#D97706", // ambre orange
   charcuterie_viande: "#DC2626", // rouge vif

@@ -65,6 +65,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
   // Pricing
   const [vatRate, setVatRate] = useState(0.1);
   const [marginRate, setMarginRate] = useState("75");
+  const [sellPrice, setSellPrice] = useState<number | "">("");
 
   // Production mode
   const [prodMode, setProdMode] = useState(initialProdMode ?? false);
@@ -168,6 +169,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
             if (mr >= 1) setMarginRate(String(Math.round(mr)));
             else if (mr > 0) setMarginRate(String(Math.round(mr * 100)));
           }
+          if (r.sell_price != null) setSellPrice(Number(r.sell_price));
           if (r.flour_mix) {
             try {
               const mix = (typeof r.flour_mix === "string" ? JSON.parse(r.flour_mix) : r.flour_mix) as FlourMixItem[];
@@ -225,6 +227,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         yield_grams: yieldGrams,
         vat_rate: vatRate,
         margin_rate,
+        sell_price: sellPrice !== "" ? Number(sellPrice) : null,
         procedure: steps.length > 0 ? JSON.stringify(steps) : null,
         user_id: auth.user.id,
       };
@@ -645,6 +648,8 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                 onVatChange={setVatRate}
                 marginRate={marginRate}
                 onMarginChange={setMarginRate}
+                sellPrice={sellPrice}
+                onSellPriceChange={setSellPrice}
                 accentColor={ACCENT}
               />
             </div>

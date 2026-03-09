@@ -14,6 +14,7 @@ type PizzaRow = {
   id: string; name: string | null;
   total_cost: number | null;
   margin_rate: number | null; vat_rate: number | null;
+  sell_price: number | null;
   establishments: string[] | null;
   pivot_ingredient_id: string | null;
 };
@@ -22,6 +23,7 @@ type KitchenRow = {
   total_cost: number | null; cost_per_kg: number | null;
   cost_per_portion: number | null;
   margin_rate: number | null; vat_rate: number | null;
+  sell_price: number | null;
   establishments: string[] | null;
   pivot_ingredient_id: string | null;
 };
@@ -106,12 +108,12 @@ function pvTTCKitchen(r: KitchenRow): number | null {
 
 function RecipeCard({
   name, href, color, establishments, prodHref,
-  cost, costLabel, pv, pvLabel,
+  cost, costLabel, pv, pvConseille, pvLabel,
 }: {
   name: string; href: string; color: string;
   establishments?: string[] | null; prodHref?: string;
   cost?: number | null; costLabel?: string;
-  pv?: number | null; pvLabel?: string;
+  pv?: number | null; pvConseille?: number | null; pvLabel?: string;
 }) {
   const router = useRouter();
   const estabs = establishments;
@@ -119,6 +121,11 @@ function RecipeCard({
   const showPM = estabs != null && estabs.length > 0 && estabs.includes("piccola") && !estabs.includes("bellomio");
   const showUnassigned = !estabs || estabs.length === 0;
   const hasBadge = showBM || showPM || showUnassigned;
+
+  // Effective price: manual sell_price > PV conseillé
+  const effectivePrice = (pv != null && pv > 0) ? pv : (pvConseille != null && pvConseille > 0 ? pvConseille : null);
+  const isConseille = (pv == null || pv <= 0) && effectivePrice != null;
+
   return (
     <div
       role="button"
@@ -177,21 +184,27 @@ function RecipeCard({
             {fmt(cost)} €{costLabel && <span style={{ fontSize: 10, marginLeft: 2 }}>{costLabel}</span>}
           </div>
         )}
-        {pv != null && pv > 0 && (
-          <div style={{ fontSize: 15, fontWeight: 900, color, whiteSpace: "nowrap" }}>
-            {fmt(pv)} €{pvLabel && <span style={{ fontSize: 10, fontWeight: 500, marginLeft: 2 }}>{pvLabel}</span>}
+        {effectivePrice != null && (
+          <div style={{
+            fontSize: 15, fontWeight: isConseille ? 500 : 900,
+            fontStyle: isConseille ? "italic" : "normal",
+            color: isConseille ? "#9a8f84" : color,
+            whiteSpace: "nowrap",
+          }}>
+            {fmt(effectivePrice)} €{pvLabel && <span style={{ fontSize: 10, fontWeight: 500, marginLeft: 2 }}>{pvLabel}</span>}
+            {isConseille && <span style={{ fontSize: 9, fontWeight: 500, marginLeft: 3 }}>(c)</span>}
           </div>
         )}
         {/* ── Marge brute + Food cost ── */}
         {cost != null && cost > 0 && (() => {
-          if (pv == null || pv <= 0) {
+          if (effectivePrice == null) {
             return <span style={{ fontSize: 11, color: "#bbb", whiteSpace: "nowrap" }}>— %</span>;
           }
-          const gm = pv - cost;
-          const fc = (cost / pv) * 100;
-          const dotColor = fc < 30 ? "#4a6741" : fc <= 35 ? "#d97706" : "#8B1A1A";
+          const gm = effectivePrice - cost;
+          const fc = (cost / effectivePrice) * 100;
+          const dotColor = isConseille ? "#9a8f84" : (fc < 30 ? "#4a6741" : fc <= 35 ? "#d97706" : "#8B1A1A");
           return (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontStyle: isConseille ? "italic" : "normal" }}>
               <span style={{ fontSize: 11, color: "#9a8f84", whiteSpace: "nowrap" }}>{fmt(gm)} € mg</span>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor, display: "inline-block", flexShrink: 0 }} />
@@ -329,10 +342,10 @@ function RecettesInner() {
       setAuthOk(true);
       Promise.all([
         supabase.from("pizza_recipes")
-          .select("id,name,total_cost,margin_rate,vat_rate,establishments,pivot_ingredient_id")
+          .select("id,name,total_cost,margin_rate,vat_rate,sell_price,establishments,pivot_ingredient_id")
           .eq("is_draft", false),
         supabase.from("kitchen_recipes")
-          .select("id,name,category,total_cost,cost_per_kg,cost_per_portion,margin_rate,vat_rate,establishments,pivot_ingredient_id")
+          .select("id,name,category,total_cost,cost_per_kg,cost_per_portion,margin_rate,vat_rate,sell_price,establishments,pivot_ingredient_id")
           .eq("is_draft", false),
         supabase.from("cocktails")
           .select("id,name,type,total_cost,sell_price,establishments,pivot_ingredient_id")
@@ -520,9 +533,7 @@ function RecettesInner() {
             open={secOpen.pizza} onToggle={() => toggleSec("pizza")}
             newHref="/recettes/new/pizza"
           >
-            {filteredPizzas.map(r => {
-              const pv = pvTTCPizza(r);
-              return (
+            {filteredPizzas.map(r => (
                 <RecipeCard
                   key={r.id}
                   name={r.name ?? "Pizza"}
@@ -531,11 +542,11 @@ function RecettesInner() {
                   color={PIZZA_COLOR}
                   establishments={r.establishments}
                   cost={r.total_cost}
-                  pv={pv}
+                  pv={r.sell_price}
+                  pvConseille={pvTTCPizza(r)}
                   pvLabel="TTC"
                 />
-              );
-            })}
+            ))}
           </Section>
 
         {/* ── Cuisine ── */}
@@ -555,7 +566,6 @@ function RecettesInner() {
                 {kitchenByCat[cat.id].map(r => {
                   const hasPortion = r.cost_per_portion != null && r.cost_per_portion > 0;
                   const hasKg = r.cost_per_kg != null && r.cost_per_kg > 0;
-                  const pv = pvTTCKitchen(r);
                   return (
                     <RecipeCard
                       key={r.id}
@@ -566,7 +576,8 @@ function RecettesInner() {
                       establishments={r.establishments}
                       cost={hasPortion ? r.cost_per_portion! : hasKg ? r.cost_per_kg! : null}
                       costLabel={hasPortion ? "/portion" : hasKg ? "/kg" : undefined}
-                      pv={pv}
+                      pv={r.sell_price}
+                      pvConseille={pvTTCKitchen(r)}
                       pvLabel={hasPortion ? "TTC/portion" : hasKg ? "TTC/kg" : undefined}
                     />
                   );
