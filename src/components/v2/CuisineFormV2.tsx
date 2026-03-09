@@ -103,6 +103,11 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Index ingredient (linked catalog entry)
+  const [indexIngredientId, setIndexIngredientId] = useState<string | null>(null);
+  const [indexMsg, setIndexMsg] = useState<string | null>(null);
+  const [indexSaving, setIndexSaving] = useState(false);
+
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   // Computed allergens
@@ -306,6 +311,13 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
             sort_order: n2(l.sort_order) || i,
           })));
         }
+
+        // Check if ingredient in catalog linked to this recipe
+        const { data: linkedIng } = await supabase
+          .from("ingredients").select("id")
+          .eq("source", "recette_maison").eq("recipe_id", recipeId)
+          .maybeSingle<{ id: string }>();
+        if (linkedIng) setIndexIngredientId(linkedIng.id);
       }
 
       setStatus("ok");
@@ -415,8 +427,9 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
             purchase_unit_label: "kg",
             purchase_unit_name: "kg",
           }).eq("id", existingIng.id);
+          setIndexIngredientId(existingIng.id);
         } else if (costPerKg && costPerKg > 0) {
-          await supabase.from("ingredients").insert({
+          const { data: newIng } = await supabase.from("ingredients").insert({
             name: name || "Nouvelle recette",
             category: ingCat,
             purchase_price: costPerKg,
@@ -432,7 +445,11 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
             piece_weight_g: null,
             piece_volume_ml: null,
             supplier_id: null,
-          });
+          }).select("id").single<{ id: string }>();
+          if (newIng) {
+            setIndexIngredientId(newIng.id);
+            await supabase.from("kitchen_recipes").update({ output_ingredient_id: newIng.id }).eq("id", rid!);
+          }
         }
       } catch (e) {
         console.warn("Ingredient sync failed:", e);
@@ -454,6 +471,58 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
     await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", recipeId);
     await supabase.from("kitchen_recipes").delete().eq("id", recipeId);
     router.push("/recettes?tab=cuisine");
+  }
+
+  async function handleIndexSave() {
+    if (!recipeId) return;
+    setIndexSaving(true);
+    setIndexMsg(null);
+    try {
+      const CAT_MAP: Record<string, Category> = {
+        preparation: "preparation", sauce: "sauce", autre: "autre",
+      };
+      const ingCat: Category = CAT_MAP[category] ?? "preparation";
+
+      if (indexIngredientId) {
+        await supabase.from("ingredients").update({
+          name: name || "Nouvelle recette",
+          category: ingCat,
+          purchase_price: costPerKg ?? null,
+          purchase_unit: 1,
+          purchase_unit_label: "kg",
+          purchase_unit_name: "kg",
+        }).eq("id", indexIngredientId);
+      } else {
+        const { data: newIng, error: insErr } = await supabase.from("ingredients").insert({
+          name: name || "Nouvelle recette",
+          category: ingCat,
+          purchase_price: costPerKg ?? null,
+          purchase_unit: 1,
+          purchase_unit_label: "kg",
+          purchase_unit_name: "kg",
+          source: "recette_maison",
+          recipe_id: recipeId,
+          is_active: true,
+          allergens: null,
+          default_unit: "g",
+          density_g_per_ml: null,
+          piece_weight_g: null,
+          piece_volume_ml: null,
+          supplier_id: null,
+        }).select("id").single<{ id: string }>();
+        if (insErr) throw insErr;
+        setIndexIngredientId(newIng.id);
+        // Link output_ingredient_id on the kitchen_recipe
+        await supabase.from("kitchen_recipes").update({ output_ingredient_id: newIng.id }).eq("id", recipeId);
+      }
+
+      setIndexMsg(costPerKg ? `Index mis à jour — ${fmtMoney(costPerKg)} €/kg` : "Ajouté à l'index (prix non calculé)");
+      setTimeout(() => setIndexMsg(null), 5000);
+    } catch (err) {
+      setIndexMsg("Erreur : " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIndexSaving(false);
+    }
   }
 
   const title = name || (isEdit ? "Fiche cuisine" : "Nouvelle fiche cuisine");
@@ -798,6 +867,39 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                 </div>
               </div>
             </div>
+
+            {/* Index button for preparations */}
+            {category === "preparation" && isEdit && (
+              <div className="card" style={{ marginBottom: 16, borderLeft: "4px solid #166534" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: "#166534", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                      Index ingrédient
+                    </p>
+                    <p className="muted" style={{ margin: "2px 0 0", fontSize: 11 }}>
+                      {costPerKg ? `Prix calculé : ${fmtMoney(costPerKg)} €/kg` : "Prix non calculé (rendement manquant)"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleIndexSave}
+                    disabled={indexSaving}
+                    className="btn"
+                    style={{ background: "#166534", borderColor: "#166534", color: "#fff", fontSize: 12, flexShrink: 0 }}
+                  >
+                    {indexSaving ? "Enregistrement…" : indexIngredientId ? "Mettre à jour l'index" : "Ajouter à l'index"}
+                  </button>
+                </div>
+                {indexMsg && (
+                  <div style={{
+                    marginTop: 8, fontSize: 12, fontWeight: 600,
+                    color: indexMsg.startsWith("Erreur") ? "#DC2626" : "#166534",
+                  }}>
+                    {indexMsg}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Allergènes */}
             <div className="card" style={{ marginBottom: 16 }}>
