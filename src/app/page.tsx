@@ -128,7 +128,7 @@ export default function Home() {
   };
 
   return (
-    <main style={{
+    <main className="page-root" style={{
       minHeight: "100dvh",
       background: "#f5f0e8",
       width: "100%",
@@ -177,7 +177,7 @@ export default function Home() {
                       <span style={{ fontSize: 11, fontWeight: 400, color: "#999", marginLeft: 3 }}>fiches</span>
                     </span>
                   )}
-                  <span style={btn("#8B1A1A")}>Entra in cucina →</span>
+                  <span style={btn("#8B1A1A")}>Ouvrir →</span>
                 </div>
               </div>
             </div>
@@ -203,7 +203,7 @@ export default function Home() {
                       <span style={{ fontSize: 11, fontWeight: 400, color: "#999", marginLeft: 3 }}>réf.</span>
                     </span>
                   )}
-                  <span style={btn("#1d4ed8")}>Gérer →</span>
+                  <span style={btn("#1d4ed8")}>Ouvrir →</span>
                 </div>
               </div>
             </div>
@@ -224,7 +224,7 @@ export default function Home() {
                       {fmtDateShort(counts.lastImport)}
                     </span>
                   )}
-                  <span style={btn("#4a6741")}>Importer →</span>
+                  <span style={btn("#4a6741")}>Ouvrir →</span>
                 </div>
               </div>
             </div>

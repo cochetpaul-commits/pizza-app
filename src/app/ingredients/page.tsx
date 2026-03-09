@@ -132,8 +132,9 @@ function IngredientsPageInner() {
   }, [items]);
 
   const filtered = useMemo(() => {
-    // Text search is server-side (handled by useIngredientsData). Only apply remaining client-side filters.
-    let base = items;
+    // Deduplicate by id (pagination can produce duplicates)
+    const seen = new Set<string>();
+    let base = items.filter((x) => { if (seen.has(x.id)) return false; seen.add(x.id); return true; });
     if (tab !== "all") base = base.filter((x) => ((x.status ?? "to_check") as IngredientStatus) === tab);
     if (filterCategory !== "all") base = base.filter((x) => x.category === filterCategory);
     if (!includeNoOffer) base = base.filter((x) => offersByIngredientId.has(x.id));
@@ -615,7 +616,7 @@ function IngredientsPageInner() {
           <Link href={backUrl ?? "/"} style={{ color: "#999", fontSize: 13, textDecoration: "none", flexShrink: 0, fontWeight: 500 }}>
             ← {backUrl ? "Retour" : "Accueil"}
           </Link>
-          <span style={{ fontFamily: "var(--font-dm-serif-display), 'DM Serif Display', Georgia, serif", fontSize: 22, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <span style={{ fontFamily: "var(--font-playfair-display), 'Playfair Display', Georgia, serif", fontSize: 22, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             Index ingrédients
           </span>
         </div>
