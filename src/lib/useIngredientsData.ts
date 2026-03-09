@@ -3,11 +3,9 @@ import { supabase } from "@/lib/supabaseClient";
 import { fetchPriceAlerts, type PriceAlert } from "@/lib/priceAlerts";
 import type { Ingredient, LatestOffer, Supplier } from "@/types/ingredients";
 
-// Note: import_name omis volontairement — la colonne est ajoutée via migration manuelle.
-// Ajouter "import_name" ici après avoir appliqué supabase/migrations/20260309000002_add_import_name.sql
-const INGREDIENT_COLS = "id,name,category,allergens,is_active,default_unit,purchase_price,purchase_unit,purchase_unit_label,purchase_unit_name,density_g_per_ml,piece_weight_g,piece_volume_ml,supplier_id,source_prep_recipe_name,source,recipe_id,status,status_note,validated_at,validated_by,cost_per_unit,cost_per_kg";
+const INGREDIENT_COLS = "id,name,import_name,category,allergens,is_active,default_unit,purchase_price,purchase_unit,purchase_unit_label,purchase_unit_name,density_g_per_ml,piece_weight_g,piece_volume_ml,supplier_id,source_prep_recipe_name,source,recipe_id,status,status_note,validated_at,validated_by,cost_per_unit,cost_per_kg";
 
-const OFFER_COLS = "id,ingredient_id,supplier_id,price_kind,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g,updated_at,establishment";
+const OFFER_COLS = "ingredient_id,supplier_id,price_kind,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g,updated_at,establishment";
 
 type IngredientsBundle = {
   items: Ingredient[];
