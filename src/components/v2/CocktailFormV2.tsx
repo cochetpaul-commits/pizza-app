@@ -11,13 +11,13 @@ import { parseAllergens, mergeAllergens } from "@/lib/allergens";
 import { offerRowToCpu } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
-import { IngredientListDnD, type IngredientLine } from "./IngredientListDnD";
+import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
 import { PricingBlock } from "./PricingBlock";
 import type { Ingredient } from "@/types/ingredients";
 import type { CpuByUnit } from "@/lib/offerPricing";
 
-const COCKTAIL_UNITS = ["cl", "ml", "pc", "g"];
+const COCKTAIL_UNITS = ["g", "cL", "pcs"];
 const ACCENT = "#0E7490";
 
 const COCKTAIL_TYPES = [
@@ -273,13 +273,13 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
           setPivotIngredientId(String(c.pivot_ingredient_id ?? "") || null);
         }
         if (cLines) {
-          setLines((cLines as Array<Record<string, unknown>>).map((l, i) => ({
-            id: String(l.id ?? tmpId()),
-            ingredient_id: String(l.ingredient_id ?? ""),
-            qty: n2(l.qty) || "",
-            unit: String(l.unit ?? "cl"),
-            sort_order: n2(l.sort_order) || i,
-          })));
+          setLines((cLines as Array<Record<string, unknown>>).map((l, i) => {
+            const rawUnit = String(l.unit ?? "cl");
+            const nu = normalizeUnit(rawUnit);
+            let rawQty: number | "" = n2(l.qty) || "";
+            if (rawUnit.toLowerCase() === "ml" && typeof rawQty === "number" && rawQty > 0) rawQty = round2(rawQty / 10);
+            return { id: String(l.id ?? tmpId()), ingredient_id: String(l.ingredient_id ?? ""), qty: rawQty, unit: nu, sort_order: n2(l.sort_order) || i };
+          }));
         }
       }
 

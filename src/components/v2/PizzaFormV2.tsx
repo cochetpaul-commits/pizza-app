@@ -13,13 +13,13 @@ import { offerRowToCpu } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
 import { EstablishmentPicker } from "./EstablishmentPicker";
-import { IngredientListDnD, type IngredientLine } from "./IngredientListDnD";
+import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
 import { PricingBlock } from "./PricingBlock";
 import type { Ingredient } from "@/types/ingredients";
 import type { CpuByUnit } from "@/lib/offerPricing";
 
-const PIZZA_UNITS = ["g", "ml", "pcs"];
+const PIZZA_UNITS = ["g", "cL", "pcs"];
 const ACCENT = "#8B1A1A";
 
 type DoughRecipeRow = {
@@ -124,6 +124,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
       const qty = Number(l.qty);
       const unit = l.unit.toLowerCase();
       if (unit === "g" && cpu.g) return acc + cpu.g * qty;
+      if (unit === "cl" && cpu.ml) return acc + cpu.ml * qty * 10;
       if (unit === "ml" && cpu.ml) return acc + cpu.ml * qty;
       if ((unit === "pcs" || unit === "pc") && cpu.pcs) return acc + cpu.pcs * qty;
       return acc;
@@ -152,7 +153,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   const prodTotalW = prodValidLines.reduce((acc, l) => {
     const qty = prodFactor !== null ? Math.round(Number(l.qty) * prodFactor) : Number(l.qty);
     const unit = l.unit.toLowerCase();
-    return (unit === "g" || unit === "ml") ? acc + qty : acc;
+    return unit === "g" ? acc + qty : acc;
   }, 0);
 
   // Load
@@ -289,12 +290,15 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         }
         if (pLines) {
           const all = (pLines as Array<Record<string, unknown>>).map((l, i) => {
-            const rawQty = n2(l.qty);
+            const rawUnit = String(l.unit ?? "g");
+            const nu = normalizeUnit(rawUnit);
+            let rawQty = n2(l.qty);
+            if (rawUnit.toLowerCase() === "ml" && rawQty > 0) rawQty = round2(rawQty / 10);
             return {
               id: String(l.id ?? tmpId()),
               ingredient_id: String(l.ingredient_id ?? ""),
               qty: (rawQty > 0 ? rawQty : "") as number | "",
-              unit: String(l.unit ?? "g"),
+              unit: nu,
               sort_order: n2(l.sort_order) || i,
               stage: String(l.stage ?? "pre"),
             };

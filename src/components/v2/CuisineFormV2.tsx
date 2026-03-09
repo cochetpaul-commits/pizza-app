@@ -263,13 +263,13 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
           setPivotIngredientId(String(r.pivot_ingredient_id ?? "") || null);
         }
         if (recLines) {
-          setLines((recLines as Array<Record<string, unknown>>).map((l, i) => ({
-            id: String(l.id ?? tmpId()),
-            ingredient_id: String(l.ingredient_id ?? ""),
-            qty: n2(l.qty) || "",
-            unit: String(l.unit ?? "g"),
-            sort_order: n2(l.sort_order) || i,
-          })));
+          setLines((recLines as Array<Record<string, unknown>>).map((l, i) => {
+            const rawUnit = String(l.unit ?? "g");
+            const nu = normalizeUnit(rawUnit);
+            let rawQty: number | "" = n2(l.qty) || "";
+            if (rawUnit.toLowerCase() === "ml" && typeof rawQty === "number" && rawQty > 0) rawQty = round2(rawQty / 10);
+            return { id: String(l.id ?? tmpId()), ingredient_id: String(l.ingredient_id ?? ""), qty: rawQty, unit: nu, sort_order: n2(l.sort_order) || i };
+          }));
         }
 
         // Check if ingredient in catalog linked to this recipe
@@ -501,7 +501,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
   const prodTotalW = prodValidLines.reduce((acc, l) => {
     const qty = prodFactor !== null ? Math.round(Number(l.qty) * prodFactor) : Number(l.qty);
     const unit = l.unit.toLowerCase();
-    return (unit === "g" || unit === "ml") ? acc + qty : acc;
+    return unit === "g" ? acc + qty : acc;
   }, 0);
 
   if (status === "loading") {
