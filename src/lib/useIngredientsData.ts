@@ -143,8 +143,14 @@ export function useIngredientsData(searchQuery: string) {
     setLoadingMore(true);
     try {
       const bundle = await fetchPage(pageRef.current);
-      setItems((prev) => [...prev, ...bundle.items]);
-      setOffers((prev) => [...prev, ...bundle.offers]);
+      setItems((prev) => {
+        const seen = new Set(prev.map((i) => i.id));
+        return [...prev, ...bundle.items.filter((i) => !seen.has(i.id))];
+      });
+      setOffers((prev) => {
+        const seen = new Set(prev.map((o) => o.ingredient_id));
+        return [...prev, ...bundle.offers.filter((o) => !seen.has(o.ingredient_id))];
+      });
       setHasMore(bundle.hasMore);
       pageRef.current += 1;
     } catch (e) {

@@ -28,6 +28,10 @@
 
 *{ box-sizing: border-box; }
 
+html, body {
+  background: #f5f0e8 !important;
+}
+
 /* ── Display typography — DM Serif Display pour tous les titres ─────────
    Cible les balises sémantiques h1-h4.
    Note : DM Serif Display n'existe qu'en weight 400 ; 900 est simulé.

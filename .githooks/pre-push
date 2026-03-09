@@ -1,0 +1,22 @@
+#!/bin/sh
+# Pre-push hook: run build:check before pushing to main
+# Protects production from broken builds
+
+remote="$1"
+
+while read local_ref local_sha remote_ref remote_sha; do
+  # Only gate pushes targeting main
+  if echo "$remote_ref" | grep -qE "refs/heads/main$"; then
+    echo "🔒 Push vers main détecté — lancement de build:check..."
+    npm run build:check
+    if [ $? -ne 0 ]; then
+      echo ""
+      echo "❌ build:check a échoué. Push vers main bloqué."
+      echo "   Corrige les erreurs puis réessaie, ou push vers develop."
+      exit 1
+    fi
+    echo "✅ build:check OK — push vers main autorisé."
+  fi
+done
+
+exit 0

@@ -708,7 +708,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
               <input
                 ref={fileRef}
                 type="file"
-                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                accept=".pdf"
                 style={{ display: "none" }}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
@@ -722,7 +722,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading}
               >
-                {uploading ? "Upload…" : "Ajouter un fichier"}
+                {uploading ? "Upload…" : "Importer un document"}
               </button>
             </div>
           )}
@@ -742,21 +742,49 @@ export default function EventForm({ eventId }: { eventId?: string }) {
               background: "#faf8f4",
             }}>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <a href={d.file_url} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 600, fontSize: 13, color: "#2f3a33", textDecoration: "none" }}>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: 13, color: "#2f3a33" }}>
                   {d.name}
-                </a>
+                </p>
                 <p className="muted" style={{ margin: 0, fontSize: 10 }}>
                   {DOC_TYPES.find((t) => t.value === d.type)?.label ?? d.type}
                   {d.file_size ? ` · ${Math.round(d.file_size / 1024)} Ko` : ""}
+                  {d.created_at ? ` · ${new Date(d.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}` : ""}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => deleteDoc(d)}
-                style={{ background: "none", border: "none", color: "#DC2626", cursor: "pointer", fontWeight: 800, fontSize: 16 }}
-              >
-                ×
-              </button>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                <a
+                  href={d.file_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 6,
+                    background: "#92400E",
+                    color: "#fff",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    textDecoration: "none",
+                  }}
+                >
+                  Voir
+                </a>
+                <button
+                  type="button"
+                  onClick={() => deleteDoc(d)}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 6,
+                    background: "none",
+                    border: "1px solid #e5ddd0",
+                    color: "#DC2626",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                    fontSize: 11,
+                  }}
+                >
+                  Supprimer
+                </button>
+              </div>
             </div>
           ))}
         </div>

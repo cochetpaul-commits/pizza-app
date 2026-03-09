@@ -42,10 +42,10 @@ const card = (color: string): React.CSSProperties => ({
 const title = (color: string): React.CSSProperties => ({
   margin: 0,
   fontSize: 14,
-  fontWeight: 800,
-  letterSpacing: 2,
+  fontWeight: 700,
+  letterSpacing: 1.5,
   textTransform: "uppercase",
-  fontFamily: "var(--font-dm-serif-display), Georgia, serif",
+  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
   color,
 });
 
@@ -58,10 +58,10 @@ const subtitle: React.CSSProperties = {
 
 const counter = (color: string): React.CSSProperties => ({
   fontSize: 28,
-  fontWeight: 800,
+  fontWeight: 700,
   color,
   lineHeight: 1,
-  fontFamily: "var(--font-dm-serif-display), Georgia, serif",
+  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
 });
 
 const counterSuffix: React.CSSProperties = {
@@ -205,11 +205,11 @@ export default function Home() {
 
           {/* ─── CATALOGUE ─── */}
           <Link href="/ingredients" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={card("#1d4ed8")}>
+            <div style={card("#a83232")}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <p style={title("#1d4ed8")}>CATALOGUE</p>
+                    <p style={title("#a83232")}>CATALOGUE</p>
                     {counts && counts.toCheck > 0 && (
                       <span style={badge("#EA580C")}>{counts.toCheck} à vérifier</span>
                     )}
@@ -218,12 +218,12 @@ export default function Home() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && (
-                    <span style={counter("#1d4ed8")}>
+                    <span style={counter("#a83232")}>
                       {counts.ingredients}
                       <span style={counterSuffix}>réf.</span>
                     </span>
                   )}
-                  <span style={btn("#1d4ed8")}>Ouvrir →</span>
+                  <span style={btn("#a83232")}>Ouvrir →</span>
                 </div>
               </div>
             </div>
@@ -231,20 +231,20 @@ export default function Home() {
 
           {/* ─── FACTURES ─── */}
           <Link href="/invoices" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={card("#4a6741")}>
+            <div style={card("#c0584a")}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <p style={title("#4a6741")}>FACTURES</p>
+                  <p style={title("#c0584a")}>FACTURES</p>
                   <p style={subtitle}>Import fournisseurs · Mise à jour prix</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && counts.lastImport && (
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#4a6741" }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#c0584a" }}>
                       {counts.lastImportSupplier ? `${counts.lastImportSupplier} · ` : ""}
                       {fmtDateShort(counts.lastImport)}
                     </span>
                   )}
-                  <span style={btn("#4a6741")}>Ouvrir →</span>
+                  <span style={btn("#c0584a")}>Ouvrir →</span>
                 </div>
               </div>
             </div>
@@ -252,20 +252,20 @@ export default function Home() {
 
           {/* ─── FOURNISSEURS ─── */}
           <Link href="/fournisseurs" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={card("#7c3aed")}>
+            <div style={card("#6b1a1a")}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <p style={title("#7c3aed")}>FOURNISSEURS</p>
+                  <p style={title("#6b1a1a")}>FOURNISSEURS</p>
                   <p style={subtitle}>Fiches · Coordonnées · Historique</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && (
-                    <span style={counter("#7c3aed")}>
+                    <span style={counter("#6b1a1a")}>
                       {counts.suppliers}
                       <span style={counterSuffix}>actifs</span>
                     </span>
                   )}
-                  <span style={btn("#7c3aed")}>Ouvrir →</span>
+                  <span style={btn("#6b1a1a")}>Ouvrir →</span>
                 </div>
               </div>
             </div>
@@ -273,25 +273,25 @@ export default function Home() {
 
           {/* ─── ÉVÉNEMENTS ─── */}
           <Link href="/evenements" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={card("#92400e")}>
+            <div style={card("#d97706")}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <p style={title("#92400e")}>ÉVÉNEMENTS</p>
+                    <p style={title("#d97706")}>ÉVÉNEMENTS</p>
                     {counts && counts.upcomingEvents.length > 0 && (
-                      <span style={badge("#92400e")}>{counts.upcomingEvents.length} à venir</span>
+                      <span style={badge("#d97706")}>{counts.upcomingEvents.length} à venir</span>
                     )}
                   </div>
                   <p style={subtitle}>Mariages · Séminaires · Traiteur</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && counts.upcomingEvents.length > 0 && (
-                    <span style={counter("#92400e")}>
+                    <span style={counter("#d97706")}>
                       {counts.upcomingEvents.length}
                       <span style={counterSuffix}>à venir</span>
                     </span>
                   )}
-                  <span style={btn("#92400e")}>Ouvrir →</span>
+                  <span style={btn("#d97706")}>Ouvrir →</span>
                 </div>
               </div>
               {counts && counts.upcomingEvents.length > 0 && (
@@ -321,17 +321,17 @@ export default function Home() {
 
           {/* ─── PILOTAGE ─── */}
           <Link href="/pilotage" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={card("#1e3a5f")}>
+            <div style={card("#4a4a4a")}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <p style={title("#1e3a5f")}>PILOTAGE</p>
+                  <p style={title("#4a4a4a")}>PILOTAGE</p>
                   <p style={subtitle}>Mercuriale · Épicerie · Variations & Alertes</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                   {counts && counts.priceAlerts > 0 && (
-                    <span style={badge("#1e3a5f")}>{counts.priceAlerts}</span>
+                    <span style={badge("#4a4a4a")}>{counts.priceAlerts}</span>
                   )}
-                  <span style={btn("#1e3a5f")}>Ouvrir →</span>
+                  <span style={btn("#4a4a4a")}>Ouvrir →</span>
                 </div>
               </div>
             </div>
