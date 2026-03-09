@@ -1044,7 +1044,7 @@ function IngredientsPageInner() {
                                 </div>
                                 {/* Nom d'import (clé stable pour matching factures) */}
                                 <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#888" }}>
-                                  <span style={{ fontWeight: 600, flexShrink: 0 }}>Nom d'import :</span>
+                                  <span style={{ fontWeight: 600, flexShrink: 0 }}>Nom d&apos;import :</span>
                                   <span style={{ fontFamily: "monospace", background: "#ede6d9", padding: "1px 7px", borderRadius: 4, color: "#555", fontSize: 11 }}>{edit.importName}</span>
                                   <button
                                     type="button"
