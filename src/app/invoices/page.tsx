@@ -29,7 +29,7 @@ export default function InvoicesHubPage() {
           <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: 2, color: "#8B1A1A", textTransform: "uppercase", margin: "0 0 6px" }}>
             FACTURES
           </p>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#1a1a1a", margin: 0, fontFamily: "var(--font-dm-serif-display), Georgia, serif" }}>
+          <h1 style={{ fontSize: 24, color: "#1a1a1a" }}>
             Import factures fournisseurs
           </h1>
           <p style={{ margin: "6px 0 0", fontSize: 13, color: "#7a6f63" }}>
