@@ -17,6 +17,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   userScalable: false,
+  themeColor: "#ffffff",
 };
 
 export const metadata: Metadata = {
@@ -24,7 +25,6 @@ export const metadata: Metadata = {
   description: "Gestion recettes, achats, coûts",
   manifest: "/manifest.json",
   applicationName: "pizza-app",
-  themeColor: "#ffffff",
   appleWebApp: {
     capable: true,
     title: "pizza-app",
