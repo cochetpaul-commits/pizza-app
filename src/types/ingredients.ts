@@ -51,6 +51,9 @@ export type Supplier = {
 export type Ingredient = {
   id: string;
   name: string;
+  /** Clé stable utilisée pour le matching lors des imports de factures.
+   *  Ne jamais modifier automatiquement. Fallback sur `name` si null. */
+  import_name?: string | null;
   category: Category;
     allergens: unknown | null;
   is_active: boolean;
@@ -106,6 +109,7 @@ export type LatestOffer = {
 
 export type IngredientUpsert = {
   name: string;
+  import_name?: string | null;
   category: Category;
     allergens: unknown | null;
   is_active: boolean;

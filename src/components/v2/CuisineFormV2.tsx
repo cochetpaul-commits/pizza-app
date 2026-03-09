@@ -13,13 +13,13 @@ import { offerRowToCpu } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
 import { EstablishmentPicker } from "./EstablishmentPicker";
-import { IngredientListDnD, type IngredientLine } from "./IngredientListDnD";
+import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
 import { PricingBlock } from "./PricingBlock";
 import type { Ingredient, Category } from "@/types/ingredients";
 import type { CpuByUnit } from "@/lib/offerPricing";
 
-const CUISINE_UNITS = ["g", "ml", "pc"];
+const CUISINE_UNITS = ["g", "cL", "pcs"];
 
 const CATEGORIES = [
   { id: "preparation",    label: "Préparation" },
@@ -97,7 +97,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
   }, [lines, ingredients]);
 
   // Computed costs
-  const totalCostG = useMemo(() => {
+  const totalCost = useMemo(() => {
     return lines.reduce((acc, l) => {
       if (!l.ingredient_id || l.qty === "" || !(Number(l.qty) > 0)) return acc;
       const cpu = priceByIngredient[l.ingredient_id];
@@ -105,28 +105,28 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
       const qty = Number(l.qty);
       const unit = l.unit.toLowerCase();
       if (unit === "g" && cpu.g) return acc + cpu.g * qty;
+      if (unit === "cl" && cpu.ml) return acc + cpu.ml * qty * 10;
       if (unit === "ml" && cpu.ml) return acc + cpu.ml * qty;
       if ((unit === "pc" || unit === "pcs") && cpu.pcs) return acc + cpu.pcs * qty;
       return acc;
     }, 0);
   }, [lines, priceByIngredient]);
 
-  // Poids total ingrédients (g + ml≈g, pc ignoré)
+  // Poids total ingrédients (g uniquement — pas de conversion implicite cL→g)
   const totalWeightG = useMemo(() => {
     return lines.reduce((acc, l) => {
       if (!l.ingredient_id || l.qty === "" || !(Number(l.qty) > 0)) return acc;
       const qty = Number(l.qty);
       const unit = l.unit.toLowerCase();
       if (unit === "g") return acc + qty;
-      if (unit === "ml") return acc + qty;
       return acc;
     }, 0);
   }, [lines]);
 
   const yieldG = yieldGrams !== "" ? Number(yieldGrams) : null;
   const portions = portionsCount !== "" ? Number(portionsCount) : null;
-  const costPerKg = yieldG && yieldG > 0 && totalCostG > 0 ? round2((totalCostG / yieldG) * 1000) : null;
-  const costPerPortion = portions && portions > 0 && totalCostG > 0 ? round2(totalCostG / portions) : null;
+  const costPerKg = yieldG && yieldG > 0 && totalCost > 0 ? round2((totalCost / yieldG) * 1000) : null;
+  const costPerPortion = portions && portions > 0 && totalCost > 0 ? round2(totalCost / portions) : null;
 
   // Load data
   useEffect(() => {
@@ -317,7 +317,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
 
       const marginRateNum = Number(marginRate);
       const margin_rate = marginRateNum > 0 ? round2(marginRateNum) : 0;
-      const totalCost = round2(totalCostG);
+      const totalCostRounded = round2(totalCost);
 
       const payload: Record<string, unknown> = {
         name: name || "Nouvelle recette",
@@ -327,7 +327,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
         establishments,
         vat_rate: vatRate,
         margin_rate,
-        total_cost: totalCost > 0 ? totalCost : null,
+        total_cost: totalCostRounded > 0 ? totalCostRounded : null,
         cost_per_kg: costPerKg,
         cost_per_portion: costPerPortion,
         photo_url: photoUrl || null,
@@ -752,7 +752,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
               {totalWeightG > 0 && (
                 <div style={{ marginTop: 10, fontSize: 13, color: "#6f6a61", display: "flex", gap: 16, flexWrap: "wrap" }}>
                   <span>Poids total : <strong style={{ color: "#166534" }}>{Math.round(totalWeightG).toLocaleString("fr-FR")} g</strong></span>
-                  {totalCostG > 0 && <span>Coût total : <strong style={{ color: "#166534" }}>{round2(totalCostG).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</strong></span>}
+                  {totalCost > 0 && <span>Coût total : <strong style={{ color: "#166534" }}>{round2(totalCost).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</strong></span>}
                 </div>
               )}
             </div>

@@ -255,18 +255,28 @@ export async function runImport(options: {
     }
 
     // Lookup par nom exact ET normalisé pour éviter les doublons (apostrophes, accents)
+    // Utilise import_name comme clé stable ; fallback sur name pour rétrocompatiblité.
     const nameToIngId = new Map<string, string>();
     const normalizedToIngId = new Map<string, string>();
     const { data: allExisting, error: eAll } = await supabase
       .from("ingredients")
-      .select("id,name")
+      .select("id,name,import_name")
       .eq("user_id", userId);
 
     if (eAll) throw new Error(eAll.message);
-    for (const r of (allExisting ?? []) as Array<{ id: string; name: string }>) {
-      const n = (r.name ?? "").trim();
-      nameToIngId.set(n.toLowerCase(), r.id);
-      normalizedToIngId.set(normalizeIngredientName(n), r.id);
+    for (const r of (allExisting ?? []) as Array<{ id: string; name: string; import_name: string | null }>) {
+      // Clé primaire = import_name (stable) ; si absent, fallback sur name
+      const primary = ((r.import_name ?? r.name) ?? "").trim();
+      nameToIngId.set(primary.toLowerCase(), r.id);
+      normalizedToIngId.set(normalizeIngredientName(primary), r.id);
+      // Indexer aussi le name courant comme fallback (rétrocompat : ancien import_name non renseigné)
+      if (r.import_name && r.name) {
+        const legacy = (r.name ?? "").trim();
+        if (legacy.toLowerCase() !== primary.toLowerCase()) {
+          nameToIngId.set(legacy.toLowerCase(), r.id);
+          normalizedToIngId.set(normalizeIngredientName(legacy), r.id);
+        }
+      }
     }
 
     // 7. Création des ingrédients manquants
@@ -295,6 +305,7 @@ export async function runImport(options: {
       toCreate.push({
         user_id: userId,
         name: nm,
+        import_name: nm, // clé stable pour les futurs imports — ne jamais modifier auto
         category: cat,
         allergens: allergens.length ? allergens : null,
         is_active: true,
@@ -343,15 +354,15 @@ export async function runImport(options: {
     if (names.length) {
       const { data: byName2, error: eName2 } = await supabase
         .from("ingredients")
-        .select("id,name")
+        .select("id,name,import_name")
         .eq("user_id", userId)
         .in("name", names);
 
       if (eName2) throw new Error(eName2.message);
-      for (const r of (byName2 ?? []) as Array<{ id: string; name: string }>) {
-        const n = (r.name ?? "").trim();
-        nameToIngId.set(n.toLowerCase(), r.id);
-        normalizedToIngId.set(normalizeIngredientName(n), r.id);
+      for (const r of (byName2 ?? []) as Array<{ id: string; name: string; import_name: string | null }>) {
+        const primary = ((r.import_name ?? r.name) ?? "").trim();
+        nameToIngId.set(primary.toLowerCase(), r.id);
+        normalizedToIngId.set(normalizeIngredientName(primary), r.id);
       }
     }
 

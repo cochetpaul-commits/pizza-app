@@ -34,6 +34,15 @@ function fmtMoney(v: number) {
   return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/** Map any unit string to the 3 canonical units: g, cL, pcs */
+export function normalizeUnit(u: string | null | undefined): string {
+  const s = (u ?? "g").toLowerCase().trim();
+  if (s === "g" || s === "kg") return "g";
+  if (s === "ml" || s === "cl" || s === "l") return "cL";
+  if (s === "pc" || s === "pcs" || s === "pce" || s === "piece" || s === "pièce") return "pcs";
+  return "g";
+}
+
 function computeCost(line: IngredientLine, cpu: CpuByUnit | undefined): number | null {
   if (!cpu || line.qty === "" || !(Number(line.qty) > 0)) return null;
   const qty = Number(line.qty);
@@ -62,7 +71,9 @@ export function IngredientListDnD({
     const isMaison = i.source === "recette_maison";
     let rightBottom = priceLabelByIngredient?.[i.id] ?? undefined;
     if (isMaison && i.purchase_price && i.purchase_price > 0) {
-      rightBottom = `maison · ${i.purchase_price.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/kg`;
+      const pul = (i.purchase_unit_label ?? "kg").toLowerCase().trim();
+      const unitLabel = pul === "l" ? "€/L" : pul === "pc" || pul === "pcs" ? "€/pc" : "€/kg";
+      rightBottom = `maison · ${i.purchase_price.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${unitLabel}`;
     }
     return { id: i.id, name: i.name, category: i.category, rightBottom, isPreparation: isMaison };
   });
@@ -148,7 +159,11 @@ export function IngredientListDnD({
                           <SmartSelect
                             options={ingredientOptions}
                             value={line.ingredient_id}
-                            onChange={id => updateLine(line.id, { ingredient_id: id })}
+                            onChange={id => {
+                              const ing = ingredients.find(i => i.id === id);
+                              const du = normalizeUnit(ing?.default_unit);
+                              updateLine(line.id, { ingredient_id: id, unit: du });
+                            }}
                             placeholder="Ingrédient…"
                             inputStyle={{ height: 34, fontSize: 13 }}
                           />
