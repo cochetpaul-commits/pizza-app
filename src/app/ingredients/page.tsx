@@ -1,16 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState, Suspense } from "react";
+import { useEffect, useMemo, useState, useCallback, Suspense } from "react";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { supabase } from "@/lib/supabaseClient";
+import { useDebounce } from "@/lib/useDebounce";
+import { useIngredientsData } from "@/lib/useIngredientsData";
 
 import {
   CATEGORIES,
-  CAT_COLORS,
+  CAT_LABELS,
   type Category,
   type Ingredient,
   type IngredientStatus,
@@ -23,57 +26,19 @@ import {
 
 import {
   fmtOfferPriceLine,
-  fmtVolume,
   legacyHasPrice,
   normalizeSupplierId,
   offerHasPrice,
   parseNum,
-  fmtQty,
 } from "@/lib/offers";
-import { formatIngredientPrice } from "@/lib/formatPrice";
 import { extractVolumeFromName, extractWeightGFromName, detectUnitFromName } from "@/lib/invoices/utils";
 import { detectAllergensFromName } from "@/lib/invoices/allergenDetector";
 import { detectCategoryFromName } from "@/lib/invoices/categoryDetector";
 import { PriceAlertsPanel } from "@/components/PriceAlertsPanel";
-import { fetchPriceAlerts, type PriceAlert } from "@/lib/priceAlerts";
-import { ALLERGENS, ALLERGEN_SHORT, parseAllergens } from "@/lib/allergens";
+import { parseAllergens } from "@/lib/allergens";
+import { CategoryHeader, IngredientRow, type EditState } from "@/components/IngredientRow";
 
 type OfferPayload = Record<string, unknown>;
-
-const CAT_LABELS: Record<Category, string> = {
-  cremerie_fromage:   "Crémerie / Fromage",
-  charcuterie_viande: "Charcuterie / Viande",
-  maree:              "Marée",
-  alcool_spiritueux:  "Alcool / Spiritueux",
-  boisson:            "Boissons",
-  legumes_herbes:     "Légumes / Herbes",
-  fruit:              "Fruits",
-  epicerie_salee:     "Épicerie Salée",
-  epicerie_sucree:    "Épicerie Sucrée",
-  preparation:        "Préparation",
-  sauce:              "Sauce",
-  antipasti:          "Antipasti",
-  emballage:          "Emballage",
-  autre:              "Autre",
-};
-
-// kept for typing; used by saveEdit path
-function statusLabel(s: IngredientStatus): string {
-  if (s === "validated") return "validé";
-  if (s === "unknown") return "incompris";
-  return "à contrôler";
-}
-
-function statusBadgeStyle(s: IngredientStatus): CSSProperties {
-  const base: CSSProperties = {
-    display: "inline-flex", alignItems: "center", gap: 6,
-    fontSize: 12, fontWeight: 800, padding: "2px 8px", borderRadius: 999,
-    border: "1px solid rgba(0,0,0,0.12)", background: "rgba(255,255,255,0.65)",
-  };
-  if (s === "validated") return { ...base, borderColor: "rgba(22,163,74,0.35)" };
-  if (s === "unknown")   return { ...base, borderColor: "rgba(234,88,12,0.35)" };
-  return { ...base, borderColor: "rgba(2,132,199,0.35)" };
-}
 
 type IngredientPatch = Partial<
   Pick<Ingredient, "status" | "status_note" | "validated_at" | "validated_by">
@@ -84,27 +49,51 @@ const iCls = "w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text
 const sCls = "w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65";
 const lCls = "text-[12px] opacity-75 mb-1.5";
 
-// ─── new design helpers ────────────────────────────────────────────────────
-function stBadge(st: IngredientStatus) {
-  if (st === "validated") return { bg: "#d1fae5", color: "#065f46", label: "Validé" };
-  if (st === "unknown")   return { bg: "rgba(234,88,12,0.10)", color: "#EA580C", label: "Incompris" };
-  return { bg: "#fef3c7", color: "#92400e", label: "À contrôler" };
+// ─── Flat list types for virtualisation ────────────────────────────────────
+type VirtualRow =
+  | { type: "header"; cat: Category; count: number }
+  | { type: "item"; item: Ingredient };
+
+// ─── Skeleton loader ──────────────────────────────────────────────────────
+function SkeletonRow({ wide }: { wide?: boolean }) {
+  return (
+    <div style={{ padding: wide ? "10px 16px" : "12px 14px", display: "flex", gap: 12, alignItems: "center", borderBottom: "1px solid #e5ddd0" }}>
+      <div style={{ height: 12, borderRadius: 4, background: "#e5ddd0", width: "35%", animation: "pulse 1.5s ease-in-out infinite" }} />
+      {wide && <div style={{ height: 12, borderRadius: 4, background: "#e5ddd0", width: "12%", animation: "pulse 1.5s ease-in-out infinite", animationDelay: "0.2s" }} />}
+      {wide && <div style={{ height: 12, borderRadius: 4, background: "#e5ddd0", width: "15%", animation: "pulse 1.5s ease-in-out infinite", animationDelay: "0.4s" }} />}
+      <div style={{ height: 12, borderRadius: 4, background: "#e5ddd0", width: "10%", animation: "pulse 1.5s ease-in-out infinite", animationDelay: "0.3s" }} />
+    </div>
+  );
 }
 
-const BTN_ACTION: CSSProperties = {
-  width: 26, height: 26, borderRadius: 7, border: "none",
-  display: "flex", alignItems: "center", justifyContent: "center",
-  cursor: "pointer", flexShrink: 0, fontSize: 14,
-};
+function SkeletonCategoryHeader() {
+  return (
+    <div style={{ padding: "7px 16px", background: "#f5f0e8", borderBottom: "1px solid #e5ddd0", display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#d4cdc0" }} />
+      <div style={{ height: 11, borderRadius: 3, background: "#d4cdc0", width: 120, animation: "pulse 1.5s ease-in-out infinite" }} />
+    </div>
+  );
+}
+
+function SkeletonTable() {
+  return (
+    <div style={{ background: "white", border: "1px solid #e5ddd0", borderRadius: 10, overflow: "hidden", marginTop: 12 }}>
+      {[0, 1, 2, 3, 4].map(i => (
+        <div key={i}>
+          <SkeletonCategoryHeader />
+          {/* Show 0 rows inside — categories are collapsed by default */}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function IngredientsPageInner() {
   const router = useRouter();
 
-  const [items, setItems] = useState<Ingredient[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [offers, setOffers] = useState<LatestOffer[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { items, suppliers, offers, alertMap, loading, error: dataError, mutate } = useIngredientsData();
   const [q, setQ] = useState("");
+  const debouncedQ = useDebounce(q, 300);
 
   const [session, setSession] = useState<Session | null>(null);
 
@@ -158,7 +147,7 @@ function IngredientsPageInner() {
   }, [items]);
 
   const filtered = useMemo(() => {
-    const qq = q.trim().toLowerCase();
+    const qq = debouncedQ.trim().toLowerCase();
     let base = items;
     if (tab !== "all") base = base.filter((x) => ((x.status ?? "to_check") as IngredientStatus) === tab);
     if (filterCategory !== "all") base = base.filter((x) => x.category === filterCategory);
@@ -179,7 +168,7 @@ function IngredientsPageInner() {
     }
     if (!qq) return base;
     return base.filter((x) => (x.name ?? "").toLowerCase().includes(qq));
-  }, [items, q, tab, filterCategory, filterSupplier, filterEstablishment, includeNoOffer, offersByIngredientId]);
+  }, [items, debouncedQ, tab, filterCategory, filterSupplier, filterEstablishment, includeNoOffer, offersByIngredientId]);
 
   const grouped = useMemo(() => {
     const byCategory = new Map<Category, Ingredient[]>();
@@ -189,7 +178,16 @@ function IngredientsPageInner() {
     return CATEGORIES.map((cat) => ({ cat, items: byCategory.get(cat) ?? [] })).filter((g) => g.items.length > 0);
   }, [filtered]);
 
-  const [collapsedCats, setCollapsedCats] = useState<Set<Category>>(new Set());
+  // Collapsed by default; open all when searching
+  const [collapsedCats, setCollapsedCats] = useState<Set<Category>>(() => new Set(CATEGORIES));
+
+  useEffect(() => {
+    if (debouncedQ.trim()) {
+      setCollapsedCats(new Set());
+    } else {
+      setCollapsedCats(new Set(CATEGORIES));
+    }
+  }, [debouncedQ]);
 
   const allCollapsed = grouped.length > 0 && collapsedCats.size >= grouped.length;
   const filterActive = filterCategory !== "all" || filterSupplier !== "all" || filterEstablishment !== "all";
@@ -205,49 +203,27 @@ function IngredientsPageInner() {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [alertMap, setAlertMap] = useState<Map<string, PriceAlert>>(new Map());
 
-  function toggleAll() {
-    if (allCollapsed) setCollapsedCats(new Set());
-    else setCollapsedCats(new Set(grouped.map((g) => g.cat)));
-  }
-  function toggleCat(cat: Category) {
+  // ─── Stable callbacks ────────────────────────────────────────────────────
+  const toggleAll = useCallback(() => {
+    setCollapsedCats(prev => {
+      const allCats = grouped.map(g => g.cat);
+      const allAreCollapsed = allCats.length > 0 && allCats.every(c => prev.has(c));
+      return allAreCollapsed ? new Set<Category>() : new Set<Category>(allCats);
+    });
+  }, [grouped]);
+
+  const toggleCat = useCallback((cat: Category) => {
     setCollapsedCats((prev) => {
       const next = new Set(prev);
       if (next.has(cat)) next.delete(cat); else next.add(cat);
       return next;
     });
-  }
+  }, []);
 
-  async function load() {
-    setLoading(true);
-    const { data: supData, error: supErr } = await supabase.from("suppliers").select("id,name,is_active").order("name", { ascending: true });
-    if (supErr) alert(supErr.message);
-    else setSuppliers((supData ?? []) as Supplier[]);
+  const reload = useCallback(() => mutate(), [mutate]);
 
-    const { data: ingData, error: ingErr } = await supabase.from("ingredients").select("*").order("name", { ascending: true });
-    console.log("ingredients count:", ingData?.length, "error:", ingErr);
-    console.log("MAEL ingredients:", ingData?.filter((x: { supplier_id?: string }) => x.supplier_id === '007483c2-0eff-4881-90ea-dd07100ff632'));
-    if (ingErr) alert(ingErr.message);
-    else setItems((ingData ?? []) as Ingredient[]);
-
-    const { data: offData, error: offErr } = await supabase.from("v_latest_offers").select("*");
-    if (offErr) alert(offErr.message);
-    else setOffers((offData ?? []) as LatestOffer[]);
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const alerts = await fetchPriceAlerts(supabase, user.id, 0.05);
-        const map = new Map<string, PriceAlert>();
-        for (const a of alerts) map.set(a.ingredient_id, a);
-        setAlertMap(map);
-      }
-    } catch { /* silent */ }
-    setLoading(false);
-  }
-
-  async function setIngredientStatus(id: string, next: IngredientStatus) {
+  const setIngredientStatus = useCallback(async (id: string, next: IngredientStatus) => {
     const ing = items.find((x) => x.id === id);
     const off = offersByIngredientId.get(id);
     if (next === "validated") {
@@ -269,17 +245,8 @@ function IngredientsPageInner() {
     }
     const r = await supabase.from("ingredients").update(patch).eq("id", id);
     if (r.error) { alert(r.error.message); return; }
-    await load();
-  }
-
-  useEffect(() => { void load(); }, []);
-
-  useEffect(() => {
-    if (!editParam || items.length === 0) return;
-    const target = items.find((x) => x.id === editParam);
-    if (target) { startEdit(target); setTab("all"); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editParam, items]);
+    await mutate();
+  }, [items, offersByIngredientId, userId, mutate]);
 
   const [newName, setNewName] = useState("");
   const [newCategory, setNewCategory] = useState<Category>("preparation");
@@ -298,14 +265,7 @@ function IngredientsPageInner() {
   const [packPieceWeightG, setPackPieceWeightG] = useState("");
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [edit, setEdit] = useState<{
-    name: string; category: Category; is_active: boolean; supplierId: string;
-    importName: string;
-    useOffer: boolean; priceKind: PriceKind; unit: "kg" | "l" | "pc"; unitPrice: string;
-    density: string; pieceWeightG: string; packTotalQty: string; packPrice: string;
-    packUnit: "kg" | "l"; packCount: string; packEachQty: string; packEachUnit: "kg" | "l" | "pc";
-    packPieceWeightG: string; pieceVolumeMl: string; allergens: string[];
-  } | null>(null);
+  const [edit, setEdit] = useState<EditState | null>(null);
 
   function handleNewNameChange(value: string) {
     setNewName(value);
@@ -455,10 +415,10 @@ function IngredientsPageInner() {
       if (off.error) { alert(off.error.message); return; }
     }
     setNewName(""); setNewCategory("preparation"); setNewSupplierId(""); setPriceKind("unit"); resetCreatePriceBlocks();
-    await load();
+    await mutate();
   }
 
-  function startEdit(x: Ingredient) {
+  const startEdit = useCallback((x: Ingredient) => {
     const off = offersByIngredientId.get(x.id);
     const isPrep = x.category === "preparation";
     const supplierId = isPrep ? "" : (off?.supplier_id ?? (x.supplier_id ?? ""));
@@ -480,7 +440,7 @@ function IngredientsPageInner() {
       packPieceWeightG: off?.piece_weight_g != null ? String(off.piece_weight_g) : "",
       allergens: parseAllergens(x.allergens),
     });
-  }
+  }, [offersByIngredientId]);
 
   function buildOfferFromEdit(ingredient_id: string, uid: string): OfferPayload | null {
     if (!edit) return null;
@@ -535,7 +495,7 @@ function IngredientsPageInner() {
     return `${line.main} • ${line.sub}`;
   }, [edit]);
 
-  async function saveEdit() {
+  const saveEdit = useCallback(async () => {
     if (!editingId || !edit) return;
     const name = edit.name.trim();
     if (!name) { alert("Nom obligatoire."); return; }
@@ -563,17 +523,76 @@ function IngredientsPageInner() {
     }
     setEditingId(null); setEdit(null);
     if (backUrl) { router.push(backUrl); return; }
-    await load();
-  }
+    await mutate();
+  }, [editingId, edit, userId, backUrl, router, mutate]);
 
-  async function del(id: string, name: string) {
+  const del = useCallback(async (id: string, name: string) => {
     if (!confirm(`Supprimer "${name}" ?`)) return;
     const d1 = await supabase.from("supplier_offers").delete().eq("ingredient_id", id);
     if (d1.error) { alert(d1.error.message); return; }
     const d2 = await supabase.from("ingredients").delete().eq("id", id);
     if (d2.error) { alert(d2.error.message); return; }
-    await load();
-  }
+    await mutate();
+  }, [mutate]);
+
+  const onEditChange = useCallback((next: EditState) => {
+    setEdit(next);
+  }, []);
+
+  const onEditImportName = useCallback(async (id: string, current: string) => {
+    const next = window.prompt("Nouveau nom d'import :", current);
+    if (!next || !next.trim() || next.trim() === current) return;
+    const { error } = await supabase.from("ingredients").update({ import_name: next.trim() }).eq("id", id);
+    if (error) { window.alert(error.message); return; }
+    setEdit(prev => prev ? { ...prev, importName: next.trim() } : prev);
+  }, []);
+
+  // ─── Flat list for virtualisation ────────────────────────────────────────
+  const flatList = useMemo(() => {
+    const result: VirtualRow[] = [];
+    for (const { cat, items: catItems } of grouped) {
+      result.push({ type: "header", cat, count: catItems.length });
+      if (!collapsedCats.has(cat)) {
+        for (const item of catItems) result.push({ type: "item", item });
+      }
+    }
+    return result;
+  }, [grouped, collapsedCats]);
+
+  // ─── Window virtualizer ──────────────────────────────────────────────────
+  const virtualizer = useWindowVirtualizer({
+    count: flatList.length,
+    estimateSize: (index) => {
+      const row = flatList[index];
+      if (row.type === "header") return 40;
+      if (editingId === row.item.id) return 450;
+      return compactMode ? 50 : 100;
+    },
+    overscan: 10,
+  });
+
+  // Re-measure when editingId or compactMode changes
+  useEffect(() => {
+    virtualizer.measure();
+  }, [editingId, compactMode, virtualizer]);
+
+  // ?edit=<id> scroll to item
+  useEffect(() => {
+    if (!editParam || items.length === 0) return;
+    const target = items.find((x) => x.id === editParam);
+    if (target) {
+      startEdit(target);
+      setTab("all");
+      // Wait for flatList to include the item, then scroll
+      requestAnimationFrame(() => {
+        const idx = flatList.findIndex(r => r.type === "item" && r.item.id === editParam);
+        if (idx >= 0) {
+          virtualizer.scrollToIndex(idx, { align: "center" });
+        }
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editParam, items]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -592,6 +611,8 @@ function IngredientsPageInner() {
     height: 32, padding: "0 14px", borderRadius: 8, fontSize: 13, fontWeight: 600,
     cursor: "pointer", border: "1px solid #e5ddd0", background: "white", color: "#1a1a1a",
   };
+
+  const virtualItems = virtualizer.getVirtualItems();
 
   return (
     <div style={{ background: "#f5f0e8", minHeight: "100vh" }}>
@@ -626,7 +647,7 @@ function IngredientsPageInner() {
             >Variations prix</button>
           )}
           {/* Rafraîchir (desktop) */}
-          <button onClick={load} className="hidden md:inline-flex" style={headerBtnStyle}>Rafraîchir</button>
+          <button onClick={reload} className="hidden md:inline-flex" style={headerBtnStyle}>Rafraîchir</button>
           {/* + Ingrédient */}
           <button
             onClick={() => {
@@ -711,7 +732,7 @@ function IngredientsPageInner() {
               <button onClick={toggleAll} style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid #e5ddd0", background: "white", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {allCollapsed ? "Tout déplier" : "Tout replier"}
               </button>
-              <button onClick={load} style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid #e5ddd0", background: "white", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              <button onClick={reload} style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid #e5ddd0", background: "white", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                 ↺
               </button>
             </div>
@@ -838,11 +859,18 @@ function IngredientsPageInner() {
               </div>
             )}
 
-            {/* Loading */}
-            {loading && <div style={{ padding: "40px 0", textAlign: "center", color: "#999", fontSize: 14 }}>Chargement…</div>}
+            {/* Skeleton loader */}
+            {loading && <SkeletonTable />}
 
-            {/* ── Table container ── */}
-            {!loading && (
+            {/* Erreur de chargement */}
+            {!loading && dataError && (
+              <div style={{ margin: "12px 0", padding: "14px 16px", background: "#FEF2F2", border: "1px solid rgba(220,38,38,0.25)", borderRadius: 10, fontSize: 12, color: "#DC2626", fontWeight: 600 }}>
+                Erreur de chargement : {(dataError as Error).message ?? String(dataError)}
+              </div>
+            )}
+
+            {/* ── Virtualised table container ── */}
+            {!loading && !dataError && (
               <div style={{ background: "white", border: "1px solid #e5ddd0", borderRadius: 10, overflow: "hidden", marginTop: 12 }}>
 
                 {/* Desktop thead */}
@@ -859,296 +887,72 @@ function IngredientsPageInner() {
                   <div style={{ width: 80, fontSize: 10, fontWeight: 700, color: "#999999", textTransform: "uppercase", letterSpacing: 1 }}>Actions</div>
                 </div>
 
-                {/* Grouped rows */}
-                {grouped.map(({ cat, items: catItems }) => {
-                  const isCollapsed = collapsedCats.has(cat);
-                  return (
-                    <div key={cat}>
-                      {/* Category header */}
-                      <button
-                        onClick={() => toggleCat(cat)}
+                {/* Virtualised rows */}
+                <div style={{ position: "relative", width: "100%", height: virtualizer.getTotalSize() }}>
+                  {virtualItems.map((virtualRow) => {
+                    const row = flatList[virtualRow.index];
+                    if (row.type === "header") {
+                      return (
+                        <div
+                          key={`header-${row.cat}`}
+                          data-index={virtualRow.index}
+                          ref={virtualizer.measureElement}
+                          style={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            width: "100%",
+                            transform: `translateY(${virtualRow.start}px)`,
+                          }}
+                        >
+                          <CategoryHeader
+                            cat={row.cat}
+                            count={row.count}
+                            isCollapsed={collapsedCats.has(row.cat)}
+                            onToggle={toggleCat}
+                          />
+                        </div>
+                      );
+                    }
+                    const x = row.item;
+                    const offer = offersByIngredientId.get(x.id);
+                    const supplierIdForDisplay = offer?.supplier_id ?? x.supplier_id ?? null;
+                    const supplierName = supplierIdForDisplay ? suppliersMap.get(supplierIdForDisplay)?.name ?? null : null;
+                    return (
+                      <div
+                        key={x.id}
+                        data-index={virtualRow.index}
+                        ref={virtualizer.measureElement}
                         style={{
-                          width: "100%", display: "flex", alignItems: "center", gap: 10,
-                          padding: "7px 16px", background: "#f5f0e8", border: "none",
-                          borderBottom: "1px solid #e5ddd0", cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          width: "100%",
+                          transform: `translateY(${virtualRow.start}px)`,
                         }}
                       >
-                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAT_COLORS[cat], flexShrink: 0 }} />
-                        <span style={{ fontWeight: 800, fontSize: 11, textTransform: "uppercase", letterSpacing: 1.5, color: "#1a1a1a" }}>{CAT_LABELS[cat]}</span>
-                        <span style={{ fontSize: 11, color: "#999" }}>({catItems.length})</span>
-                        <span style={{ marginLeft: "auto", fontSize: 10, color: "#999" }}>{isCollapsed ? "▶" : "▼"}</span>
-                      </button>
-
-                      {!isCollapsed && catItems.map((x) => {
-                        const isEditing = editingId === x.id;
-                        const offer = offersByIngredientId.get(x.id);
-                        const price = formatIngredientPrice(x, offer ?? null);
-                        const estab = offer?.establishment ?? "both";
-                        const estabBadge = estab === "bellomio"
-                          ? { label: "BM", bg: "#FEF2F2", color: "#8B1A1A" }
-                          : estab === "piccola"
-                          ? { label: "PM", bg: "#F5F3FF", color: "#6B21A8" }
-                          : { label: "BM·PM", bg: "#F3F4F6", color: "#6B7280" };
-                        const supplierIdForDisplay = offer?.supplier_id ?? x.supplier_id;
-                        const supplierName = supplierIdForDisplay ? suppliersMap.get(supplierIdForDisplay)?.name : null;
-                        const st = (x.status ?? "to_check") as IngredientStatus;
-                        const hasPrice = offerHasPrice(offer) || legacyHasPrice(x);
-                        const canValidate = hasPrice;
-                        const alg = parseAllergens(x.allergens);
-                        const alert = alertMap.get(x.id);
-                        const sb = stBadge(st);
-                        const condInfo = offer?.density_kg_per_l != null ? `${fmtQty(offer.density_kg_per_l)} kg/L`
-                          : offer?.piece_weight_g != null ? `${fmtQty(offer.piece_weight_g)} g/pc`
-                          : x.piece_volume_ml != null ? fmtVolume(x.piece_volume_ml) + "/pc"
-                          : x.purchase_unit_name === "l" ? `${x.density_g_per_ml ?? 1} kg/L`
-                          : x.piece_weight_g ? `${x.piece_weight_g} g/pc` : "—";
-
-                        return (
-                          <div key={x.id} style={{ borderBottom: "1px solid #e5ddd0" }}>
-
-                            {/* ── DESKTOP ROW ── */}
-                            <div
-                              className="hidden md:flex"
-                              style={{ alignItems: "center", padding: "10px 16px", gap: 8, background: "white", transition: "background 0.1s" }}
-                              onMouseEnter={e => (e.currentTarget.style.background = "#ede6d9")}
-                              onMouseLeave={e => (e.currentTarget.style.background = "white")}
-                            >
-                              {/* Désignation */}
-                              <div style={{ flex: 2.5, minWidth: 0 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                                  <span style={{ fontWeight: 700, fontSize: 12, textTransform: "uppercase", color: CAT_COLORS[x.category], letterSpacing: 0.3 }}>{x.name}</span>
-                                  {alert && (
-                                    <span style={{ fontSize: 10, fontWeight: 800, padding: "1px 5px", borderRadius: 6, color: alert.direction === "up" ? "#DC2626" : "#16A34A", background: alert.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)", border: `1px solid ${alert.direction === "up" ? "rgba(220,38,38,0.30)" : "rgba(22,163,74,0.30)"}` }}>
-                                      {alert.direction === "up" ? "↑" : "↓"} {(Math.abs(alert.change_pct) * 100).toFixed(0)}%
-                                    </span>
-                                  )}
-                                </div>
-                                <div style={{ fontSize: 10, color: "#999999", marginTop: 1 }}>
-                                  {supplierName || CAT_LABELS[x.category]}
-                                  {x.source_prep_recipe_name ? ` · Pivot: ${x.source_prep_recipe_name}` : ""}
-                                  {x.status_note ? ` · ${x.status_note}` : ""}
-                                </div>
-                                {alg.length > 0 && (
-                                  <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 3 }}>
-                                    {alg.map(a => (
-                                      <span key={a} title={a} style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "rgba(220,38,38,0.08)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.20)" }}>
-                                        {ALLERGEN_SHORT[a as keyof typeof ALLERGEN_SHORT] ?? a}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                                {!hasPrice && <span style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", display: "inline-block", marginTop: 3 }}>prix manquant</span>}
-                                {st !== "validated" && (
-                                  <div style={{ display: "flex", gap: 4, marginTop: 5, flexWrap: "wrap" }}>
-                                    <button onClick={() => setIngredientStatus(x.id, "to_check")} style={{ height: 22, padding: "0 8px", borderRadius: 5, border: "1px solid #e5ddd0", background: "white", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>À contrôler</button>
-                                    <button disabled={!canValidate} onClick={() => { if (!canValidate) return; setIngredientStatus(x.id, "validated"); }} style={{ height: 22, padding: "0 8px", borderRadius: 5, border: "1px solid #4a6741", background: "rgba(74,103,65,0.08)", fontSize: 10, fontWeight: 600, cursor: canValidate ? "pointer" : "not-allowed", color: "#4a6741", opacity: !canValidate ? 0.4 : 1 }}>Valider</button>
-                                    <button onClick={() => setIngredientStatus(x.id, "unknown")} style={{ height: 22, padding: "0 8px", borderRadius: 5, border: "1px solid #e5ddd0", background: "white", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>Incompris</button>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Prix */}
-                              <div style={{ flex: 1 }}>
-                                <span style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>{price}</span>
-                              </div>
-
-                              {/* Conditionnement */}
-                              <div style={{ flex: 1, fontSize: 12, color: "#666" }}>{condInfo}</div>
-
-                              {/* Statut */}
-                              <div style={{ flex: 0.8 }}>
-                                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 999, background: sb.bg, color: sb.color }}>{sb.label}</span>
-                              </div>
-
-                              {/* Fournisseur */}
-                              <div style={{ flex: 0.8, fontSize: 12, color: "#666", display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
-                                {supplierName && supplierIdForDisplay ? (
-                                  <Link href={`/fournisseurs/${supplierIdForDisplay}`} style={{ color: "inherit", textDecoration: "underline dotted", textUnderlineOffset: 2 }}>{supplierName}</Link>
-                                ) : "—"}
-                                <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: estabBadge.bg, color: estabBadge.color }}>{estabBadge.label}</span>
-                              </div>
-
-                              {/* Actions */}
-                              <div style={{ width: 80, display: "flex", gap: 6, alignItems: "center", justifyContent: "flex-end" }}>
-                                {!isEditing
-                                  ? <button onClick={() => startEdit(x)} title="Modifier" style={{ ...BTN_ACTION, background: "#8B1A1A", color: "white", fontWeight: 700 }}>→</button>
-                                  : <button onClick={saveEdit} style={{ ...BTN_ACTION, background: "#4a6741", color: "white", fontSize: 11, fontWeight: 700 }}>OK</button>}
-                                <button onClick={() => del(x.id, x.name)} title="Supprimer" style={{ ...BTN_ACTION, background: "#ede6d9", color: "#aaa" }}>✕</button>
-                              </div>
-                            </div>
-
-                            {/* ── MOBILE ROW ── */}
-                            <div
-                              className="md:hidden"
-                              style={{ padding: "12px 14px", background: st === "to_check" ? "#fffbeb" : "white", borderBottom: st === "to_check" ? "1px solid #fde68a" : "none" }}
-                            >
-                              {compactMode ? (
-                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  <div style={{ fontWeight: 800, fontSize: 11, textTransform: "uppercase", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: CAT_COLORS[x.category] }}>{x.name}</div>
-                                  <span style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 14, fontWeight: 700, flexShrink: 0 }}>{price}</span>
-                                  {alert && <span style={{ fontSize: 10, color: alert.direction === "up" ? "#DC2626" : "#16A34A", flexShrink: 0 }}>{alert.direction === "up" ? "↑" : "↓"}</span>}
-                                  {!isEditing
-                                    ? <button onClick={() => startEdit(x)} style={{ ...BTN_ACTION, background: "#8B1A1A", color: "white", fontWeight: 700 }}>→</button>
-                                    : <button onClick={saveEdit} style={{ ...BTN_ACTION, background: "#4a6741", color: "white", fontSize: 10, fontWeight: 700 }}>OK</button>}
-                                  <button onClick={() => del(x.id, x.name)} style={{ ...BTN_ACTION, background: "#ede6d9", color: "#aaa" }}>✕</button>
-                                </div>
-                              ) : (
-                                <>
-                                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ fontWeight: 800, fontSize: 11, textTransform: "uppercase", color: CAT_COLORS[x.category], letterSpacing: 0.3 }}>{x.name}</div>
-                                      <div style={{ fontSize: 10, color: "#999999", marginTop: 2 }}>
-                                        {supplierName || CAT_LABELS[x.category]}
-                                        {x.status_note ? ` · ${x.status_note}` : ""}
-                                      </div>
-                                      {alg.length > 0 && (
-                                        <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 4 }}>
-                                          {alg.map(a => (
-                                            <span key={a} style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "rgba(220,38,38,0.08)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.18)" }}>
-                                              {ALLERGEN_SHORT[a as keyof typeof ALLERGEN_SHORT] ?? a}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                                      <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>{price}</div>
-                                      <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 999, background: sb.bg, color: sb.color, display: "inline-block", marginTop: 3 }}>{sb.label}</span>
-                                      {alert && <div style={{ fontSize: 10, fontWeight: 800, color: alert.direction === "up" ? "#DC2626" : "#16A34A", marginTop: 2 }}>{alert.direction === "up" ? "↑" : "↓"} {(Math.abs(alert.change_pct) * 100).toFixed(0)}%</div>}
-                                    </div>
-                                  </div>
-                                  {!hasPrice && <div style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", marginTop: 4 }}>prix manquant</div>}
-                                  <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                                    {st !== "validated" && <button onClick={() => { if (!canValidate) return; setIngredientStatus(x.id, "validated"); }} disabled={!canValidate} style={{ flex: 1, height: 30, borderRadius: 7, border: "1px solid #4a6741", background: "rgba(74,103,65,0.08)", fontSize: 11, fontWeight: 700, cursor: canValidate ? "pointer" : "not-allowed", color: "#4a6741", opacity: !canValidate ? 0.4 : 1 }}>Valider</button>}
-                                    {!isEditing
-                                      ? <button onClick={() => startEdit(x)} style={{ flex: 1, height: 30, borderRadius: 7, border: "none", background: "#8B1A1A", color: "white", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Modifier</button>
-                                      : <button onClick={saveEdit} style={{ flex: 1, height: 30, borderRadius: 7, border: "none", background: "#4a6741", color: "white", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>OK</button>}
-                                    <button onClick={() => del(x.id, x.name)} style={{ width: 30, height: 30, borderRadius: 7, border: "none", background: "#ede6d9", color: "#aaa", fontSize: 14, cursor: "pointer" }}>✕</button>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-
-                            {/* ── EDIT FORM (logic unchanged) ── */}
-                            {isEditing && edit && (
-                              <div className="grid gap-2.5" style={{ padding: "14px 16px", borderTop: "1px solid #e5ddd0", background: "#faf7f2" }}>
-                                <div className="grid gap-2.5" style={{ gridTemplateColumns: "2fr 1fr 1fr" }}>
-                                  <input className={iCls} value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
-                                  <select className={sCls} value={edit.category} onChange={(e) => setEdit({ ...edit, category: e.target.value as Category })}>
-                                    {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                                  </select>
-                                  <select className={sCls} value={edit.supplierId} onChange={(e) => setEdit({ ...edit, supplierId: e.target.value })}>
-                                    <option value="">—</option>
-                                    {suppliers.filter((s) => s.is_active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                  </select>
-                                </div>
-                                {/* Nom d'import (clé stable pour matching factures) */}
-                                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#888" }}>
-                                  <span style={{ fontWeight: 600, flexShrink: 0 }}>Nom d&apos;import :</span>
-                                  <span style={{ fontFamily: "monospace", background: "#ede6d9", padding: "1px 7px", borderRadius: 4, color: "#555", fontSize: 11 }}>{edit.importName}</span>
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      const next = window.prompt("Nouveau nom d'import :", edit.importName);
-                                      if (!next || !next.trim() || next.trim() === edit.importName) return;
-                                      const { error } = await supabase.from("ingredients").update({ import_name: next.trim() }).eq("id", editingId!);
-                                      if (error) { window.alert(error.message); return; }
-                                      setEdit({ ...edit, importName: next.trim() });
-                                    }}
-                                    style={{ fontSize: 11, padding: "1px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", color: "#888", cursor: "pointer", flexShrink: 0 }}
-                                  >✎</button>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2.5 items-center">
-                                  <div className="flex items-center gap-2.5">
-                                    <span className="font-extrabold">Offre fournisseur</span>
-                                    <label className="flex items-center gap-2">
-                                      <input type="checkbox" checked={edit.useOffer} onChange={(e) => setEdit({ ...edit, useOffer: e.target.checked })} />
-                                      <span className="muted">recommandé</span>
-                                    </label>
-                                  </div>
-                                  <select className={sCls} value={edit.is_active ? "1" : "0"} onChange={(e) => setEdit({ ...edit, is_active: e.target.value === "1" })}>
-                                    <option value="1">Actif</option><option value="0">Inactif</option>
-                                  </select>
-                                </div>
-                                {edit.useOffer && (
-                                  <>
-                                    <div><div className={lCls}>Mode prix</div>
-                                      <select className={sCls} value={edit.priceKind} onChange={(e) => setEdit({ ...edit, priceKind: e.target.value as PriceKind })}>
-                                        <option value="unit">Unitaire</option><option value="pack_simple">Pack</option><option value="pack_composed">Pack composé</option>
-                                      </select>
-                                    </div>
-                                    {edit.priceKind === "unit" && (
-                                      <>
-                                        <div className="grid grid-cols-2 gap-2.5">
-                                          <input className={iCls} placeholder="Prix unitaire" value={edit.unitPrice} onChange={(e) => setEdit({ ...edit, unitPrice: e.target.value })} />
-                                          <select className={sCls} value={edit.unit} onChange={(e) => setEdit({ ...edit, unit: e.target.value as "kg" | "l" | "pc" })}>
-                                            <option value="kg">kg</option><option value="l">L</option><option value="pc">pc</option>
-                                          </select>
-                                        </div>
-                                        {edit.unit === "l" && <input className={iCls} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => setEdit({ ...edit, density: e.target.value })} />}
-                                        {edit.unit === "pc" && <input className={iCls} placeholder="Poids pièce (g)" value={edit.pieceWeightG} onChange={(e) => setEdit({ ...edit, pieceWeightG: e.target.value })} />}
-                                        {edit.unit === "pc" && <input className={iCls} placeholder="Volume pièce (ml)" value={edit.pieceVolumeMl} onChange={(e) => setEdit({ ...edit, pieceVolumeMl: e.target.value })} />}
-                                        <div className="muted text-[12px]">{previewEditPack || "—"}</div>
-                                      </>
-                                    )}
-                                    {edit.priceKind === "pack_simple" && (
-                                      <>
-                                        <div className="grid grid-cols-3 gap-2.5">
-                                          <input className={iCls} placeholder="Prix pack (€)" value={edit.packPrice} onChange={(e) => setEdit({ ...edit, packPrice: e.target.value })} />
-                                          <input className={iCls} placeholder="Qté totale (kg/L)" value={edit.packTotalQty} onChange={(e) => setEdit({ ...edit, packTotalQty: e.target.value })} />
-                                          <select className={sCls} value={edit.packUnit} onChange={(e) => setEdit({ ...edit, packUnit: e.target.value as "kg" | "l" })}>
-                                            <option value="kg">kg</option><option value="l">L</option>
-                                          </select>
-                                        </div>
-                                        {edit.packUnit === "l" && <input className={iCls} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => setEdit({ ...edit, density: e.target.value })} />}
-                                        <div className="muted text-[12px]">{previewEditPack || "—"}</div>
-                                      </>
-                                    )}
-                                    {edit.priceKind === "pack_composed" && (
-                                      <>
-                                        <div className="grid grid-cols-2 gap-2.5">
-                                          <input className={iCls} placeholder="Prix pack (€)" value={edit.packPrice} onChange={(e) => setEdit({ ...edit, packPrice: e.target.value })} />
-                                          <input className={iCls} placeholder="Nombre d'unités (ex: 8)" value={edit.packCount} onChange={(e) => setEdit({ ...edit, packCount: e.target.value })} />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2.5">
-                                          <select className={sCls} value={edit.packEachUnit} onChange={(e) => setEdit({ ...edit, packEachUnit: e.target.value as "kg" | "l" | "pc" })}>
-                                            <option value="l">L</option><option value="kg">kg</option><option value="pc">pc</option>
-                                          </select>
-                                          {edit.packEachUnit !== "pc"
-                                            ? <input className={iCls} placeholder="Qté par unité (ex: 1.5)" value={edit.packEachQty} onChange={(e) => setEdit({ ...edit, packEachQty: e.target.value })} />
-                                            : <input className={iCls} placeholder="Poids pièce (g)" value={edit.packPieceWeightG} onChange={(e) => setEdit({ ...edit, packPieceWeightG: e.target.value })} />}
-                                        </div>
-                                        {edit.packEachUnit === "l" && <input className={iCls} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => setEdit({ ...edit, density: e.target.value })} />}
-                                        <div className="muted text-[12px]">{previewEditPack || "—"}</div>
-                                      </>
-                                    )}
-                                  </>
-                                )}
-                                {/* Allergènes */}
-                                <div className="pt-1">
-                                  <div className="text-[11px] font-extrabold opacity-60 mb-2 uppercase tracking-wide">Allergènes</div>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {ALLERGENS.map(a => {
-                                      const checked = edit.allergens.includes(a);
-                                      return (
-                                        <label key={a} title={a} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 800, background: checked ? "rgba(220,38,38,0.12)" : "rgba(0,0,0,0.04)", border: `1px solid ${checked ? "rgba(220,38,38,0.35)" : "rgba(0,0,0,0.10)"}`, color: checked ? "#DC2626" : "#6B6257", transition: "all 120ms" }}>
-                                          <input type="checkbox" checked={checked} style={{ margin: 0 }}
-                                            onChange={() => setEdit({ ...edit, allergens: checked ? edit.allergens.filter(v => v !== a) : [...edit.allergens, a] })} />
-                                          {ALLERGEN_SHORT[a]}
-                                        </label>
-                                      );
-                                    })}
-                                  </div>
-                                  <div className="muted text-[10px] mt-1">{edit.allergens.length === 0 ? "Aucun allergène" : edit.allergens.join(" · ")}</div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
+                        <IngredientRow
+                          item={x}
+                          offer={offer}
+                          supplierName={supplierName}
+                          supplierIdForDisplay={supplierIdForDisplay}
+                          alert={alertMap.get(x.id)}
+                          isEditing={editingId === x.id}
+                          compactMode={compactMode}
+                          edit={editingId === x.id ? edit : null}
+                          suppliers={suppliers}
+                          previewEditPack={editingId === x.id ? previewEditPack : ""}
+                          onStartEdit={startEdit}
+                          onSaveEdit={saveEdit}
+                          onDelete={del}
+                          onSetStatus={setIngredientStatus}
+                          onEditChange={onEditChange}
+                          onEditImportName={onEditImportName}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
 
                 {grouped.length === 0 && !loading && (
                   <div style={{ padding: "40px 20px", textAlign: "center", color: "#999", fontSize: 14 }}>
