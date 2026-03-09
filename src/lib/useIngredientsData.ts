@@ -5,6 +5,7 @@ import type { Ingredient, LatestOffer, Supplier } from "@/types/ingredients";
 
 const INGREDIENT_COLS = "id,name,import_name,category,allergens,is_active,default_unit,purchase_price,purchase_unit,purchase_unit_label,purchase_unit_name,density_g_per_ml,piece_weight_g,piece_volume_ml,supplier_id,source_prep_recipe_name,source,recipe_id,status,status_note,validated_at,validated_by,cost_per_unit,cost_per_kg";
 
+// v_latest_offers n'expose pas price_kind/establishment/updated_at — on interroge supplier_offers directement
 const OFFER_COLS = "ingredient_id,supplier_id,price_kind,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g,updated_at,establishment";
 
 type IngredientsBundle = {
@@ -19,7 +20,7 @@ async function fetcher(): Promise<IngredientsBundle> {
   const [supRes, ingRes, offRes, userRes] = await Promise.all([
     supabase.from("suppliers").select("id,name,is_active").order("name", { ascending: true }),
     supabase.from("ingredients").select(INGREDIENT_COLS).order("name", { ascending: true }),
-    supabase.from("v_latest_offers").select(OFFER_COLS),
+    supabase.from("supplier_offers").select(OFFER_COLS).eq("is_active", true),
     supabase.auth.getUser(),
   ]);
 
