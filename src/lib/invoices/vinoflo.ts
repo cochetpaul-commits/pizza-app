@@ -76,13 +76,6 @@ function parseLines(text: string): ParsedLine[] {
   const rows = text.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
   const tmp: ParsedLine[] = [];
 
-  // Known lines from Vinoflo invoices with their correct values
-  // Used to patch OCR errors on specific problematic lines
-  const KNOWN_LINES: Record<string, { qty: number; sku: string; unit_price: number; total_price: number }> = {
-    "barolo": { qty: 6, sku: "28", unit_price: 18.00, total_price: 108.00 },
-    "lugana": { qty: 12, sku: "9", unit_price: 9.10, total_price: 109.20 },
-  };
-
   for (const r of rows) {
     // Pattern normal: qty  sku  name  price  total
     // Gère aussi le cas où qty+sku sont collés ex: "628" = qty:6 sku:28
@@ -94,15 +87,13 @@ function parseLines(text: string): ParsedLine[] {
       if (mCollé) {
         const name = mCollé[3].replace(/\s+/g, " ").trim();
         if (name.toLowerCase().includes("description") || name.toLowerCase().includes("prix")) continue;
-        const nameKey = name.toLowerCase().split(" ")[0];
-        const known = KNOWN_LINES[nameKey];
         tmp.push({
           sku: mCollé[2],
           name,
-          quantity: known?.qty ?? parseFrenchNumber(mCollé[1]),
+          quantity: parseFrenchNumber(mCollé[1]),
           unit: "pc",
-          unit_price: known?.unit_price ?? parseFrenchNumber(cleanOcrPrice(mCollé[4])),
-          total_price: known?.total_price ?? parseFrenchNumber(cleanOcrPrice(mCollé[5])),
+          unit_price: parseFrenchNumber(cleanOcrPrice(mCollé[4])),
+          total_price: parseFrenchNumber(cleanOcrPrice(mCollé[5])),
           tax_rate: 20,
           notes: isAlcoholTax(name) ? "taxe_alcool" : null,
           piece_weight_g: null,
@@ -116,13 +107,10 @@ function parseLines(text: string): ParsedLine[] {
     if (name.toLowerCase().includes("description") || name.toLowerCase().includes("prix")) continue;
     if (/^[-*T]+$/.test(name)) continue;
 
-    const nameKey = name.toLowerCase().split(" ")[0];
-    const known = KNOWN_LINES[nameKey];
-
     const rawSku = cleanOcrSku(m[2]);
-    const qty = known?.qty ?? parseFrenchNumber(m[1]);
-    const unit_price = known?.unit_price ?? parseFrenchNumber(cleanOcrPrice(m[4]));
-    const total_price = known?.total_price ?? parseFrenchNumber(cleanOcrPrice(m[5]));
+    const qty = parseFrenchNumber(m[1]);
+    const unit_price = parseFrenchNumber(cleanOcrPrice(m[4]));
+    const total_price = parseFrenchNumber(cleanOcrPrice(m[5]));
 
     tmp.push({
       sku: rawSku || null,

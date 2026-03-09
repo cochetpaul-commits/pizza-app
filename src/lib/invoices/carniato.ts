@@ -8,6 +8,7 @@ type ParsedLine = {
   tax_rate: number | null;
   notes: string | null;
   piece_weight_g: number | null;
+  piece_volume_ml: number | null;
 };
 
 export type ParsedInvoice = {
@@ -133,6 +134,7 @@ function parseLines(text: string): ParsedLine[] {
       tax_rate: taxRate,
       notes: null,
       piece_weight_g: null,
+      piece_volume_ml: null,
     });
   }
 

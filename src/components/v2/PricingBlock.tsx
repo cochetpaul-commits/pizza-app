@@ -143,13 +143,20 @@ export function PricingBlock({
         <>
           <div style={{ borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 14, marginBottom: 14 }}>
             <label className="label">Prix de vente TTC (€)</label>
-            <input
-              className="input" type="number" min={0} step={0.5}
-              value={sellPrice ?? ""}
-              onChange={e => onSellPriceChange(e.target.value === "" ? "" : Number(e.target.value))}
-              placeholder="ex: 12.00"
-              style={{ maxWidth: 160, fontWeight: 700 }}
-            />
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <input
+                className="input" type="number" min={0} step={0.5}
+                value={sellPrice ?? ""}
+                onChange={e => onSellPriceChange(e.target.value === "" ? "" : Number(e.target.value))}
+                placeholder="ex: 12.00"
+                style={{ maxWidth: 160, fontWeight: 700 }}
+              />
+              {pvPortionTTC != null && (
+                <span style={{ fontSize: 11, fontStyle: "italic", color: "#8B1A1A", whiteSpace: "nowrap" }}>
+                  conseillé : {fmtMoney(pvPortionTTC)} €
+                </span>
+              )}
+            </div>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { pdfToText, runImport } from "@/lib/invoices/importEngine";
+import { pdfToText } from "@/lib/pdfToText";
+import { runImport } from "@/lib/invoices/importEngine";
 import { parseMetroInvoiceText } from "@/lib/invoices/metro";
 
 export const runtime = "nodejs";
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
     }
 
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const text = await pdfToText(bytes, { prefix: "pizzaapp-metro-", flags: ["-raw"] });
+    const text = await pdfToText(bytes);
     const payload = parseMetroInvoiceText(text);
 
     const supabase = createClient(getEnv("NEXT_PUBLIC_SUPABASE_URL"), getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"), {

@@ -35,7 +35,7 @@ type PreviewResult = {
   };
 };
 
-export default function MaelInvoicePage() {
+export default function MetroInvoicePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [file, setFile] = useState<File | null>(null);
@@ -71,6 +71,7 @@ export default function MaelInvoicePage() {
       const form = new FormData();
       form.append("file", file);
       form.append("mode", "preview");
+      form.append("establishment", establishment);
 
       const auth = await getAuthHeader();
       const res = await fetch("/api/invoices/metro", {
@@ -130,18 +131,6 @@ export default function MaelInvoicePage() {
       </h1>
 
       {/* Zone upload */}
-      <div
-        style={{
-          border: "2px dashed #ccc",
-          borderRadius: 8,
-          padding: "2rem",
-          textAlign: "center",
-          cursor: "pointer",
-          marginBottom: "1rem",
-          background: file ? "#f0fdf4" : "#fafafa",
-        }}
-        onClick={() => fileInputRef.current?.click()}
-      >
       {/* Establishment selector */}
       <div style={{ margin: "1rem 0", padding: "1rem", background: "#f9f9f9", borderRadius: 8, border: "1px solid #e5e7eb" }}>
         <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: "#374151" }}>Cet import concerne :</div>
@@ -157,6 +146,18 @@ export default function MaelInvoicePage() {
         </div>
       </div>
 
+      <div
+        style={{
+          border: "2px dashed #ccc",
+          borderRadius: 8,
+          padding: "2rem",
+          textAlign: "center",
+          cursor: "pointer",
+          marginBottom: "1rem",
+          background: file ? "#f0fdf4" : "#fafafa",
+        }}
+        onClick={() => fileInputRef.current?.click()}
+      >
         <input
           ref={fileInputRef}
           type="file"

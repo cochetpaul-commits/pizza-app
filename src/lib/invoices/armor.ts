@@ -7,6 +7,8 @@ type ParsedLine = {
   total_price: number | null;
   tax_rate: number | null;
   notes: string | null;
+  piece_weight_g: number | null;
+  piece_volume_ml: number | null;
 };
 
 export type ParsedInvoice = {
@@ -121,6 +123,8 @@ function parseLines(text: string): ParsedLine[] {
         total_price: total,
         tax_rate: 20,
         notes: null,
+        piece_weight_g: null,
+        piece_volume_ml: null,
       });
     } else if (CODE_ONLY_RE.test(row)) {
       pendingCode = row;

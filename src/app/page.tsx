@@ -6,6 +6,14 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchPriceAlerts } from "@/lib/priceAlerts";
 
+type UpcomingEvent = {
+  id: string;
+  name: string;
+  date: string | null;
+  status: string;
+  covers: number;
+};
+
 type Counts = {
   recettes: number;
   ingredients: number;
@@ -13,6 +21,7 @@ type Counts = {
   lastImport: string | null;
   lastImportSupplier: string | null;
   priceAlerts: number;
+  upcomingEvents: UpcomingEvent[];
 };
 
 function fmtDateShort(iso: string) {
@@ -29,7 +38,8 @@ export default function Home() {
       if (!data.user) { setAuthState("anon"); return; }
       setAuthState("ok");
 
-      const [pizza, emp, kitchen, pivot, cocktail, ingredients, toCheck, lastInvoice] = await Promise.all([
+      const today = new Date().toISOString().slice(0, 10);
+      const [pizza, emp, kitchen, pivot, cocktail, ingredients, toCheck, lastInvoice, upcomingEvts] = await Promise.all([
         supabase.from("pizza_recipes").select("*", { count: "exact", head: true }).eq("is_draft", false),
         supabase.from("recipes").select("*", { count: "exact", head: true }),
         supabase.from("kitchen_recipes").select("*", { count: "exact", head: true }).eq("is_draft", false),
@@ -38,6 +48,7 @@ export default function Home() {
         supabase.from("ingredients").select("*", { count: "exact", head: true }),
         supabase.from("ingredients").select("*", { count: "exact", head: true }).eq("status", "to_check"),
         supabase.from("supplier_invoices").select("created_at,supplier_name").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("events").select("id,name,date,status,covers").gte("date", today).not("status", "in", '("termine","annule")').order("date", { ascending: true }).limit(5),
       ]);
 
       let priceAlerts = 0;
@@ -53,6 +64,7 @@ export default function Home() {
         lastImport: lastInvoice.data?.created_at ?? null,
         lastImportSupplier: lastInvoice.data?.supplier_name ?? null,
         priceAlerts,
+        upcomingEvents: (upcomingEvts.data ?? []) as UpcomingEvent[],
       });
     };
     run();
@@ -195,6 +207,55 @@ export default function Home() {
                   Voir →
                 </span>
               </div>
+            </div>
+          </Link>
+
+          {/* ─── ÉVÉNEMENTS ─── */}
+          <Link href="/evenements" style={{ textDecoration: "none", color: "inherit" }}>
+            <div className="card" style={{ borderLeft: "4px solid #8B1A1A", cursor: "pointer" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div>
+                  <p className="cardTitle" style={{ marginBottom: 3, letterSpacing: 1, color: "#8B1A1A" }}>ÉVÉNEMENTS</p>
+                  <p className="muted" style={{ margin: 0, fontSize: 11 }}>Mariages · Séminaires · Traiteur</p>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, marginLeft: 12 }}>
+                  {counts && counts.upcomingEvents.length > 0 && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 900,
+                      background: "rgba(139,26,26,0.10)", color: "#8B1A1A",
+                      border: "1px solid rgba(139,26,26,0.25)", borderRadius: 8,
+                      padding: "2px 7px",
+                    }}>
+                      {counts.upcomingEvents.length}
+                    </span>
+                  )}
+                  <span className="btn btnPrimary" style={{ fontSize: 12, background: "#8B1A1A", borderColor: "#8B1A1A" }}>
+                    Voir →
+                  </span>
+                </div>
+              </div>
+              {counts && counts.upcomingEvents.length > 0 && (
+                <div style={{ marginTop: 8, display: "grid", gap: 4 }}>
+                  {counts.upcomingEvents.slice(0, 3).map((ev) => (
+                    <div key={ev.id} style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      fontSize: 11,
+                      padding: "4px 8px",
+                      background: "#faf8f4",
+                      borderRadius: 6,
+                      border: "1px solid #e5ddd0",
+                    }}>
+                      <span style={{ fontWeight: 700, color: "#2f3a33" }}>{ev.name}</span>
+                      <span className="muted" style={{ fontSize: 10 }}>
+                        {ev.date ? fmtDateShort(ev.date) : "—"}
+                        {ev.covers > 0 ? ` · ${ev.covers} couv.` : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </Link>
 
