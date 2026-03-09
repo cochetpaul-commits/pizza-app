@@ -182,6 +182,24 @@ function RecipeCard({
             {fmt(pv)} €{pvLabel && <span style={{ fontSize: 10, fontWeight: 500, marginLeft: 2 }}>{pvLabel}</span>}
           </div>
         )}
+        {/* ── Marge brute + Food cost ── */}
+        {cost != null && cost > 0 && (() => {
+          if (pv == null || pv <= 0) {
+            return <span style={{ fontSize: 11, color: "#bbb", whiteSpace: "nowrap" }}>— %</span>;
+          }
+          const gm = pv - cost;
+          const fc = (cost / pv) * 100;
+          const dotColor = fc < 30 ? "#4a6741" : fc <= 35 ? "#d97706" : "#8B1A1A";
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 11, color: "#9a8f84", whiteSpace: "nowrap" }}>{fmt(gm)} € mg</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor, display: "inline-block", flexShrink: 0 }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: dotColor, whiteSpace: "nowrap" }}>{fc.toFixed(1)} %</span>
+              </span>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
