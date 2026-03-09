@@ -64,7 +64,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
 
   // Pricing
   const [vatRate, setVatRate] = useState(0.1);
-  const [coefficient, setCoefficient] = useState(3.5);
+  const [marginRate, setMarginRate] = useState("75");
 
   // Production mode
   const [prodMode, setProdMode] = useState(initialProdMode ?? false);
@@ -165,7 +165,8 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
           if (r.vat_rate) setVatRate(Number(r.vat_rate));
           if (r.margin_rate) {
             const mr = Number(r.margin_rate);
-            if (mr > 0 && mr < 1) setCoefficient(Math.round((1 / (1 - mr)) * 10) / 10);
+            if (mr >= 1) setMarginRate(String(Math.round(mr)));
+            else if (mr > 0) setMarginRate(String(Math.round(mr * 100)));
           }
           if (r.flour_mix) {
             try {
@@ -205,7 +206,8 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("NOT_LOGGED");
 
-      const marginRate = coefficient > 0 ? round2(1 - 1 / coefficient) : null;
+      const marginRateNum = Number(marginRate);
+      const margin_rate = marginRateNum > 0 ? round2(marginRateNum) : 0;
       const yieldGrams = result?.summary.total_dough_g ?? null;
 
       const payload: Record<string, unknown> = {
@@ -222,7 +224,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         flour_mix: flourMix,
         yield_grams: yieldGrams,
         vat_rate: vatRate,
-        margin_rate: marginRate,
+        margin_rate,
         procedure: steps.length > 0 ? JSON.stringify(steps) : null,
         user_id: auth.user.id,
       };
@@ -630,18 +632,20 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
               <StepsList steps={steps} onChange={setSteps} />
             </div>
 
-            {/* Pricing */}
+            {/* Prix & Marges */}
             <div className="card" style={{ marginBottom: 16 }}>
               <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
                 Prix &amp; Marges
               </h3>
               <PricingBlock
                 costPerKg={costPerKg}
-                costPerBall={costPerBall}
+                costPerPortion={costPerBall}
+                portionLabel="pâton"
                 vatRate={vatRate}
                 onVatChange={setVatRate}
-                coefficient={coefficient}
-                onCoeffChange={setCoefficient}
+                marginRate={marginRate}
+                onMarginChange={setMarginRate}
+                accentColor={ACCENT}
               />
             </div>
 

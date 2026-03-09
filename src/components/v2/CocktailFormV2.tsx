@@ -13,6 +13,7 @@ import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
 import { IngredientListDnD, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
+import { PricingBlock } from "./PricingBlock";
 import type { Ingredient } from "@/types/ingredients";
 import type { CpuByUnit } from "@/lib/offerPricing";
 
@@ -29,12 +30,6 @@ const COCKTAIL_TYPES = [
 
 const GLASS_OPTIONS = ["Tumbler", "Coupe", "Flûte", "Highball", "Martini", "Autre"];
 const METHOD_OPTIONS = ["Shaker", "Build", "Stirred", "Blender"];
-
-const VAT_OPTIONS = [
-  { value: 0.055, label: "5,5 %" },
-  { value: 0.1,   label: "10 %" },
-  { value: 0.2,   label: "20 %" },
-];
 
 function tmpId() { return `tmp-${Math.random().toString(36).slice(2)}`; }
 function n2(v: unknown) { const x = Number(v); return Number.isFinite(x) ? x : 0; }
@@ -75,7 +70,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
   // Pricing
   const [vatRate, setVatRate] = useState(0.2);
-  const [coefficient, setCoefficient] = useState(3.5);
+  const [marginRate, setMarginRate] = useState("75");
 
   // Production mode
   const [prodMode, setProdMode] = useState(initialProdMode ?? false);
@@ -125,10 +120,6 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
       return acc;
     }, 0);
   }, [lines, priceByIngredient, pieceVolById]);
-
-  const pvTTC = totalCostEur > 0 && coefficient > 0
-    ? round2(totalCostEur * coefficient * (1 + vatRate))
-    : null;
 
   // Production mode computations
   const prodPivotLine = pivotIngredientId
@@ -272,7 +263,8 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
           if (c.vat_rate) setVatRate(Number(c.vat_rate));
           if (c.margin_rate) {
             const mr = Number(c.margin_rate);
-            if (mr > 0 && mr < 1) setCoefficient(Math.round((1 / (1 - mr)) * 10) / 10);
+            if (mr >= 1) setMarginRate(String(Math.round(mr)));
+            else if (mr > 0) setMarginRate(String(Math.round(mr * 100)));
           }
           if (c.steps) {
             try { setSteps(JSON.parse(String(c.steps)) as string[]); }
@@ -322,7 +314,8 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("NOT_LOGGED");
 
-      const marginRate = coefficient > 0 ? round2(1 - 1 / coefficient) : null;
+      const marginRateNum = Number(marginRate);
+      const margin_rate = marginRateNum > 0 ? round2(marginRateNum) : 0;
       const totalCost = round2(totalCostEur);
 
       const payload: Record<string, unknown> = {
@@ -333,7 +326,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
         sell_price: sellPrice !== "" ? Number(sellPrice) : null,
         image_url: imageUrl || null,
         vat_rate: vatRate,
-        margin_rate: marginRate,
+        margin_rate,
         total_cost: totalCost > 0 ? totalCost : null,
         steps: steps.length > 0 ? JSON.stringify(steps) : null,
         is_draft: false,
@@ -638,51 +631,20 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
               <AllergenBadges allergens={computedAllergens} />
             </div>
 
-            {/* Pricing */}
+            {/* Prix & Marges */}
             <div className="card" style={{ marginBottom: 16 }}>
               <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
                 Prix &amp; Marges
               </h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <div>
-                  <label className="label">TVA</label>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    {VAT_OPTIONS.map(opt => (
-                      <button
-                        key={opt.value} type="button" onClick={() => setVatRate(opt.value)}
-                        style={{
-                          padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700,
-                          border: "1.5px solid",
-                          borderColor: vatRate === opt.value ? ACCENT : "rgba(217,199,182,0.95)",
-                          background: vatRate === opt.value ? "rgba(14,116,144,0.08)" : "rgba(255,255,255,0.7)",
-                          color: vatRate === opt.value ? ACCENT : "#6f6a61",
-                          cursor: "pointer",
-                        }}
-                      >{opt.label}</button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="label">Coefficient multiplicateur</label>
-                  <input
-                    type="number" value={coefficient} min={1} step={0.1}
-                    onChange={e => { const v = parseFloat(e.target.value); if (v >= 1) setCoefficient(v); }}
-                    className="input" style={{ maxWidth: 120 }}
-                  />
-                </div>
-                {pvTTC != null && (
-                  <div style={{
-                    padding: "10px 16px", borderRadius: 10,
-                    background: "rgba(14,116,144,0.06)", border: "1px solid rgba(14,116,144,0.2)",
-                  }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: ACCENT, textTransform: "uppercase", letterSpacing: 1 }}>Prix conseillé TTC</div>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: ACCENT }}>{fmtMoney(pvTTC)} €</div>
-                    <div style={{ fontSize: 11, color: "#6f6a61", marginTop: 2 }}>
-                      Coeff ×{coefficient.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} · TVA {(vatRate * 100).toFixed(1).replace(".", ",")} %
-                    </div>
-                  </div>
-                )}
-              </div>
+              <PricingBlock
+                costPerPortion={totalCostEur > 0 ? round2(totalCostEur) : null}
+                portionLabel="cocktail"
+                vatRate={vatRate}
+                onVatChange={setVatRate}
+                marginRate={marginRate}
+                onMarginChange={setMarginRate}
+                accentColor={ACCENT}
+              />
             </div>
 
             {/* Photo */}

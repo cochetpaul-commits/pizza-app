@@ -76,7 +76,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
   // Pricing
   const [vatRate, setVatRate] = useState(0.1);
-  const [coefficient, setCoefficient] = useState(3.5);
+  const [marginRate, setMarginRate] = useState("75");
 
   // Production mode
   const [prodMode, setProdMode] = useState(initialProdMode ?? false);
@@ -282,7 +282,8 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
           if (p.vat_rate) setVatRate(Number(p.vat_rate));
           if (p.margin_rate) {
             const mr = Number(p.margin_rate);
-            if (mr > 0 && mr < 1) setCoefficient(Math.round((1 / (1 - mr)) * 10) / 10);
+            if (mr >= 1) setMarginRate(String(Math.round(mr)));
+            else if (mr > 0) setMarginRate(String(Math.round(mr * 100)));
           }
           setPivotIngredientId(String(p.pivot_ingredient_id ?? "") || null);
         }
@@ -334,7 +335,8 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("NOT_LOGGED");
 
-      const marginRate = coefficient > 0 ? round2(1 - 1 / coefficient) : null;
+      const marginRateNum = Number(marginRate);
+      const margin_rate = marginRateNum > 0 ? round2(marginRateNum) : 0;
       const stepsJson = steps.length > 0 ? JSON.stringify(steps) : null;
       const notesValue = stepsJson ?? (notes || null);
 
@@ -346,7 +348,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         establishments,
         total_cost: totalCost > 0 ? totalCost : null,
         vat_rate: vatRate,
-        margin_rate: marginRate,
+        margin_rate,
         is_draft: false,
       };
 
@@ -623,19 +625,6 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
               />
             </div>
 
-            {/* Coût total */}
-            {totalCost > 0 && (
-              <div style={{ marginBottom: 16, padding: "8px 14px", borderRadius: 10, background: "rgba(0,0,0,0.04)", border: "1px solid rgba(217,199,182,0.7)" }}>
-                <span style={{ fontSize: 12, color: "#6f6a61" }}>Coût total pizza : </span>
-                <span style={{ fontSize: 16, fontWeight: 800, color: ACCENT }}>{fmtMoney(totalCost)}</span>
-                {doughCostPerBall != null && (
-                  <span style={{ fontSize: 11, color: "#9a8f84", marginLeft: 8 }}>
-                    (dont pâton : {fmtMoney(doughCostPerBall)})
-                  </span>
-                )}
-              </div>
-            )}
-
             {/* Étapes */}
             <div className="card" style={{ marginBottom: 16 }}>
               <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
@@ -666,18 +655,19 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
               <AllergenBadges allergens={computedAllergens} />
             </div>
 
-            {/* Pricing */}
+            {/* Prix & Marges */}
             <div className="card" style={{ marginBottom: 16 }}>
               <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
                 Prix &amp; Marges
               </h3>
               <PricingBlock
                 costPerPortion={totalCost > 0 ? totalCost : null}
-                portionsLabel="pizza"
+                portionLabel="pizza"
                 vatRate={vatRate}
                 onVatChange={setVatRate}
-                coefficient={coefficient}
-                onCoeffChange={setCoefficient}
+                marginRate={marginRate}
+                onMarginChange={setMarginRate}
+                accentColor={ACCENT}
               />
             </div>
 

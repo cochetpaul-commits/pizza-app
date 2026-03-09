@@ -15,6 +15,7 @@ import { compressImage } from "@/lib/compressImage";
 import { EstablishmentPicker } from "./EstablishmentPicker";
 import { IngredientListDnD, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
+import { PricingBlock } from "./PricingBlock";
 import type { Ingredient, Category } from "@/types/ingredients";
 import type { CpuByUnit } from "@/lib/offerPricing";
 
@@ -30,35 +31,10 @@ const CATEGORIES = [
   { id: "autre",          label: "Autre" },
 ];
 
-const VAT_OPTIONS = [
-  { value: 0.055, label: "5,5 %" },
-  { value: 0.1,   label: "10 %" },
-  { value: 0.2,   label: "20 %" },
-];
-
 function tmpId() { return `tmp-${Math.random().toString(36).slice(2)}`; }
 function n2(v: unknown) { const x = Number(v); return Number.isFinite(x) ? x : 0; }
 function round2(v: number) { return Math.round(v * 100) / 100; }
 function fmtMoney(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-
-const kpiCard: React.CSSProperties = {
-  background: "rgba(0,0,0,0.03)",
-  borderRadius: 10,
-  padding: "10px 12px",
-};
-const kpiLabel: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  color: "#6f6a61",
-  textTransform: "uppercase",
-  letterSpacing: 0.5,
-  marginBottom: 3,
-};
-const kpiValue: React.CSSProperties = {
-  fontSize: 20,
-  fontWeight: 900,
-  color: "#2d2d2d",
-};
 
 interface Props { recipeId?: string; initialProdMode?: boolean; }
 
@@ -151,22 +127,6 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
   const portions = portionsCount !== "" ? Number(portionsCount) : null;
   const costPerKg = yieldG && yieldG > 0 && totalCostG > 0 ? round2((totalCostG / yieldG) * 1000) : null;
   const costPerPortion = portions && portions > 0 && totalCostG > 0 ? round2(totalCostG / portions) : null;
-
-  // Pricing calculations
-  const marginPctNum = useMemo(() => {
-    const n = Number(String(marginRate).replace(",", "."));
-    return Number.isFinite(n) && n >= 0 ? n : 0;
-  }, [marginRate]);
-
-  const pricing = useMemo(() => {
-    const m = Math.min(Math.max(marginPctNum, 0), 99.9) / 100;
-    const v = vatRate;
-    const pvKgHT = costPerKg && costPerKg > 0 && m < 1 ? costPerKg / (1 - m) : null;
-    const pvKgTTC = pvKgHT ? pvKgHT * (1 + v) : null;
-    const pvPortionHT = costPerPortion && costPerPortion > 0 && m < 1 ? costPerPortion / (1 - m) : null;
-    const pvPortionTTC = pvPortionHT ? pvPortionHT * (1 + v) : null;
-    return { pvKgHT, pvKgTTC, pvPortionHT, pvPortionTTC };
-  }, [costPerKg, costPerPortion, marginPctNum, vatRate]);
 
   // Load data
   useEffect(() => {
@@ -810,62 +770,15 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
               <h3 style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#166534" }}>
                 Prix &amp; Marges
               </h3>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-                <div style={kpiCard}>
-                  <div style={kpiLabel}>Coût / kg</div>
-                  <div style={kpiValue}>{costPerKg ? fmtMoney(costPerKg) + " €" : "—"}</div>
-                </div>
-                <div style={kpiCard}>
-                  <div style={kpiLabel}>Coût / portion</div>
-                  <div style={kpiValue}>{costPerPortion ? fmtMoney(costPerPortion) + " €" : "—"}</div>
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-                <div>
-                  <label className="label">TVA vente</label>
-                  <div style={{ display: "flex", gap: 4 }}>
-                    {VAT_OPTIONS.map(opt => (
-                      <button
-                        key={opt.value} type="button" onClick={() => setVatRate(opt.value)}
-                        style={{
-                          flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                          border: "1.5px solid",
-                          borderColor: vatRate === opt.value ? "#8B1A1A" : "rgba(217,199,182,0.9)",
-                          background: vatRate === opt.value ? "rgba(139,26,26,0.08)" : "rgba(255,255,255,0.7)",
-                          color: vatRate === opt.value ? "#8B1A1A" : "#6f6a61",
-                          cursor: "pointer",
-                        }}
-                      >{opt.label}</button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="label">Marge %</label>
-                  <input
-                    className="input" type="number" min={0} max={99} step={1}
-                    value={marginRate}
-                    onChange={e => setMarginRate(e.target.value)}
-                    style={{ textAlign: "center", fontWeight: 700 }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <div style={kpiCard}>
-                  <div style={kpiLabel}>PV conseillé / portion TTC</div>
-                  <div style={{ ...kpiValue, color: "#8B1A1A" }}>
-                    {pricing.pvPortionTTC ? fmtMoney(pricing.pvPortionTTC) + " €" : "—"}
-                  </div>
-                </div>
-                <div style={kpiCard}>
-                  <div style={kpiLabel}>PV conseillé / kg TTC</div>
-                  <div style={{ ...kpiValue, color: "#8B1A1A" }}>
-                    {pricing.pvKgTTC ? fmtMoney(pricing.pvKgTTC) + " €" : "—"}
-                  </div>
-                </div>
-              </div>
+              <PricingBlock
+                costPerKg={costPerKg}
+                costPerPortion={costPerPortion}
+                vatRate={vatRate}
+                onVatChange={setVatRate}
+                marginRate={marginRate}
+                onMarginChange={setMarginRate}
+                accentColor="#8B1A1A"
+              />
             </div>
 
             {/* Index button for preparations */}

@@ -1,16 +1,5 @@
 "use client";
 
-interface Props {
-  costPerKg?: number | null;
-  costPerPortion?: number | null;
-  costPerBall?: number | null;
-  portionsLabel?: string;
-  vatRate: number;
-  onVatChange: (v: number) => void;
-  coefficient: number;
-  onCoeffChange: (v: number) => void;
-}
-
 const VAT_OPTIONS = [
   { value: 0.055, label: "5,5 %" },
   { value: 0.1,   label: "10 %" },
@@ -21,103 +10,122 @@ function fmtMoney(v: number) {
   return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function suggestedPrice(costHT: number, coeff: number, vatRate: number) {
-  const pvHT = costHT * coeff;
-  return pvHT * (1 + vatRate);
+function hexToRgba(hex: string, alpha: number) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+const kpiCard: React.CSSProperties = {
+  background: "rgba(0,0,0,0.03)",
+  borderRadius: 10,
+  padding: "10px 12px",
+};
+const kpiLabel: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 700,
+  color: "#6f6a61",
+  textTransform: "uppercase",
+  letterSpacing: 0.5,
+  marginBottom: 3,
+};
+const kpiValue: React.CSSProperties = {
+  fontSize: 20,
+  fontWeight: 900,
+  color: "#2d2d2d",
+};
+
+interface Props {
+  costPerKg?: number | null;
+  costPerPortion?: number | null;
+  portionLabel?: string;
+  vatRate: number;
+  onVatChange: (v: number) => void;
+  marginRate: string;
+  onMarginChange: (v: string) => void;
+  accentColor?: string;
 }
 
 export function PricingBlock({
-  costPerKg, costPerPortion, costPerBall,
-  portionsLabel = "portion",
-  vatRate, onVatChange, coefficient, onCoeffChange,
+  costPerKg,
+  costPerPortion,
+  portionLabel = "portion",
+  vatRate,
+  onVatChange,
+  marginRate,
+  onMarginChange,
+  accentColor = "#8B1A1A",
 }: Props) {
-  const costRef = costPerPortion ?? costPerBall ?? null;
-  const pvTTC = costRef != null && coefficient > 0 ? suggestedPrice(costRef, coefficient, vatRate) : null;
+  const marginPctNum = (() => {
+    const n = Number(String(marginRate).replace(",", "."));
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  })();
+
+  const m = Math.min(Math.max(marginPctNum, 0), 99.9) / 100;
+
+  const pvKgHT = costPerKg && costPerKg > 0 && m < 1 ? costPerKg / (1 - m) : null;
+  const pvKgTTC = pvKgHT ? pvKgHT * (1 + vatRate) : null;
+  const pvPortionHT = costPerPortion && costPerPortion > 0 && m < 1 ? costPerPortion / (1 - m) : null;
+  const pvPortionTTC = pvPortionHT ? pvPortionHT * (1 + vatRate) : null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {/* Costs summary */}
-      {(costPerKg != null || costPerPortion != null || costPerBall != null) && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-          {costPerKg != null && costPerKg > 0 && (
-            <div style={{ padding: "8px 14px", borderRadius: 10, background: "rgba(0,0,0,0.04)", border: "1px solid rgba(217,199,182,0.7)" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#9a8f84", textTransform: "uppercase", letterSpacing: 1 }}>Coût/kg</div>
-              <div style={{ fontSize: 17, fontWeight: 800, color: "#2f3a33" }}>{fmtMoney(costPerKg)} €</div>
-            </div>
-          )}
-          {costPerPortion != null && costPerPortion > 0 && (
-            <div style={{ padding: "8px 14px", borderRadius: 10, background: "rgba(0,0,0,0.04)", border: "1px solid rgba(217,199,182,0.7)" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#9a8f84", textTransform: "uppercase", letterSpacing: 1 }}>Coût/{portionsLabel}</div>
-              <div style={{ fontSize: 17, fontWeight: 800, color: "#2f3a33" }}>{fmtMoney(costPerPortion)} €</div>
-            </div>
-          )}
-          {costPerBall != null && costPerBall > 0 && (
-            <div style={{ padding: "8px 14px", borderRadius: 10, background: "rgba(0,0,0,0.04)", border: "1px solid rgba(217,199,182,0.7)" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#9a8f84", textTransform: "uppercase", letterSpacing: 1 }}>Coût/pâton</div>
-              <div style={{ fontSize: 17, fontWeight: 800, color: "#2f3a33" }}>{fmtMoney(costPerBall)} €</div>
-            </div>
-          )}
+    <>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+        <div style={kpiCard}>
+          <div style={kpiLabel}>Coût / kg</div>
+          <div style={kpiValue}>{costPerKg ? fmtMoney(costPerKg) + " €" : "—"}</div>
         </div>
-      )}
-
-      {/* TVA */}
-      <div>
-        <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#6f6a61", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
-          TVA
-        </label>
-        <div style={{ display: "flex", gap: 8 }}>
-          {VAT_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => onVatChange(opt.value)}
-              style={{
-                padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700,
-                border: "1.5px solid",
-                borderColor: vatRate === opt.value ? "#8B1A1A" : "rgba(217,199,182,0.95)",
-                background: vatRate === opt.value ? "rgba(139,26,26,0.08)" : "rgba(255,255,255,0.7)",
-                color: vatRate === opt.value ? "#8B1A1A" : "#6f6a61",
-                cursor: "pointer",
-              }}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div style={kpiCard}>
+          <div style={kpiLabel}>Coût / {portionLabel}</div>
+          <div style={kpiValue}>{costPerPortion ? fmtMoney(costPerPortion) + " €" : "—"}</div>
         </div>
       </div>
 
-      {/* Coefficient */}
-      <div>
-        <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#6f6a61", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
-          Coefficient multiplicateur
-        </label>
-        <input
-          type="number"
-          value={coefficient}
-          min={1}
-          step={0.1}
-          onChange={e => {
-            const v = parseFloat(e.target.value);
-            if (v >= 1) onCoeffChange(v);
-          }}
-          className="input"
-          style={{ maxWidth: 120 }}
-        />
-      </div>
-
-      {/* Prix conseillé */}
-      {pvTTC != null && (
-        <div style={{
-          padding: "10px 16px", borderRadius: 10,
-          background: "rgba(139,26,26,0.06)", border: "1px solid rgba(139,26,26,0.2)",
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#8B1A1A", textTransform: "uppercase", letterSpacing: 1 }}>Prix conseillé TTC</div>
-          <div style={{ fontSize: 22, fontWeight: 900, color: "#8B1A1A" }}>{fmtMoney(pvTTC)} €</div>
-          <div style={{ fontSize: 11, color: "#6f6a61", marginTop: 2 }}>
-            Coeff ×{coefficient.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} · TVA {(vatRate * 100).toFixed(1).replace(".", ",")} %
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+        <div>
+          <label className="label">TVA vente</label>
+          <div style={{ display: "flex", gap: 4 }}>
+            {VAT_OPTIONS.map(opt => (
+              <button
+                key={opt.value} type="button" onClick={() => onVatChange(opt.value)}
+                style={{
+                  flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                  border: "1.5px solid",
+                  borderColor: vatRate === opt.value ? accentColor : "rgba(217,199,182,0.9)",
+                  background: vatRate === opt.value ? hexToRgba(accentColor, 0.08) : "rgba(255,255,255,0.7)",
+                  color: vatRate === opt.value ? accentColor : "#6f6a61",
+                  cursor: "pointer",
+                }}
+              >{opt.label}</button>
+            ))}
           </div>
         </div>
-      )}
-    </div>
+        <div>
+          <label className="label">Marge %</label>
+          <input
+            className="input" type="number" min={0} max={99} step={1}
+            value={marginRate}
+            onChange={e => onMarginChange(e.target.value)}
+            style={{ textAlign: "center", fontWeight: 700 }}
+          />
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <div style={kpiCard}>
+          <div style={kpiLabel}>PV conseillé / {portionLabel} TTC</div>
+          <div style={{ ...kpiValue, color: accentColor }}>
+            {pvPortionTTC ? fmtMoney(pvPortionTTC) + " €" : "—"}
+          </div>
+        </div>
+        <div style={kpiCard}>
+          <div style={kpiLabel}>PV conseillé / kg TTC</div>
+          <div style={{ ...kpiValue, color: accentColor }}>
+            {pvKgTTC ? fmtMoney(pvKgTTC) + " €" : "—"}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
