@@ -12,6 +12,7 @@ const SUPPLIERS = [
   { key: "carniato",  label: "CARNIATO",          category: "Charcuterie",       color: "#8e44ad", href: "/invoices/carniato" },
   { key: "barspirits",label: "BAR SPIRITS",       category: "Spiritueux",        color: "#16a085", href: "/invoices/barspirits" },
   { key: "sum",       label: "SUM",               category: "Divers",            color: "#7f8c8d", href: "/invoices/sum" },
+  { key: "masse",     label: "MASSE",              category: "Viande & foie gras", color: "#8B1A1A", href: "/invoices/masse" },
   { key: "armor",     label: "ARMOR EMBALLAGES",  category: "Emballage",         color: "#f39c12", href: "/invoices/armor", fullWidth: true },
 ];
 
@@ -28,7 +29,7 @@ export default function InvoicesHubPage() {
           <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: 2, color: "#8B1A1A", textTransform: "uppercase", margin: "0 0 6px" }}>
             FACTURES
           </p>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#1a1a1a", margin: 0, fontFamily: "Georgia, 'Times New Roman', serif" }}>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#1a1a1a", margin: 0, fontFamily: "var(--font-dm-serif-display), Georgia, serif" }}>
             Import factures fournisseurs
           </h1>
           <p style={{ margin: "6px 0 0", fontSize: 13, color: "#7a6f63" }}>

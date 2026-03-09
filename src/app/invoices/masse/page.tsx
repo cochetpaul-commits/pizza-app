@@ -35,7 +35,7 @@ type PreviewResult = {
   };
 };
 
-export default function BarSpiritsInvoicePage() {
+export default function MasseInvoicePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [file, setFile] = useState<File | null>(null);
@@ -43,7 +43,7 @@ export default function BarSpiritsInvoicePage() {
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [commitResult, setCommitResult] = useState<PreviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [establishment, setEstablishment] = useState<"bellomio" | "piccola" | "both">("both");
+  const [establishment, setEstablishment] = useState<"bellomio" | "piccola" | "both">("bellomio");
 
   async function getAuthHeader(): Promise<string> {
     const raw = localStorage.getItem(
@@ -65,16 +65,20 @@ export default function BarSpiritsInvoicePage() {
     setError(null);
     setPreview(null);
     setCommitResult(null);
+
     try {
       const form = new FormData();
       form.append("file", file);
       form.append("mode", "preview");
+      form.append("establishment", establishment);
+
       const auth = await getAuthHeader();
-      const res = await fetch("/api/invoices/barspirits", {
+      const res = await fetch("/api/invoices/masse", {
         method: "POST",
         headers: auth ? { Authorization: auth } : {},
         body: form,
       });
+
       const data: PreviewResult = await res.json();
       if (!data.ok) throw new Error(data.error ?? "Erreur inconnue");
       setPreview(data);
@@ -90,17 +94,20 @@ export default function BarSpiritsInvoicePage() {
     setLoading(true);
     setError(null);
     setCommitResult(null);
+
     try {
       const form = new FormData();
       form.append("file", file);
       form.append("mode", "commit");
       form.append("establishment", establishment);
+
       const auth = await getAuthHeader();
-      const res = await fetch("/api/invoices/barspirits", {
+      const res = await fetch("/api/invoices/masse", {
         method: "POST",
         headers: auth ? { Authorization: auth } : {},
         body: form,
       });
+
       const data: PreviewResult = await res.json();
       if (!data.ok) throw new Error(data.error ?? "Erreur inconnue");
       setCommitResult(data);
@@ -119,21 +126,9 @@ export default function BarSpiritsInvoicePage() {
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "2rem" }}>
 
       <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1.5rem" }}>
-        Import factures BAR SPIRITS
+        Import factures MASSE
       </h1>
 
-      <div
-        style={{
-          border: "2px dashed #ccc",
-          borderRadius: 8,
-          padding: "2rem",
-          textAlign: "center",
-          cursor: "pointer",
-          marginBottom: "1rem",
-          background: file ? "#f0fdf4" : "#fafafa",
-        }}
-        onClick={() => fileInputRef.current?.click()}
-      >
       {/* Establishment selector */}
       <div style={{ margin: "1rem 0", padding: "1rem", background: "#f9f9f9", borderRadius: 8, border: "1px solid #e5e7eb" }}>
         <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: "#374151" }}>Cet import concerne :</div>
@@ -149,6 +144,19 @@ export default function BarSpiritsInvoicePage() {
         </div>
       </div>
 
+      {/* Zone upload */}
+      <div
+        style={{
+          border: "2px dashed #ccc",
+          borderRadius: 8,
+          padding: "2rem",
+          textAlign: "center",
+          cursor: "pointer",
+          marginBottom: "1rem",
+          background: file ? "#f0fdf4" : "#fafafa",
+        }}
+        onClick={() => fileInputRef.current?.click()}
+      >
         <input
           ref={fileInputRef}
           type="file"
@@ -165,10 +173,11 @@ export default function BarSpiritsInvoicePage() {
         {file ? (
           <p style={{ color: "#16a34a", fontWeight: 600 }}>📄 {file.name}</p>
         ) : (
-          <p style={{ color: "#666" }}>Cliquez pour sélectionner un PDF de facture BAR SPIRITS</p>
+          <p style={{ color: "#666" }}>Cliquez pour sélectionner un PDF de facture MASSE</p>
         )}
       </div>
 
+      {/* Bouton preview */}
       {file && !preview && !commitResult && (
         <button
           onClick={handlePreview}
@@ -188,12 +197,14 @@ export default function BarSpiritsInvoicePage() {
         </button>
       )}
 
+      {/* Erreur */}
       {error && (
         <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 6, padding: "1rem", marginTop: "1rem", color: "#dc2626" }}>
           ❌ {error}
         </div>
       )}
 
+      {/* Preview */}
       {preview && parsed && !commitResult && (
         <div style={{ marginTop: "1.5rem" }}>
           {preview.invoice?.already_imported && (
@@ -213,6 +224,7 @@ export default function BarSpiritsInvoicePage() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.875rem", marginBottom: "1.5rem" }}>
             <thead>
               <tr style={{ background: "#f1f5f9" }}>
+                <th style={th}>SKU</th>
                 <th style={th}>Nom</th>
                 <th style={th}>Qté</th>
                 <th style={th}>Unité</th>
@@ -224,6 +236,7 @@ export default function BarSpiritsInvoicePage() {
             <tbody>
               {parsed.lines.map((l, i) => (
                 <tr key={i} style={{ borderBottom: "1px solid #e2e8f0" }}>
+                  <td style={td}>{l.sku ?? "—"}</td>
                   <td style={td}>{l.name ?? "—"}</td>
                   <td style={td}>{l.quantity ?? "—"}</td>
                   <td style={td}>{l.unit ?? "—"}</td>
@@ -254,7 +267,14 @@ export default function BarSpiritsInvoicePage() {
             </button>
             <button
               onClick={() => { setFile(null); setPreview(null); setError(null); }}
-              style={{ background: "transparent", border: "1px solid #ccc", borderRadius: 6, padding: "0.6rem 1.5rem", fontSize: "1rem", cursor: "pointer" }}
+              style={{
+                background: "transparent",
+                border: "1px solid #ccc",
+                borderRadius: 6,
+                padding: "0.6rem 1.5rem",
+                fontSize: "1rem",
+                cursor: "pointer",
+              }}
             >
               Annuler
             </button>
@@ -262,6 +282,7 @@ export default function BarSpiritsInvoicePage() {
         </div>
       )}
 
+      {/* Résultat commit */}
       {commitResult && (
         <div style={{ marginTop: "1.5rem", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: "1.5rem" }}>
           <h2 style={{ color: "#16a34a", fontWeight: 700, marginBottom: "0.75rem" }}>✅ Import terminé</h2>
@@ -269,7 +290,16 @@ export default function BarSpiritsInvoicePage() {
           <p><strong>Offres insérées :</strong> {commitResult.inserted?.offers_inserted ?? 0}</p>
           <button
             onClick={() => { setFile(null); setPreview(null); setCommitResult(null); setError(null); }}
-            style={{ marginTop: "1rem", background: "#2563eb", color: "white", border: "none", borderRadius: 6, padding: "0.6rem 1.5rem", fontSize: "1rem", cursor: "pointer" }}
+            style={{
+              marginTop: "1rem",
+              background: "#2563eb",
+              color: "white",
+              border: "none",
+              borderRadius: 6,
+              padding: "0.6rem 1.5rem",
+              fontSize: "1rem",
+              cursor: "pointer",
+            }}
           >
             Importer une autre facture
           </button>

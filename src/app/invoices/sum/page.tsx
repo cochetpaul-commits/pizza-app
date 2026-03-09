@@ -116,7 +116,7 @@ export default function SumInvoicePage() {
   return (
     <>
     <NavBar backHref="/invoices" backLabel="Factures" right={<Link href="/ingredients" className="btn">≡ Index ingrédients</Link>} />
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: "2rem", fontFamily: "sans-serif" }}>
+    <div style={{ maxWidth: 900, margin: "0 auto", padding: "2rem" }}>
 
       <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1.5rem" }}>
         Import factures SUM

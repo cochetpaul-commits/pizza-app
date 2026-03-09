@@ -45,6 +45,7 @@ const title = (color: string): React.CSSProperties => ({
   fontWeight: 800,
   letterSpacing: 2,
   textTransform: "uppercase",
+  fontFamily: "var(--font-dm-serif-display), Georgia, serif",
   color,
 });
 
