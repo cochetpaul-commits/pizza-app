@@ -497,34 +497,25 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
       <NavBar
         backHref="/recettes?tab=cuisine"
         backLabel="Recettes"
-        right={
-          <div style={{ display: "flex", gap: 6 }}>
-            <button
-              type="button"
-              onClick={() => { setProdMode(m => !m); setProdQty(""); }}
-              style={{
-                padding: "0 12px", height: 32, borderRadius: 8, fontSize: 12, fontWeight: 700,
-                border: "1.5px solid",
-                borderColor: prodMode ? "#166534" : "rgba(217,199,182,0.95)",
-                background: prodMode ? "#166534" : "rgba(255,255,255,0.7)",
-                color: prodMode ? "white" : "#6f6a61",
-                cursor: "pointer", whiteSpace: "nowrap",
-              }}
-            >
-              {prodMode ? "Mode normal" : "Mode production"}
-            </button>
-            {!prodMode && isEdit && (
-              <button onClick={handleDelete} className="btn" style={{ color: "#d93f3f", borderColor: "#d93f3f" }}>
-                Supprimer
-              </button>
-            )}
-            {!prodMode && (
-              <button onClick={handleSave} disabled={saving} className="btn btnPrimary">
-                {saving ? "Sauvegarde…" : "Sauvegarder"}
-              </button>
-            )}
-          </div>
-        }
+        menuItems={[
+          {
+            label: prodMode ? "Mode normal" : "Mode production",
+            onClick: () => { setProdMode(m => !m); setProdQty(""); },
+            style: prodMode
+              ? { background: "#166534", color: "white", borderColor: "#166534" }
+              : undefined,
+          },
+          ...(!prodMode && isEdit ? [{
+            label: "Supprimer",
+            onClick: handleDelete,
+            style: { color: "#d93f3f" } as React.CSSProperties,
+          }] : []),
+        ]}
+        primaryAction={!prodMode ? (
+          <button onClick={handleSave} disabled={saving} className="btn btnPrimary">
+            {saving ? "Sauvegarde…" : "Sauvegarder"}
+          </button>
+        ) : undefined}
       />
 
       <main className="container safe-bottom">

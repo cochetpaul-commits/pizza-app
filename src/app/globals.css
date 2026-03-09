@@ -354,6 +354,28 @@ textarea.input{
   .nav-home-hide-mobile { display: none; }
 }
 
+/* NavBar responsive: back button */
+.nav-back-full { display: inline-flex !important; }
+.nav-back-icon  { display: none !important; }
+
+@media (max-width: 767px) {
+  .nav-back-full { display: none !important; }
+  .nav-back-icon  { display: inline-flex !important; }
+}
+
+/* NavBar responsive: desktop actions vs mobile menu */
+.nav-desktop-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.nav-mobile-menu { display: none; }
+
+@media (max-width: 767px) {
+  .nav-desktop-actions { display: none !important; }
+  .nav-mobile-menu     { display: block !important; }
+}
+
 /* Boutons dans la NavBar : plus compacts que les boutons de contenu */
 nav .btn {
   height: 30px;

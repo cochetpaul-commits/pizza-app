@@ -1,25 +1,112 @@
 "use client";
 
 import Link from "next/link";
-import React from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+
+export type MenuItem = {
+  label: string;
+  onClick: () => void;
+  style?: React.CSSProperties;
+  disabled?: boolean;
+};
 
 type NavBarProps = {
   backHref?: string;
   backLabel?: string;
   right?: React.ReactNode;
+  /** Primary action button — always visible (e.g. Sauvegarder) */
+  primaryAction?: React.ReactNode;
+  /** Secondary actions — visible on desktop, collapsed into ⋯ menu on mobile */
+  menuItems?: MenuItem[];
 };
 
-export function NavBar({ backHref, backLabel, right }: NavBarProps) {
+export function NavBar({ backHref, backLabel, right, primaryAction, menuItems }: NavBarProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) closeMenu();
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [menuOpen, closeMenu]);
+
+  const hasStructuredRight = !!(primaryAction || (menuItems && menuItems.length > 0));
+
   return (
     <nav style={navStyle}>
       <div style={inner}>
+        {/* ── Left: back button ── */}
         <div style={leftStyle}>
-          <Link href="/" style={navBtn} className={backHref ? "nav-home-hide-mobile" : ""}>← Accueil</Link>
-          {backHref && (
-            <Link href={backHref} style={navBtn}>← {backLabel ?? "Retour"}</Link>
+          {backHref ? (
+            <>
+              {/* Desktop: "← Recettes" */}
+              <Link href={backHref} style={navBtn} className="nav-back-full">← {backLabel ?? "Retour"}</Link>
+              {/* Mobile: just "←" */}
+              <Link href={backHref} style={navBtn} className="nav-back-icon" aria-label={backLabel ?? "Retour"}>←</Link>
+            </>
+          ) : (
+            <Link href="/" style={navBtn}>← Accueil</Link>
           )}
         </div>
-        {right && <div style={rightStyle}>{right}</div>}
+
+        {/* ── Right: structured or legacy ── */}
+        {hasStructuredRight ? (
+          <div style={rightStyle}>
+            {/* Desktop: all buttons inline */}
+            {menuItems && menuItems.length > 0 && (
+              <div className="nav-desktop-actions">
+                {menuItems.map((item, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={item.onClick}
+                    disabled={item.disabled}
+                    className="btn"
+                    style={item.style}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Mobile: ⋯ menu trigger */}
+            {menuItems && menuItems.length > 0 && (
+              <div className="nav-mobile-menu" ref={menuRef} style={{ position: "relative" }}>
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen(o => !o)}
+                  style={dotsBtn}
+                  aria-label="Plus d'actions"
+                >⋯</button>
+                {menuOpen && (
+                  <div style={dropdownStyle}>
+                    {menuItems.map((item, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => { item.onClick(); closeMenu(); }}
+                        disabled={item.disabled}
+                        style={{ ...dropdownItemStyle, ...item.style }}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {primaryAction}
+          </div>
+        ) : right ? (
+          <div style={rightStyle}>{right}</div>
+        ) : null}
       </div>
     </nav>
   );
@@ -31,7 +118,7 @@ const navStyle: React.CSSProperties = {
   zIndex: 50,
   width: "100%",
   maxWidth: "100vw",
-  overflow: "hidden",
+  overflow: "visible",
   background: "#FAF7F2",
   borderBottom: "1px solid rgba(217,199,182,0.7)",
 };
@@ -77,4 +164,47 @@ const navBtn: React.CSSProperties = {
   fontWeight: 600,
   background: "rgba(255,255,255,0.70)",
   whiteSpace: "nowrap" as const,
+};
+
+const dotsBtn: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 32,
+  height: 30,
+  borderRadius: 8,
+  border: "1px solid rgba(217,199,182,0.95)",
+  background: "rgba(255,255,255,0.70)",
+  color: "#6f6a61",
+  fontSize: 16,
+  fontWeight: 700,
+  cursor: "pointer",
+  letterSpacing: 2,
+};
+
+const dropdownStyle: React.CSSProperties = {
+  position: "absolute",
+  top: "calc(100% + 6px)",
+  right: 0,
+  minWidth: 180,
+  background: "#FAF7F2",
+  border: "1px solid rgba(217,199,182,0.95)",
+  borderRadius: 12,
+  boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+  padding: "6px 0",
+  zIndex: 100,
+  animation: "slideDown 0.15s ease",
+};
+
+const dropdownItemStyle: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  padding: "10px 16px",
+  background: "none",
+  border: "none",
+  textAlign: "left",
+  fontSize: 14,
+  fontWeight: 600,
+  color: "#2f3a33",
+  cursor: "pointer",
 };
