@@ -114,7 +114,7 @@ export default function Home() {
                 )}
               </div>
               <div style={{ marginTop: 8 }}>
-                <span className="btn btnPrimary" style={{ background: "#8B1A1A", borderColor: "#8B1A1A" }}>Voir les recettes →</span>
+                <span className="btn btnPrimary" style={{ background: "#8B1A1A", borderColor: "#8B1A1A" }}>Entra in cucina →</span>
               </div>
             </div>
           </Link>
