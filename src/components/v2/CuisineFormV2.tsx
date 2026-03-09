@@ -344,7 +344,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
       if (!auth.user) throw new Error("NOT_LOGGED");
 
       const marginRateNum = Number(marginRate);
-      const margin_rate = marginRateNum > 0 ? round2(marginRateNum) : null;
+      const margin_rate = marginRateNum > 0 ? round2(marginRateNum) : 0;
       const totalCost = round2(totalCostG);
 
       const payload: Record<string, unknown> = {
