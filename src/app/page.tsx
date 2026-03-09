@@ -22,6 +22,7 @@ type Counts = {
   lastImportSupplier: string | null;
   priceAlerts: number;
   upcomingEvents: UpcomingEvent[];
+  suppliers: number;
 };
 
 function fmtDateShort(iso: string) {
@@ -40,7 +41,7 @@ const card = (color: string): React.CSSProperties => ({
 
 const title = (color: string): React.CSSProperties => ({
   margin: 0,
-  fontSize: 12,
+  fontSize: 14,
   fontWeight: 800,
   letterSpacing: 2,
   textTransform: "uppercase",
@@ -49,8 +50,24 @@ const title = (color: string): React.CSSProperties => ({
 
 const subtitle: React.CSSProperties = {
   margin: "3px 0 0",
-  fontSize: 12,
+  fontSize: 13,
+  fontWeight: 500,
+  color: "#888",
+};
+
+const counter = (color: string): React.CSSProperties => ({
+  fontSize: 28,
+  fontWeight: 800,
+  color,
+  lineHeight: 1,
+  fontFamily: "var(--font-dm-serif-display), Georgia, serif",
+});
+
+const counterSuffix: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 400,
   color: "#999",
+  marginLeft: 3,
 };
 
 const btn = (color: string): React.CSSProperties => ({
@@ -91,7 +108,7 @@ export default function Home() {
       setAuthState("ok");
 
       const today = new Date().toISOString().slice(0, 10);
-      const [pizza, emp, kitchen, pivot, cocktail, ingredients, toCheck, lastInvoice, upcomingEvts] = await Promise.all([
+      const [pizza, emp, kitchen, pivot, cocktail, ingredients, toCheck, lastInvoice, upcomingEvts, suppCount] = await Promise.all([
         supabase.from("pizza_recipes").select("*", { count: "exact", head: true }).eq("is_draft", false),
         supabase.from("recipes").select("*", { count: "exact", head: true }),
         supabase.from("kitchen_recipes").select("*", { count: "exact", head: true }).eq("is_draft", false),
@@ -101,6 +118,7 @@ export default function Home() {
         supabase.from("ingredients").select("*", { count: "exact", head: true }).eq("status", "to_check"),
         supabase.from("supplier_invoices").select("created_at,supplier_name").order("created_at", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("events").select("id,name,date,status,covers").gte("date", today).not("status", "in", '("termine","annule")').order("date", { ascending: true }).limit(5),
+        supabase.from("suppliers").select("*", { count: "exact", head: true }).eq("is_active", true),
       ]);
 
       let priceAlerts = 0;
@@ -117,6 +135,7 @@ export default function Home() {
         lastImportSupplier: lastInvoice.data?.supplier_name ?? null,
         priceAlerts,
         upcomingEvents: (upcomingEvts.data ?? []) as UpcomingEvent[],
+        suppliers: suppCount.count ?? 0,
       });
     };
     run();
@@ -172,9 +191,9 @@ export default function Home() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && (
-                    <span style={{ fontSize: 28, fontWeight: 800, color: "#8B1A1A", lineHeight: 1 }}>
+                    <span style={counter("#8B1A1A")}>
                       {counts.recettes}
-                      <span style={{ fontSize: 11, fontWeight: 400, color: "#999", marginLeft: 3 }}>fiches</span>
+                      <span style={counterSuffix}>fiches</span>
                     </span>
                   )}
                   <span style={btn("#8B1A1A")}>Ouvrir →</span>
@@ -198,9 +217,9 @@ export default function Home() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && (
-                    <span style={{ fontSize: 28, fontWeight: 800, color: "#1d4ed8", lineHeight: 1 }}>
+                    <span style={counter("#1d4ed8")}>
                       {counts.ingredients}
-                      <span style={{ fontSize: 11, fontWeight: 400, color: "#999", marginLeft: 3 }}>réf.</span>
+                      <span style={counterSuffix}>réf.</span>
                     </span>
                   )}
                   <span style={btn("#1d4ed8")}>Ouvrir →</span>
@@ -238,7 +257,15 @@ export default function Home() {
                   <p style={title("#7c3aed")}>FOURNISSEURS</p>
                   <p style={subtitle}>Fiches · Coordonnées · Historique</p>
                 </div>
-                <span style={btn("#7c3aed")}>Voir →</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  {counts && (
+                    <span style={counter("#7c3aed")}>
+                      {counts.suppliers}
+                      <span style={counterSuffix}>actifs</span>
+                    </span>
+                  )}
+                  <span style={btn("#7c3aed")}>Ouvrir →</span>
+                </div>
               </div>
             </div>
           </Link>
@@ -256,7 +283,15 @@ export default function Home() {
                   </div>
                   <p style={subtitle}>Mariages · Séminaires · Traiteur</p>
                 </div>
-                <span style={btn("#92400e")}>Voir →</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  {counts && counts.upcomingEvents.length > 0 && (
+                    <span style={counter("#92400e")}>
+                      {counts.upcomingEvents.length}
+                      <span style={counterSuffix}>à venir</span>
+                    </span>
+                  )}
+                  <span style={btn("#92400e")}>Ouvrir →</span>
+                </div>
               </div>
               {counts && counts.upcomingEvents.length > 0 && (
                 <div style={{ marginTop: 10, display: "grid", gap: 4 }}>
@@ -295,7 +330,7 @@ export default function Home() {
                   {counts && counts.priceAlerts > 0 && (
                     <span style={badge("#1e3a5f")}>{counts.priceAlerts}</span>
                   )}
-                  <span style={btn("#1e3a5f")}>Voir →</span>
+                  <span style={btn("#1e3a5f")}>Ouvrir →</span>
                 </div>
               </div>
             </div>

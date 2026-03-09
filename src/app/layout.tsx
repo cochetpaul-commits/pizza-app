@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Inter, Playfair_Display } from "next/font/google";
+import { Geist, Geist_Mono, DM_Sans, DM_Serif_Display } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -12,15 +12,15 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const inter = Inter({
-  variable: "--font-inter",
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
   subsets: ["latin"],
 });
 
-const playfairDisplay = Playfair_Display({
-  variable: "--font-playfair-display",
+const dmSerifDisplay = DM_Serif_Display({
+  variable: "--font-dm-serif-display",
   subsets: ["latin"],
-  weight: ["400", "700"],
+  weight: "400",
 });
 
 export const viewport: Viewport = {
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr">
-      <body className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${playfairDisplay.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${dmSans.variable} ${dmSerifDisplay.variable} antialiased`}>
         {children}
       </body>
     </html>

@@ -616,7 +616,7 @@ function IngredientsPageInner() {
           <Link href={backUrl ?? "/"} style={{ color: "#999", fontSize: 13, textDecoration: "none", flexShrink: 0, fontWeight: 500 }}>
             ← {backUrl ? "Retour" : "Accueil"}
           </Link>
-          <span style={{ fontFamily: "var(--font-playfair-display), 'Playfair Display', Georgia, serif", fontSize: 22, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <span style={{ fontFamily: "var(--font-dm-serif-display), 'DM Serif Display', Georgia, serif", fontSize: 22, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             Index ingrédients
           </span>
         </div>
