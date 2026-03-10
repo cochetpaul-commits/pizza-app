@@ -64,7 +64,7 @@ function UsersContent() {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
 
   async function handleRoleChange(userId: string, newRole: Role) {
     const token = await getToken();
