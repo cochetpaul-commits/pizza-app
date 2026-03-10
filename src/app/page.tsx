@@ -172,19 +172,42 @@ export default function Home() {
       width: "100%",
       boxSizing: "border-box",
     }}>
-      <div style={{ maxWidth: 600, margin: "0 auto", padding: "0 16px 40px" }}>
-
-      {/* ── Logo ── */}
-      <div style={{ padding: "28px 0 20px", display: "flex", justifyContent: "center" }}>
-        <Image
-          src="/logo.png"
-          alt="iFratelli Group"
-          width={190}
-          height={76}
-          style={{ width: 190, height: "auto", mixBlendMode: "multiply" }}
-          priority
-        />
+      {/* ── Header noir ── */}
+      <div style={{
+        background: "#1a1a1a",
+        padding: "12px 20px",
+        marginBottom: 20,
+        width: "100vw",
+        marginLeft: "calc(-50vw + 50%)",
+      }}>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 12,
+        }}>
+          <Image
+            src="/logo-ifratelli.png"
+            alt="iFratelli Group"
+            width={48}
+            height={48}
+            style={{ width: 48, height: 48, objectFit: "contain", mixBlendMode: "screen", opacity: 0.9 }}
+            priority
+          />
+          <span className="dashboard-header-text" style={{
+            fontFamily: "var(--font-cormorant), 'Cormorant Garamond', Georgia, serif",
+            fontSize: 18,
+            fontWeight: 600,
+            fontStyle: "italic",
+            color: "#c9b99a",
+            letterSpacing: 1.5,
+          }}>
+            iFratelli Group
+          </span>
+        </div>
       </div>
+
+      <div style={{ maxWidth: 600, margin: "0 auto", padding: "0 16px 40px" }}>
 
       {/* ── Non connecté ── */}
       {authState === "anon" && (
