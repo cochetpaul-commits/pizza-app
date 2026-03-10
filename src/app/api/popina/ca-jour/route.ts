@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { POPINA_BASE, LOCATION_ID, getParisDate } from "@/lib/popinaClient";
-import type { PopinaReport } from "@/lib/popinaClient";
+import { fetchReports, getParisDate, LOCATION_ID } from "@/lib/popinaClient";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,28 +11,7 @@ export async function GET() {
   }
 
   const today = getParisDate(0);
-  const url = `${POPINA_BASE}/reports?locationId=${LOCATION_ID}&from=${today}&to=${today}`;
-  console.log("[ca-jour] Requête →", url);
-
-  let reports: PopinaReport[] = [];
-  try {
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      cache: "no-store",
-    });
-    const text = await res.text();
-    console.log("[ca-jour] Status:", res.status);
-    console.log("[ca-jour] Body brut:", text.slice(0, 1000));
-    if (res.ok) {
-      const data = JSON.parse(text);
-      reports = Array.isArray(data) ? data : [data];
-    }
-  } catch (e) {
-    console.error("[ca-jour] Erreur fetch:", e);
-  }
-
-  console.log("[ca-jour] reports.length:", reports.length);
-  if (reports[0]) console.log("[ca-jour] reports[0] keys:", Object.keys(reports[0]));
+  const reports = await fetchReports(apiKey, today, today);
 
   // Popina peut renvoyer 0 rapport si la caisse n'a pas encore tourné
   const r = reports[0] ?? { totalSales: 0, guestsNumber: 0, reportProducts: [] };
@@ -49,9 +27,9 @@ export async function GET() {
     guestsNumber,
     ticketMoyen,
     reportProducts: (r.reportProducts ?? []).map((p) => ({
-      name: p.name ?? "Inconnu",
-      quantity: p.quantity ?? 0,
-      totalSales: Math.round((p.totalSales ?? 0) / 100 * 100) / 100,
+      name: p.productName ?? "Inconnu",
+      quantity: p.productQuantity ?? 0,
+      totalSales: Math.round((p.productSales ?? 0) / 100 * 100) / 100,
     })),
   });
 }

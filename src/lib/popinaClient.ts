@@ -18,16 +18,20 @@ export type PopinaProduct = {
 };
 
 export type PopinaReport = {
-  date?: string;
+  startedAt?: string;
+  finalizedAt?: string;
   totalSales: number;   // centimes
   guestsNumber: number;
-  reportProducts: PopinaProduct[];
+  reportProducts: Array<{
+    productName: string;
+    productQuantity: number;
+    productSales: number; // centimes
+  }>;
 };
 
 /**
  * Appelle GET /v1/reports?locationId=…&from=…&to=…
- * Renvoie un tableau de rapports (un par jour si la période couvre plusieurs jours,
- * ou un seul objet si la période est d'un jour).
+ * Popina répond { data: [...] }
  * En cas d'erreur, renvoie [].
  */
 export async function fetchReports(
@@ -38,31 +42,38 @@ export async function fetchReports(
   const url = `${POPINA_BASE}/reports?locationId=${LOCATION_ID}&from=${from}&to=${to}`;
   try {
     const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${apiKey}` },
       cache: "no-store",
     });
     if (!res.ok) return [];
-    const data = await res.json();
-    if (Array.isArray(data)) return data as PopinaReport[];
-    if (data && typeof data === "object") return [data as PopinaReport];
-    return [];
+    const json = await res.json();
+    // Popina wraps results in { data: [...] }
+    const items = Array.isArray(json) ? json
+                : Array.isArray(json?.data) ? json.data
+                : json ? [json]
+                : [];
+    return items as PopinaReport[];
   } catch {
     return [];
   }
 }
 
-/** Aggrège un tableau de reportProducts en dédupliquant par nom */
+/** Agrège un tableau de reportProducts en dédupliquant par nom */
 export function aggregateProducts(reports: PopinaReport[]): PopinaProduct[] {
   const map = new Map<string, PopinaProduct>();
   for (const r of reports) {
     for (const p of r.reportProducts ?? []) {
-      const key = p.name ?? "Inconnu";
+      const key = p.productName ?? "Inconnu";
       const prev = map.get(key);
       if (prev) {
-        prev.quantity += p.quantity ?? 0;
-        prev.totalSales += p.totalSales ?? 0;
+        prev.quantity += p.productQuantity ?? 0;
+        prev.totalSales += p.productSales ?? 0;
       } else {
-        map.set(key, { name: key, quantity: p.quantity ?? 0, totalSales: p.totalSales ?? 0 });
+        map.set(key, {
+          name: key,
+          quantity: p.productQuantity ?? 0,
+          totalSales: p.productSales ?? 0,
+        });
       }
     }
   }
