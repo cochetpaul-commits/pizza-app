@@ -27,7 +27,7 @@ type MeteoData = { temp: number; description: string; emoji: string; tonight: { 
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-const ACCENT = "#8B1A1A";
+const ACCENT = "#7a4a2a";
 const GREEN = "#4a6741";
 const RED = "#8B1A1A";
 
@@ -57,7 +57,7 @@ function ChartTooltip({ active, payload, label }: {
   if (!active || !payload?.[0]) return null;
   const d = payload[0].payload;
   return (
-    <div style={{ background: "#fff", border: "1px solid #e5ddd0", borderRadius: 10, padding: "10px 14px", fontSize: 12, minWidth: 120 }}>
+    <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 10, padding: "10px 14px", fontSize: 12, minWidth: 120 }}>
       <p style={{ margin: 0, fontWeight: 700, color: "#1a1a1a" }}>{label}</p>
       {d.totalSales > 0 ? (
         <>
@@ -77,7 +77,7 @@ function ChartTooltip({ active, payload, label }: {
 const card: React.CSSProperties = {
   background: "#fff",
   borderRadius: 16,
-  border: "1.5px solid #e5ddd0",
+  border: "1.5px solid #ddd6c8",
   padding: "16px",
 };
 
@@ -87,12 +87,12 @@ const sectionLabel: React.CSSProperties = {
   fontWeight: 800,
   letterSpacing: 2,
   textTransform: "uppercase",
-  color: "#9a8f84",
+  color: "#999",
 };
 
 const SECTIONS = [
-  { href: "/mercuriale", label: "MERCURIALE", sub: "Prix fournisseurs · Export PDF", color: "#92400e" },
-  { href: "/epicerie", label: "ÉPICERIE", sub: "Prix de vente · Export CSV", color: "#1e40af" },
+  { href: "/mercuriale", label: "MERCURIALE", sub: "Prix fournisseurs · Export PDF", color: "#7a4a2a" },
+  { href: "/epicerie", label: "ÉPICERIE", sub: "Prix de vente · Export CSV", color: "#7a4a2a" },
   { href: "/variations-prix", label: "VARIATIONS & ALERTES", sub: "Historique · Hausses & baisses · Veille 30 j", color: ACCENT },
 ];
 
@@ -134,7 +134,7 @@ export default function PilotagePage() {
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
             flexWrap: "wrap", gap: 8, padding: "12px 16px",
-            background: "#fff", borderRadius: 16, border: "1.5px solid #e5ddd0",
+            background: "#fff", borderRadius: 16, border: "1.5px solid #ddd6c8",
             marginBottom: 16,
           }}>
             <div>
@@ -170,8 +170,8 @@ export default function PilotagePage() {
 
                 {/* CA Semaine */}
                 <div style={card}>
-                  <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#9a8f84" }}>CA semaine</p>
-                  <p style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#1a1a1a", lineHeight: 1, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
+                  <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#999" }}>CA semaine</p>
+                  <p style={{ margin: 0, fontSize: 26, fontWeight: 600, color: "#7a4a2a", lineHeight: 1, fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
                     {fmtEuroInt(s.semaine.totalSales)}
                   </p>
                   {delta(s.semaine.totalSales, s.semainePrec.totalSales) && (
@@ -183,8 +183,8 @@ export default function PilotagePage() {
 
                 {/* Couverts */}
                 <div style={card}>
-                  <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#9a8f84" }}>Couverts</p>
-                  <p style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#1a1a1a", lineHeight: 1, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
+                  <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#999" }}>Couverts</p>
+                  <p style={{ margin: 0, fontSize: 26, fontWeight: 600, color: "#7a4a2a", lineHeight: 1, fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
                     {s.semaine.guestsNumber}
                   </p>
                   {delta(s.semaine.guestsNumber, s.semainePrec.guestsNumber) && (
@@ -196,8 +196,8 @@ export default function PilotagePage() {
 
                 {/* Ticket moyen */}
                 <div style={card}>
-                  <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#9a8f84" }}>Ticket moyen</p>
-                  <p style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#1a1a1a", lineHeight: 1, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
+                  <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#999" }}>Ticket moyen</p>
+                  <p style={{ margin: 0, fontSize: 26, fontWeight: 600, color: "#7a4a2a", lineHeight: 1, fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
                     {fmtEuro(s.semaine.ticketMoyen)}
                   </p>
                   {delta(s.semaine.ticketMoyen, s.semainePrec.ticketMoyen) && (
@@ -209,8 +209,8 @@ export default function PilotagePage() {
 
                 {/* Meilleur jour */}
                 <div style={card}>
-                  <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#9a8f84" }}>Meilleur jour</p>
-                  <p style={{ margin: 0, fontSize: 26, fontWeight: 700, color: ACCENT, lineHeight: 1, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
+                  <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#999" }}>Meilleur jour</p>
+                  <p style={{ margin: 0, fontSize: 26, fontWeight: 600, color: "#7a4a2a", lineHeight: 1, fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
                     {s.semaine.bestDay.label}
                   </p>
                   <p style={{ margin: "6px 0 0", fontSize: 12, fontWeight: 700, color: "#888" }}>
@@ -237,7 +237,7 @@ export default function PilotagePage() {
                       <Tooltip content={<ChartTooltip />} cursor={{ fill: "#f5f0e8" }} />
                       <Bar dataKey="totalSales" radius={[4, 4, 0, 0]} maxBarSize={42}>
                         {s.semaine.days.map((d, i) => (
-                          <Cell key={`c-${i}`} fill={d.totalSales === 0 ? "#e0d8ce" : ACCENT} />
+                          <Cell key={`c-${i}`} fill={d.totalSales === 0 ? "#ddd6c8" : ACCENT} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -276,7 +276,7 @@ export default function PilotagePage() {
                               </div>
                             </div>
                             <div style={{ height: 4, background: "#f0ebe3", borderRadius: 2 }}>
-                              <div style={{ width: `${Math.round((p.totalSales / maxSales) * 100)}%`, height: "100%", background: i === 0 ? ACCENT : "#c9a898", borderRadius: 2, transition: "width 0.5s" }} />
+                              <div style={{ width: `${Math.round((p.totalSales / maxSales) * 100)}%`, height: "100%", background: i === 0 ? ACCENT : "#c9b99a", borderRadius: 2, transition: "width 0.5s" }} />
                             </div>
                           </div>
                         );
@@ -293,27 +293,27 @@ export default function PilotagePage() {
                   <p style={{ ...sectionLabel, margin: "0 0 12px" }}>INSIGHTS AUTOMATIQUES</p>
                   <div style={{ display: "grid", gap: 10 }}>
                     {s.insights.meilleurJour && (
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "#faf7f2", borderRadius: 10 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "#1a1a1a", borderRadius: 10 }}>
                         <span style={{ fontSize: 16, flexShrink: 0 }}>📈</span>
-                        <p style={{ margin: 0, fontSize: 13, color: "#444", lineHeight: 1.4 }}>
+                        <p style={{ margin: 0, fontSize: 13, color: "#c9b99a", lineHeight: 1.4, fontStyle: "italic" as const }}>
                           <strong>{s.insights.meilleurJour.label}</strong> est ton meilleur jour
                           {" — "}moyenne <strong>{fmtEuroInt(s.insights.meilleurJour.avgCA)}</strong> sur 30 jours
                         </p>
                       </div>
                     )}
                     {s.insights.produitEnHausse && (
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "#faf7f2", borderRadius: 10 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "#1a1a1a", borderRadius: 10 }}>
                         <span style={{ fontSize: 16, flexShrink: 0 }}>🍕</span>
-                        <p style={{ margin: 0, fontSize: 13, color: "#444", lineHeight: 1.4 }}>
+                        <p style={{ margin: 0, fontSize: 13, color: "#c9b99a", lineHeight: 1.4, fontStyle: "italic" as const }}>
                           <strong>&ldquo;{s.insights.produitEnHausse.name}&rdquo;</strong> est en hausse de{" "}
                           <strong style={{ color: GREEN }}>+{s.insights.produitEnHausse.pctChange}%</strong> vs la semaine dernière
                         </p>
                       </div>
                     )}
                     {s.insights.caVsMoyenne && (
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "#faf7f2", borderRadius: 10 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "#1a1a1a", borderRadius: 10 }}>
                         <span style={{ fontSize: 16, flexShrink: 0 }}>{s.insights.caVsMoyenne.pct >= 0 ? "📈" : "📉"}</span>
-                        <p style={{ margin: 0, fontSize: 13, color: "#444", lineHeight: 1.4 }}>
+                        <p style={{ margin: 0, fontSize: 13, color: "#c9b99a", lineHeight: 1.4, fontStyle: "italic" as const }}>
                           Ce <strong>{s.insights.caVsMoyenne.label}</strong> est à{" "}
                           <strong style={{ color: s.insights.caVsMoyenne.pct >= 0 ? GREEN : RED }}>
                             {s.insights.caVsMoyenne.pct >= 0 ? "+" : ""}{s.insights.caVsMoyenne.pct}%

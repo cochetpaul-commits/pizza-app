@@ -165,7 +165,7 @@ export function PricingBlock({
               <div style={{
                 ...kpiValue,
                 fontStyle: isConseille ? "italic" : "normal",
-                color: margeBrute != null && !isConseille && margeBrute > 0 ? "#166534" : margeBrute != null && !isConseille && margeBrute < 0 ? "#DC2626" : "#2d2d2d",
+                color: margeBrute != null && !isConseille && margeBrute > 0 ? "#4a6741" : margeBrute != null && !isConseille && margeBrute < 0 ? "#8B1A1A" : "#2d2d2d",
               }}>
                 {margeBrute != null ? fmtMoney(margeBrute) + " €" : "—"}
                 {margeBrute != null && isConseille && <span style={{ fontSize: 11, fontWeight: 500, marginLeft: 4, color: "#6f6a61" }}>(conseillé)</span>}
@@ -176,7 +176,7 @@ export function PricingBlock({
               <div style={{
                 ...kpiValue,
                 fontStyle: isConseille ? "italic" : "normal",
-                color: foodCostPct != null && !isConseille ? (foodCostPct <= 30 ? "#166534" : foodCostPct > 35 ? "#DC2626" : "#92400e") : "#2d2d2d",
+                color: foodCostPct != null && !isConseille ? (foodCostPct <= 30 ? "#4a6741" : foodCostPct > 35 ? "#8B1A1A" : "#92400e") : "#2d2d2d",
               }}>
                 {foodCostPct != null ? fmtMoney(foodCostPct) + " %" : "—"}
                 {foodCostPct != null && isConseille && <span style={{ fontSize: 11, fontWeight: 500, marginLeft: 4, color: "#6f6a61" }}>(conseillé)</span>}

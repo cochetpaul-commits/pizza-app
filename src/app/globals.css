@@ -1,45 +1,43 @@
-/* src/app/globals.css */
+/* src/app/globals.css — Design System "Éditorial Italien" */
 @import "tailwindcss";
 
 :root{
-  --bg: #f3eadc;
-  --bg2: #efe2d3;
+  --creme: #f2ede4;
+  --creme-dark: #e8e0d0;
+  --terre: #7a4a2a;
+  --terre-light: #c9b99a;
+  --noir: #1a1a1a;
+  --sauge: #4a6741;
+  --sauge-light: #e8ede6;
+  --bordeaux: #8B1A1A;
+  --gris: #999999;
+  --border: #ddd6c8;
 
   --surface: rgba(255,255,255,0.55);
   --surface2: rgba(255,255,255,0.38);
 
-  --text: #2f3a33;
-  --muted: #6f6a61;
+  --text: var(--noir);
+  --muted: var(--gris);
 
-  --border: rgba(217, 199, 182, 0.95);
-
-  --primary: #c97a5a;
-  --primary-hover: #b86a4c;
+  --primary: var(--terre);
+  --primary-hover: #643d22;
   --primary-text: #ffffff;
 
-  --good: #1f9d55;
-  --bad: #d93f3f;
+  --good: var(--sauge);
+  --bad: var(--bordeaux);
 
-  --radius: 18px;
-  --radius2: 14px;
+  --radius: 14px;
+  --radius2: 10px;
 
-  --shadow: 0 10px 30px rgba(47, 58, 51, 0.10);
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
 }
 
 *{ box-sizing: border-box; }
 
-html, body {
-  background: #f5f0e8 !important;
-}
-
-/* ── Display typography — DM Serif Display pour tous les titres ─────────
-   Cible les balises sémantiques h1-h4.
-   Note : DM Serif Display n'existe qu'en weight 400 ; 900 est simulé.
-   Les classes .h1/.h2/.h3 surchargent letter-spacing via leur spécificité. */
 h1, h2, h3, h4 {
-  font-family: var(--font-dm-serif-display), 'DM Serif Display', Georgia, serif;
-  font-weight: 900;
-  letter-spacing: 2px;
+  font-family: var(--font-oswald), 'Oswald', sans-serif;
+  font-weight: 700;
+  letter-spacing: 1.5px;
   text-transform: uppercase;
   margin: 0;
 }
@@ -51,35 +49,32 @@ html, body{
   overflow-x: hidden;
   max-width: 100%;
   color: var(--text);
-  background: #f5f0e8 !important;
+  background: var(--creme) !important;
   font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 .page-root {
-  background: #f5f0e8 !important;
+  background: var(--creme) !important;
 }
-/* selects : même look que les inputs (supprime le style natif) */
+
+/* selects : même look que les inputs */
 select.input{
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
-
   height: 44px;
-  border-radius: 14px;
-  padding: 0 42px 0 14px; /* place pour la flèche à droite */
-
-  border: 1px solid rgba(217, 199, 182, 0.95);
-  background: rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius2);
+  padding: 0 42px 0 14px;
+  border: 1.5px solid var(--border);
+  background: #fff;
   color: var(--text);
-
   line-height: 44px;
 }
 
-/* flèche custom (discrète) */
 select.input{
   background-image:
-    linear-gradient(45deg, transparent 50%, rgba(47,58,51,0.55) 50%),
-    linear-gradient(135deg, rgba(47,58,51,0.55) 50%, transparent 50%);
+    linear-gradient(45deg, transparent 50%, rgba(26,26,26,0.4) 50%),
+    linear-gradient(135deg, rgba(26,26,26,0.4) 50%, transparent 50%);
   background-position:
     calc(100% - 20px) 18px,
     calc(100% - 14px) 18px;
@@ -87,10 +82,9 @@ select.input{
   background-repeat: no-repeat;
 }
 
-/* options (sinon certaines plateformes te mettent un fond chelou) */
 select.input option{
-  color: #2f3a33;
-  background: #f3eadc;
+  color: var(--noir);
+  background: var(--creme);
 }
 
 a{
@@ -106,39 +100,40 @@ a{
 }
 
 .h1{
-  font-family: var(--font-dm-serif-display), 'DM Serif Display', Georgia, serif;
-  font-size: 34px;
-  font-weight: 900;
-  letter-spacing: -0.02em;
+  font-family: var(--font-oswald), 'Oswald', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
   text-transform: uppercase;
+  color: var(--noir);
   margin: 0;
 }
 
 .h2{
-  font-family: var(--font-dm-serif-display), 'DM Serif Display', Georgia, serif;
+  font-family: var(--font-oswald), 'Oswald', sans-serif;
   font-size: 22px;
-  font-weight: 900;
-  letter-spacing: -0.01em;
+  font-weight: 700;
+  letter-spacing: 1.5px;
   text-transform: uppercase;
   margin: 0;
 }
 
 .h3{
-  font-family: var(--font-dm-serif-display), 'DM Serif Display', Georgia, serif;
+  font-family: var(--font-oswald), 'Oswald', sans-serif;
   font-size: 16px;
-  font-weight: 900;
-  letter-spacing: -0.01em;
+  font-weight: 700;
+  letter-spacing: 1.5px;
   text-transform: uppercase;
   margin: 0;
 }
 
 .muted{
-  color: var(--muted);
+  color: var(--gris);
   font-size: 13px;
 }
 
 .code{
-  background: rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.5);
   border: 1px solid var(--border);
   padding: 12px;
   border-radius: 12px;
@@ -147,19 +142,20 @@ a{
 }
 
 .card{
-  background: var(--surface);
+  background: #fff;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 16px;
   box-shadow: var(--shadow);
-  backdrop-filter: blur(10px);
 }
 
 .cardTitle{
-  font-weight: 800;
+  font-weight: 700;
   font-size: 14px;
   margin: 0;
-  letter-spacing: 0.01em;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-family: var(--font-oswald), 'Oswald', sans-serif;
 }
 
 .topbar{
@@ -172,9 +168,9 @@ a{
 select.input,
 textarea.input{
   width: 100%;
-  border-radius: 14px;
-  border: 1px solid rgba(217,199,182,0.95);
-  background: rgba(255,255,255,0.55);
+  border-radius: var(--radius2);
+  border: 1.5px solid var(--border);
+  background: #fff;
   color: var(--text);
   padding: 0 14px;
   outline: none;
@@ -191,34 +187,35 @@ textarea.input{
 }
 
 .input::placeholder{
-  color: rgba(47,58,51,0.45);
+  color: rgba(26,26,26,0.35);
 }
 
 .input:focus{
-  border-color: rgba(201,122,90,0.70);
-  box-shadow: 0 0 0 4px rgba(201,122,90,0.16);
-  background: rgba(255,255,255,0.72);
+  border-color: var(--terre);
+  box-shadow: 0 0 0 3px rgba(122,74,42,0.12);
+  background: #fff;
 }
 
 .btn{
-  height: 44px;
-  border-radius: 14px;
-  border: 1px solid rgba(217, 199, 182, 0.95);
-  background: rgba(255, 255, 255, 0.38);
-  color: var(--text);
-  padding: 0 14px;
+  height: 34px;
+  border-radius: var(--radius2);
+  border: 1.5px solid var(--border);
+  background: #fff;
+  color: var(--noir);
+  padding: 0 12px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   text-align: center;
-  gap: 10px;
-  font-weight: 800;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 13px;
   transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
 }
 
 .btn:hover{
-  background: rgba(255, 255, 255, 0.55);
+  background: var(--creme-dark);
 }
 
 .btn:active{
@@ -226,18 +223,31 @@ textarea.input{
 }
 
 .btnPrimary{
-  background: var(--primary);
-  border-color: rgba(201, 122, 90, 0.95);
+  background: var(--terre);
+  border-color: var(--terre);
   color: var(--primary-text);
 }
 
 .btnPrimary:hover{
   background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 
 .btn:disabled{
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.btnDanger {
+  background: #fff;
+  border-color: var(--border);
+  color: var(--gris);
+}
+
+.btnDanger:hover {
+  background: rgba(139,26,26,0.06);
+  border-color: rgba(139,26,26,0.4);
+  color: var(--bordeaux);
 }
 
 .kv{
@@ -250,19 +260,19 @@ textarea.input{
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  border: 1px solid rgba(217,199,182,0.65);
-  background: rgba(255,255,255,0.35);
-  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: var(--radius2);
 }
 
 .kvKey{
-  color: rgba(47,58,51,0.75);
-  font-weight: 800;
+  color: var(--gris);
+  font-weight: 700;
 }
 
 .kvVal{
-  color: rgba(47,58,51,0.92);
-  font-weight: 900;
+  color: var(--noir);
+  font-weight: 800;
 }
 
 .grid{
@@ -276,9 +286,9 @@ textarea.input{
 }
 
 .errorBox{
-  border: 1px solid rgba(217, 63, 63, 0.35);
-  background: rgba(217, 63, 63, 0.08);
-  border-radius: 14px;
+  border: 1px solid rgba(139, 26, 26, 0.25);
+  background: rgba(139, 26, 26, 0.06);
+  border-radius: var(--radius2);
   padding: 12px;
 }
 
@@ -287,12 +297,12 @@ textarea.input{
 }
 
 .stepPrimary .stepInput{
-  background: rgba(201,122,90,0.18);
-  border-color: rgba(201,122,90,0.55);
+  background: rgba(122,74,42,0.10);
+  border-color: rgba(122,74,42,0.4);
 }
 
 .stepPrimary .stepInput:focus{
-  box-shadow: 0 0 0 4px rgba(201,122,90,0.20);
+  box-shadow: 0 0 0 3px rgba(122,74,42,0.15);
 }
 
 .stepInput::-webkit-outer-spin-button,
@@ -301,7 +311,7 @@ textarea.input{
   margin: 0;
 }
 
-/* Pivot input (Mode Production) — no spinners */
+/* Pivot input — no spinners */
 .pivotInput::-webkit-outer-spin-button,
 .pivotInput::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -317,47 +327,21 @@ textarea.input{
 
 .stepSuffix{
   margin-left: 8px;
-  color: rgba(47,58,51,0.65);
-  font-weight: 900;
+  color: var(--gris);
+  font-weight: 800;
 }
 
 .stepBtn{
   width: 44px;
   height: 40px;
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 0;
 }
 
-/* ─────────────────────────────────────────────
-   PATCH BOUTONS — harmonisation 34px
-   Ajouter à la fin de src/app/globals.css
-   ───────────────────────────────────────────── */
-
-/* Boutons action compacts (Nouvelle pizza, Rafraîchir…) */
-.btn {
-  height: 34px;
-  padding: 0 12px;
-  border-radius: 10px;
-  font-size: 13px;
-}
-
-/* Danger (Supprimer) — discret, rouge au hover */
-.btnDanger {
-  background: rgba(255,255,255,0.50);
-  border-color: rgba(217,199,182,0.95);
-  color: #9a8f84;
-}
-
-.btnDanger:hover {
-  background: rgba(217,63,63,0.08);
-  border-color: rgba(217,63,63,0.5);
-  color: #d93f3f;
-}
 :root {
   --pil-grid-cols: 2fr 110px 90px 110px auto;
 }
 
-/* Mobile (iPhone) */
 @media (max-width: 640px) {
   :root {
     --pil-grid-cols: 1fr;
@@ -406,7 +390,7 @@ textarea.input{
   .nav-mobile-menu     { display: block !important; }
 }
 
-/* Boutons dans la NavBar : plus compacts que les boutons de contenu */
+/* Boutons dans la NavBar : plus compacts */
 nav .btn {
   height: 30px;
   padding: 0 9px;
@@ -435,6 +419,30 @@ nav .btn {
 
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+
+/* Dashboard header: hide text on mobile */
+@media (max-width: 640px) {
+  .dashboard-header-text { display: none; }
+}
+
+/* Séparateur de section dashboard */
+.section-separator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 20px 0 10px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--gris);
+}
+.section-separator::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
 }
 
 input[type='number']::-webkit-inner-spin-button,

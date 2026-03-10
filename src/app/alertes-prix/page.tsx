@@ -190,7 +190,7 @@ function AlertCard({
     <div className="card" style={{
       padding: "12px 14px", marginBottom: 8,
       opacity: snoozed ? 0.55 : 1,
-      borderLeft: snoozed ? "4px solid #D1D5DB" : a.aberrant ? "4px solid #EA580C" : a.direction === "down" ? "4px solid #16A34A" : "4px solid #DC2626",
+      borderLeft: snoozed ? "4px solid #ddd6c8" : a.aberrant ? "4px solid #EA580C" : a.direction === "down" ? "4px solid #16A34A" : "4px solid #DC2626",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
         <div style={{ minWidth: 0 }}>

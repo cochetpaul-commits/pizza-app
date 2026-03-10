@@ -143,13 +143,13 @@ export default function MaelInvoicePage() {
         onClick={() => fileInputRef.current?.click()}
       >
       {/* Establishment selector */}
-      <div style={{ margin: "1rem 0", padding: "1rem", background: "#f9f9f9", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+      <div style={{ margin: "1rem 0", padding: "1rem", background: "#f9f9f9", borderRadius: 8, border: "1px solid #ddd6c8" }}>
         <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: "#374151" }}>Cet import concerne :</div>
         <div style={{ display: "flex", gap: 8 }}>
           {(["bellomio", "piccola", "both"] as const).map((v) => (
             <button key={v} onClick={() => setEstablishment(v)}
               style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #d1d5db", cursor: "pointer", fontWeight: 700, fontSize: 13,
-                background: establishment === v ? (v === "bellomio" ? "#8B1A1A" : v === "piccola" ? "#6B1B1B" : "#6B7280") : "#fff",
+                background: establishment === v ? (v === "bellomio" ? "#7a4a2a" : v === "piccola" ? "#6B1B1B" : "#6B7280") : "#fff",
                 color: establishment === v ? "#fff" : "#374151" }}>
               {v === "bellomio" ? "Bello Mio" : v === "piccola" ? "Piccola Mia" : "Les deux"}
             </button>
@@ -171,7 +171,7 @@ export default function MaelInvoicePage() {
           }}
         />
         {file ? (
-          <p style={{ color: "#16a34a", fontWeight: 600 }}>📄 {file.name}</p>
+          <p style={{ color: "#4a6741", fontWeight: 600 }}>📄 {file.name}</p>
         ) : (
           <p style={{ color: "#666" }}>Cliquez pour sélectionner un PDF de facture MAEL</p>
         )}
@@ -183,7 +183,7 @@ export default function MaelInvoicePage() {
           onClick={handlePreview}
           disabled={loading}
           style={{
-            background: "#2563eb",
+            background: "#7a4a2a",
             color: "white",
             border: "none",
             borderRadius: 6,
@@ -199,7 +199,7 @@ export default function MaelInvoicePage() {
 
       {/* Erreur */}
       {error && (
-        <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 6, padding: "1rem", marginTop: "1rem", color: "#dc2626" }}>
+        <div style={{ background: "rgba(139,26,26,0.06)", border: "1px solid rgba(139,26,26,0.25)", borderRadius: 6, padding: "1rem", marginTop: "1rem", color: "#dc2626" }}>
           ❌ {error}
         </div>
       )}
@@ -253,7 +253,7 @@ export default function MaelInvoicePage() {
               onClick={handleCommit}
               disabled={loading}
               style={{
-                background: "#16a34a",
+                background: "#4a6741",
                 color: "white",
                 border: "none",
                 borderRadius: 6,
@@ -285,14 +285,14 @@ export default function MaelInvoicePage() {
       {/* Résultat commit */}
       {commitResult && (
         <div style={{ marginTop: "1.5rem", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: "1.5rem" }}>
-          <h2 style={{ color: "#16a34a", fontWeight: 700, marginBottom: "0.75rem" }}>✅ Import terminé</h2>
+          <h2 style={{ color: "#4a6741", fontWeight: 700, marginBottom: "0.75rem" }}>✅ Import terminé</h2>
           <p><strong>Ingrédients créés :</strong> {commitResult.inserted?.ingredients_created ?? 0}</p>
           <p><strong>Offres insérées :</strong> {commitResult.inserted?.offers_inserted ?? 0}</p>
           <button
             onClick={() => { setFile(null); setPreview(null); setCommitResult(null); setError(null); }}
             style={{
               marginTop: "1rem",
-              background: "#2563eb",
+              background: "#7a4a2a",
               color: "white",
               border: "none",
               borderRadius: 6,

@@ -44,10 +44,10 @@ type SortDir = "asc" | "desc";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PIZZA_COLOR    = "#8B1A1A";  // rouge
-const CUISINE_COLOR  = "#166534";  // vert
-const COCKTAIL_COLOR = "#0E7490";  // teal
-const EMP_COLOR      = "#B45309";  // ambre-brun
+const PIZZA_COLOR    = "#8B1A1A";  // bordeaux
+const CUISINE_COLOR  = "#4a6741";  // sauge
+const COCKTAIL_COLOR = "#7a4a2a";  // terre
+const EMP_COLOR      = "#c9b99a";  // terre-light
 
 const CUISINE_CATS = [
   { id: "preparation",    label: "Préparation" },
@@ -136,13 +136,13 @@ function RecipeCard({
       style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
         padding: "11px 14px", borderRadius: 12,
-        background: "rgba(255,255,255,0.45)",
-        border: "1px solid rgba(217,199,182,0.5)",
+        background: "#fff",
+        border: "1px solid #ddd6c8",
         cursor: "pointer", transition: "background 0.12s",
         marginBottom: 6,
       }}
-      onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.75)")}
-      onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.45)")}
+      onMouseEnter={e => (e.currentTarget.style.background = "#f2ede4")}
+      onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
     >
       <div style={{ flex: 1, minWidth: 0, paddingRight: 10 }}>
         <div style={{
@@ -172,8 +172,8 @@ function RecipeCard({
             onClick={ev => { ev.stopPropagation(); router.push(prodHref); }}
             style={{
               padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700,
-              border: "1.5px solid #166534",
-              background: "rgba(22,101,52,0.08)", color: "#166534",
+              border: "1.5px solid #4a6741",
+              background: "rgba(74,103,65,0.08)", color: "#4a6741",
               cursor: "pointer", whiteSpace: "nowrap",
             }}
           >
@@ -233,7 +233,7 @@ function Section({
     <div style={{ marginBottom: 24 }}>
       <div style={{
         display: "flex", alignItems: "center", gap: 10,
-        padding: "6px 0 8px", borderBottom: `2px solid ${color}`, marginBottom: 12,
+        padding: "6px 0 8px", borderBottom: "1.5px solid #1a1a1a", marginBottom: 12,
       }}>
         {newHref && (
           <button
@@ -256,7 +256,7 @@ function Section({
             background: "none", border: "none", cursor: "pointer", padding: 0,
           }}
         >
-          <span style={{ fontSize: 14, fontWeight: 900, color, textTransform: "uppercase", letterSpacing: 1 }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
             {title}
             <span style={{ fontWeight: 500, fontSize: 12, marginLeft: 6, color: "#6f6a61" }}>({count})</span>
           </span>
@@ -284,7 +284,7 @@ function SubSection({
         style={{
           width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
           background: "none", border: "none", cursor: "pointer",
-          padding: "8px 4px 9px", borderBottom: `1px solid rgba(22,101,52,0.2)`, marginBottom: 8,
+          padding: "8px 4px 9px", borderBottom: "1px solid rgba(74,103,65,0.2)", marginBottom: 8,
         }}
       >
         <span style={{ fontSize: 14, fontWeight: 800, color, letterSpacing: 0.5 }}>
@@ -472,9 +472,9 @@ function RecettesInner() {
                 style={{
                   padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
                   border: "1.5px solid",
-                  borderColor: estab === v ? "#8B1A1A" : "rgba(217,199,182,0.9)",
-                  background: estab === v ? "rgba(139,26,26,0.08)" : "rgba(255,255,255,0.7)",
-                  color: estab === v ? "#8B1A1A" : "#6f6a61",
+                  borderColor: estab === v ? "#7a4a2a" : "rgba(217,199,182,0.9)",
+                  background: estab === v ? "rgba(122,74,42,0.08)" : "rgba(255,255,255,0.7)",
+                  color: estab === v ? "#7a4a2a" : "#6f6a61",
                   cursor: "pointer",
                 }}
               >
@@ -509,7 +509,7 @@ function RecettesInner() {
               <span style={{
                 display: "inline-flex", alignItems: "center",
                 width: 38, height: 22, borderRadius: 11,
-                background: allExpanded ? "#8B1A1A" : "rgba(217,199,182,0.9)",
+                background: allExpanded ? "#7a4a2a" : "rgba(217,199,182,0.9)",
                 transition: "background 0.2s", flexShrink: 0, padding: "0 3px",
                 justifyContent: allExpanded ? "flex-end" : "flex-start",
               }}>

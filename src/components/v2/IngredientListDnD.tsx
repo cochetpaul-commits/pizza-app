@@ -192,7 +192,7 @@ export function IngredientListDnD({
                         </select>
 
                         {/* Cost display */}
-                        <span style={{ fontSize: 12, color: cost != null ? "#166534" : "#9a8f84", fontWeight: 700, minWidth: 60, flexShrink: 0 }}>
+                        <span style={{ fontSize: 12, color: cost != null ? "#4a6741" : "#9a8f84", fontWeight: 700, minWidth: 60, flexShrink: 0 }}>
                           {cost != null ? `${fmtMoney(cost)} €` : "—"}
                         </span>
 

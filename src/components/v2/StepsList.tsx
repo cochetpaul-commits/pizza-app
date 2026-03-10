@@ -51,9 +51,9 @@ export function StepsList({ steps, onChange }: Props) {
                     >
                       <span
                         {...drag.dragHandleProps}
-                        style={{ fontSize: 16, color: "#b0a89a", cursor: "grab", paddingTop: 4, userSelect: "none", flexShrink: 0 }}
+                        style={{ fontSize: 16, color: "#999", cursor: "grab", paddingTop: 4, userSelect: "none", flexShrink: 0 }}
                       >⠿</span>
-                      <span style={{ fontSize: 11, fontWeight: 800, color: "#b0a89a", paddingTop: 6, flexShrink: 0, minWidth: 18 }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: "#999", paddingTop: 6, flexShrink: 0, minWidth: 18 }}>
                         {i + 1}.
                       </span>
                       <textarea

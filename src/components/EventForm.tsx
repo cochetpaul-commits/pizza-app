@@ -17,10 +17,10 @@ const EVENT_TYPES = [
 ];
 
 const STATUSES = [
-  { value: "prospect", label: "Prospect", color: "#8B1A1A" },
+  { value: "prospect", label: "Prospect", color: "#7a4a2a" },
   { value: "confirme", label: "Confirmé", color: "#4a6741" },
   { value: "en_cours", label: "En cours", color: "#2563eb" },
-  { value: "termine", label: "Terminé", color: "#6B7280" },
+  { value: "termine", label: "Terminé", color: "#999999" },
   { value: "annule", label: "Annulé", color: "#DC2626" },
 ];
 
@@ -63,7 +63,7 @@ type RecipeOption = {
 
 const sectionStyle: React.CSSProperties = {
   background: "#fff",
-  border: "1px solid #e5ddd0",
+  border: "1px solid #ddd6c8",
   borderRadius: 14,
   padding: "16px 16px 20px",
   marginBottom: 14,
@@ -82,14 +82,14 @@ const inputStyle: React.CSSProperties = {
   width: "100%",
   height: 40,
   borderRadius: 10,
-  border: "1px solid #e5ddd0",
+  border: "1.5px solid #ddd6c8",
   padding: "0 12px",
   fontSize: 14,
   background: "rgba(255,255,255,0.7)",
   boxSizing: "border-box",
 };
 
-const sectionTitle = (label: string, color = "#8B1A1A"): React.ReactNode => (
+const sectionTitle = (label: string, color = "#7a4a2a"): React.ReactNode => (
   <p style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, letterSpacing: 1, color, textTransform: "uppercase" }}>
     {label}
   </p>
@@ -394,7 +394,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
         primaryAction={
           <button
             className="btn btnPrimary"
-            style={{ background: "#4a6741", borderColor: "#4a6741" }}
+            style={{ background: "#7a4a2a", borderColor: "#7a4a2a" }}
             onClick={handleSave}
             disabled={saving}
           >
@@ -443,7 +443,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
                     style={{
                       padding: "4px 10px",
                       borderRadius: 6,
-                      border: `1px solid ${status === s.value ? s.color : "#e5ddd0"}`,
+                      border: `1px solid ${status === s.value ? s.color : "#ddd6c8"}`,
                       background: status === s.value ? s.color : "#fff",
                       color: status === s.value ? "#fff" : "#6f6a61",
                       fontWeight: 700,
@@ -502,11 +502,11 @@ export default function EventForm({ eventId }: { eventId?: string }) {
                     style={{
                       padding: "6px 12px",
                       borderRadius: 6,
-                      border: "1px solid #e5ddd0",
+                      border: "1px solid #ddd6c8",
                       fontWeight: 700,
                       fontSize: 12,
                       cursor: "pointer",
-                      background: establishment === v ? (v === "bellomio" ? "#8B1A1A" : v === "piccola" ? "#6B1B1B" : "#6B7280") : "#fff",
+                      background: establishment === v ? (v === "bellomio" ? "#7a4a2a" : v === "piccola" ? "#643d22" : "#6B7280") : "#fff",
                       color: establishment === v ? "#fff" : "#6f6a61",
                     }}
                   >
@@ -548,7 +548,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
 
         {/* ═══ 3. RECETTES LIÉES ═══ */}
         <div style={sectionStyle}>
-          {sectionTitle("Recettes liées", "#4A6FA5")}
+          {sectionTitle("Recettes liées", "#7a4a2a")}
 
           {/* Add recipe */}
           <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
@@ -570,7 +570,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
             <button
               type="button"
               className="btn btnPrimary"
-              style={{ background: "#4A6FA5", borderColor: "#4A6FA5", flexShrink: 0 }}
+              style={{ background: "#7a4a2a", borderColor: "#7a4a2a", flexShrink: 0 }}
               onClick={addRecipe}
               disabled={!addRecipeId}
             >
@@ -584,7 +584,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
             <div
               key={r.recipe_id}
               style={{
-                border: "1px solid #e5ddd0",
+                border: "1px solid #ddd6c8",
                 borderRadius: 10,
                 padding: "10px 12px",
                 marginBottom: 8,
@@ -643,9 +643,9 @@ export default function EventForm({ eventId }: { eventId?: string }) {
             <div style={{
               marginTop: 12,
               padding: "12px 14px",
-              background: "#f5f0e8",
+              background: "#f2ede4",
               borderRadius: 10,
-              border: "1px solid #e5ddd0",
+              border: "1px solid #ddd6c8",
             }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                 <div>
@@ -694,7 +694,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
 
         {/* ═══ 4. DOCUMENTS ═══ */}
         <div style={sectionStyle}>
-          {sectionTitle("Documents", "#92400E")}
+          {sectionTitle("Documents", "#7a4a2a")}
 
           {!isNew && (
             <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
@@ -736,7 +736,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
               justifyContent: "space-between",
               alignItems: "center",
               padding: "8px 10px",
-              border: "1px solid #e5ddd0",
+              border: "1px solid #ddd6c8",
               borderRadius: 8,
               marginBottom: 6,
               background: "#faf8f4",
@@ -759,7 +759,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
                   style={{
                     padding: "4px 10px",
                     borderRadius: 6,
-                    background: "#92400E",
+                    background: "#7a4a2a",
                     color: "#fff",
                     fontSize: 11,
                     fontWeight: 700,
@@ -775,7 +775,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
                     padding: "4px 10px",
                     borderRadius: 6,
                     background: "none",
-                    border: "1px solid #e5ddd0",
+                    border: "1px solid #ddd6c8",
                     color: "#DC2626",
                     cursor: "pointer",
                     fontWeight: 700,

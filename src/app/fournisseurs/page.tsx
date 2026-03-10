@@ -88,7 +88,7 @@ export default function FournisseursPage() {
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <Link
                 href={`/fournisseurs/${s.id}`}
-                style={{ fontWeight: 900, fontSize: 15, color: "#8B1A1A", textDecoration: "none" }}
+                style={{ fontWeight: 900, fontSize: 15, color: "#7a4a2a", textDecoration: "none" }}
               >
                 {s.name}
               </Link>
@@ -142,7 +142,7 @@ export default function FournisseursPage() {
       <NavBar />
       <main style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 26, fontWeight: 900 }}>Fournisseurs</div>
+          <div style={{ fontSize: 26, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", letterSpacing: 1.5, textTransform: "uppercase" as const }}>Fournisseurs</div>
           <div className="muted" style={{ marginTop: 2 }}>
             Coordonnées, références et historique d&apos;imports.
           </div>

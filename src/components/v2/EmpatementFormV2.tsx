@@ -316,7 +316,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
             label: prodMode ? "Mode normal" : "Mode production",
             onClick: () => { setProdMode(m => !m); setProdQty(""); },
             style: prodMode
-              ? { background: "#166534", color: "white", borderColor: "#166534" }
+              ? { background: "#4a6741", color: "white", borderColor: "#4a6741" }
               : undefined,
           },
           ...(isEdit ? [{
@@ -342,7 +342,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         {prodMode ? (
           <>
             <div style={{
-              background: "#166534", color: "white", borderRadius: 12,
+              background: "#4a6741", color: "white", borderRadius: 12,
               padding: "12px 16px", marginBottom: 16,
             }}>
               <div style={{ fontSize: 15, fontWeight: 800 }}>Mode Production</div>
@@ -394,7 +394,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                         background: "white", border: "1px solid #EFEFEF", borderRadius: 10, padding: "10px 14px",
                       }}>
                         <span style={{ fontSize: 14, color: "#2d2d2d" }}>{item.name}</span>
-                        <span style={{ fontSize: 22, fontWeight: 800, color: "#166534" }}>
+                        <span style={{ fontSize: 22, fontWeight: 800, color: "#4a6741" }}>
                           {newQty !== null ? `${newQty.toLocaleString("fr-FR")} ${item.unit}` : fmtG(item.qty)}
                         </span>
                       </div>
@@ -405,7 +405,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                 {prodTotalW > 0 && (
                   <div style={{
                     background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10,
-                    padding: "12px 16px", color: "#166534", fontWeight: 700, fontSize: 15, marginBottom: 16,
+                    padding: "12px 16px", color: "#4a6741", fontWeight: 700, fontSize: 15, marginBottom: 16,
                   }}>
                     Poids total estimé : {prodTotalW.toLocaleString("fr-FR")} g
                   </div>

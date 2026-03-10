@@ -561,7 +561,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
             label: prodMode ? "Mode normal" : "Mode production",
             onClick: () => { setProdMode(m => !m); setProdQty(""); },
             style: prodMode
-              ? { background: "#166534", color: "white", borderColor: "#166534" }
+              ? { background: "#4a6741", color: "white", borderColor: "#4a6741" }
               : undefined,
           },
           ...(isEdit ? [{
@@ -588,7 +588,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
           <>
             {/* Banner */}
             <div style={{
-              background: "#166534", color: "white", borderRadius: 12,
+              background: "#4a6741", color: "white", borderRadius: 12,
               padding: "12px 16px", marginBottom: 16,
             }}>
               <div style={{ fontSize: 15, fontWeight: 800 }}>Mode Production</div>
@@ -646,7 +646,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                           background: "white", border: "1px solid #EFEFEF", borderRadius: 10, padding: "10px 14px",
                         }}>
                           <span style={{ fontSize: 14, color: "#2d2d2d" }}>{truncate(ing?.name ?? "—", 35)}</span>
-                          <span style={{ fontSize: 22, fontWeight: 800, color: "#166534" }}>
+                          <span style={{ fontSize: 22, fontWeight: 800, color: "#4a6741" }}>
                             {newQty !== null
                               ? `${newQty.toLocaleString("fr-FR")} ${l.unit}`
                               : `${l.qty} ${l.unit}`}
@@ -662,7 +662,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                   <div style={{
                     background: "#F0FDF4", border: "1px solid #BBF7D0",
                     borderRadius: 10, padding: "12px 16px",
-                    color: "#166534", fontWeight: 700, fontSize: 15, marginBottom: 16,
+                    color: "#4a6741", fontWeight: 700, fontSize: 15, marginBottom: 16,
                   }}>
                     Poids total estimé : {prodTotalW.toLocaleString("fr-FR")} g
                   </div>
@@ -708,9 +708,9 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                         style={{
                           padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
                           border: "1.5px solid",
-                          borderColor: category === c.id ? "#166534" : "rgba(217,199,182,0.9)",
+                          borderColor: category === c.id ? "#4a6741" : "rgba(217,199,182,0.9)",
                           background: category === c.id ? "rgba(22,101,52,0.08)" : "rgba(255,255,255,0.7)",
-                          color: category === c.id ? "#166534" : "#6f6a61",
+                          color: category === c.id ? "#4a6741" : "#6f6a61",
                           cursor: "pointer",
                         }}
                       >{c.label}</button>
@@ -735,8 +735,8 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                           title={`Utiliser le poids total des ingrédients (${Math.round(totalWeightG)} g)`}
                           style={{
                             padding: "0 10px", height: 36, borderRadius: 8, fontSize: 12, fontWeight: 700,
-                            border: "1.5px solid #166534", background: "rgba(22,101,52,0.07)",
-                            color: "#166534", cursor: "pointer", whiteSpace: "nowrap",
+                            border: "1.5px solid #4a6741", background: "rgba(22,101,52,0.07)",
+                            color: "#4a6741", cursor: "pointer", whiteSpace: "nowrap",
                           }}
                         >= Poids ingrédients</button>
                       )}
@@ -762,7 +762,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
 
             {/* Ingrédients */}
             <div className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#166534" }}>
+              <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#4a6741" }}>
                 Ingrédients
               </h3>
               <IngredientListDnD
@@ -777,15 +777,15 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
               />
               {totalWeightG > 0 && (
                 <div style={{ marginTop: 10, fontSize: 13, color: "#6f6a61", display: "flex", gap: 16, flexWrap: "wrap" }}>
-                  <span>Poids total : <strong style={{ color: "#166534" }}>{Math.round(totalWeightG).toLocaleString("fr-FR")} g</strong></span>
-                  {totalCost > 0 && <span>Coût total : <strong style={{ color: "#166534" }}>{round2(totalCost).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</strong></span>}
+                  <span>Poids total : <strong style={{ color: "#4a6741" }}>{Math.round(totalWeightG).toLocaleString("fr-FR")} g</strong></span>
+                  {totalCost > 0 && <span>Coût total : <strong style={{ color: "#4a6741" }}>{round2(totalCost).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</strong></span>}
                 </div>
               )}
             </div>
 
             {/* Étapes */}
             <div className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#166534" }}>
+              <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#4a6741" }}>
                 Étapes
               </h3>
               <StepsList steps={steps} onChange={setSteps} />
@@ -793,7 +793,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
 
             {/* Prix & Marges */}
             <div className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#166534" }}>
+              <h3 style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#4a6741" }}>
                 Prix &amp; Marges
               </h3>
               <PricingBlock
@@ -805,16 +805,16 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                 onMarginChange={setMarginRate}
                 sellPrice={sellPrice}
                 onSellPriceChange={setSellPrice}
-                accentColor="#8B1A1A"
+                accentColor="#7a4a2a"
               />
             </div>
 
             {/* Index button for preparations */}
             {category === "preparation" && isEdit && (
-              <div className="card" style={{ marginBottom: 16, borderLeft: "4px solid #166534" }}>
+              <div className="card" style={{ marginBottom: 16, borderLeft: "4px solid #4a6741" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
                   <div>
-                    <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: "#166534", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: "#4a6741", textTransform: "uppercase", letterSpacing: 0.5 }}>
                       Index ingrédient
                     </p>
                     <p className="muted" style={{ margin: "2px 0 0", fontSize: 11 }}>
@@ -826,7 +826,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                     onClick={handleIndexSave}
                     disabled={indexSaving}
                     className="btn"
-                    style={{ background: "#166534", borderColor: "#166534", color: "#fff", fontSize: 12, flexShrink: 0 }}
+                    style={{ background: "#4a6741", borderColor: "#4a6741", color: "#fff", fontSize: 12, flexShrink: 0 }}
                   >
                     {indexSaving ? "Enregistrement…" : indexIngredientId ? "Mettre à jour l'index" : "Ajouter à l'index"}
                   </button>
@@ -834,7 +834,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                 {indexMsg && (
                   <div style={{
                     marginTop: 8, fontSize: 12, fontWeight: 600,
-                    color: indexMsg.startsWith("Erreur") ? "#DC2626" : "#166534",
+                    color: indexMsg.startsWith("Erreur") ? "#8B1A1A" : "#4a6741",
                   }}>
                     {indexMsg}
                   </div>

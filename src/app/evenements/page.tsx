@@ -30,10 +30,10 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
-  prospect: { bg: "rgba(139,26,26,0.10)", fg: "#8B1A1A" },
-  confirme: { bg: "rgba(74,103,65,0.12)", fg: "#4a6741" },
+  prospect: { bg: "#e8e0d0", fg: "#999999" },
+  confirme: { bg: "#e8ede6", fg: "#4a6741" },
   en_cours: { bg: "rgba(37,99,235,0.10)", fg: "#2563eb" },
-  termine: { bg: "rgba(107,114,128,0.10)", fg: "#6B7280" },
+  termine: { bg: "#f0f0f0", fg: "#bbbbbb" },
   annule: { bg: "rgba(220,38,38,0.10)", fg: "#DC2626" },
 };
 
@@ -46,10 +46,10 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const CAL_BADGE_COLORS: Record<string, string> = {
-  prospect: "#9CA3AF",
+  prospect: "#999999",
   confirme: "#4a6741",
   en_cours: "#D97706",
-  termine: "#8B1A1A",
+  termine: "#bbbbbb",
   annule: "#DC2626",
 };
 
@@ -164,13 +164,13 @@ export default function EventsPage() {
         backHref="/"
         backLabel="Dashboard"
         primaryAction={
-          <Link href="/evenements/new" className="btn btnPrimary" style={{ background: "#8B1A1A", borderColor: "#8B1A1A" }}>
+          <Link href="/evenements/new" className="btn btnPrimary" style={{ background: "#7a4a2a", borderColor: "#7a4a2a" }}>
             + Événement
           </Link>
         }
       />
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "12px 16px 40px" }}>
-        <h1 style={{ fontSize: "1.4rem", fontWeight: 800, color: "#2f3a33", margin: "0 0 16px" }}>
+        <h1 style={{ fontSize: "1.4rem", fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", letterSpacing: 1.5, textTransform: "uppercase" as const, color: "#2f3a33", margin: "0 0 16px" }}>
           Événements
         </h1>
 
@@ -184,9 +184,9 @@ export default function EventsPage() {
                 padding: "6px 14px",
                 borderRadius: 8,
                 border: "1.5px solid",
-                borderColor: view === v ? "#8B1A1A" : "#e5ddd0",
-                background: view === v ? "rgba(139,26,26,0.08)" : "#fff",
-                color: view === v ? "#8B1A1A" : "#6f6a61",
+                borderColor: view === v ? "#7a4a2a" : "#ddd6c8",
+                background: view === v ? "rgba(122,74,42,0.08)" : "#fff",
+                color: view === v ? "#7a4a2a" : "#6f6a61",
                 fontWeight: 700,
                 fontSize: 13,
                 cursor: "pointer",
@@ -207,8 +207,8 @@ export default function EventsPage() {
                 style={{
                   padding: "6px 14px",
                   borderRadius: 8,
-                  border: "1px solid #e5ddd0",
-                  background: filter === f ? "#8B1A1A" : "#fff",
+                  border: "1px solid #ddd6c8",
+                  background: filter === f ? "#7a4a2a" : "#fff",
                   color: filter === f ? "#fff" : "#2f3a33",
                   fontWeight: 700,
                   fontSize: 13,
@@ -235,14 +235,14 @@ export default function EventsPage() {
                 marginBottom: 12,
               }}>
                 <button onClick={prevMonth} style={{
-                  width: 36, height: 36, borderRadius: 10, border: "1px solid #e5ddd0",
+                  width: 36, height: 36, borderRadius: 10, border: "1px solid #ddd6c8",
                   background: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700, color: "#6f6a61",
                 }}>←</button>
                 <span style={{ fontSize: 16, fontWeight: 800, color: "#2f3a33" }}>
                   {MONTH_NAMES[calMonth]} {calYear}
                 </span>
                 <button onClick={nextMonth} style={{
-                  width: 36, height: 36, borderRadius: 10, border: "1px solid #e5ddd0",
+                  width: 36, height: 36, borderRadius: 10, border: "1px solid #ddd6c8",
                   background: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700, color: "#6f6a61",
                 }}>→</button>
               </div>
@@ -250,7 +250,7 @@ export default function EventsPage() {
               {/* Day headers */}
               <div style={{
                 display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0,
-                background: "#fff", border: "1px solid #e5ddd0", borderRadius: "10px 10px 0 0",
+                background: "#fff", border: "1px solid #ddd6c8", borderRadius: "10px 10px 0 0",
                 overflow: "hidden",
               }}>
                 {DAY_HEADERS.map((d) => (
@@ -258,7 +258,7 @@ export default function EventsPage() {
                     padding: "8px 0", textAlign: "center",
                     fontSize: 11, fontWeight: 700, color: "#9a8f84",
                     textTransform: "uppercase", letterSpacing: 0.5,
-                    borderBottom: "1px solid #e5ddd0",
+                    borderBottom: "1px solid #ddd6c8",
                   }}>{d}</div>
                 ))}
               </div>
@@ -266,7 +266,7 @@ export default function EventsPage() {
               {/* Day cells */}
               <div style={{
                 display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0,
-                background: "#fff", border: "1px solid #e5ddd0", borderTop: "none",
+                background: "#fff", border: "1px solid #ddd6c8", borderTop: "none",
                 borderRadius: "0 0 10px 10px", overflow: "hidden",
               }}>
                 {cells.map((day, i) => {
@@ -285,11 +285,11 @@ export default function EventsPage() {
                       minHeight: 70, padding: "4px 5px",
                       borderBottom: "1px solid #f0ebe3",
                       borderRight: i % 7 < 6 ? "1px solid #f0ebe3" : "none",
-                      background: isToday ? "rgba(139,26,26,0.04)" : isWeekend ? "#faf7f2" : "#fff",
+                      background: isToday ? "rgba(122,74,42,0.04)" : isWeekend ? "#faf7f2" : "#fff",
                     }}>
                       <div style={{
                         fontSize: 12, fontWeight: isToday ? 800 : 500,
-                        color: isToday ? "#8B1A1A" : "#6f6a61",
+                        color: isToday ? "#7a4a2a" : "#6f6a61",
                         marginBottom: 3,
                       }}>
                         {day}
@@ -338,7 +338,7 @@ export default function EventsPage() {
         {!loading && view === "list" && filtered.length === 0 && (
           <div className="card" style={{ textAlign: "center", padding: "2rem" }}>
             <p className="muted">Aucun événement</p>
-            <Link href="/evenements/new" className="btn btnPrimary" style={{ marginTop: 12, background: "#8B1A1A", borderColor: "#8B1A1A" }}>
+            <Link href="/evenements/new" className="btn btnPrimary" style={{ marginTop: 12, background: "#7a4a2a", borderColor: "#7a4a2a" }}>
               Créer le premier
             </Link>
           </div>

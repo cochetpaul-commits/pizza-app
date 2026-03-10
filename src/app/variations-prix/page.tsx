@@ -57,7 +57,7 @@ function AlertCard({
   onSnooze?: () => void; onUnsnooze?: () => void;
 }) {
   const isUp = a.direction === "up";
-  const accentColor = snoozed ? "#D1D5DB" : a.aberrant ? "#EA580C" : isUp ? "#DC2626" : "#16A34A";
+  const accentColor = snoozed ? "#ddd6c8" : a.aberrant ? "#EA580C" : isUp ? "#DC2626" : "#16A34A";
   const badgeBg = isUp ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)";
   const badgeColor = isUp ? "#DC2626" : "#16A34A";
   const badgeBorder = isUp ? "rgba(220,38,38,0.25)" : "rgba(22,163,74,0.25)";
@@ -262,7 +262,7 @@ export default function VariationsPrixPage() {
   const totalActiveAlerts = activeUp.length + activeDown.length;
 
   // ── Styles ──
-  const pillBtn = (active: boolean, color = "#8B1A1A") => ({
+  const pillBtn = (active: boolean, color = "#7a4a2a") => ({
     padding: "5px 13px", borderRadius: 20, border: `1px solid ${active ? color : "rgba(217,199,182,0.95)"}`,
     background: active ? color : "rgba(255,255,255,0.38)", color: active ? "#fff" : "var(--text)" as const,
     fontWeight: 700, fontSize: 13, cursor: "pointer" as const, transition: "all 120ms",
@@ -293,8 +293,8 @@ export default function VariationsPrixPage() {
               style={{
                 display: "inline-flex", alignItems: "center", gap: 6,
                 padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                border: `1.5px solid ${tab === t.key ? "#8B1A1A" : "rgba(217,199,182,0.95)"}`,
-                background: tab === t.key ? "#8B1A1A" : "rgba(255,255,255,0.55)",
+                border: `1.5px solid ${tab === t.key ? "#7a4a2a" : "rgba(217,199,182,0.95)"}`,
+                background: tab === t.key ? "#7a4a2a" : "rgba(255,255,255,0.55)",
                 color: tab === t.key ? "#fff" : "var(--text)",
                 cursor: "pointer",
               }}
@@ -384,7 +384,7 @@ export default function VariationsPrixPage() {
                     <div style={{ fontSize: 11, opacity: 0.6, marginTop: 3 }}>Moy. variation</div>
                   </div>
                   <div className="card" style={{ padding: "12px 14px", textAlign: "center" }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.2, color: "#8B1A1A" }}>{kpis.topSupplier}</div>
+                    <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.2, color: "#7a4a2a" }}>{kpis.topSupplier}</div>
                     {kpis.topCount > 0 && <div style={{ fontSize: 11, opacity: 0.6, marginTop: 3 }}>{kpis.topCount} hausse{kpis.topCount > 1 ? "s" : ""}</div>}
                     <div style={{ fontSize: 10, opacity: 0.5, marginTop: 1 }}>Top fournisseur</div>
                   </div>

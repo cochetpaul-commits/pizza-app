@@ -12,7 +12,7 @@ const SUPPLIERS = [
   { key: "carniato",  label: "CARNIATO",          category: "Charcuterie",       color: "#8e44ad", href: "/invoices/carniato" },
   { key: "barspirits",label: "BAR SPIRITS",       category: "Spiritueux",        color: "#16a085", href: "/invoices/barspirits" },
   { key: "sum",       label: "SUM",               category: "Divers",            color: "#7f8c8d", href: "/invoices/sum" },
-  { key: "masse",     label: "MASSE",              category: "Viande & foie gras", color: "#8B1A1A", href: "/invoices/masse" },
+  { key: "masse",     label: "MASSE",              category: "Viande & foie gras", color: "#7a4a2a", href: "/invoices/masse" },
   { key: "armor",     label: "ARMOR EMBALLAGES",  category: "Emballage",         color: "#f39c12", href: "/invoices/armor", fullWidth: true },
 ];
 
@@ -26,10 +26,10 @@ export default function InvoicesHubPage() {
 
         {/* Header */}
         <div style={{ marginBottom: 24 }}>
-          <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: 2, color: "#8B1A1A", textTransform: "uppercase", margin: "0 0 6px" }}>
+          <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: 2, color: "#7a4a2a", textTransform: "uppercase", margin: "0 0 6px" }}>
             FACTURES
           </p>
-          <h1 style={{ fontSize: 24, color: "#1a1a1a" }}>
+          <h1 style={{ fontSize: 24, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>
             Import factures fournisseurs
           </h1>
           <p style={{ margin: "6px 0 0", fontSize: 13, color: "#7a6f63" }}>
@@ -47,8 +47,8 @@ export default function InvoicesHubPage() {
                 gridColumn: s.fullWidth ? "1 / -1" : undefined,
                 display: "flex",
                 alignItems: "stretch",
-                background: "rgba(255,255,255,0.82)",
-                border: "1px solid rgba(217,199,182,0.8)",
+                background: "#fff",
+                border: "1px solid #ddd6c8",
                 borderRadius: 16,
                 padding: 0,
                 overflow: "hidden",
@@ -59,11 +59,11 @@ export default function InvoicesHubPage() {
               }}
               onMouseEnter={e => {
                 (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 14px rgba(0,0,0,0.10)";
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(217,199,182,1)";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "#ddd6c8";
               }}
               onMouseLeave={e => {
                 (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 2px 6px rgba(0,0,0,0.04)";
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(217,199,182,0.8)";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "#ddd6c8";
               }}
             >
               {/* Color bar */}

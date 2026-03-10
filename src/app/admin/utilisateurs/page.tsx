@@ -21,9 +21,9 @@ const ROLE_LABELS: Record<Role, string> = {
 };
 
 const ROLE_COLORS: Record<Role, string> = {
-  admin: "#8B1A1A",
-  direction: "#166534",
-  cuisine: "#4a4a4a",
+  admin: "#7a4a2a",
+  direction: "#4a6741",
+  cuisine: "#1a1a1a",
 };
 
 function fmtDate(iso: string) {
@@ -116,9 +116,9 @@ function UsersContent() {
         <div style={{ marginBottom: 24 }}>
           <p style={{
             fontSize: 10, fontWeight: 800, letterSpacing: 2,
-            color: "#8B1A1A", textTransform: "uppercase", margin: "0 0 6px",
+            color: "#7a4a2a", textTransform: "uppercase", margin: "0 0 6px",
           }}>ADMINISTRATION</p>
-          <h1 style={{ fontSize: 24, color: "#1a1a1a", margin: 0 }}>Gestion des utilisateurs</h1>
+          <h1 style={{ fontSize: 24, color: "#1a1a1a", margin: 0, fontFamily: "'Oswald', sans-serif" }}>Gestion des utilisateurs</h1>
         </div>
 
         {/* Invite button */}
@@ -127,7 +127,7 @@ function UsersContent() {
             onClick={() => setShowInvite(true)}
             style={{
               padding: "10px 20px", borderRadius: 10, border: "none",
-              background: "#8B1A1A", color: "#fff", fontSize: 13, fontWeight: 700,
+              background: "#7a4a2a", color: "#fff", fontSize: 13, fontWeight: 700,
               cursor: "pointer",
             }}
           >
@@ -202,7 +202,7 @@ function UsersContent() {
                   disabled={inviting || !inviteEmail.trim()}
                   style={{
                     padding: "9px 18px", borderRadius: 8, border: "none",
-                    background: "#8B1A1A", color: "#fff", fontSize: 13, fontWeight: 700,
+                    background: "#7a4a2a", color: "#fff", fontSize: 13, fontWeight: 700,
                     cursor: "pointer", opacity: inviting ? 0.6 : 1,
                   }}
                 >{inviting ? "Envoi…" : "Inviter"}</button>
@@ -213,7 +213,7 @@ function UsersContent() {
 
         {/* Error */}
         {error && (
-          <div style={{ padding: "12px 16px", borderRadius: 10, background: "#FEF2F2", border: "1px solid rgba(139,26,26,0.2)", marginBottom: 16, fontSize: 13, color: "#8B1A1A" }}>
+          <div style={{ padding: "12px 16px", borderRadius: 10, background: "#FEF2F2", border: "1px solid rgba(139,26,26,0.2)", marginBottom: 16, fontSize: 13, color: "#7a4a2a" }}>
             {error}
           </div>
         )}
@@ -227,7 +227,7 @@ function UsersContent() {
             {users.map((u) => (
               <div key={u.id} style={{
                 background: "#fff", borderRadius: 14, padding: "16px 18px",
-                border: "1px solid #e5ddd0", boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+                border: "1px solid #ddd6c8", boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -274,7 +274,7 @@ function UsersContent() {
                       <button
                         onClick={() => setDeleteConfirm(u.id)}
                         style={{
-                          padding: "5px 10px", borderRadius: 6, border: "1px solid #e5ddd0",
+                          padding: "5px 10px", borderRadius: 6, border: "1px solid #ddd6c8",
                           background: "#fff", fontSize: 11, cursor: "pointer", color: "#d93f3f", fontWeight: 600,
                         }}
                       >Supprimer</button>

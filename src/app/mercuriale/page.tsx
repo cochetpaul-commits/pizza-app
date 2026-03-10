@@ -57,13 +57,13 @@ export default function MercurialePage() {
   }
 
   const btnStyle = (active: boolean, color: string) => ({
-    padding: "6px 14px", borderRadius: 8, border: `1px solid ${active ? color : "#d1d5db"}`,
+    padding: "6px 14px", borderRadius: 8, border: `1px solid ${active ? color : "#ddd6c8"}`,
     background: active ? color : "#fff", color: active ? "#fff" : "#374151",
     fontWeight: 700, fontSize: 13, cursor: "pointer" as const,
   });
 
   const selectStyle = {
-    width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #d1d5db",
+    width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #ddd6c8",
     fontSize: 13, fontWeight: 600, background: "#fff", cursor: "pointer" as const,
   };
 
@@ -74,16 +74,16 @@ export default function MercurialePage() {
     <main style={{ maxWidth: 600, margin: "0 auto", padding: "2rem" }}>
       <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, marginBottom: 24 }}>Mercuriale des prix</h1>
 
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 20, marginBottom: 12 }}>
+      <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, padding: 20, marginBottom: 12 }}>
         <div style={{ fontWeight: 700, marginBottom: 10, color: "#374151", fontSize: 13 }}>Établissement</div>
         <div style={{ display: "flex", gap: 8 }}>
-          {([["all", "Tous", "#6B7280"], ["bellomio", "Bello Mio", "#8B1A1A"], ["piccola", "Piccola Mia", "#6B1B1B"]] as const).map(([v, label, color]) => (
+          {([["all", "Tous", "#999999"], ["bellomio", "Bello Mio", "#7a4a2a"], ["piccola", "Piccola Mia", "#6B1B1B"]] as const).map(([v, label, color]) => (
             <button key={v} onClick={() => setEstablishment(v)} style={btnStyle(establishment === v, color)}>{label}</button>
           ))}
         </div>
       </div>
 
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 20, marginBottom: 12 }}>
+      <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, padding: 20, marginBottom: 12 }}>
         <div style={{ fontWeight: 700, marginBottom: 10, color: "#374151", fontSize: 13 }}>Fournisseur</div>
         <select style={selectStyle} value={filterSupplier} onChange={e => setFilterSupplier(e.target.value)}>
           <option value="all">Tous les fournisseurs</option>
@@ -91,7 +91,7 @@ export default function MercurialePage() {
         </select>
       </div>
 
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 20, marginBottom: 16 }}>
+      <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, padding: 20, marginBottom: 16 }}>
         <div style={{ fontWeight: 700, marginBottom: 10, color: "#374151", fontSize: 13 }}>Grouper par</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {([["category", "Catégorie"], ["supplier", "Fournisseur"], ["alpha", "Alphabétique"]] as const).map(([v, label]) => (
@@ -103,7 +103,7 @@ export default function MercurialePage() {
       {error && <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: 12, marginBottom: 16, color: "#991b1b", fontSize: 13 }}>{error}</div>}
 
       <button onClick={downloadPdf} disabled={loading}
-        style={{ width: "100%", padding: "14px", borderRadius: 12, background: "#8B1A1A", color: "#fff", fontWeight: 900, fontSize: 16, border: "none", cursor: loading ? "wait" : "pointer", opacity: loading ? 0.7 : 1 }}>
+        style={{ width: "100%", padding: "14px", borderRadius: 12, background: "#7a4a2a", color: "#fff", fontWeight: 900, fontSize: 16, border: "none", cursor: loading ? "wait" : "pointer", opacity: loading ? 0.7 : 1 }}>
         {loading ? "Génération en cours…" : "⬇ Télécharger la mercuriale PDF"}
       </button>
     </main>

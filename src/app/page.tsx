@@ -30,17 +30,9 @@ function fmtDateShort(iso: string) {
   return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
-// ── Shared card styles ──────────────────────────────────────────────────────
+// ── Éditorial Italien — style helpers ───────────────────────────────────────
 
-const card = (color: string): React.CSSProperties => ({
-  background: "#fff",
-  borderRadius: 14,
-  borderLeft: `4px solid ${color}`,
-  padding: "18px 20px",
-  cursor: "pointer",
-});
-
-const title = (color: string): React.CSSProperties => ({
+const titleStyle = (color: string): React.CSSProperties => ({
   margin: 0,
   fontSize: 14,
   fontWeight: 700,
@@ -50,19 +42,19 @@ const title = (color: string): React.CSSProperties => ({
   color,
 });
 
-const subtitle: React.CSSProperties = {
+const subtitleStyle: React.CSSProperties = {
   margin: "3px 0 0",
   fontSize: 13,
   fontWeight: 500,
-  color: "#888",
+  color: "#999",
 };
 
-const counter = (color: string): React.CSSProperties => ({
+const counterStyle = (color: string): React.CSSProperties => ({
   fontSize: 28,
-  fontWeight: 700,
+  fontWeight: 600,
   color,
   lineHeight: 1,
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+  fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif",
 });
 
 const counterSuffix: React.CSSProperties = {
@@ -72,11 +64,11 @@ const counterSuffix: React.CSSProperties = {
   marginLeft: 3,
 };
 
-const btn = (color: string): React.CSSProperties => ({
+const btnStyle = (bg: string): React.CSSProperties => ({
   display: "inline-block",
   padding: "7px 16px",
   borderRadius: 10,
-  background: color,
+  background: bg,
   color: "#fff",
   fontSize: 12,
   fontWeight: 700,
@@ -86,16 +78,94 @@ const btn = (color: string): React.CSSProperties => ({
   flexShrink: 0,
 });
 
-const badge = (color: string): React.CSSProperties => ({
+const badgeStyle = (color: string): React.CSSProperties => ({
   display: "inline-block",
   fontSize: 10,
-  fontWeight: 800,
+  fontWeight: 700,
   padding: "2px 7px",
   borderRadius: 6,
   background: `${color}18`,
   color,
   border: `1px solid ${color}40`,
 });
+
+// ── Card presets per section ────────────────────────────────────────────────
+
+const cardAtelier: React.CSSProperties = {
+  background: "#1a1a1a",
+  borderRadius: 14,
+  padding: "18px 20px",
+  cursor: "pointer",
+};
+
+const cardCatalogue: React.CSSProperties = {
+  background: "#fff",
+  border: "1px solid #ddd6c8",
+  borderRadius: 14,
+  padding: "18px 20px",
+  cursor: "pointer",
+};
+
+const cardFactures: React.CSSProperties = {
+  background: "#e8e0d0",
+  borderRadius: 14,
+  padding: "18px 20px",
+  cursor: "pointer",
+};
+
+const cardFournisseurs: React.CSSProperties = {
+  background: "#fff",
+  border: "1px solid #ddd6c8",
+  borderRadius: 14,
+  padding: "18px 20px",
+  cursor: "pointer",
+};
+
+const cardEvenements: React.CSSProperties = {
+  background: "#f5ede4",
+  borderLeft: "4px solid #7a4a2a",
+  borderRadius: 14,
+  padding: "18px 20px",
+  cursor: "pointer",
+};
+
+const cardPilotage: React.CSSProperties = {
+  background: "#e8ede6",
+  borderRadius: 14,
+  padding: "18px 20px",
+  cursor: "pointer",
+};
+
+const cardAdmin: React.CSSProperties = {
+  background: "#1a1a1a",
+  borderRadius: 14,
+  padding: "18px 20px",
+  cursor: "pointer",
+};
+
+// ── Section separator ───────────────────────────────────────────────────────
+
+function SectionSeparator({ label }: { label: string }) {
+  return (
+    <div className="section-separator" style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      margin: "8px 0 2px",
+    }}>
+      <span style={{
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: 2,
+        textTransform: "uppercase",
+        color: "#b0a894",
+        fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+        whiteSpace: "nowrap",
+      }}>{label}</span>
+      <span style={{ flex: 1, height: 1, background: "#d5cdbc" }} />
+    </div>
+  );
+}
 
 // ── Component ───────────────────────────────────────────────────────────────
 
@@ -168,7 +238,7 @@ export default function Home() {
   return (
     <main className="page-root" style={{
       minHeight: "100dvh",
-      background: "#f5f0e8",
+      background: "#f2ede4",
       width: "100%",
       boxSizing: "border-box",
     }}>
@@ -211,10 +281,10 @@ export default function Home() {
 
       {/* ── Non connecté ── */}
       {authState === "anon" && (
-        <div style={{ ...card("#8B1A1A"), textAlign: "center", cursor: "default" }}>
+        <div style={{ ...cardCatalogue, textAlign: "center", cursor: "default" }}>
           <p style={{ margin: 0, fontSize: 13, color: "#999" }}>Connecte-toi pour accéder aux fiches.</p>
           <div style={{ marginTop: 12 }}>
-            <Link href="/login" style={btn("#8B1A1A")}>Se connecter</Link>
+            <Link href="/login" style={btnStyle("#7a4a2a")}>Se connecter</Link>
           </div>
         </div>
       )}
@@ -225,20 +295,20 @@ export default function Home() {
 
           {/* ─── ATELIER ─── */}
           <Link href="/recettes" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={card("#8B1A1A")}>
+            <div style={cardAtelier}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <p style={title("#8B1A1A")}>ATELIER</p>
-                  <p style={subtitle}>Pizza · Empâtement · Cuisine · Cocktail</p>
+                  <p style={titleStyle("#c9b99a")}>ATELIER</p>
+                  <p style={{ ...subtitleStyle, color: "#888" }}>Pizza · Empâtement · Cuisine · Cocktail</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && (
-                    <span style={counter("#8B1A1A")}>
+                    <span style={counterStyle("#c9b99a")}>
                       {counts.recettes}
                       <span style={counterSuffix}>fiches</span>
                     </span>
                   )}
-                  <span style={btn("#8B1A1A")}>Ouvrir →</span>
+                  <span style={btnStyle("#7a4a2a")}>Ouvrir →</span>
                 </div>
               </div>
             </div>
@@ -246,47 +316,50 @@ export default function Home() {
 
           {/* ─── CATALOGUE ─── */}
           <Link href="/ingredients" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={card("#a83232")}>
+            <div style={cardCatalogue}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <p style={title("#a83232")}>CATALOGUE</p>
+                    <p style={titleStyle("#7a4a2a")}>CATALOGUE</p>
                     {counts && counts.toCheck > 0 && (
-                      <span style={badge("#EA580C")}>{counts.toCheck} à vérifier</span>
+                      <span style={badgeStyle("#EA580C")}>{counts.toCheck} à vérifier</span>
                     )}
                   </div>
-                  <p style={subtitle}>Index · Coûts · Prix</p>
+                  <p style={subtitleStyle}>Index · Coûts · Prix</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && (
-                    <span style={counter("#a83232")}>
+                    <span style={counterStyle("#7a4a2a")}>
                       {counts.ingredients}
                       <span style={counterSuffix}>réf.</span>
                     </span>
                   )}
-                  <span style={btn("#a83232")}>Ouvrir →</span>
+                  <span style={btnStyle("#7a4a2a")}>Ouvrir →</span>
                 </div>
               </div>
             </div>
           </Link>
 
+          {/* ── Separator GESTION ── */}
+          {role && role !== "cuisine" && <SectionSeparator label="GESTION" />}
+
           {/* ─── FACTURES (admin/direction only) ─── */}
           {role && role !== "cuisine" && (
           <Link href="/invoices" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={card("#c0584a")}>
+            <div style={cardFactures}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <p style={title("#c0584a")}>FACTURES</p>
-                  <p style={subtitle}>Import fournisseurs · Mise à jour prix</p>
+                  <p style={titleStyle("#7a4a2a")}>FACTURES</p>
+                  <p style={subtitleStyle}>Import fournisseurs · Mise à jour prix</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && counts.lastImport && (
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#c0584a" }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#7a4a2a" }}>
                       {counts.lastImportSupplier ? `${counts.lastImportSupplier} · ` : ""}
                       {fmtDateShort(counts.lastImport)}
                     </span>
                   )}
-                  <span style={btn("#c0584a")}>Ouvrir →</span>
+                  <span style={btnStyle("#7a4a2a")}>Ouvrir →</span>
                 </div>
               </div>
             </div>
@@ -296,20 +369,20 @@ export default function Home() {
           {/* ─── FOURNISSEURS (admin/direction only) ─── */}
           {role && role !== "cuisine" && (
           <Link href="/fournisseurs" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={card("#6b1a1a")}>
+            <div style={cardFournisseurs}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <p style={title("#6b1a1a")}>FOURNISSEURS</p>
-                  <p style={subtitle}>Fiches · Coordonnées · Historique</p>
+                  <p style={titleStyle("#7a4a2a")}>FOURNISSEURS</p>
+                  <p style={subtitleStyle}>Fiches · Coordonnées · Historique</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && (
-                    <span style={counter("#6b1a1a")}>
+                    <span style={counterStyle("#7a4a2a")}>
                       {counts.suppliers}
                       <span style={counterSuffix}>actifs</span>
                     </span>
                   )}
-                  <span style={btn("#6b1a1a")}>Ouvrir →</span>
+                  <span style={btnStyle("#7a4a2a")}>Ouvrir →</span>
                 </div>
               </div>
             </div>
@@ -319,25 +392,25 @@ export default function Home() {
           {/* ─── ÉVÉNEMENTS (admin/direction only) ─── */}
           {role && role !== "cuisine" && (
           <Link href="/evenements" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={card("#d97706")}>
+            <div style={cardEvenements}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <p style={title("#d97706")}>ÉVÉNEMENTS</p>
+                    <p style={titleStyle("#7a4a2a")}>ÉVÉNEMENTS</p>
                     {counts && counts.upcomingEvents.length > 0 && (
-                      <span style={badge("#d97706")}>{counts.upcomingEvents.length} à venir</span>
+                      <span style={badgeStyle("#7a4a2a")}>{counts.upcomingEvents.length} à venir</span>
                     )}
                   </div>
-                  <p style={subtitle}>Mariages · Séminaires · Traiteur</p>
+                  <p style={subtitleStyle}>Mariages · Séminaires · Traiteur</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && counts.upcomingEvents.length > 0 && (
-                    <span style={counter("#d97706")}>
+                    <span style={counterStyle("#7a4a2a")}>
                       {counts.upcomingEvents.length}
                       <span style={counterSuffix}>à venir</span>
                     </span>
                   )}
-                  <span style={btn("#d97706")}>Ouvrir →</span>
+                  <span style={btnStyle("#7a4a2a")}>Ouvrir →</span>
                 </div>
               </div>
               {counts && counts.upcomingEvents.length > 0 && (
@@ -369,23 +442,23 @@ export default function Home() {
           {/* ─── PILOTAGE (admin/direction only) ─── */}
           {role && role !== "cuisine" && (
           <Link href="/pilotage" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={card("#4a4a4a")}>
+            <div style={cardPilotage}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <p style={title("#4a4a4a")}>PILOTAGE</p>
-                  <p style={subtitle}>Mercuriale · Épicerie · Variations & Alertes</p>
+                  <p style={titleStyle("#4a6741")}>PILOTAGE</p>
+                  <p style={subtitleStyle}>Mercuriale · Épicerie · Variations & Alertes</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                   {caJour !== null && (
-                    <span style={counter("#4a4a4a")}>
+                    <span style={counterStyle("#4a6741")}>
                       {caJour.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                       <span style={counterSuffix}>€ auj.</span>
                     </span>
                   )}
                   {counts && counts.priceAlerts > 0 && (
-                    <span style={badge("#4a4a4a")}>{counts.priceAlerts}</span>
+                    <span style={badgeStyle("#4a6741")}>{counts.priceAlerts}</span>
                   )}
-                  <span style={btn("#4a4a4a")}>Ouvrir →</span>
+                  <span style={btnStyle("#4a6741")}>Ouvrir →</span>
                 </div>
               </div>
             </div>
@@ -395,13 +468,13 @@ export default function Home() {
           {/* ─── ADMIN (admin only) ─── */}
           {isAdmin && (
           <Link href="/admin/utilisateurs" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={card("#333")}>
+            <div style={cardAdmin}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <p style={title("#333")}>ADMIN</p>
-                  <p style={subtitle}>Utilisateurs · Rôles</p>
+                  <p style={titleStyle("#c9b99a")}>ADMIN</p>
+                  <p style={{ ...subtitleStyle, color: "#888" }}>Utilisateurs · Rôles</p>
                 </div>
-                <span style={btn("#333")}>Ouvrir →</span>
+                <span style={btnStyle("#7a4a2a")}>Ouvrir →</span>
               </div>
             </div>
           </Link>
@@ -414,7 +487,7 @@ export default function Home() {
       {authState === "ok" && (
         <div style={{ textAlign: "center", marginTop: 32, paddingBottom: 20 }}>
           {displayName && (
-            <div style={{ fontSize: 11, color: "#bbb", marginBottom: 6 }}>
+            <div style={{ fontSize: 11, color: "#999", marginBottom: 6 }}>
               {displayName}
               {role && <span style={{ marginLeft: 6, padding: "1px 6px", borderRadius: 4, background: "#f0ebe3", fontSize: 10, fontWeight: 600 }}>{role}</span>}
             </div>
@@ -422,7 +495,7 @@ export default function Home() {
           <span
             onClick={signOut}
             style={{
-              color: "#aaa",
+              color: "#999",
               fontSize: 11,
               cursor: "pointer",
             }}
