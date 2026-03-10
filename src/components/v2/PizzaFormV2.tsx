@@ -17,6 +17,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
 import { PricingBlock } from "./PricingBlock";
+import { StepperInput } from "@/components/StepperInput";
 import type { Ingredient } from "@/types/ingredients";
 import type { CpuByUnit } from "@/lib/offerPricing";
 
@@ -522,17 +523,11 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                     {prodPivotIng?.name ?? "—"}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                    <input
-                      type="number" inputMode="numeric" min={0} step={1}
-                      className="pivotInput"
+                    <StepperInput
                       value={prodQty}
-                      onChange={e => setProdQty(e.target.value === "" ? "" : Number(e.target.value))}
+                      onChange={setProdQty}
+                      step={1} min={0}
                       placeholder={String(prodPivotLine.qty)}
-                      style={{
-                        width: 120, height: 52, fontSize: 28, fontWeight: 800,
-                        textAlign: "center", borderRadius: 10,
-                        border: "2px solid #D97706", background: "white", fontFamily: "inherit",
-                      }}
                     />
                     <span style={{ fontSize: 16, color: "#6f6a61", fontWeight: 600 }}>{prodPivotLine.unit}</span>
                   </div>
@@ -608,11 +603,10 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                 {doughRecipeId && (
                   <div>
                     <label className="label">Poids pâton (g)</label>
-                    <input
-                      className="input" type="number" min={0} step={1}
+                    <StepperInput
                       value={ballWeightG}
-                      onChange={e => setBallWeightG(e.target.value === "" ? "" : Number(e.target.value))}
-                      style={{ maxWidth: 120 }}
+                      onChange={setBallWeightG}
+                      step={1} min={0}
                     />
                     {doughCostPerBall != null && (
                       <span style={{ marginLeft: 10, fontSize: 13, color: "#6f6a61" }}>

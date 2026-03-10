@@ -1,5 +1,7 @@
 "use client";
 
+import { StepperInput } from "@/components/StepperInput";
+
 const VAT_OPTIONS = [
   { value: 0.055, label: "5,5 %" },
   { value: 0.1,   label: "10 %" },
@@ -114,11 +116,10 @@ export function PricingBlock({
         </div>
         <div>
           <label className="label">Marge %</label>
-          <input
-            className="input" type="number" min={0} max={99} step={1}
-            value={marginRate}
-            onChange={e => onMarginChange(e.target.value)}
-            style={{ textAlign: "center", fontWeight: 700 }}
+          <StepperInput
+            value={Number(marginRate) || ""}
+            onChange={v => onMarginChange(String(v))}
+            step={1} min={0} max={99}
           />
         </div>
       </div>
@@ -144,12 +145,11 @@ export function PricingBlock({
           <div style={{ borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 14, marginBottom: 14 }}>
             <label className="label">Prix de vente TTC (€)</label>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <input
-                className="input" type="number" min={0} step={0.5}
+              <StepperInput
                 value={sellPrice ?? ""}
-                onChange={e => onSellPriceChange(e.target.value === "" ? "" : Number(e.target.value))}
+                onChange={v => onSellPriceChange!(v)}
+                step={0.5} min={0}
                 placeholder="ex: 12.00"
-                style={{ maxWidth: 160, fontWeight: 700 }}
               />
               {pvPortionTTC != null && (
                 <span style={{ fontSize: 11, fontStyle: "italic", color: "#8B1A1A", whiteSpace: "nowrap" }}>

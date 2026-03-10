@@ -15,6 +15,7 @@ import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./Ingredi
 import { StepsList } from "./StepsList";
 import { useProfile } from "@/lib/ProfileContext";
 import { PricingBlock } from "./PricingBlock";
+import { StepperInput } from "@/components/StepperInput";
 import type { Ingredient } from "@/types/ingredients";
 import type { CpuByUnit } from "@/lib/offerPricing";
 
@@ -489,17 +490,11 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                     {prodPivotIng?.name ?? "—"}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                    <input
-                      type="number" inputMode="numeric" min={0} step={0.1}
-                      className="pivotInput"
+                    <StepperInput
                       value={prodQty}
-                      onChange={e => setProdQty(e.target.value === "" ? "" : Number(e.target.value))}
+                      onChange={setProdQty}
+                      step={0.1} min={0}
                       placeholder={String(prodPivotLine.qty)}
-                      style={{
-                        width: 120, height: 52, fontSize: 28, fontWeight: 800,
-                        textAlign: "center", borderRadius: 10,
-                        border: "2px solid #D97706", background: "white", fontFamily: "inherit",
-                      }}
                     />
                     <span style={{ fontSize: 16, color: "#6f6a61", fontWeight: 600 }}>{prodPivotLine.unit}</span>
                   </div>

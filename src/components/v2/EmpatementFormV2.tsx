@@ -8,6 +8,7 @@ import { TopNav } from "@/components/TopNav";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { StepsList } from "./StepsList";
 import { PricingBlock } from "./PricingBlock";
+import { StepperInput } from "@/components/StepperInput";
 import { useProfile } from "@/lib/ProfileContext";
 import { calculerPate, type EmpatementType, type FlourMixItem } from "@/lib/pateEngine";
 import type { Ingredient } from "@/types/ingredients";
@@ -371,17 +372,11 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                     {prodPivotItem.name}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                    <input
-                      type="number" inputMode="numeric" min={0} step={1}
-                      className="pivotInput"
+                    <StepperInput
                       value={prodQty}
-                      onChange={e => setProdQty(e.target.value === "" ? "" : Number(e.target.value))}
+                      onChange={setProdQty}
+                      step={1} min={0}
                       placeholder={String(roundG(prodPivotItem.qty))}
-                      style={{
-                        width: 120, height: 52, fontSize: 28, fontWeight: 800,
-                        textAlign: "center", borderRadius: 10,
-                        border: "2px solid #D97706", background: "white", fontFamily: "inherit",
-                      }}
                     />
                     <span style={{ fontSize: 16, color: "#6f6a61", fontWeight: 600 }}>{prodPivotItem.unit}</span>
                   </div>
@@ -467,18 +462,18 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                   <div>
                     <label className="label">Nombre de pâtons</label>
-                    <input
-                      type="number" min={1} step={1} value={nbPatons}
-                      onChange={e => setNbPatons(Math.max(1, Number(e.target.value)))}
-                      className="input" style={{ maxWidth: 100 }}
+                    <StepperInput
+                      value={nbPatons}
+                      onChange={v => setNbPatons(v === "" ? 1 : v)}
+                      step={1} min={1}
                     />
                   </div>
                   <div>
                     <label className="label">Poids pâton (g)</label>
-                    <input
-                      type="number" min={50} step={1} value={poidsPaton}
-                      onChange={e => setPoidsPaton(Math.max(50, Number(e.target.value)))}
-                      className="input" style={{ maxWidth: 100 }}
+                    <StepperInput
+                      value={poidsPaton}
+                      onChange={v => setPoidsPaton(v === "" ? 50 : v)}
+                      step={1} min={50}
                     />
                   </div>
                 </div>
@@ -501,11 +496,10 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                 ].map(p => (
                   <div key={p.label}>
                     <label className="label">{p.label}</label>
-                    <input
-                      type="number" min={p.min} max={p.max} step={0.1}
+                    <StepperInput
                       value={p.value}
-                      onChange={e => p.set(Number(e.target.value))}
-                      className="input"
+                      onChange={v => p.set(v === "" ? p.min : v)}
+                      step={0.1} min={p.min} max={p.max}
                     />
                   </div>
                 ))}
@@ -539,13 +533,12 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                     </div>
                   )}
                   {useTwoFlours && (
-                    <div style={{ width: 80 }}>
+                    <div style={{ width: 140 }}>
                       <label className="label">% farine 1</label>
-                      <input
-                        type="number" min={0} max={100} step={5}
+                      <StepperInput
                         value={flour1Pct}
-                        onChange={e => setFlour1Pct(Math.max(0, Math.min(100, Number(e.target.value))))}
-                        className="input"
+                        onChange={v => setFlour1Pct(v === "" ? 0 : v)}
+                        step={5} min={0} max={100}
                       />
                     </div>
                   )}

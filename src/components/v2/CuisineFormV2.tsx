@@ -17,6 +17,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
 import { PricingBlock } from "./PricingBlock";
+import { StepperInput } from "@/components/StepperInput";
 import type { Ingredient, Category } from "@/types/ingredients";
 import type { CpuByUnit } from "@/lib/offerPricing";
 
@@ -619,18 +620,11 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                     {prodPivotIng?.name ?? "—"}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                    <input
-                      type="number" inputMode="numeric" min={0} step={1}
-                      className="pivotInput"
+                    <StepperInput
                       value={prodQty}
-                      onChange={e => setProdQty(e.target.value === "" ? "" : Number(e.target.value))}
+                      onChange={setProdQty}
+                      step={1} min={0}
                       placeholder={String(prodPivotLine.qty)}
-                      style={{
-                        width: 120, height: 52, fontSize: 28, fontWeight: 800,
-                        textAlign: "center", borderRadius: 10,
-                        border: "2px solid #D97706", background: "white",
-                        fontFamily: "inherit",
-                      }}
                     />
                     <span style={{ fontSize: 16, color: "#6f6a61", fontWeight: 600 }}>{prodPivotLine.unit}</span>
                   </div>
@@ -728,12 +722,11 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                   <div>
                     <label className="label">Rendement (g)</label>
                     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                      <input
-                        className="input" type="number" min={0} step={1}
+                      <StepperInput
                         value={yieldGrams}
-                        onChange={e => setYieldGrams(e.target.value === "" ? "" : Number(e.target.value))}
+                        onChange={setYieldGrams}
+                        step={50} min={0}
                         placeholder="ex: 1000"
-                        style={{ width: 100 }}
                       />
                       {totalWeightG > 0 && (
                         <button
@@ -751,12 +744,11 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                   </div>
                   <div>
                     <label className="label">Portions</label>
-                    <input
-                      className="input" type="number" min={0} step={1}
+                    <StepperInput
                       value={portionsCount}
-                      onChange={e => setPortionsCount(e.target.value === "" ? "" : Number(e.target.value))}
+                      onChange={setPortionsCount}
+                      step={1} min={1}
                       placeholder="ex: 4"
-                      style={{ width: 90 }}
                     />
                   </div>
                 </div>

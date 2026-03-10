@@ -4,6 +4,7 @@ import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-p
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import type { Ingredient } from "@/types/ingredients";
 import type { CpuByUnit } from "@/lib/offerPricing";
+import { StepperInput } from "@/components/StepperInput";
 
 export interface IngredientLine {
   id: string;
@@ -170,21 +171,11 @@ export function IngredientListDnD({
                         </div>
 
                         {/* Qty */}
-                        <input
-                          type="number"
+                        <StepperInput
                           value={line.qty}
-                          min={0}
-                          step="any"
-                          onChange={e => {
-                            const v = e.target.value === "" ? "" : parseFloat(e.target.value);
-                            updateLine(line.id, { qty: v as number | "" });
-                          }}
+                          onChange={v => updateLine(line.id, { qty: v })}
+                          step={1} min={0}
                           placeholder="Qté"
-                          style={{
-                            width: 72, height: 34, borderRadius: 8,
-                            border: "1px solid rgba(217,199,182,0.8)", padding: "0 8px",
-                            fontSize: 14, background: "rgba(255,255,255,0.8)",
-                          }}
                         />
 
                         {/* Unit */}
