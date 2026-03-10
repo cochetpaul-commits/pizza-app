@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 
 interface Props {
   value: number | "";
@@ -21,14 +21,9 @@ export function StepperInput({
   placeholder,
   disabled,
 }: Props) {
-  const [draft, setDraft] = useState(value === "" ? "" : String(value));
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (document.activeElement !== inputRef.current) {
-      setDraft(value === "" ? "" : String(value));
-    }
-  }, [value]);
 
   function clamp(v: number): number {
     let r = v;
@@ -37,7 +32,13 @@ export function StepperInput({
     return r;
   }
 
+  function handleFocus() {
+    setDraft(value === "" ? "" : String(value));
+    setEditing(true);
+  }
+
   function commit() {
+    setEditing(false);
     if (draft === "" || draft === "-") {
       onChange("");
       return;
@@ -45,12 +46,10 @@ export function StepperInput({
     const n = parseFloat(draft);
     if (!Number.isFinite(n)) {
       onChange("");
-      setDraft("");
       return;
     }
     const clamped = clamp(n);
     onChange(clamped);
-    setDraft(String(clamped));
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -67,9 +66,9 @@ export function StepperInput({
     const precision = step < 1 ? String(step).split(".")[1]?.length ?? 0 : 0;
     const rounded = Number(clamped.toFixed(precision));
     onChange(rounded);
-    setDraft(String(rounded));
   }
 
+  const displayValue = editing ? draft : (value === "" ? "" : String(value));
   const atMin = min != null && (value === "" ? 0 : value) <= min;
   const atMax = max != null && (value === "" ? 0 : value) >= max;
 
@@ -98,8 +97,9 @@ export function StepperInput({
         ref={inputRef}
         type="number"
         inputMode="decimal"
-        value={draft}
+        value={displayValue}
         onChange={e => setDraft(e.target.value)}
+        onFocus={handleFocus}
         onBlur={commit}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
