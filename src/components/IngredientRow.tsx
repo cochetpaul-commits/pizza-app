@@ -22,10 +22,18 @@ import { formatIngredientPrice } from "@/lib/formatPrice";
 import { ALLERGENS, ALLERGEN_SHORT, parseAllergens } from "@/lib/allergens";
 import type { PriceAlert } from "@/lib/priceAlerts";
 
-// ─── shared input style helpers (kept in sync with page.tsx) ────────────────
-const iCls = "w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none";
-const sCls = "w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65";
-const lCls = "text-[12px] opacity-75 mb-1.5";
+// ─── shared input style helpers ─────────────────────────────────────────────
+const inputStyle: CSSProperties = {
+  width: "100%", height: 40, borderRadius: 10,
+  border: "1.5px solid #e5ddd0", padding: "8px 12px",
+  fontSize: 13, background: "#fff", color: "#1a1a1a", outline: "none",
+};
+const selectStyle: CSSProperties = {
+  ...inputStyle,
+  appearance: "none", WebkitAppearance: "none" as CSSProperties["WebkitAppearance"],
+  paddingRight: 28, cursor: "pointer",
+};
+const labelStyle: CSSProperties = { fontSize: 12, opacity: 0.75, marginBottom: 6 };
 
 const BTN_ACTION: CSSProperties = {
   width: 26, height: 26, borderRadius: 7, border: "none",
@@ -60,7 +68,7 @@ export const CategoryHeader = React.memo(function CategoryHeader({
       }}
     >
       <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAT_COLORS[cat], flexShrink: 0 }} />
-      <span style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: 1.5, color: "#1a1a1a" }}>{CAT_LABELS[cat]}</span>
+      <span style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: 1.5, color: "#1a1a1a" }}>{CAT_LABELS[cat]}</span>
       <span style={{ fontSize: 12, fontWeight: 400, color: "#999" }}>({count})</span>
       <span style={{ marginLeft: "auto", fontSize: 10, color: "#999" }}>{isCollapsed ? "▶" : "▼"}</span>
     </button>
@@ -249,86 +257,93 @@ export const IngredientRow = React.memo(function IngredientRow({
       {isEditing && edit && (
         <div className="grid gap-2.5" style={{ padding: "14px 16px", borderTop: "1px solid #e5ddd0", background: "#faf7f2" }}>
           <div className="grid gap-2.5" style={{ gridTemplateColumns: "2fr 1fr 1fr" }}>
-            <input className={iCls} value={edit.name} onChange={(e) => onEditChange({ ...edit, name: e.target.value })} />
-            <select className={sCls} value={edit.category} onChange={(e) => onEditChange({ ...edit, category: e.target.value as Category })}>
+            <input style={inputStyle} value={edit.name} onChange={(e) => onEditChange({ ...edit, name: e.target.value })} />
+            <select style={selectStyle} value={edit.category} onChange={(e) => onEditChange({ ...edit, category: e.target.value as Category })}>
               {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
-            <select className={sCls} value={edit.supplierId} onChange={(e) => onEditChange({ ...edit, supplierId: e.target.value })}>
+            <select style={selectStyle} value={edit.supplierId} onChange={(e) => onEditChange({ ...edit, supplierId: e.target.value })}>
               <option value="">—</option>
               {suppliers.filter((s) => s.is_active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
           {/* Nom d'import (clé stable pour matching factures) */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#888" }}>
-            <span style={{ fontWeight: 600, flexShrink: 0 }}>Nom d&apos;import :</span>
-            <span style={{ fontFamily: "monospace", background: "#ede6d9", padding: "1px 7px", borderRadius: 4, color: "#555", fontSize: 11 }}>{edit.importName}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{
+              flex: 1, display: "flex", alignItems: "center", gap: 6,
+              background: "#f5f0e8", border: "1.5px solid #e5ddd0", borderRadius: 10,
+              padding: "8px 12px", fontSize: 13, color: "#999", cursor: "not-allowed",
+            }}>
+              <span style={{ fontSize: 12 }}>🔒</span>
+              <span style={{ fontFamily: "monospace", fontSize: 12 }}>{edit.importName || "—"}</span>
+              <span style={{ fontSize: 10, color: "#bbb", marginLeft: "auto" }}>(verrouillé)</span>
+            </div>
             <button
               type="button"
               onClick={() => onEditImportName(x.id, edit.importName)}
-              style={{ fontSize: 11, padding: "1px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", color: "#888", cursor: "pointer", flexShrink: 0 }}
+              style={{ fontSize: 11, padding: "4px 10px", borderRadius: 8, border: "1.5px solid #e5ddd0", background: "white", color: "#888", cursor: "pointer", flexShrink: 0 }}
             >✎</button>
           </div>
           <div className="grid grid-cols-2 gap-2.5 items-center">
             <div className="flex items-center gap-2.5">
               <span className="font-extrabold">Offre fournisseur</span>
               <label className="flex items-center gap-2">
-                <input type="checkbox" checked={edit.useOffer} onChange={(e) => onEditChange({ ...edit, useOffer: e.target.checked })} />
+                <input type="checkbox" checked={edit.useOffer} onChange={(e) => onEditChange({ ...edit, useOffer: e.target.checked })} style={{ accentColor: "#8B1A1A" }} />
                 <span className="muted">recommandé</span>
               </label>
             </div>
-            <select className={sCls} value={edit.is_active ? "1" : "0"} onChange={(e) => onEditChange({ ...edit, is_active: e.target.value === "1" })}>
+            <select style={selectStyle} value={edit.is_active ? "1" : "0"} onChange={(e) => onEditChange({ ...edit, is_active: e.target.value === "1" })}>
               <option value="1">Actif</option><option value="0">Inactif</option>
             </select>
           </div>
           {edit.useOffer && (
             <>
-              <div><div className={lCls}>Mode prix</div>
-                <select className={sCls} value={edit.priceKind} onChange={(e) => onEditChange({ ...edit, priceKind: e.target.value as PriceKind })}>
+              <div><div style={labelStyle}>Mode prix</div>
+                <select style={selectStyle} value={edit.priceKind} onChange={(e) => onEditChange({ ...edit, priceKind: e.target.value as PriceKind })}>
                   <option value="unit">Unitaire</option><option value="pack_simple">Pack</option><option value="pack_composed">Pack composé</option>
                 </select>
               </div>
               {edit.priceKind === "unit" && (
                 <>
                   <div className="grid grid-cols-2 gap-2.5">
-                    <input className={iCls} placeholder="Prix unitaire" value={edit.unitPrice} onChange={(e) => onEditChange({ ...edit, unitPrice: e.target.value })} />
-                    <select className={sCls} value={edit.unit} onChange={(e) => onEditChange({ ...edit, unit: e.target.value as "kg" | "l" | "pc" })}>
+                    <input style={inputStyle} placeholder="Prix unitaire" value={edit.unitPrice} onChange={(e) => onEditChange({ ...edit, unitPrice: e.target.value })} />
+                    <select style={selectStyle} value={edit.unit} onChange={(e) => onEditChange({ ...edit, unit: e.target.value as "kg" | "l" | "pc" })}>
                       <option value="kg">kg</option><option value="l">L</option><option value="pc">pc</option>
                     </select>
                   </div>
-                  {edit.unit === "l" && <input className={iCls} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => onEditChange({ ...edit, density: e.target.value })} />}
-                  {edit.unit === "pc" && <input className={iCls} placeholder="Poids pièce (g)" value={edit.pieceWeightG} onChange={(e) => onEditChange({ ...edit, pieceWeightG: e.target.value })} />}
-                  {edit.unit === "pc" && <input className={iCls} placeholder="Volume pièce (ml)" value={edit.pieceVolumeMl} onChange={(e) => onEditChange({ ...edit, pieceVolumeMl: e.target.value })} />}
+                  {edit.unit === "l" && <input style={inputStyle} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => onEditChange({ ...edit, density: e.target.value })} />}
+                  {edit.unit === "pc" && <input style={inputStyle} placeholder="Poids pièce (g)" value={edit.pieceWeightG} onChange={(e) => onEditChange({ ...edit, pieceWeightG: e.target.value })} />}
+                  {edit.unit === "pc" && <input style={inputStyle} placeholder="Volume pièce (ml)" value={edit.pieceVolumeMl} onChange={(e) => onEditChange({ ...edit, pieceVolumeMl: e.target.value })} />}
                   <div className="muted text-[12px]">{previewEditPack || "—"}</div>
                 </>
               )}
               {edit.priceKind === "pack_simple" && (
                 <>
                   <div className="grid grid-cols-3 gap-2.5">
-                    <input className={iCls} placeholder="Prix pack (€)" value={edit.packPrice} onChange={(e) => onEditChange({ ...edit, packPrice: e.target.value })} />
-                    <input className={iCls} placeholder="Qté totale (kg/L)" value={edit.packTotalQty} onChange={(e) => onEditChange({ ...edit, packTotalQty: e.target.value })} />
-                    <select className={sCls} value={edit.packUnit} onChange={(e) => onEditChange({ ...edit, packUnit: e.target.value as "kg" | "l" })}>
+                    <input style={inputStyle} placeholder="Prix pack (€)" value={edit.packPrice} onChange={(e) => onEditChange({ ...edit, packPrice: e.target.value })} />
+                    <input style={inputStyle} placeholder="Qté totale (kg/L)" value={edit.packTotalQty} onChange={(e) => onEditChange({ ...edit, packTotalQty: e.target.value })} />
+                    <select style={selectStyle} value={edit.packUnit} onChange={(e) => onEditChange({ ...edit, packUnit: e.target.value as "kg" | "l" })}>
                       <option value="kg">kg</option><option value="l">L</option>
                     </select>
                   </div>
-                  {edit.packUnit === "l" && <input className={iCls} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => onEditChange({ ...edit, density: e.target.value })} />}
+                  {edit.packUnit === "l" && <input style={inputStyle} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => onEditChange({ ...edit, density: e.target.value })} />}
                   <div className="muted text-[12px]">{previewEditPack || "—"}</div>
                 </>
               )}
               {edit.priceKind === "pack_composed" && (
                 <>
                   <div className="grid grid-cols-2 gap-2.5">
-                    <input className={iCls} placeholder="Prix pack (€)" value={edit.packPrice} onChange={(e) => onEditChange({ ...edit, packPrice: e.target.value })} />
-                    <input className={iCls} placeholder="Nombre d'unités (ex: 8)" value={edit.packCount} onChange={(e) => onEditChange({ ...edit, packCount: e.target.value })} />
+                    <input style={inputStyle} placeholder="Prix pack (€)" value={edit.packPrice} onChange={(e) => onEditChange({ ...edit, packPrice: e.target.value })} />
+                    <input style={inputStyle} placeholder="Nombre d'unités (ex: 8)" value={edit.packCount} onChange={(e) => onEditChange({ ...edit, packCount: e.target.value })} />
                   </div>
                   <div className="grid grid-cols-2 gap-2.5">
-                    <select className={sCls} value={edit.packEachUnit} onChange={(e) => onEditChange({ ...edit, packEachUnit: e.target.value as "kg" | "l" | "pc" })}>
+                    <select style={selectStyle} value={edit.packEachUnit} onChange={(e) => onEditChange({ ...edit, packEachUnit: e.target.value as "kg" | "l" | "pc" })}>
                       <option value="l">L</option><option value="kg">kg</option><option value="pc">pc</option>
                     </select>
                     {edit.packEachUnit !== "pc"
-                      ? <input className={iCls} placeholder="Qté par unité (ex: 1.5)" value={edit.packEachQty} onChange={(e) => onEditChange({ ...edit, packEachQty: e.target.value })} />
-                      : <input className={iCls} placeholder="Poids pièce (g)" value={edit.packPieceWeightG} onChange={(e) => onEditChange({ ...edit, packPieceWeightG: e.target.value })} />}
+                      ? <input style={inputStyle} placeholder="Qté par unité (ex: 1.5)" value={edit.packEachQty} onChange={(e) => onEditChange({ ...edit, packEachQty: e.target.value })} />
+                      : <input style={inputStyle} placeholder="Poids pièce (g)" value={edit.packPieceWeightG} onChange={(e) => onEditChange({ ...edit, packPieceWeightG: e.target.value })} />}
                   </div>
-                  {edit.packEachUnit === "l" && <input className={iCls} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => onEditChange({ ...edit, density: e.target.value })} />}
+                  {edit.packEachUnit === "l" && <input style={inputStyle} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => onEditChange({ ...edit, density: e.target.value })} />}
                   <div className="muted text-[12px]">{previewEditPack || "—"}</div>
                 </>
               )}
