@@ -31,12 +31,28 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     async function fetchProfile(userId: string) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("profiles")
         .select("role, display_name")
         .eq("id", userId)
         .maybeSingle();
       if (cancelled) return;
+      if (error) {
+        console.error("[ProfileProvider] fetch error:", error.message);
+        // RLS or network error — don't default to cuisine, retry once via RPC
+        const { data: rpcRole } = await supabase.rpc("user_role");
+        if (cancelled) return;
+        if (rpcRole) {
+          setRole(rpcRole as Role);
+          setDisplayName(null);
+        } else {
+          // Genuine failure — default cuisine (safest restrictive fallback)
+          setRole("cuisine");
+          setDisplayName(null);
+        }
+        setLoading(false);
+        return;
+      }
       if (data) {
         setRole(data.role as Role);
         setDisplayName(data.display_name);
