@@ -6,8 +6,13 @@ import { supabase } from "@/lib/supabaseClient";
 export default function AuthCallbackPage() {
   useEffect(() => {
     const run = async () => {
-      // If using OAuth/magic link flows, Supabase may set session from URL.
-      // For password sign-in, this page is not strictly required, but keep it for future.
+      // Detect invite flow from hash URL (type=invite)
+      const hash = window.location.hash;
+      if (hash.includes("type=invite") || hash.includes("type%3Dinvite")) {
+        window.location.href = `/auth/setup-password${hash}`;
+        return;
+      }
+
       await supabase.auth.getSession();
       window.location.href = "/";
     };

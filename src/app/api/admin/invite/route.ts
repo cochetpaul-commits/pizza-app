@@ -33,8 +33,10 @@ export async function POST(req: NextRequest) {
   }
 
   // Invite user
+  const origin = new URL(req.url).origin;
   const { data: inviteData, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-    data: { display_name: displayName || email },
+    data: { display_name: displayName || email, role },
+    redirectTo: `${origin}/auth/setup-password`,
   });
 
   if (inviteErr) return NextResponse.json({ error: inviteErr.message }, { status: 500 });
