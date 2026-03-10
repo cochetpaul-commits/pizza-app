@@ -51,7 +51,7 @@ const subtitleStyle: React.CSSProperties = {
 
 const counterStyle = (color: string): React.CSSProperties => ({
   fontSize: 28,
-  fontWeight: 600,
+  fontWeight: 700,
   color,
   lineHeight: 1,
   fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif",
