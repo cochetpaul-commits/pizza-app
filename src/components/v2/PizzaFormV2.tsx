@@ -13,6 +13,7 @@ import { offerRowToCpu } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
 import { EstablishmentPicker } from "./EstablishmentPicker";
+import { useProfile } from "@/lib/ProfileContext";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
 import { PricingBlock } from "./PricingBlock";
@@ -44,6 +45,7 @@ function truncate(s: string, n: number) { return s.length > n ? s.slice(0, n) + 
 
 export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   const router = useRouter();
+  const { canWrite: userCanWrite } = useProfile();
   const isEdit = !!pizzaId;
 
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
@@ -88,6 +90,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   // Save state
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -411,6 +414,29 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
     router.push("/recettes?tab=pizza");
   }
 
+  async function handleExportPdf() {
+    if (!pizzaId) return;
+    setPdfLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { alert("Non authentifié"); return; }
+      const res = await fetch("/api/pizzas/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ pizzaId }),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({ message: "Erreur inconnue" })); alert(`Erreur PDF: ${e.message}`); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(name || "pizza").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfLoading(false); }
+  }
+
   const title = name || (isEdit ? "Fiche pizza" : "Nouvelle pizza");
 
   if (status === "loading") {
@@ -443,13 +469,18 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
               ? { background: "#166534", color: "white", borderColor: "#166534" }
               : undefined,
           },
-          ...(!prodMode && isEdit ? [{
+          ...(isEdit ? [{
+            label: pdfLoading ? "Export…" : "Exporter PDF",
+            onClick: handleExportPdf,
+            disabled: pdfLoading,
+          }] : []),
+          ...(!prodMode && isEdit && userCanWrite ? [{
             label: "Supprimer",
             onClick: handleDelete,
             style: { color: "#d93f3f" } as React.CSSProperties,
           }] : []),
         ]}
-        primaryAction={!prodMode ? (
+        primaryAction={!prodMode && userCanWrite ? (
           <button onClick={handleSave} disabled={saving} className="btn btnPrimary">
             {saving ? "Sauvegarde…" : "Sauvegarder"}
           </button>
@@ -700,9 +731,11 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
             {/* Bottom save */}
             <div style={{ paddingBottom: 32 }}>
               {saveError && <div className="errorBox" style={{ marginBottom: 8 }}>{saveError}</div>}
-              <button onClick={handleSave} disabled={saving} className="btn btnPrimary w-full">
-                {saving ? "Sauvegarde…" : "Sauvegarder"}
-              </button>
+              {userCanWrite && (
+                <button onClick={handleSave} disabled={saving} className="btn btnPrimary w-full">
+                  {saving ? "Sauvegarde…" : "Sauvegarder"}
+                </button>
+              )}
             </div>
           </>
         )}

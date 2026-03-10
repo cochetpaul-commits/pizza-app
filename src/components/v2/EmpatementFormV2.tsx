@@ -8,6 +8,7 @@ import { TopNav } from "@/components/TopNav";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { StepsList } from "./StepsList";
 import { PricingBlock } from "./PricingBlock";
+import { useProfile } from "@/lib/ProfileContext";
 import { calculerPate, type EmpatementType, type FlourMixItem } from "@/lib/pateEngine";
 import type { Ingredient } from "@/types/ingredients";
 
@@ -32,6 +33,7 @@ interface Props { recipeId?: string; initialProdMode?: boolean; }
 
 export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
   const router = useRouter();
+  const { canWrite: userCanWrite } = useProfile();
   const isEdit = !!recipeId;
 
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
@@ -75,6 +77,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
   // Save
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   // Flour ingredients for SmartSelect
   const [flourIngredients, setFlourIngredients] = useState<Ingredient[]>([]);
@@ -260,6 +263,29 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     router.push("/recettes?tab=empatement");
   }
 
+  async function handleExportPdf() {
+    if (!recipeId) return;
+    setPdfLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { alert("Non authentifié"); return; }
+      const res = await fetch("/api/recipes/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ recipeId, nbPatons, poidsPaton }),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({ message: "Erreur inconnue" })); alert(`Erreur PDF: ${e.message}`); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(name || "empatement").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfLoading(false); }
+  }
+
   const title = name || (isEdit ? "Empâtement" : "Nouvel empâtement");
 
   if (status === "loading") {
@@ -292,13 +318,18 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
               ? { background: "#166534", color: "white", borderColor: "#166534" }
               : undefined,
           },
-          ...(!prodMode && isEdit ? [{
+          ...(isEdit ? [{
+            label: pdfLoading ? "Export…" : "Exporter PDF",
+            onClick: handleExportPdf,
+            disabled: pdfLoading,
+          }] : []),
+          ...(!prodMode && isEdit && userCanWrite ? [{
             label: "Supprimer",
             onClick: handleDelete,
             style: { color: "#d93f3f" } as React.CSSProperties,
           }] : []),
         ]}
-        primaryAction={!prodMode ? (
+        primaryAction={!prodMode && userCanWrite ? (
           <button onClick={handleSave} disabled={saving} className="btn btnPrimary">
             {saving ? "Sauvegarde…" : "Sauvegarder"}
           </button>
@@ -657,9 +688,11 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
             {/* Bottom save */}
             <div style={{ paddingBottom: 32 }}>
               {saveError && <div className="errorBox" style={{ marginBottom: 8 }}>{saveError}</div>}
-              <button onClick={handleSave} disabled={saving} className="btn btnPrimary w-full">
-                {saving ? "Sauvegarde…" : "Sauvegarder"}
-              </button>
+              {userCanWrite && (
+                <button onClick={handleSave} disabled={saving} className="btn btnPrimary w-full">
+                  {saving ? "Sauvegarde…" : "Sauvegarder"}
+                </button>
+              )}
             </div>
           </>
         )}
