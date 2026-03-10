@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { NavBar } from "@/components/NavBar";
 import { TopNav } from "@/components/TopNav";
 import { EstabBadge } from "@/components/EstabBadge";
+import { useProfile } from "@/lib/ProfileContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -300,6 +301,7 @@ function SubSection({
 // ─── Main inner component ─────────────────────────────────────────────────────
 
 function RecettesInner() {
+  const { canWrite } = useProfile();
   const [authOk, setAuthOk] = useState<boolean | null>(null);
   const [pizzas,    setPizzas]    = useState<PizzaRow[]>([]);
   const [kitchens,  setKitchens]  = useState<KitchenRow[]>([]);
@@ -531,7 +533,7 @@ function RecettesInner() {
         <Section
             title="Pizza" color={PIZZA_COLOR} count={filteredPizzas.length}
             open={secOpen.pizza} onToggle={() => toggleSec("pizza")}
-            newHref="/recettes/new/pizza"
+            newHref={canWrite ? "/recettes/new/pizza" : undefined}
           >
             {filteredPizzas.map(r => (
                 <RecipeCard
@@ -553,7 +555,7 @@ function RecettesInner() {
           <Section
             title="Cuisine" color={CUISINE_COLOR} count={filteredKitchens.length}
             open={secOpen.cuisine} onToggle={() => toggleSec("cuisine")}
-            newHref="/recettes/new/cuisine"
+            newHref={canWrite ? "/recettes/new/cuisine" : undefined}
           >
             {CUISINE_CATS.filter(cat => (kitchenByCat[cat.id]?.length ?? 0) > 0).map(cat => (
               <SubSection
@@ -590,7 +592,7 @@ function RecettesInner() {
           <Section
             title="Cocktail" color={COCKTAIL_COLOR} count={filteredCocktails.length}
             open={secOpen.cocktail} onToggle={() => toggleSec("cocktail")}
-            newHref="/recettes/new/cocktail"
+            newHref={canWrite ? "/recettes/new/cocktail" : undefined}
           >
             {filteredCocktails.map(r => (
               <RecipeCard
@@ -611,7 +613,7 @@ function RecettesInner() {
           <Section
             title="Empâtement" color={EMP_COLOR} count={filteredEmps.length}
             open={secOpen.empatement} onToggle={() => toggleSec("empatement")}
-            newHref="/recettes/new/empatement"
+            newHref={canWrite ? "/recettes/new/empatement" : undefined}
           >
             {filteredEmps.map(r => (
               <RecipeCard

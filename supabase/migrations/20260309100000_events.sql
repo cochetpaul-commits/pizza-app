@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS events (
 );
 
 ALTER TABLE events ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "events_user" ON events;
 CREATE POLICY "events_user" ON events FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- 2. Recettes liées
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS event_recipes (
 );
 
 ALTER TABLE event_recipes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "event_recipes_user" ON event_recipes;
 CREATE POLICY "event_recipes_user" ON event_recipes FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- 3. Documents
@@ -60,6 +62,7 @@ CREATE TABLE IF NOT EXISTS event_documents (
 );
 
 ALTER TABLE event_documents ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "event_documents_user" ON event_documents;
 CREATE POLICY "event_documents_user" ON event_documents FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- 4. Storage bucket
@@ -67,9 +70,12 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('event-documents', 'event-documents', true)
 ON CONFLICT (id) DO NOTHING;
 
+DROP POLICY IF EXISTS "event_docs_upload" ON storage.objects;
 CREATE POLICY "event_docs_upload" ON storage.objects FOR INSERT
   WITH CHECK (bucket_id = 'event-documents' AND auth.uid() IS NOT NULL);
+DROP POLICY IF EXISTS "event_docs_read" ON storage.objects;
 CREATE POLICY "event_docs_read" ON storage.objects FOR SELECT
   USING (bucket_id = 'event-documents');
+DROP POLICY IF EXISTS "event_docs_delete" ON storage.objects;
 CREATE POLICY "event_docs_delete" ON storage.objects FOR DELETE
   USING (bucket_id = 'event-documents' AND auth.uid() IS NOT NULL);

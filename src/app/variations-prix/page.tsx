@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { NavBar } from "@/components/NavBar";
+import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchPriceAlerts, PriceAlert, ALERT_THRESHOLD } from "@/lib/priceAlerts";
 import Link from "next/link";
@@ -268,6 +269,7 @@ export default function VariationsPrixPage() {
   });
 
   return (
+    <RequireRole allowedRoles={["admin", "direction"]}>
     <>
       <NavBar backHref="/" />
       <main className="container safe-bottom">
@@ -541,5 +543,6 @@ export default function VariationsPrixPage() {
 
       </main>
     </>
+    </RequireRole>
   );
 }

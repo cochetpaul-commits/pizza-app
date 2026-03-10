@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { NavBar } from "@/components/NavBar";
+import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
 import { CATEGORIES, CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingredients";
 import { offerRowToCpu } from "@/lib/offerPricing";
@@ -170,6 +171,7 @@ export default function EpiceriePage() {
   const sel = { padding: "7px 10px", borderRadius: 8, border: "1px solid #E8E0D0", fontSize: 13, background: "#fff", color: "#1A1A1A" };
 
   return (
+    <RequireRole allowedRoles={["admin", "direction"]}>
     <>
     <NavBar />
     <main style={{ minHeight: "100vh", background: "#FAF7F2", padding: 16, fontFamily: "inherit", overflowX: "hidden" as const, maxWidth: "100vw", position: "relative", boxSizing: "border-box" }}>
@@ -343,5 +345,6 @@ export default function EpiceriePage() {
       </div>
     </main>
     </>
+    </RequireRole>
   );
 }

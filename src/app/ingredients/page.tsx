@@ -36,6 +36,7 @@ import { detectCategoryFromName } from "@/lib/invoices/categoryDetector";
 import { PriceAlertsPanel } from "@/components/PriceAlertsPanel";
 import { parseAllergens } from "@/lib/allergens";
 import { CategoryHeader, IngredientRow, type EditState } from "@/components/IngredientRow";
+import { useProfile } from "@/lib/ProfileContext";
 import DuplicatePanel from "@/components/DuplicatePanel";
 import { detectDuplicates, type DuplicatePair } from "@/lib/duplicateDetection";
 
@@ -75,6 +76,7 @@ function SkeletonTable() {
 
 function IngredientsPageInner() {
   const router = useRouter();
+  const { canWrite: userCanWrite } = useProfile();
 
   const [q, setQ] = useState("");
   const debouncedQ = useDebounce(q, 300);
@@ -638,6 +640,7 @@ function IngredientsPageInner() {
             )}
           </button>
           {/* + Ingrédient */}
+          {userCanWrite && (
           <button
             onClick={() => {
               setShowCreateForm(v => {
@@ -650,6 +653,7 @@ function IngredientsPageInner() {
           >
             {showCreateForm ? "✕ Fermer" : "+ Ingrédient"}
           </button>
+          )}
         </div>
       </header>
 
@@ -884,10 +888,10 @@ function IngredientsPageInner() {
                             edit={editingId === x.id ? edit : null}
                             suppliers={suppliers}
                             previewEditPack={editingId === x.id ? previewEditPack : ""}
-                            onStartEdit={startEdit}
-                            onSaveEdit={saveEdit}
-                            onDelete={del}
-                            onSetStatus={setIngredientStatus}
+                            onStartEdit={userCanWrite ? startEdit : () => {}}
+                            onSaveEdit={userCanWrite ? saveEdit : () => {}}
+                            onDelete={userCanWrite ? del : () => {}}
+                            onSetStatus={userCanWrite ? setIngredientStatus : () => {}}
                             onEditChange={onEditChange}
                             onEditImportName={onEditImportName}
                           />

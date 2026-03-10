@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { NavBar } from "@/components/NavBar";
+import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
 
 type Supplier = { id: string; name: string };
@@ -67,6 +68,7 @@ export default function MercurialePage() {
   };
 
   return (
+    <RequireRole allowedRoles={["admin", "direction"]}>
     <>
     <NavBar />
     <main style={{ maxWidth: 600, margin: "0 auto", padding: "2rem" }}>
@@ -106,5 +108,6 @@ export default function MercurialePage() {
       </button>
     </main>
     </>
+    </RequireRole>
   );
 }

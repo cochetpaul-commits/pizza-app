@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchPriceAlerts } from "@/lib/priceAlerts";
+import { useProfile } from "@/lib/ProfileContext";
 
 type UpcomingEvent = {
   id: string;
@@ -101,6 +102,7 @@ const badge = (color: string): React.CSSProperties => ({
 export default function Home() {
   const [authState, setAuthState] = useState<"loading" | "ok" | "anon">("loading");
   const [counts, setCounts] = useState<Counts | null>(null);
+  const { role, displayName, isAdmin } = useProfile();
 
   useEffect(() => {
     const run = async () => {
@@ -229,7 +231,8 @@ export default function Home() {
             </div>
           </Link>
 
-          {/* ─── FACTURES ─── */}
+          {/* ─── FACTURES (admin/direction only) ─── */}
+          {role && role !== "cuisine" && (
           <Link href="/invoices" style={{ textDecoration: "none", color: "inherit" }}>
             <div style={card("#c0584a")}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -249,8 +252,10 @@ export default function Home() {
               </div>
             </div>
           </Link>
+          )}
 
-          {/* ─── FOURNISSEURS ─── */}
+          {/* ─── FOURNISSEURS (admin/direction only) ─── */}
+          {role && role !== "cuisine" && (
           <Link href="/fournisseurs" style={{ textDecoration: "none", color: "inherit" }}>
             <div style={card("#6b1a1a")}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -270,8 +275,10 @@ export default function Home() {
               </div>
             </div>
           </Link>
+          )}
 
-          {/* ─── ÉVÉNEMENTS ─── */}
+          {/* ─── ÉVÉNEMENTS (admin/direction only) ─── */}
+          {role && role !== "cuisine" && (
           <Link href="/evenements" style={{ textDecoration: "none", color: "inherit" }}>
             <div style={card("#d97706")}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -318,8 +325,10 @@ export default function Home() {
               )}
             </div>
           </Link>
+          )}
 
-          {/* ─── PILOTAGE ─── */}
+          {/* ─── PILOTAGE (admin/direction only) ─── */}
+          {role && role !== "cuisine" && (
           <Link href="/pilotage" style={{ textDecoration: "none", color: "inherit" }}>
             <div style={card("#4a4a4a")}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -336,6 +345,22 @@ export default function Home() {
               </div>
             </div>
           </Link>
+          )}
+
+          {/* ─── ADMIN (admin only) ─── */}
+          {isAdmin && (
+          <Link href="/admin/utilisateurs" style={{ textDecoration: "none", color: "inherit" }}>
+            <div style={card("#333")}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <p style={title("#333")}>ADMIN</p>
+                  <p style={subtitle}>Utilisateurs · Rôles</p>
+                </div>
+                <span style={btn("#333")}>Ouvrir →</span>
+              </div>
+            </div>
+          </Link>
+          )}
 
         </div>
       )}
@@ -343,6 +368,12 @@ export default function Home() {
       {/* ── Footer ── */}
       {authState === "ok" && (
         <div style={{ textAlign: "center", marginTop: 32, paddingBottom: 20 }}>
+          {displayName && (
+            <div style={{ fontSize: 11, color: "#bbb", marginBottom: 6 }}>
+              {displayName}
+              {role && <span style={{ marginLeft: 6, padding: "1px 6px", borderRadius: 4, background: "#f0ebe3", fontSize: 10, fontWeight: 600 }}>{role}</span>}
+            </div>
+          )}
           <span
             onClick={signOut}
             style={{

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, DM_Sans, DM_Serif_Display, Oswald } from "next/font/google";
 import "./globals.css";
+import { Providers } from "@/components/Providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -57,7 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr">
       <body className={`${geistSans.variable} ${geistMono.variable} ${dmSans.variable} ${dmSerifDisplay.variable} ${oswald.variable} antialiased`}>
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

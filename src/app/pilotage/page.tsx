@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { NavBar } from "@/components/NavBar";
+import { RequireRole } from "@/components/RequireRole";
 
 const SECTIONS = [
   { href: "/mercuriale",      label: "MERCURIALE",            sub: "Prix fournisseurs · Export PDF", color: "#92400e" },
@@ -11,6 +12,7 @@ const SECTIONS = [
 
 export default function PilotagePage() {
   return (
+    <RequireRole allowedRoles={["admin", "direction"]}>
     <>
       <NavBar />
       <main style={{ maxWidth: 600, margin: "0 auto", padding: "24px 16px 40px", boxSizing: "border-box" }}>
@@ -63,5 +65,6 @@ export default function PilotagePage() {
         </div>
       </main>
     </>
+    </RequireRole>
   );
 }

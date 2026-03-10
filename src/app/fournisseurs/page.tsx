@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { NavBar } from "@/components/NavBar";
+import { RequireRole } from "@/components/RequireRole";
 
 type SupplierRow = {
   id: string;
@@ -136,6 +137,7 @@ export default function FournisseursPage() {
   }
 
   return (
+    <RequireRole allowedRoles={["admin", "direction"]}>
     <>
       <NavBar />
       <main style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
@@ -170,5 +172,6 @@ export default function FournisseursPage() {
         )}
       </main>
     </>
+    </RequireRole>
   );
 }

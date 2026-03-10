@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { NavBar } from "@/components/NavBar";
+import { RequireRole } from "@/components/RequireRole";
 
 type Event = {
   id: string;
@@ -157,6 +158,7 @@ export default function EventsPage() {
   const overlaps = detectOverlaps(events);
 
   return (
+    <RequireRole allowedRoles={["admin", "direction"]}>
     <>
       <NavBar
         backHref="/"
@@ -415,5 +417,6 @@ export default function EventsPage() {
         )}
       </div>
     </>
+    </RequireRole>
   );
 }
