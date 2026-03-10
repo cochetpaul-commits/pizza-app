@@ -110,8 +110,9 @@ export default function PilotagePage() {
   }
 
   useEffect(() => {
-    loadAll();
-    const iv = setInterval(loadAll, 5 * 60 * 1000); // refresh toutes les 5 min
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadAll();
+    const iv = setInterval(() => { void loadAll(); }, 5 * 60 * 1000);
     return () => clearInterval(iv);
   }, []);
 
