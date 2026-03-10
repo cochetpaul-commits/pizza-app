@@ -164,7 +164,7 @@ export default function EventsPage() {
         backHref="/"
         backLabel="Dashboard"
         primaryAction={
-          <Link href="/evenements/new" className="btn btnPrimary" style={{ background: "#7a4a2a", borderColor: "#7a4a2a" }}>
+          <Link href="/evenements/new" className="btn btnPrimary" style={{ background: "#D4775A", borderColor: "#D4775A" }}>
             + Événement
           </Link>
         }
@@ -184,9 +184,9 @@ export default function EventsPage() {
                 padding: "6px 14px",
                 borderRadius: 8,
                 border: "1.5px solid",
-                borderColor: view === v ? "#7a4a2a" : "#ddd6c8",
+                borderColor: view === v ? "#D4775A" : "#ddd6c8",
                 background: view === v ? "rgba(122,74,42,0.08)" : "#fff",
-                color: view === v ? "#7a4a2a" : "#6f6a61",
+                color: view === v ? "#D4775A" : "#6f6a61",
                 fontWeight: 700,
                 fontSize: 13,
                 cursor: "pointer",
@@ -208,7 +208,7 @@ export default function EventsPage() {
                   padding: "6px 14px",
                   borderRadius: 8,
                   border: "1px solid #ddd6c8",
-                  background: filter === f ? "#7a4a2a" : "#fff",
+                  background: filter === f ? "#D4775A" : "#fff",
                   color: filter === f ? "#fff" : "#2f3a33",
                   fontWeight: 700,
                   fontSize: 13,
@@ -289,7 +289,7 @@ export default function EventsPage() {
                     }}>
                       <div style={{
                         fontSize: 12, fontWeight: isToday ? 800 : 500,
-                        color: isToday ? "#7a4a2a" : "#6f6a61",
+                        color: isToday ? "#D4775A" : "#6f6a61",
                         marginBottom: 3,
                       }}>
                         {day}
@@ -338,7 +338,7 @@ export default function EventsPage() {
         {!loading && view === "list" && filtered.length === 0 && (
           <div className="card" style={{ textAlign: "center", padding: "2rem" }}>
             <p className="muted">Aucun événement</p>
-            <Link href="/evenements/new" className="btn btnPrimary" style={{ marginTop: 12, background: "#7a4a2a", borderColor: "#7a4a2a" }}>
+            <Link href="/evenements/new" className="btn btnPrimary" style={{ marginTop: 12, background: "#D4775A", borderColor: "#D4775A" }}>
               Créer le premier
             </Link>
           </div>

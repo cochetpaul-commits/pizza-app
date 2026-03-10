@@ -93,7 +93,7 @@ const badgeStyle = (color: string): React.CSSProperties => ({
 
 const cardAtelier: React.CSSProperties = {
   background: "#f5ede4",
-  borderLeft: "4px solid #7a4a2a",
+  borderLeft: "4px solid #D4775A",
   borderRadius: 14,
   padding: "18px 20px",
   cursor: "pointer",
@@ -124,7 +124,7 @@ const cardFournisseurs: React.CSSProperties = {
 
 const cardEvenements: React.CSSProperties = {
   background: "#f5ede4",
-  borderLeft: "4px solid #7a4a2a",
+  borderLeft: "4px solid #D4775A",
   borderRadius: 14,
   padding: "18px 20px",
   cursor: "pointer",
@@ -276,7 +276,7 @@ export default function Home() {
               fontSize: 22,
               fontWeight: 600,
               fontStyle: "italic",
-              color: "#7a4a2a",
+              color: "#D4775A",
               lineHeight: 1.1,
             }}>
               iFratelli
@@ -303,7 +303,7 @@ export default function Home() {
         <div style={{ ...cardCatalogue, textAlign: "center", cursor: "default" }}>
           <p style={{ margin: 0, fontSize: 13, color: "#999" }}>Connecte-toi pour accéder aux fiches.</p>
           <div style={{ marginTop: 12 }}>
-            <Link href="/login" style={btnStyle("#7a4a2a")}>Se connecter</Link>
+            <Link href="/login" style={btnStyle("#D4775A")}>Se connecter</Link>
           </div>
         </div>
       )}
@@ -317,17 +317,17 @@ export default function Home() {
             <div style={cardAtelier}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <p style={titleStyle("#7a4a2a")}>ATELIER</p>
+                  <p style={titleStyle("#D4775A")}>ATELIER</p>
                   <p style={subtitleStyle}>Pizza · Empâtement · Cuisine · Cocktail</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && (
-                    <span style={counterStyle("#7a4a2a")}>
+                    <span style={counterStyle("#D4775A")}>
                       {counts.recettes}
                       <span style={counterSuffix}>fiches</span>
                     </span>
                   )}
-                  <span style={btnStyle("#7a4a2a")}>Ouvrir →</span>
+                  <span style={btnStyle("#D4775A")}>Ouvrir →</span>
                 </div>
               </div>
             </div>
@@ -339,7 +339,7 @@ export default function Home() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <p style={titleStyle("#7a4a2a")}>CATALOGUE</p>
+                    <p style={titleStyle("#D4775A")}>CATALOGUE</p>
                     {counts && counts.toCheck > 0 && (
                       <span style={badgeStyle("#EA580C")}>{counts.toCheck} à vérifier</span>
                     )}
@@ -348,12 +348,12 @@ export default function Home() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && (
-                    <span style={counterStyle("#7a4a2a")}>
+                    <span style={counterStyle("#D4775A")}>
                       {counts.ingredients}
                       <span style={counterSuffix}>réf.</span>
                     </span>
                   )}
-                  <span style={btnStyle("#7a4a2a")}>Ouvrir →</span>
+                  <span style={btnStyle("#D4775A")}>Ouvrir →</span>
                 </div>
               </div>
             </div>
@@ -368,17 +368,17 @@ export default function Home() {
             <div style={cardFactures}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <p style={titleStyle("#7a4a2a")}>FACTURES</p>
+                  <p style={titleStyle("#D4775A")}>FACTURES</p>
                   <p style={subtitleStyle}>Import fournisseurs · Mise à jour prix</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && counts.lastImport && (
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#7a4a2a" }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#D4775A" }}>
                       {counts.lastImportSupplier ? `${counts.lastImportSupplier} · ` : ""}
                       {fmtDateShort(counts.lastImport)}
                     </span>
                   )}
-                  <span style={btnStyle("#7a4a2a")}>Ouvrir →</span>
+                  <span style={btnStyle("#D4775A")}>Ouvrir →</span>
                 </div>
               </div>
             </div>
@@ -391,17 +391,17 @@ export default function Home() {
             <div style={cardFournisseurs}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <p style={titleStyle("#7a4a2a")}>FOURNISSEURS</p>
+                  <p style={titleStyle("#D4775A")}>FOURNISSEURS</p>
                   <p style={subtitleStyle}>Fiches · Coordonnées · Historique</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && (
-                    <span style={counterStyle("#7a4a2a")}>
+                    <span style={counterStyle("#D4775A")}>
                       {counts.suppliers}
                       <span style={counterSuffix}>actifs</span>
                     </span>
                   )}
-                  <span style={btnStyle("#7a4a2a")}>Ouvrir →</span>
+                  <span style={btnStyle("#D4775A")}>Ouvrir →</span>
                 </div>
               </div>
             </div>
@@ -415,21 +415,21 @@ export default function Home() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <p style={titleStyle("#7a4a2a")}>ÉVÉNEMENTS</p>
+                    <p style={titleStyle("#D4775A")}>ÉVÉNEMENTS</p>
                     {counts && counts.upcomingEvents.length > 0 && (
-                      <span style={badgeStyle("#7a4a2a")}>{counts.upcomingEvents.length} à venir</span>
+                      <span style={badgeStyle("#D4775A")}>{counts.upcomingEvents.length} à venir</span>
                     )}
                   </div>
                   <p style={subtitleStyle}>Mariages · Séminaires · Traiteur</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && counts.upcomingEvents.length > 0 && (
-                    <span style={counterStyle("#7a4a2a")}>
+                    <span style={counterStyle("#D4775A")}>
                       {counts.upcomingEvents.length}
                       <span style={counterSuffix}>à venir</span>
                     </span>
                   )}
-                  <span style={btnStyle("#7a4a2a")}>Ouvrir →</span>
+                  <span style={btnStyle("#D4775A")}>Ouvrir →</span>
                 </div>
               </div>
               {counts && counts.upcomingEvents.length > 0 && (
@@ -493,7 +493,7 @@ export default function Home() {
                   <p style={titleStyle("#c9b99a")}>ADMIN</p>
                   <p style={{ ...subtitleStyle, color: "#888" }}>Utilisateurs · Rôles</p>
                 </div>
-                <span style={btnStyle("#7a4a2a")}>Ouvrir →</span>
+                <span style={btnStyle("#D4775A")}>Ouvrir →</span>
               </div>
             </div>
           </Link>

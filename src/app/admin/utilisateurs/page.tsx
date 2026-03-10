@@ -21,7 +21,7 @@ const ROLE_LABELS: Record<Role, string> = {
 };
 
 const ROLE_COLORS: Record<Role, string> = {
-  admin: "#7a4a2a",
+  admin: "#D4775A",
   direction: "#4a6741",
   cuisine: "#1a1a1a",
 };
@@ -116,7 +116,7 @@ function UsersContent() {
         <div style={{ marginBottom: 24 }}>
           <p style={{
             fontSize: 10, fontWeight: 800, letterSpacing: 2,
-            color: "#7a4a2a", textTransform: "uppercase", margin: "0 0 6px",
+            color: "#D4775A", textTransform: "uppercase", margin: "0 0 6px",
           }}>ADMINISTRATION</p>
           <h1 style={{ fontSize: 24, color: "#1a1a1a", margin: 0, fontFamily: "'Oswald', sans-serif" }}>Gestion des utilisateurs</h1>
         </div>
@@ -127,7 +127,7 @@ function UsersContent() {
             onClick={() => setShowInvite(true)}
             style={{
               padding: "10px 20px", borderRadius: 10, border: "none",
-              background: "#7a4a2a", color: "#fff", fontSize: 13, fontWeight: 700,
+              background: "#D4775A", color: "#fff", fontSize: 13, fontWeight: 700,
               cursor: "pointer",
             }}
           >
@@ -202,7 +202,7 @@ function UsersContent() {
                   disabled={inviting || !inviteEmail.trim()}
                   style={{
                     padding: "9px 18px", borderRadius: 8, border: "none",
-                    background: "#7a4a2a", color: "#fff", fontSize: 13, fontWeight: 700,
+                    background: "#D4775A", color: "#fff", fontSize: 13, fontWeight: 700,
                     cursor: "pointer", opacity: inviting ? 0.6 : 1,
                   }}
                 >{inviting ? "Envoi…" : "Inviter"}</button>
@@ -213,7 +213,7 @@ function UsersContent() {
 
         {/* Error */}
         {error && (
-          <div style={{ padding: "12px 16px", borderRadius: 10, background: "#FEF2F2", border: "1px solid rgba(139,26,26,0.2)", marginBottom: 16, fontSize: 13, color: "#7a4a2a" }}>
+          <div style={{ padding: "12px 16px", borderRadius: 10, background: "#FEF2F2", border: "1px solid rgba(139,26,26,0.2)", marginBottom: 16, fontSize: 13, color: "#D4775A" }}>
             {error}
           </div>
         )}

@@ -165,9 +165,9 @@ export default function EpiceriePage() {
   }
 
   const card = { background: "#fff", border: "1px solid #E8E0D0", borderRadius: 12, padding: 16 };
-  const btnPrimary = { padding: "7px 16px", borderRadius: 8, background: "#7a4a2a", color: "#fff", fontWeight: 800, fontSize: 13, border: "none", cursor: "pointer" as const };
-  const btnSecondary = { padding: "7px 16px", borderRadius: 8, background: "transparent", color: "#7a4a2a", fontWeight: 800, fontSize: 13, border: "1px solid #7a4a2a", cursor: "pointer" as const };
-  const btnGhost = (active?: boolean) => ({ padding: "5px 12px", borderRadius: 8, background: active ? "#7a4a2a" : "transparent", color: active ? "#fff" : "#6B6257", fontWeight: 700, fontSize: 12, border: "1px solid #ddd6c8", cursor: "pointer" as const });
+  const btnPrimary = { padding: "7px 16px", borderRadius: 8, background: "#D4775A", color: "#fff", fontWeight: 800, fontSize: 13, border: "none", cursor: "pointer" as const };
+  const btnSecondary = { padding: "7px 16px", borderRadius: 8, background: "transparent", color: "#D4775A", fontWeight: 800, fontSize: 13, border: "1px solid #D4775A", cursor: "pointer" as const };
+  const btnGhost = (active?: boolean) => ({ padding: "5px 12px", borderRadius: 8, background: active ? "#D4775A" : "transparent", color: active ? "#fff" : "#6B6257", fontWeight: 700, fontSize: 12, border: "1px solid #ddd6c8", cursor: "pointer" as const });
   const sel = { padding: "7px 10px", borderRadius: 8, border: "1px solid #E8E0D0", fontSize: 13, background: "#fff", color: "#1A1A1A" };
 
   return (
@@ -185,7 +185,7 @@ export default function EpiceriePage() {
 
           {/* CATALOGUE */}
           <div className="md:sticky md:top-4" style={{ ...card, maxWidth: "100%", overflow: "hidden" }}>
-            <div style={{ fontWeight: 900, fontSize: 14, marginBottom: 12, color: "#7a4a2a", letterSpacing: 0.5, textTransform: "uppercase" }}>Catalogue</div>
+            <div style={{ fontWeight: 900, fontSize: 14, marginBottom: 12, color: "#D4775A", letterSpacing: 0.5, textTransform: "uppercase" }}>Catalogue</div>
 
             <input placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)}
               style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #E8E0D0", fontSize: 13, marginBottom: 8, boxSizing: "border-box" as const, background: "#FAF7F2" }} />
@@ -224,7 +224,7 @@ export default function EpiceriePage() {
                         </div>
                       </div>
                       <button onClick={() => addToCalc(ing)} disabled={inCalc || !hasPrice}
-                        style={{ marginLeft: 8, width: 26, height: 26, borderRadius: 6, border: "none", background: inCalc ? "#FBBF24" : hasPrice ? "#7a4a2a" : "#E5E7EB", color: inCalc ? "#fff" : hasPrice ? "#fff" : "#9CA3AF", fontWeight: 900, fontSize: 15, cursor: inCalc || !hasPrice ? "default" : "pointer" }}>
+                        style={{ marginLeft: 8, width: 26, height: 26, borderRadius: 6, border: "none", background: inCalc ? "#FBBF24" : hasPrice ? "#D4775A" : "#E5E7EB", color: inCalc ? "#fff" : hasPrice ? "#fff" : "#9CA3AF", fontWeight: 900, fontSize: 15, cursor: inCalc || !hasPrice ? "default" : "pointer" }}>
                         {inCalc ? "✓" : "+"}
                       </button>
                     </div>
@@ -238,7 +238,7 @@ export default function EpiceriePage() {
           <div style={{ maxWidth: "100%", overflow: "hidden", minWidth: 0 }}>
             {/* Réglages globaux */}
             <div style={{ ...card, marginBottom: 12 }}>
-              <div style={{ fontWeight: 900, fontSize: 14, marginBottom: 12, color: "#7a4a2a", letterSpacing: 0.5, textTransform: "uppercase" }}>Réglages globaux</div>
+              <div style={{ fontWeight: 900, fontSize: 14, marginBottom: 12, color: "#D4775A", letterSpacing: 0.5, textTransform: "uppercase" }}>Réglages globaux</div>
               <div style={{ display: "grid", gap: 12 }}>
                 {/* Ligne 1 : Coeff · TVA · Arrondi */}
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -321,7 +321,7 @@ export default function EpiceriePage() {
                           <td style={{ padding: "4px 10px", textAlign: "right", color: "#6B6257" }}>{l.priceHT.toFixed(2)} €</td>
                           <td style={{ padding: "4px 10px", textAlign: "right", color: "#374151" }}>{l.priceTTC.toFixed(2)} €</td>
                           <td style={{ padding: "4px 10px", textAlign: "right" }}>
-                            <span style={{ fontWeight: 900, fontSize: 14, color: "#7a4a2a" }}>{l.priceRounded.toFixed(2)} €</span>
+                            <span style={{ fontWeight: 900, fontSize: 14, color: "#D4775A" }}>{l.priceRounded.toFixed(2)} €</span>
                           </td>
                           <td style={{ padding: "4px 10px", textAlign: "right" }}>
                             <span style={{ fontWeight: 800, fontSize: 12, color: l.margin >= 60 ? "#166534" : l.margin >= 40 ? "#D97706" : "#DC2626" }}>{l.margin.toFixed(1)}%</span>
@@ -336,7 +336,7 @@ export default function EpiceriePage() {
                 </div>
                 <div style={{ padding: "10px 16px", borderTop: "1px solid #E8E0D0", background: "#FAF7F2", display: "flex", justifyContent: "space-between", fontSize: 12, color: "#9B8E7E" }}>
                   <span>{lines.length} produit{lines.length > 1 ? "s" : ""}</span>
-                  <span>Marge moy. : <strong style={{ color: "#7a4a2a" }}>{(lines.reduce((a, l) => a + l.margin, 0) / lines.length).toFixed(1)}%</strong></span>
+                  <span>Marge moy. : <strong style={{ color: "#D4775A" }}>{(lines.reduce((a, l) => a + l.margin, 0) / lines.length).toFixed(1)}%</strong></span>
                 </div>
               </div>
             )}

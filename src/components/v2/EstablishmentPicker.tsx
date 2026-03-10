@@ -32,9 +32,9 @@ export function EstablishmentPicker({ value, onChange }: Props) {
             style={{
               padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700,
               border: "1.5px solid",
-              borderColor: active ? "#7a4a2a" : "rgba(217,199,182,0.95)",
+              borderColor: active ? "#D4775A" : "rgba(217,199,182,0.95)",
               background: active ? "rgba(139,26,26,0.08)" : "rgba(255,255,255,0.7)",
-              color: active ? "#7a4a2a" : "#6f6a61",
+              color: active ? "#D4775A" : "#6f6a61",
               cursor: "pointer", transition: "all 0.12s",
             }}
           >

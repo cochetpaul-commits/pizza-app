@@ -93,7 +93,7 @@ export function PivotPanel({ items, ingredients, enabled, onToggle }: Props) {
                     return (
                       <div key={l.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                         <span style={{ color: "#2f3a33", fontWeight: 600 }}>{ing?.name ?? l.ingredient_id}</span>
-                        <span style={{ fontWeight: 800, color: "#7a4a2a" }}>
+                        <span style={{ fontWeight: 800, color: "#D4775A" }}>
                           {fmtQty(scaledQty)} {l.unit}
                         </span>
                       </div>

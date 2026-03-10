@@ -12,7 +12,7 @@ export function TopNav({ title, subtitle, eyebrow }: TopNavProps) {
       {eyebrow && (
         <p style={{
           margin: "0 0 4px", fontSize: 9, fontWeight: 700,
-          letterSpacing: 3, textTransform: "uppercase", color: "#7a4a2a",
+          letterSpacing: 3, textTransform: "uppercase", color: "#D4775A",
         }}>
           {eyebrow}
         </p>

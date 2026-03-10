@@ -17,7 +17,7 @@ const EVENT_TYPES = [
 ];
 
 const STATUSES = [
-  { value: "prospect", label: "Prospect", color: "#7a4a2a" },
+  { value: "prospect", label: "Prospect", color: "#D4775A" },
   { value: "confirme", label: "Confirmé", color: "#4a6741" },
   { value: "en_cours", label: "En cours", color: "#2563eb" },
   { value: "termine", label: "Terminé", color: "#999999" },
@@ -89,7 +89,7 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
-const sectionTitle = (label: string, color = "#7a4a2a"): React.ReactNode => (
+const sectionTitle = (label: string, color = "#D4775A"): React.ReactNode => (
   <p style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, letterSpacing: 1, color, textTransform: "uppercase" }}>
     {label}
   </p>
@@ -394,7 +394,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
         primaryAction={
           <button
             className="btn btnPrimary"
-            style={{ background: "#7a4a2a", borderColor: "#7a4a2a" }}
+            style={{ background: "#D4775A", borderColor: "#D4775A" }}
             onClick={handleSave}
             disabled={saving}
           >
@@ -506,7 +506,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
                       fontWeight: 700,
                       fontSize: 12,
                       cursor: "pointer",
-                      background: establishment === v ? (v === "bellomio" ? "#7a4a2a" : v === "piccola" ? "#643d22" : "#6B7280") : "#fff",
+                      background: establishment === v ? (v === "bellomio" ? "#D4775A" : v === "piccola" ? "#643d22" : "#6B7280") : "#fff",
                       color: establishment === v ? "#fff" : "#6f6a61",
                     }}
                   >
@@ -548,7 +548,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
 
         {/* ═══ 3. RECETTES LIÉES ═══ */}
         <div style={sectionStyle}>
-          {sectionTitle("Recettes liées", "#7a4a2a")}
+          {sectionTitle("Recettes liées", "#D4775A")}
 
           {/* Add recipe */}
           <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
@@ -570,7 +570,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
             <button
               type="button"
               className="btn btnPrimary"
-              style={{ background: "#7a4a2a", borderColor: "#7a4a2a", flexShrink: 0 }}
+              style={{ background: "#D4775A", borderColor: "#D4775A", flexShrink: 0 }}
               onClick={addRecipe}
               disabled={!addRecipeId}
             >
@@ -694,7 +694,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
 
         {/* ═══ 4. DOCUMENTS ═══ */}
         <div style={sectionStyle}>
-          {sectionTitle("Documents", "#7a4a2a")}
+          {sectionTitle("Documents", "#D4775A")}
 
           {!isNew && (
             <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
@@ -759,7 +759,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
                   style={{
                     padding: "4px 10px",
                     borderRadius: 6,
-                    background: "#7a4a2a",
+                    background: "#D4775A",
                     color: "#fff",
                     fontSize: 11,
                     fontWeight: 700,

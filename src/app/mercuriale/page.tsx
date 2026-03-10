@@ -77,7 +77,7 @@ export default function MercurialePage() {
       <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, padding: 20, marginBottom: 12 }}>
         <div style={{ fontWeight: 700, marginBottom: 10, color: "#374151", fontSize: 13 }}>Établissement</div>
         <div style={{ display: "flex", gap: 8 }}>
-          {([["all", "Tous", "#999999"], ["bellomio", "Bello Mio", "#7a4a2a"], ["piccola", "Piccola Mia", "#6B1B1B"]] as const).map(([v, label, color]) => (
+          {([["all", "Tous", "#999999"], ["bellomio", "Bello Mio", "#D4775A"], ["piccola", "Piccola Mia", "#6B1B1B"]] as const).map(([v, label, color]) => (
             <button key={v} onClick={() => setEstablishment(v)} style={btnStyle(establishment === v, color)}>{label}</button>
           ))}
         </div>
@@ -103,7 +103,7 @@ export default function MercurialePage() {
       {error && <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: 12, marginBottom: 16, color: "#991b1b", fontSize: 13 }}>{error}</div>}
 
       <button onClick={downloadPdf} disabled={loading}
-        style={{ width: "100%", padding: "14px", borderRadius: 12, background: "#7a4a2a", color: "#fff", fontWeight: 900, fontSize: 16, border: "none", cursor: loading ? "wait" : "pointer", opacity: loading ? 0.7 : 1 }}>
+        style={{ width: "100%", padding: "14px", borderRadius: 12, background: "#D4775A", color: "#fff", fontWeight: 900, fontSize: 16, border: "none", cursor: loading ? "wait" : "pointer", opacity: loading ? 0.7 : 1 }}>
         {loading ? "Génération en cours…" : "⬇ Télécharger la mercuriale PDF"}
       </button>
     </main>

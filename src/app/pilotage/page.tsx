@@ -27,7 +27,7 @@ type MeteoData = { temp: number; description: string; emoji: string; tonight: { 
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-const ACCENT = "#7a4a2a";
+const ACCENT = "#D4775A";
 const GREEN = "#4a6741";
 const RED = "#8B1A1A";
 
@@ -91,8 +91,8 @@ const sectionLabel: React.CSSProperties = {
 };
 
 const SECTIONS = [
-  { href: "/mercuriale", label: "MERCURIALE", sub: "Prix fournisseurs · Export PDF", color: "#7a4a2a" },
-  { href: "/epicerie", label: "ÉPICERIE", sub: "Prix de vente · Export CSV", color: "#7a4a2a" },
+  { href: "/mercuriale", label: "MERCURIALE", sub: "Prix fournisseurs · Export PDF", color: "#D4775A" },
+  { href: "/epicerie", label: "ÉPICERIE", sub: "Prix de vente · Export CSV", color: "#D4775A" },
   { href: "/variations-prix", label: "VARIATIONS & ALERTES", sub: "Historique · Hausses & baisses · Veille 30 j", color: ACCENT },
 ];
 
@@ -145,7 +145,7 @@ export default function PilotagePage() {
               {meteo ? (
                 <>
                   <span style={{ fontSize: 14, fontWeight: 600, color: "#444" }}>
-                    {meteo.emoji} {meteo.temp}° <span style={{ fontWeight: 400, color: "#888", fontSize: 12 }}>{meteo.description}</span>
+                    {meteo.emoji} {meteo.temp}° <span style={{ fontWeight: 500, color: "#888", fontSize: 12 }}>{meteo.description}</span>
                   </span>
                   {meteo.tonight && (
                     <span style={{ fontSize: 12, color: "#999" }}>
@@ -171,7 +171,7 @@ export default function PilotagePage() {
                 {/* CA Semaine */}
                 <div style={card}>
                   <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#999" }}>CA semaine</p>
-                  <p style={{ margin: 0, fontSize: 26, fontWeight: 600, color: "#7a4a2a", lineHeight: 1, fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
+                  <p style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#D4775A", lineHeight: 1, fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
                     {fmtEuroInt(s.semaine.totalSales)}
                   </p>
                   {delta(s.semaine.totalSales, s.semainePrec.totalSales) && (
@@ -184,7 +184,7 @@ export default function PilotagePage() {
                 {/* Couverts */}
                 <div style={card}>
                   <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#999" }}>Couverts</p>
-                  <p style={{ margin: 0, fontSize: 26, fontWeight: 600, color: "#7a4a2a", lineHeight: 1, fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
+                  <p style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#D4775A", lineHeight: 1, fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
                     {s.semaine.guestsNumber}
                   </p>
                   {delta(s.semaine.guestsNumber, s.semainePrec.guestsNumber) && (
@@ -197,7 +197,7 @@ export default function PilotagePage() {
                 {/* Ticket moyen */}
                 <div style={card}>
                   <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#999" }}>Ticket moyen</p>
-                  <p style={{ margin: 0, fontSize: 26, fontWeight: 600, color: "#7a4a2a", lineHeight: 1, fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
+                  <p style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#D4775A", lineHeight: 1, fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
                     {fmtEuro(s.semaine.ticketMoyen)}
                   </p>
                   {delta(s.semaine.ticketMoyen, s.semainePrec.ticketMoyen) && (
@@ -210,7 +210,7 @@ export default function PilotagePage() {
                 {/* Meilleur jour */}
                 <div style={card}>
                   <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#999" }}>Meilleur jour</p>
-                  <p style={{ margin: 0, fontSize: 26, fontWeight: 600, color: "#7a4a2a", lineHeight: 1, fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
+                  <p style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#D4775A", lineHeight: 1, fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
                     {s.semaine.bestDay.label}
                   </p>
                   <p style={{ margin: "6px 0 0", fontSize: 12, fontWeight: 700, color: "#888" }}>
@@ -237,7 +237,7 @@ export default function PilotagePage() {
                       <Tooltip content={<ChartTooltip />} cursor={{ fill: "#f5f0e8" }} />
                       <Bar dataKey="totalSales" radius={[4, 4, 0, 0]} maxBarSize={42}>
                         {s.semaine.days.map((d, i) => (
-                          <Cell key={`c-${i}`} fill={d.totalSales === 0 ? "#ddd6c8" : ACCENT} />
+                          <Cell key={`c-${i}`} fill={d.totalSales === 0 ? "#ddd6c8" : RED} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -276,7 +276,7 @@ export default function PilotagePage() {
                               </div>
                             </div>
                             <div style={{ height: 4, background: "#f0ebe3", borderRadius: 2 }}>
-                              <div style={{ width: `${Math.round((p.totalSales / maxSales) * 100)}%`, height: "100%", background: i === 0 ? ACCENT : "#c9b99a", borderRadius: 2, transition: "width 0.5s" }} />
+                              <div style={{ width: `${Math.round((p.totalSales / maxSales) * 100)}%`, height: "100%", background: i === 0 ? RED : "#c9b99a", borderRadius: 2, transition: "width 0.5s" }} />
                             </div>
                           </div>
                         );

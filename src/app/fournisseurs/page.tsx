@@ -88,7 +88,7 @@ export default function FournisseursPage() {
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <Link
                 href={`/fournisseurs/${s.id}`}
-                style={{ fontWeight: 900, fontSize: 15, color: "#7a4a2a", textDecoration: "none" }}
+                style={{ fontWeight: 900, fontSize: 15, color: "#D4775A", textDecoration: "none" }}
               >
                 {s.name}
               </Link>

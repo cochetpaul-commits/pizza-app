@@ -805,7 +805,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                 onMarginChange={setMarginRate}
                 sellPrice={sellPrice}
                 onSellPriceChange={setSellPrice}
-                accentColor="#7a4a2a"
+                accentColor="#D4775A"
               />
             </div>
 

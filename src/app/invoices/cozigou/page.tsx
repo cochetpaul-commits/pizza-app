@@ -141,7 +141,7 @@ export default function CozigouInvoicePage() {
           {(["bellomio", "piccola", "both"] as const).map((v) => (
             <button key={v} onClick={() => setEstablishment(v)}
               style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #d1d5db", cursor: "pointer", fontWeight: 700, fontSize: 13,
-                background: establishment === v ? (v === "bellomio" ? "#7a4a2a" : v === "piccola" ? "#6B1B1B" : "#6B7280") : "#fff",
+                background: establishment === v ? (v === "bellomio" ? "#D4775A" : v === "piccola" ? "#6B1B1B" : "#6B7280") : "#fff",
                 color: establishment === v ? "#fff" : "#374151" }}>
               {v === "bellomio" ? "Bello Mio" : v === "piccola" ? "Piccola Mia" : "Les deux"}
             </button>
@@ -174,7 +174,7 @@ export default function CozigouInvoicePage() {
           onClick={handlePreview}
           disabled={loading}
           style={{
-            background: "#7a4a2a",
+            background: "#D4775A",
             color: "white",
             border: "none",
             borderRadius: 6,
@@ -271,7 +271,7 @@ export default function CozigouInvoicePage() {
           <p><strong>Offres insérées :</strong> {commitResult.inserted?.offers_inserted ?? 0}</p>
           <button
             onClick={() => { setFile(null); setPreview(null); setCommitResult(null); setError(null); }}
-            style={{ marginTop: "1rem", background: "#7a4a2a", color: "white", border: "none", borderRadius: 6, padding: "0.6rem 1.5rem", fontSize: "1rem", cursor: "pointer" }}
+            style={{ marginTop: "1rem", background: "#D4775A", color: "white", border: "none", borderRadius: 6, padding: "0.6rem 1.5rem", fontSize: "1rem", cursor: "pointer" }}
           >
             Importer une autre facture
           </button>

@@ -12,7 +12,7 @@ const SUPPLIERS = [
   { key: "carniato",  label: "CARNIATO",          category: "Charcuterie",       color: "#8e44ad", href: "/invoices/carniato" },
   { key: "barspirits",label: "BAR SPIRITS",       category: "Spiritueux",        color: "#16a085", href: "/invoices/barspirits" },
   { key: "sum",       label: "SUM",               category: "Divers",            color: "#7f8c8d", href: "/invoices/sum" },
-  { key: "masse",     label: "MASSE",              category: "Viande & foie gras", color: "#7a4a2a", href: "/invoices/masse" },
+  { key: "masse",     label: "MASSE",              category: "Viande & foie gras", color: "#D4775A", href: "/invoices/masse" },
   { key: "armor",     label: "ARMOR EMBALLAGES",  category: "Emballage",         color: "#f39c12", href: "/invoices/armor", fullWidth: true },
 ];
 
@@ -26,7 +26,7 @@ export default function InvoicesHubPage() {
 
         {/* Header */}
         <div style={{ marginBottom: 24 }}>
-          <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: 2, color: "#7a4a2a", textTransform: "uppercase", margin: "0 0 6px" }}>
+          <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: 2, color: "#D4775A", textTransform: "uppercase", margin: "0 0 6px" }}>
             FACTURES
           </p>
           <h1 style={{ fontSize: 24, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>

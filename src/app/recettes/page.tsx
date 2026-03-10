@@ -46,7 +46,7 @@ type SortDir = "asc" | "desc";
 
 const PIZZA_COLOR    = "#8B1A1A";  // bordeaux
 const CUISINE_COLOR  = "#4a6741";  // sauge
-const COCKTAIL_COLOR = "#7a4a2a";  // terre
+const COCKTAIL_COLOR = "#D4775A";  // terre
 const EMP_COLOR      = "#c9b99a";  // terre-light
 
 const CUISINE_CATS = [
@@ -472,9 +472,9 @@ function RecettesInner() {
                 style={{
                   padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
                   border: "1.5px solid",
-                  borderColor: estab === v ? "#7a4a2a" : "rgba(217,199,182,0.9)",
+                  borderColor: estab === v ? "#D4775A" : "rgba(217,199,182,0.9)",
                   background: estab === v ? "rgba(122,74,42,0.08)" : "rgba(255,255,255,0.7)",
-                  color: estab === v ? "#7a4a2a" : "#6f6a61",
+                  color: estab === v ? "#D4775A" : "#6f6a61",
                   cursor: "pointer",
                 }}
               >
@@ -509,7 +509,7 @@ function RecettesInner() {
               <span style={{
                 display: "inline-flex", alignItems: "center",
                 width: 38, height: 22, borderRadius: 11,
-                background: allExpanded ? "#7a4a2a" : "rgba(217,199,182,0.9)",
+                background: allExpanded ? "#D4775A" : "rgba(217,199,182,0.9)",
                 transition: "background 0.2s", flexShrink: 0, padding: "0 3px",
                 justifyContent: allExpanded ? "flex-end" : "flex-start",
               }}>
