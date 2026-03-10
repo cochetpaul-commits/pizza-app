@@ -186,7 +186,7 @@ export default function PilotagePage() {
                         width={48}
                       />
                       <Tooltip
-                        formatter={(v: number) => [fmtEuro(v), "CA"]}
+                        formatter={(v) => [fmtEuro(Number(v ?? 0)), "CA"]}
                         contentStyle={{ borderRadius: 8, border: "1px solid #e8e0d6", fontSize: 12 }}
                         cursor={{ fill: "#f5f0e8" }}
                       />
