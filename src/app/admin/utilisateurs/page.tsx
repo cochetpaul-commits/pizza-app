@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
@@ -41,32 +41,33 @@ function UsersContent() {
   const [inviting, setInviting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  const fetchToken = useCallback(async () => {
+  async function getToken() {
     const { data } = await supabase.auth.getSession();
     return data.session?.access_token ?? "";
-  }, []);
+  }
 
-  const loadUsers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    const token = await fetchToken();
-    const res = await fetch("/api/admin/users", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) {
-      setError("Erreur chargement utilisateurs");
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      const token = await getToken();
+      const res = await fetch("/api/admin/users", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (cancelled) return;
+      if (!res.ok) { setError("Erreur chargement utilisateurs"); setLoading(false); return; }
+      const data = await res.json();
+      setUsers(data.users ?? []);
       setLoading(false);
-      return;
-    }
-    const data = await res.json();
-    setUsers(data.users ?? []);
-    setLoading(false);
-  }, [fetchToken]);
-
-  useEffect(() => { loadUsers(); }, [loadUsers]);
+    })();
+    return () => { cancelled = true; };
+  }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleRoleChange(userId: string, newRole: Role) {
-    const token = await fetchToken();
+    const token = await getToken();
     await fetch("/api/admin/users", {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -76,7 +77,7 @@ function UsersContent() {
   }
 
   async function handleDelete(userId: string) {
-    const token = await fetchToken();
+    const token = await getToken();
     await fetch("/api/admin/users", {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -89,7 +90,7 @@ function UsersContent() {
   async function handleInvite() {
     if (!inviteEmail.trim()) return;
     setInviting(true);
-    const token = await fetchToken();
+    const token = await getToken();
     const res = await fetch("/api/admin/invite", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -101,7 +102,7 @@ function UsersContent() {
       setInviteEmail("");
       setInviteName("");
       setInviteRole("cuisine");
-      loadUsers();
+      setRefreshKey(k => k + 1);
     } else {
       const data = await res.json();
       alert(data.error || "Erreur invitation");
