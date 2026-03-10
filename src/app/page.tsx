@@ -92,7 +92,8 @@ const badgeStyle = (color: string): React.CSSProperties => ({
 // ── Card presets per section ────────────────────────────────────────────────
 
 const cardAtelier: React.CSSProperties = {
-  background: "#1a1a1a",
+  background: "#f5ede4",
+  borderLeft: "4px solid #7a4a2a",
   borderRadius: 14,
   padding: "18px 20px",
   cursor: "pointer",
@@ -242,13 +243,14 @@ export default function Home() {
       width: "100%",
       boxSizing: "border-box",
     }}>
-      {/* ── Header noir ── */}
+      {/* ── Header crème ── */}
       <div style={{
-        background: "#1a1a1a",
+        background: "#f2ede4",
         padding: "12px 20px",
         marginBottom: 20,
         width: "100vw",
         marginLeft: "calc(-50vw + 50%)",
+        borderBottom: "1.5px solid #1a1a1a",
       }}>
         <div style={{
           display: "flex",
@@ -261,19 +263,36 @@ export default function Home() {
             alt="iFratelli Group"
             width={48}
             height={48}
-            style={{ width: 48, height: 48, objectFit: "contain", mixBlendMode: "screen", opacity: 0.9 }}
+            style={{ height: 64, width: "auto", objectFit: "contain", mixBlendMode: "multiply" }}
             priority
           />
-          <span className="dashboard-header-text" style={{
-            fontFamily: "var(--font-cormorant), 'Cormorant Garamond', Georgia, serif",
-            fontSize: 18,
-            fontWeight: 600,
-            fontStyle: "italic",
-            color: "#c9b99a",
-            letterSpacing: 1.5,
+          <div className="dashboard-header-text" style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
           }}>
-            iFratelli Group
-          </span>
+            <span style={{
+              fontFamily: "var(--font-cormorant), 'Cormorant Garamond', Georgia, serif",
+              fontSize: 22,
+              fontWeight: 600,
+              fontStyle: "italic",
+              color: "#7a4a2a",
+              lineHeight: 1.1,
+            }}>
+              iFratelli
+            </span>
+            <span style={{
+              fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: 3,
+              textTransform: "uppercase",
+              color: "#999",
+              lineHeight: 1,
+            }}>
+              GROUP
+            </span>
+          </div>
         </div>
       </div>
 
@@ -298,12 +317,12 @@ export default function Home() {
             <div style={cardAtelier}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <p style={titleStyle("#c9b99a")}>ATELIER</p>
-                  <p style={{ ...subtitleStyle, color: "#888" }}>Pizza · Empâtement · Cuisine · Cocktail</p>
+                  <p style={titleStyle("#7a4a2a")}>ATELIER</p>
+                  <p style={subtitleStyle}>Pizza · Empâtement · Cuisine · Cocktail</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && (
-                    <span style={counterStyle("#c9b99a")}>
+                    <span style={counterStyle("#7a4a2a")}>
                       {counts.recettes}
                       <span style={counterSuffix}>fiches</span>
                     </span>
