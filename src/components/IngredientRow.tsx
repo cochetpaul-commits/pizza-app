@@ -245,7 +245,7 @@ export const IngredientRow = React.memo(function IngredientRow({
             <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
               {st !== "validated" && <button onClick={() => { if (!canValidate) return; onSetStatus(x.id, "validated"); }} disabled={!canValidate} style={{ flex: 1, height: 30, borderRadius: 7, border: "1px solid #4a6741", background: "rgba(74,103,65,0.08)", fontSize: 11, fontWeight: 700, cursor: canValidate ? "pointer" : "not-allowed", color: "#4a6741", opacity: !canValidate ? 0.4 : 1 }}>Valider</button>}
               {!isEditing
-                ? <button onClick={() => onStartEdit(x)} style={{ flex: 1, height: 30, borderRadius: 7, border: "none", background: "#8B1A1A", color: "white", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Modifier</button>
+                ? <button onClick={() => onStartEdit(x)} style={{ flex: 1, height: 30, borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", color: "#8B1A1A", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Modifier</button>
                 : <button onClick={onSaveEdit} style={{ flex: 1, height: 30, borderRadius: 7, border: "none", background: "#4a6741", color: "white", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>OK</button>}
               <button onClick={() => onDelete(x.id, x.name)} style={{ width: 30, height: 30, borderRadius: 7, border: "none", background: "#ede6d9", color: "#aaa", fontSize: 14, cursor: "pointer" }}>✕</button>
             </div>
