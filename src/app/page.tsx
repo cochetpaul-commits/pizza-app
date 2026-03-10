@@ -102,7 +102,23 @@ const badge = (color: string): React.CSSProperties => ({
 export default function Home() {
   const [authState, setAuthState] = useState<"loading" | "ok" | "anon">("loading");
   const [counts, setCounts] = useState<Counts | null>(null);
+  const [caJour, setCaJour] = useState<number | null>(null);
   const { role, displayName, isAdmin } = useProfile();
+
+  // CA du jour Popina — auto-refresh toutes les 5 min
+  useEffect(() => {
+    async function fetchCa() {
+      try {
+        const res = await fetch("/api/popina/ca-jour");
+        if (!res.ok) return;
+        const d = await res.json();
+        setCaJour(typeof d.totalSales === "number" ? d.totalSales : null);
+      } catch { /* silencieux */ }
+    }
+    fetchCa();
+    const iv = setInterval(fetchCa, 5 * 60 * 1000);
+    return () => clearInterval(iv);
+  }, []);
 
   useEffect(() => {
     const run = async () => {
@@ -337,6 +353,12 @@ export default function Home() {
                   <p style={subtitle}>Mercuriale · Épicerie · Variations & Alertes</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  {caJour !== null && (
+                    <span style={counter("#4a4a4a")}>
+                      {caJour.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      <span style={counterSuffix}>€ auj.</span>
+                    </span>
+                  )}
                   {counts && counts.priceAlerts > 0 && (
                     <span style={badge("#4a4a4a")}>{counts.priceAlerts}</span>
                   )}
