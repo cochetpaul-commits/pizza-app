@@ -1,5 +1,8 @@
-import { NextResponse } from "next/server";
-import { fetchReports, getParisDate } from "@/lib/popinaClient";
+import { NextRequest, NextResponse } from "next/server";
+import {
+  fetchReports, getParisDate,
+  dateToISOWeek, isoWeekToMonday, fmtDateUTC,
+} from "@/lib/popinaClient";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,17 +16,50 @@ function toParisDate(iso: string): string {
 type DayStats = {
   totalSales: number;   // centimes
   guestsNumber: number;
-  products: Array<{ name: string; quantity: number; totalSales: number }>; // centimes
+  products: Array<{ name: string; quantity: number; totalSales: number; category: string }>;
 };
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const apiKey = process.env.POPINA_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "POPINA_API_KEY manquant" }, { status: 500 });
 
-  // Un seul appel pour 30 jours
-  const reports = await fetchReports(apiKey, getParisDate(-29), getParisDate(0));
+  // ── Week parameter ───────────────────────────────────────────────────────
+  const todayParis = getParisDate(0);
+  const currentWeek = dateToISOWeek(todayParis);
+  const selectedWeek = request.nextUrl.searchParams.get("week") || currentWeek;
+  const isCurrentWeek = selectedWeek === currentWeek;
 
-  // ── Grouper par date Paris ───────────────────────────────────────────────
+  // Monday of selected week
+  const monday = isoWeekToMonday(selectedWeek);
+  // 7 date strings Mon→Sun
+  const weekDates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setUTCDate(monday.getUTCDate() + i);
+    return fmtDateUTC(d);
+  });
+
+  // Active dates: current week → only up to today; past week → full Mon–Sun
+  const activeDates = isCurrentWeek
+    ? weekDates.filter((d) => d <= todayParis)
+    : weekDates;
+
+  // Previous week: same equivalent days
+  const prevMonday = new Date(monday);
+  prevMonday.setUTCDate(monday.getUTCDate() - 7);
+  const prevDates = activeDates.map((_, i) => {
+    const d = new Date(prevMonday);
+    d.setUTCDate(prevMonday.getUTCDate() + i);
+    return fmtDateUTC(d);
+  });
+
+  // ── Fetch reports (cover selected + prev week + 30 days for insights) ──
+  const prevMondayStr = fmtDateUTC(prevMonday);
+  const thirtyDaysAgo = getParisDate(-29);
+  const fetchFrom = prevMondayStr < thirtyDaysAgo ? prevMondayStr : thirtyDaysAgo;
+  const fetchTo = weekDates[6] > todayParis ? todayParis : weekDates[6];
+  const reports = await fetchReports(apiKey, fetchFrom, fetchTo);
+
+  // ── Group by Paris date ────────────────────────────────────────────────
   const byDate = new Map<string, DayStats>();
   for (const r of reports) {
     if (!r.startedAt) continue;
@@ -35,7 +71,7 @@ export async function GET() {
       for (const p of r.reportProducts ?? []) {
         const prev = existing.products.find((x) => x.name === p.productName);
         if (prev) { prev.quantity += p.productQuantity ?? 0; prev.totalSales += p.productSales ?? 0; }
-        else existing.products.push({ name: p.productName ?? "?", quantity: p.productQuantity ?? 0, totalSales: p.productSales ?? 0 });
+        else existing.products.push({ name: p.productName ?? "?", quantity: p.productQuantity ?? 0, totalSales: p.productSales ?? 0, category: p.productCategory ?? "" });
       }
     } else {
       byDate.set(key, {
@@ -45,14 +81,14 @@ export async function GET() {
           name: p.productName ?? "?",
           quantity: p.productQuantity ?? 0,
           totalSales: p.productSales ?? 0,
+          category: p.productCategory ?? "",
         })),
       });
     }
   }
 
-  // ── 7 derniers jours (pour graphe + KPIs) ───────────────────────────────
-  const dates7 = Array.from({ length: 7 }, (_, i) => getParisDate(i - 6));
-  const days = dates7.map((dateStr) => {
+  // ── Graph: 7 days of selected week (Mon→Sun) ──────────────────────────
+  const days = weekDates.map((dateStr) => {
     const d = byDate.get(dateStr) ?? { totalSales: 0, guestsNumber: 0, products: [] };
     const dow = new Date(dateStr + "T12:00:00").getDay();
     const totalSales = Math.round(d.totalSales / 100 * 100) / 100;
@@ -60,21 +96,25 @@ export async function GET() {
     return { date: dateStr, label: DAY_LABELS[dow], totalSales, guestsNumber: d.guestsNumber, ticketMoyen };
   });
 
-  const totalSalesSem = days.reduce((s, d) => s + d.totalSales, 0);
-  const guestsSem = days.reduce((s, d) => s + d.guestsNumber, 0);
+  // ── KPIs: active dates only (fair comparison) ─────────────────────────
+  const activeDays = days.filter((d) => activeDates.includes(d.date));
+  const totalSalesSem = activeDays.reduce((s, d) => s + d.totalSales, 0);
+  const guestsSem = activeDays.reduce((s, d) => s + d.guestsNumber, 0);
   const ticketMoyenSem = guestsSem > 0 ? Math.round((totalSalesSem / guestsSem) * 100) / 100 : 0;
-  const bestDay = days.reduce((b, d) => d.totalSales > b.totalSales ? d : b, days[0] ?? { label: "—", totalSales: 0 });
+  const bestDay = activeDays.reduce(
+    (b, d) => d.totalSales > b.totalSales ? d : b,
+    activeDays[0] ?? { label: "—", totalSales: 0 },
+  );
 
-  // ── Semaine précédente (J-13 à J-7) ─────────────────────────────────────
-  const datesPrev = Array.from({ length: 7 }, (_, i) => getParisDate(i - 13));
-  const daysPrevRaw = datesPrev.map((d) => byDate.get(d) ?? { totalSales: 0, guestsNumber: 0, products: [] });
-  const totalSalesPrec = Math.round(daysPrevRaw.reduce((s, d) => s + d.totalSales, 0) / 100 * 100) / 100;
-  const guestsPrec = daysPrevRaw.reduce((s, d) => s + d.guestsNumber, 0);
+  // ── Previous week: equivalent days ────────────────────────────────────
+  const prevDaysRaw = prevDates.map((d) => byDate.get(d) ?? { totalSales: 0, guestsNumber: 0, products: [] });
+  const totalSalesPrec = Math.round(prevDaysRaw.reduce((s, d) => s + d.totalSales, 0) / 100 * 100) / 100;
+  const guestsPrec = prevDaysRaw.reduce((s, d) => s + d.guestsNumber, 0);
   const ticketMoyenPrec = guestsPrec > 0 ? Math.round((totalSalesPrec / guestsPrec) * 100) / 100 : 0;
 
-  // ── Top produits semaine (centimes) ─────────────────────────────────────
+  // ── Top products: active dates ────────────────────────────────────────
   const prodMap = new Map<string, { quantity: number; totalSales: number }>();
-  for (const dateStr of dates7) {
+  for (const dateStr of activeDates) {
     for (const p of byDate.get(dateStr)?.products ?? []) {
       const prev = prodMap.get(p.name);
       if (prev) { prev.quantity += p.quantity; prev.totalSales += p.totalSales; }
@@ -82,9 +122,8 @@ export async function GET() {
     }
   }
 
-  // Top produits semaine précédente (centimes) pour comparaison
   const prodMapPrec = new Map<string, number>();
-  for (const dateStr of datesPrev) {
+  for (const dateStr of prevDates) {
     for (const p of byDate.get(dateStr)?.products ?? []) {
       prodMapPrec.set(p.name, (prodMapPrec.get(p.name) ?? 0) + p.totalSales);
     }
@@ -108,43 +147,73 @@ export async function GET() {
       };
     });
 
-  // ── Insights ─────────────────────────────────────────────────────────────
-  // 1. Meilleur jour de semaine (30j, moyenne CA)
-  const avgByDow = Array.from({ length: 7 }, () => ({ total: 0, count: 0 }));
-  for (const [dateStr, d] of byDate) {
-    if (d.totalSales === 0) continue;
-    const dow = new Date(dateStr + "T12:00:00").getDay();
-    avgByDow[dow].total += d.totalSales;
-    avgByDow[dow].count += 1;
+  // ── Categories: active dates ──────────────────────────────────────────
+  const catMap = new Map<string, number>();
+  for (const dateStr of activeDates) {
+    for (const p of byDate.get(dateStr)?.products ?? []) {
+      if (p.category) catMap.set(p.category, (catMap.get(p.category) ?? 0) + p.totalSales);
+    }
   }
-  const avgByDowEur = avgByDow.map((x) => x.count > 0 ? (x.total / x.count) / 100 : 0);
-  const bestDowIdx = avgByDowEur.indexOf(Math.max(...avgByDowEur));
-  const meilleurJour = avgByDow[bestDowIdx].count >= 2
-    ? { label: DAY_LABELS[bestDowIdx], avgCA: Math.round(avgByDowEur[bestDowIdx] * 100) / 100 }
-    : null;
+  const totalSalesCentimesSem = Math.round(totalSalesSem * 100);
+  const categories = Array.from(catMap.entries())
+    .sort(([, a], [, b]) => b - a)
+    .map(([name, centimes]) => ({
+      name,
+      ca: Math.round(centimes / 100 * 100) / 100,
+      pct: totalSalesCentimesSem > 0 ? Math.round((centimes / totalSalesCentimesSem) * 100) : 0,
+    }));
 
-  // 2. Produit en plus forte hausse
-  const prodEnHausse = topSemaine
-    .filter((p) => p.pctChange !== null && p.pctChange > 0)
-    .sort((a, b) => (b.pctChange ?? 0) - (a.pctChange ?? 0))[0] ?? null;
+  // ── Insights (only for current week, using 30-day data) ───────────────
+  let insights: {
+    meilleurJour: { label: string; avgCA: number } | null;
+    produitEnHausse: { name: string; pctChange: number } | null;
+    caVsMoyenne: { label: string; pct: number } | null;
+  } = { meilleurJour: null, produitEnHausse: null, caVsMoyenne: null };
 
-  // 3. CA aujourd'hui vs moyenne du même jour de semaine
-  const todayStr = getParisDate(0);
-  const todayData = byDate.get(todayStr);
-  const todayDow = new Date(todayStr + "T12:00:00").getDay();
-  let caVsMoyenne: { label: string; pct: number } | null = null;
-  if (todayData && todayData.totalSales > 0 && avgByDow[todayDow].count >= 3) {
-    const sumExToday = avgByDow[todayDow].total - todayData.totalSales;
-    const countExToday = avgByDow[todayDow].count - 1;
-    const avgCentimes = sumExToday / countExToday;
-    const pct = Math.round(((todayData.totalSales - avgCentimes) / avgCentimes) * 100);
-    caVsMoyenne = { label: DAY_LABELS[todayDow], pct };
+  if (isCurrentWeek) {
+    const avgByDow = Array.from({ length: 7 }, () => ({ total: 0, count: 0 }));
+    for (const [dateStr, d] of byDate) {
+      if (d.totalSales === 0) continue;
+      const dow = new Date(dateStr + "T12:00:00").getDay();
+      avgByDow[dow].total += d.totalSales;
+      avgByDow[dow].count += 1;
+    }
+    const avgByDowEur = avgByDow.map((x) => x.count > 0 ? (x.total / x.count) / 100 : 0);
+    const bestDowIdx = avgByDowEur.indexOf(Math.max(...avgByDowEur));
+    const meilleurJour = avgByDow[bestDowIdx].count >= 2
+      ? { label: DAY_LABELS[bestDowIdx], avgCA: Math.round(avgByDowEur[bestDowIdx] * 100) / 100 }
+      : null;
+
+    const prodEnHausse = topSemaine
+      .filter((p) => p.pctChange !== null && p.pctChange > 0)
+      .sort((a, b) => (b.pctChange ?? 0) - (a.pctChange ?? 0))[0] ?? null;
+
+    const todayData = byDate.get(todayParis);
+    const todayDow = new Date(todayParis + "T12:00:00").getDay();
+    let caVsMoyenne: { label: string; pct: number } | null = null;
+    if (todayData && todayData.totalSales > 0 && avgByDow[todayDow].count >= 3) {
+      const sumExToday = avgByDow[todayDow].total - todayData.totalSales;
+      const countExToday = avgByDow[todayDow].count - 1;
+      const avgCentimes = sumExToday / countExToday;
+      const pct = Math.round(((todayData.totalSales - avgCentimes) / avgCentimes) * 100);
+      caVsMoyenne = { label: DAY_LABELS[todayDow], pct };
+    }
+
+    insights = {
+      meilleurJour,
+      produitEnHausse: prodEnHausse ? { name: prodEnHausse.name, pctChange: prodEnHausse.pctChange! } : null,
+      caVsMoyenne,
+    };
   }
 
   return NextResponse.json({
+    week: selectedWeek,
+    isCurrentWeek,
+    activeDays: activeDates.length,
     semaine: { totalSales: totalSalesSem, guestsNumber: guestsSem, ticketMoyen: ticketMoyenSem, bestDay, days },
     semainePrec: { totalSales: totalSalesPrec, guestsNumber: guestsPrec, ticketMoyen: ticketMoyenPrec },
     topSemaine,
-    insights: { meilleurJour, produitEnHausse: prodEnHausse ? { name: prodEnHausse.name, pctChange: prodEnHausse.pctChange! } : null, caVsMoyenne },
+    categories,
+    insights,
   });
 }

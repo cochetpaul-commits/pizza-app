@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
 import {
@@ -15,6 +15,9 @@ type DayData = { date: string; label: string; totalSales: number; guestsNumber: 
 type TopProduct = { name: string; quantity: number; totalSales: number; isNew: boolean; pctChange: number | null };
 type CategoryData = { name: string; ca: number; pct: number };
 type StatsData = {
+  week: string;
+  isCurrentWeek: boolean;
+  activeDays: number;
   semaine: { totalSales: number; guestsNumber: number; ticketMoyen: number; bestDay: { label: string; totalSales: number }; days: DayData[] };
   semainePrec: { totalSales: number; guestsNumber: number; ticketMoyen: number };
   topSemaine: TopProduct[];
@@ -40,6 +43,53 @@ type DayDetail = {
   topProducts: Array<{ name: string; quantity: number; totalSales: number }>;
   categories: CategoryData[];
 };
+
+// ── ISO Week helpers (client-side) ───────────────────────────────────────
+
+function dateToISOWeek(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00");
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  const week = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${d.getFullYear()}-${String(week).padStart(2, "0")}`;
+}
+
+function isoWeekToMonday(weekStr: string): Date {
+  const [y, w] = weekStr.split("-").map(Number);
+  const jan4 = new Date(y, 0, 4);
+  const dow = jan4.getDay() || 7;
+  const week1Mon = new Date(y, 0, 4 - dow + 1);
+  const monday = new Date(week1Mon);
+  monday.setDate(week1Mon.getDate() + (w - 1) * 7);
+  return monday;
+}
+
+function getCurrentWeek(): string {
+  const parisDate = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
+  return dateToISOWeek(parisDate);
+}
+
+function shiftWeek(weekStr: string, offset: number): string {
+  const monday = isoWeekToMonday(weekStr);
+  monday.setDate(monday.getDate() + offset * 7);
+  const dateStr = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
+  return dateToISOWeek(dateStr);
+}
+
+function getWeekLabel(weekStr: string): string {
+  const monday = isoWeekToMonday(weekStr);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const monDay = monday.getDate();
+  const sunDay = sunday.getDate();
+  if (monday.getMonth() === sunday.getMonth()) {
+    const monthYear = sunday.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+    return `Semaine du ${monDay} au ${sunDay} ${monthYear}`;
+  }
+  const monMonth = monday.toLocaleDateString("fr-FR", { month: "long" });
+  const sunMonthYear = sunday.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  return `Semaine du ${monDay} ${monMonth} au ${sunDay} ${sunMonthYear}`;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -116,6 +166,49 @@ function ChartTooltip({ active, payload, label }: {
   );
 }
 
+// ── Week Selector ─────────────────────────────────────────────────────────
+
+function WeekSelector({ weekStr, currentWeek, onPrev, onNext }: {
+  weekStr: string; currentWeek: string; onPrev: () => void; onNext: () => void;
+}) {
+  const isNow = weekStr === currentWeek;
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12,
+      padding: "10px 16px", marginBottom: 16, gap: 8,
+    }}>
+      <button onClick={onPrev} style={{
+        background: "none", border: "none", fontSize: 18, color: ACCENT,
+        cursor: "pointer", padding: "0 4px", fontWeight: 700, lineHeight: 1,
+      }}>←</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <span style={{
+          fontSize: 13, fontWeight: 600, color: "#1a1a1a",
+          fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+        }}>
+          {getWeekLabel(weekStr)}
+        </span>
+        {isNow && (
+          <span style={{
+            fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
+            background: ACCENT, color: "#fff", whiteSpace: "nowrap", flexShrink: 0,
+          }}>
+            Cette semaine
+          </span>
+        )}
+      </div>
+      <button onClick={onNext} disabled={isNow} style={{
+        background: "none", border: "none", fontSize: 18,
+        color: isNow ? "#ddd6c8" : ACCENT,
+        cursor: isNow ? "not-allowed" : "pointer",
+        padding: "0 4px", fontWeight: 700, lineHeight: 1,
+      }}>→</button>
+    </div>
+  );
+}
+
 // ── Day Detail Drawer ─────────────────────────────────────────────────────
 
 function DayDrawer({ detail, loading, onClose }: { detail: DayDetail | null; loading: boolean; onClose: () => void }) {
@@ -178,7 +271,6 @@ function DayDrawer({ detail, loading, onClose }: { detail: DayDetail | null; loa
             {/* Midi / Soir */}
             {(detail.midi.ca > 0 || detail.soir.ca > 0) && (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
-                {/* Midi */}
                 <div style={{ background: "#fff", borderRadius: 12, padding: "14px 12px", border: "1px solid #ddd6c8" }}>
                   <p style={{ margin: "0 0 8px", fontSize: 9, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#999" }}>MIDI</p>
                   <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: ACCENT, lineHeight: 1, fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
@@ -186,7 +278,6 @@ function DayDrawer({ detail, loading, onClose }: { detail: DayDetail | null; loa
                   </p>
                   <p style={{ margin: "4px 0 0", fontSize: 11, color: "#888", fontWeight: 600 }}>{detail.midi.couverts} couverts</p>
                 </div>
-                {/* Soir */}
                 <div style={{ background: "#1a1a1a", borderRadius: 12, padding: "14px 12px" }}>
                   <p style={{ margin: "0 0 8px", fontSize: 9, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#666" }}>SOIR</p>
                   <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#f2ede4", lineHeight: 1, fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
@@ -286,6 +377,11 @@ const kpiValue: React.CSSProperties = {
   fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
 };
 
+const deltaStyle: React.CSSProperties = {
+  margin: "6px 0 0", fontSize: 12, fontWeight: 600,
+  fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+};
+
 const SECTIONS = [
   { href: "/mercuriale", label: "MERCURIALE", sub: "Prix fournisseurs · Export PDF", color: "#D4775A" },
   { href: "/epicerie", label: "ÉPICERIE", sub: "Prix de vente · Export CSV", color: "#D4775A" },
@@ -295,6 +391,8 @@ const SECTIONS = [
 // ── Component ─────────────────────────────────────────────────────────────
 
 export default function PilotagePage() {
+  const currentWeek = useMemo(() => getCurrentWeek(), []);
+  const [weekStr, setWeekStr] = useState(currentWeek);
   const [stats, setStats] = useState<StatsData | null>(null);
   const [meteo, setMeteo] = useState<MeteoData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -305,9 +403,10 @@ export default function PilotagePage() {
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
   const [dayLoading, setDayLoading] = useState(false);
 
-  const loadAll = useCallback(async () => {
+  const loadStats = useCallback(async (week: string) => {
+    setLoading(true);
     const [s, m] = await Promise.all([
-      fetch("/api/popina/stats").then((r) => r.ok ? r.json() : null),
+      fetch(`/api/popina/stats?week=${week}`).then((r) => r.ok ? r.json() : null),
       fetch("/api/meteo").then((r) => r.ok ? r.json() : null),
     ]);
     if (s) setStats(s);
@@ -317,10 +416,23 @@ export default function PilotagePage() {
   }, []);
 
   useEffect(() => {
-    void loadAll();
-    const iv = setInterval(() => { void loadAll(); }, 10 * 60 * 1000);
-    return () => clearInterval(iv);
-  }, [loadAll]);
+    void loadStats(weekStr);
+    // Auto-refresh only for current week
+    if (weekStr === currentWeek) {
+      const iv = setInterval(() => { void loadStats(weekStr); }, 10 * 60 * 1000);
+      return () => clearInterval(iv);
+    }
+  }, [weekStr, currentWeek, loadStats]);
+
+  function goPrevWeek() {
+    setWeekStr((w) => shiftWeek(w, -1));
+  }
+  function goNextWeek() {
+    setWeekStr((w) => {
+      const next = shiftWeek(w, 1);
+      return next <= currentWeek ? next : w;
+    });
+  }
 
   async function handleBarClick(day: DayData) {
     if (day.totalSales === 0) return;
@@ -341,12 +453,16 @@ export default function PilotagePage() {
   }
 
   const s = stats;
+  const isNow = weekStr === currentWeek;
 
   return (
     <RequireRole allowedRoles={["admin", "direction"]}>
       <>
         <NavBar />
         <main style={{ maxWidth: 720, margin: "0 auto", padding: "20px 16px 56px", boxSizing: "border-box" }}>
+
+          {/* ── BLOC 0 : WEEK SELECTOR ─────────────────────────── */}
+          <WeekSelector weekStr={weekStr} currentWeek={currentWeek} onPrev={goPrevWeek} onNext={goNextWeek} />
 
           {/* ── BLOC 1 : BANDEAU HAUT ────────────────────────────── */}
           <div style={{
@@ -383,14 +499,16 @@ export default function PilotagePage() {
           ) : s ? (
             <>
               {/* ── BLOC 2 : CHIFFRES CLÉS ───────────────────────────── */}
-              <p style={sectionLabel}>CHIFFRES CLÉS · 7 DERNIERS JOURS</p>
+              <p style={sectionLabel}>
+                CHIFFRES CLÉS{isNow && s.activeDays < 7 ? ` · ${s.activeDays}J SUR 7` : " · SEMAINE"}
+              </p>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 20 }}>
 
                 <div style={card}>
                   <p style={kpiLabel}>CA semaine</p>
                   <p style={kpiValue}>{fmtEuroInt(s.semaine.totalSales)}</p>
                   {delta(s.semaine.totalSales, s.semainePrec.totalSales) && (
-                    <p style={{ margin: "6px 0 0", fontSize: 12, fontWeight: 600, fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif", color: deltaColor(s.semaine.totalSales, s.semainePrec.totalSales) }}>
+                    <p style={{ ...deltaStyle, color: deltaColor(s.semaine.totalSales, s.semainePrec.totalSales) }}>
                       {delta(s.semaine.totalSales, s.semainePrec.totalSales)}
                     </p>
                   )}
@@ -400,7 +518,7 @@ export default function PilotagePage() {
                   <p style={kpiLabel}>Couverts</p>
                   <p style={kpiValue}>{s.semaine.guestsNumber}</p>
                   {delta(s.semaine.guestsNumber, s.semainePrec.guestsNumber) && (
-                    <p style={{ margin: "6px 0 0", fontSize: 12, fontWeight: 600, fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif", color: deltaColor(s.semaine.guestsNumber, s.semainePrec.guestsNumber) }}>
+                    <p style={{ ...deltaStyle, color: deltaColor(s.semaine.guestsNumber, s.semainePrec.guestsNumber) }}>
                       {delta(s.semaine.guestsNumber, s.semainePrec.guestsNumber)}
                     </p>
                   )}
@@ -410,7 +528,7 @@ export default function PilotagePage() {
                   <p style={kpiLabel}>Ticket moyen</p>
                   <p style={kpiValue}>{fmtEuro(s.semaine.ticketMoyen)}</p>
                   {delta(s.semaine.ticketMoyen, s.semainePrec.ticketMoyen) && (
-                    <p style={{ margin: "6px 0 0", fontSize: 12, fontWeight: 600, fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif", color: deltaColor(s.semaine.ticketMoyen, s.semainePrec.ticketMoyen) }}>
+                    <p style={{ ...deltaStyle, color: deltaColor(s.semaine.ticketMoyen, s.semainePrec.ticketMoyen) }}>
                       {delta(s.semaine.ticketMoyen, s.semainePrec.ticketMoyen)}
                     </p>
                   )}
@@ -431,7 +549,7 @@ export default function PilotagePage() {
 
                 {/* Graphe — cliquable */}
                 <div style={{ ...card, padding: "16px 8px 12px" }}>
-                  <p style={{ ...sectionLabel, margin: "0 0 4px 12px" }}>CA 7 DERNIERS JOURS</p>
+                  <p style={{ ...sectionLabel, margin: "0 0 4px 12px" }}>CA SEMAINE</p>
                   <p style={{ margin: "0 0 12px 12px", fontSize: 10, color: "#bbb" }}>Clique sur une barre pour le détail</p>
                   <ResponsiveContainer width="100%" height={180}>
                     <BarChart data={s.semaine.days} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
@@ -504,11 +622,11 @@ export default function PilotagePage() {
               </div>
 
               {/* ── BLOC 3b : RÉPARTITION PAR CATÉGORIE ─────────────── */}
-              {s.categories.length > 0 && (
+              {(s.categories ?? []).length > 0 && (
                 <div style={{ ...card, marginBottom: 20 }}>
                   <p style={{ ...sectionLabel, margin: "0 0 14px" }}>RÉPARTITION PAR CATÉGORIE · SEMAINE</p>
                   <div style={{ display: "grid", gap: 12 }}>
-                    {s.categories.map((cat, i) => {
+                    {(s.categories ?? []).map((cat, i) => {
                       const color = getCatColor(cat.name);
                       const label = getCatLabel(cat.name);
                       return (
@@ -537,8 +655,8 @@ export default function PilotagePage() {
                 </div>
               )}
 
-              {/* ── BLOC 4 : INSIGHTS ────────────────────────────────── */}
-              {(s.insights.meilleurJour || s.insights.produitEnHausse || s.insights.caVsMoyenne) && (
+              {/* ── BLOC 4 : INSIGHTS (current week only) ──────────── */}
+              {isNow && (s.insights.meilleurJour || s.insights.produitEnHausse || s.insights.caVsMoyenne) && (
                 <div style={{ ...card, marginBottom: 24 }}>
                   <p style={{ ...sectionLabel, margin: "0 0 12px" }}>INSIGHTS AUTOMATIQUES</p>
                   <div style={{ display: "grid", gap: 10 }}>
