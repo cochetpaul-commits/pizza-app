@@ -415,13 +415,32 @@ export default function PilotagePage() {
     setLoading(false);
   }, []);
 
+  // Service-hours auto-refresh (15 min during midi 10-15h / soir 18-23h30)
+  const [isService, setIsService] = useState(() => {
+    const h = new Date().getHours();
+    return (h >= 10 && h < 15) || (h >= 18 && h < 24);
+  });
+
   useEffect(() => {
     void loadStats(weekStr);
-    // Auto-refresh only for current week
-    if (weekStr === currentWeek) {
-      const iv = setInterval(() => { void loadStats(weekStr); }, 10 * 60 * 1000);
-      return () => clearInterval(iv);
-    }
+
+    if (weekStr !== currentWeek) return;
+
+    // Check service status every minute and refresh data every 15 min during service
+    const REFRESH_MS = 15 * 60 * 1000;
+    let lastRefresh = Date.now();
+
+    const tick = setInterval(() => {
+      const h = new Date().getHours();
+      const service = (h >= 10 && h < 15) || (h >= 18 && h < 24);
+      setIsService(service);
+      if (service && Date.now() - lastRefresh >= REFRESH_MS) {
+        lastRefresh = Date.now();
+        void loadStats(weekStr);
+      }
+    }, 60_000);
+
+    return () => clearInterval(tick);
   }, [weekStr, currentWeek, loadStats]);
 
   function goPrevWeek() {
@@ -473,7 +492,24 @@ export default function PilotagePage() {
           }}>
             <div>
               <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>{todayLabel()}</p>
-              {lastUpdate && <p style={{ margin: 0, fontSize: 10, color: "#bbb", marginTop: 1 }}>Màj {lastUpdate}</p>}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                {lastUpdate && (
+                  <span style={{ fontSize: 10, color: "#bbb" }}>
+                    {isService ? "Màj auto · 15min" : "Hors service · Màj manuelle"}
+                    {" · "}{lastUpdate}
+                  </span>
+                )}
+                <button
+                  onClick={() => void loadStats(weekStr)}
+                  disabled={loading}
+                  style={{
+                    background: "none", border: "none", padding: 0,
+                    fontSize: 13, cursor: loading ? "not-allowed" : "pointer",
+                    opacity: loading ? 0.4 : 0.7, lineHeight: 1,
+                  }}
+                  title="Rafraîchir"
+                >🔄</button>
+              </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
               {meteo ? (
