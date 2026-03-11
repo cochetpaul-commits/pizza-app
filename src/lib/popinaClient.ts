@@ -60,6 +60,48 @@ export async function fetchReports(
   }
 }
 
+// ── Orders ───────────────────────────────────────────────────────────────
+
+export type PopinaOrder = {
+  openedAt?: string;
+  closedAt?: string;
+  totalSales?: number;  // centimes
+  guestsNumber?: number;
+  orderPlace?: string;
+  orderItems?: Array<{
+    productName?: string;
+    productQuantity?: number;
+    productSales?: number;
+    productCategory?: string;
+  }>;
+};
+
+/**
+ * GET /v1/orders?locationId=…&date=YYYY-MM-DD
+ * Renvoie [] en cas d'erreur.
+ */
+export async function fetchOrders(
+  apiKey: string,
+  date: string,
+): Promise<PopinaOrder[]> {
+  const url = `${POPINA_BASE}/orders?locationId=${LOCATION_ID}&date=${date}`;
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const items = Array.isArray(json) ? json
+                : Array.isArray(json?.data) ? json.data
+                : json ? [json]
+                : [];
+    return items as PopinaOrder[];
+  } catch {
+    return [];
+  }
+}
+
 // ── ISO week helpers ──────────────────────────────────────────────────────
 
 /** YYYY-MM-DD → ISO week string "YYYY-WW" */

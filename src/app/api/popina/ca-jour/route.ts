@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchReports, getParisDate, LOCATION_ID } from "@/lib/popinaClient";
+import { fetchReports, fetchOrders, getParisDate, LOCATION_ID } from "@/lib/popinaClient";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const SALLE_ROOMS = ["salle", "pergolas", "terrasse"];
+const SALLE_PLACES = ["salle", "pergolas", "terrasse"];
+const COUVERTS_CATEGORIES = ["pizze", "cucina"];
 
-function getParisHour(iso: string): number {
-  const str = new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    hour12: false,
-    timeZone: "Europe/Paris",
-  }).format(new Date(iso));
-  return parseInt(str, 10);
+/** Parse "DD/MM/YYYY HH:MM" → { date: "YYYY-MM-DD", hour: number } */
+function parsePopinaDateTime(raw: string): { date: string; hour: number } | null {
+  const m = raw.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const [, dd, mm, yyyy, hh] = m;
+  return { date: `${yyyy}-${mm}-${dd}`, hour: parseInt(hh, 10) };
+}
+
+/** Convert ISO timestamp to Paris date "YYYY-MM-DD" */
+function toParisDate(iso: string): string {
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(new Date(iso));
 }
 
 export async function GET(request: NextRequest) {
@@ -23,44 +28,44 @@ export async function GET(request: NextRequest) {
 
   const dateParam = request.nextUrl.searchParams.get("date");
   const date = dateParam || getParisDate(0);
-  const reports = await fetchReports(apiKey, date, date);
 
+  console.log(`[ca-jour] date demandée: ${date}`);
+
+  // Fetch reports (totaux, produits, catégories) + orders (midi/soir, surPlace/aEmporter)
+  const [allReports, allOrders] = await Promise.all([
+    fetchReports(apiKey, date, date),
+    fetchOrders(apiKey, date),
+  ]);
+
+  // ── Filtrer strictement par date ──
+  const reports = allReports.filter((r) => {
+    if (!r.startedAt) return false;
+    return toParisDate(r.startedAt) === date;
+  });
+
+  const orders = allOrders.filter((o) => {
+    const timeRef = o.closedAt || o.openedAt;
+    if (!timeRef) return false;
+    // Try DD/MM/YYYY format first
+    const parsed = parsePopinaDateTime(timeRef);
+    if (parsed) return parsed.date === date;
+    // Fallback: try ISO format
+    try { return toParisDate(timeRef) === date; } catch { return false; }
+  });
+
+  console.log(`[ca-jour] reports bruts: ${allReports.length}, filtrés: ${reports.length}`);
+  console.log(`[ca-jour] orders bruts: ${allOrders.length}, filtrés: ${orders.length}`);
+
+  // ── Totaux depuis reports ──
   let totalSalesCentimes = 0;
   let totalGuests = 0;
-  const midi = { ca: 0, couverts: 0 };
-  const soir = { ca: 0, couverts: 0 };
-  const surPlace = { ca: 0, couverts: 0 };
-  const aEmporter = { ca: 0, couverts: 0 };
   const prodMap = new Map<string, { quantity: number; totalSales: number }>();
   const catMap = new Map<string, number>();
 
   for (const r of reports) {
-    const sales = r.totalSales ?? 0;
-    const guests = r.guestsNumber ?? 0;
-    totalSalesCentimes += sales;
-    totalGuests += guests;
+    totalSalesCentimes += r.totalSales ?? 0;
+    totalGuests += r.guestsNumber ?? 0;
 
-    // ── Midi / Soir ──
-    if (r.startedAt) {
-      const h = getParisHour(r.startedAt);
-      if (h >= 10 && h <= 14) { midi.ca += sales; midi.couverts += guests; }
-      else if (h >= 18 || h === 0) { soir.ca += sales; soir.couverts += guests; }
-    }
-
-    // ── Sur place / À emporter ──
-    const room = (r as Record<string, unknown>).roomName as string | undefined;
-    if (room) {
-      const lower = room.toLowerCase();
-      if (SALLE_ROOMS.some((s) => lower.includes(s))) {
-        surPlace.ca += sales;
-        surPlace.couverts += guests;
-      } else if (lower.includes("emporter")) {
-        aEmporter.ca += sales;
-        aEmporter.couverts += guests;
-      }
-    }
-
-    // ── Produits + catégories ──
     for (const p of r.reportProducts ?? []) {
       const name = p.productName ?? "Inconnu";
       const prev = prodMap.get(name);
@@ -72,6 +77,53 @@ export async function GET(request: NextRequest) {
       }
       const cat = p.productCategory;
       if (cat) catMap.set(cat, (catMap.get(cat) ?? 0) + (p.productSales ?? 0));
+    }
+  }
+
+  // ── Midi / Soir + Sur place / À emporter depuis orders ──
+  const midi = { ca: 0, couverts: 0 };
+  const soir = { ca: 0, couverts: 0 };
+  const surPlace = { ca: 0, couverts: 0 };
+  const aEmporter = { ca: 0, couverts: 0 };
+
+  for (const o of orders) {
+    const sales = o.totalSales ?? 0;
+
+    // Couverts estimés : somme des quantités d'items PIZZE/CUCINA
+    let couverts = 0;
+    for (const item of o.orderItems ?? []) {
+      const cat = (item.productCategory ?? "").toLowerCase();
+      if (COUVERTS_CATEGORIES.some((c) => cat.includes(c))) {
+        couverts += item.productQuantity ?? 0;
+      }
+    }
+
+    // Classification horaire par closedAt (ou openedAt en fallback)
+    const timeRef = o.closedAt || o.openedAt;
+    if (timeRef) {
+      // Parse DD/MM/YYYY HH:MM format
+      const parsed = parsePopinaDateTime(timeRef);
+      const h = parsed ? parsed.hour : NaN;
+
+      if (!isNaN(h)) {
+        if (h >= 12 && h < 15) {
+          midi.ca += sales;
+          midi.couverts += couverts;
+        } else if (h >= 19 || h === 0) {
+          soir.ca += sales;
+          soir.couverts += couverts;
+        }
+      }
+    }
+
+    // Sur place / À emporter par orderPlace
+    const place = (o.orderPlace ?? "").toLowerCase();
+    if (place && SALLE_PLACES.some((s) => place.includes(s))) {
+      surPlace.ca += sales;
+      surPlace.couverts += couverts;
+    } else if (/emporter/i.test(place)) {
+      aEmporter.ca += sales;
+      aEmporter.couverts += couverts;
     }
   }
 

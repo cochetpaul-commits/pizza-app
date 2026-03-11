@@ -13,7 +13,7 @@ import {
 
 type DayData = { date: string; label: string; totalSales: number; guestsNumber: number; ticketMoyen: number };
 type TopProduct = { name: string; quantity: number; totalSales: number; isNew: boolean; pctChange: number | null };
-type CategoryData = { name: string; ca: number; pct: number };
+type CategoryData = { name: string; ca: number; pct: number; topProduct?: string | null };
 type StatsData = {
   week: string;
   isCurrentWeek: boolean;
@@ -151,13 +151,13 @@ function ChartTooltip({ active, payload, label }: {
   if (!active || !payload?.[0]) return null;
   const d = payload[0].payload;
   return (
-    <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 10, padding: "10px 14px", fontSize: 12, minWidth: 120 }}>
+    <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 10, padding: "10px 14px", fontSize: 14, minWidth: 120 }}>
       <p style={{ margin: 0, fontWeight: 700, color: "#1a1a1a" }}>{label}</p>
       {d.totalSales > 0 ? (
         <>
-          <p style={{ margin: "4px 0 0", color: ACCENT, fontWeight: 700 }}>{fmtEuroInt(d.totalSales)}</p>
-          {d.guestsNumber > 0 && <p style={{ margin: "2px 0 0", color: "#888" }}>{d.guestsNumber} couverts</p>}
-          {d.ticketMoyen > 0 && <p style={{ margin: "2px 0 0", color: "#888" }}>Ticket moy. {fmtEuro(d.ticketMoyen)}</p>}
+          <p style={{ margin: "4px 0 0", color: ACCENT, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmtEuroInt(d.totalSales)}</p>
+          {d.guestsNumber > 0 && <p style={{ margin: "2px 0 0", color: "#888", fontSize: 13 }}>{d.guestsNumber} couverts</p>}
+          {d.ticketMoyen > 0 && <p style={{ margin: "2px 0 0", color: "#888", fontSize: 13 }}>Ticket moy. {fmtEuro(d.ticketMoyen)}</p>}
         </>
       ) : (
         <p style={{ margin: "4px 0 0", color: "#bbb" }}>Fermé</p>
@@ -260,8 +260,8 @@ function DayDrawer({ detail, loading, onClose }: { detail: DayDetail | null; loa
                 { label: "TICKET MOY.", value: fmtEuro(detail.ticketMoyen) },
               ].map((kpi) => (
                 <div key={kpi.label} style={{ background: "#fff", borderRadius: 12, padding: "12px 10px", textAlign: "center", border: "1px solid #ddd6c8" }}>
-                  <p style={{ margin: "0 0 4px", fontSize: 9, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#999" }}>{kpi.label}</p>
-                  <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color: ACCENT, lineHeight: 1, fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
+                  <p style={{ margin: "0 0 4px", fontSize: 12, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", color: "#999", fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>{kpi.label}</p>
+                  <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#1a1a1a", lineHeight: 1, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
                     {kpi.value}
                   </p>
                 </div>
@@ -272,18 +272,18 @@ function DayDrawer({ detail, loading, onClose }: { detail: DayDetail | null; loa
             {(detail.midi.ca > 0 || detail.soir.ca > 0) && (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
                 <div style={{ background: "#fff", borderRadius: 12, padding: "14px 12px", border: "1px solid #ddd6c8" }}>
-                  <p style={{ margin: "0 0 8px", fontSize: 9, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#999" }}>MIDI</p>
-                  <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: ACCENT, lineHeight: 1, fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
+                  <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: "#999", fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>MIDI · 12H→15H</p>
+                  <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#1a1a1a", lineHeight: 1, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
                     {fmtEuroInt(detail.midi.ca)}
                   </p>
-                  <p style={{ margin: "4px 0 0", fontSize: 11, color: "#888", fontWeight: 600 }}>{detail.midi.couverts} couverts</p>
+                  <p style={{ margin: "4px 0 0", fontSize: 13, color: "#888", fontWeight: 600 }}>{detail.midi.couverts} couverts</p>
                 </div>
                 <div style={{ background: "#1a1a1a", borderRadius: 12, padding: "14px 12px" }}>
-                  <p style={{ margin: "0 0 8px", fontSize: 9, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#666" }}>SOIR</p>
-                  <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#f2ede4", lineHeight: 1, fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
+                  <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: "#666", fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>SOIR · 19H→00H</p>
+                  <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#f2ede4", lineHeight: 1, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
                     {fmtEuroInt(detail.soir.ca)}
                   </p>
-                  <p style={{ margin: "4px 0 0", fontSize: 11, color: "#888", fontWeight: 600 }}>{detail.soir.couverts} couverts</p>
+                  <p style={{ margin: "4px 0 0", fontSize: 13, color: "#888", fontWeight: 600 }}>{detail.soir.couverts} couverts</p>
                 </div>
               </div>
             )}
@@ -292,13 +292,13 @@ function DayDrawer({ detail, loading, onClose }: { detail: DayDetail | null; loa
             {hasSurPlaceData && (
               <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16, background: "#fff", borderRadius: 12, padding: "12px 16px", border: "1px solid #ddd6c8" }}>
                 <div style={{ flex: 1 }}>
-                  <p style={{ margin: "0 0 6px", fontSize: 9, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#999" }}>RÉPARTITION</p>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
-                    Sur place <strong style={{ color: ACCENT }}>{fmtEuroInt(detail.surPlace.ca)}</strong>
+                  <p style={{ margin: "0 0 6px", fontSize: 12, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: "#999", fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>RÉPARTITION</p>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>
+                    Sur place <strong style={{ color: ACCENT, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmtEuroInt(detail.surPlace.ca)}</strong>
                     <span style={{ color: "#ccc", margin: "0 6px" }}>·</span>
-                    À emporter <strong style={{ color: "#c9b99a" }}>{fmtEuroInt(detail.aEmporter.ca)}</strong>
+                    À emporter <strong style={{ color: "#c9b99a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmtEuroInt(detail.aEmporter.ca)}</strong>
                   </p>
-                  <p style={{ margin: "2px 0 0", fontSize: 11, color: "#888" }}>
+                  <p style={{ margin: "2px 0 0", fontSize: 13, color: "#888" }}>
                     {detail.surPlace.couverts} + {detail.aEmporter.couverts} couverts
                   </p>
                 </div>
@@ -326,17 +326,17 @@ function DayDrawer({ detail, loading, onClose }: { detail: DayDetail | null; loa
             {/* Top 5 produits */}
             {detail.topProducts.length > 0 && (
               <>
-                <p style={{ margin: "0 0 10px", fontSize: 9, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#999" }}>TOP 5 PRODUITS</p>
+                <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: "#999", fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>TOP 5 PRODUITS</p>
                 <div style={{ display: "grid", gap: 8, marginBottom: 8 }}>
                   {detail.topProducts.map((p, i) => (
                     <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#fff", borderRadius: 10, border: "1px solid #ddd6c8" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                         <span style={{ fontSize: 10, fontWeight: 800, color: i === 0 ? RED : "#ccc", flexShrink: 0 }}>#{i + 1}</span>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
                       </div>
                       <div style={{ flexShrink: 0, marginLeft: 8, textAlign: "right" }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: ACCENT }}>{fmtEuroInt(p.totalSales)}</span>
-                        <span style={{ fontSize: 10, color: "#bbb", marginLeft: 4 }}>{p.quantity}x</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: ACCENT, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmtEuroInt(p.totalSales)}</span>
+                        <span style={{ fontSize: 11, color: "#bbb", marginLeft: 4, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{p.quantity}x</span>
                       </div>
                     </div>
                   ))}
@@ -361,15 +361,17 @@ const card: React.CSSProperties = {
 
 const sectionLabel: React.CSSProperties = {
   margin: "0 0 12px",
-  fontSize: 10,
-  fontWeight: 800,
+  fontSize: 12,
+  fontWeight: 600,
   letterSpacing: 2,
   textTransform: "uppercase",
   color: "#999",
+  fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
 };
 
 const kpiLabel: React.CSSProperties = {
-  margin: "0 0 6px", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#999",
+  margin: "0 0 6px", fontSize: 12, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", color: "#999",
+  fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
 };
 
 const kpiValue: React.CSSProperties = {
@@ -418,7 +420,7 @@ export default function PilotagePage() {
   // Service-hours auto-refresh (15 min during midi 10-15h / soir 18-23h30)
   const [isService, setIsService] = useState(() => {
     const h = new Date().getHours();
-    return (h >= 10 && h < 15) || (h >= 18 && h < 24);
+    return (h >= 12 && h < 15) || h >= 19;
   });
 
   useEffect(() => {
@@ -432,7 +434,7 @@ export default function PilotagePage() {
 
     const tick = setInterval(() => {
       const h = new Date().getHours();
-      const service = (h >= 10 && h < 15) || (h >= 18 && h < 24);
+      const service = (h >= 12 && h < 15) || h >= 19;
       setIsService(service);
       if (service && Date.now() - lastRefresh >= REFRESH_MS) {
         lastRefresh = Date.now();
@@ -573,7 +575,7 @@ export default function PilotagePage() {
                 <div style={card}>
                   <p style={kpiLabel}>Meilleur jour</p>
                   <p style={kpiValue}>{s.semaine.bestDay.label}</p>
-                  <p style={{ margin: "6px 0 0", fontSize: 12, fontWeight: 700, color: "#888" }}>
+                  <p style={{ margin: "6px 0 0", fontSize: 14, fontWeight: 700, color: "#888", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
                     {fmtEuroInt(s.semaine.bestDay.totalSales)}
                   </p>
                 </div>
@@ -628,7 +630,7 @@ export default function PilotagePage() {
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                                 <span style={{ fontSize: 10, fontWeight: 800, color: i === 0 ? ACCENT : "#bbb", flexShrink: 0 }}>#{i + 1}</span>
-                                <span style={{ fontSize: 12, fontWeight: i < 3 ? 700 : 500, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                                <span style={{ fontSize: 14, fontWeight: i < 3 ? 700 : 500, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
                                 {p.isNew && (
                                   <span style={{ fontSize: 9, fontWeight: 800, padding: "1px 5px", borderRadius: 5, background: "#d1fae5", color: "#065f46", flexShrink: 0 }}>↑ Nouveau</span>
                                 )}
@@ -641,8 +643,8 @@ export default function PilotagePage() {
                                 )}
                               </div>
                               <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
-                                <span style={{ fontSize: 12, fontWeight: 700, color: ACCENT }}>{fmtEuroInt(p.totalSales)}</span>
-                                <span style={{ fontSize: 10, color: "#bbb", marginLeft: 4 }}>{p.quantity}x</span>
+                                <span style={{ fontSize: 14, fontWeight: 700, color: ACCENT, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmtEuroInt(p.totalSales)}</span>
+                                <span style={{ fontSize: 11, color: "#bbb", marginLeft: 4, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{p.quantity}x</span>
                               </div>
                             </div>
                             <div style={{ height: 4, background: "#f0ebe3", borderRadius: 2 }}>
@@ -668,11 +670,18 @@ export default function PilotagePage() {
                       return (
                         <div key={i}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                              {label}
-                            </span>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{fmtEuroInt(cat.ca)}</span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", flexShrink: 0 }}>
+                                {label}
+                              </span>
+                              {cat.topProduct && (
+                                <span style={{ fontSize: 10, color: "#999", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {cat.topProduct}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                              <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmtEuroInt(cat.ca)}</span>
                               <span style={{
                                 fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 5,
                                 background: `${color}14`, color,
@@ -699,7 +708,7 @@ export default function PilotagePage() {
                     {s.insights.meilleurJour && (
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "#1a1a1a", borderRadius: 10 }}>
                         <span style={{ fontSize: 16, flexShrink: 0 }}>📈</span>
-                        <p style={{ margin: 0, fontSize: 13, color: "#c9b99a", lineHeight: 1.4, fontStyle: "italic" as const }}>
+                        <p style={{ margin: 0, fontSize: 14, color: "#c9b99a", lineHeight: 1.4, fontStyle: "italic" as const }}>
                           <strong>{s.insights.meilleurJour.label}</strong> est ton meilleur jour
                           {" — "}moyenne <strong>{fmtEuroInt(s.insights.meilleurJour.avgCA)}</strong> sur 30 jours
                         </p>
@@ -708,7 +717,7 @@ export default function PilotagePage() {
                     {s.insights.produitEnHausse && (
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "#1a1a1a", borderRadius: 10 }}>
                         <span style={{ fontSize: 16, flexShrink: 0 }}>🍕</span>
-                        <p style={{ margin: 0, fontSize: 13, color: "#c9b99a", lineHeight: 1.4, fontStyle: "italic" as const }}>
+                        <p style={{ margin: 0, fontSize: 14, color: "#c9b99a", lineHeight: 1.4, fontStyle: "italic" as const }}>
                           <strong>&ldquo;{s.insights.produitEnHausse.name}&rdquo;</strong> est en hausse de{" "}
                           <strong style={{ color: GREEN }}>+{s.insights.produitEnHausse.pctChange}%</strong> vs la semaine dernière
                         </p>
@@ -717,7 +726,7 @@ export default function PilotagePage() {
                     {s.insights.caVsMoyenne && (
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "#1a1a1a", borderRadius: 10 }}>
                         <span style={{ fontSize: 16, flexShrink: 0 }}>{s.insights.caVsMoyenne.pct >= 0 ? "📈" : "📉"}</span>
-                        <p style={{ margin: 0, fontSize: 13, color: "#c9b99a", lineHeight: 1.4, fontStyle: "italic" as const }}>
+                        <p style={{ margin: 0, fontSize: 14, color: "#c9b99a", lineHeight: 1.4, fontStyle: "italic" as const }}>
                           Ce <strong>{s.insights.caVsMoyenne.label}</strong> est à{" "}
                           <strong style={{ color: s.insights.caVsMoyenne.pct >= 0 ? GREEN : RED }}>
                             {s.insights.caVsMoyenne.pct >= 0 ? "+" : ""}{s.insights.caVsMoyenne.pct}%
@@ -743,7 +752,7 @@ export default function PilotagePage() {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <p style={{ margin: 0, fontSize: 12, fontWeight: 800, letterSpacing: 2, textTransform: "uppercase", color: sec.color, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{sec.label}</p>
-                      <p style={{ margin: "3px 0 0", fontSize: 12, color: "#999" }}>{sec.sub}</p>
+                      <p style={{ margin: "3px 0 0", fontSize: 14, color: "#999" }}>{sec.sub}</p>
                     </div>
                     <span style={{ display: "inline-block", padding: "7px 14px", borderRadius: 10, background: sec.color, color: "#fff", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0 }}>
                       Ouvrir →

@@ -155,12 +155,52 @@ export async function GET(request: NextRequest) {
     }
   }
   const totalSalesCentimesSem = Math.round(totalSalesSem * 100);
+  // Top product per category (by quantity)
+  const catTopProduct = new Map<string, { name: string; quantity: number }>();
+  for (const dateStr of activeDates) {
+    for (const p of byDate.get(dateStr)?.products ?? []) {
+      if (!p.category) continue;
+      const prev = catTopProduct.get(p.category);
+      if (!prev) {
+        catTopProduct.set(p.category, { name: p.name, quantity: p.quantity });
+      } else {
+        // Accumulate quantities per product per category
+        if (p.name === prev.name) {
+          prev.quantity += p.quantity;
+        } else if (p.quantity > prev.quantity) {
+          catTopProduct.set(p.category, { name: p.name, quantity: p.quantity });
+        }
+      }
+    }
+  }
+
+  // More accurate: build full product-per-category map
+  const catProdMap = new Map<string, Map<string, number>>();
+  for (const dateStr of activeDates) {
+    for (const p of byDate.get(dateStr)?.products ?? []) {
+      if (!p.category) continue;
+      if (!catProdMap.has(p.category)) catProdMap.set(p.category, new Map());
+      const m = catProdMap.get(p.category)!;
+      m.set(p.name, (m.get(p.name) ?? 0) + p.quantity);
+    }
+  }
+  const catTopProductFinal = new Map<string, string>();
+  for (const [cat, prods] of catProdMap) {
+    let best = "";
+    let bestQty = 0;
+    for (const [name, qty] of prods) {
+      if (qty > bestQty) { best = name; bestQty = qty; }
+    }
+    if (best) catTopProductFinal.set(cat, best);
+  }
+
   const categories = Array.from(catMap.entries())
     .sort(([, a], [, b]) => b - a)
     .map(([name, centimes]) => ({
       name,
       ca: Math.round(centimes / 100 * 100) / 100,
       pct: totalSalesCentimesSem > 0 ? Math.round((centimes / totalSalesCentimesSem) * 100) : 0,
+      topProduct: catTopProductFinal.get(name) ?? null,
     }));
 
   // ── Insights (only for current week, using 30-day data) ───────────────
