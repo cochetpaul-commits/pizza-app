@@ -137,6 +137,11 @@ export default function Home() {
   const { current: etab, isGroupAdmin, isGroupView } = useEtablissement();
   const router = useRouter();
 
+  // Debug: log establishment context values
+  useEffect(() => {
+    console.log("[Home] useEtablissement:", { etab: etab?.slug ?? null, isGroupAdmin, isGroupView });
+  }, [etab, isGroupAdmin, isGroupView]);
+
   // Redirect group admins in group view to /groupe
   useEffect(() => {
     if (isGroupAdmin && isGroupView) router.replace("/groupe");

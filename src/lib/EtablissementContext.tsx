@@ -46,11 +46,16 @@ export function EtablissementProvider({ children }: { children: ReactNode }) {
       if (cancelled || !u.user) { setLoading(false); return; }
 
       // Fetch profile for group admin flag + access list
-      const { data: profile } = await supabase
+      // Columns may not exist yet if migration hasn't run — handle gracefully
+      const { data: profile, error: profileErr } = await supabase
         .from("profiles")
         .select("is_group_admin, etablissements_access")
         .eq("id", u.user.id)
         .maybeSingle();
+
+      if (profileErr) {
+        console.warn("[EtablissementProvider] profile query failed (columns may not exist yet):", profileErr.message);
+      }
 
       const groupAdmin = profile?.is_group_admin ?? false;
       const accessIds: string[] = profile?.etablissements_access ?? [];
@@ -58,7 +63,8 @@ export function EtablissementProvider({ children }: { children: ReactNode }) {
       setIsGroupAdmin(groupAdmin);
 
       // Fetch all active establishments
-      const { data: etabs } = await supabase
+      // Table may not exist yet if migration hasn't run
+      const { data: etabs, error: etabErr } = await supabase
         .from("etablissements")
         .select("*")
         .eq("actif", true)
@@ -66,11 +72,26 @@ export function EtablissementProvider({ children }: { children: ReactNode }) {
 
       if (cancelled) return;
 
+      if (etabErr) {
+        console.warn("[EtablissementProvider] etablissements query failed (table may not exist yet):", etabErr.message);
+        // Graceful fallback — app works without establishment filtering
+        setLoading(false);
+        return;
+      }
+
       // Filter to accessible ones (group admin sees all)
       const all = (etabs ?? []) as Etablissement[];
       const accessible = groupAdmin
         ? all
         : all.filter(e => accessIds.includes(e.id));
+
+      console.log("[EtablissementProvider]", {
+        groupAdmin,
+        accessIds,
+        allCount: all.length,
+        accessibleCount: accessible.length,
+        slugs: accessible.map(e => e.slug),
+      });
 
       setEtablissements(accessible);
 

@@ -4,11 +4,14 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useEtablissement } from "@/lib/EtablissementContext";
 
 export function EtablissementSelector() {
-  const { current, setCurrent, etablissements, isGroupView, setGroupView, isGroupAdmin } = useEtablissement();
+  const { current, setCurrent, etablissements, isGroupView, setGroupView, isGroupAdmin, loading } = useEtablissement();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   const close = useCallback(() => setOpen(false), []);
+
+  // Don't render while loading or if no establishments exist (migration not run yet)
+  if (loading || etablissements.length === 0) return null;
 
   useEffect(() => {
     if (!open) return;
