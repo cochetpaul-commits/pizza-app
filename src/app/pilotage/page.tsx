@@ -30,6 +30,23 @@ type StatsData = {
 };
 type MeteoData = { temp: number; description: string; emoji: string; tonight: { temp: number; description: string; emoji: string } | null };
 
+type CostData = {
+  week: string;
+  totalCA: number;
+  totalCOGS: number;
+  foodCostPct: number | null;
+  margeBrute: number;
+  matchRate: number;
+  matchedProducts: number;
+  totalProducts: number;
+  prev: {
+    totalCA: number;
+    totalCOGS: number;
+    foodCostPct: number | null;
+    margeBrute: number;
+  };
+};
+
 type ServiceSlot = { ca: number; couverts: number };
 type DayDetail = {
   date: string;
@@ -385,6 +402,7 @@ const deltaStyle: React.CSSProperties = {
 };
 
 const SECTIONS = [
+  { href: "/finances", label: "CONTRÔLE FINANCIER", sub: "P&L · Rentabilité produits · Suivi coûts matières", color: "#4a6741" },
   { href: "/mercuriale", label: "MERCURIALE", sub: "Prix fournisseurs · Export PDF", color: "#D4775A" },
   { href: "/epicerie", label: "ÉPICERIE", sub: "Prix de vente · Export CSV", color: "#D4775A" },
   { href: "/variations-prix", label: "VARIATIONS & ALERTES", sub: "Historique · Hausses & baisses · Veille 30 j", color: ACCENT },
@@ -396,6 +414,7 @@ export default function PilotagePage() {
   const currentWeek = useMemo(() => getCurrentWeek(), []);
   const [weekStr, setWeekStr] = useState(currentWeek);
   const [stats, setStats] = useState<StatsData | null>(null);
+  const [costs, setCosts] = useState<CostData | null>(null);
   const [meteo, setMeteo] = useState<MeteoData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState("");
@@ -407,12 +426,14 @@ export default function PilotagePage() {
 
   const loadStats = useCallback(async (week: string) => {
     setLoading(true);
-    const [s, m] = await Promise.all([
+    const [s, m, c] = await Promise.all([
       fetch(`/api/popina/stats?week=${week}`).then((r) => r.ok ? r.json() : null),
       fetch("/api/meteo").then((r) => r.ok ? r.json() : null),
+      fetch(`/api/pilotage/costs?week=${week}`).then((r) => r.ok ? r.json() : null),
     ]);
     if (s) setStats(s);
     if (m) setMeteo(m);
+    if (c) setCosts(c);
     setLastUpdate(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
     setLoading(false);
   }, []);
@@ -581,6 +602,57 @@ export default function PilotagePage() {
                 </div>
 
               </div>
+
+              {/* ── BLOC 2b : INDICATEURS FINANCIERS ──────────────────── */}
+              {costs && costs.foodCostPct !== null && (
+                <>
+                  <p style={sectionLabel}>CONTRÔLE FINANCIER</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 20 }}>
+
+                    <div style={{ ...card, borderLeft: `4px solid ${costs.foodCostPct <= 30 ? GREEN : costs.foodCostPct <= 35 ? "#d4a24e" : RED}` }}>
+                      <p style={kpiLabel}>Food Cost</p>
+                      <p style={{ ...kpiValue, color: costs.foodCostPct <= 30 ? GREEN : costs.foodCostPct <= 35 ? "#d4a24e" : RED }}>
+                        {costs.foodCostPct.toFixed(1)}%
+                      </p>
+                      {costs.prev.foodCostPct !== null && (
+                        <p style={{ ...deltaStyle, color: costs.foodCostPct <= costs.prev.foodCostPct ? GREEN : RED }}>
+                          {costs.foodCostPct <= costs.prev.foodCostPct ? "↓ " : "↑ +"}
+                          {(costs.foodCostPct - costs.prev.foodCostPct).toFixed(1)} pts
+                        </p>
+                      )}
+                    </div>
+
+                    <div style={{ ...card, borderLeft: `4px solid ${GREEN}` }}>
+                      <p style={kpiLabel}>Marge brute</p>
+                      <p style={kpiValue}>{fmtEuroInt(costs.margeBrute)}</p>
+                      {costs.prev.margeBrute > 0 && delta(costs.margeBrute, costs.prev.margeBrute) && (
+                        <p style={{ ...deltaStyle, color: deltaColor(costs.margeBrute, costs.prev.margeBrute) }}>
+                          {delta(costs.margeBrute, costs.prev.margeBrute)}
+                        </p>
+                      )}
+                    </div>
+
+                    <div style={card}>
+                      <p style={kpiLabel}>Coût matières</p>
+                      <p style={kpiValue}>{fmtEuroInt(costs.totalCOGS)}</p>
+                      {costs.prev.totalCOGS > 0 && delta(costs.totalCOGS, costs.prev.totalCOGS) && (
+                        <p style={{ ...deltaStyle, color: deltaColor(costs.prev.totalCOGS, costs.totalCOGS) }}>
+                          {delta(costs.totalCOGS, costs.prev.totalCOGS)}
+                        </p>
+                      )}
+                    </div>
+
+                    <div style={card}>
+                      <p style={kpiLabel}>Couverture</p>
+                      <p style={kpiValue}>{costs.matchRate}%</p>
+                      <p style={{ margin: "6px 0 0", fontSize: 11, color: "#999" }}>
+                        {costs.matchedProducts}/{costs.totalProducts} produits
+                      </p>
+                    </div>
+
+                  </div>
+                </>
+              )}
 
               {/* ── BLOC 3 : GRAPHE + TOP PRODUITS ───────────────────── */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12, marginBottom: 20 }}>
