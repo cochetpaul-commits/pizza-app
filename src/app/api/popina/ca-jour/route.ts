@@ -28,13 +28,14 @@ export async function GET(request: NextRequest) {
 
   const dateParam = request.nextUrl.searchParams.get("date");
   const date = dateParam || getParisDate(0);
+  const locationParam = request.nextUrl.searchParams.get("locationId") || undefined;
 
-  console.log(`[ca-jour] date demandée: ${date}`);
+  console.log(`[ca-jour] date demandée: ${date}, location: ${locationParam ?? LOCATION_ID}`);
 
   // Fetch reports (totaux, produits, catégories) + orders (midi/soir, surPlace/aEmporter)
   const [allReports, allOrders] = await Promise.all([
-    fetchReports(apiKey, date, date),
-    fetchOrders(apiKey, date),
+    fetchReports(apiKey, date, date, locationParam),
+    fetchOrders(apiKey, date, locationParam),
   ]);
 
   // ── Filtrer strictement par date ──
@@ -146,7 +147,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     date,
-    locationId: LOCATION_ID,
+    locationId: locationParam ?? LOCATION_ID,
     totalSales: totalSalesEur,
     guestsNumber: totalGuests,
     ticketMoyen,
