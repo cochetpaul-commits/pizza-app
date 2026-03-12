@@ -71,7 +71,7 @@ function cpuFromPack(row: Record<string, unknown>): CpuByUnit {
   return {};
 }
 
-function enrichCpuWithConversions(row: Record<string, unknown>, cpu: CpuByUnit): CpuByUnit {
+export function enrichCpuWithConversions(row: Record<string, unknown>, cpu: CpuByUnit): CpuByUnit {
   const out: CpuByUnit = { ...cpu };
 
   const pieceWeightG = n2(row["piece_weight_g"]);
