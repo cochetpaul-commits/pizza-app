@@ -83,3 +83,32 @@ La densité `density_g_per_ml` de l'ingrédient n'était pas exploitée.
 Exporter `enrichCpuWithConversions` depuis `offerPricing.ts` et l'appliquer
 dans les 3 fallbacks des formulaires V2 en utilisant `density_g_per_ml` de
 l'ingrédient (numériquement identique à `density_kg_per_l` : 1 kg/L = 1 g/mL).
+
+## Valeurs par défaut de densité (density_g_per_ml)
+
+Migration `20260312100000_fill_density_liquids.sql` — appliquée automatiquement
+aux ingrédients liquides dont `density_g_per_ml` est null ou 0.
+
+| Catégorie / Nom | density_g_per_ml | Justification |
+|---|---|---|
+| Miel | **1.4** | ~1.4 g/mL (dense, sucré) |
+| Sirop, grenadine, orgeat | **1.3** | Sirop de sucre concentré |
+| Eau, lait, crème, vinaigre, jus | **1.0** | Base aqueuse, ~1 g/mL |
+| Vin, bière, prosecco, vermouth, marsala, porto | **0.99** | Légèrement < eau |
+| Huile (olive, tournesol, olio) | **0.91** | Huiles végétales standard |
+| Spiritueux (vodka, gin, rhum, whisky, tequila, limoncello, campari, aperol…) | **0.79** | Alcool éthylique ~0.789 g/mL |
+| Autres liquides non identifiés (default_unit ml/l/cl, catégorie boisson/alcool) | **1.0** | Valeur neutre par défaut |
+
+### Ordre d'application (important)
+
+Les UPDATE s'exécutent dans l'ordre ci-dessus. Un ingrédient correspondant à
+plusieurs patterns reçoit la première valeur (ex : "sirop de miel" → 1.3 car
+sirop est matché avant le catch-all eau).
+
+### Warning dans les fiches recettes
+
+Si un ingrédient liquide est utilisé dans une recette et que `density_g_per_ml`
+est null ou 0, un avertissement orange s'affiche sous la ligne :
+> ⚠️ Densité manquante — prix estimé avec 1g/ml
+
+Le texte est un lien cliquable vers `/ingredients/[id]` pour corriger la densité.
