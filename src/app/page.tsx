@@ -3,9 +3,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchPriceAlerts } from "@/lib/priceAlerts";
 import { useProfile } from "@/lib/ProfileContext";
+import { useEtablissement } from "@/lib/EtablissementContext";
+import { EtablissementSelector } from "@/components/EtablissementSelector";
 
 type UpcomingEvent = {
   id: string;
@@ -131,6 +134,13 @@ export default function Home() {
   const [counts, setCounts] = useState<Counts | null>(null);
   const [caJour, setCaJour] = useState<number | null>(null);
   const { role, displayName, isAdmin } = useProfile();
+  const { current: etab, isGroupAdmin, isGroupView } = useEtablissement();
+  const router = useRouter();
+
+  // Redirect group admins in group view to /groupe
+  useEffect(() => {
+    if (isGroupAdmin && isGroupView) router.replace("/groupe");
+  }, [isGroupAdmin, isGroupView, router]);
 
   // CA du jour Popina — auto-refresh toutes les 5 min
   useEffect(() => {
@@ -248,6 +258,9 @@ export default function Home() {
             }}>
               GROUP
             </span>
+          </div>
+          <div style={{ marginLeft: 16 }}>
+            <EtablissementSelector />
           </div>
         </div>
       </div>

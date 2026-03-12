@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
+import { useEtablissement } from "@/lib/EtablissementContext";
 
 type SupplierRow = {
   id: string;
@@ -29,13 +30,17 @@ export default function FournisseursPage() {
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [stats, setStats] = useState<Map<string, SupplierStats>>(new Map());
   const [loading, setLoading] = useState(true);
+  const { current: etab } = useEtablissement();
 
   useEffect(() => {
     async function load() {
       setLoading(true);
 
+      const supQuery = supabase.from("suppliers").select("id,name,is_active,email,phone,contact_name").order("name");
+      if (etab) supQuery.eq("etablissement_id", etab.id);
+
       const [supRes, offRes, invRes] = await Promise.all([
-        supabase.from("suppliers").select("id,name,is_active,email,phone,contact_name").order("name"),
+        supQuery,
         supabase.from("v_latest_offers").select("supplier_id"),
         supabase.from("supplier_invoices")
           .select("supplier_id,created_at,invoice_number")
@@ -74,7 +79,7 @@ export default function FournisseursPage() {
     }
 
     load();
-  }, []);
+  }, [etab?.id]);
 
   const active = suppliers.filter((s) => s.is_active);
   const inactive = suppliers.filter((s) => !s.is_active);
