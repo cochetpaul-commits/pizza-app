@@ -256,6 +256,14 @@ export default function EventForm({ eventId }: { eventId?: string }) {
 
   const handleUpload = async (file: File) => {
     if (!eventId || !userId) return;
+    if (!file.name.toLowerCase().endsWith(".pdf") && file.type !== "application/pdf") {
+      alert("Seuls les fichiers PDF sont acceptés.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Le fichier dépasse la taille maximum de 10 Mo.");
+      return;
+    }
     setUploading(true);
     try {
       const ext = file.name.split(".").pop() ?? "pdf";
@@ -708,7 +716,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
               <input
                 ref={fileRef}
                 type="file"
-                accept=".pdf"
+                accept="application/pdf,.pdf"
                 style={{ display: "none" }}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
@@ -718,11 +726,11 @@ export default function EventForm({ eventId }: { eventId?: string }) {
               <button
                 type="button"
                 className="btn"
-                style={{ fontSize: 12 }}
+                style={{ fontSize: 13, fontWeight: 600, minHeight: 48, padding: "10px 16px" }}
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading}
               >
-                {uploading ? "Upload…" : "Importer un document"}
+                {uploading ? "Upload en cours…" : "Ajouter un document PDF"}
               </button>
             </div>
           )}
@@ -757,29 +765,35 @@ export default function EventForm({ eventId }: { eventId?: string }) {
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{
-                    padding: "4px 10px",
+                    padding: "8px 14px",
+                    minHeight: 40,
                     borderRadius: 6,
                     background: "#D4775A",
                     color: "#fff",
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: 700,
                     textDecoration: "none",
+                    display: "inline-flex",
+                    alignItems: "center",
                   }}
                 >
-                  Voir
+                  Télécharger
                 </a>
                 <button
                   type="button"
                   onClick={() => deleteDoc(d)}
                   style={{
-                    padding: "4px 10px",
+                    padding: "8px 14px",
+                    minHeight: 40,
                     borderRadius: 6,
                     background: "none",
                     border: "1px solid #ddd6c8",
                     color: "#DC2626",
                     cursor: "pointer",
                     fontWeight: 700,
-                    fontSize: 11,
+                    fontSize: 12,
+                    display: "inline-flex",
+                    alignItems: "center",
                   }}
                 >
                   Supprimer
