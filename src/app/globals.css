@@ -456,3 +456,145 @@ input[type='number']::-webkit-outer-spin-button {
 input[type='number'] {
   -moz-appearance: textfield !important;
 }
+
+/* ── Dashboard v2 ──────────────────────────────────── */
+
+.dash-grid {
+  display: grid;
+  gap: 14px;
+}
+
+@keyframes dashIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.dash-grid > * {
+  animation: dashIn .45s cubic-bezier(.22,1,.36,1) both;
+}
+.dash-grid > :nth-child(1)  { animation-delay: 0s; }
+.dash-grid > :nth-child(2)  { animation-delay: .05s; }
+.dash-grid > :nth-child(3)  { animation-delay: .09s; }
+.dash-grid > :nth-child(4)  { animation-delay: .13s; }
+.dash-grid > :nth-child(5)  { animation-delay: .17s; }
+.dash-grid > :nth-child(6)  { animation-delay: .21s; }
+.dash-grid > :nth-child(7)  { animation-delay: .25s; }
+.dash-grid > :nth-child(8)  { animation-delay: .29s; }
+.dash-grid > :nth-child(9)  { animation-delay: .33s; }
+
+/* ─ Base card ─ */
+.dash-card {
+  position: relative;
+  background: #fff;
+  border-radius: 16px;
+  padding: 22px 24px;
+  cursor: pointer;
+  border: 1px solid rgba(221,214,200,0.3);
+  overflow: hidden;
+  transition:
+    transform .22s cubic-bezier(.34,1.56,.64,1),
+    box-shadow .22s ease,
+    border-color .22s ease;
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.03),
+    0 4px 14px rgba(0,0,0,0.05);
+}
+.dash-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 4px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent, var(--terre));
+  transition: top .2s ease, bottom .2s ease;
+}
+.dash-card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 4px 8px rgba(0,0,0,0.04),
+    0 14px 32px rgba(0,0,0,0.10);
+  border-color: rgba(221,214,200,0.6);
+}
+.dash-card:hover::before {
+  top: 10px;
+  bottom: 10px;
+}
+.dash-card:active {
+  transform: translateY(-1px);
+  transition-duration: .08s;
+}
+
+/* ─ Hero (ATELIER) ─ */
+.dash-hero {
+  background: linear-gradient(150deg, #fff 0%, #fdf9f5 100%);
+  border-radius: 20px;
+  padding: 28px 28px;
+  box-shadow:
+    0 2px 6px rgba(0,0,0,0.03),
+    0 8px 28px rgba(212,119,90,0.10);
+}
+.dash-hero::before {
+  width: 5px;
+  top: 18px;
+  bottom: 18px;
+}
+.dash-hero:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 8px 16px rgba(0,0,0,0.04),
+    0 20px 44px rgba(212,119,90,0.14);
+}
+.dash-hero:hover::before {
+  top: 14px;
+  bottom: 14px;
+}
+
+/* ─ Green (PILOTAGE) ─ */
+.dash-green {
+  background: linear-gradient(150deg, #f5f8f4 0%, #edf2eb 100%);
+}
+.dash-green:hover {
+  box-shadow:
+    0 4px 8px rgba(0,0,0,0.03),
+    0 14px 32px rgba(74,103,65,0.10);
+}
+
+/* ─ Warm (FACTURES) ─ */
+.dash-warm {
+  background: linear-gradient(150deg, #f8f3ec 0%, #f3ece3 100%);
+}
+
+/* ─ Dark (ADMIN) ─ */
+.dash-dark {
+  background: linear-gradient(150deg, #2c2c2c 0%, #1a1a1a 100%);
+  border-color: rgba(255,255,255,0.06);
+}
+.dash-dark::before {
+  background: #c9b99a;
+}
+.dash-dark:hover {
+  border-color: rgba(255,255,255,0.12);
+  box-shadow:
+    0 4px 8px rgba(0,0,0,0.12),
+    0 14px 32px rgba(0,0,0,0.22);
+}
+
+/* ─ Pill button ─ */
+.dash-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: var(--pill-bg, rgba(212,119,90,0.10));
+  color: var(--pill-color, #D4775A);
+  transition: background .2s ease;
+}
+.dash-card:hover .dash-pill {
+  background: var(--pill-hover, rgba(212,119,90,0.18));
+}

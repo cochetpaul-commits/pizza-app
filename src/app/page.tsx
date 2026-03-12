@@ -30,11 +30,11 @@ function fmtDateShort(iso: string) {
   return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
-// ── Éditorial Italien — style helpers ───────────────────────────────────────
+// ── Style helpers ─────────────────────────────────────────────────────────────
 
-const titleStyle = (color: string): React.CSSProperties => ({
+const titleOf = (color: string, size = 14): React.CSSProperties => ({
   margin: 0,
-  fontSize: 14,
+  fontSize: size,
   fontWeight: 700,
   letterSpacing: 1.5,
   textTransform: "uppercase",
@@ -42,133 +42,89 @@ const titleStyle = (color: string): React.CSSProperties => ({
   color,
 });
 
-const subtitleStyle: React.CSSProperties = {
-  margin: "3px 0 0",
+const sub: React.CSSProperties = {
+  margin: "4px 0 0",
   fontSize: 13,
   fontWeight: 500,
   color: "#999",
 };
 
-const counterStyle = (color: string): React.CSSProperties => ({
-  fontSize: 28,
+const ctr = (color: string, size = 30): React.CSSProperties => ({
+  fontSize: size,
   fontWeight: 700,
   color,
   lineHeight: 1,
   fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif",
 });
 
-const counterSuffix: React.CSSProperties = {
+const ctrSfx: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 400,
   color: "#999",
   marginLeft: 3,
 };
 
-const btnStyle = (bg: string): React.CSSProperties => ({
-  display: "inline-block",
-  padding: "7px 16px",
-  borderRadius: 10,
-  background: bg,
-  color: "#fff",
-  fontSize: 12,
-  fontWeight: 700,
-  border: "none",
-  textDecoration: "none",
-  whiteSpace: "nowrap",
-  flexShrink: 0,
-});
-
-const badgeStyle = (color: string): React.CSSProperties => ({
+const badge = (color: string): React.CSSProperties => ({
   display: "inline-block",
   fontSize: 10,
   fontWeight: 700,
-  padding: "2px 7px",
-  borderRadius: 6,
-  background: `${color}18`,
+  padding: "3px 8px",
+  borderRadius: 8,
+  background: `${color}14`,
   color,
-  border: `1px solid ${color}40`,
+  border: `1px solid ${color}30`,
 });
 
-// ── Card presets per section ────────────────────────────────────────────────
-
-const cardAtelier: React.CSSProperties = {
-  background: "#f5ede4",
-  borderLeft: "4px solid #D4775A",
-  borderRadius: 14,
-  padding: "18px 20px",
-  cursor: "pointer",
+const row: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
 };
 
-const cardCatalogue: React.CSSProperties = {
-  background: "#fff",
-  border: "1px solid #ddd6c8",
-  borderRadius: 14,
-  padding: "18px 20px",
-  cursor: "pointer",
-};
+const pillGreen = {
+  "--pill-bg": "rgba(74,103,65,0.10)",
+  "--pill-color": "#4a6741",
+  "--pill-hover": "rgba(74,103,65,0.25)",
+} as React.CSSProperties;
 
-const cardFactures: React.CSSProperties = {
-  background: "#e8e0d0",
-  borderRadius: 14,
-  padding: "18px 20px",
-  cursor: "pointer",
-};
+const pillDark = {
+  "--pill-bg": "rgba(201,185,154,0.15)",
+  "--pill-color": "#c9b99a",
+  "--pill-hover": "rgba(201,185,154,0.28)",
+} as React.CSSProperties;
 
-const cardFournisseurs: React.CSSProperties = {
-  background: "#fff",
-  border: "1px solid #ddd6c8",
-  borderRadius: 14,
-  padding: "18px 20px",
-  cursor: "pointer",
-};
+const pillWarm = {
+  "--pill-bg": "rgba(160,132,92,0.10)",
+  "--pill-color": "#A0845C",
+  "--pill-hover": "rgba(160,132,92,0.20)",
+} as React.CSSProperties;
 
-const cardEvenements: React.CSSProperties = {
-  background: "#f5ede4",
-  borderLeft: "4px solid #D4775A",
-  borderRadius: 14,
-  padding: "18px 20px",
-  cursor: "pointer",
-};
-
-const cardPilotage: React.CSSProperties = {
-  background: "#e8ede6",
-  borderRadius: 14,
-  padding: "18px 20px",
-  cursor: "pointer",
-};
-
-const cardAdmin: React.CSSProperties = {
-  background: "#1a1a1a",
-  borderRadius: 14,
-  padding: "18px 20px",
-  cursor: "pointer",
-};
-
-// ── Section separator ───────────────────────────────────────────────────────
+// ── Section separator ─────────────────────────────────────────────────────────
 
 function SectionSeparator({ label }: { label: string }) {
   return (
-    <div className="section-separator" style={{
+    <div style={{
       display: "flex",
       alignItems: "center",
       gap: 12,
-      margin: "8px 0 2px",
+      margin: "6px 0 0",
+      padding: "0 4px",
     }}>
       <span style={{
         fontSize: 10,
         fontWeight: 700,
-        letterSpacing: 2,
+        letterSpacing: 2.5,
         textTransform: "uppercase",
         color: "#b0a894",
         fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
         whiteSpace: "nowrap",
       }}>{label}</span>
-      <span style={{ flex: 1, height: 1, background: "#d5cdbc" }} />
+      <span style={{ flex: 1, height: 1, background: "linear-gradient(90deg, #d5cdbc, transparent)" }} />
     </div>
   );
 }
 
-// ── Component ───────────────────────────────────────────────────────────────
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Home() {
   const [authState, setAuthState] = useState<"loading" | "ok" | "anon">("loading");
@@ -243,19 +199,19 @@ export default function Home() {
       width: "100%",
       boxSizing: "border-box",
     }}>
-      {/* ── Header crème ── */}
+      {/* ── Header ── */}
       <div style={{
-        background: "#f2ede4",
-        padding: "12px 20px",
-        marginBottom: 20,
+        padding: "18px 20px",
+        marginBottom: 16,
         width: "100vw",
         marginLeft: "calc(-50vw + 50%)",
-        borderBottom: "1.5px solid #1a1a1a",
+        borderBottom: "1px solid rgba(0,0,0,0.06)",
+        display: "flex",
+        justifyContent: "center",
       }}>
         <div style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
           gap: 12,
         }}>
           <Image
@@ -263,7 +219,7 @@ export default function Home() {
             alt="iFratelli Group"
             width={48}
             height={48}
-            style={{ height: 64, width: "auto", objectFit: "contain", mixBlendMode: "multiply" }}
+            style={{ height: 56, width: "auto", objectFit: "contain", mixBlendMode: "multiply" }}
             priority
           />
           <div className="dashboard-header-text" style={{
@@ -300,60 +256,58 @@ export default function Home() {
 
       {/* ── Non connecté ── */}
       {authState === "anon" && (
-        <div style={{ ...cardCatalogue, textAlign: "center", cursor: "default" }}>
+        <div className="dash-card" style={{ textAlign: "center", cursor: "default" }}>
           <p style={{ margin: 0, fontSize: 13, color: "#999" }}>Connecte-toi pour accéder aux fiches.</p>
           <div style={{ marginTop: 12 }}>
-            <Link href="/login" style={btnStyle("#D4775A")}>Se connecter</Link>
+            <Link href="/login" className="dash-pill" style={{ textDecoration: "none" }}>Se connecter</Link>
           </div>
         </div>
       )}
 
       {/* ── Connecté ── */}
       {authState === "ok" && (
-        <div style={{ display: "grid", gap: 12 }}>
+        <div className="dash-grid">
 
-          {/* ─── ATELIER ─── */}
+          {/* ─── ATELIER (hero) ─── */}
           <Link href="/recettes" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={cardAtelier}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <p style={titleStyle("#D4775A")}>ATELIER</p>
-                  <p style={subtitleStyle}>Pizza · Empâtement · Cuisine · Cocktail</p>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  {counts && (
-                    <span style={counterStyle("#D4775A")}>
-                      {counts.recettes}
-                      <span style={counterSuffix}>fiches</span>
-                    </span>
-                  )}
-                  <span style={btnStyle("#D4775A")}>Ouvrir →</span>
-                </div>
+            <div className="dash-card dash-hero" style={{ "--accent": "#D4775A" } as React.CSSProperties}>
+              <div>
+                <p style={titleOf("#D4775A", 16)}>ATELIER</p>
+                <p style={sub}>Pizza · Empâtement · Cuisine · Cocktail</p>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16 }}>
+                {counts && (
+                  <span style={ctr("#D4775A", 38)}>
+                    {counts.recettes}
+                    <span style={ctrSfx}>fiches</span>
+                  </span>
+                )}
+                <span className="dash-pill" style={{ marginLeft: "auto" }}>Ouvrir →</span>
               </div>
             </div>
           </Link>
 
           {/* ─── CATALOGUE ─── */}
           <Link href="/ingredients" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={cardCatalogue}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div className="dash-card" style={{ "--accent": "#D4775A" } as React.CSSProperties}>
+              <div style={row}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <p style={titleStyle("#D4775A")}>CATALOGUE</p>
+                    <p style={titleOf("#D4775A")}>CATALOGUE</p>
                     {counts && counts.toCheck > 0 && (
-                      <span style={badgeStyle("#EA580C")}>{counts.toCheck} à vérifier</span>
+                      <span style={badge("#EA580C")}>{counts.toCheck} à vérifier</span>
                     )}
                   </div>
-                  <p style={subtitleStyle}>Index · Coûts · Prix</p>
+                  <p style={sub}>Index · Coûts · Prix</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && (
-                    <span style={counterStyle("#D4775A")}>
+                    <span style={ctr("#D4775A")}>
                       {counts.ingredients}
-                      <span style={counterSuffix}>réf.</span>
+                      <span style={ctrSfx}>réf.</span>
                     </span>
                   )}
-                  <span style={btnStyle("#D4775A")}>Ouvrir →</span>
+                  <span className="dash-pill">Ouvrir →</span>
                 </div>
               </div>
             </div>
@@ -362,88 +316,88 @@ export default function Home() {
           {/* ── Separator GESTION ── */}
           {role && role !== "cuisine" && <SectionSeparator label="GESTION" />}
 
-          {/* ─── FACTURES (admin/direction only) ─── */}
+          {/* ─── FACTURES ─── */}
           {role && role !== "cuisine" && (
           <Link href="/invoices" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={cardFactures}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div className="dash-card dash-warm" style={{ "--accent": "#A0845C" } as React.CSSProperties}>
+              <div style={row}>
                 <div>
-                  <p style={titleStyle("#D4775A")}>FACTURES</p>
-                  <p style={subtitleStyle}>Import fournisseurs · Mise à jour prix</p>
+                  <p style={titleOf("#A0845C")}>FACTURES</p>
+                  <p style={sub}>Import fournisseurs · Mise à jour prix</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && counts.lastImport && (
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#D4775A" }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#A0845C" }}>
                       {counts.lastImportSupplier ? `${counts.lastImportSupplier} · ` : ""}
                       {fmtDateShort(counts.lastImport)}
                     </span>
                   )}
-                  <span style={btnStyle("#D4775A")}>Ouvrir →</span>
+                  <span className="dash-pill" style={pillWarm}>Ouvrir →</span>
                 </div>
               </div>
             </div>
           </Link>
           )}
 
-          {/* ─── FOURNISSEURS (admin/direction only) ─── */}
+          {/* ─── FOURNISSEURS ─── */}
           {role && role !== "cuisine" && (
           <Link href="/fournisseurs" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={cardFournisseurs}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div className="dash-card" style={{ "--accent": "#D4775A" } as React.CSSProperties}>
+              <div style={row}>
                 <div>
-                  <p style={titleStyle("#D4775A")}>FOURNISSEURS</p>
-                  <p style={subtitleStyle}>Fiches · Coordonnées · Historique</p>
+                  <p style={titleOf("#D4775A")}>FOURNISSEURS</p>
+                  <p style={sub}>Fiches · Coordonnées · Historique</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && (
-                    <span style={counterStyle("#D4775A")}>
+                    <span style={ctr("#D4775A")}>
                       {counts.suppliers}
-                      <span style={counterSuffix}>actifs</span>
+                      <span style={ctrSfx}>actifs</span>
                     </span>
                   )}
-                  <span style={btnStyle("#D4775A")}>Ouvrir →</span>
+                  <span className="dash-pill">Ouvrir →</span>
                 </div>
               </div>
             </div>
           </Link>
           )}
 
-          {/* ─── ÉVÉNEMENTS (admin/direction only) ─── */}
+          {/* ─── ÉVÉNEMENTS ─── */}
           {role && role !== "cuisine" && (
           <Link href="/evenements" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={cardEvenements}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div className="dash-card" style={{ "--accent": "#D4775A" } as React.CSSProperties}>
+              <div style={row}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <p style={titleStyle("#D4775A")}>ÉVÉNEMENTS</p>
+                    <p style={titleOf("#D4775A")}>ÉVÉNEMENTS</p>
                     {counts && counts.upcomingEvents.length > 0 && (
-                      <span style={badgeStyle("#D4775A")}>{counts.upcomingEvents.length} à venir</span>
+                      <span style={badge("#D4775A")}>{counts.upcomingEvents.length} à venir</span>
                     )}
                   </div>
-                  <p style={subtitleStyle}>Mariages · Séminaires · Traiteur</p>
+                  <p style={sub}>Mariages · Séminaires · Traiteur</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {counts && counts.upcomingEvents.length > 0 && (
-                    <span style={counterStyle("#D4775A")}>
+                    <span style={ctr("#D4775A")}>
                       {counts.upcomingEvents.length}
-                      <span style={counterSuffix}>à venir</span>
+                      <span style={ctrSfx}>à venir</span>
                     </span>
                   )}
-                  <span style={btnStyle("#D4775A")}>Ouvrir →</span>
+                  <span className="dash-pill">Ouvrir →</span>
                 </div>
               </div>
               {counts && counts.upcomingEvents.length > 0 && (
-                <div style={{ marginTop: 10, display: "grid", gap: 4 }}>
+                <div style={{ marginTop: 12, display: "grid", gap: 5 }}>
                   {counts.upcomingEvents.slice(0, 3).map((ev) => (
                     <div key={ev.id} style={{
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
                       fontSize: 11,
-                      padding: "5px 10px",
-                      background: "#faf8f4",
-                      borderRadius: 8,
-                      border: "1px solid #e5ddd0",
+                      padding: "7px 12px",
+                      background: "rgba(245,237,228,0.5)",
+                      borderRadius: 10,
+                      border: "1px solid rgba(221,214,200,0.25)",
                     }}>
                       <span style={{ fontWeight: 700, color: "#2f3a33" }}>{ev.name}</span>
                       <span style={{ fontSize: 10, color: "#999" }}>
@@ -458,42 +412,42 @@ export default function Home() {
           </Link>
           )}
 
-          {/* ─── PILOTAGE (admin/direction only) ─── */}
+          {/* ─── PILOTAGE ─── */}
           {role && role !== "cuisine" && (
           <Link href="/pilotage" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={cardPilotage}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div className="dash-card dash-green" style={{ "--accent": "#4a6741" } as React.CSSProperties}>
+              <div style={row}>
                 <div>
-                  <p style={titleStyle("#4a6741")}>PILOTAGE</p>
-                  <p style={subtitleStyle}>Mercuriale · Épicerie · Variations & Alertes</p>
+                  <p style={titleOf("#4a6741")}>PILOTAGE</p>
+                  <p style={sub}>Mercuriale · Épicerie · Variations & Alertes</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                   {caJour !== null && (
-                    <span style={counterStyle("#4a6741")}>
+                    <span style={ctr("#4a6741")}>
                       {caJour.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                      <span style={counterSuffix}>€ auj.</span>
+                      <span style={ctrSfx}>€ auj.</span>
                     </span>
                   )}
                   {counts && counts.priceAlerts > 0 && (
-                    <span style={badgeStyle("#4a6741")}>{counts.priceAlerts}</span>
+                    <span style={badge("#4a6741")}>{counts.priceAlerts}</span>
                   )}
-                  <span style={btnStyle("#4a6741")}>Ouvrir →</span>
+                  <span className="dash-pill" style={pillGreen}>Ouvrir →</span>
                 </div>
               </div>
             </div>
           </Link>
           )}
 
-          {/* ─── ADMIN (admin only) ─── */}
+          {/* ─── ADMIN ─── */}
           {isAdmin && (
           <Link href="/admin/utilisateurs" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={cardAdmin}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div className="dash-card dash-dark" style={{ "--accent": "#c9b99a" } as React.CSSProperties}>
+              <div style={row}>
                 <div>
-                  <p style={titleStyle("#c9b99a")}>ADMIN</p>
-                  <p style={{ ...subtitleStyle, color: "#888" }}>Utilisateurs · Rôles</p>
+                  <p style={titleOf("#c9b99a")}>ADMIN</p>
+                  <p style={{ ...sub, color: "#777" }}>Utilisateurs · Rôles</p>
                 </div>
-                <span style={btnStyle("#D4775A")}>Ouvrir →</span>
+                <span className="dash-pill" style={pillDark}>Ouvrir →</span>
               </div>
             </div>
           </Link>
@@ -504,20 +458,26 @@ export default function Home() {
 
       {/* ── Footer ── */}
       {authState === "ok" && (
-        <div style={{ textAlign: "center", marginTop: 32, paddingBottom: 20 }}>
+        <div style={{ textAlign: "center", marginTop: 36, paddingBottom: 24 }}>
           {displayName && (
             <div style={{ fontSize: 11, color: "#999", marginBottom: 6 }}>
               {displayName}
-              {role && <span style={{ marginLeft: 6, padding: "1px 6px", borderRadius: 4, background: "#f0ebe3", fontSize: 10, fontWeight: 600 }}>{role}</span>}
+              {role && (
+                <span style={{
+                  marginLeft: 6,
+                  padding: "2px 8px",
+                  borderRadius: 6,
+                  background: "rgba(212,119,90,0.08)",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: "#b0a894",
+                }}>{role}</span>
+              )}
             </div>
           )}
           <span
             onClick={signOut}
-            style={{
-              color: "#999",
-              fontSize: 11,
-              cursor: "pointer",
-            }}
+            style={{ color: "#b0a894", fontSize: 11, cursor: "pointer" }}
           >
             Déconnexion
           </span>
