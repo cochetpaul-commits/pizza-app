@@ -32,6 +32,8 @@ const EtablissementContext = createContext<EtablissementCtx>({
 });
 
 export function EtablissementProvider({ children }: { children: ReactNode }) {
+  console.log("[EtablissementProvider] RENDER — component body executing");
+
   const [etablissements, setEtablissements] = useState<Etablissement[]>([]);
   const [current, setCurrentRaw] = useState<Etablissement | null>(null);
   const [isGroupView, setGroupViewRaw] = useState(false);
