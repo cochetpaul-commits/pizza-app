@@ -141,6 +141,9 @@ export const IngredientRow = React.memo(function IngredientRow({
         <div style={{ flex: 3, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <span style={{ fontWeight: 600, fontSize: 13, color: CAT_COLORS[x.category] }}>{x.name}</span>
+            {x.is_derived && (
+              <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED", border: "1px solid rgba(124,58,237,0.20)" }}>DÉRIVÉ</span>
+            )}
             {alert && (
               <span style={{ fontSize: 10, fontWeight: 800, padding: "1px 5px", borderRadius: 6, color: alert.direction === "up" ? "#DC2626" : "#16A34A", background: alert.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)", border: `1px solid ${alert.direction === "up" ? "rgba(220,38,38,0.30)" : "rgba(22,163,74,0.30)"}` }}>
                 {alert.direction === "up" ? "↑" : "↓"} {(Math.abs(alert.change_pct) * 100).toFixed(0)}%
@@ -151,6 +154,7 @@ export const IngredientRow = React.memo(function IngredientRow({
             {supplierName || CAT_LABELS[x.category]}
             {x.source_prep_recipe_name ? ` · Pivot: ${x.source_prep_recipe_name}` : ""}
             {x.status_note ? ` · ${x.status_note}` : ""}
+            {x.is_derived && x.rendement ? ` · Rendement ${(x.rendement * 100).toFixed(1)}%` : ""}
           </div>
           {alg.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 3 }}>
@@ -220,10 +224,14 @@ export const IngredientRow = React.memo(function IngredientRow({
           <>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: 13, color: CAT_COLORS[x.category] }}>{x.name}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ fontWeight: 600, fontSize: 13, color: CAT_COLORS[x.category] }}>{x.name}</span>
+                  {x.is_derived && <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED" }}>DÉRIVÉ</span>}
+                </div>
                 <div style={{ fontSize: 10, color: "#999999", marginTop: 2 }}>
                   {supplierName || CAT_LABELS[x.category]}
                   {x.status_note ? ` · ${x.status_note}` : ""}
+                  {x.is_derived && x.rendement ? ` · ${(x.rendement * 100).toFixed(1)}%` : ""}
                 </div>
                 {alg.length > 0 && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 4 }}>

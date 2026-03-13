@@ -97,6 +97,11 @@ export type Ingredient = {
 
   cost_per_unit?: number | null;
   cost_per_kg?: number | null;
+
+  // Ingrédients dérivés (rendement)
+  parent_ingredient_id?: string | null;
+  rendement?: number | null;
+  is_derived?: boolean;
 };
 
 export type LatestOffer = {

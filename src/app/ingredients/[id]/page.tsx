@@ -5,6 +5,8 @@ import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { NavBar } from "@/components/NavBar";
 import { supabase } from "@/lib/supabaseClient";
+import { StepperInput } from "@/components/StepperInput";
+import { computeDerivedPrice, computeRendement } from "@/lib/rendement";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
@@ -15,6 +17,23 @@ type Ingredient = {
   allergens: string | null; status: string | null; status_note: string | null;
   supplier_id: string | null; establishments: string[] | null;
   unit?: string | null;
+  parent_ingredient_id?: string | null;
+  rendement?: number | null;
+  is_derived?: boolean;
+  cost_per_unit?: number | null;
+};
+
+type DerivedIngredient = {
+  id: string;
+  name: string;
+  rendement: number | null;
+  cost_per_unit: number | null;
+};
+
+type ParentInfo = {
+  id: string;
+  name: string;
+  cost_per_unit: number | null;
 };
 
 type Offer = {
@@ -55,6 +74,15 @@ function IngredientDetailInner() {
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Derived ingredients
+  const [derivedList, setDerivedList] = useState<DerivedIngredient[]>([]);
+  const [parentInfo, setParentInfo] = useState<ParentInfo | null>(null);
+  const [showDerivePanel, setShowDerivePanel] = useState(false);
+  const [deriveName, setDeriveName] = useState("");
+  const [poidsBrut, setPoidsBrut] = useState<number | "">(1);
+  const [poidsNet, setPoidsNet] = useState<number | "">(0.5);
+  const [deriveSaving, setDeriveSaving] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -100,6 +128,31 @@ function IngredientDetailInner() {
     };
     run();
   }, [id]);
+
+  // Load derived ingredients + parent info
+  useEffect(() => {
+    if (!id || !ingredient) return;
+    const loadRelations = async () => {
+      // Load children (derived from this ingredient)
+      const { data: children } = await supabase
+        .from("ingredients")
+        .select("id, name, rendement, cost_per_unit")
+        .eq("parent_ingredient_id", id)
+        .eq("is_derived", true);
+      setDerivedList((children ?? []) as DerivedIngredient[]);
+
+      // Load parent info if this is a derived ingredient
+      if (ingredient.parent_ingredient_id) {
+        const { data: parent } = await supabase
+          .from("ingredients")
+          .select("id, name, cost_per_unit")
+          .eq("id", ingredient.parent_ingredient_id)
+          .single();
+        setParentInfo(parent as ParentInfo | null);
+      }
+    };
+    loadRelations();
+  }, [id, ingredient?.parent_ingredient_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Suppliers with at least one offer
   const supplierList = useMemo(() => {
@@ -179,6 +232,15 @@ function IngredientDetailInner() {
           <h1 className="h1" style={{ marginBottom: 4 }}>{ingredient.name}</h1>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <span style={{ fontSize: 13, opacity: 0.65 }}>{ingredient.category}</span>
+            {ingredient.is_derived && (
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 8,
+                background: "rgba(124,58,237,0.10)", color: "#7C3AED",
+                border: "1px solid rgba(124,58,237,0.25)",
+              }}>
+                DÉRIVÉ
+              </span>
+            )}
             {ingredient.status && ingredient.status !== "ok" && (
               <span style={{
                 fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 8,
@@ -308,6 +370,229 @@ function IngredientDetailInner() {
         {offers.length === 0 && (
           <div className="card" style={{ textAlign: "center", padding: 32, color: "var(--muted)" }}>
             Aucune offre enregistrée pour cet ingrédient.
+          </div>
+        )}
+
+        {/* ── Ingrédient dérivé — info parent ── */}
+        {ingredient.is_derived && parentInfo && (
+          <div className="card" style={{ padding: "14px 16px", marginBottom: 12, borderLeft: "4px solid #7C3AED" }}>
+            <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 6, color: "#7C3AED" }}>
+              Ingrédient dérivé
+            </div>
+            <div style={{ fontSize: 13 }}>
+              <span style={{ opacity: 0.65 }}>Basé sur : </span>
+              <Link href={`/ingredients/${parentInfo.id}`} style={{ fontWeight: 700, color: "#1a1a1a" }}>
+                {parentInfo.name}
+              </Link>
+            </div>
+            <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 12 }}>
+              <span>
+                Rendement : <strong>{ingredient.rendement ? `${(ingredient.rendement * 100).toFixed(1)}%` : "—"}</strong>
+              </span>
+              <span>
+                Prix parent : <strong>{parentInfo.cost_per_unit ? `${parentInfo.cost_per_unit.toFixed(2)} €/kg` : "—"}</strong>
+              </span>
+              <span>
+                Prix calculé : <strong style={{ color: "#7C3AED" }}>
+                  {parentInfo.cost_per_unit && ingredient.rendement
+                    ? `${computeDerivedPrice(parentInfo.cost_per_unit, ingredient.rendement).toFixed(2)} €/kg`
+                    : "—"}
+                </strong>
+              </span>
+            </div>
+            <div style={{ fontSize: 10, color: "#999", marginTop: 6 }}>
+              Prix mis à jour automatiquement quand le prix parent change
+            </div>
+          </div>
+        )}
+
+        {/* ── Section dérivés (sur un ingrédient parent) ── */}
+        {!ingredient.is_derived && (
+          <div className="card" style={{ padding: "14px 16px", marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontWeight: 800, fontSize: 13 }}>
+                Dérivés
+                {derivedList.length > 0 && (
+                  <span style={{ fontWeight: 400, fontSize: 12, opacity: 0.55, marginLeft: 6 }}>({derivedList.length})</span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeriveName(`${ingredient.name} cuit`);
+                  setPoidsBrut(1);
+                  setPoidsNet(0.5);
+                  setShowDerivePanel(true);
+                }}
+                style={{
+                  fontSize: 11, fontWeight: 700, color: "#D4775A",
+                  background: "rgba(212,119,90,0.08)", border: "1px solid rgba(212,119,90,0.20)",
+                  borderRadius: 8, padding: "5px 12px", cursor: "pointer",
+                }}
+              >
+                + Créer un dérivé
+              </button>
+            </div>
+
+            {derivedList.length === 0 && !showDerivePanel && (
+              <p style={{ fontSize: 12, color: "#999", margin: 0 }}>
+                Aucun ingrédient dérivé. Créez-en un pour calculer automatiquement le prix après cuisson, épluchage, etc.
+              </p>
+            )}
+
+            {derivedList.map((d) => (
+              <div key={d.id} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "8px 0", borderBottom: "1px solid rgba(217,199,182,0.35)",
+              }}>
+                <div>
+                  <Link href={`/ingredients/${d.id}`} style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
+                    {d.name}
+                  </Link>
+                  <span style={{ fontSize: 10, color: "#999", marginLeft: 8 }}>
+                    Rendement {d.rendement ? `${(d.rendement * 100).toFixed(1)}%` : "—"}
+                  </span>
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#7C3AED" }}>
+                  {d.cost_per_unit ? `${d.cost_per_unit.toFixed(2)} €/kg` : "—"}
+                </span>
+              </div>
+            ))}
+
+            {/* ── Panneau création dérivé ── */}
+            {showDerivePanel && (
+              <div style={{
+                background: "#f2ede4", borderRadius: 16, padding: 20, marginTop: 12,
+              }}>
+                <div style={{
+                  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                  fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 14,
+                }}>
+                  CRÉER UN INGRÉDIENT DÉRIVÉ
+                </div>
+
+                <div style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>
+                  Basé sur : <strong style={{ color: "#1a1a1a" }}>{ingredient.name}</strong>
+                  {bestOffers.length > 0 && (
+                    <span style={{ marginLeft: 8 }}>
+                      Prix brut : <strong style={{ color: "#1a1a1a" }}>{bestOffers[0].best.unit_price.toFixed(2)} €/{bestOffers[0].unit}</strong>
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, opacity: 0.75, display: "block", marginBottom: 4 }}>Nom du dérivé</label>
+                  <input
+                    type="text"
+                    value={deriveName}
+                    onChange={(e) => setDeriveName(e.target.value)}
+                    style={{
+                      width: "100%", height: 40, borderRadius: 10,
+                      border: "1.5px solid #e5ddd0", padding: "8px 12px",
+                      fontSize: 13, background: "#fff",
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 12, opacity: 0.75, display: "block", marginBottom: 4 }}>Poids brut (kg)</label>
+                    <StepperInput value={poidsBrut} onChange={setPoidsBrut} step={0.1} min={0.1} placeholder="1.0" />
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", paddingTop: 18, fontSize: 18, color: "#999" }}>→</div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 12, opacity: 0.75, display: "block", marginBottom: 4 }}>Poids après (kg)</label>
+                    <StepperInput value={poidsNet} onChange={setPoidsNet} step={0.1} min={0.1} placeholder="0.5" />
+                  </div>
+                </div>
+
+                {/* Calculs en temps réel */}
+                {(() => {
+                  const brut = typeof poidsBrut === "number" ? poidsBrut : 0;
+                  const net = typeof poidsNet === "number" ? poidsNet : 0;
+                  const rend = brut > 0 && net > 0 ? computeRendement(brut, net) : 0;
+                  const parentPrice = bestOffers.length > 0 ? bestOffers[0].best.unit_price : (ingredient.cost_per_unit ?? 0);
+                  const derivedPrice = rend > 0 ? computeDerivedPrice(parentPrice, rend) : 0;
+
+                  return (
+                    <div style={{
+                      background: "#fff", borderRadius: 12, padding: "12px 16px",
+                      marginBottom: 16, display: "flex", justifyContent: "space-between",
+                    }}>
+                      <div>
+                        <div style={{ fontSize: 11, color: "#999" }}>Rendement calculé</div>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: rend > 0 ? "#1a1a1a" : "#ccc" }}>
+                          {rend > 0 ? `${(rend * 100).toFixed(1)}%` : "—"}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 11, color: "#999" }}>Prix dérivé</div>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: derivedPrice > 0 ? "#7C3AED" : "#ccc" }}>
+                          {derivedPrice > 0 ? `${derivedPrice.toFixed(2)} €/kg` : "—"}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowDerivePanel(false)}
+                    style={{
+                      padding: "10px 20px", borderRadius: 10,
+                      border: "1px solid #ddd6c8", background: "#fff",
+                      fontSize: 13, fontWeight: 600, cursor: "pointer",
+                    }}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    disabled={deriveSaving || !deriveName.trim()}
+                    onClick={async () => {
+                      if (!deriveName.trim()) return;
+                      setDeriveSaving(true);
+                      const brut = typeof poidsBrut === "number" ? poidsBrut : 0;
+                      const net = typeof poidsNet === "number" ? poidsNet : 0;
+                      const rend = brut > 0 && net > 0 ? computeRendement(brut, net) : 0;
+                      const parentPrice = bestOffers.length > 0 ? bestOffers[0].best.unit_price : (ingredient.cost_per_unit ?? 0);
+                      const derivedPrice = rend > 0 ? computeDerivedPrice(parentPrice, rend) : 0;
+
+                      const { data: newIng, error: createErr } = await supabase
+                        .from("ingredients")
+                        .insert({
+                          name: deriveName.trim(),
+                          category: ingredient.category,
+                          parent_ingredient_id: ingredient.id,
+                          rendement: rend > 0 ? Number(rend.toFixed(4)) : null,
+                          is_derived: true,
+                          cost_per_unit: derivedPrice > 0 ? Number(derivedPrice.toFixed(4)) : null,
+                          status: "validated",
+                        })
+                        .select("id, name, rendement, cost_per_unit")
+                        .single();
+
+                      if (createErr) {
+                        alert(createErr.message);
+                      } else if (newIng) {
+                        setDerivedList((prev) => [...prev, newIng as DerivedIngredient]);
+                        setShowDerivePanel(false);
+                      }
+                      setDeriveSaving(false);
+                    }}
+                    style={{
+                      padding: "10px 20px", borderRadius: 10,
+                      border: "none", background: "#D4775A", color: "#fff",
+                      fontSize: 13, fontWeight: 700, cursor: "pointer",
+                      opacity: deriveSaving || !deriveName.trim() ? 0.5 : 1,
+                    }}
+                  >
+                    {deriveSaving ? "Création…" : "Créer l'ingrédient"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
