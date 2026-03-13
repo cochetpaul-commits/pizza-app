@@ -781,8 +781,8 @@ export default function CommandesPage() {
                             <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
                               <button type="button" onClick={() => toggleFavori(item.id, true, isMael)} style={starBtnStyle(true)} title="Retirer des habituels">⭐</button>
                               <span style={{
-                                fontSize: 13, fontWeight: (qty[item.id] ?? 0) > 0 ? 700 : 500,
-                                color: (qty[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
+                                fontSize: 13, fontWeight: Number(qty[item.id] ?? 0) > 0 ? 700 : 500,
+                                color: Number(qty[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
                                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                               }}>
                                 {item.name}
@@ -804,8 +804,8 @@ export default function CommandesPage() {
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
                           <button type="button" onClick={() => toggleFavori(item.id, false, isMael)} style={starBtnStyle(false)} title="Ajouter aux habituels">⭐</button>
                           <span style={{
-                            fontSize: 13, fontWeight: (qty[item.id] ?? 0) > 0 ? 700 : 500,
-                            color: (qty[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
+                            fontSize: 13, fontWeight: Number(qty[item.id] ?? 0) > 0 ? 700 : 500,
+                            color: Number(qty[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                           }}>
                             {item.name}
