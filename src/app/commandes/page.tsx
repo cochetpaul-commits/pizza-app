@@ -331,7 +331,7 @@ export default function CommandesPage() {
     const g = groupCatalog(catalog);
     for (const cat of Object.keys(g)) {
       const hasFav = g[cat].favoris.length > 0;
-      const hasSel = [...g[cat].favoris, ...g[cat].others].some((i) => (quantities[i.id] ?? 0) > 0);
+      const hasSel = [...g[cat].favoris, ...g[cat].others].some((i) => Number(quantities[i.id] ?? 0) > 0);
       opens[cat] = hasFav || hasSel;
     }
     setOpenCats(opens);
@@ -344,7 +344,7 @@ export default function CommandesPage() {
     const g = groupCatalog(metroCatalog);
     for (const cat of Object.keys(g)) {
       const hasFav = g[cat].favoris.length > 0;
-      const hasSel = [...g[cat].favoris, ...g[cat].others].some((i) => (metroQuantities[i.id] ?? 0) > 0);
+      const hasSel = [...g[cat].favoris, ...g[cat].others].some((i) => Number(metroQuantities[i.id] ?? 0) > 0);
       opens[cat] = hasFav || hasSel;
     }
     setMetroOpenCats(opens);
