@@ -10,6 +10,7 @@ type ProfileCtx = {
   loading: boolean;
   isAdmin: boolean;
   isDirection: boolean;
+  isGroupAdmin: boolean;
   canWrite: boolean;
 };
 
@@ -19,12 +20,14 @@ const ProfileContext = createContext<ProfileCtx>({
   loading: true,
   isAdmin: false,
   isDirection: false,
+  isGroupAdmin: false,
   canWrite: false,
 });
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [isGroupAdmin, setIsGroupAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,7 +36,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     async function fetchProfile(userId: string) {
       const { data, error } = await supabase
         .from("profiles")
-        .select("role, display_name")
+        .select("role, display_name, is_group_admin")
         .eq("id", userId)
         .maybeSingle();
       if (cancelled) return;
@@ -56,6 +59,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       if (data) {
         setRole(data.role as Role);
         setDisplayName(data.display_name);
+        setIsGroupAdmin(!!data.is_group_admin);
       } else {
         // No profile row yet (race condition on first login) — default cuisine
         setRole("cuisine");
@@ -98,7 +102,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const cw = role === "admin" || role === "direction";
 
   return (
-    <ProfileContext.Provider value={{ role, displayName, loading, isAdmin, isDirection, canWrite: cw }}>
+    <ProfileContext.Provider value={{ role, displayName, loading, isAdmin, isDirection, isGroupAdmin, canWrite: cw }}>
       {children}
     </ProfileContext.Provider>
   );

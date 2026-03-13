@@ -130,7 +130,7 @@ export default function Home() {
   const [authState, setAuthState] = useState<"loading" | "ok" | "anon">("loading");
   const [counts, setCounts] = useState<Counts | null>(null);
   const [caJour, setCaJour] = useState<number | null>(null);
-  const { role, displayName, isAdmin } = useProfile();
+  const { role, displayName, isAdmin, isGroupAdmin } = useProfile();
 
   // CA du jour Popina — auto-refresh toutes les 5 min
   useEffect(() => {
@@ -250,6 +250,43 @@ export default function Home() {
             </span>
           </div>
         </div>
+
+        {/* ── Établissement badge + Vue Groupe ── */}
+        {authState === "ok" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 16 }}>
+            <span style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "4px 10px",
+              borderRadius: 8,
+              background: "rgba(212,119,90,0.10)",
+              border: "1px solid rgba(212,119,90,0.20)",
+              fontSize: 11,
+              fontWeight: 700,
+              color: "#D4775A",
+              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+              letterSpacing: 0.5,
+            }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#D4775A", flexShrink: 0 }} />
+              Bello Mio
+            </span>
+            {isGroupAdmin && (
+              <Link href="/groupe" style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: "#A0845C",
+                textDecoration: "none",
+                padding: "4px 8px",
+                borderRadius: 6,
+                border: "1px solid rgba(160,132,92,0.25)",
+                background: "rgba(160,132,92,0.08)",
+              }}>
+                Vue Groupe →
+              </Link>
+            )}
+          </div>
+        )}
       </div>
 
       <div style={{ maxWidth: 600, margin: "0 auto", padding: "0 16px 40px" }}>
