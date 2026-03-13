@@ -243,8 +243,9 @@ export default function GroupePage() {
                 fontSize: 11,
                 fontWeight: 700,
                 cursor: "not-allowed",
+                opacity: 0.4,
               }}>
-                Ouvrir →
+                Bientôt disponible
               </span>
             </div>
           </div>
