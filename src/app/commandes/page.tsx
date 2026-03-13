@@ -707,7 +707,7 @@ export default function CommandesPage() {
             {currentSortedCats.map((cat) => {
               const { favoris, others } = currentGrouped[cat];
               const allItems = [...favoris, ...others];
-              const selectedCount = allItems.filter((i) => (qty[i.id] ?? 0) > 0).length;
+              const selectedCount = allItems.filter((i) => Number(qty[i.id] ?? 0) > 0).length;
               const isOpen = currentOpenCats[cat] ?? false;
               const color = CAT_COLORS[cat] ?? "#6B7280";
 
