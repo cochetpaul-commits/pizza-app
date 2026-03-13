@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     .from("commande_sessions")
     .select("*")
     .eq("supplier_id", supplier.id)
-    .in("status", ["brouillon", "validee"])
+    .in("status", ["brouillon", "en_attente", "validee"])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

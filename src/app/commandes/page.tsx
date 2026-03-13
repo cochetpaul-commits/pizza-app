@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
 import { StepperInput } from "@/components/StepperInput";
+import { useProfile } from "@/lib/ProfileContext";
 import { supabase } from "@/lib/supabaseClient";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -101,12 +102,13 @@ function catIndex(cat: string | null): number {
 
 const tile: React.CSSProperties = {
   background: "#fff",
-  padding: "10px 14px",
+  padding: "8px 14px",
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
   gap: 8,
   borderBottom: "1px solid #f0ebe2",
+  minHeight: 36,
 };
 
 const floatingBtn: React.CSSProperties = {
@@ -134,7 +136,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "metro", label: "METRO" },
 ];
 
-// ── Helper: group catalog into favoris / others per category ──────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function groupCatalog(items: CatalogItem[]): Record<string, { favoris: CatalogItem[]; others: CatalogItem[] }> {
   const result: Record<string, { favoris: CatalogItem[]; others: CatalogItem[] }> = {};
@@ -154,24 +156,6 @@ function groupCatalog(items: CatalogItem[]): Record<string, { favoris: CatalogIt
   return result;
 }
 
-// ── ReadOnlyQty component ─────────────────────────────────────────────────
-
-function ReadOnlyQty({ value }: { value: number | "" | undefined }) {
-  const qty = value === "" || value == null ? 0 : value;
-  return (
-    <div style={{
-      width: 64, height: 40,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontWeight: 700, fontSize: 14,
-      color: qty > 0 ? "#1a1a1a" : "#ccc",
-    }}>
-      {qty > 0 ? `× ${qty}` : "—"}
-    </div>
-  );
-}
-
-// ── Star button style ─────────────────────────────────────────────────────
-
 function starBtnStyle(isFav: boolean): React.CSSProperties {
   return {
     background: "none",
@@ -186,35 +170,37 @@ function starBtnStyle(isFav: boolean): React.CSSProperties {
   };
 }
 
-// ── Banner styles ─────────────────────────────────────────────────────────
+// ── Status config ────────────────────────────────────────────────────────────
 
-const pendingBannerStyle: React.CSSProperties = {
-  background: "#FFF7ED",
-  border: "1.5px solid #EA580C",
-  color: "#EA580C",
-  padding: "12px 16px",
-  borderRadius: 10,
-  fontSize: 14,
-  fontWeight: 600,
-  marginBottom: 16,
-  textAlign: "center",
+const statusLabel: Record<string, string> = {
+  brouillon: "Brouillon",
+  en_attente: "En attente de validation",
+  validee: "Validée",
+  recue: "Reçue",
+  annulee: "Annulée",
 };
 
-const validatedBannerStyle: React.CSSProperties = {
-  background: "#e8ede6",
-  border: "1.5px solid #4a6741",
-  color: "#4a6741",
-  padding: "10px 16px",
-  borderRadius: 10,
-  fontSize: 14,
-  fontWeight: 600,
-  marginBottom: 16,
-  textAlign: "center",
+const statusColor: Record<string, string> = {
+  brouillon: "#A0845C",
+  en_attente: "#2563EB",
+  validee: "#4a6741",
+  recue: "#16a34a",
+  annulee: "#999",
+};
+
+const statusBannerBg: Record<string, string> = {
+  brouillon: "#FFF8F0",
+  en_attente: "#EFF6FF",
+  validee: "#e8ede6",
+  recue: "#e8ede6",
 };
 
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function CommandesPage() {
+  const { isAdmin, isDirection } = useProfile();
+  const canValidate = isAdmin || isDirection;
+
   const [tab, setTab] = useState<Tab>("mael");
 
   // Session state per tab
@@ -281,6 +267,18 @@ export default function CommandesPage() {
     return [];
   }
 
+  function applySessionQuantities(
+    session: Session | null,
+    setQty: (q: Record<string, number | "">) => void,
+  ) {
+    if (!session?.lignes) { setQty({}); return; }
+    const q: Record<string, number | ""> = {};
+    for (const l of session.lignes) {
+      if (l.ingredient_id) q[l.ingredient_id] = l.quantite;
+    }
+    setQty(q);
+  }
+
   useEffect(() => {
     async function init() {
       setLoading(true);
@@ -294,21 +292,8 @@ export default function CommandesPage() {
       setMetroSupplierId(metroData.supplier_id);
       setMetroSession(metroData.session);
 
-      // Pré-remplir quantités depuis session existante
-      if (maelData.session?.lignes) {
-        const q: Record<string, number | ""> = {};
-        for (const l of maelData.session.lignes) {
-          if (l.ingredient_id) q[l.ingredient_id] = l.quantite;
-        }
-        setQuantities(q);
-      }
-      if (metroData.session?.lignes) {
-        const q: Record<string, number | ""> = {};
-        for (const l of metroData.session.lignes) {
-          if (l.ingredient_id) q[l.ingredient_id] = l.quantite;
-        }
-        setMetroQuantities(q);
-      }
+      applySessionQuantities(maelData.session, setQuantities);
+      applySessionQuantities(metroData.session, setMetroQuantities);
 
       // Charger catalogues
       if (maelData.supplier_id) {
@@ -414,7 +399,18 @@ export default function CommandesPage() {
     }
   }
 
-  // ── Envoyer pour validation ───────────────────────────────────────────────
+  // ── Status transitions ─────────────────────────────────────────────────
+
+  async function reloadAll() {
+    const [maelData, metroData] = await Promise.all([
+      loadSession("mael"),
+      loadSession("metro"),
+    ]);
+    setMaelSession(maelData.session);
+    setMetroSession(metroData.session);
+    applySessionQuantities(maelData.session, setQuantities);
+    applySessionQuantities(metroData.session, setMetroQuantities);
+  }
 
   async function envoyerSession(sessionId: string) {
     setSaving(true);
@@ -423,19 +419,11 @@ export default function CommandesPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: sessionId, status: "en_attente" }),
     });
-    const [maelData, metroData] = await Promise.all([
-      loadSession("mael"),
-      loadSession("metro"),
-    ]);
-    setMaelSession(maelData.session);
-    setMetroSession(metroData.session);
-    reloadQuantities(maelData, metroData);
+    await reloadAll();
     setSaving(false);
     setConfirmation("Commande envoyée pour validation");
     setTimeout(() => setConfirmation(null), 4000);
   }
-
-  // ── Valider (admin/direction) ──────────────────────────────────────────
 
   async function validerSession(sessionId: string) {
     setSaving(true);
@@ -444,20 +432,11 @@ export default function CommandesPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: sessionId, status: "validee" }),
     });
-    const [maelData, metroData] = await Promise.all([
-      loadSession("mael"),
-      loadSession("metro"),
-    ]);
-    setMaelSession(maelData.session);
-    setMetroSession(metroData.session);
-    setQuantities({});
-    setMetroQuantities({});
+    await reloadAll();
     setSaving(false);
     setConfirmation("Commande validée");
     setTimeout(() => setConfirmation(null), 4000);
   }
-
-  // ── Rejeter → brouillon ────────────────────────────────────────────────
 
   async function rejeterSession(sessionId: string) {
     setSaving(true);
@@ -466,36 +445,37 @@ export default function CommandesPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: sessionId, status: "brouillon" }),
     });
-    const [maelData, metroData] = await Promise.all([
-      loadSession("mael"),
-      loadSession("metro"),
-    ]);
-    setMaelSession(maelData.session);
-    setMetroSession(metroData.session);
-    reloadQuantities(maelData, metroData);
+    await reloadAll();
     setSaving(false);
     setConfirmation("Commande renvoyée en brouillon");
     setTimeout(() => setConfirmation(null), 4000);
   }
 
-  function reloadQuantities(
-    maelData: { session?: Session },
-    metroData: { session?: Session },
-  ) {
-    if (maelData.session?.lignes) {
-      const q: Record<string, number | ""> = {};
-      for (const l of maelData.session.lignes) {
-        if (l.ingredient_id) q[l.ingredient_id] = l.quantite;
-      }
-      setQuantities(q);
-    }
-    if (metroData.session?.lignes) {
-      const q: Record<string, number | ""> = {};
-      for (const l of metroData.session.lignes) {
-        if (l.ingredient_id) q[l.ingredient_id] = l.quantite;
-      }
-      setMetroQuantities(q);
-    }
+  async function recevoirSession(sessionId: string) {
+    setSaving(true);
+    await fetch("/api/commandes/session", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: sessionId, status: "recue" }),
+    });
+    await reloadAll();
+    setSaving(false);
+    setConfirmation("Commande marquée comme reçue");
+    setTimeout(() => setConfirmation(null), 4000);
+  }
+
+  // ── PDF download ───────────────────────────────────────────────────────
+
+  async function downloadPdf(sessionId: string, supplierLabel: string) {
+    const res = await fetch(`/api/commandes/pdf?session_id=${sessionId}`);
+    if (!res.ok) { alert("Erreur lors de la génération du PDF"); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `commande-${supplierLabel.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   // ── Historique ────────────────────────────────────────────────────────────
@@ -503,7 +483,7 @@ export default function CommandesPage() {
   async function loadHistorique() {
     const suppId = tab === "mael" ? maelSupplierId : metroSupplierId;
     if (!suppId) return;
-    const res = await fetch(`/api/commandes/historique?supplier_id=${suppId}&limit=10`);
+    const res = await fetch(`/api/commandes/historique?supplier_id=${suppId}&limit=5`);
     const data = await res.json();
     setHistorique(data.historique ?? []);
     setHistOpen(true);
@@ -526,41 +506,26 @@ export default function CommandesPage() {
     const { session: oldSession } = await sessRes.json();
 
     for (const l of oldSession?.lignes ?? []) {
-      await fetch("/api/commandes/ligne", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: newSession.id,
-          ingredient_id: l.ingredient_id,
-          quantite: l.quantite,
-          unite: l.unite,
-          prix_unitaire_ht: l.prix_unitaire_ht,
-        }),
-      });
+      if (l.quantite > 0) {
+        await fetch("/api/commandes/ligne", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session_id: newSession.id,
+            ingredient_id: l.ingredient_id,
+            quantite: l.quantite,
+            unite: l.unite,
+            prix_unitaire_ht: l.prix_unitaire_ht,
+          }),
+        });
+      }
     }
 
-    const data = await loadSession(tab);
-    if (tab === "mael") {
-      setMaelSession(data.session);
-      if (data.session?.lignes) {
-        const q: Record<string, number | ""> = {};
-        for (const l of data.session.lignes) {
-          if (l.ingredient_id) q[l.ingredient_id] = l.quantite;
-        }
-        setQuantities(q);
-      }
-    } else {
-      setMetroSession(data.session);
-      if (data.session?.lignes) {
-        const q: Record<string, number | ""> = {};
-        for (const l of data.session.lignes) {
-          if (l.ingredient_id) q[l.ingredient_id] = l.quantite;
-        }
-        setMetroQuantities(q);
-      }
-    }
+    await reloadAll();
     setSaving(false);
     setHistOpen(false);
+    setConfirmation("Commande dupliquée en brouillon");
+    setTimeout(() => setConfirmation(null), 4000);
   }
 
   // ── Computed ──────────────────────────────────────────────────────────────
@@ -568,8 +533,8 @@ export default function CommandesPage() {
   const activeSession = tab === "mael" ? maelSession : metroSession;
   const activeSupplierId = tab === "mael" ? maelSupplierId : metroSupplierId;
 
-  const maelCount = Object.values(quantities).filter((v) => v !== "" && (v as number) > 0).length;
-  const metroCount = Object.values(metroQuantities).filter((v) => v !== "" && (v as number) > 0).length;
+  const maelCount = Object.values(quantities).filter((v) => v !== "" && Number(v) > 0).length;
+  const metroCount = Object.values(metroQuantities).filter((v) => v !== "" && Number(v) > 0).length;
   const activeCount = tab === "mael" ? maelCount : metroCount;
 
   // ── Render helpers ────────────────────────────────────────────────────────
@@ -580,23 +545,348 @@ export default function CommandesPage() {
     });
   }
 
-  const statusLabel: Record<string, string> = {
-    brouillon: "Brouillon",
-    en_attente: "En attente de validation",
-    validee: "Validée",
-    envoyee: "Envoyée",
-    recue: "Reçue",
-    annulee: "Annulée",
-  };
+  // ── Summary view (read-only: en_attente / validee / recue) ─────────────
 
-  const statusColor: Record<string, string> = {
-    brouillon: "#A0845C",
-    en_attente: "#EA580C",
-    validee: "#4a6741",
-    envoyee: "#2563eb",
-    recue: "#16a34a",
-    annulee: "#999",
-  };
+  function renderSummary(
+    session: Session,
+    qty: Record<string, number | "">,
+    currentCatalog: CatalogItem[],
+    isMael: boolean,
+    supplierLabel: string,
+  ) {
+    // Build items with qty > 0
+    type SummaryItem = { name: string; qty: number; unit: string; category: string };
+    const selected: SummaryItem[] = [];
+
+    for (const item of currentCatalog) {
+      const q = Number(qty[item.id] ?? 0);
+      if (q > 0) {
+        selected.push({
+          name: item.name,
+          qty: q,
+          unit: item.default_unit ?? "",
+          category: item.category ?? "autre",
+        });
+      }
+    }
+
+    // Also include lignes from session that might not be in catalog
+    for (const l of session.lignes) {
+      if (l.quantite > 0 && l.ingredient_id) {
+        const alreadyIncluded = selected.some(
+          (s) => currentCatalog.find((c) => c.id === l.ingredient_id)?.name === s.name
+        );
+        if (!alreadyIncluded) {
+          selected.push({
+            name: l.ingredients?.name ?? "?",
+            qty: l.quantite,
+            unit: l.unite ?? l.ingredients?.default_unit ?? "",
+            category: l.ingredients?.category ?? "autre",
+          });
+        }
+      }
+    }
+
+    // Group by category
+    const byCat: Record<string, SummaryItem[]> = {};
+    for (const item of selected) {
+      if (!byCat[item.category]) byCat[item.category] = [];
+      byCat[item.category].push(item);
+    }
+
+    const sortedCats = Object.keys(byCat).sort((a, b) => catIndex(a) - catIndex(b));
+
+    return (
+      <div>
+        {/* Status banner */}
+        <div style={{
+          background: statusBannerBg[session.status] ?? "#f5f5f5",
+          border: `1.5px solid ${statusColor[session.status] ?? "#999"}`,
+          color: statusColor[session.status] ?? "#999",
+          padding: "12px 16px",
+          borderRadius: 10,
+          fontSize: 14,
+          fontWeight: 600,
+          marginBottom: 16,
+          textAlign: "center",
+        }}>
+          {session.status === "en_attente" && "En attente de validation"}
+          {session.status === "validee" && "Commande validée"}
+          {session.status === "recue" && "Commande reçue"}
+
+          {/* Action buttons */}
+          {session.status === "en_attente" && canValidate && (
+            <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "center" }}>
+              <button
+                onClick={() => rejeterSession(session.id)}
+                disabled={saving}
+                style={{
+                  padding: "8px 20px", borderRadius: 8,
+                  border: "1.5px solid #8B1A1A", background: "#fff",
+                  color: "#8B1A1A", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                }}
+              >
+                Refuser / Corriger
+              </button>
+              <button
+                onClick={() => validerSession(session.id)}
+                disabled={saving}
+                style={{
+                  padding: "8px 20px", borderRadius: 8,
+                  border: "none", background: "#4a6741",
+                  color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                }}
+              >
+                Valider la commande
+              </button>
+            </div>
+          )}
+
+          {session.status === "validee" && (
+            <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "center", flexWrap: "wrap" }}>
+              <button
+                onClick={() => downloadPdf(session.id, supplierLabel)}
+                style={{
+                  padding: "8px 20px", borderRadius: 8,
+                  border: "1.5px solid #4a6741", background: "#fff",
+                  color: "#4a6741", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                }}
+              >
+                Télécharger PDF
+              </button>
+              {canValidate && (
+                <button
+                  onClick={() => recevoirSession(session.id)}
+                  disabled={saving}
+                  style={{
+                    padding: "8px 20px", borderRadius: 8,
+                    border: "none", background: "#16a34a",
+                    color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                  }}
+                >
+                  Marquer comme reçue
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Summary list */}
+        {selected.length === 0 ? (
+          <p style={{ color: "#999", fontSize: 13, textAlign: "center", padding: 24 }}>
+            Aucun article commandé.
+          </p>
+        ) : (
+          <>
+            {sortedCats.map((cat) => {
+              const items = byCat[cat].sort((a, b) => a.name.localeCompare(b.name, "fr"));
+              const color = CAT_COLORS[cat] ?? "#6B7280";
+              return (
+                <div key={cat} style={{ marginBottom: 8 }}>
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    padding: "8px 14px", background: "#f5f0e8",
+                    borderRadius: "8px 8px 0 0", borderBottom: `2px solid ${color}`,
+                  }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                    <span style={{
+                      fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                      fontWeight: 700, fontSize: 12, textTransform: "uppercase",
+                      letterSpacing: 1, color: "#1a1a1a",
+                    }}>
+                      {catLabel(cat)}
+                    </span>
+                  </div>
+                  {items.map((item, i) => (
+                    <div key={i} style={{
+                      ...tile,
+                      borderRadius: i === items.length - 1 ? "0 0 8px 8px" : 0,
+                    }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", flex: 1 }}>
+                        {item.name}
+                      </span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "#D4775A", flexShrink: 0 }}>
+                        × {item.qty}
+                      </span>
+                      {item.unit && (
+                        <span style={{ fontSize: 11, color: "#999", width: 30, flexShrink: 0 }}>
+                          {item.unit}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+
+            <div style={{
+              textAlign: "center", fontSize: 13, fontWeight: 700,
+              color: "#D4775A", marginTop: 12,
+            }}>
+              {selected.length} article{selected.length > 1 ? "s" : ""} commandé{selected.length > 1 ? "s" : ""}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // ── Catalog view (brouillon) ───────────────────────────────────────────
+
+  function renderCatalog(
+    session: Session,
+    isMael: boolean,
+  ) {
+    const qty = isMael ? quantities : metroQuantities;
+    const count = isMael ? maelCount : metroCount;
+    const currentOpenCats = isMael ? openCats : metroOpenCats;
+    const setCurrentOpenCats = isMael ? setOpenCats : setMetroOpenCats;
+    const currentCatalog = isMael ? catalog : metroCatalog;
+    const currentGrouped = groupCatalog(currentCatalog);
+    const currentSortedCats = Object.keys(currentGrouped).sort((a, b) => catIndex(a) - catIndex(b));
+
+    return (
+      <>
+        {/* Brouillon banner */}
+        <div style={{
+          background: statusBannerBg.brouillon,
+          border: `1.5px solid ${statusColor.brouillon}`,
+          color: statusColor.brouillon,
+          padding: "10px 16px",
+          borderRadius: 10,
+          fontSize: 13,
+          fontWeight: 600,
+          marginBottom: 12,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}>
+          <span>Brouillon</span>
+          <span style={{ fontWeight: 700, color: "#D4775A" }}>
+            {count} article{count > 1 ? "s" : ""}
+          </span>
+        </div>
+
+        {currentCatalog.length === 0 && (
+          <p style={{ color: "#999", fontSize: 13, textAlign: "center", padding: 24 }}>
+            Aucun ingrédient lié à ce fournisseur dans le catalogue.
+          </p>
+        )}
+
+        {/* Accordion categories */}
+        {currentSortedCats.map((cat) => {
+          const { favoris, others } = currentGrouped[cat];
+          const allItems = [...favoris, ...others];
+          const selectedCount = allItems.filter((i) => Number(qty[i.id] ?? 0) > 0).length;
+          const isOpen = currentOpenCats[cat] ?? false;
+          const color = CAT_COLORS[cat] ?? "#6B7280";
+
+          return (
+            <div key={cat} style={{ marginBottom: 4 }}>
+              {/* Accordion header */}
+              <button
+                type="button"
+                onClick={() => setCurrentOpenCats((prev: Record<string, boolean>) => ({ ...prev, [cat]: !isOpen }))}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center",
+                  justifyContent: "space-between", padding: "11px 14px",
+                  background: "#fff", border: "1px solid #e5ddd0",
+                  borderLeft: `4px solid ${color}`,
+                  borderRadius: isOpen ? "10px 10px 0 0" : 10,
+                  cursor: "pointer", fontFamily: "inherit",
+                  transition: "border-radius 0.2s",
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{
+                    fontSize: 11, transition: "transform 0.2s",
+                    transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)",
+                    display: "inline-block",
+                  }}>▾</span>
+                  <span style={{
+                    fontWeight: 700, fontSize: 12, textTransform: "uppercase",
+                    letterSpacing: 1,
+                    fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                  }}>
+                    {catLabel(cat)}
+                  </span>
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 10, color: "#999" }}>
+                    {allItems.length} article{allItems.length > 1 ? "s" : ""}
+                  </span>
+                  {selectedCount > 0 && (
+                    <span style={{
+                      background: color, color: "#fff", fontSize: 10,
+                      fontWeight: 700, padding: "2px 8px", borderRadius: 10,
+                      minWidth: 20, textAlign: "center",
+                    }}>
+                      {selectedCount}
+                    </span>
+                  )}
+                </span>
+              </button>
+
+              {/* Accordion body */}
+              <div style={{
+                maxHeight: isOpen ? 5000 : 0, overflow: "hidden",
+                transition: "max-height 0.3s ease",
+                border: isOpen ? "1px solid #e5ddd0" : "none",
+                borderTop: "none", borderRadius: "0 0 10px 10px",
+              }}>
+                {/* Favoris sub-group */}
+                {favoris.length > 0 && (
+                  <div style={{
+                    background: "#FFFBF0", borderLeft: "3px solid #F59E0B",
+                    padding: "6px 0 2px 0",
+                  }}>
+                    <div style={{
+                      fontSize: 9, fontWeight: 700, textTransform: "uppercase",
+                      letterSpacing: 2, color: "#b8860b", padding: "0 14px 4px",
+                    }}>
+                      Habituels
+                    </div>
+                    {favoris.map((item) => (
+                      <div key={item.id} style={tile}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                          <button type="button" onClick={() => toggleFavori(item.id, true, isMael)} style={starBtnStyle(true)} title="Retirer des habituels">⭐</button>
+                          <span style={{
+                            fontSize: 13, fontWeight: Number(qty[item.id] ?? 0) > 0 ? 700 : 500,
+                            color: Number(qty[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          }}>
+                            {item.name}
+                          </span>
+                        </div>
+                        <StepperInput value={qty[item.id] ?? ""} onChange={(v) => handleQtyChange(item.id, v, isMael)} step={1} min={0} placeholder="0" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Other ingredients */}
+                {others.map((item) => (
+                  <div key={item.id} style={tile}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                      <button type="button" onClick={() => toggleFavori(item.id, false, isMael)} style={starBtnStyle(false)} title="Ajouter aux habituels">⭐</button>
+                      <span style={{
+                        fontSize: 13, fontWeight: Number(qty[item.id] ?? 0) > 0 ? 700 : 500,
+                        color: Number(qty[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>
+                        {item.name}
+                      </span>
+                    </div>
+                    <StepperInput value={qty[item.id] ?? ""} onChange={(v) => handleQtyChange(item.id, v, isMael)} step={1} min={0} placeholder="0" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </>
+    );
+  }
 
   // ── renderSupplierTab ─────────────────────────────────────────────────────
 
@@ -607,13 +897,8 @@ export default function CommandesPage() {
     supplierLabel: string,
   ) {
     const qty = isMael ? quantities : metroQuantities;
-    const count = isMael ? maelCount : metroCount;
-    const currentOpenCats = isMael ? openCats : metroOpenCats;
-    const setCurrentOpenCats = isMael ? setOpenCats : setMetroOpenCats;
     const currentCatalog = isMael ? catalog : metroCatalog;
-    const currentGrouped = groupCatalog(currentCatalog);
-    const currentSortedCats = Object.keys(currentGrouped).sort((a, b) => catIndex(a) - catIndex(b));
-    const readOnly = session?.status === "en_attente" || session?.status === "validee";
+    const readOnly = session?.status === "en_attente" || session?.status === "validee" || session?.status === "recue";
 
     return (
       <div style={{ marginTop: 16 }}>
@@ -648,180 +933,9 @@ export default function CommandesPage() {
         {/* Session active */}
         {session && (
           <>
-            <div style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8,
-            }}>
-              <span style={{ fontSize: 11, color: statusColor[session.status] ?? "#999", fontWeight: 600 }}>
-                {statusLabel[session.status] ?? session.status}
-              </span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#D4775A" }}>
-                {count} article{count > 1 ? "s" : ""}
-              </span>
-            </div>
-
-            {/* ── En attente banner ── */}
-            {session.status === "en_attente" && (
-              <div style={pendingBannerStyle}>
-                <span>En attente de validation</span>
-                <div style={{ display: "flex", gap: 8, marginTop: 8, justifyContent: "center" }}>
-                  <button
-                    onClick={() => rejeterSession(session.id)}
-                    disabled={saving}
-                    style={{
-                      padding: "6px 16px", borderRadius: 8,
-                      border: "1.5px solid #8B1A1A", background: "#fff",
-                      color: "#8B1A1A", fontWeight: 700, fontSize: 12, cursor: "pointer",
-                    }}
-                  >
-                    Refuser
-                  </button>
-                  <button
-                    onClick={() => validerSession(session.id)}
-                    disabled={saving}
-                    style={{
-                      padding: "6px 16px", borderRadius: 8,
-                      border: "none", background: "#4a6741",
-                      color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer",
-                    }}
-                  >
-                    Valider
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* ── Validated banner ── */}
-            {session.status === "validee" && (
-              <div style={validatedBannerStyle}>
-                Commande validée — mode lecture
-              </div>
-            )}
-
-            {currentCatalog.length === 0 && (
-              <p style={{ color: "#999", fontSize: 13, textAlign: "center", padding: 24 }}>
-                Aucun ingrédient lié à {supplierLabel.toUpperCase()} dans le catalogue.
-              </p>
-            )}
-
-            {/* ── Accordion categories ── */}
-            {currentSortedCats.map((cat) => {
-              const { favoris, others } = currentGrouped[cat];
-              const allItems = [...favoris, ...others];
-              const selectedCount = allItems.filter((i) => Number(qty[i.id] ?? 0) > 0).length;
-              const isOpen = currentOpenCats[cat] ?? false;
-              const color = CAT_COLORS[cat] ?? "#6B7280";
-
-              return (
-                <div key={cat} style={{ marginBottom: 4 }}>
-                  {/* Accordion header */}
-                  <button
-                    type="button"
-                    onClick={() => setCurrentOpenCats((prev: Record<string, boolean>) => ({ ...prev, [cat]: !isOpen }))}
-                    style={{
-                      width: "100%", display: "flex", alignItems: "center",
-                      justifyContent: "space-between", padding: "11px 14px",
-                      background: "#fff", border: "1px solid #e5ddd0",
-                      borderLeft: `4px solid ${color}`,
-                      borderRadius: isOpen ? "10px 10px 0 0" : 10,
-                      cursor: "pointer", fontFamily: "inherit",
-                      transition: "border-radius 0.2s",
-                    }}
-                  >
-                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{
-                        fontSize: 11, transition: "transform 0.2s",
-                        transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)",
-                        display: "inline-block",
-                      }}>▾</span>
-                      <span style={{
-                        fontWeight: 700, fontSize: 12, textTransform: "uppercase",
-                        letterSpacing: 1,
-                        fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                      }}>
-                        {catLabel(cat)}
-                      </span>
-                    </span>
-                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 10, color: "#999" }}>
-                        {allItems.length} article{allItems.length > 1 ? "s" : ""}
-                      </span>
-                      {selectedCount > 0 && (
-                        <span style={{
-                          background: color, color: "#fff", fontSize: 10,
-                          fontWeight: 700, padding: "2px 8px", borderRadius: 10,
-                          minWidth: 20, textAlign: "center",
-                        }}>
-                          {selectedCount}
-                        </span>
-                      )}
-                    </span>
-                  </button>
-
-                  {/* Accordion body */}
-                  <div style={{
-                    maxHeight: isOpen ? 5000 : 0, overflow: "hidden",
-                    transition: "max-height 0.3s ease",
-                    border: isOpen ? "1px solid #e5ddd0" : "none",
-                    borderTop: "none", borderRadius: "0 0 10px 10px",
-                  }}>
-                    {/* Favoris sub-group */}
-                    {favoris.length > 0 && (
-                      <div style={{
-                        background: "#FFFBF0", borderLeft: "3px solid #F59E0B",
-                        padding: "6px 0 2px 0",
-                      }}>
-                        <div style={{
-                          fontSize: 9, fontWeight: 700, textTransform: "uppercase",
-                          letterSpacing: 2, color: "#b8860b", padding: "0 14px 4px",
-                        }}>
-                          Habituels
-                        </div>
-                        {favoris.map((item) => (
-                          <div key={item.id} style={tile}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                              <button type="button" onClick={() => toggleFavori(item.id, true, isMael)} style={starBtnStyle(true)} title="Retirer des habituels">⭐</button>
-                              <span style={{
-                                fontSize: 13, fontWeight: Number(qty[item.id] ?? 0) > 0 ? 700 : 500,
-                                color: Number(qty[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
-                                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                              }}>
-                                {item.name}
-                              </span>
-                            </div>
-                            {readOnly ? (
-                              <ReadOnlyQty value={qty[item.id]} />
-                            ) : (
-                              <StepperInput value={qty[item.id] ?? ""} onChange={(v) => handleQtyChange(item.id, v, isMael)} step={1} min={0} placeholder="0" />
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Other ingredients */}
-                    {others.map((item) => (
-                      <div key={item.id} style={tile}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                          <button type="button" onClick={() => toggleFavori(item.id, false, isMael)} style={starBtnStyle(false)} title="Ajouter aux habituels">⭐</button>
-                          <span style={{
-                            fontSize: 13, fontWeight: Number(qty[item.id] ?? 0) > 0 ? 700 : 500,
-                            color: Number(qty[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          }}>
-                            {item.name}
-                          </span>
-                        </div>
-                        {readOnly ? (
-                          <ReadOnlyQty value={qty[item.id]} />
-                        ) : (
-                          <StepperInput value={qty[item.id] ?? ""} onChange={(v) => handleQtyChange(item.id, v, isMael)} step={1} min={0} placeholder="0" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+            {readOnly
+              ? renderSummary(session, qty, currentCatalog, isMael, supplierLabel)
+              : renderCatalog(session, isMael)}
           </>
         )}
       </div>
@@ -833,7 +947,7 @@ export default function CommandesPage() {
   return (
     <RequireRole allowedRoles={["admin", "direction", "cuisine"]}>
       <NavBar />
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px", background: "#f2ede4", minHeight: "100vh" }}>
         <h1 style={{
           fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
           fontSize: 28, fontWeight: 700, color: "#1a1a1a", margin: 0,
@@ -841,7 +955,7 @@ export default function CommandesPage() {
           Commandes fournisseurs
         </h1>
 
-        {/* ── Confirmation banner ── */}
+        {/* Confirmation banner */}
         {confirmation && (
           <div style={{
             background: "#e8ede6", color: "#4a6741",
@@ -853,7 +967,7 @@ export default function CommandesPage() {
           </div>
         )}
 
-        {/* ── Onglets ── */}
+        {/* Onglets */}
         <div style={{ display: "flex", gap: 0, marginTop: 20, borderBottom: "2px solid #e5e5e5" }}>
           {TABS.map((t) => (
             <button
@@ -880,7 +994,7 @@ export default function CommandesPage() {
           <p style={{ textAlign: "center", color: "#999", marginTop: 40 }}>Chargement…</p>
         )}
 
-        {/* ── Tab content ── */}
+        {/* Tab content */}
         {!loading && tab === "mael" && renderSupplierTab(maelSession, maelSupplierId, true, "Maël")}
         {!loading && tab === "metro" && renderSupplierTab(metroSession, metroSupplierId, false, "Metro")}
 
@@ -956,7 +1070,7 @@ export default function CommandesPage() {
           </div>
         )}
 
-        {/* ── Bouton flottant ── */}
+        {/* Bouton flottant — brouillon uniquement */}
         {activeSession && activeSession.status === "brouillon" && activeCount > 0 && (
           <button
             type="button"
