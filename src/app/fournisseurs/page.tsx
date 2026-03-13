@@ -79,6 +79,7 @@ export default function FournisseursPage() {
     }
 
     load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etab?.id]);
 
   const active = suppliers.filter((s) => s.is_active);

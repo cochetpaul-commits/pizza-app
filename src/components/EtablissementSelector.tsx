@@ -10,9 +10,6 @@ export function EtablissementSelector() {
 
   const close = useCallback(() => setOpen(false), []);
 
-  // Don't render while loading or if no establishments exist (migration not run yet)
-  if (loading || etablissements.length === 0) return null;
-
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
@@ -21,6 +18,9 @@ export function EtablissementSelector() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open, close]);
+
+  // Don't render while loading or if no establishments exist (migration not run yet)
+  if (loading || etablissements.length === 0) return null;
 
   // Single establishment, no dropdown needed
   if (etablissements.length <= 1 && !isGroupAdmin) {

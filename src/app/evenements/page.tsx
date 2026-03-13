@@ -150,6 +150,7 @@ export default function EventsPage() {
       setEvents(data ?? []);
       setLoading(false);
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etab?.id]);
 
   const today = new Date().toISOString().slice(0, 10);

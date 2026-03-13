@@ -379,6 +379,7 @@ function RecettesInner() {
         setLoading(false);
       });
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey, etabCtx?.id]);
 
   // ── Filtered + sorted data ──
