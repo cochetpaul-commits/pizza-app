@@ -438,6 +438,21 @@ export default function Home() {
           </Link>
           )}
 
+          {/* ─── FINANCES ─── */}
+          {role && role !== "cuisine" && (
+          <Link href="/finances" style={{ textDecoration: "none", color: "inherit" }}>
+            <div className="dash-card dash-green" style={{ "--accent": "#2d6a4f" } as React.CSSProperties}>
+              <div style={row}>
+                <div>
+                  <p style={titleOf("#2d6a4f")}>FINANCES</p>
+                  <p style={sub}>P&L · Food cost · Rentabilité produits</p>
+                </div>
+                <span className="dash-pill" style={pillGreen}>Ouvrir →</span>
+              </div>
+            </div>
+          </Link>
+          )}
+
           {/* ─── ADMIN ─── */}
           {isAdmin && (
           <Link href="/admin/utilisateurs" style={{ textDecoration: "none", color: "inherit" }}>
