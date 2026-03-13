@@ -313,6 +313,19 @@ export default function Home() {
             </div>
           </Link>
 
+          {/* ─── COMMANDES ─── */}
+          <Link href="/commandes" style={{ textDecoration: "none", color: "inherit" }}>
+            <div className="dash-card" style={{ "--accent": "#A0845C" } as React.CSSProperties}>
+              <div style={row}>
+                <div>
+                  <p style={titleOf("#A0845C")}>COMMANDES</p>
+                  <p style={sub}>Maël · Metro · Masse</p>
+                </div>
+                <span className="dash-pill" style={pillWarm}>Ouvrir →</span>
+              </div>
+            </div>
+          </Link>
+
           {/* ── Separator GESTION ── */}
           {role && role !== "cuisine" && <SectionSeparator label="GESTION" />}
 
