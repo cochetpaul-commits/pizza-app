@@ -15,7 +15,7 @@ export default function CommandesPage() {
   const [tab, setTab] = useState<Tab>("mael");
 
   return (
-    <RequireRole allowedRoles={["admin", "manager", "cuisinier"]}>
+    <RequireRole allowedRoles={["admin", "direction", "cuisine"]}>
       <NavBar />
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px" }}>
         <h1 style={{ fontFamily: "Oswald, sans-serif", fontSize: 28, fontWeight: 700, color: "#1a1a1a", margin: 0 }}>
