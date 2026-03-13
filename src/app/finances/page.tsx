@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
 import {
@@ -300,17 +300,17 @@ export default function FinancesPage() {
   const [sortAsc, setSortAsc] = useState(false);
   const [showUnmatched, setShowUnmatched] = useState(false);
 
-  const loadData = useCallback(async (m: "week" | "month", week: string, month: string) => {
-    setLoading(true);
-    const params = m === "week" ? `mode=week&week=${week}` : `mode=month&month=${month}`;
-    const res = await fetch(`/api/finances/stats?${params}`);
-    if (res.ok) setData(await res.json());
-    setLoading(false);
-  }, []);
-
   useEffect(() => {
-    void loadData(mode, weekStr, monthStr);
-  }, [mode, weekStr, monthStr, loadData]);
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const params = mode === "week" ? `mode=week&week=${weekStr}` : `mode=month&month=${monthStr}`;
+      const res = await fetch(`/api/finances/stats?${params}`);
+      if (!cancelled && res.ok) setData(await res.json());
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [mode, weekStr, monthStr]);
 
   function goPrev() {
     if (mode === "week") setWeekStr((w) => shiftWeek(w, -1));
