@@ -3,44 +3,40 @@
 -- ============================================================
 
 -- ============================================================
--- 0. Table etablissements (nécessaire pour le module HR)
+-- 0. Enrichir la table etablissements existante (colonnes HR)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.etablissements (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  nom TEXT NOT NULL,
-  slug TEXT NOT NULL UNIQUE, -- 'bellomio', 'piccola'
-  convention TEXT NOT NULL DEFAULT 'HCR_1979'
-    CHECK (convention IN ('HCR_1979', 'RAPIDE_1501')),
-  code_ape TEXT,
-  siret TEXT,
-  medecin_travail TEXT,
-  adresse TEXT,
-  popina_location_id TEXT,
-  -- Paramètres planning
-  pause_defaut_minutes INT DEFAULT 30,
-  duree_min_shift_pause INTERVAL DEFAULT '3 hours',
-  objectif_cout_ventes NUMERIC DEFAULT 37,
-  objectif_productivite NUMERIC DEFAULT 50,
-  cotisations_patronales NUMERIC DEFAULT 35,
-  ajouter_cp_taux_horaire BOOLEAN DEFAULT FALSE,
-  -- Paramètres congés
-  base_calcul_cp NUMERIC DEFAULT 6, -- jours ouvrables
-  acquisition_mensuelle_cp NUMERIC DEFAULT 2.5,
-  -- Paramètres repas
-  type_indemnisation_repas TEXT DEFAULT 'AN',
-  valeur_avantage_nature NUMERIC DEFAULT 3.57,
-  actif BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+ALTER TABLE public.etablissements
+  ADD COLUMN IF NOT EXISTS convention TEXT DEFAULT 'HCR_1979',
+  ADD COLUMN IF NOT EXISTS code_ape TEXT,
+  ADD COLUMN IF NOT EXISTS siret TEXT,
+  ADD COLUMN IF NOT EXISTS medecin_travail TEXT,
+  ADD COLUMN IF NOT EXISTS pause_defaut_minutes INT DEFAULT 30,
+  ADD COLUMN IF NOT EXISTS duree_min_shift_pause INTERVAL DEFAULT '3 hours',
+  ADD COLUMN IF NOT EXISTS objectif_cout_ventes NUMERIC DEFAULT 37,
+  ADD COLUMN IF NOT EXISTS objectif_productivite NUMERIC DEFAULT 50,
+  ADD COLUMN IF NOT EXISTS cotisations_patronales NUMERIC DEFAULT 35,
+  ADD COLUMN IF NOT EXISTS ajouter_cp_taux_horaire BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS base_calcul_cp NUMERIC DEFAULT 6,
+  ADD COLUMN IF NOT EXISTS acquisition_mensuelle_cp NUMERIC DEFAULT 2.5,
+  ADD COLUMN IF NOT EXISTS type_indemnisation_repas TEXT DEFAULT 'AN',
+  ADD COLUMN IF NOT EXISTS valeur_avantage_nature NUMERIC DEFAULT 3.57;
+
+-- Contrainte convention
+DO $$ BEGIN
+  ALTER TABLE public.etablissements
+    ADD CONSTRAINT chk_convention CHECK (convention IN ('HCR_1979', 'RAPIDE_1501'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 ALTER TABLE public.etablissements ENABLE ROW LEVEL SECURITY;
 
--- Seed les deux établissements
-INSERT INTO public.etablissements (nom, slug, convention, popina_location_id)
-VALUES
-  ('Bello Mio', 'bellomio', 'HCR_1979', NULL),
-  ('Piccola Mia', 'piccola', 'RAPIDE_1501', NULL)
+-- Seed Piccola Mia si absente
+INSERT INTO public.etablissements (nom, slug, convention)
+VALUES ('Piccola Mia', 'piccola', 'RAPIDE_1501')
 ON CONFLICT (slug) DO NOTHING;
+
+-- Mettre à jour Bello Mio avec la convention HCR
+UPDATE public.etablissements SET convention = 'HCR_1979' WHERE slug = 'bello_mio';
 
 -- Ajouter etablissements_access au profil (array d'UUIDs)
 ALTER TABLE public.profiles
@@ -470,7 +466,7 @@ DO $$
 DECLARE
   bellomio_id UUID;
 BEGIN
-  SELECT id INTO bellomio_id FROM public.etablissements WHERE slug = 'bellomio';
+  SELECT id INTO bellomio_id FROM public.etablissements WHERE slug = 'bello_mio';
 
   -- Cuisine
   INSERT INTO public.postes (etablissement_id, equipe, nom, couleur, emoji) VALUES
