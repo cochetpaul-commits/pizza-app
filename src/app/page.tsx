@@ -3,12 +3,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchPriceAlerts } from "@/lib/priceAlerts";
 import { useProfile } from "@/lib/ProfileContext";
-import { useEtablissement } from "@/lib/EtablissementContext";
-import { EtablissementSelector } from "@/components/EtablissementSelector";
 
 type UpcomingEvent = {
   id: string;
@@ -133,19 +130,7 @@ export default function Home() {
   const [authState, setAuthState] = useState<"loading" | "ok" | "anon">("loading");
   const [counts, setCounts] = useState<Counts | null>(null);
   const [caJour, setCaJour] = useState<number | null>(null);
-  const { role, displayName, isAdmin } = useProfile();
-  const { current: etab, isGroupAdmin, isGroupView } = useEtablissement();
-  const router = useRouter();
-
-  // Debug: log establishment context values
-  useEffect(() => {
-    console.log("[Home] useEtablissement:", { etab: etab?.slug ?? null, isGroupAdmin, isGroupView });
-  }, [etab, isGroupAdmin, isGroupView]);
-
-  // Redirect group admins in group view to /groupe
-  useEffect(() => {
-    if (isGroupAdmin && isGroupView) router.replace("/groupe");
-  }, [isGroupAdmin, isGroupView, router]);
+  const { role, displayName, isAdmin, isGroupAdmin } = useProfile();
 
   // CA du jour Popina — auto-refresh toutes les 5 min
   useEffect(() => {
@@ -264,10 +249,44 @@ export default function Home() {
               GROUP
             </span>
           </div>
-          <div style={{ marginLeft: 16 }}>
-            <EtablissementSelector />
-          </div>
         </div>
+
+        {/* ── Établissement badge + Vue Groupe ── */}
+        {authState === "ok" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 16 }}>
+            <span style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "4px 10px",
+              borderRadius: 8,
+              background: "rgba(212,119,90,0.10)",
+              border: "1px solid rgba(212,119,90,0.20)",
+              fontSize: 11,
+              fontWeight: 700,
+              color: "#D4775A",
+              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+              letterSpacing: 0.5,
+            }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#D4775A", flexShrink: 0 }} />
+              Bello Mio
+            </span>
+            {isGroupAdmin && (
+              <Link href="/groupe" style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: "#A0845C",
+                textDecoration: "none",
+                padding: "4px 8px",
+                borderRadius: 6,
+                border: "1px solid rgba(160,132,92,0.25)",
+                background: "rgba(160,132,92,0.08)",
+              }}>
+                Vue Groupe →
+              </Link>
+            )}
+          </div>
+        )}
       </div>
 
       <div style={{ maxWidth: 600, margin: "0 auto", padding: "0 16px 40px" }}>
@@ -327,6 +346,19 @@ export default function Home() {
                   )}
                   <span className="dash-pill">Ouvrir →</span>
                 </div>
+              </div>
+            </div>
+          </Link>
+
+          {/* ─── COMMANDES ─── */}
+          <Link href="/commandes" style={{ textDecoration: "none", color: "inherit" }}>
+            <div className="dash-card" style={{ "--accent": "#A0845C" } as React.CSSProperties}>
+              <div style={row}>
+                <div>
+                  <p style={titleOf("#A0845C")}>COMMANDES</p>
+                  <p style={sub}>Maël · Metro · Masse</p>
+                </div>
+                <span className="dash-pill" style={pillWarm}>Ouvrir →</span>
               </div>
             </div>
           </Link>
@@ -451,6 +483,21 @@ export default function Home() {
                   )}
                   <span className="dash-pill" style={pillGreen}>Ouvrir →</span>
                 </div>
+              </div>
+            </div>
+          </Link>
+          )}
+
+          {/* ─── FINANCES ─── */}
+          {role && role !== "cuisine" && (
+          <Link href="/finances" style={{ textDecoration: "none", color: "inherit" }}>
+            <div className="dash-card dash-green" style={{ "--accent": "#2d6a4f" } as React.CSSProperties}>
+              <div style={row}>
+                <div>
+                  <p style={titleOf("#2d6a4f")}>FINANCES</p>
+                  <p style={sub}>P&L · Food cost · Rentabilité produits</p>
+                </div>
+                <span className="dash-pill" style={pillGreen}>Ouvrir →</span>
               </div>
             </div>
           </Link>
