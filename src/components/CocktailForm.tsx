@@ -8,6 +8,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { fetchApi } from "@/lib/fetchApi";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { formatLiquidQty } from "@/lib/formatUnit";
 
@@ -525,7 +526,7 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
       const token = session.session?.access_token;
       if (!token) throw new Error("Token manquant");
 
-      const res = await fetch("/api/cocktails/pdf", {
+      const res = await fetchApi("/api/cocktails/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ cocktailId }),

@@ -4,6 +4,7 @@ import {
   fetchReports, getParisDate,
   dateToISOWeek, isoWeekToMonday, fmtDateUTC,
 } from "@/lib/popinaClient";
+import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,17 +59,20 @@ function getWeekLabel(dateStr: string): string {
   return `S${weekStr.split("-")[1]}`;
 }
 
-async function loadRecipeCosts(): Promise<Map<string, RecipeCost>> {
+async function loadRecipeCosts(etabId: string): Promise<Map<string, RecipeCost>> {
   const [pizzaRes, kitchenRes, cocktailRes] = await Promise.all([
     supabaseAdmin.from("pizza_recipes")
       .select("name,total_cost,sell_price")
-      .eq("is_draft", false),
+      .eq("is_draft", false)
+      .eq("etablissement_id", etabId),
     supabaseAdmin.from("kitchen_recipes")
       .select("name,category,total_cost,cost_per_portion,cost_per_kg,sell_price")
-      .eq("is_draft", false),
+      .eq("is_draft", false)
+      .eq("etablissement_id", etabId),
     supabaseAdmin.from("cocktails")
       .select("name,total_cost,sell_price")
-      .eq("is_draft", false),
+      .eq("is_draft", false)
+      .eq("etablissement_id", etabId),
   ]);
 
   const recipeCosts = new Map<string, RecipeCost>();
@@ -116,6 +120,14 @@ export async function GET(request: NextRequest) {
   const apiKey = process.env.POPINA_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "POPINA_API_KEY manquant" }, { status: 500 });
 
+  let etabId: string;
+  try {
+    ({ etabId } = await getEtablissement(request));
+  } catch (e) {
+    if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
+
   const todayParis = getParisDate(0);
   const mode = request.nextUrl.searchParams.get("mode") || "week";
 
@@ -161,7 +173,7 @@ export async function GET(request: NextRequest) {
   // ── Parallel fetch ──
   const [reports, recipeCosts] = await Promise.all([
     fetchReports(apiKey, trendFromStr, fetchTo),
-    loadRecipeCosts(),
+    loadRecipeCosts(etabId),
   ]);
 
   // ── Group sales by date ──

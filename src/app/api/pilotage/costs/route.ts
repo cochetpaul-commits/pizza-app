@@ -4,6 +4,7 @@ import {
   fetchReports, getParisDate,
   dateToISOWeek, isoWeekToMonday, fmtDateUTC,
 } from "@/lib/popinaClient";
+import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +42,14 @@ export async function GET(request: NextRequest) {
   const apiKey = process.env.POPINA_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "POPINA_API_KEY manquant" }, { status: 500 });
 
+  let etabId: string;
+  try {
+    ({ etabId } = await getEtablissement(request));
+  } catch (e) {
+    if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
+
   // ── Week parameter ──
   const todayParis = getParisDate(0);
   const currentWeek = dateToISOWeek(todayParis);
@@ -65,13 +74,16 @@ export async function GET(request: NextRequest) {
     fetchReports(apiKey, weekDates[0], fetchTo),
     supabaseAdmin.from("pizza_recipes")
       .select("name,total_cost,sell_price")
-      .eq("is_draft", false),
+      .eq("is_draft", false)
+      .eq("etablissement_id", etabId),
     supabaseAdmin.from("kitchen_recipes")
       .select("name,total_cost,cost_per_portion,cost_per_kg,sell_price")
-      .eq("is_draft", false),
+      .eq("is_draft", false)
+      .eq("etablissement_id", etabId),
     supabaseAdmin.from("cocktails")
       .select("name,total_cost,sell_price")
-      .eq("is_draft", false),
+      .eq("is_draft", false)
+      .eq("etablissement_id", etabId),
   ]);
 
   // ── Build recipe cost map (normalized name → cost) ──

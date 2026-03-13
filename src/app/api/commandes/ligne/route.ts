@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 
 /**
  * POST /api/commandes/ligne
@@ -7,11 +8,30 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
  * Body: { session_id, ingredient_id, quantite, unite?, prix_unitaire_ht?, nom_libre? }
  */
 export async function POST(req: NextRequest) {
+  try {
+    var { etabId } = await getEtablissement(req);
+  } catch (e) {
+    if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
+
   const body = await req.json();
   const { session_id, ingredient_id, quantite, unite, prix_unitaire_ht, nom_libre } = body;
 
   if (!session_id || (!ingredient_id && !nom_libre)) {
     return NextResponse.json({ error: "session_id et ingredient_id ou nom_libre requis" }, { status: 400 });
+  }
+
+  // Verify the session belongs to this etablissement
+  const { data: sess } = await supabaseAdmin
+    .from("commande_sessions")
+    .select("id")
+    .eq("id", session_id)
+    .eq("etablissement_id", etabId)
+    .maybeSingle();
+
+  if (!sess) {
+    return NextResponse.json({ error: "session introuvable" }, { status: 404 });
   }
 
   const totalLigne = prix_unitaire_ht && quantite
@@ -82,8 +102,27 @@ export async function POST(req: NextRequest) {
  * Supprime une ligne de commande.
  */
 export async function DELETE(req: NextRequest) {
+  try {
+    var { etabId } = await getEtablissement(req);
+  } catch (e) {
+    if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
+
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id requis" }, { status: 400 });
+
+  // Verify the line's session belongs to this etablissement
+  const { data: ligne } = await supabaseAdmin
+    .from("commande_lignes")
+    .select("session_id, commande_sessions!inner(etablissement_id)")
+    .eq("id", id)
+    .eq("commande_sessions.etablissement_id", etabId)
+    .maybeSingle();
+
+  if (!ligne) {
+    return NextResponse.json({ error: "ligne introuvable" }, { status: 404 });
+  }
 
   const { error } = await supabaseAdmin
     .from("commande_lignes")

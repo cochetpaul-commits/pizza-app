@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { useEtablissement } from "@/lib/EtablissementContext";
 import { NavBar } from "@/components/NavBar";
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -99,6 +100,7 @@ const sectionTitle = (label: string, color = "#D4775A"): React.ReactNode => (
 
 export default function EventForm({ eventId }: { eventId?: string }) {
   const router = useRouter();
+  const { current: etab } = useEtablissement();
   const isNew = !eventId;
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -144,12 +146,12 @@ export default function EventForm({ eventId }: { eventId?: string }) {
       if (!u.user) return;
       setUserId(u.user.id);
 
-      const [pizzas, kitchens, cocktails, empats] = await Promise.all([
-        supabase.from("pizza_recipes").select("id,name,total_cost,nb_parts").eq("is_draft", false),
-        supabase.from("kitchen_recipes").select("id,name,cost_per_portion").eq("is_draft", false),
-        supabase.from("cocktails").select("id,name,total_cost").eq("is_draft", false),
-        supabase.from("recipes").select("id,name"),
-      ]);
+      let pQ = supabase.from("pizza_recipes").select("id,name,total_cost,nb_parts").eq("is_draft", false);
+      let kQ = supabase.from("kitchen_recipes").select("id,name,cost_per_portion").eq("is_draft", false);
+      let cQ = supabase.from("cocktails").select("id,name,total_cost").eq("is_draft", false);
+      let eQ = supabase.from("recipes").select("id,name");
+      if (etab) { pQ = pQ.eq("etablissement_id", etab.id); kQ = kQ.eq("etablissement_id", etab.id); cQ = cQ.eq("etablissement_id", etab.id); eQ = eQ.eq("etablissement_id", etab.id); }
+      const [pizzas, kitchens, cocktails, empats] = await Promise.all([pQ, kQ, cQ, eQ]);
 
       const opts: RecipeOption[] = [];
       for (const r of pizzas.data ?? []) {
@@ -168,7 +170,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
       opts.sort((a, b) => a.name.localeCompare(b.name, "fr"));
       setRecipeOptions(opts);
     })();
-  }, []);
+  }, [etab?.id]);
 
   // ── Load existing event ───────────────────────────────────────────────
   useEffect(() => {

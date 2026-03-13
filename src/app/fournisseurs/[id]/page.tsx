@@ -4,6 +4,7 @@ import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { NavBar } from "@/components/NavBar";
+import { useEtablissement } from "@/lib/EtablissementContext";
 
 // Mapping nom fournisseur → route import facture
 const INVOICE_ROUTES: Record<string, string> = {
@@ -53,6 +54,7 @@ function fmtMoney(n: number | null) {
 
 export default function FournisseurDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const { current: etab } = useEtablissement();
 
   const [supplier, setSupplier] = useState<SupplierFull | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -67,13 +69,19 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
     async function load() {
       setLoading(true);
 
+      const supQuery = supabase.from("suppliers").select("*").eq("id", id);
+      if (etab) supQuery.eq("etablissement_id", etab.id);
+
+      const invQuery = supabase.from("supplier_invoices")
+        .select("id,invoice_number,invoice_date,total_ht,source_file_name,created_at")
+        .eq("supplier_id", id)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (etab) invQuery.eq("etablissement_id", etab.id);
+
       const [supRes, invRes, offRes] = await Promise.all([
-        supabase.from("suppliers").select("*").eq("id", id).single(),
-        supabase.from("supplier_invoices")
-          .select("id,invoice_number,invoice_date,total_ht,source_file_name,created_at")
-          .eq("supplier_id", id)
-          .order("created_at", { ascending: false })
-          .limit(10),
+        supQuery.single(),
+        invQuery,
         supabase.from("v_latest_offers")
           .select("supplier_id", { count: "exact", head: true })
           .eq("supplier_id", id),
@@ -96,7 +104,8 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
     }
 
     load();
-  }, [id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, etab?.id]);
 
   async function save() {
     if (!supplier) return;

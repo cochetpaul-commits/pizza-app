@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
 import type { Role } from "@/lib/rbac";
+import { fetchApi } from "@/lib/fetchApi";
 
 type UserRow = {
   id: string;
@@ -54,7 +55,7 @@ function UsersContent() {
       setLoading(true);
       setError(null);
       const token = await getToken();
-      const res = await fetch("/api/admin/users", {
+      const res = await fetchApi("/api/admin/users", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (cancelled) return;
@@ -68,7 +69,7 @@ function UsersContent() {
 
   async function handleRoleChange(userId: string, newRole: Role) {
     const token = await getToken();
-    await fetch("/api/admin/users", {
+    await fetchApi("/api/admin/users", {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ userId, role: newRole }),
@@ -78,7 +79,7 @@ function UsersContent() {
 
   async function handleDelete(userId: string) {
     const token = await getToken();
-    await fetch("/api/admin/users", {
+    await fetchApi("/api/admin/users", {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ userId }),
@@ -91,7 +92,7 @@ function UsersContent() {
     if (!inviteEmail.trim()) return;
     setInviting(true);
     const token = await getToken();
-    const res = await fetch("/api/admin/invite", {
+    const res = await fetchApi("/api/admin/invite", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole, displayName: inviteName.trim() || undefined }),

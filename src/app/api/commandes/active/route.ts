@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 
 /**
  * GET /api/commandes/active?supplier=mael
  * Retourne la session brouillon en cours pour ce fournisseur, avec ses lignes.
  */
 export async function GET(req: NextRequest) {
+  try {
+    var { etabId } = await getEtablissement(req);
+  } catch (e) {
+    if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
+
   const supplierName = req.nextUrl.searchParams.get("supplier");
   if (!supplierName) {
     return NextResponse.json({ error: "supplier requis" }, { status: 400 });
@@ -29,6 +37,7 @@ export async function GET(req: NextRequest) {
     .from("commande_sessions")
     .select("*")
     .eq("supplier_id", supplier.id)
+    .eq("etablissement_id", etabId)
     .in("status", ["brouillon", "en_attente", "validee"])
     .order("created_at", { ascending: false })
     .limit(1)

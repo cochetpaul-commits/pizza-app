@@ -13,7 +13,9 @@ import { offerRowToCpu, enrichCpuWithConversions } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
 import { EstablishmentPicker } from "./EstablishmentPicker";
+import { fetchApi } from "@/lib/fetchApi";
 import { useProfile } from "@/lib/ProfileContext";
+import { useEtablissement } from "@/lib/EtablissementContext";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
 import { PricingBlock } from "./PricingBlock";
@@ -47,6 +49,7 @@ function truncate(s: string, n: number) { return s.length > n ? s.slice(0, n) + 
 export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   const router = useRouter();
   const { canWrite: userCanWrite } = useProfile();
+  const { current: etab } = useEtablissement();
   const isEdit = !!pizzaId;
 
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
@@ -168,10 +171,13 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) { setStatus("error"); setError({ message: "NOT_LOGGED" }); return; }
 
+      let ingsQ = supabase.from("ingredients").select("*").eq("is_active", true);
+      let doughQ = supabase.from("recipes").select("id,name,type,total_cost,yield_grams,ball_weight");
+      if (etab) { ingsQ = ingsQ.eq("etablissement_id", etab.id); doughQ = doughQ.eq("etablissement_id", etab.id); }
       const [{ data: ingsData, error: iErr }, { data: offers }, { data: doughs }] = await Promise.all([
-        supabase.from("ingredients").select("*").eq("is_active", true).order("name"),
+        ingsQ.order("name"),
         supabase.from("v_latest_offers").select("*"),
-        supabase.from("recipes").select("id,name,type,total_cost,yield_grams,ball_weight").order("created_at", { ascending: false }),
+        doughQ.order("created_at", { ascending: false }),
       ]);
       if (iErr) { setStatus("error"); setError(iErr); return; }
 
@@ -235,10 +241,10 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
           if (nk) ingNameToId[nk] = i.id;
         }
         if (missingIds.size > 0) {
-          const [{ data: krAll }, { data: prAll }] = await Promise.all([
-            supabase.from("kitchen_recipes").select("name,output_ingredient_id,total_cost,yield_grams,cost_per_kg"),
-            supabase.from("prep_recipes").select("name,output_ingredient_id,total_cost,yield_grams"),
-          ]);
+          let krQ = supabase.from("kitchen_recipes").select("name,output_ingredient_id,total_cost,yield_grams,cost_per_kg");
+          let prQ = supabase.from("prep_recipes").select("name,output_ingredient_id,total_cost,yield_grams");
+          if (etab) { krQ = krQ.eq("etablissement_id", etab.id); prQ = prQ.eq("etablissement_id", etab.id); }
+          const [{ data: krAll }, { data: prAll }] = await Promise.all([krQ, prQ]);
           for (const kr of (krAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; total_cost: number | null; yield_grams: number | null; cost_per_kg: number | null }>) {
             let cpuG = 0;
             if (kr.cost_per_kg && kr.cost_per_kg > 0) cpuG = kr.cost_per_kg / 1000;
@@ -320,7 +326,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
       setStatus("ok");
     }
     load();
-  }, [pizzaId]);
+  }, [pizzaId, etab?.id]);
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -424,7 +430,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
       if (!token) { alert("Non authentifié"); return; }
-      const res = await fetch("/api/pizzas/pdf", {
+      const res = await fetchApi("/api/pizzas/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ pizzaId }),

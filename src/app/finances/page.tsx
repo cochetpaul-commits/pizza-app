@@ -7,6 +7,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, LineChart, Line, Legend, ReferenceLine,
 } from "recharts";
+import { fetchApi } from "@/lib/fetchApi";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -305,7 +306,7 @@ export default function FinancesPage() {
     (async () => {
       setLoading(true);
       const params = mode === "week" ? `mode=week&week=${weekStr}` : `mode=month&month=${monthStr}`;
-      const res = await fetch(`/api/finances/stats?${params}`);
+      const res = await fetchApi(`/api/finances/stats?${params}`);
       if (!cancelled && res.ok) setData(await res.json());
       if (!cancelled) setLoading(false);
     })();

@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { NavBar } from "@/components/NavBar";
+import { fetchApi } from "@/lib/fetchApi";
 
 type InvoiceLine = {
   sku?: string | null;
@@ -73,7 +74,7 @@ export default function MasseInvoicePage() {
       form.append("establishment", establishment);
 
       const auth = await getAuthHeader();
-      const res = await fetch("/api/invoices/masse", {
+      const res = await fetchApi("/api/invoices/masse", {
         method: "POST",
         headers: auth ? { Authorization: auth } : {},
         body: form,
@@ -102,7 +103,7 @@ export default function MasseInvoicePage() {
       form.append("establishment", establishment);
 
       const auth = await getAuthHeader();
-      const res = await fetch("/api/invoices/masse", {
+      const res = await fetchApi("/api/invoices/masse", {
         method: "POST",
         headers: auth ? { Authorization: auth } : {},
         body: form,

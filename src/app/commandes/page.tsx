@@ -6,6 +6,7 @@ import { RequireRole } from "@/components/RequireRole";
 import { StepperInput } from "@/components/StepperInput";
 import { useProfile } from "@/lib/ProfileContext";
 import { supabase } from "@/lib/supabaseClient";
+import { fetchApi } from "@/lib/fetchApi";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -233,7 +234,7 @@ export default function CommandesPage() {
   // ── Load active sessions ──────────────────────────────────────────────────
 
   const loadSession = useCallback(async (supplier: string) => {
-    const res = await fetch(`/api/commandes/active?supplier=${supplier}`);
+    const res = await fetchApi(`/api/commandes/active?supplier=${supplier}`);
     const data = await res.json();
     return data;
   }, []);
@@ -340,7 +341,7 @@ export default function CommandesPage() {
 
   async function createSession(supplierId: string, setSession: (s: Session) => void) {
     setSaving(true);
-    const res = await fetch("/api/commandes/session", {
+    const res = await fetchApi("/api/commandes/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ supplier_id: supplierId }),
@@ -355,7 +356,7 @@ export default function CommandesPage() {
   // ── Save ligne ────────────────────────────────────────────────────────────
 
   async function saveLigne(sessionId: string, ingredientId: string, qty: number | "") {
-    await fetch("/api/commandes/ligne", {
+    await fetchApi("/api/commandes/ligne", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -385,7 +386,7 @@ export default function CommandesPage() {
       prev.map((i) => (i.id === ingredientId ? { ...i, favori_commande: !currentVal } : i))
     );
     try {
-      const res = await fetch("/api/commandes/favori", {
+      const res = await fetchApi("/api/commandes/favori", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ingredient_id: ingredientId, favori: !currentVal }),
@@ -414,7 +415,7 @@ export default function CommandesPage() {
 
   async function envoyerSession(sessionId: string) {
     setSaving(true);
-    await fetch("/api/commandes/session", {
+    await fetchApi("/api/commandes/session", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: sessionId, status: "en_attente" }),
@@ -427,7 +428,7 @@ export default function CommandesPage() {
 
   async function validerSession(sessionId: string) {
     setSaving(true);
-    await fetch("/api/commandes/session", {
+    await fetchApi("/api/commandes/session", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: sessionId, status: "validee" }),
@@ -440,7 +441,7 @@ export default function CommandesPage() {
 
   async function rejeterSession(sessionId: string) {
     setSaving(true);
-    await fetch("/api/commandes/session", {
+    await fetchApi("/api/commandes/session", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: sessionId, status: "brouillon" }),
@@ -453,7 +454,7 @@ export default function CommandesPage() {
 
   async function recevoirSession(sessionId: string) {
     setSaving(true);
-    await fetch("/api/commandes/session", {
+    await fetchApi("/api/commandes/session", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: sessionId, status: "recue" }),
@@ -467,7 +468,7 @@ export default function CommandesPage() {
   // ── PDF download ───────────────────────────────────────────────────────
 
   async function downloadPdf(sessionId: string, supplierLabel: string) {
-    const res = await fetch(`/api/commandes/pdf?session_id=${sessionId}`);
+    const res = await fetchApi(`/api/commandes/pdf?session_id=${sessionId}`);
     if (!res.ok) { alert("Erreur lors de la génération du PDF"); return; }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -483,7 +484,7 @@ export default function CommandesPage() {
   async function loadHistorique() {
     const suppId = tab === "mael" ? maelSupplierId : metroSupplierId;
     if (!suppId) return;
-    const res = await fetch(`/api/commandes/historique?supplier_id=${suppId}&limit=5`);
+    const res = await fetchApi(`/api/commandes/historique?supplier_id=${suppId}&limit=5`);
     const data = await res.json();
     setHistorique(data.historique ?? []);
     setHistOpen(true);
@@ -494,7 +495,7 @@ export default function CommandesPage() {
     if (!suppId) return;
     setSaving(true);
 
-    const res = await fetch("/api/commandes/session", {
+    const res = await fetchApi("/api/commandes/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ supplier_id: suppId }),
@@ -502,12 +503,12 @@ export default function CommandesPage() {
     const { session: newSession } = await res.json();
     if (!newSession) { setSaving(false); return; }
 
-    const sessRes = await fetch(`/api/commandes/session?id=${histSessionId}`);
+    const sessRes = await fetchApi(`/api/commandes/session?id=${histSessionId}`);
     const { session: oldSession } = await sessRes.json();
 
     for (const l of oldSession?.lignes ?? []) {
       if (l.quantite > 0) {
-        await fetch("/api/commandes/ligne", {
+        await fetchApi("/api/commandes/ligne", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

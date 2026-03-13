@@ -51,7 +51,7 @@ async function fetchPage(page: number, etabId?: string | null): Promise<{ items:
     .range(from, from + PAGE_SIZE - 1);
 
   if (etabId) {
-    query = query.or(`etablissement_id.eq.${etabId},shared.eq.true`);
+    query = query.eq("etablissement_id", etabId);
   }
 
   const { data, error } = await query;
@@ -70,7 +70,7 @@ async function searchIngredients(q: string, etabId?: string | null): Promise<{ i
     .order("name", { ascending: true });
 
   if (etabId) {
-    query = query.or(`etablissement_id.eq.${etabId},shared.eq.true`);
+    query = query.eq("etablissement_id", etabId);
   }
 
   const { data, error } = await query;

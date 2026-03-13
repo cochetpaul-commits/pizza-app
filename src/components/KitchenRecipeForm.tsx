@@ -9,6 +9,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { fetchApi } from "@/lib/fetchApi";
 import type { Ingredient } from "@/lib/types";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { AllergenBadges } from "@/components/AllergenBadges";
@@ -764,7 +765,7 @@ if (supplierIds.length) {
       const token = session.session?.access_token;
       if (!token) throw new Error("Token manquant (session)");
 
-      const res = await fetch("/api/kitchen/pdf", {
+      const res = await fetchApi("/api/kitchen/pdf", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

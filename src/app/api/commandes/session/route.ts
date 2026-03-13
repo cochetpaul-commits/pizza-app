@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 
 /**
  * POST /api/commandes/session
@@ -7,23 +8,23 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
  * Body: { supplier_id: string }
  */
 export async function POST(req: NextRequest) {
+  try {
+    var { etabId } = await getEtablissement(req);
+  } catch (e) {
+    if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
+
   const { supplier_id } = await req.json();
   if (!supplier_id) {
     return NextResponse.json({ error: "supplier_id requis" }, { status: 400 });
   }
 
-  // Récupérer l'établissement Bello Mio par défaut
-  const { data: etab } = await supabaseAdmin
-    .from("etablissements")
-    .select("id")
-    .eq("slug", "bello_mio")
-    .single();
-
   const { data: session, error } = await supabaseAdmin
     .from("commande_sessions")
     .insert({
       supplier_id,
-      etablissement_id: etab?.id ?? null,
+      etablissement_id: etabId,
       status: "brouillon",
     })
     .select()
@@ -41,6 +42,13 @@ export async function POST(req: NextRequest) {
  * Récupère une session par ID avec ses lignes.
  */
 export async function GET(req: NextRequest) {
+  try {
+    var { etabId } = await getEtablissement(req);
+  } catch (e) {
+    if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
+
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id requis" }, { status: 400 });
 
@@ -48,6 +56,7 @@ export async function GET(req: NextRequest) {
     .from("commande_sessions")
     .select("*")
     .eq("id", id)
+    .eq("etablissement_id", etabId)
     .single();
 
   if (!session) {
@@ -69,9 +78,28 @@ export async function GET(req: NextRequest) {
  * Body: { id: string, status: string, notes?: string }
  */
 export async function PATCH(req: NextRequest) {
+  try {
+    var { etabId } = await getEtablissement(req);
+  } catch (e) {
+    if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
+
   const { id, status, notes } = await req.json();
   if (!id || !status) {
     return NextResponse.json({ error: "id et status requis" }, { status: 400 });
+  }
+
+  // Verify session belongs to this etablissement
+  const { data: existing } = await supabaseAdmin
+    .from("commande_sessions")
+    .select("id")
+    .eq("id", id)
+    .eq("etablissement_id", etabId)
+    .maybeSingle();
+
+  if (!existing) {
+    return NextResponse.json({ error: "session introuvable" }, { status: 404 });
   }
 
   const update: Record<string, unknown> = { status, updated_at: new Date().toISOString() };

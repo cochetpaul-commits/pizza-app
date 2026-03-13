@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { RequireRole } from "@/components/RequireRole";
+import { fetchApi } from "@/lib/fetchApi";
 
 type CaData = { totalSales: number; guestsNumber: number } | null;
 
@@ -13,7 +14,7 @@ export default function GroupePage() {
   useEffect(() => {
     async function fetchCa() {
       try {
-        const res = await fetch("/api/popina/ca-jour");
+        const res = await fetchApi("/api/popina/ca-jour");
         if (!res.ok) return;
         const d = await res.json();
         setCa({ totalSales: d.totalSales ?? 0, guestsNumber: d.guestsNumber ?? 0 });

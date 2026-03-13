@@ -8,6 +8,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Cell, PieChart, Pie,
 } from "recharts";
+import { fetchApi } from "@/lib/fetchApi";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -427,9 +428,9 @@ export default function PilotagePage() {
   const loadStats = useCallback(async (week: string) => {
     setLoading(true);
     const [s, m, c] = await Promise.all([
-      fetch(`/api/popina/stats?week=${week}`).then((r) => r.ok ? r.json() : null),
-      fetch("/api/meteo").then((r) => r.ok ? r.json() : null),
-      fetch(`/api/pilotage/costs?week=${week}`).then((r) => r.ok ? r.json() : null),
+      fetchApi(`/api/popina/stats?week=${week}`).then((r) => r.ok ? r.json() : null),
+      fetchApi("/api/meteo").then((r) => r.ok ? r.json() : null),
+      fetchApi(`/api/pilotage/costs?week=${week}`).then((r) => r.ok ? r.json() : null),
     ]);
     if (s) setStats(s);
     if (m) setMeteo(m);
@@ -482,7 +483,7 @@ export default function PilotagePage() {
     setDayDetail(null);
     setDayLoading(true);
     try {
-      const res = await fetch(`/api/popina/ca-jour?date=${day.date}`);
+      const res = await fetchApi(`/api/popina/ca-jour?date=${day.date}`);
       if (res.ok) setDayDetail(await res.json());
     } finally {
       setDayLoading(false);

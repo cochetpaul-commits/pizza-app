@@ -5,6 +5,7 @@ import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { RecipePdfDocument, type RecipePdfData } from "@/lib/recipePdf";
 import { calculerPate } from "@/lib/pateEngine";
 import { POLE_COLORS } from "@/lib/poleColors";
+import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 import fs from "fs";
 import path from "path";
 
@@ -53,6 +54,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    let etabId: string;
+    try {
+      ({ etabId } = await getEtablissement(req));
+    } catch (e) {
+      if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
+      throw e;
+    }
+
     const body = (await req.json()) as { recipeId?: string; nbPatons?: number; poidsPaton?: number };
 
     const recipeId = String(body.recipeId ?? "").trim();
@@ -75,6 +84,7 @@ export async function POST(req: Request) {
       .from("recipes")
       .select("*")
       .eq("id", recipeId)
+      .eq("etablissement_id", etabId)
       .maybeSingle();
 
     if (rErr) return NextResponse.json({ message: rErr.message }, { status: 500 });

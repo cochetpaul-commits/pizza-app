@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { NavBar } from "@/components/NavBar";
 import { supabase } from "@/lib/supabaseClient";
+import { useEtablissement } from "@/lib/EtablissementContext";
 import { StepperInput } from "@/components/StepperInput";
 import { computeDerivedPrice, computeRendement } from "@/lib/rendement";
 import {
@@ -65,6 +66,7 @@ function IngredientDetailInner() {
   const searchParams = useSearchParams();
   const id = params.id as string;
   const fromVariations = searchParams.get("from") === "variations-prix";
+  const { current: etab } = useEtablissement();
 
   const variationsBtn = fromVariations
     ? <Link href="/variations-prix" className="btn">← Variations prix</Link>
@@ -93,14 +95,20 @@ function IngredientDetailInner() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Non connecté");
 
+        const ingQuery = supabase.from("ingredients").select("*").eq("id", id).eq("user_id", user.id);
+        if (etab) ingQuery.eq("etablissement_id", etab.id);
+
+        const offQuery = supabase.from("supplier_offers")
+          .select("id, supplier_id, unit, unit_price, supplier_label, is_active, created_at, establishment, price_kind")
+          .eq("ingredient_id", id)
+          .eq("user_id", user.id)
+          .not("unit_price", "is", null)
+          .order("created_at", { ascending: true });
+        if (etab) offQuery.eq("etablissement_id", etab.id);
+
         const [{ data: ing, error: e1 }, { data: offerData, error: e2 }] = await Promise.all([
-          supabase.from("ingredients").select("*").eq("id", id).eq("user_id", user.id).single(),
-          supabase.from("supplier_offers")
-            .select("id, supplier_id, unit, unit_price, supplier_label, is_active, created_at, establishment, price_kind")
-            .eq("ingredient_id", id)
-            .eq("user_id", user.id)
-            .not("unit_price", "is", null)
-            .order("created_at", { ascending: true }),
+          ingQuery.single(),
+          offQuery,
         ]);
 
         if (e1) throw new Error(e1.message);
@@ -127,7 +135,8 @@ function IngredientDetailInner() {
       }
     };
     run();
-  }, [id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, etab?.id]);
 
   // Load derived ingredients + parent info
   useEffect(() => {

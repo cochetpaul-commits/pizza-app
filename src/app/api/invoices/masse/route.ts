@@ -3,6 +3,7 @@ import { pdfToText } from "@/lib/pdfToText";
 import { createClient } from "@supabase/supabase-js";
 import { runImport } from "@/lib/invoices/importEngine";
 import { parseMasseInvoiceText } from "@/lib/invoices/masse";
+import { resolveEtabId, EtabError } from "@/lib/getEtablissement";
 
 export const runtime = "nodejs";
 
@@ -39,10 +40,18 @@ export async function POST(req: Request) {
     const userId = auth?.user?.id ?? null;
     if (!userId) return NextResponse.json({ ok: false, error: "Non authentifié (Supabase user manquant)." }, { status: 401 });
 
+    let etabId: string;
+    try {
+      ({ etabId } = await resolveEtabId(userId, req.headers));
+    } catch (e) {
+      if (e instanceof EtabError) return NextResponse.json({ ok: false, error: e.message }, { status: e.status });
+      throw e;
+    }
+
     const result = await runImport({
       supabase, userId, supplierName: "MASSE",
       payload, sourceFileName: file.name, rawText: text, mode, establishment,
-      defaultUnit: "kg",
+      defaultUnit: "kg", etabId,
     });
 
     return NextResponse.json({

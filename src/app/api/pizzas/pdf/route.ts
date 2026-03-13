@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 import { POLE_COLORS } from "@/lib/poleColors";
 import { parseAllergens, mergeAllergens } from "@/lib/allergens";
+import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,6 +68,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    let etabId: string;
+    try {
+      ({ etabId } = await getEtablissement(req));
+    } catch (e) {
+      if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
+      throw e;
+    }
+
     const { pizzaId } = (await req.json()) as { pizzaId?: string };
     if (!pizzaId) {
       return NextResponse.json({ message: "pizzaId manquant" }, { status: 400 });
@@ -81,6 +90,7 @@ export async function POST(req: Request) {
       .from("pizza_recipes")
       .select("id,name,notes,dough_recipe_id,photo_url")
       .eq("id", pizzaId)
+      .eq("etablissement_id", etabId)
       .maybeSingle();
 
     if (pErr) return NextResponse.json({ message: "Pizza fetch error", details: pErr.message }, { status: 500 });

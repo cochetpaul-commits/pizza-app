@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 import React from "react";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { CommandePdfDocument, type CommandePdfData, type CommandePdfCategory } from "@/lib/commandePdf";
@@ -74,16 +75,25 @@ function getIng(row: LigneRow): { name: string; category: string | null; default
 }
 
 export async function GET(req: NextRequest) {
+  let etabId: string;
+  try {
+    ({ etabId } = await getEtablissement(req));
+  } catch (e) {
+    if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
+
   const sessionId = req.nextUrl.searchParams.get("session_id");
   if (!sessionId) {
     return NextResponse.json({ error: "session_id requis" }, { status: 400 });
   }
 
-  // Fetch session with supplier name
+  // Fetch session with supplier name, filtered by etablissement
   const { data: session } = await supabaseAdmin
     .from("commande_sessions")
     .select("*, suppliers(name)")
     .eq("id", sessionId)
+    .eq("etablissement_id", etabId)
     .single();
 
   if (!session) {

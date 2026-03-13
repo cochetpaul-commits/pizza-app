@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { resolveEtabId, EtabError } from "@/lib/getEtablissement";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 
@@ -32,6 +34,15 @@ export async function POST(req: Request) {
     if (authErr) return NextResponse.json({ ok: false, error: authErr.message }, { status: 401 });
     if (!auth?.user?.id) return NextResponse.json({ ok: false, error: "Non authentifié." }, { status: 401 });
 
+    // Resolve etablissement
+    let etabId: string;
+    try {
+      ({ etabId } = await resolveEtabId(auth.user.id, req.headers));
+    } catch (e) {
+      if (e instanceof EtabError) return NextResponse.json({ ok: false, error: e.message }, { status: e.status });
+      throw e;
+    }
+
     const body = await req.json() as { keepId?: string; deleteId?: string };
     const { keepId, deleteId } = body;
 
@@ -40,6 +51,22 @@ export async function POST(req: Request) {
     }
     if (keepId === deleteId) {
       return NextResponse.json({ ok: false, error: "keepId et deleteId identiques." }, { status: 400 });
+    }
+
+    // Verify both ingredients belong to this etablissement
+    const { data: ings } = await supabaseAdmin
+      .from("ingredients")
+      .select("id, etablissement_id")
+      .in("id", [keepId, deleteId]);
+
+    const foreign = (ings ?? []).filter(
+      (i) => i.etablissement_id && i.etablissement_id !== etabId
+    );
+    if (foreign.length > 0) {
+      return NextResponse.json(
+        { ok: false, error: "Un ou plusieurs ingrédients n'appartiennent pas à cet établissement." },
+        { status: 403 }
+      );
     }
 
     const errors: string[] = [];

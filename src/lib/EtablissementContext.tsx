@@ -106,16 +106,20 @@ export function EtablissementProvider({ children }: { children: ReactNode }) {
         setCurrentRaw(null);
       } else if (savedId) {
         const found = accessible.find(e => e.id === savedId);
-        setCurrentRaw(found ?? accessible[0] ?? null);
+        const picked = found ?? accessible[0] ?? null;
+        setCurrentRaw(picked);
         setGroupViewRaw(false);
+        if (picked && picked.id !== savedId) localStorage.setItem(LS_KEY, picked.id);
       } else if (groupAdmin) {
         // Default: group view for admins
         setGroupViewRaw(true);
         setCurrentRaw(null);
       } else {
         // Default: first accessible establishment
-        setCurrentRaw(accessible[0] ?? null);
+        const first = accessible[0] ?? null;
+        setCurrentRaw(first);
         setGroupViewRaw(false);
+        if (first) localStorage.setItem(LS_KEY, first.id);
       }
 
       setLoading(false);

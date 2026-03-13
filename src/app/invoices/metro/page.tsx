@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { NavBar } from "@/components/NavBar";
+import { fetchApi } from "@/lib/fetchApi";
 
 type InvoiceLine = {
   sku?: string | null;
@@ -74,7 +75,7 @@ export default function MetroInvoicePage() {
       form.append("establishment", establishment);
 
       const auth = await getAuthHeader();
-      const res = await fetch("/api/invoices/metro", {
+      const res = await fetchApi("/api/invoices/metro", {
         method: "POST",
         headers: auth ? { Authorization: auth } : {},
         body: form,
@@ -103,7 +104,7 @@ export default function MetroInvoicePage() {
       form.append("establishment", establishment);
 
       const auth = await getAuthHeader();
-      const res = await fetch("/api/invoices/metro", {
+      const res = await fetchApi("/api/invoices/metro", {
         method: "POST",
         headers: auth ? { Authorization: auth } : {},
         body: form,

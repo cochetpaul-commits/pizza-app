@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 
 /**
  * GET /api/commandes/historique?supplier_id=xxx&limit=10
  * Retourne les commandes passées (non brouillon) pour un fournisseur.
  */
 export async function GET(req: NextRequest) {
+  try {
+    var { etabId } = await getEtablissement(req);
+  } catch (e) {
+    if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
+
   const supplierId = req.nextUrl.searchParams.get("supplier_id");
   const limit = Number(req.nextUrl.searchParams.get("limit") || "10");
 
@@ -17,6 +25,7 @@ export async function GET(req: NextRequest) {
     .from("commande_sessions")
     .select("*")
     .eq("supplier_id", supplierId)
+    .eq("etablissement_id", etabId)
     .not("status", "eq", "brouillon")
     .order("created_at", { ascending: false })
     .limit(limit);
