@@ -45,8 +45,6 @@ type HistItem = {
   nb_articles: number;
 };
 
-type MetroFreeInput = { nom: string; quantite: number | ""; unite: string };
-
 // ── Catégories ordonnées ─────────────────────────────────────────────────────
 
 const CAT_ORDER = [
@@ -149,7 +147,6 @@ export default function CommandesPage() {
   const [urgents, setUrgents] = useState<Set<string>>(new Set());
 
   // METRO free input
-  const [metroInputs, setMetroInputs] = useState<Record<string, MetroFreeInput>>({});
   const [metroNewCat, setMetroNewCat] = useState("epicerie");
   const [metroNewNom, setMetroNewNom] = useState("");
   const [metroNewQte, setMetroNewQte] = useState<number | "">("");
