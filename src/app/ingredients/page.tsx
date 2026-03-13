@@ -254,6 +254,14 @@ function IngredientsPageInner() {
     await mutate();
   }, [items, offersByIngredientId, userId, mutate]);
 
+  const openDeriveModal = useCallback((x: Ingredient) => {
+    setRcIngredientId(x.id);
+    setRcDeriveName("");
+    setRcPoidsBrut(1000);
+    setRcPoidsNet(625);
+    setShowRendementCalc(true);
+  }, []);
+
   const [newName, setNewName] = useState("");
   const [newCategory, setNewCategory] = useState<Category>("preparation");
   const [newSupplierId, setNewSupplierId] = useState<string>("");
@@ -656,10 +664,6 @@ function IngredientsPageInner() {
               </span>
             )}
           </button>
-          {/* Rendement calculator */}
-          <button onClick={() => { setShowRendementCalc(true); setRcIngredientId(""); setRcPoidsBrut(1000); setRcPoidsNet(625); setRcDeriveName(""); }} style={headerBtnStyle}>
-            Rendement
-          </button>
           {/* + Ingrédient */}
           {userCanWrite && (
           <button
@@ -915,6 +919,7 @@ function IngredientsPageInner() {
                             onSetStatus={userCanWrite ? setIngredientStatus : () => {}}
                             onEditChange={onEditChange}
                             onEditImportName={onEditImportName}
+                            onCreateDerived={userCanWrite ? openDeriveModal : undefined}
                           />
                         </div>
                       );
@@ -991,24 +996,14 @@ function IngredientsPageInner() {
               boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                <span style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a" }}>Calculer un rendement</span>
+                <span style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a" }}>Créer un dérivé</span>
                 <button onClick={() => setShowRendementCalc(false)} style={{ height: 30, padding: "0 10px", borderRadius: 8, border: "1px solid #e5ddd0", background: "white", cursor: "pointer", fontSize: 13 }}>✕</button>
               </div>
 
-              {/* Ingredient selector */}
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 12, color: "#999", marginBottom: 4 }}>Ingrédient parent</div>
-                <select
-                  value={rcIngredientId}
-                  onChange={e => { setRcIngredientId(e.target.value); setRcDeriveName(""); }}
-                  style={{ width: "100%", height: 40, borderRadius: 8, border: "1px solid #e5ddd0", padding: "0 10px", fontSize: 14, background: "white" }}
-                >
-                  <option value="">— Sélectionner —</option>
-                  {items
-                    .filter(x => !x.is_derived)
-                    .sort((a, b) => a.name.localeCompare(b.name, "fr"))
-                    .map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
-                </select>
+              {/* Ingredient parent */}
+              <div style={{ marginBottom: 14, padding: "10px 12px", background: "white", borderRadius: 10, border: "1px solid #e5ddd0" }}>
+                <div style={{ fontSize: 11, color: "#999", marginBottom: 2 }}>Ingrédient parent</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>{selectedIng?.name ?? "—"}</div>
               </div>
 
               {/* Weights */}
@@ -1047,13 +1042,13 @@ function IngredientsPageInner() {
                     </div>
                   </>
                 )}
-                {rcIngredientId && parentPrice == null && (
+                {parentPrice == null && (
                   <div style={{ fontSize: 12, color: "#D97706", marginTop: 4 }}>Aucun prix trouvé pour cet ingrédient.</div>
                 )}
               </div>
 
               {/* Derive name + actions */}
-              {rcIngredientId && userCanWrite && (
+              {userCanWrite && (
                 <div style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 12, color: "#999", marginBottom: 4 }}>Nom du dérivé (pour créer)</div>
                   <input type="text" value={rcDeriveName} onChange={e => setRcDeriveName(e.target.value)}
@@ -1067,7 +1062,7 @@ function IngredientsPageInner() {
                   flex: 1, height: 42, borderRadius: 10, border: "1px solid #e5ddd0",
                   background: "white", fontSize: 14, fontWeight: 600, cursor: "pointer",
                 }}>Fermer</button>
-                {rcIngredientId && userCanWrite && rendement && (
+                {userCanWrite && rendement && (
                   <button
                     disabled={rcSaving || !rendement}
                     onClick={async () => {

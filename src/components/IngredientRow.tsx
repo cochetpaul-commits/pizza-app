@@ -103,12 +103,13 @@ export type IngredientRowProps = {
   onSetStatus: (id: string, next: IngredientStatus) => void;
   onEditChange: (next: EditState) => void;
   onEditImportName: (id: string, current: string) => void;
+  onCreateDerived?: (x: Ingredient) => void;
 };
 
 export const IngredientRow = React.memo(function IngredientRow({
   item: x, offer, supplierName, supplierIdForDisplay, alert, isEditing, compactMode, edit,
   suppliers, previewEditPack,
-  onStartEdit, onSaveEdit, onDelete, onSetStatus, onEditChange, onEditImportName,
+  onStartEdit, onSaveEdit, onDelete, onSetStatus, onEditChange, onEditImportName, onCreateDerived,
 }: IngredientRowProps) {
   const price = formatIngredientPrice(x, offer ?? null);
   const estab = offer?.establishment ?? "both";
@@ -197,7 +198,10 @@ export const IngredientRow = React.memo(function IngredientRow({
         </div>
 
         {/* Actions */}
-        <div style={{ width: 80, display: "flex", gap: 6, alignItems: "center", justifyContent: "flex-end" }}>
+        <div style={{ width: 110, display: "flex", gap: 5, alignItems: "center", justifyContent: "flex-end" }}>
+          {!x.is_derived && onCreateDerived && (
+            <button onClick={() => onCreateDerived(x)} title="Créer un dérivé" style={{ ...BTN_ACTION, background: "rgba(124,58,237,0.10)", color: "#7C3AED", fontSize: 12, fontWeight: 700 }}>⚗</button>
+          )}
           {!isEditing
             ? <button onClick={() => onStartEdit(x)} title="Modifier" style={{ ...BTN_ACTION, background: "#8B1A1A", color: "white", fontWeight: 700 }}>→</button>
             : <button onClick={onSaveEdit} style={{ ...BTN_ACTION, background: "#4a6741", color: "white", fontSize: 11, fontWeight: 700 }}>OK</button>}
@@ -255,6 +259,9 @@ export const IngredientRow = React.memo(function IngredientRow({
               {!isEditing
                 ? <button onClick={() => onStartEdit(x)} style={{ flex: 1, height: 30, borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", color: "#8B1A1A", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Modifier</button>
                 : <button onClick={onSaveEdit} style={{ flex: 1, height: 30, borderRadius: 7, border: "none", background: "#4a6741", color: "white", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>OK</button>}
+              {!x.is_derived && onCreateDerived && (
+                <button onClick={() => onCreateDerived(x)} title="Créer un dérivé" style={{ width: 30, height: 30, borderRadius: 7, border: "1px solid rgba(124,58,237,0.25)", background: "rgba(124,58,237,0.08)", color: "#7C3AED", fontSize: 13, cursor: "pointer" }}>⚗</button>
+              )}
               <button onClick={() => onDelete(x.id, x.name)} style={{ width: 30, height: 30, borderRadius: 7, border: "none", background: "#ede6d9", color: "#aaa", fontSize: 14, cursor: "pointer" }}>✕</button>
             </div>
           </>
@@ -391,5 +398,6 @@ export const IngredientRow = React.memo(function IngredientRow({
   if (prev.isEditing && prev.edit !== next.edit) return false;
   if (prev.previewEditPack !== next.previewEditPack) return false;
   if (prev.supplierName !== next.supplierName) return false;
+  if (prev.onCreateDerived !== next.onCreateDerived) return false;
   return true;
 });
