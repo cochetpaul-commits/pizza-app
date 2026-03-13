@@ -305,7 +305,7 @@ function calculerHeuresSupHCR(
   let heures_supp_50 = 0;
   let heures_comp_10 = 0;
   let heures_comp_25 = 0;
-  let rc_acquis = 0;
+  const rc_acquis = 0;
 
   if (isTempsPartiel) {
     // Temps partiel : heures complémentaires
