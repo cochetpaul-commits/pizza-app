@@ -12,6 +12,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/epicerie":     ["admin", "direction"],
   "/variations-prix": ["admin", "direction"],
   "/rh":           ["admin", "direction"],
+  "/plannings":    ["admin", "direction"],
   "/recettes":     ["admin", "direction", "cuisine"],
   "/ingredients":  ["admin", "direction", "cuisine"],
 };

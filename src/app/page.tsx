@@ -492,7 +492,21 @@ export default function Home() {
               <div style={row}>
                 <div>
                   <p style={titleOf("#D4775A")}>EQUIPE</p>
-                  <p style={sub}>Employes · Planning · Contrats</p>
+                  <p style={sub}>Employes · Contrats · Absences</p>
+                </div>
+                <span className="dash-pill">Ouvrir →</span>
+              </div>
+            </div>
+          </Link>
+          )}
+
+          {role && role !== "cuisine" && (
+          <Link href="/plannings" style={{ textDecoration: "none", color: "inherit" }}>
+            <div className="dash-card" style={{ "--accent": "#D4775A" } as React.CSSProperties}>
+              <div style={row}>
+                <div>
+                  <p style={titleOf("#D4775A")}>PLANNING</p>
+                  <p style={sub}>Shifts · Horaires · Heures sup</p>
                 </div>
                 <span className="dash-pill">Ouvrir →</span>
               </div>
