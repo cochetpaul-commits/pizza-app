@@ -1083,7 +1083,9 @@ function IngredientsPageInner() {
                           parent_ingredient_id: selectedIng.id,
                           rendement,
                           is_derived: true,
-                          cost_per_unit: derivedPrice,
+                          purchase_price: derivedPrice,
+                          purchase_unit: 1,
+                          purchase_unit_label: "kg",
                           allergens: selectedIng.allergens ?? null,
                           supplier_id: selectedIng.supplier_id ?? null,
                         });

@@ -567,7 +567,9 @@ function IngredientDetailInner() {
                           parent_ingredient_id: ingredient.id,
                           rendement: rend > 0 ? Number(rend.toFixed(4)) : null,
                           is_derived: true,
-                          cost_per_unit: derivedPrice > 0 ? Number(derivedPrice.toFixed(4)) : null,
+                          purchase_price: derivedPrice > 0 ? Number(derivedPrice.toFixed(4)) : null,
+                          purchase_unit: 1,
+                          purchase_unit_label: "kg",
                           status: "validated",
                         })
                         .select("id, name, rendement, cost_per_unit")

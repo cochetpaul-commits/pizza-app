@@ -39,7 +39,7 @@ export async function updateDerivedIngredients(
     const newPrice = computeDerivedPrice(newParentPrice, d.rendement);
     await supabaseClient
       .from("ingredients")
-      .update({ cost_per_unit: newPrice })
+      .update({ purchase_price: newPrice, purchase_unit: 1, purchase_unit_label: "kg" })
       .eq("id", d.id);
   }
 }
