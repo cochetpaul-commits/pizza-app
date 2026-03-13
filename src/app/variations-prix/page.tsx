@@ -166,8 +166,7 @@ export default function VariationsPrixPage() {
       }
     };
     run();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [etab?.id]);
+  }, [etab]);
 
   // ── Snooze handlers ──
   function snooze(a: PriceAlert) {

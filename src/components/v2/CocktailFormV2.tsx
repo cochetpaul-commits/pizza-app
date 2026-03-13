@@ -297,7 +297,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
       setStatus("ok");
     }
     load();
-  }, [cocktailId, etab?.id]);
+  }, [cocktailId, etab]);
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];

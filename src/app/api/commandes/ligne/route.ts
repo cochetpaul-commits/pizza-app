@@ -8,8 +8,9 @@ import { getEtablissement, EtabError } from "@/lib/getEtablissement";
  * Body: { session_id, ingredient_id, quantite, unite?, prix_unitaire_ht?, nom_libre? }
  */
 export async function POST(req: NextRequest) {
+  let etabId: string;
   try {
-    var { etabId } = await getEtablissement(req);
+    ({ etabId } = await getEtablissement(req));
   } catch (e) {
     if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
@@ -102,8 +103,9 @@ export async function POST(req: NextRequest) {
  * Supprime une ligne de commande.
  */
 export async function DELETE(req: NextRequest) {
+  let etabId: string;
   try {
-    var { etabId } = await getEtablissement(req);
+    ({ etabId } = await getEtablissement(req));
   } catch (e) {
     if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;

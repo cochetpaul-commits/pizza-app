@@ -7,8 +7,9 @@ import { getEtablissement, EtabError } from "@/lib/getEtablissement";
  * Retourne les commandes passées (non brouillon) pour un fournisseur.
  */
 export async function GET(req: NextRequest) {
+  let etabId: string;
   try {
-    var { etabId } = await getEtablissement(req);
+    ({ etabId } = await getEtablissement(req));
   } catch (e) {
     if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;

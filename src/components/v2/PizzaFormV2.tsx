@@ -326,7 +326,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
       setStatus("ok");
     }
     load();
-  }, [pizzaId, etab?.id]);
+  }, [pizzaId, etab]);
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];

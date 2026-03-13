@@ -7,8 +7,9 @@ import { getEtablissement, EtabError } from "@/lib/getEtablissement";
  * Retourne la session brouillon en cours pour ce fournisseur, avec ses lignes.
  */
 export async function GET(req: NextRequest) {
+  let etabId: string;
   try {
-    var { etabId } = await getEtablissement(req);
+    ({ etabId } = await getEtablissement(req));
   } catch (e) {
     if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;

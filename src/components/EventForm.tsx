@@ -170,7 +170,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
       opts.sort((a, b) => a.name.localeCompare(b.name, "fr"));
       setRecipeOptions(opts);
     })();
-  }, [etab?.id]);
+  }, [etab]);
 
   // ── Load existing event ───────────────────────────────────────────────
   useEffect(() => {

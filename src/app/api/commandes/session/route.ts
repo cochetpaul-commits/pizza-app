@@ -8,8 +8,9 @@ import { getEtablissement, EtabError } from "@/lib/getEtablissement";
  * Body: { supplier_id: string }
  */
 export async function POST(req: NextRequest) {
+  let etabId: string;
   try {
-    var { etabId } = await getEtablissement(req);
+    ({ etabId } = await getEtablissement(req));
   } catch (e) {
     if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
@@ -42,8 +43,9 @@ export async function POST(req: NextRequest) {
  * Récupère une session par ID avec ses lignes.
  */
 export async function GET(req: NextRequest) {
+  let etabId: string;
   try {
-    var { etabId } = await getEtablissement(req);
+    ({ etabId } = await getEtablissement(req));
   } catch (e) {
     if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
@@ -78,8 +80,9 @@ export async function GET(req: NextRequest) {
  * Body: { id: string, status: string, notes?: string }
  */
 export async function PATCH(req: NextRequest) {
+  let etabId: string;
   try {
-    var { etabId } = await getEtablissement(req);
+    ({ etabId } = await getEtablissement(req));
   } catch (e) {
     if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;

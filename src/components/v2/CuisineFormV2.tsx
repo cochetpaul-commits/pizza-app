@@ -296,7 +296,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
       setStatus("ok");
     }
     load();
-  }, [recipeId, etab?.id]);
+  }, [recipeId, etab]);
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];

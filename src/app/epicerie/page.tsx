@@ -92,7 +92,7 @@ export default function EpiceriePage() {
       setLoading(true);
       let ingQ = supabase.from("ingredients").select("id,name,category,cost_per_unit,piece_weight_g,piece_volume_ml,default_unit").eq("is_active", true);
       let supQ = supabase.from("suppliers").select("id,name").eq("is_active", true);
-      let offQ = supabase.from("v_latest_offers").select("ingredient_id,supplier_id,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g");
+      const offQ = supabase.from("v_latest_offers").select("ingredient_id,supplier_id,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g");
       if (etab) {
         ingQ = ingQ.eq("etablissement_id", etab.id);
         supQ = supQ.eq("etablissement_id", etab.id);
@@ -120,7 +120,7 @@ export default function EpiceriePage() {
       setLoading(false);
     }
     load();
-  }, [etab?.id]);
+  }, [etab]);
 
   const filtered = useMemo(() => ingredients.filter(x => {
     if (filterCat !== "all" && x.category !== filterCat) return false;

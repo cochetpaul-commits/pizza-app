@@ -24,7 +24,7 @@ export default function MercurialePage() {
     q.then(({ data }) => {
       setSuppliers((data ?? []) as Supplier[]);
     });
-  }, [etab?.id]);
+  }, [etab]);
 
   async function getToken(): Promise<string> {
     const { data } = await supabase.auth.getSession();
