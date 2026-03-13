@@ -39,9 +39,10 @@ export type PopinaReport = {
 export async function fetchReports(
   apiKey: string,
   from: string,
-  to: string
+  to: string,
+  locationId: string = LOCATION_ID,
 ): Promise<PopinaReport[]> {
-  const url = `${POPINA_BASE}/reports?locationId=${LOCATION_ID}&from=${from}&to=${to}`;
+  const url = `${POPINA_BASE}/reports?locationId=${locationId}&from=${from}&to=${to}`;
   try {
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${apiKey}` },
@@ -83,8 +84,9 @@ export type PopinaOrder = {
 export async function fetchOrders(
   apiKey: string,
   date: string,
+  locationId: string = LOCATION_ID,
 ): Promise<PopinaOrder[]> {
-  const url = `${POPINA_BASE}/orders?locationId=${LOCATION_ID}&date=${date}`;
+  const url = `${POPINA_BASE}/orders?locationId=${locationId}&date=${date}`;
   try {
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${apiKey}` },

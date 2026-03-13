@@ -9,7 +9,7 @@ import { TopNav } from "@/components/TopNav";
 
 import { AllergenBadges } from "@/components/AllergenBadges";
 import { parseAllergens, mergeAllergens } from "@/lib/allergens";
-import { offerRowToCpu } from "@/lib/offerPricing";
+import { offerRowToCpu, enrichCpuWithConversions } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
 import { EstablishmentPicker } from "./EstablishmentPicker";
@@ -182,12 +182,14 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
           else if (pul === "ml") pm[i.id] = { ml: perUnit };
           else if (pul === "pc" || pul === "pcs") pm[i.id] = { pcs: perUnit };
           else pm[i.id] = { g: perUnit };
+          pm[i.id] = enrichCpuWithConversions({ density_kg_per_l: i.density_g_per_ml, piece_weight_g: i.piece_weight_g }, pm[i.id]);
           supplierByIng[i.id] = "maison";
           continue;
         }
         const cpu = i.cost_per_unit;
         if (cpu != null && cpu > 0) {
           pm[i.id] = { g: cpu };
+          pm[i.id] = enrichCpuWithConversions({ density_kg_per_l: i.density_g_per_ml, piece_weight_g: i.piece_weight_g }, pm[i.id]);
           supplierByIng[i.id] = "maison";
         }
       }

@@ -8,6 +8,7 @@ import { NavBar } from "@/components/NavBar";
 import { TopNav } from "@/components/TopNav";
 import { EstabBadge } from "@/components/EstabBadge";
 import { useProfile } from "@/lib/ProfileContext";
+import { useEtablissement } from "@/lib/EtablissementContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -302,6 +303,7 @@ function SubSection({
 
 function RecettesInner() {
   const { canWrite } = useProfile();
+  const { current: etabCtx } = useEtablissement();
   const [authOk, setAuthOk] = useState<boolean | null>(null);
   const [pizzas,    setPizzas]    = useState<PizzaRow[]>([]);
   const [kitchens,  setKitchens]  = useState<KitchenRow[]>([]);
@@ -342,19 +344,27 @@ function RecettesInner() {
     supabase.auth.getSession().then(({ data: sessionData }) => {
       if (!sessionData.session) { setAuthOk(false); setLoading(false); return; }
       setAuthOk(true);
-      Promise.all([
-        supabase.from("pizza_recipes")
-          .select("id,name,total_cost,margin_rate,vat_rate,sell_price,establishments,pivot_ingredient_id")
-          .eq("is_draft", false),
-        supabase.from("kitchen_recipes")
-          .select("id,name,category,total_cost,cost_per_kg,cost_per_portion,margin_rate,vat_rate,sell_price,establishments,pivot_ingredient_id")
-          .eq("is_draft", false),
-        supabase.from("cocktails")
-          .select("id,name,type,total_cost,sell_price,establishments,pivot_ingredient_id")
-          .eq("is_draft", false),
-        supabase.from("recipes")
-          .select("id,name,type,created_at,pivot_ingredient_id")
-          .order("created_at", { ascending: false }),
+      const pq = supabase.from("pizza_recipes")
+        .select("id,name,total_cost,margin_rate,vat_rate,sell_price,establishments,pivot_ingredient_id")
+        .eq("is_draft", false);
+      const kq = supabase.from("kitchen_recipes")
+        .select("id,name,category,total_cost,cost_per_kg,cost_per_portion,margin_rate,vat_rate,sell_price,establishments,pivot_ingredient_id")
+        .eq("is_draft", false);
+      const cq = supabase.from("cocktails")
+        .select("id,name,type,total_cost,sell_price,establishments,pivot_ingredient_id")
+        .eq("is_draft", false);
+      const eq = supabase.from("recipes")
+        .select("id,name,type,created_at,pivot_ingredient_id")
+        .order("created_at", { ascending: false });
+
+      if (etabCtx) {
+        pq.eq("etablissement_id", etabCtx.id);
+        kq.eq("etablissement_id", etabCtx.id);
+        cq.eq("etablissement_id", etabCtx.id);
+        eq.eq("etablissement_id", etabCtx.id);
+      }
+
+      Promise.all([pq, kq, cq, eq
       ]).then(([p, k, c, e]) => {
         const errs: string[] = [];
         if (p.error) errs.push(`Pizza : ${p.error.message ?? JSON.stringify(p.error)}`);
@@ -369,7 +379,7 @@ function RecettesInner() {
         setLoading(false);
       });
     });
-  }, [refreshKey]);
+  }, [refreshKey, etabCtx?.id]);
 
   // ── Filtered + sorted data ──
   const filteredPizzas = useMemo(() =>

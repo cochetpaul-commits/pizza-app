@@ -9,6 +9,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { useDebounce } from "@/lib/useDebounce";
 import { useIngredientsData } from "@/lib/useIngredientsData";
+import { useEtablissement } from "@/lib/EtablissementContext";
 
 import {
   CATEGORIES,
@@ -77,10 +78,11 @@ function SkeletonTable() {
 function IngredientsPageInner() {
   const router = useRouter();
   const { canWrite: userCanWrite } = useProfile();
+  const { current: etab } = useEtablissement();
 
   const [q, setQ] = useState("");
   const debouncedQ = useDebounce(q, 300);
-  const { items, suppliers, offers, alertMap, loading, loadingMore, hasMore, loadMore, error: dataError, mutate } = useIngredientsData(debouncedQ);
+  const { items, suppliers, offers, alertMap, loading, loadingMore, hasMore, loadMore, error: dataError, mutate } = useIngredientsData(debouncedQ, etab?.id);
 
   const [session, setSession] = useState<Session | null>(null);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
 import { StepperInput } from "@/components/StepperInput";
@@ -35,6 +35,7 @@ type CatalogItem = {
   name: string;
   category: string | null;
   default_unit: string | null;
+  favori_commande?: boolean;
 };
 
 type HistItem = {
@@ -48,21 +49,48 @@ type HistItem = {
 // ── Catégories ordonnées ─────────────────────────────────────────────────────
 
 const CAT_ORDER = [
-  "epicerie", "frais", "surgele", "boucherie", "charcuterie",
-  "cremerie", "maree", "fruits_legumes", "boissons", "cave",
-  "boulangerie", "patisserie", "emballage", "entretien", "autre",
+  "cremerie_fromage", "charcuterie_viande", "maree",
+  "legumes_herbes", "fruit", "epicerie_salee", "epicerie_sucree",
+  "alcool_spiritueux", "boisson", "preparation", "sauce",
+  "antipasti", "emballage", "autre",
 ];
 
 function catLabel(cat: string | null): string {
   const map: Record<string, string> = {
-    epicerie: "ÉPICERIE", frais: "FRAIS", surgele: "SURGELÉ",
-    boucherie: "BOUCHERIE", charcuterie: "CHARCUTERIE", cremerie: "CRÉMERIE",
-    maree: "MARÉE", fruits_legumes: "FRUITS & LÉGUMES", boissons: "BOISSONS",
-    cave: "CAVE", boulangerie: "BOULANGERIE", patisserie: "PÂTISSERIE",
-    emballage: "EMBALLAGE", entretien: "ENTRETIEN", autre: "AUTRE",
+    cremerie_fromage: "CRÉMERIE / FROMAGE",
+    charcuterie_viande: "CHARCUTERIE / VIANDE",
+    maree: "MARÉE",
+    alcool_spiritueux: "ALCOOL / SPIRITUEUX",
+    boisson: "BOISSONS",
+    legumes_herbes: "LÉGUMES / HERBES",
+    fruit: "FRUITS",
+    epicerie_salee: "ÉPICERIE SALÉE",
+    epicerie_sucree: "ÉPICERIE SUCRÉE",
+    preparation: "PRÉPARATION",
+    sauce: "SAUCE",
+    antipasti: "ANTIPASTI",
+    emballage: "EMBALLAGE",
+    autre: "AUTRE",
   };
   return map[cat ?? "autre"] ?? (cat?.toUpperCase() ?? "AUTRE");
 }
+
+const CAT_COLORS: Record<string, string> = {
+  cremerie_fromage: "#D97706",
+  charcuterie_viande: "#DC2626",
+  maree: "#0284C7",
+  alcool_spiritueux: "#7C3AED",
+  boisson: "#0D9488",
+  legumes_herbes: "#16A34A",
+  fruit: "#EA580C",
+  epicerie_salee: "#1E40AF",
+  epicerie_sucree: "#92400E",
+  preparation: "#C026D3",
+  sauce: "#9D174D",
+  antipasti: "#CA8A04",
+  emballage: "#78716C",
+  autre: "#6B7280",
+};
 
 function catIndex(cat: string | null): number {
   const idx = CAT_ORDER.indexOf(cat ?? "autre");
@@ -71,38 +99,14 @@ function catIndex(cat: string | null): number {
 
 // ── Styles ───────────────────────────────────────────────────────────────────
 
-const sectionLabel: React.CSSProperties = {
-  margin: "18px 0 6px 4px",
-  fontSize: 9,
-  fontWeight: 700,
-  letterSpacing: 2.5,
-  textTransform: "uppercase",
-  color: "#b0a894",
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-};
-
 const tile: React.CSSProperties = {
   background: "#fff",
-  border: "1px solid #ddd6c8",
-  borderRadius: 12,
   padding: "10px 14px",
-  marginBottom: 6,
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
   gap: 8,
-};
-
-const urgentBadge: React.CSSProperties = {
-  fontSize: 9,
-  fontWeight: 700,
-  padding: "2px 7px",
-  borderRadius: 6,
-  background: "rgba(139,26,26,0.10)",
-  color: "#8B1A1A",
-  border: "1px solid rgba(139,26,26,0.20)",
-  cursor: "pointer",
-  userSelect: "none",
+  borderBottom: "1px solid #f0ebe2",
 };
 
 const floatingBtn: React.CSSProperties = {
@@ -130,6 +134,84 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "metro", label: "METRO" },
 ];
 
+// ── Helper: group catalog into favoris / others per category ──────────────
+
+function groupCatalog(items: CatalogItem[]): Record<string, { favoris: CatalogItem[]; others: CatalogItem[] }> {
+  const result: Record<string, { favoris: CatalogItem[]; others: CatalogItem[] }> = {};
+  for (const item of items) {
+    const cat = item.category ?? "autre";
+    if (!result[cat]) result[cat] = { favoris: [], others: [] };
+    if (item.favori_commande) {
+      result[cat].favoris.push(item);
+    } else {
+      result[cat].others.push(item);
+    }
+  }
+  for (const cat of Object.keys(result)) {
+    result[cat].favoris.sort((a, b) => a.name.localeCompare(b.name, "fr"));
+    result[cat].others.sort((a, b) => a.name.localeCompare(b.name, "fr"));
+  }
+  return result;
+}
+
+// ── ReadOnlyQty component ─────────────────────────────────────────────────
+
+function ReadOnlyQty({ value }: { value: number | "" | undefined }) {
+  const qty = value === "" || value == null ? 0 : value;
+  return (
+    <div style={{
+      width: 64, height: 40,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontWeight: 700, fontSize: 14,
+      color: qty > 0 ? "#1a1a1a" : "#ccc",
+    }}>
+      {qty > 0 ? `× ${qty}` : "—"}
+    </div>
+  );
+}
+
+// ── Star button style ─────────────────────────────────────────────────────
+
+function starBtnStyle(isFav: boolean): React.CSSProperties {
+  return {
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    fontSize: 15,
+    padding: 0,
+    lineHeight: 1,
+    opacity: isFav ? 1 : 0.25,
+    filter: isFav ? "none" : "grayscale(100%)",
+    flexShrink: 0,
+  };
+}
+
+// ── Banner styles ─────────────────────────────────────────────────────────
+
+const pendingBannerStyle: React.CSSProperties = {
+  background: "#FFF7ED",
+  border: "1.5px solid #EA580C",
+  color: "#EA580C",
+  padding: "12px 16px",
+  borderRadius: 10,
+  fontSize: 14,
+  fontWeight: 600,
+  marginBottom: 16,
+  textAlign: "center",
+};
+
+const validatedBannerStyle: React.CSSProperties = {
+  background: "#e8ede6",
+  border: "1.5px solid #4a6741",
+  color: "#4a6741",
+  padding: "10px 16px",
+  borderRadius: 10,
+  fontSize: 14,
+  fontWeight: 600,
+  marginBottom: 16,
+  textAlign: "center",
+};
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function CommandesPage() {
@@ -141,16 +223,18 @@ export default function CommandesPage() {
   const [metroSession, setMetroSession] = useState<Session | null>(null);
   const [metroSupplierId, setMetroSupplierId] = useState<string | null>(null);
 
-  // Catalogue MAËL
+  // Catalogues per supplier
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [metroCatalog, setMetroCatalog] = useState<CatalogItem[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number | "">>({});
-  const [urgents, setUrgents] = useState<Set<string>>(new Set());
+  const [metroQuantities, setMetroQuantities] = useState<Record<string, number | "">>({});
 
-  // METRO free input
-  const [metroNewCat, setMetroNewCat] = useState("epicerie");
-  const [metroNewNom, setMetroNewNom] = useState("");
-  const [metroNewQte, setMetroNewQte] = useState<number | "">("");
-  const [metroNewUnite, setMetroNewUnite] = useState("kg");
+  // Accordion state
+  const [openCats, setOpenCats] = useState<Record<string, boolean>>({});
+  const [metroOpenCats, setMetroOpenCats] = useState<Record<string, boolean>>({});
+
+  // Confirmation banner
+  const [confirmation, setConfirmation] = useState<string | null>(null);
 
   // Historique
   const [histOpen, setHistOpen] = useState(false);
@@ -167,6 +251,35 @@ export default function CommandesPage() {
     const data = await res.json();
     return data;
   }, []);
+
+  async function loadCatalogForSupplier(supplierId: string): Promise<CatalogItem[]> {
+    const { data: offerIngIds } = await supabase
+      .from("supplier_offers")
+      .select("ingredient_id")
+      .eq("supplier_id", supplierId)
+      .eq("is_active", true);
+
+    const ids = [...new Set((offerIngIds ?? []).map((o: { ingredient_id: string }) => o.ingredient_id))];
+
+    const { data: directIngs } = await supabase
+      .from("ingredients")
+      .select("id, name, category, default_unit, favori_commande")
+      .eq("supplier_id", supplierId);
+
+    const directIds = (directIngs ?? []).map((i: { id: string }) => i.id);
+    const allIds = [...new Set([...ids, ...directIds])];
+
+    if (allIds.length > 0) {
+      const { data: items } = await supabase
+        .from("ingredients")
+        .select("id, name, category, default_unit, favori_commande")
+        .in("id", allIds)
+        .order("category")
+        .order("name");
+      return (items ?? []) as CatalogItem[];
+    }
+    return [];
+  }
 
   useEffect(() => {
     async function init() {
@@ -189,42 +302,54 @@ export default function CommandesPage() {
         }
         setQuantities(q);
       }
-
-      // Charger catalogue ingrédients liés à MAËL (via supplier_offers ou supplier_id)
-      if (maelData.supplier_id) {
-        // Ingrédients avec offres de ce fournisseur
-        const { data: offerIngIds } = await supabase
-          .from("supplier_offers")
-          .select("ingredient_id")
-          .eq("supplier_id", maelData.supplier_id)
-          .eq("is_active", true);
-
-        const ids = [...new Set((offerIngIds ?? []).map((o) => o.ingredient_id))];
-
-        // Aussi ingrédients avec supplier_id direct
-        const { data: directIngs } = await supabase
-          .from("ingredients")
-          .select("id, name, category, default_unit")
-          .eq("supplier_id", maelData.supplier_id);
-
-        const directIds = (directIngs ?? []).map((i) => i.id);
-        const allIds = [...new Set([...ids, ...directIds])];
-
-        if (allIds.length > 0) {
-          const { data: items } = await supabase
-            .from("ingredients")
-            .select("id, name, category, default_unit")
-            .in("id", allIds)
-            .order("category")
-            .order("name");
-          setCatalog(items ?? []);
+      if (metroData.session?.lignes) {
+        const q: Record<string, number | ""> = {};
+        for (const l of metroData.session.lignes) {
+          if (l.ingredient_id) q[l.ingredient_id] = l.quantite;
         }
+        setMetroQuantities(q);
+      }
+
+      // Charger catalogues
+      if (maelData.supplier_id) {
+        setCatalog(await loadCatalogForSupplier(maelData.supplier_id));
+      }
+      if (metroData.supplier_id) {
+        setMetroCatalog(await loadCatalogForSupplier(metroData.supplier_id));
       }
 
       setLoading(false);
     }
     init();
   }, [loadSession]);
+
+  // ── Set accordion defaults based on favorites/selected ──────────────────
+
+  useEffect(() => {
+    if (!catalog.length) return;
+    const opens: Record<string, boolean> = {};
+    const g = groupCatalog(catalog);
+    for (const cat of Object.keys(g)) {
+      const hasFav = g[cat].favoris.length > 0;
+      const hasSel = [...g[cat].favoris, ...g[cat].others].some((i) => (quantities[i.id] ?? 0) > 0);
+      opens[cat] = hasFav || hasSel;
+    }
+    setOpenCats(opens);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalog, maelSession?.id]);
+
+  useEffect(() => {
+    if (!metroCatalog.length) return;
+    const opens: Record<string, boolean> = {};
+    const g = groupCatalog(metroCatalog);
+    for (const cat of Object.keys(g)) {
+      const hasFav = g[cat].favoris.length > 0;
+      const hasSel = [...g[cat].favoris, ...g[cat].others].some((i) => (metroQuantities[i.id] ?? 0) > 0);
+      opens[cat] = hasFav || hasSel;
+    }
+    setMetroOpenCats(opens);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metroCatalog, metroSession?.id]);
 
   // ── Create session ────────────────────────────────────────────────────────
 
@@ -242,7 +367,7 @@ export default function CommandesPage() {
     setSaving(false);
   }
 
-  // ── Save ligne (MAËL) ────────────────────────────────────────────────────
+  // ── Save ligne ────────────────────────────────────────────────────────────
 
   async function saveLigne(sessionId: string, ingredientId: string, qty: number | "") {
     await fetch("/api/commandes/ligne", {
@@ -251,87 +376,42 @@ export default function CommandesPage() {
       body: JSON.stringify({
         session_id: sessionId,
         ingredient_id: ingredientId,
-        quantite: qty === "" ? 0 : qty,
+        quantite: qty === "" ? 0 : Math.floor(qty as number),
       }),
     });
   }
 
-  function handleQtyChange(ingredientId: string, val: number | "") {
-    setQuantities((prev) => ({ ...prev, [ingredientId]: val }));
-    if (maelSession) {
-      saveLigne(maelSession.id, ingredientId, val);
+  function handleQtyChange(ingredientId: string, val: number | "", isMael: boolean) {
+    const qty = val === "" ? "" : Math.floor(val as number);
+    if (isMael) {
+      setQuantities((prev) => ({ ...prev, [ingredientId]: qty }));
+      if (maelSession) saveLigne(maelSession.id, ingredientId, qty);
+    } else {
+      setMetroQuantities((prev) => ({ ...prev, [ingredientId]: qty }));
+      if (metroSession) saveLigne(metroSession.id, ingredientId, qty);
     }
   }
 
-  function toggleUrgent(id: string) {
-    setUrgents((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  // ── Toggle favorite ─────────────────────────────────────────────────────
 
-  // ── Add METRO free line ───────────────────────────────────────────────────
-
-  async function addMetroLine() {
-    if (!metroSession || !metroNewNom.trim() || !metroNewQte) return;
-    setSaving(true);
-
-    // Chercher ou créer un ingrédient "libre" pour METRO
-    const { data: existing } = await supabase
-      .from("ingredients")
-      .select("id")
-      .ilike("name", metroNewNom.trim())
-      .limit(1)
-      .maybeSingle();
-
-    let ingredientId = existing?.id;
-
-    if (!ingredientId) {
-      // Créer un ingrédient temporaire
-      const { data: newIng } = await supabase
-        .from("ingredients")
-        .insert({
-          name: metroNewNom.trim(),
-          category: metroNewCat,
-          default_unit: metroNewUnite,
-          status: "to_check",
-        })
-        .select("id")
-        .single();
-      ingredientId = newIng?.id;
-    }
-
-    if (ingredientId) {
-      const res = await fetch("/api/commandes/ligne", {
-        method: "POST",
+  async function toggleFavori(ingredientId: string, currentVal: boolean, isMael: boolean) {
+    const updateCatalog = isMael ? setCatalog : setMetroCatalog;
+    updateCatalog((prev) =>
+      prev.map((i) => (i.id === ingredientId ? { ...i, favori_commande: !currentVal } : i))
+    );
+    try {
+      const res = await fetch("/api/commandes/favori", {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: metroSession.id,
-          ingredient_id: ingredientId,
-          quantite: metroNewQte,
-          unite: metroNewUnite,
-        }),
+        body: JSON.stringify({ ingredient_id: ingredientId, favori: !currentVal }),
       });
       const data = await res.json();
-      if (data.ligne) {
-        setMetroSession((prev) =>
-          prev ? { ...prev, lignes: [...prev.lignes, data.ligne] } : prev
-        );
-      }
+      if (!data.ok) throw new Error(data.error);
+    } catch {
+      updateCatalog((prev) =>
+        prev.map((i) => (i.id === ingredientId ? { ...i, favori_commande: currentVal } : i))
+      );
     }
-
-    setMetroNewNom("");
-    setMetroNewQte("");
-    setSaving(false);
-  }
-
-  async function removeMetroLine(ligneId: string) {
-    await fetch(`/api/commandes/ligne?id=${ligneId}`, { method: "DELETE" });
-    setMetroSession((prev) =>
-      prev ? { ...prev, lignes: prev.lignes.filter((l) => l.id !== ligneId) } : prev
-    );
   }
 
   // ── Envoyer pour validation ───────────────────────────────────────────────
@@ -341,9 +421,29 @@ export default function CommandesPage() {
     await fetch("/api/commandes/session", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: sessionId, status: "en_attente" }),
+    });
+    const [maelData, metroData] = await Promise.all([
+      loadSession("mael"),
+      loadSession("metro"),
+    ]);
+    setMaelSession(maelData.session);
+    setMetroSession(metroData.session);
+    reloadQuantities(maelData, metroData);
+    setSaving(false);
+    setConfirmation("Commande envoyée pour validation");
+    setTimeout(() => setConfirmation(null), 4000);
+  }
+
+  // ── Valider (admin/direction) ──────────────────────────────────────────
+
+  async function validerSession(sessionId: string) {
+    setSaving(true);
+    await fetch("/api/commandes/session", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: sessionId, status: "validee" }),
     });
-    // Recharger
     const [maelData, metroData] = await Promise.all([
       loadSession("mael"),
       loadSession("metro"),
@@ -351,7 +451,51 @@ export default function CommandesPage() {
     setMaelSession(maelData.session);
     setMetroSession(metroData.session);
     setQuantities({});
+    setMetroQuantities({});
     setSaving(false);
+    setConfirmation("Commande validée");
+    setTimeout(() => setConfirmation(null), 4000);
+  }
+
+  // ── Rejeter → brouillon ────────────────────────────────────────────────
+
+  async function rejeterSession(sessionId: string) {
+    setSaving(true);
+    await fetch("/api/commandes/session", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: sessionId, status: "brouillon" }),
+    });
+    const [maelData, metroData] = await Promise.all([
+      loadSession("mael"),
+      loadSession("metro"),
+    ]);
+    setMaelSession(maelData.session);
+    setMetroSession(metroData.session);
+    reloadQuantities(maelData, metroData);
+    setSaving(false);
+    setConfirmation("Commande renvoyée en brouillon");
+    setTimeout(() => setConfirmation(null), 4000);
+  }
+
+  function reloadQuantities(
+    maelData: { session?: Session },
+    metroData: { session?: Session },
+  ) {
+    if (maelData.session?.lignes) {
+      const q: Record<string, number | ""> = {};
+      for (const l of maelData.session.lignes) {
+        if (l.ingredient_id) q[l.ingredient_id] = l.quantite;
+      }
+      setQuantities(q);
+    }
+    if (metroData.session?.lignes) {
+      const q: Record<string, number | ""> = {};
+      for (const l of metroData.session.lignes) {
+        if (l.ingredient_id) q[l.ingredient_id] = l.quantite;
+      }
+      setMetroQuantities(q);
+    }
   }
 
   // ── Historique ────────────────────────────────────────────────────────────
@@ -370,7 +514,6 @@ export default function CommandesPage() {
     if (!suppId) return;
     setSaving(true);
 
-    // Créer session
     const res = await fetch("/api/commandes/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -379,11 +522,9 @@ export default function CommandesPage() {
     const { session: newSession } = await res.json();
     if (!newSession) { setSaving(false); return; }
 
-    // Récupérer lignes de l'ancienne session
     const sessRes = await fetch(`/api/commandes/session?id=${histSessionId}`);
     const { session: oldSession } = await sessRes.json();
 
-    // Copier les lignes
     for (const l of oldSession?.lignes ?? []) {
       await fetch("/api/commandes/ligne", {
         method: "POST",
@@ -398,7 +539,6 @@ export default function CommandesPage() {
       });
     }
 
-    // Recharger
     const data = await loadSession(tab);
     if (tab === "mael") {
       setMaelSession(data.session);
@@ -411,6 +551,13 @@ export default function CommandesPage() {
       }
     } else {
       setMetroSession(data.session);
+      if (data.session?.lignes) {
+        const q: Record<string, number | ""> = {};
+        for (const l of data.session.lignes) {
+          if (l.ingredient_id) q[l.ingredient_id] = l.quantite;
+        }
+        setMetroQuantities(q);
+      }
     }
     setSaving(false);
     setHistOpen(false);
@@ -421,33 +568,11 @@ export default function CommandesPage() {
   const activeSession = tab === "mael" ? maelSession : metroSession;
   const activeSupplierId = tab === "mael" ? maelSupplierId : metroSupplierId;
 
-  const maelCount = Object.values(quantities).filter((v) => v !== "" && v > 0).length;
-  const metroCount = metroSession?.lignes.length ?? 0;
+  const maelCount = Object.values(quantities).filter((v) => v !== "" && (v as number) > 0).length;
+  const metroCount = Object.values(metroQuantities).filter((v) => v !== "" && (v as number) > 0).length;
   const activeCount = tab === "mael" ? maelCount : metroCount;
 
-  // Group catalog by category
-  const grouped = catalog.reduce<Record<string, CatalogItem[]>>((acc, item) => {
-    const cat = item.category ?? "autre";
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(item);
-    return acc;
-  }, {});
-
-  const sortedCats = Object.keys(grouped).sort((a, b) => catIndex(a) - catIndex(b));
-
-  // Group metro lines by category
-  const metroGrouped = (metroSession?.lignes ?? []).reduce<Record<string, Ligne[]>>((acc, l) => {
-    const cat = l.ingredients?.category ?? "autre";
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(l);
-    return acc;
-  }, {});
-
-  const metroSortedCats = Object.keys(metroGrouped).sort((a, b) => catIndex(a) - catIndex(b));
-
-  const METRO_SECTIONS = ["epicerie", "frais", "surgele", "boissons", "autre"];
-
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render helpers ────────────────────────────────────────────────────────
 
   function fmtDate(iso: string) {
     return new Date(iso).toLocaleDateString("fr-FR", {
@@ -457,6 +582,7 @@ export default function CommandesPage() {
 
   const statusLabel: Record<string, string> = {
     brouillon: "Brouillon",
+    en_attente: "En attente de validation",
     validee: "Validée",
     envoyee: "Envoyée",
     recue: "Reçue",
@@ -465,11 +591,244 @@ export default function CommandesPage() {
 
   const statusColor: Record<string, string> = {
     brouillon: "#A0845C",
+    en_attente: "#EA580C",
     validee: "#4a6741",
     envoyee: "#2563eb",
     recue: "#16a34a",
     annulee: "#999",
   };
+
+  // ── renderSupplierTab ─────────────────────────────────────────────────────
+
+  function renderSupplierTab(
+    session: Session | null,
+    supplierId: string | null,
+    isMael: boolean,
+    supplierLabel: string,
+  ) {
+    const qty = isMael ? quantities : metroQuantities;
+    const count = isMael ? maelCount : metroCount;
+    const currentOpenCats = isMael ? openCats : metroOpenCats;
+    const setCurrentOpenCats = isMael ? setOpenCats : setMetroOpenCats;
+    const currentCatalog = isMael ? catalog : metroCatalog;
+    const currentGrouped = groupCatalog(currentCatalog);
+    const currentSortedCats = Object.keys(currentGrouped).sort((a, b) => catIndex(a) - catIndex(b));
+    const readOnly = session?.status === "en_attente" || session?.status === "validee";
+
+    return (
+      <div style={{ marginTop: 16 }}>
+        {/* Pas de session active → bouton créer */}
+        {!session && supplierId && (
+          <div style={{ textAlign: "center", padding: 40 }}>
+            <p style={{ color: "#999", fontSize: 13, marginBottom: 16 }}>
+              Aucune commande en cours
+            </p>
+            <button
+              onClick={() => createSession(supplierId, isMael ? (s) => setMaelSession(s) : (s) => setMetroSession(s))}
+              disabled={saving}
+              style={{
+                background: "#D4775A", color: "#fff", border: "none", borderRadius: 12,
+                padding: "12px 28px", fontSize: 14, fontWeight: 700, cursor: "pointer",
+                fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+              }}
+            >
+              Nouvelle commande {supplierLabel}
+            </button>
+          </div>
+        )}
+
+        {!supplierId && !loading && (
+          <div style={{ textAlign: "center", padding: 40 }}>
+            <p style={{ color: "#999", fontSize: 13 }}>
+              Fournisseur {supplierLabel.toUpperCase()} introuvable dans la base.
+            </p>
+          </div>
+        )}
+
+        {/* Session active */}
+        {session && (
+          <>
+            <div style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8,
+            }}>
+              <span style={{ fontSize: 11, color: statusColor[session.status] ?? "#999", fontWeight: 600 }}>
+                {statusLabel[session.status] ?? session.status}
+              </span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#D4775A" }}>
+                {count} article{count > 1 ? "s" : ""}
+              </span>
+            </div>
+
+            {/* ── En attente banner ── */}
+            {session.status === "en_attente" && (
+              <div style={pendingBannerStyle}>
+                <span>En attente de validation</span>
+                <div style={{ display: "flex", gap: 8, marginTop: 8, justifyContent: "center" }}>
+                  <button
+                    onClick={() => rejeterSession(session.id)}
+                    disabled={saving}
+                    style={{
+                      padding: "6px 16px", borderRadius: 8,
+                      border: "1.5px solid #8B1A1A", background: "#fff",
+                      color: "#8B1A1A", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                    }}
+                  >
+                    Refuser
+                  </button>
+                  <button
+                    onClick={() => validerSession(session.id)}
+                    disabled={saving}
+                    style={{
+                      padding: "6px 16px", borderRadius: 8,
+                      border: "none", background: "#4a6741",
+                      color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                    }}
+                  >
+                    Valider
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ── Validated banner ── */}
+            {session.status === "validee" && (
+              <div style={validatedBannerStyle}>
+                Commande validée — mode lecture
+              </div>
+            )}
+
+            {currentCatalog.length === 0 && (
+              <p style={{ color: "#999", fontSize: 13, textAlign: "center", padding: 24 }}>
+                Aucun ingrédient lié à {supplierLabel.toUpperCase()} dans le catalogue.
+              </p>
+            )}
+
+            {/* ── Accordion categories ── */}
+            {currentSortedCats.map((cat) => {
+              const { favoris, others } = currentGrouped[cat];
+              const allItems = [...favoris, ...others];
+              const selectedCount = allItems.filter((i) => (qty[i.id] ?? 0) > 0).length;
+              const isOpen = currentOpenCats[cat] ?? false;
+              const color = CAT_COLORS[cat] ?? "#6B7280";
+
+              return (
+                <div key={cat} style={{ marginBottom: 4 }}>
+                  {/* Accordion header */}
+                  <button
+                    type="button"
+                    onClick={() => setCurrentOpenCats((prev: Record<string, boolean>) => ({ ...prev, [cat]: !isOpen }))}
+                    style={{
+                      width: "100%", display: "flex", alignItems: "center",
+                      justifyContent: "space-between", padding: "11px 14px",
+                      background: "#fff", border: "1px solid #e5ddd0",
+                      borderLeft: `4px solid ${color}`,
+                      borderRadius: isOpen ? "10px 10px 0 0" : 10,
+                      cursor: "pointer", fontFamily: "inherit",
+                      transition: "border-radius 0.2s",
+                    }}
+                  >
+                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{
+                        fontSize: 11, transition: "transform 0.2s",
+                        transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)",
+                        display: "inline-block",
+                      }}>▾</span>
+                      <span style={{
+                        fontWeight: 700, fontSize: 12, textTransform: "uppercase",
+                        letterSpacing: 1,
+                        fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                      }}>
+                        {catLabel(cat)}
+                      </span>
+                    </span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 10, color: "#999" }}>
+                        {allItems.length} article{allItems.length > 1 ? "s" : ""}
+                      </span>
+                      {selectedCount > 0 && (
+                        <span style={{
+                          background: color, color: "#fff", fontSize: 10,
+                          fontWeight: 700, padding: "2px 8px", borderRadius: 10,
+                          minWidth: 20, textAlign: "center",
+                        }}>
+                          {selectedCount}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+
+                  {/* Accordion body */}
+                  <div style={{
+                    maxHeight: isOpen ? 5000 : 0, overflow: "hidden",
+                    transition: "max-height 0.3s ease",
+                    border: isOpen ? "1px solid #e5ddd0" : "none",
+                    borderTop: "none", borderRadius: "0 0 10px 10px",
+                  }}>
+                    {/* Favoris sub-group */}
+                    {favoris.length > 0 && (
+                      <div style={{
+                        background: "#FFFBF0", borderLeft: "3px solid #F59E0B",
+                        padding: "6px 0 2px 0",
+                      }}>
+                        <div style={{
+                          fontSize: 9, fontWeight: 700, textTransform: "uppercase",
+                          letterSpacing: 2, color: "#b8860b", padding: "0 14px 4px",
+                        }}>
+                          Habituels
+                        </div>
+                        {favoris.map((item) => (
+                          <div key={item.id} style={tile}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                              <button type="button" onClick={() => toggleFavori(item.id, true, isMael)} style={starBtnStyle(true)} title="Retirer des habituels">⭐</button>
+                              <span style={{
+                                fontSize: 13, fontWeight: (qty[item.id] ?? 0) > 0 ? 700 : 500,
+                                color: (qty[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
+                                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                              }}>
+                                {item.name}
+                              </span>
+                            </div>
+                            {readOnly ? (
+                              <ReadOnlyQty value={qty[item.id]} />
+                            ) : (
+                              <StepperInput value={qty[item.id] ?? ""} onChange={(v) => handleQtyChange(item.id, v, isMael)} step={1} min={0} placeholder="0" />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Other ingredients */}
+                    {others.map((item) => (
+                      <div key={item.id} style={tile}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                          <button type="button" onClick={() => toggleFavori(item.id, false, isMael)} style={starBtnStyle(false)} title="Ajouter aux habituels">⭐</button>
+                          <span style={{
+                            fontSize: 13, fontWeight: (qty[item.id] ?? 0) > 0 ? 700 : 500,
+                            color: (qty[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          }}>
+                            {item.name}
+                          </span>
+                        </div>
+                        {readOnly ? (
+                          <ReadOnlyQty value={qty[item.id]} />
+                        ) : (
+                          <StepperInput value={qty[item.id] ?? ""} onChange={(v) => handleQtyChange(item.id, v, isMael)} step={1} min={0} placeholder="0" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // ── Main render ───────────────────────────────────────────────────────────
 
   return (
     <RequireRole allowedRoles={["admin", "direction", "cuisine"]}>
@@ -477,13 +836,22 @@ export default function CommandesPage() {
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px" }}>
         <h1 style={{
           fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-          fontSize: 28,
-          fontWeight: 700,
-          color: "#1a1a1a",
-          margin: 0,
+          fontSize: 28, fontWeight: 700, color: "#1a1a1a", margin: 0,
         }}>
           Commandes fournisseurs
         </h1>
+
+        {/* ── Confirmation banner ── */}
+        {confirmation && (
+          <div style={{
+            background: "#e8ede6", color: "#4a6741",
+            padding: "10px 16px", borderRadius: 10,
+            fontSize: 14, fontWeight: 600,
+            marginTop: 16, textAlign: "center",
+          }}>
+            {confirmation}
+          </div>
+        )}
 
         {/* ── Onglets ── */}
         <div style={{ display: "flex", gap: 0, marginTop: 20, borderBottom: "2px solid #e5e5e5" }}>
@@ -497,11 +865,9 @@ export default function CommandesPage() {
                 fontSize: 15,
                 fontWeight: tab === t.key ? 700 : 500,
                 color: tab === t.key ? "#D4775A" : "#888",
-                background: "none",
-                border: "none",
+                background: "none", border: "none",
                 borderBottom: tab === t.key ? "3px solid #D4775A" : "3px solid transparent",
-                cursor: "pointer",
-                marginBottom: -2,
+                cursor: "pointer", marginBottom: -2,
                 transition: "all .15s",
               }}
             >
@@ -514,346 +880,9 @@ export default function CommandesPage() {
           <p style={{ textAlign: "center", color: "#999", marginTop: 40 }}>Chargement…</p>
         )}
 
-        {/* ═══════════════════════════════════════════════════════════════════
-            ONGLET MAËL
-            ═══════════════════════════════════════════════════════════════════ */}
-        {!loading && tab === "mael" && (
-          <div style={{ marginTop: 16 }}>
-            {/* Pas de session active → bouton créer */}
-            {!maelSession && maelSupplierId && (
-              <div style={{ textAlign: "center", padding: 40 }}>
-                <p style={{ color: "#999", fontSize: 13, marginBottom: 16 }}>
-                  Aucune commande en cours
-                </p>
-                <button
-                  onClick={() => createSession(maelSupplierId, (s) => setMaelSession(s))}
-                  disabled={saving}
-                  style={{
-                    background: "#D4775A",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: 12,
-                    padding: "12px 28px",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                  }}
-                >
-                  Nouvelle commande Maël
-                </button>
-              </div>
-            )}
-
-            {!maelSupplierId && !loading && (
-              <div style={{ textAlign: "center", padding: 40 }}>
-                <p style={{ color: "#999", fontSize: 13 }}>
-                  Fournisseur MAËL introuvable dans la base.
-                  Vérifiez la table suppliers.
-                </p>
-              </div>
-            )}
-
-            {/* Session active → liste catalogue */}
-            {maelSession && (
-              <>
-                <div style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 8,
-                }}>
-                  <span style={{ fontSize: 11, color: "#999" }}>
-                    Session du {fmtDate(maelSession.created_at)} — {statusLabel[maelSession.status]}
-                  </span>
-                  <span style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "#D4775A",
-                  }}>
-                    {maelCount} article{maelCount > 1 ? "s" : ""}
-                  </span>
-                </div>
-
-                {catalog.length === 0 && (
-                  <p style={{ color: "#999", fontSize: 13, textAlign: "center", padding: 24 }}>
-                    Aucun ingrédient lié à MAËL dans le catalogue.
-                  </p>
-                )}
-
-                {sortedCats.map((cat) => (
-                  <div key={cat}>
-                    <p style={sectionLabel}>{catLabel(cat)}</p>
-                    {grouped[cat].map((item) => (
-                      <div key={item.id} style={tile}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <span style={{
-                              fontSize: 13,
-                              fontWeight: 600,
-                              color: "#1a1a1a",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}>
-                              {item.name}
-                            </span>
-                            {urgents.has(item.id) && (
-                              <span style={urgentBadge}>URGENT</span>
-                            )}
-                          </div>
-                          {item.default_unit && (
-                            <span style={{ fontSize: 10, color: "#999" }}>
-                              {item.default_unit}
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <button
-                            type="button"
-                            onClick={() => toggleUrgent(item.id)}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              cursor: "pointer",
-                              fontSize: 14,
-                              opacity: urgents.has(item.id) ? 1 : 0.3,
-                              padding: 4,
-                            }}
-                            title="Marquer urgent"
-                          >
-                            ★
-                          </button>
-                          <StepperInput
-                            value={quantities[item.id] ?? ""}
-                            onChange={(v) => handleQtyChange(item.id, v)}
-                            step={1}
-                            min={0}
-                            placeholder="0"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════════════
-            ONGLET METRO
-            ═══════════════════════════════════════════════════════════════════ */}
-        {!loading && tab === "metro" && (
-          <div style={{ marginTop: 16 }}>
-            {/* Pas de session active */}
-            {!metroSession && metroSupplierId && (
-              <div style={{ textAlign: "center", padding: 40 }}>
-                <p style={{ color: "#999", fontSize: 13, marginBottom: 16 }}>
-                  Aucune commande en cours
-                </p>
-                <button
-                  onClick={() => createSession(metroSupplierId, (s) => setMetroSession(s))}
-                  disabled={saving}
-                  style={{
-                    background: "#D4775A",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: 12,
-                    padding: "12px 28px",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                  }}
-                >
-                  Nouvelle commande Metro
-                </button>
-              </div>
-            )}
-
-            {!metroSupplierId && !loading && (
-              <div style={{ textAlign: "center", padding: 40 }}>
-                <p style={{ color: "#999", fontSize: 13 }}>
-                  Fournisseur METRO introuvable dans la base.
-                  Vérifiez la table suppliers.
-                </p>
-              </div>
-            )}
-
-            {/* Session active → saisie libre par catégorie */}
-            {metroSession && (
-              <>
-                <div style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 8,
-                }}>
-                  <span style={{ fontSize: 11, color: "#999" }}>
-                    Session du {fmtDate(metroSession.created_at)} — {statusLabel[metroSession.status]}
-                  </span>
-                  <span style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "#D4775A",
-                  }}>
-                    {metroCount} article{metroCount > 1 ? "s" : ""}
-                  </span>
-                </div>
-
-                {/* Lignes existantes groupées */}
-                {metroSortedCats.map((cat) => (
-                  <div key={cat}>
-                    <p style={sectionLabel}>{catLabel(cat)}</p>
-                    {metroGrouped[cat].map((l) => (
-                      <div key={l.id} style={tile}>
-                        <div style={{ flex: 1 }}>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
-                            {l.ingredients?.name ?? "—"}
-                          </span>
-                          <span style={{ fontSize: 11, color: "#999", marginLeft: 8 }}>
-                            {l.quantite} {l.unite ?? l.ingredients?.default_unit ?? ""}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeMetroLine(l.id)}
-                          style={{
-                            background: "none",
-                            border: "none",
-                            color: "#ccc",
-                            fontSize: 18,
-                            cursor: "pointer",
-                            padding: "0 4px",
-                          }}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-
-                {metroCount === 0 && (
-                  <p style={{ color: "#ccc", fontSize: 13, textAlign: "center", padding: 16 }}>
-                    Aucun article ajouté
-                  </p>
-                )}
-
-                {/* Formulaire ajout rapide */}
-                <div style={{
-                  background: "#fff",
-                  border: "1px solid #ddd6c8",
-                  borderRadius: 14,
-                  padding: 16,
-                  marginTop: 16,
-                }}>
-                  <p style={{
-                    margin: "0 0 10px",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "#999",
-                    textTransform: "uppercase",
-                    letterSpacing: 1,
-                  }}>
-                    + Ajouter un article
-                  </p>
-
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "flex-end" }}>
-                    {/* Catégorie */}
-                    <select
-                      value={metroNewCat}
-                      onChange={(e) => setMetroNewCat(e.target.value)}
-                      style={{
-                        padding: "8px 10px",
-                        borderRadius: 8,
-                        border: "1px solid #ddd6c8",
-                        fontSize: 12,
-                        background: "#fafaf7",
-                        flex: "0 0 auto",
-                      }}
-                    >
-                      {METRO_SECTIONS.map((c) => (
-                        <option key={c} value={c}>{catLabel(c)}</option>
-                      ))}
-                    </select>
-
-                    {/* Nom */}
-                    <input
-                      type="text"
-                      value={metroNewNom}
-                      onChange={(e) => setMetroNewNom(e.target.value)}
-                      placeholder="Nom du produit"
-                      style={{
-                        flex: "1 1 140px",
-                        padding: "8px 10px",
-                        borderRadius: 8,
-                        border: "1px solid #ddd6c8",
-                        fontSize: 13,
-                      }}
-                    />
-
-                    {/* Quantité */}
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      value={metroNewQte}
-                      onChange={(e) => setMetroNewQte(e.target.value === "" ? "" : Number(e.target.value))}
-                      placeholder="Qté"
-                      style={{
-                        width: 60,
-                        padding: "8px 10px",
-                        borderRadius: 8,
-                        border: "1px solid #ddd6c8",
-                        fontSize: 13,
-                        textAlign: "center",
-                      }}
-                    />
-
-                    {/* Unité */}
-                    <select
-                      value={metroNewUnite}
-                      onChange={(e) => setMetroNewUnite(e.target.value)}
-                      style={{
-                        padding: "8px 10px",
-                        borderRadius: 8,
-                        border: "1px solid #ddd6c8",
-                        fontSize: 12,
-                        background: "#fafaf7",
-                      }}
-                    >
-                      <option value="kg">kg</option>
-                      <option value="l">L</option>
-                      <option value="pc">pièce</option>
-                      <option value="bte">boîte</option>
-                      <option value="sac">sac</option>
-                      <option value="pack">pack</option>
-                    </select>
-
-                    <button
-                      type="button"
-                      onClick={addMetroLine}
-                      disabled={saving || !metroNewNom.trim() || !metroNewQte}
-                      style={{
-                        padding: "8px 16px",
-                        borderRadius: 8,
-                        border: "none",
-                        background: metroNewNom.trim() && metroNewQte ? "#D4775A" : "#ddd",
-                        color: metroNewNom.trim() && metroNewQte ? "#fff" : "#999",
-                        fontWeight: 700,
-                        fontSize: 12,
-                        cursor: metroNewNom.trim() && metroNewQte ? "pointer" : "not-allowed",
-                      }}
-                    >
-                      Ajouter
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        )}
+        {/* ── Tab content ── */}
+        {!loading && tab === "mael" && renderSupplierTab(maelSession, maelSupplierId, true, "Maël")}
+        {!loading && tab === "metro" && renderSupplierTab(metroSession, metroSupplierId, false, "Metro")}
 
         {/* ═══════════════════════════════════════════════════════════════════
             HISTORIQUE
@@ -864,18 +893,10 @@ export default function CommandesPage() {
               type="button"
               onClick={() => histOpen ? setHistOpen(false) : loadHistorique()}
               style={{
-                width: "100%",
-                background: "#fff",
-                border: "1px solid #ddd6c8",
-                borderRadius: 12,
-                padding: "12px 16px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                cursor: "pointer",
-                fontSize: 13,
-                fontWeight: 600,
-                color: "#666",
+                width: "100%", background: "#fff", border: "1px solid #ddd6c8",
+                borderRadius: 12, padding: "12px 16px",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#666",
               }}
             >
               <span>Commandes précédentes</span>
@@ -891,10 +912,9 @@ export default function CommandesPage() {
                 )}
                 {historique.map((h) => (
                   <div key={h.id} style={{
-                    ...tile,
-                    flexDirection: "column",
-                    alignItems: "stretch",
-                    gap: 6,
+                    background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12,
+                    padding: "10px 14px", marginBottom: 6,
+                    display: "flex", flexDirection: "column", gap: 6,
                   }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
@@ -902,11 +922,8 @@ export default function CommandesPage() {
                           {fmtDate(h.created_at)}
                         </span>
                         <span style={{
-                          marginLeft: 8,
-                          fontSize: 10,
-                          fontWeight: 700,
-                          padding: "2px 7px",
-                          borderRadius: 6,
+                          marginLeft: 8, fontSize: 10, fontWeight: 700,
+                          padding: "2px 7px", borderRadius: 6,
                           background: `${statusColor[h.status] ?? "#999"}14`,
                           color: statusColor[h.status] ?? "#999",
                         }}>
@@ -923,13 +940,10 @@ export default function CommandesPage() {
                         onClick={() => dupliquerSession(h.id)}
                         disabled={saving || !!activeSession}
                         style={{
-                          fontSize: 11,
-                          fontWeight: 600,
+                          fontSize: 11, fontWeight: 600,
                           color: activeSession ? "#ccc" : "#D4775A",
-                          background: "none",
-                          border: "none",
-                          cursor: activeSession ? "not-allowed" : "pointer",
-                          padding: 0,
+                          background: "none", border: "none",
+                          cursor: activeSession ? "not-allowed" : "pointer", padding: 0,
                         }}
                       >
                         Dupliquer →
@@ -943,7 +957,7 @@ export default function CommandesPage() {
         )}
 
         {/* ── Bouton flottant ── */}
-        {activeSession && activeCount > 0 && (
+        {activeSession && activeSession.status === "brouillon" && activeCount > 0 && (
           <button
             type="button"
             onClick={() => envoyerSession(activeSession.id)}

@@ -42,13 +42,19 @@ async function fetchOffersForIds(ids: string[]): Promise<LatestOffer[]> {
   })) as LatestOffer[];
 }
 
-async function fetchPage(page: number): Promise<{ items: Ingredient[]; offers: LatestOffer[]; hasMore: boolean }> {
+async function fetchPage(page: number, etabId?: string | null): Promise<{ items: Ingredient[]; offers: LatestOffer[]; hasMore: boolean }> {
   const from = page * PAGE_SIZE;
-  const { data, error } = await supabase
+  let query = supabase
     .from("ingredients")
     .select(INGREDIENT_COLS)
     .order("name", { ascending: true })
     .range(from, from + PAGE_SIZE - 1);
+
+  if (etabId) {
+    query = query.or(`etablissement_id.eq.${etabId},shared.eq.true`);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(error.message);
   const items = (data ?? []) as Ingredient[];
@@ -56,12 +62,18 @@ async function fetchPage(page: number): Promise<{ items: Ingredient[]; offers: L
   return { items, offers, hasMore: items.length === PAGE_SIZE };
 }
 
-async function searchIngredients(q: string): Promise<{ items: Ingredient[]; offers: LatestOffer[] }> {
-  const { data, error } = await supabase
+async function searchIngredients(q: string, etabId?: string | null): Promise<{ items: Ingredient[]; offers: LatestOffer[] }> {
+  let query = supabase
     .from("ingredients")
     .select(INGREDIENT_COLS)
     .ilike("name", `%${q}%`)
     .order("name", { ascending: true });
+
+  if (etabId) {
+    query = query.or(`etablissement_id.eq.${etabId},shared.eq.true`);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(error.message);
   const items = (data ?? []) as Ingredient[];
@@ -69,7 +81,7 @@ async function searchIngredients(q: string): Promise<{ items: Ingredient[]; offe
   return { items, offers };
 }
 
-export function useIngredientsData(searchQuery: string) {
+export function useIngredientsData(searchQuery: string, etablissementId?: string | null) {
   const [items, setItems] = useState<Ingredient[]>([]);
   const [offers, setOffers] = useState<LatestOffer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -81,6 +93,8 @@ export function useIngredientsData(searchQuery: string) {
 
   const pageRef = useRef(0);
   const fetchIdRef = useRef(0);
+  const etabRef = useRef(etablissementId);
+  etabRef.current = etablissementId;
 
   // Suppliers + alerts: load once (independent of pagination)
   useEffect(() => {
@@ -112,13 +126,13 @@ export function useIngredientsData(searchQuery: string) {
 
     try {
       if (q) {
-        const bundle = await searchIngredients(q);
+        const bundle = await searchIngredients(q, etabRef.current);
         if (fetchIdRef.current !== fetchId) return;
         setItems(bundle.items);
         setOffers(bundle.offers);
         setHasMore(false);
       } else {
-        const bundle = await fetchPage(0);
+        const bundle = await fetchPage(0, etabRef.current);
         if (fetchIdRef.current !== fetchId) return;
         setItems(bundle.items);
         setOffers(bundle.offers);
@@ -136,13 +150,13 @@ export function useIngredientsData(searchQuery: string) {
   useEffect(() => {
     const id = ++fetchIdRef.current;
     doLoad(searchQuery, id);
-  }, [searchQuery, doLoad]);
+  }, [searchQuery, etablissementId, doLoad]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
-      const bundle = await fetchPage(pageRef.current);
+      const bundle = await fetchPage(pageRef.current, etabRef.current);
       setItems((prev) => {
         const seen = new Set(prev.map((i) => i.id));
         return [...prev, ...bundle.items.filter((i) => !seen.has(i.id))];

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { EtablissementSelector } from "@/components/EtablissementSelector";
 
 export type MenuItem = {
   label: string;
@@ -52,6 +53,11 @@ export function NavBar({ backHref, backLabel, right, primaryAction, menuItems }:
           ) : (
             <Link href="/" style={navBtn}>← Accueil</Link>
           )}
+        </div>
+
+        {/* ── Center: establishment selector ── */}
+        <div style={{ flex: "0 0 auto" }}>
+          <EtablissementSelector />
         </div>
 
         {/* ── Right: structured or legacy ── */}
@@ -139,7 +145,7 @@ const leftStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 6,
-  flex: "1 1 auto",
+  flex: "0 1 auto",
   minWidth: 0,
   overflow: "hidden",
 };

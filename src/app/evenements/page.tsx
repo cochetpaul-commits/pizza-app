@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
+import { useEtablissement } from "@/lib/EtablissementContext";
 
 type Event = {
   id: string;
@@ -108,6 +109,7 @@ type ViewMode = "list" | "calendar";
 
 export default function EventsPage() {
   const router = useRouter();
+  const { current: etab } = useEtablissement();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"upcoming" | "all" | "past">("upcoming");
@@ -139,14 +141,16 @@ export default function EventsPage() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
+      const q = supabase
         .from("events")
         .select("id,name,type,date,time,location,covers,establishment,status,contact_name,sell_price")
         .order("date", { ascending: true, nullsFirst: false });
+      if (etab) q.eq("etablissement_id", etab.id);
+      const { data } = await q;
       setEvents(data ?? []);
       setLoading(false);
     })();
-  }, []);
+  }, [etab?.id]);
 
   const today = new Date().toISOString().slice(0, 10);
   const filtered = events.filter((e) => {

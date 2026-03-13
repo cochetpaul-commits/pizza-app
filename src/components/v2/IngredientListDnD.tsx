@@ -44,6 +44,16 @@ export function normalizeUnit(u: string | null | undefined): string {
   return "g";
 }
 
+/** Returns true if the ingredient is liquid and has no density set */
+function isMissingDensity(ing: Ingredient | undefined, line: IngredientLine): boolean {
+  if (!ing) return false;
+  const unit = line.unit.toLowerCase();
+  const isLiquidLine = unit === "cl" || unit === "ml" || unit === "l";
+  const isLiquidDefault = ["ml", "cl", "l"].includes((ing.default_unit ?? "").toLowerCase());
+  if (!isLiquidLine && !isLiquidDefault) return false;
+  return ing.density_g_per_ml == null || ing.density_g_per_ml === 0;
+}
+
 function computeCost(line: IngredientLine, cpu: CpuByUnit | undefined): number | null {
   if (!cpu || line.qty === "" || !(Number(line.qty) > 0)) return null;
   const qty = Number(line.qty);
@@ -114,6 +124,8 @@ export function IngredientListDnD({
               {items.map((line, i) => {
                 const cpu = priceByIngredient[line.ingredient_id];
                 const cost = computeCost(line, cpu);
+                const ing = ingredients.find(ig => ig.id === line.ingredient_id);
+                const densityMissing = isMissingDensity(ing, line);
 
                 return (
                   <Draggable key={line.id} draggableId={line.id} index={i}>
@@ -208,6 +220,22 @@ export function IngredientListDnD({
                             alignItems: "center", justifyContent: "center",
                           }}
                         >✕</button>
+
+                        {/* Density warning for liquids */}
+                        {densityMissing && (
+                          <a
+                            href={`/ingredients/${line.ingredient_id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              width: "100%", fontSize: 11, color: "#d97706",
+                              textDecoration: "none", marginTop: 2,
+                              paddingLeft: 24,
+                            }}
+                          >
+                            ⚠️ Densité manquante — prix estimé avec 1g/ml
+                          </a>
+                        )}
                       </div>
                     )}
                   </Draggable>
