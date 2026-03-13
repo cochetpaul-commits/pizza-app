@@ -73,6 +73,30 @@ UPDATE ingredients SET shared = true
     '%tomate%', '%vinaigre%'
   ]);
 
+-- Commandes fournisseurs
+CREATE TABLE IF NOT EXISTS commande_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  supplier_id UUID REFERENCES suppliers(id) NOT NULL,
+  etablissement_id UUID REFERENCES etablissements(id),
+  status TEXT DEFAULT 'brouillon' CHECK (status IN ('brouillon','validee','envoyee','recue','annulee')),
+  notes TEXT,
+  total_ht NUMERIC(10,2) DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  created_by UUID REFERENCES profiles(id)
+);
+
+CREATE TABLE IF NOT EXISTS commande_lignes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID REFERENCES commande_sessions(id) ON DELETE CASCADE NOT NULL,
+  ingredient_id UUID REFERENCES ingredients(id) NOT NULL,
+  quantite NUMERIC(10,3) NOT NULL DEFAULT 0,
+  unite TEXT,
+  prix_unitaire_ht NUMERIC(10,4),
+  total_ligne_ht NUMERIC(10,2),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- Admin : accès groupe
 UPDATE profiles SET
   is_group_admin = true,
