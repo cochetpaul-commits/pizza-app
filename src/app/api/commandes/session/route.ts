@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 /**
  * POST /api/commandes/session
  * Crée ou met à jour une session de commande fournisseur.
  */
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   // TODO: implémenter création session
-  const body = await req.json();
   return NextResponse.json({ ok: true, session: null });
 }
 
