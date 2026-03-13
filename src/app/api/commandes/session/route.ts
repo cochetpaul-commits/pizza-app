@@ -4,7 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
  * POST /api/commandes/session
  * Crée ou met à jour une session de commande fournisseur.
  */
-export async function POST(_req: NextRequest) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function POST(req: NextRequest) {
   // TODO: implémenter création session
   return NextResponse.json({ ok: true, session: null });
 }

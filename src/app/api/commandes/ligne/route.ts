@@ -4,7 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
  * POST /api/commandes/ligne
  * Ajoute ou met à jour une ligne de commande.
  */
-export async function POST(_req: NextRequest) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function POST(req: NextRequest) {
   // TODO: implémenter ajout/modification ligne
   return NextResponse.json({ ok: true, ligne: null });
 }
