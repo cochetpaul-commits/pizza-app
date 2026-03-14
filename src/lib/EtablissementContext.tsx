@@ -47,19 +47,18 @@ export function EtablissementProvider({ children }: { children: ReactNode }) {
       const { data: u } = await supabase.auth.getUser();
       if (cancelled || !u.user) { setLoading(false); return; }
 
-      // Fetch profile for group admin flag + access list
-      // Columns may not exist yet if migration hasn't run — handle gracefully
+      // Fetch profile for role + access list
       const { data: profile, error: profileErr } = await supabase
         .from("profiles")
-        .select("is_group_admin, etablissements_access")
+        .select("role, etablissements_access")
         .eq("id", u.user.id)
         .maybeSingle();
 
       if (profileErr) {
-        console.warn("[EtablissementProvider] profile query failed (columns may not exist yet):", profileErr.message);
+        console.warn("[EtablissementProvider] profile query failed:", profileErr.message);
       }
 
-      const groupAdmin = profile?.is_group_admin ?? false;
+      const groupAdmin = profile?.role === "group_admin";
       const accessIds: string[] = profile?.etablissements_access ?? [];
 
       setIsGroupAdmin(groupAdmin);

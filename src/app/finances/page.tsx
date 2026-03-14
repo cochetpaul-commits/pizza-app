@@ -351,7 +351,7 @@ export default function FinancesPage() {
   const d = data;
 
   return (
-    <RequireRole allowedRoles={["admin", "direction"]}>
+    <RequireRole allowedRoles={["group_admin"]}>
       <>
         <NavBar backHref="/pilotage" backLabel="Pilotage" />
         <main style={{ maxWidth: 720, margin: "0 auto", padding: "20px 16px 56px", boxSizing: "border-box" }}>

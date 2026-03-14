@@ -1,20 +1,22 @@
-export type Role = "admin" | "direction" | "cuisine";
+export type Role = "group_admin" | "cuisine" | "salle";
 
 /** Routes and which roles can access them (prefix match) */
 export const ROUTE_ACCESS: Record<string, Role[]> = {
-  "/groupe":       ["admin"],
-  "/admin":        ["admin"],
-  "/invoices":     ["admin", "direction"],
-  "/fournisseurs": ["admin", "direction"],
-  "/evenements":   ["admin", "direction"],
-  "/pilotage":     ["admin", "direction"],
-  "/mercuriale":   ["admin", "direction"],
-  "/epicerie":     ["admin", "direction"],
-  "/variations-prix": ["admin", "direction"],
-  "/rh":           ["admin", "direction"],
-  "/plannings":    ["admin", "direction"],
-  "/recettes":     ["admin", "direction", "cuisine"],
-  "/ingredients":  ["admin", "direction", "cuisine"],
+  "/groupe":       ["group_admin"],
+  "/admin":        ["group_admin"],
+  "/invoices":     ["group_admin"],
+  "/fournisseurs": ["group_admin", "cuisine", "salle"],
+  "/evenements":   ["group_admin"],
+  "/pilotage":     ["group_admin"],
+  "/mercuriale":   ["group_admin"],
+  "/epicerie":     ["group_admin"],
+  "/variations-prix": ["group_admin"],
+  "/rh":           ["group_admin"],
+  "/plannings":    ["group_admin", "cuisine", "salle"],
+  "/recettes":     ["group_admin", "cuisine", "salle"],
+  "/ingredients":  ["group_admin", "cuisine", "salle"],
+  "/commandes":    ["group_admin", "cuisine", "salle"],
+  "/finances":     ["group_admin"],
 };
 
 /** Check if a role can access a given path (prefix match) */
@@ -32,5 +34,5 @@ export function canAccess(role: Role, path: string): boolean {
 
 /** Can this role write (create/edit/delete)? */
 export function canWrite(role: Role): boolean {
-  return role !== "cuisine";
+  return role === "group_admin";
 }

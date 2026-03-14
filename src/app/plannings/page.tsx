@@ -104,7 +104,8 @@ function fmtH(t: string): string {
 
 export default function PlanningPage() {
   const { current: etab } = useEtablissement();
-  const { canWrite } = useProfile();
+  const { can } = useProfile();
+  const canWrite = can("planning.edit");
 
   const [employes, setEmployes] = useState<Employe[]>([]);
   const [postes, setPostes] = useState<Poste[]>([]);
@@ -376,7 +377,7 @@ export default function PlanningPage() {
   const isToday = (iso: string) => iso === toISO(new Date());
 
   return (
-    <RequireRole allowedRoles={["admin", "direction"]}>
+    <RequireRole allowedRoles={["group_admin", "cuisine", "salle"]}>
       <NavBar
         backHref="/rh/equipe"
         backLabel="Equipe"

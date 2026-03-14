@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchPriceAlerts } from "@/lib/priceAlerts";
 import { useProfile } from "@/lib/ProfileContext";
@@ -129,11 +130,19 @@ function SectionSeparator({ label }: { label: string }) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Home() {
+  const router = useRouter();
   const [authState, setAuthState] = useState<"loading" | "ok" | "anon">("loading");
   const [counts, setCounts] = useState<Counts | null>(null);
   const [caJour, setCaJour] = useState<number | null>(null);
-  const { role, displayName, isAdmin, isGroupAdmin } = useProfile();
-  const { current: etab } = useEtablissement();
+  const { role, displayName, isGroupAdmin, can, loading: profileLoading } = useProfile();
+  const { current: etab, isGroupView } = useEtablissement();
+
+  // Redirect group_admin to /groupe when in group view (first login)
+  useEffect(() => {
+    if (!profileLoading && isGroupAdmin && isGroupView) {
+      router.replace("/groupe");
+    }
+  }, [profileLoading, isGroupAdmin, isGroupView, router]);
 
   // CA du jour Popina — auto-refresh toutes les 5 min
   useEffect(() => {
@@ -387,10 +396,10 @@ export default function Home() {
           </Link>
 
           {/* ── Separator GESTION ── */}
-          {role && role !== "cuisine" && <SectionSeparator label="GESTION" />}
+          {can("factures") && <SectionSeparator label="GESTION" />}
 
           {/* ─── FACTURES ─── */}
-          {role && role !== "cuisine" && (
+          {can("factures") && (
           <Link href="/invoices" style={{ textDecoration: "none", color: "inherit" }}>
             <div className="dash-card dash-warm" style={{ "--accent": "#A0845C" } as React.CSSProperties}>
               <div style={row}>
@@ -413,7 +422,7 @@ export default function Home() {
           )}
 
           {/* ─── FOURNISSEURS ─── */}
-          {role && role !== "cuisine" && (
+          {can("fournisseurs.view") && (
           <Link href="/fournisseurs" style={{ textDecoration: "none", color: "inherit" }}>
             <div className="dash-card" style={{ "--accent": "#D4775A" } as React.CSSProperties}>
               <div style={row}>
@@ -436,7 +445,7 @@ export default function Home() {
           )}
 
           {/* ─── ÉVÉNEMENTS ─── */}
-          {role && role !== "cuisine" && (
+          {can("evenements") && (
           <Link href="/evenements" style={{ textDecoration: "none", color: "inherit" }}>
             <div className="dash-card" style={{ "--accent": "#D4775A" } as React.CSSProperties}>
               <div style={row}>
@@ -486,7 +495,7 @@ export default function Home() {
           )}
 
           {/* ─── RH & PLANNING ─── */}
-          {role && role !== "cuisine" && (
+          {can("rh") && (
           <Link href="/rh/equipe" style={{ textDecoration: "none", color: "inherit" }}>
             <div className="dash-card" style={{ "--accent": "#D4775A" } as React.CSSProperties}>
               <div style={row}>
@@ -500,7 +509,7 @@ export default function Home() {
           </Link>
           )}
 
-          {role && role !== "cuisine" && (
+          {can("planning.view") && (
           <Link href="/plannings" style={{ textDecoration: "none", color: "inherit" }}>
             <div className="dash-card" style={{ "--accent": "#D4775A" } as React.CSSProperties}>
               <div style={row}>
@@ -515,7 +524,7 @@ export default function Home() {
           )}
 
           {/* ─── PILOTAGE ─── */}
-          {role && role !== "cuisine" && (
+          {can("pilotage") && (
           <Link href="/pilotage" style={{ textDecoration: "none", color: "inherit" }}>
             <div className="dash-card dash-green" style={{ "--accent": "#4a6741" } as React.CSSProperties}>
               <div style={row}>
@@ -541,7 +550,7 @@ export default function Home() {
           )}
 
           {/* ─── FINANCES ─── */}
-          {role && role !== "cuisine" && (
+          {can("finances") && (
           <Link href="/finances" style={{ textDecoration: "none", color: "inherit" }}>
             <div className="dash-card dash-green" style={{ "--accent": "#2d6a4f" } as React.CSSProperties}>
               <div style={row}>
@@ -556,7 +565,7 @@ export default function Home() {
           )}
 
           {/* ─── ADMIN ─── */}
-          {isAdmin && (
+          {can("admin") && (
           <Link href="/admin/utilisateurs" style={{ textDecoration: "none", color: "inherit" }}>
             <div className="dash-card dash-dark" style={{ "--accent": "#c9b99a" } as React.CSSProperties}>
               <div style={row}>

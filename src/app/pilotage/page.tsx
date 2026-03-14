@@ -499,7 +499,7 @@ export default function PilotagePage() {
   const isNow = weekStr === currentWeek;
 
   return (
-    <RequireRole allowedRoles={["admin", "direction"]}>
+    <RequireRole allowedRoles={["group_admin"]}>
       <>
         <NavBar />
         <main style={{ maxWidth: 720, margin: "0 auto", padding: "20px 16px 56px", boxSizing: "border-box" }}>

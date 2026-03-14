@@ -163,7 +163,7 @@ export default function EventsPage() {
   const overlaps = detectOverlaps(events);
 
   return (
-    <RequireRole allowedRoles={["admin", "direction"]}>
+    <RequireRole allowedRoles={["group_admin"]}>
     <>
       <NavBar
         backHref="/"

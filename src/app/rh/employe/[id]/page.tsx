@@ -357,7 +357,7 @@ export default function EmployeDetailPage() {
 
   if (loading) {
     return (
-      <RequireRole allowedRoles={["admin", "direction"]}>
+      <RequireRole allowedRoles={["group_admin"]}>
         <NavBar backHref="/rh/equipe" backLabel="Equipe" />
         <div style={{ textAlign: "center", padding: 60, color: "#999" }}>Chargement...</div>
       </RequireRole>
@@ -367,7 +367,7 @@ export default function EmployeDetailPage() {
   const activeContrat = contrats.find((c) => c.actif);
 
   return (
-    <RequireRole allowedRoles={["admin", "direction"]}>
+    <RequireRole allowedRoles={["group_admin"]}>
       <NavBar
         backHref="/rh/equipe"
         backLabel="Equipe"

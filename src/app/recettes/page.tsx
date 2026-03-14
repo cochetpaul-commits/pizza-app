@@ -302,7 +302,8 @@ function SubSection({
 // ─── Main inner component ─────────────────────────────────────────────────────
 
 function RecettesInner() {
-  const { canWrite } = useProfile();
+  const { can } = useProfile();
+  const canWrite = can("recettes.edit");
   const { current: etabCtx } = useEtablissement();
   const [authOk, setAuthOk] = useState<boolean | null>(null);
   const [pizzas,    setPizzas]    = useState<PizzaRow[]>([]);

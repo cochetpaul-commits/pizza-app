@@ -35,7 +35,8 @@ interface Props { recipeId?: string; initialProdMode?: boolean; }
 
 export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
   const router = useRouter();
-  const { canWrite: userCanWrite } = useProfile();
+  const { can } = useProfile();
+  const userCanWrite = can("recettes.edit");
   const isEdit = !!recipeId;
 
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");

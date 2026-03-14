@@ -146,7 +146,7 @@ export default function FournisseursPage() {
   }
 
   return (
-    <RequireRole allowedRoles={["admin", "direction"]}>
+    <RequireRole allowedRoles={["group_admin", "cuisine", "salle"]}>
     <>
       <NavBar />
       <main style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>

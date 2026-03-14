@@ -180,7 +180,7 @@ export default function EpiceriePage() {
   const sel = { padding: "7px 10px", borderRadius: 8, border: "1px solid #E8E0D0", fontSize: 13, background: "#fff", color: "#1A1A1A" };
 
   return (
-    <RequireRole allowedRoles={["admin", "direction"]}>
+    <RequireRole allowedRoles={["group_admin"]}>
     <>
     <NavBar />
     <main style={{ minHeight: "100vh", background: "#FAF7F2", padding: 16, fontFamily: "inherit", overflowX: "hidden" as const, maxWidth: "100vw", position: "relative", boxSizing: "border-box" }}>

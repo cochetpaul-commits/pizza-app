@@ -16,15 +16,15 @@ type UserRow = {
 };
 
 const ROLE_LABELS: Record<Role, string> = {
-  admin: "Admin",
-  direction: "Direction",
+  group_admin: "Group Admin",
   cuisine: "Cuisine",
+  salle: "Salle",
 };
 
 const ROLE_COLORS: Record<Role, string> = {
-  admin: "#D4775A",
-  direction: "#4a6741",
+  group_admin: "#D4775A",
   cuisine: "#1a1a1a",
+  salle: "#4a6741",
 };
 
 function fmtDate(iso: string) {
@@ -185,8 +185,8 @@ function UsersContent() {
                     }}
                   >
                     <option value="cuisine">Cuisine</option>
-                    <option value="direction">Direction</option>
-                    <option value="admin">Admin</option>
+                    <option value="salle">Salle</option>
+                    <option value="group_admin">Group Admin</option>
                   </select>
                 </div>
               </div>
@@ -297,7 +297,7 @@ function UsersContent() {
 
 export default function AdminUsersPage() {
   return (
-    <RequireRole allowedRoles={["admin"]}>
+    <RequireRole allowedRoles={["group_admin"]}>
       <UsersContent />
     </RequireRole>
   );

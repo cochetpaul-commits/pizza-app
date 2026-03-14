@@ -199,8 +199,8 @@ const statusBannerBg: Record<string, string> = {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function CommandesPage() {
-  const { isAdmin, isDirection } = useProfile();
-  const canValidate = isAdmin || isDirection;
+  const { can } = useProfile();
+  const canValidate = can("commandes.valider");
 
   const [tab, setTab] = useState<Tab>("mael");
 
@@ -946,7 +946,7 @@ export default function CommandesPage() {
   // ── Main render ───────────────────────────────────────────────────────────
 
   return (
-    <RequireRole allowedRoles={["admin", "direction", "cuisine"]}>
+    <RequireRole allowedRoles={["group_admin", "cuisine", "salle"]}>
       <NavBar />
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px", background: "#f2ede4", minHeight: "100vh" }}>
         <h1 style={{

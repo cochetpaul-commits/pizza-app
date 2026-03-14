@@ -44,11 +44,11 @@ export async function getEtablissement(req: NextRequest | Request): Promise<Etab
   // 3. Fetch profile to check access
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("is_group_admin, etablissements_access")
+    .select("role, etablissements_access")
     .eq("id", userId)
     .single();
 
-  const isGroupAdmin = profile?.is_group_admin ?? false;
+  const isGroupAdmin = profile?.role === "group_admin";
   const accessIds: string[] = profile?.etablissements_access ?? [];
 
   // 4. Resolve etablissement_id
@@ -96,11 +96,11 @@ export async function resolveEtabId(
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("is_group_admin, etablissements_access")
+    .select("role, etablissements_access")
     .eq("id", userId)
     .single();
 
-  const isGroupAdmin = profile?.is_group_admin ?? false;
+  const isGroupAdmin = profile?.role === "group_admin";
   const accessIds: string[] = profile?.etablissements_access ?? [];
 
   let etabId = etabHeader;

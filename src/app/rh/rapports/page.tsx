@@ -227,7 +227,7 @@ export default function RapportsPage() {
   };
 
   return (
-    <RequireRole allowedRoles={["admin", "direction"]}>
+    <RequireRole allowedRoles={["group_admin"]}>
       <NavBar
         backHref="/rh/equipe"
         backLabel="Equipe"

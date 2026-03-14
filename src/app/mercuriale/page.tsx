@@ -73,7 +73,7 @@ export default function MercurialePage() {
   };
 
   return (
-    <RequireRole allowedRoles={["admin", "direction"]}>
+    <RequireRole allowedRoles={["group_admin"]}>
     <>
     <NavBar />
     <main style={{ maxWidth: 600, margin: "0 auto", padding: "2rem" }}>

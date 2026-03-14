@@ -272,7 +272,7 @@ export default function VariationsPrixPage() {
   });
 
   return (
-    <RequireRole allowedRoles={["admin", "direction"]}>
+    <RequireRole allowedRoles={["group_admin"]}>
     <>
       <NavBar backHref="/" />
       <main className="container safe-bottom">

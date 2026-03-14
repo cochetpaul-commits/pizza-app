@@ -26,7 +26,7 @@ export default function GroupePage() {
   const fmtEur = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
   return (
-    <RequireRole allowedRoles={["admin"]}>
+    <RequireRole allowedRoles={["group_admin"]}>
       <div style={{ minHeight: "100dvh", background: "#f2ede4" }}>
 
         {/* ── Header sombre ── */}

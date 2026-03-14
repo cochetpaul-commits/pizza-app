@@ -48,7 +48,8 @@ function truncate(s: string, n: number) { return s.length > n ? s.slice(0, n) + 
 
 export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   const router = useRouter();
-  const { canWrite: userCanWrite } = useProfile();
+  const { can } = useProfile();
+  const userCanWrite = can("recettes.edit");
   const { current: etab } = useEtablissement();
   const isEdit = !!pizzaId;
 
