@@ -204,12 +204,12 @@ export default function PlanningPage() {
     return m;
   }, [shifts]);
 
-  /* ── Bilan per employee ── */
+  /* ── Bilan per employee (TNS exclus) ── */
   const bilans = useMemo(() => {
     const map = new Map<string, BilanSemaine>();
     for (const emp of filteredEmployes) {
       const contrat = emp.contrats?.find((c) => c.actif);
-      if (!contrat) continue;
+      if (!contrat || contrat.type === "TNS") continue;
 
       const empShifts: ShiftInput[] = shifts
         .filter((s) => s.employe_id === emp.id)
@@ -442,6 +442,7 @@ export default function PlanningPage() {
                   const bilan = bilans.get(emp.id);
                   const initials = emp.initiales || ((emp.prenom?.[0] ?? "") + (emp.nom?.[0] ?? "")).toUpperCase();
                   const contrat = emp.contrats?.find((c) => c.actif);
+                  const isTNS = contrat?.type === "TNS";
                   const weekHours = bilan?.heures_travaillees ?? 0;
                   const hasAlerts = bilan && bilan.alertes.length > 0;
 
@@ -450,8 +451,11 @@ export default function PlanningPage() {
                     <div key={`name-${emp.id}`} style={empCell}>
                       <div style={empAvatar}>{initials}</div>
                       <div style={{ minWidth: 0 }}>
-                        <div style={empName}>{emp.prenom} {emp.nom.charAt(0)}.</div>
-                        {contrat && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <span style={empName}>{emp.prenom} {emp.nom.charAt(0)}.</span>
+                          {isTNS && <span style={tnsBadge}>TNS</span>}
+                        </div>
+                        {contrat && !isTNS && (
                           <div style={{ fontSize: 10, color: "#999" }}>{contrat.heures_semaine}h</div>
                         )}
                       </div>
@@ -518,22 +522,28 @@ export default function PlanningPage() {
 
                     /* Hours total cell */
                     <div key={`h-${emp.id}`} style={hoursCell}>
-                      <span style={{
-                        fontWeight: 700,
-                        fontSize: 13,
-                        color: hasAlerts ? "#DC2626" : weekHours > 0 ? "#1a1a1a" : "#ccc",
-                      }}>
-                        {weekHours > 0 ? `${weekHours.toFixed(1)}h` : "—"}
-                      </span>
-                      {hasAlerts && <span title={bilan.alertes.map((a) => a.message).join("\n")} style={alertDot}>!</span>}
-                      {bilan && bilan.delta_contrat !== 0 && (
-                        <div style={{
-                          fontSize: 10,
-                          color: bilan.delta_contrat > 0 ? "#D4775A" : "#2563eb",
-                          fontWeight: 600,
-                        }}>
-                          {bilan.delta_contrat > 0 ? "+" : ""}{bilan.delta_contrat.toFixed(1)}
-                        </div>
+                      {isTNS ? (
+                        <span style={{ fontSize: 10, color: "#A0845C", fontWeight: 700 }}>TNS</span>
+                      ) : (
+                        <>
+                          <span style={{
+                            fontWeight: 700,
+                            fontSize: 13,
+                            color: hasAlerts ? "#DC2626" : weekHours > 0 ? "#1a1a1a" : "#ccc",
+                          }}>
+                            {weekHours > 0 ? `${weekHours.toFixed(1)}h` : "—"}
+                          </span>
+                          {hasAlerts && <span title={bilan.alertes.map((a) => a.message).join("\n")} style={alertDot}>!</span>}
+                          {bilan && bilan.delta_contrat !== 0 && (
+                            <div style={{
+                              fontSize: 10,
+                              color: bilan.delta_contrat > 0 ? "#D4775A" : "#2563eb",
+                              fontWeight: 600,
+                            }}>
+                              {bilan.delta_contrat > 0 ? "+" : ""}{bilan.delta_contrat.toFixed(1)}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>,
                   ];
@@ -790,6 +800,17 @@ const hoursCell: React.CSSProperties = {
   padding: "6px 4px",
   borderBottom: "1px solid #f0ebe3",
   background: "#faf7f2",
+};
+
+const tnsBadge: React.CSSProperties = {
+  display: "inline-block",
+  padding: "1px 5px",
+  borderRadius: 4,
+  background: "rgba(160,132,92,0.12)",
+  color: "#A0845C",
+  fontSize: 9,
+  fontWeight: 700,
+  letterSpacing: 0.5,
 };
 
 const alertDot: React.CSSProperties = {

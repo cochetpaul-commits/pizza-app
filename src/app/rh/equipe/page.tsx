@@ -48,6 +48,7 @@ const CONTRAT_LABELS: Record<string, string> = {
   interim: "Intérim",
   apprenti: "Apprenti",
   stagiaire: "Stagiaire",
+  TNS: "TNS",
 };
 
 const CONTRAT_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -55,6 +56,7 @@ const CONTRAT_COLORS: Record<string, { bg: string; fg: string }> = {
   CDD: { bg: "rgba(37,99,235,0.10)", fg: "#2563eb" },
   extra: { bg: "#FFF3E0", fg: "#E65100" },
   interim: { bg: "#F3E5F5", fg: "#7B1FA2" },
+  TNS: { bg: "rgba(160,132,92,0.12)", fg: "#A0845C" },
   apprenti: { bg: "#E0F7FA", fg: "#00695C" },
   stagiaire: { bg: "#e8e0d0", fg: "#999999" },
 };

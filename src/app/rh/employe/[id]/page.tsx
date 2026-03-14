@@ -50,7 +50,7 @@ type Tab = "identite" | "contrat" | "absences" | "admin";
 
 const CONTRAT_LABELS: Record<string, string> = {
   CDI: "CDI", CDD: "CDD", extra: "Extra", interim: "Interim",
-  apprenti: "Apprenti", stagiaire: "Stagiaire",
+  apprenti: "Apprenti", stagiaire: "Stagiaire", TNS: "TNS",
 };
 
 const ABSENCE_LABELS: Record<string, string> = {
