@@ -12,6 +12,10 @@ import { parseMael } from "./mael";
 import { parseCozigou } from "./cozigou";
 import { parseSum } from "./sum";
 import { parseArmor } from "./armor";
+import { parseCarniato } from "./carniato";
+import { parseBarSpirits } from "./barspirits";
+import { parseVinoflo } from "./vinoflo";
+import { parseMasse } from "./masse";
 import { parseGeneric } from "./generic";
 
 export type { ParseResult, ParsedIngredient, ParseLog, Categorie, Confidence } from "./types";
@@ -28,9 +32,10 @@ const PARSERS: Record<string, (text: string, etab: string) => ParseResult> = {
   cozigou: parseCozigou,
   sum: parseSum,
   armor: parseArmor,
-  // masse: parseMasse,     // ⏳ à implémenter
-  // vinoflo: parseVinoflo, // ⏳ à implémenter
-  // carniato: parseCarniato, // ⏳ à implémenter
+  carniato: parseCarniato,
+  bar_spirits: parseBarSpirits,
+  vinoflo: parseVinoflo,
+  masse: parseMasse,
 };
 
 export function parseInvoice(options: ParserOptions): ParseResult {

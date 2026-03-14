@@ -17,6 +17,7 @@ const SUPPLIER_KEYWORDS: Record<string, string[]> = {
   cozigou: ["COZIGOU"],
   vinoflo: ["VINOFLO"],
   carniato: ["CARNIATO"],
+  bar_spirits: ["BAR SPIRITS", "BARSPIRITS"],
   sum: ["SUM SARL", "SUM ", "BUSSY-SAINT-GEORGES"],
   armor: ["ARMOR EMBALLAGES", "ARMOR-EMBALLAGES", "CAUDAN"],
 };

@@ -13,7 +13,7 @@ const CATEGORIE_KEYWORDS: Record<Categorie, string[]> = {
   charcuterie_viande: [
     "jambon", "bresaola", "pancetta", "coppa",
     "mortadelle", "salami", "viande", "boeuf",
-    "veau", "porc", "poulet", "filet", "tartare",
+    "veau", "porc", "poulet", "filet ", "tartare",
     "merguez", "saucisse", "saucisson", "speck", "spianata",
     "anchois", "guanciale", "salame", "lonzino", "lonza",
   ],
@@ -31,7 +31,7 @@ const CATEGORIE_KEYWORDS: Record<Categorie, string[]> = {
   ],
   epicerie: [
     "farine", "huile", "vinaigre", "sel ", "sucre",
-    "pâtes", "pates", "riz", "conserve", "sauce", "miel",
+    "pâtes", "pates", " riz", "conserve", "sauce", "miel",
     "nocciolata", "nutella", "café", "nescafe",
     "olive", "semoule", "chapelure", "gnocchi", "fregula",
     "mafaldine", "pignon", "origan", "piment", "speculoos",
@@ -43,7 +43,13 @@ const CATEGORIE_KEYWORDS: Record<Categorie, string[]> = {
   boissons: [
     "vin", "bière", "biere", "eau", "jus", "sirop",
     "prosecco", "limoncello", "marsala", "rioba",
-    "cranberry", "ananas", "pomme", "spiritueux",
+    "cranberry", "pomme", "spiritueux",
+    "acqua", "nectar", "montepulciano", "molecola", "bianco",
+    "barolo", "chianti", "amarone", "grappa", "campari",
+    "aperol", "vermouth", "gin ", "vodka", "rhum", "rum",
+    "whisky", "whiskey", "tequila", "mezcal", "liqueur",
+    "amaro", "sambuca", "fernet", "spritz", "bitter",
+    "champagne", "cava", "spumante", "lambrusco",
   ],
   surgele: [
     "surgelé", "surgele", "congelé", "congele", "ivp",
