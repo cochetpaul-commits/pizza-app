@@ -17,6 +17,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/ingredients":  ["group_admin", "cuisine", "salle"],
   "/commandes":    ["group_admin", "cuisine", "salle"],
   "/finances":     ["group_admin"],
+  "/settings":     ["group_admin"],
 };
 
 /** Check if a role can access a given path (prefix match) */

@@ -158,7 +158,7 @@ export default function RapportsPage() {
         const ci: ContratInput = {
           type: contrat.type,
           heures_semaine: contrat.heures_semaine,
-          convention: "HCR_1979",
+          convention: ((etab as { convention?: string })?.convention === "RAPIDE_1501" ? "RAPIDE_1501" : "HCR_1979"),
         };
 
         const bilan = calculerBilanMensuel(empShifts, ci, emp.id);

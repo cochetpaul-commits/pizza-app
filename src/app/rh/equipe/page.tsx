@@ -294,6 +294,10 @@ export default function EquipePage() {
             </button>
           ) : undefined
         }
+        menuItems={canWrite ? [
+          { label: "Rapports", onClick: () => router.push("/rh/rapports") },
+          { label: "Parametres", onClick: () => router.push("/settings/planning") },
+        ] : undefined}
       />
 
       <div style={pageStyle}>

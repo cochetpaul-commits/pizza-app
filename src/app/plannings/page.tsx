@@ -226,7 +226,7 @@ export default function PlanningPage() {
       const ci: ContratInput = {
         type: contrat.type,
         heures_semaine: contrat.heures_semaine,
-        convention: "HCR_1979",
+        convention: ((etab as { convention?: string })?.convention === "RAPIDE_1501" ? "RAPIDE_1501" : "HCR_1979"),
       };
       map.set(emp.id, calculerBilanSemaine(empShifts, ci, emp.id));
     }
