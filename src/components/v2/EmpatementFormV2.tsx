@@ -12,6 +12,7 @@ import { StepperInput } from "@/components/StepperInput";
 import { useProfile } from "@/lib/ProfileContext";
 import { calculerPate, type EmpatementType, type FlourMixItem } from "@/lib/pateEngine";
 import type { Ingredient } from "@/types/ingredients";
+import { fetchApi } from "@/lib/fetchApi";
 
 const TYPE_OPTIONS: { id: EmpatementType; label: string }[] = [
   { id: "direct",   label: "Direct" },
@@ -271,7 +272,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
       if (!token) { alert("Non authentifié"); return; }
-      const res = await fetch("/api/recipes/pdf", {
+      const res = await fetchApi("/api/recipes/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ recipeId, nbPatons, poidsPaton }),

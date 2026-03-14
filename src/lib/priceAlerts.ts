@@ -32,7 +32,8 @@ export async function fetchPriceAlerts(
   supabase: SupabaseClient,
   userId: string,
   threshold = ALERT_THRESHOLD,
-  since?: string // ISO date string — only alerts where the active offer was created after this date
+  since?: string, // ISO date string — only alerts where the active offer was created after this date
+  etabId?: string, // optional etablissement filter
 ): Promise<PriceAlert[]> {
   let q = supabase
     .from("supplier_offers")
@@ -41,6 +42,7 @@ export async function fetchPriceAlerts(
     .eq("is_active", true)
     .not("unit_price", "is", null);
   if (since) q = q.gte("created_at", since);
+  if (etabId) q = q.eq("etablissement_id", etabId);
   const { data: active, error: e1 } = await q;
 
   if (e1) throw new Error(e1.message);
@@ -48,7 +50,7 @@ export async function fetchPriceAlerts(
 
   const ingredientIds = [...new Set((active as RawOffer[]).map(r => r.ingredient_id))];
 
-  const { data: previous, error: e2 } = await supabase
+  let q2 = supabase
     .from("supplier_offers")
     .select("ingredient_id, supplier_id, unit, unit_price, supplier_label, created_at")
     .eq("user_id", userId)
@@ -56,6 +58,8 @@ export async function fetchPriceAlerts(
     .in("ingredient_id", ingredientIds)
     .not("unit_price", "is", null)
     .order("created_at", { ascending: false });
+  if (etabId) q2 = q2.eq("etablissement_id", etabId);
+  const { data: previous, error: e2 } = await q2;
 
   if (e2) throw new Error(e2.message);
 
@@ -65,11 +69,13 @@ export async function fetchPriceAlerts(
     if (!prevMap.has(key)) prevMap.set(key, r);
   }
 
-  const { data: ingredients, error: e3 } = await supabase
+  let q3 = supabase
     .from("ingredients")
     .select("id, name, supplier, category")
     .eq("user_id", userId)
     .in("id", ingredientIds);
+  if (etabId) q3 = q3.eq("etablissement_id", etabId);
+  const { data: ingredients, error: e3 } = await q3;
 
   if (e3) throw new Error(e3.message);
 
@@ -79,10 +85,12 @@ export async function fetchPriceAlerts(
   }
 
   const supplierIds = [...new Set((active as RawOffer[]).map(r => r.supplier_id))];
-  const { data: suppliers } = await supabase
+  let q4 = supabase
     .from("suppliers")
     .select("id, name")
     .in("id", supplierIds);
+  if (etabId) q4 = q4.eq("etablissement_id", etabId);
+  const { data: suppliers } = await q4;
 
   const supMap = new Map<string, string>();
   for (const s of (suppliers ?? []) as Array<{ id: string; name: string }>) {

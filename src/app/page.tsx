@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchPriceAlerts } from "@/lib/priceAlerts";
 import { useProfile } from "@/lib/ProfileContext";
+import { useEtablissement } from "@/lib/EtablissementContext";
+import { fetchApi } from "@/lib/fetchApi";
 
 type UpcomingEvent = {
   id: string;
@@ -130,13 +132,14 @@ export default function Home() {
   const [authState, setAuthState] = useState<"loading" | "ok" | "anon">("loading");
   const [counts, setCounts] = useState<Counts | null>(null);
   const [caJour, setCaJour] = useState<number | null>(null);
-  const { role, displayName, isAdmin } = useProfile();
+  const { role, displayName, isAdmin, isGroupAdmin } = useProfile();
+  const { current: etab } = useEtablissement();
 
   // CA du jour Popina — auto-refresh toutes les 5 min
   useEffect(() => {
     async function fetchCa() {
       try {
-        const res = await fetch("/api/popina/ca-jour");
+        const res = await fetchApi("/api/popina/ca-jour");
         if (!res.ok) return;
         const d = await res.json();
         setCaJour(typeof d.totalSales === "number" ? d.totalSales : null);
@@ -154,17 +157,37 @@ export default function Home() {
       setAuthState("ok");
 
       const today = new Date().toISOString().slice(0, 10);
+      const eid = etab?.id;
+
+      let qPizza = supabase.from("pizza_recipes").select("*", { count: "exact", head: true }).eq("is_draft", false);
+      let qEmp = supabase.from("recipes").select("*", { count: "exact", head: true });
+      let qKitchen = supabase.from("kitchen_recipes").select("*", { count: "exact", head: true }).eq("is_draft", false);
+      let qPivot = supabase.from("prep_recipes").select("*", { count: "exact", head: true });
+      let qCocktail = supabase.from("cocktails").select("*", { count: "exact", head: true }).eq("is_draft", false);
+      let qIngredients = supabase.from("ingredients").select("*", { count: "exact", head: true });
+      let qToCheck = supabase.from("ingredients").select("*", { count: "exact", head: true }).eq("status", "to_check");
+      let qLastInvoice = supabase.from("supplier_invoices").select("created_at,supplier_name").order("created_at", { ascending: false }).limit(1);
+      let qEvents = supabase.from("events").select("id,name,date,status,covers").gte("date", today).not("status", "in", '("termine","annule")').order("date", { ascending: true }).limit(5);
+      let qSuppliers = supabase.from("suppliers").select("*", { count: "exact", head: true }).eq("is_active", true);
+
+      if (eid) {
+        qPizza = qPizza.eq("etablissement_id", eid);
+        qEmp = qEmp.eq("etablissement_id", eid);
+        qKitchen = qKitchen.eq("etablissement_id", eid);
+        qPivot = qPivot.eq("etablissement_id", eid);
+        qCocktail = qCocktail.eq("etablissement_id", eid);
+        qIngredients = qIngredients.eq("etablissement_id", eid);
+        qToCheck = qToCheck.eq("etablissement_id", eid);
+        qLastInvoice = qLastInvoice.eq("etablissement_id", eid);
+        qEvents = qEvents.eq("etablissement_id", eid);
+        qSuppliers = qSuppliers.eq("etablissement_id", eid);
+      }
+
       const [pizza, emp, kitchen, pivot, cocktail, ingredients, toCheck, lastInvoice, upcomingEvts, suppCount] = await Promise.all([
-        supabase.from("pizza_recipes").select("*", { count: "exact", head: true }).eq("is_draft", false),
-        supabase.from("recipes").select("*", { count: "exact", head: true }),
-        supabase.from("kitchen_recipes").select("*", { count: "exact", head: true }).eq("is_draft", false),
-        supabase.from("prep_recipes").select("*", { count: "exact", head: true }),
-        supabase.from("cocktails").select("*", { count: "exact", head: true }).eq("is_draft", false),
-        supabase.from("ingredients").select("*", { count: "exact", head: true }),
-        supabase.from("ingredients").select("*", { count: "exact", head: true }).eq("status", "to_check"),
-        supabase.from("supplier_invoices").select("created_at,supplier_name").order("created_at", { ascending: false }).limit(1).maybeSingle(),
-        supabase.from("events").select("id,name,date,status,covers").gte("date", today).not("status", "in", '("termine","annule")').order("date", { ascending: true }).limit(5),
-        supabase.from("suppliers").select("*", { count: "exact", head: true }).eq("is_active", true),
+        qPizza, qEmp, qKitchen, qPivot, qCocktail, qIngredients, qToCheck,
+        qLastInvoice.maybeSingle(),
+        qEvents,
+        qSuppliers,
       ]);
 
       let priceAlerts = 0;
@@ -185,7 +208,7 @@ export default function Home() {
       });
     };
     run();
-  }, []);
+  }, [etab?.id]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -250,6 +273,43 @@ export default function Home() {
             </span>
           </div>
         </div>
+
+        {/* ── Établissement badge + Vue Groupe ── */}
+        {authState === "ok" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 16 }}>
+            <span style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "4px 10px",
+              borderRadius: 8,
+              background: "rgba(212,119,90,0.10)",
+              border: "1px solid rgba(212,119,90,0.20)",
+              fontSize: 11,
+              fontWeight: 700,
+              color: "#D4775A",
+              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+              letterSpacing: 0.5,
+            }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#D4775A", flexShrink: 0 }} />
+              Bello Mio
+            </span>
+            {isGroupAdmin && (
+              <Link href="/groupe" style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: "#A0845C",
+                textDecoration: "none",
+                padding: "4px 8px",
+                borderRadius: 6,
+                border: "1px solid rgba(160,132,92,0.25)",
+                background: "rgba(160,132,92,0.08)",
+              }}>
+                Vue Groupe →
+              </Link>
+            )}
+          </div>
+        )}
       </div>
 
       <div style={{ maxWidth: 600, margin: "0 auto", padding: "0 16px 40px" }}>
@@ -309,6 +369,19 @@ export default function Home() {
                   )}
                   <span className="dash-pill">Ouvrir →</span>
                 </div>
+              </div>
+            </div>
+          </Link>
+
+          {/* ─── COMMANDES ─── */}
+          <Link href="/commandes" style={{ textDecoration: "none", color: "inherit" }}>
+            <div className="dash-card" style={{ "--accent": "#A0845C" } as React.CSSProperties}>
+              <div style={row}>
+                <div>
+                  <p style={titleOf("#A0845C")}>COMMANDES</p>
+                  <p style={sub}>Maël · Metro · Masse</p>
+                </div>
+                <span className="dash-pill" style={pillWarm}>Ouvrir →</span>
               </div>
             </div>
           </Link>
@@ -412,6 +485,21 @@ export default function Home() {
           </Link>
           )}
 
+          {/* ─── RH & PLANNING ─── */}
+          {role && role !== "cuisine" && (
+          <Link href="/rh/equipe" style={{ textDecoration: "none", color: "inherit" }}>
+            <div className="dash-card" style={{ "--accent": "#D4775A" } as React.CSSProperties}>
+              <div style={row}>
+                <div>
+                  <p style={titleOf("#D4775A")}>EQUIPE</p>
+                  <p style={sub}>Employes · Planning · Contrats</p>
+                </div>
+                <span className="dash-pill">Ouvrir →</span>
+              </div>
+            </div>
+          </Link>
+          )}
+
           {/* ─── PILOTAGE ─── */}
           {role && role !== "cuisine" && (
           <Link href="/pilotage" style={{ textDecoration: "none", color: "inherit" }}>
@@ -438,9 +526,6 @@ export default function Home() {
           </Link>
           )}
 
-          {/* ── Separator RH & PLANNING ── */}
-          {role && role !== "cuisine" && <SectionSeparator label="RH & PLANNING" />}
-
           {/* ─── PLANNING ─── */}
           {role && role !== "cuisine" && (
           <Link href="/plannings" style={{ textDecoration: "none", color: "inherit" }}>
@@ -456,16 +541,16 @@ export default function Home() {
           </Link>
           )}
 
-          {/* ─── ÉQUIPE ─── */}
+          {/* ─── FINANCES ─── */}
           {role && role !== "cuisine" && (
-          <Link href="/rh/equipe" style={{ textDecoration: "none", color: "inherit" }}>
-            <div className="dash-card" style={{ "--accent": "#D4775A" } as React.CSSProperties}>
+          <Link href="/finances" style={{ textDecoration: "none", color: "inherit" }}>
+            <div className="dash-card dash-green" style={{ "--accent": "#2d6a4f" } as React.CSSProperties}>
               <div style={row}>
                 <div>
-                  <p style={titleOf("#D4775A")}>ÉQUIPE</p>
-                  <p style={sub}>Collaborateurs · Contrats · DPAE</p>
+                  <p style={titleOf("#2d6a4f")}>FINANCES</p>
+                  <p style={sub}>P&L · Food cost · Rentabilité produits</p>
                 </div>
-                <span className="dash-pill">Ouvrir →</span>
+                <span className="dash-pill" style={pillGreen}>Ouvrir →</span>
               </div>
             </div>
           </Link>

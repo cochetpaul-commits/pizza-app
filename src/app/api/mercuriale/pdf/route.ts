@@ -4,6 +4,7 @@ import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { MercurialePdfDocument, type MercurialePdfData, type MercurialeRow } from "@/lib/mercurialePdf";
 import { offerRowToCpu } from "@/lib/offerPricing";
+import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 import fs from "fs";
 import path from "path";
 
@@ -36,6 +37,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    let etabId: string;
+    try {
+      ({ etabId } = await getEtablissement(req));
+    } catch (e) {
+      if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
+      throw e;
+    }
+
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
     const groupBy = (String(body.groupBy ?? "category")) as "category" | "supplier" | "alpha";
     const establishment = String(body.establishment ?? "all");
@@ -54,6 +63,7 @@ export async function POST(req: Request) {
       .from("ingredients")
       .select("id,name,category,is_active")
       .eq("is_active", true)
+      .eq("etablissement_id", etabId)
       .order("name", { ascending: true });
     if (ingErr) return NextResponse.json({ message: ingErr.message }, { status: 500 });
 
@@ -75,7 +85,7 @@ export async function POST(req: Request) {
     }
 
     // Fetch fournisseurs
-    const { data: sups } = await supabase.from("suppliers").select("id,name");
+    const { data: sups } = await supabase.from("suppliers").select("id,name").eq("etablissement_id", etabId);
     const supMap = new Map<string, string>();
     for (const s of (sups ?? []) as { id: string; name: string }[]) supMap.set(s.id, s.name);
 

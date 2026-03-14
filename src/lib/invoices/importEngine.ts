@@ -103,6 +103,7 @@ export async function runImport(options: {
   mode: string;
   defaultUnit?: "g" | "pc" | "kg" | "l";
   establishment?: "bellomio" | "piccola" | "both";
+  etabId?: string;
   filterLine?: (l: ParsedLine) => boolean;
 }): Promise<ImportResult> {
   const {
@@ -115,13 +116,16 @@ export async function runImport(options: {
     mode,
     defaultUnit = "g",
     establishment = "both",
+    etabId,
     filterLine,
   } = options;
 
   // 1. Upsert supplier
+  const supplierRow: Record<string, unknown> = { user_id: userId, name: supplierName, is_active: true };
+  if (etabId) supplierRow.etablissement_id = etabId;
   const { data: supRows, error: supErr } = await supabase
     .from("suppliers")
-    .upsert({ user_id: userId, name: supplierName, is_active: true }, { onConflict: "user_id,name" })
+    .upsert(supplierRow, { onConflict: "user_id,name" })
     .select("id")
     .limit(1);
 
@@ -154,9 +158,7 @@ export async function runImport(options: {
 
   // 3. Insert facture si nouvelle
   if (!invoiceId) {
-    const { data: invRows, error: invErr } = await supabase
-      .from("supplier_invoices")
-      .insert({
+    const invoiceRow: Record<string, unknown> = {
         user_id: userId,
         supplier_id: supplierId,
         supplier_name: supplierName,
@@ -168,7 +170,11 @@ export async function runImport(options: {
         source_file_name: sourceFileName,
         raw_text: rawText,
         parsed_json: payload,
-      })
+      };
+    if (etabId) invoiceRow.etablissement_id = etabId;
+    const { data: invRows, error: invErr } = await supabase
+      .from("supplier_invoices")
+      .insert(invoiceRow)
       .select("id")
       .limit(1);
 
@@ -213,11 +219,12 @@ export async function runImport(options: {
   }
 
   // 6. COMMIT : lookup ingrédients normalisé
-  const { data: catRows, error: catErr } = await supabase
+  let catQ = supabase
     .from("ingredients")
     .select("category")
-    .eq("user_id", userId)
-    .limit(1);
+    .eq("user_id", userId);
+  if (etabId) catQ = catQ.eq("etablissement_id", etabId);
+  const { data: catRows, error: catErr } = await catQ.limit(1);
 
   if (catErr) throw new Error(catErr.message);
   const fallbackCategory = (catRows?.[0]?.category as string | undefined) ?? "autre";
@@ -240,12 +247,14 @@ export async function runImport(options: {
 
     const skuToIngId = new Map<string, string>();
     if (skus.length) {
-      const { data: bySku, error: eSku } = await supabase
+      let skuQ = supabase
         .from("ingredients")
         .select("id,supplier_sku")
         .eq("user_id", userId)
         .eq("supplier_id", supplierId)
         .in("supplier_sku", skus);
+      if (etabId) skuQ = skuQ.eq("etablissement_id", etabId);
+      const { data: bySku, error: eSku } = await skuQ;
 
       if (eSku) throw new Error(eSku.message);
       for (const r of (bySku ?? []) as Array<{ id: string; supplier_sku: string | null }>) {
@@ -258,10 +267,12 @@ export async function runImport(options: {
     // Utilise import_name comme clé stable ; fallback sur name pour rétrocompatiblité.
     const nameToIngId = new Map<string, string>();
     const normalizedToIngId = new Map<string, string>();
-    const { data: allExisting, error: eAll } = await supabase
+    let allQ = supabase
       .from("ingredients")
       .select("id,name,import_name")
       .eq("user_id", userId);
+    if (etabId) allQ = allQ.eq("etablissement_id", etabId);
+    const { data: allExisting, error: eAll } = await allQ;
 
     if (eAll) throw new Error(eAll.message);
     for (const r of (allExisting ?? []) as Array<{ id: string; name: string; import_name: string | null }>) {
@@ -302,7 +313,7 @@ export async function runImport(options: {
 
       const allergens = detectAllergensFromName(nm);
 
-      toCreate.push({
+      const ingRow: Record<string, unknown> = {
         user_id: userId,
         name: nm,
         import_name: nm, // clé stable pour les futurs imports — ne jamais modifier auto
@@ -317,7 +328,9 @@ export async function runImport(options: {
         status: "to_check",
         status_note: statusNote,
         piece_volume_ml: pieceVolumeMl,
-      });
+      };
+      if (etabId) ingRow.etablissement_id = etabId;
+      toCreate.push(ingRow);
     }
 
     if (toCreate.length) {
@@ -337,12 +350,14 @@ export async function runImport(options: {
 
     // 8. Re-fetch maps après création
     if (skus.length) {
-      const { data: bySku2, error: eSku2 } = await supabase
+      let skuQ2 = supabase
         .from("ingredients")
         .select("id,supplier_sku")
         .eq("user_id", userId)
         .eq("supplier_id", supplierId)
         .in("supplier_sku", skus);
+      if (etabId) skuQ2 = skuQ2.eq("etablissement_id", etabId);
+      const { data: bySku2, error: eSku2 } = await skuQ2;
 
       if (eSku2) throw new Error(eSku2.message);
       for (const r of (bySku2 ?? []) as Array<{ id: string; supplier_sku: string | null }>) {
@@ -352,11 +367,13 @@ export async function runImport(options: {
     }
 
     if (names.length) {
-      const { data: byName2, error: eName2 } = await supabase
+      let nameQ2 = supabase
         .from("ingredients")
         .select("id,name,import_name")
         .eq("user_id", userId)
         .in("name", names);
+      if (etabId) nameQ2 = nameQ2.eq("etablissement_id", etabId);
+      const { data: byName2, error: eName2 } = await nameQ2;
 
       if (eName2) throw new Error(eName2.message);
       for (const r of (byName2 ?? []) as Array<{ id: string; name: string; import_name: string | null }>) {
@@ -382,7 +399,7 @@ export async function runImport(options: {
 
         if (!ingId || !u || !(p != null && Number.isFinite(p) && p > 0)) return null;
 
-        return {
+        const offerRow: Record<string, unknown> = {
           user_id: userId,
           ingredient_id: ingId,
           supplier_id: supplierId,
@@ -398,6 +415,8 @@ export async function runImport(options: {
           density_kg_per_l: null,
           establishment,
         };
+        if (etabId) offerRow.etablissement_id = etabId;
+        return offerRow;
       })
       .filter(Boolean) as Array<Record<string, unknown>>;
 

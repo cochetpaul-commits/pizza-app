@@ -103,12 +103,13 @@ export type IngredientRowProps = {
   onSetStatus: (id: string, next: IngredientStatus) => void;
   onEditChange: (next: EditState) => void;
   onEditImportName: (id: string, current: string) => void;
+  onCreateDerived?: (x: Ingredient) => void;
 };
 
 export const IngredientRow = React.memo(function IngredientRow({
   item: x, offer, supplierName, supplierIdForDisplay, alert, isEditing, compactMode, edit,
   suppliers, previewEditPack,
-  onStartEdit, onSaveEdit, onDelete, onSetStatus, onEditChange, onEditImportName,
+  onStartEdit, onSaveEdit, onDelete, onSetStatus, onEditChange, onEditImportName, onCreateDerived,
 }: IngredientRowProps) {
   const price = formatIngredientPrice(x, offer ?? null);
   const estab = offer?.establishment ?? "both";
@@ -141,6 +142,9 @@ export const IngredientRow = React.memo(function IngredientRow({
         <div style={{ flex: 3, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <span style={{ fontWeight: 600, fontSize: 13, color: CAT_COLORS[x.category] }}>{x.name}</span>
+            {x.is_derived && (
+              <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED", border: "1px solid rgba(124,58,237,0.20)" }}>DÉRIVÉ</span>
+            )}
             {alert && (
               <span style={{ fontSize: 10, fontWeight: 800, padding: "1px 5px", borderRadius: 6, color: alert.direction === "up" ? "#DC2626" : "#16A34A", background: alert.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)", border: `1px solid ${alert.direction === "up" ? "rgba(220,38,38,0.30)" : "rgba(22,163,74,0.30)"}` }}>
                 {alert.direction === "up" ? "↑" : "↓"} {(Math.abs(alert.change_pct) * 100).toFixed(0)}%
@@ -151,6 +155,7 @@ export const IngredientRow = React.memo(function IngredientRow({
             {supplierName || CAT_LABELS[x.category]}
             {x.source_prep_recipe_name ? ` · Pivot: ${x.source_prep_recipe_name}` : ""}
             {x.status_note ? ` · ${x.status_note}` : ""}
+            {x.is_derived && x.rendement ? ` · Rendement ${(x.rendement * 100).toFixed(1)}%` : ""}
           </div>
           {alg.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 3 }}>
@@ -193,7 +198,10 @@ export const IngredientRow = React.memo(function IngredientRow({
         </div>
 
         {/* Actions */}
-        <div style={{ width: 80, display: "flex", gap: 6, alignItems: "center", justifyContent: "flex-end" }}>
+        <div style={{ width: 110, display: "flex", gap: 5, alignItems: "center", justifyContent: "flex-end" }}>
+          {!x.is_derived && onCreateDerived && (
+            <button onClick={() => onCreateDerived(x)} title="Créer un dérivé" style={{ ...BTN_ACTION, background: "rgba(124,58,237,0.10)", color: "#7C3AED", fontSize: 12, fontWeight: 700 }}>⚗</button>
+          )}
           {!isEditing
             ? <button onClick={() => onStartEdit(x)} title="Modifier" style={{ ...BTN_ACTION, background: "#8B1A1A", color: "white", fontWeight: 700 }}>→</button>
             : <button onClick={onSaveEdit} style={{ ...BTN_ACTION, background: "#4a6741", color: "white", fontSize: 11, fontWeight: 700 }}>OK</button>}
@@ -220,10 +228,14 @@ export const IngredientRow = React.memo(function IngredientRow({
           <>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: 13, color: CAT_COLORS[x.category] }}>{x.name}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ fontWeight: 600, fontSize: 13, color: CAT_COLORS[x.category] }}>{x.name}</span>
+                  {x.is_derived && <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED" }}>DÉRIVÉ</span>}
+                </div>
                 <div style={{ fontSize: 10, color: "#999999", marginTop: 2 }}>
                   {supplierName || CAT_LABELS[x.category]}
                   {x.status_note ? ` · ${x.status_note}` : ""}
+                  {x.is_derived && x.rendement ? ` · ${(x.rendement * 100).toFixed(1)}%` : ""}
                 </div>
                 {alg.length > 0 && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 4 }}>
@@ -247,6 +259,9 @@ export const IngredientRow = React.memo(function IngredientRow({
               {!isEditing
                 ? <button onClick={() => onStartEdit(x)} style={{ flex: 1, height: 30, borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", color: "#8B1A1A", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Modifier</button>
                 : <button onClick={onSaveEdit} style={{ flex: 1, height: 30, borderRadius: 7, border: "none", background: "#4a6741", color: "white", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>OK</button>}
+              {!x.is_derived && onCreateDerived && (
+                <button onClick={() => onCreateDerived(x)} title="Créer un dérivé" style={{ width: 30, height: 30, borderRadius: 7, border: "1px solid rgba(124,58,237,0.25)", background: "rgba(124,58,237,0.08)", color: "#7C3AED", fontSize: 13, cursor: "pointer" }}>⚗</button>
+              )}
               <button onClick={() => onDelete(x.id, x.name)} style={{ width: 30, height: 30, borderRadius: 7, border: "none", background: "#ede6d9", color: "#aaa", fontSize: 14, cursor: "pointer" }}>✕</button>
             </div>
           </>
@@ -383,5 +398,6 @@ export const IngredientRow = React.memo(function IngredientRow({
   if (prev.isEditing && prev.edit !== next.edit) return false;
   if (prev.previewEditPack !== next.previewEditPack) return false;
   if (prev.supplierName !== next.supplierName) return false;
+  if (prev.onCreateDerived !== next.onCreateDerived) return false;
   return true;
 });

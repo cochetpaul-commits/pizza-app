@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
+import { useEtablissement } from "@/lib/EtablissementContext";
 import { CATEGORIES, CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingredients";
 import { offerRowToCpu } from "@/lib/offerPricing";
 
@@ -70,6 +71,7 @@ function StepInput({ value, onChange, step = 0.1, min = 0.1, decimals = 1 }: { v
 }
 
 export default function EpiceriePage() {
+  const { current: etab } = useEtablissement();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [offers, setOffers] = useState<Record<string, string>>({});
@@ -88,10 +90,17 @@ export default function EpiceriePage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
+      let ingQ = supabase.from("ingredients").select("id,name,category,cost_per_unit,piece_weight_g,piece_volume_ml,default_unit").eq("is_active", true);
+      let supQ = supabase.from("suppliers").select("id,name").eq("is_active", true);
+      const offQ = supabase.from("v_latest_offers").select("ingredient_id,supplier_id,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g");
+      if (etab) {
+        ingQ = ingQ.eq("etablissement_id", etab.id);
+        supQ = supQ.eq("etablissement_id", etab.id);
+      }
       const [{ data: ings }, { data: sups }, { data: offs }] = await Promise.all([
-        supabase.from("ingredients").select("id,name,category,cost_per_unit,piece_weight_g,piece_volume_ml,default_unit").eq("is_active", true).order("name"),
-        supabase.from("suppliers").select("id,name").eq("is_active", true).order("name"),
-        supabase.from("v_latest_offers").select("ingredient_id,supplier_id,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g"),
+        ingQ.order("name"),
+        supQ.order("name"),
+        offQ,
       ]);
       setIngredients((ings ?? []) as Ingredient[]);
       setSuppliers((sups ?? []) as Supplier[]);
@@ -111,7 +120,7 @@ export default function EpiceriePage() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [etab]);
 
   const filtered = useMemo(() => ingredients.filter(x => {
     if (filterCat !== "all" && x.category !== filterCat) return false;

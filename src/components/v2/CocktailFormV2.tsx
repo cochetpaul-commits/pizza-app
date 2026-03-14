@@ -8,12 +8,14 @@ import { NavBar } from "@/components/NavBar";
 import { TopNav } from "@/components/TopNav";
 import { AllergenBadges } from "@/components/AllergenBadges";
 import { parseAllergens, mergeAllergens } from "@/lib/allergens";
-import { offerRowToCpu } from "@/lib/offerPricing";
+import { offerRowToCpu, enrichCpuWithConversions } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
+import { fetchApi } from "@/lib/fetchApi";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
 import { useProfile } from "@/lib/ProfileContext";
+import { useEtablissement } from "@/lib/EtablissementContext";
 import { PricingBlock } from "./PricingBlock";
 import { StepperInput } from "@/components/StepperInput";
 import type { Ingredient } from "@/types/ingredients";
@@ -45,6 +47,7 @@ function truncate(s: string, n: number) { return s.length > n ? s.slice(0, n) + 
 export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
   const router = useRouter();
   const { canWrite: userCanWrite } = useProfile();
+  const { current: etab } = useEtablissement();
   const isEdit = !!cocktailId;
 
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
@@ -148,8 +151,10 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) { setStatus("error"); setError({ message: "NOT_LOGGED" }); return; }
 
+      let ingsQ = supabase.from("ingredients").select("*").eq("is_active", true);
+      if (etab) ingsQ = ingsQ.eq("etablissement_id", etab.id);
       const [{ data: ingsData, error: iErr }, { data: offers }] = await Promise.all([
-        supabase.from("ingredients").select("*").eq("is_active", true).order("name"),
+        ingsQ.order("name"),
         supabase.from("v_latest_offers").select("*"),
       ]);
       if (iErr) { setStatus("error"); setError(iErr); return; }
@@ -191,12 +196,14 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
           else if (pul === "ml") pm[i.id] = { ml: perUnit };
           else if (pul === "pc" || pul === "pcs") pm[i.id] = { pcs: perUnit };
           else pm[i.id] = { g: perUnit };
+          pm[i.id] = enrichCpuWithConversions({ density_kg_per_l: i.density_g_per_ml, piece_weight_g: i.piece_weight_g }, pm[i.id]);
           supplierByIng[i.id] = "maison";
           continue;
         }
         const cpu = i.cost_per_unit;
         if (cpu != null && cpu > 0) {
           pm[i.id] = { g: cpu };
+          pm[i.id] = enrichCpuWithConversions({ density_kg_per_l: i.density_g_per_ml, piece_weight_g: i.piece_weight_g }, pm[i.id]);
           supplierByIng[i.id] = "maison";
         }
       }
@@ -211,10 +218,10 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
           if (nk) ingNameToId[nk] = i.id;
         }
         if (missingIds.size > 0) {
-          const [{ data: krAll }, { data: prAll }] = await Promise.all([
-            supabase.from("kitchen_recipes").select("name,output_ingredient_id,total_cost,yield_grams,cost_per_kg"),
-            supabase.from("prep_recipes").select("name,output_ingredient_id,total_cost,yield_grams"),
-          ]);
+          let krQ = supabase.from("kitchen_recipes").select("name,output_ingredient_id,total_cost,yield_grams,cost_per_kg");
+          let prQ = supabase.from("prep_recipes").select("name,output_ingredient_id,total_cost,yield_grams");
+          if (etab) { krQ = krQ.eq("etablissement_id", etab.id); prQ = prQ.eq("etablissement_id", etab.id); }
+          const [{ data: krAll }, { data: prAll }] = await Promise.all([krQ, prQ]);
           for (const kr of (krAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; total_cost: number | null; yield_grams: number | null; cost_per_kg: number | null }>) {
             let cpuG = 0;
             if (kr.cost_per_kg && kr.cost_per_kg > 0) cpuG = kr.cost_per_kg / 1000;
@@ -290,7 +297,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
       setStatus("ok");
     }
     load();
-  }, [cocktailId]);
+  }, [cocktailId, etab]);
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -389,7 +396,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
       if (!token) { alert("Non authentifié"); return; }
-      const res = await fetch("/api/cocktails/pdf", {
+      const res = await fetchApi("/api/cocktails/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ cocktailId }),

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   calculerBilanSemaine,
-  calculerBilanMensuel,
+  // calculerBilanMensuel,
   genererExportSilae,
   exportSilaeToCSV,
   timeToMinutes,

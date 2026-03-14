@@ -2,6 +2,7 @@ export type Role = "admin" | "direction" | "cuisine";
 
 /** Routes and which roles can access them (prefix match) */
 export const ROUTE_ACCESS: Record<string, Role[]> = {
+  "/groupe":       ["admin"],
   "/admin":        ["admin"],
   "/invoices":     ["admin", "direction"],
   "/fournisseurs": ["admin", "direction"],

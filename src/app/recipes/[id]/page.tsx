@@ -8,6 +8,7 @@ import { calculerPate } from "@/lib/pateEngine";
 import { TopNav } from "@/components/TopNav";
 import { NavBar } from "@/components/NavBar";
 import NumberStepper from "@/components/NumberStepper";
+import { fetchApi } from "@/lib/fetchApi";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 
 function isUuid(v: string) {
@@ -574,7 +575,7 @@ export default function RecipePage() {
       const token = sessionData.session?.access_token;
       if (!token) throw new Error("Session invalide (token manquant)");
 
-      const res = await fetch("/api/recipes/pdf", {
+      const res = await fetchApi("/api/recipes/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ recipeId: id, nbPatons, poidsPaton }),

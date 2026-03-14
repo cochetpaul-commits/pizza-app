@@ -5,6 +5,7 @@ import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchPriceAlerts, PriceAlert, ALERT_THRESHOLD } from "@/lib/priceAlerts";
+import { useEtablissement } from "@/lib/EtablissementContext";
 import Link from "next/link";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -119,6 +120,7 @@ function AlertCard({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function VariationsPrixPage() {
+  const { current: etab } = useEtablissement();
   const [tab, setTab] = useState<"variations" | "alertes">("variations");
 
   // Shared loading
@@ -150,9 +152,10 @@ export default function VariationsPrixPage() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Non connecté");
+        const eid = etab?.id;
         const [var12m, alerts] = await Promise.all([
-          fetchPriceAlerts(supabase, user.id, 0.01, sinceDate(365)),
-          fetchPriceAlerts(supabase, user.id, ALERT_THRESHOLD),
+          fetchPriceAlerts(supabase, user.id, 0.01, sinceDate(365), eid),
+          fetchPriceAlerts(supabase, user.id, ALERT_THRESHOLD, undefined, eid),
         ]);
         setAllAlerts(var12m);
         setAlertsData(alerts);
@@ -163,7 +166,7 @@ export default function VariationsPrixPage() {
       }
     };
     run();
-  }, []);
+  }, [etab]);
 
   // ── Snooze handlers ──
   function snooze(a: PriceAlert) {

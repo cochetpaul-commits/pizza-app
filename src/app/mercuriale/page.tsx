@@ -4,10 +4,13 @@ import { useState, useEffect } from "react";
 import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
+import { fetchApi } from "@/lib/fetchApi";
+import { useEtablissement } from "@/lib/EtablissementContext";
 
 type Supplier = { id: string; name: string };
 
 export default function MercurialePage() {
+  const { current: etab } = useEtablissement();
   const [groupBy, setGroupBy] = useState<"category" | "supplier" | "alpha">("category");
   const [establishment, setEstablishment] = useState<"all" | "bellomio" | "piccola">("all");
   const [filterSupplier, setFilterSupplier] = useState<string>("all");
@@ -16,10 +19,12 @@ export default function MercurialePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.from("suppliers").select("id,name").eq("is_active", true).order("name").then(({ data }) => {
+    const q = supabase.from("suppliers").select("id,name").eq("is_active", true).order("name");
+    if (etab) q.eq("etablissement_id", etab.id);
+    q.then(({ data }) => {
       setSuppliers((data ?? []) as Supplier[]);
     });
-  }, []);
+  }, [etab]);
 
   async function getToken(): Promise<string> {
     const { data } = await supabase.auth.getSession();
@@ -31,7 +36,7 @@ export default function MercurialePage() {
     setError(null);
     try {
       const token = await getToken();
-      const res = await fetch("/api/mercuriale/pdf", {
+      const res = await fetchApi("/api/mercuriale/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: token },
         body: JSON.stringify({ groupBy, establishment, filterSupplier }),

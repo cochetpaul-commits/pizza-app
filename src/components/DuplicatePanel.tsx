@@ -5,6 +5,7 @@ import type { DuplicatePair } from "@/lib/duplicateDetection";
 import type { LatestOffer, Supplier } from "@/types/ingredients";
 import { fmtOfferPriceLine } from "@/lib/offers";
 import { supabase } from "@/lib/supabaseClient";
+import { fetchApi } from "@/lib/fetchApi";
 
 interface Props {
   pairs: DuplicatePair[];
@@ -53,7 +54,7 @@ export default function DuplicatePanel({ pairs, offersByIngredientId, suppliers,
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token ?? "";
 
-      const res = await fetch("/api/ingredients/merge", {
+      const res = await fetchApi("/api/ingredients/merge", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ keepId, deleteId }),

@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { NavBar } from "@/components/NavBar";
+import { fetchApi } from "@/lib/fetchApi";
 
 type InvoiceLine = {
   sku?: string | null;
@@ -72,7 +73,7 @@ export default function VinofloInvoicePage() {
       form.append("mode", "preview");
 
       const auth = await getAuthHeader();
-      const res = await fetch("/api/invoices/vinoflo", {
+      const res = await fetchApi("/api/invoices/vinoflo", {
         method: "POST",
         headers: auth ? { Authorization: auth } : {},
         body: form,
@@ -101,7 +102,7 @@ export default function VinofloInvoicePage() {
       form.append("establishment", establishment);
 
       const auth = await getAuthHeader();
-      const res = await fetch("/api/invoices/vinoflo", {
+      const res = await fetchApi("/api/invoices/vinoflo", {
         method: "POST",
         headers: auth ? { Authorization: auth } : {},
         body: form,

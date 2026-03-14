@@ -9,6 +9,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { useDebounce } from "@/lib/useDebounce";
 import { useIngredientsData } from "@/lib/useIngredientsData";
+import { useEtablissement } from "@/lib/EtablissementContext";
 
 import {
   CATEGORIES,
@@ -37,6 +38,7 @@ import { PriceAlertsPanel } from "@/components/PriceAlertsPanel";
 import { parseAllergens } from "@/lib/allergens";
 import { CategoryHeader, IngredientRow, type EditState } from "@/components/IngredientRow";
 import { useProfile } from "@/lib/ProfileContext";
+import { updateDerivedIngredients, computeDerivedPrice, computeRendement } from "@/lib/rendement";
 import DuplicatePanel from "@/components/DuplicatePanel";
 import { detectDuplicates, type DuplicatePair } from "@/lib/duplicateDetection";
 
@@ -77,10 +79,11 @@ function SkeletonTable() {
 function IngredientsPageInner() {
   const router = useRouter();
   const { canWrite: userCanWrite } = useProfile();
+  const { current: etab } = useEtablissement();
 
   const [q, setQ] = useState("");
   const debouncedQ = useDebounce(q, 300);
-  const { items, suppliers, offers, alertMap, loading, loadingMore, hasMore, loadMore, error: dataError, mutate } = useIngredientsData(debouncedQ);
+  const { items, suppliers, offers, alertMap, loading, loadingMore, hasMore, loadMore, error: dataError, mutate } = useIngredientsData(debouncedQ, etab?.id);
 
   const [session, setSession] = useState<Session | null>(null);
 
@@ -191,6 +194,12 @@ function IngredientsPageInner() {
   const [showFilters, setShowFilters] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showDuplicates, setShowDuplicates] = useState(false);
+  const [showRendementCalc, setShowRendementCalc] = useState(false);
+  const [rcIngredientId, setRcIngredientId] = useState<string>("");
+  const [rcPoidsBrut, setRcPoidsBrut] = useState<number | "">(1000);
+  const [rcPoidsNet, setRcPoidsNet] = useState<number | "">(625);
+  const [rcDeriveName, setRcDeriveName] = useState("");
+  const [rcSaving, setRcSaving] = useState(false);
   const [ignoreKeys, setIgnoreKeys] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem("ingredient-duplicate-ignores") ?? "[]")); }
     catch { return new Set(); }
@@ -244,6 +253,14 @@ function IngredientsPageInner() {
     if (r.error) { alert(r.error.message); return; }
     await mutate();
   }, [items, offersByIngredientId, userId, mutate]);
+
+  const openDeriveModal = useCallback((x: Ingredient) => {
+    setRcIngredientId(x.id);
+    setRcDeriveName("");
+    setRcPoidsBrut(1000);
+    setRcPoidsNet(625);
+    setShowRendementCalc(true);
+  }, []);
 
   const [newName, setNewName] = useState("");
   const [newCategory, setNewCategory] = useState<Category>("preparation");
@@ -517,6 +534,14 @@ function IngredientsPageInner() {
         off = await supabase.from("supplier_offers").insert(offerPayload);
       }
       if (off.error) { alert(off.error.message); return; }
+
+      // Mettre à jour les ingrédients dérivés si le prix unitaire a changé
+      if (edit.priceKind === "unit" && edit.unitPrice) {
+        const newPrice = parseNum(edit.unitPrice);
+        if (newPrice) {
+          await updateDerivedIngredients(supabase, editingId, newPrice);
+        }
+      }
     }
     setEditingId(null); setEdit(null);
     if (backUrl) { router.push(backUrl); return; }
@@ -894,6 +919,7 @@ function IngredientsPageInner() {
                             onSetStatus={userCanWrite ? setIngredientStatus : () => {}}
                             onEditChange={onEditChange}
                             onEditImportName={onEditImportName}
+                            onCreateDerived={userCanWrite ? openDeriveModal : undefined}
                           />
                         </div>
                       );
@@ -945,6 +971,138 @@ function IngredientsPageInner() {
           }}
         />
       )}
+
+      {/* ══════════════════════════════════════════════
+          RENDEMENT CALCULATOR MODAL
+      ══════════════════════════════════════════════ */}
+      {showRendementCalc && (() => {
+        const selectedIng = items.find(x => x.id === rcIngredientId);
+        const parentOffer = selectedIng ? offersByIngredientId.get(selectedIng.id) : undefined;
+        const parentPrice = parentOffer?.unit_price
+          ?? (selectedIng?.purchase_price && selectedIng?.purchase_unit
+            ? selectedIng.purchase_price / selectedIng.purchase_unit : null)
+          ?? selectedIng?.cost_per_unit
+          ?? null;
+        const rendement = (Number(rcPoidsBrut) > 0 && Number(rcPoidsNet) > 0)
+          ? computeRendement(Number(rcPoidsBrut), Number(rcPoidsNet)) : null;
+        const derivedPrice = (parentPrice && rendement) ? computeDerivedPrice(parentPrice, rendement) : null;
+
+        return (
+          <>
+            <div style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(0,0,0,0.45)" }} onClick={() => setShowRendementCalc(false)} />
+            <div style={{
+              position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+              zIndex: 71, background: "#faf7f2", borderRadius: 16, padding: 24, width: "min(420px, 92vw)",
+              boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <span style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a" }}>Créer un dérivé</span>
+                <button onClick={() => setShowRendementCalc(false)} style={{ height: 30, padding: "0 10px", borderRadius: 8, border: "1px solid #e5ddd0", background: "white", cursor: "pointer", fontSize: 13 }}>✕</button>
+              </div>
+
+              {/* Ingredient parent */}
+              <div style={{ marginBottom: 14, padding: "10px 12px", background: "white", borderRadius: 10, border: "1px solid #e5ddd0" }}>
+                <div style={{ fontSize: 11, color: "#999", marginBottom: 2 }}>Ingrédient parent</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>{selectedIng?.name ?? "—"}</div>
+              </div>
+
+              {/* Weights */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: "#999", marginBottom: 4 }}>Poids brut (g)</div>
+                  <input type="number" value={rcPoidsBrut} onChange={e => setRcPoidsBrut(e.target.value === "" ? "" : Number(e.target.value))}
+                    style={{ width: "100%", height: 40, borderRadius: 8, border: "1px solid #e5ddd0", padding: "0 10px", fontSize: 14, background: "white", boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: "#999", marginBottom: 4 }}>Poids net (g)</div>
+                  <input type="number" value={rcPoidsNet} onChange={e => setRcPoidsNet(e.target.value === "" ? "" : Number(e.target.value))}
+                    style={{ width: "100%", height: 40, borderRadius: 8, border: "1px solid #e5ddd0", padding: "0 10px", fontSize: 14, background: "white", boxSizing: "border-box" }} />
+                </div>
+              </div>
+
+              {/* Result */}
+              <div style={{ background: "white", borderRadius: 10, padding: 14, border: "1px solid #e5ddd0", marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, color: "#666" }}>Rendement</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: rendement ? "#7C3AED" : "#ccc" }}>
+                    {rendement ? `${(rendement * 100).toFixed(1)} %` : "—"}
+                  </span>
+                </div>
+                {parentPrice != null && (
+                  <>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ fontSize: 12, color: "#999" }}>Prix parent</span>
+                      <span style={{ fontSize: 13 }}>{parentPrice.toFixed(2)} EUR/unité</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 12, color: "#999" }}>Prix dérivé</span>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: derivedPrice ? "#16A34A" : "#ccc" }}>
+                        {derivedPrice ? `${derivedPrice.toFixed(2)} EUR/unité` : "—"}
+                      </span>
+                    </div>
+                  </>
+                )}
+                {parentPrice == null && (
+                  <div style={{ fontSize: 12, color: "#D97706", marginTop: 4 }}>Aucun prix trouvé pour cet ingrédient.</div>
+                )}
+              </div>
+
+              {/* Derive name + actions */}
+              {userCanWrite && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, color: "#999", marginBottom: 4 }}>Nom du dérivé (pour créer)</div>
+                  <input type="text" value={rcDeriveName} onChange={e => setRcDeriveName(e.target.value)}
+                    placeholder={selectedIng ? `${selectedIng.name} (paré)` : ""}
+                    style={{ width: "100%", height: 40, borderRadius: 8, border: "1px solid #e5ddd0", padding: "0 10px", fontSize: 14, background: "white", boxSizing: "border-box" }} />
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setShowRendementCalc(false)} style={{
+                  flex: 1, height: 42, borderRadius: 10, border: "1px solid #e5ddd0",
+                  background: "white", fontSize: 14, fontWeight: 600, cursor: "pointer",
+                }}>Fermer</button>
+                {userCanWrite && rendement && (
+                  <button
+                    disabled={rcSaving || !rendement}
+                    onClick={async () => {
+                      if (!selectedIng || !rendement) return;
+                      setRcSaving(true);
+                      try {
+                        const name = rcDeriveName.trim() || `${selectedIng.name} (paré)`;
+                        const { error } = await supabase.from("ingredients").insert({
+                          name,
+                          category: selectedIng.category,
+                          is_active: true,
+                          default_unit: selectedIng.default_unit,
+                          parent_ingredient_id: selectedIng.id,
+                          rendement,
+                          is_derived: true,
+                          purchase_price: derivedPrice,
+                          purchase_unit: 1,
+                          purchase_unit_label: "kg",
+                          allergens: selectedIng.allergens ?? null,
+                          supplier_id: selectedIng.supplier_id ?? null,
+                        });
+                        if (error) { alert(error.message); return; }
+                        setShowRendementCalc(false);
+                        mutate();
+                      } finally { setRcSaving(false); }
+                    }}
+                    style={{
+                      flex: 1, height: 42, borderRadius: 10, border: "none",
+                      background: "#7C3AED", color: "white", fontSize: 14, fontWeight: 700, cursor: "pointer",
+                      opacity: rcSaving ? 0.6 : 1,
+                    }}
+                  >
+                    {rcSaving ? "Création..." : "Créer dérivé"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {showFilters && (
         <>

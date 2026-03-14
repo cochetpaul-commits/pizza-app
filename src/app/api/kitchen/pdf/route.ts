@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 import { POLE_COLORS } from "@/lib/poleColors";
 import { parseAllergens, mergeAllergens } from "@/lib/allergens";
+import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -81,6 +82,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    let etabId: string;
+    try {
+      ({ etabId } = await getEtablissement(req));
+    } catch (e) {
+      if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
+      throw e;
+    }
+
     const body = (await req.json().catch(() => null)) as unknown;
     const b = (body && typeof body === "object") ? (body as Record<string, unknown>) : {};
     const kitchenId = String(b.kitchenId ?? b.recipeId ?? b.id ?? "").trim();
@@ -97,6 +106,7 @@ export async function POST(req: Request) {
       .from("kitchen_recipes")
       .select("id,name,category,yield_grams,portions_count,notes,procedure,photo_url")
       .eq("id", kitchenId)
+      .eq("etablissement_id", etabId)
       .maybeSingle();
 
     if (rErr) return NextResponse.json({ message: rErr.message, details: rErr.details ?? null }, { status: 500 });

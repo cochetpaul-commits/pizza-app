@@ -8,6 +8,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import PizzaIngredientList from "@/components/PizzaIngredientList";
+import { fetchApi } from "@/lib/fetchApi";
 import type { Ingredient, PizzaIngredientRow, UnitType } from "@/lib/types";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { TopNav } from "@/components/TopNav";
@@ -645,7 +646,7 @@ setPriceLabelByIngredient(priceLabelMap);
       const token = session.session?.access_token;
       if (!token) throw new Error("Token manquant (session)");
 
-      const res = await fetch("/api/pizzas/pdf", {
+      const res = await fetchApi("/api/pizzas/pdf", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
