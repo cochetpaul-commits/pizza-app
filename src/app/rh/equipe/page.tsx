@@ -296,6 +296,7 @@ export default function EquipePage() {
         }
         menuItems={canWrite ? [
           { label: "Rapports", onClick: () => router.push("/rh/rapports") },
+          { label: "Masse salariale", onClick: () => router.push("/rh/masse-salariale") },
           { label: "Parametres", onClick: () => router.push("/settings/planning") },
         ] : undefined}
       />
