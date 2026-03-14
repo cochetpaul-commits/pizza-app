@@ -231,7 +231,7 @@ export default function PlanningPage() {
       map.set(emp.id, calculerBilanSemaine(empShifts, ci, emp.id));
     }
     return map;
-  }, [filteredEmployes, shifts]);
+  }, [filteredEmployes, shifts, etab]);
 
   /* ── Week navigation ── */
   const goWeek = (delta: number) => setWeekStart((w) => addDays(w, delta * 7));
