@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { NavBar } from "@/components/NavBar";
 import { TopNav } from "@/components/TopNav";
 import { useProfile } from "@/lib/ProfileContext";
 import { supabase } from "@/lib/supabaseClient";
+import { AddCollaborateurModal } from "@/components/rh/AddCollaborateurModal";
 
 type Employe = {
   id: string;
@@ -46,6 +46,21 @@ export default function EquipePage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterEquipe>("Tous");
   const [search, setSearch] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [etablissementId, setEtablissementId] = useState<string | null>(null);
+  const [fetchKey, setFetchKey] = useState(0);
+
+  // Fetch etablissement id (Bello Mio par défaut)
+  useEffect(() => {
+    supabase
+      .from("etablissements")
+      .select("id")
+      .eq("slug", "bellomio")
+      .single()
+      .then(({ data }) => {
+        if (data) setEtablissementId(data.id);
+      });
+  }, []);
 
   useEffect(() => {
     async function fetchEmployes() {
@@ -62,7 +77,7 @@ export default function EquipePage() {
       setLoading(false);
     }
     fetchEmployes();
-  }, []);
+  }, [fetchKey]);
 
   const filtered = employes.filter((e) => {
     if (filter !== "Tous" && !e.equipe_access?.includes(filter)) return false;
@@ -142,6 +157,7 @@ export default function EquipePage() {
           <div style={{ marginBottom: 16 }}>
             <button
               type="button"
+              onClick={() => setShowAdd(true)}
               style={{
                 width: "100%",
                 padding: "12px 16px",
@@ -158,6 +174,15 @@ export default function EquipePage() {
               + Ajouter un collaborateur
             </button>
           </div>
+        )}
+
+        {/* Modal ajout */}
+        {showAdd && (
+          <AddCollaborateurModal
+            onClose={() => setShowAdd(false)}
+            onCreated={() => { setFetchKey(k => k + 1); }}
+            etablissementId={etablissementId}
+          />
         )}
 
         {/* Liste */}
