@@ -6,6 +6,7 @@ import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
+import { fetchApi } from "@/lib/fetchApi";
 import {
   calculerBilanMensuel,
   genererExportSilae,
@@ -89,6 +90,8 @@ export default function RapportsPage() {
   const [empBilans, setEmpBilans] = useState<EmpBilan[]>([]);
   const [allAlertes, setAllAlertes] = useState<Alerte[]>([]);
   const [absencesByEmp, setAbsencesByEmp] = useState<Map<string, Absence[]>>(new Map());
+  const [prevRcByEmp, setPrevRcByEmp] = useState<Map<string, number>>(new Map());
+  const [saving, setSaving] = useState(false);
   const [expandedEmp, setExpandedEmp] = useState<string | null>(null);
 
   const dateDebut = firstOfMonth(year, month);
@@ -102,7 +105,12 @@ export default function RapportsPage() {
     (async () => {
       setLoading(true);
 
-      const [empRes, shiftsRes, absRes] = await Promise.all([
+      // Previous period for RC solde
+      const prevMonth = month === 0 ? 11 : month - 1;
+      const prevYear = month === 0 ? year - 1 : year;
+      const prevPeriode = `${prevYear}-${String(prevMonth + 1).padStart(2, "0")}`;
+
+      const [empRes, shiftsRes, absRes, compteursRes] = await Promise.all([
         supabase
           .from("employes")
           .select("id, prenom, nom, initiales, matricule, actif, contrats(type, heures_semaine, date_debut, date_fin, actif)")
@@ -121,6 +129,11 @@ export default function RapportsPage() {
           .eq("etablissement_id", etab.id)
           .gte("date_debut", dateDebut)
           .lte("date_fin", dateFin),
+        supabase
+          .from("compteurs_employe")
+          .select("employe_id, solde_rc")
+          .eq("etablissement_id", etab.id)
+          .eq("periode", prevPeriode),
       ]);
 
       if (cancelled) return;
@@ -145,6 +158,13 @@ export default function RapportsPage() {
         absByEmp.set(a.employe_id, arr);
       }
       setAbsencesByEmp(absByEmp);
+
+      // Map previous RC soldes
+      const rcMap = new Map<string, number>();
+      for (const c of (compteursRes.data ?? []) as { employe_id: string; solde_rc: number }[]) {
+        rcMap.set(c.employe_id, c.solde_rc ?? 0);
+      }
+      setPrevRcByEmp(rcMap);
 
       // Calculate bilans
       const bilans: EmpBilan[] = [];
@@ -174,7 +194,7 @@ export default function RapportsPage() {
     })();
 
     return () => { cancelled = true; };
-  }, [etab, dateDebut, dateFin]);
+  }, [etab, dateDebut, dateFin, month, year]);
 
   /* ── Totals ── */
   const totals = useMemo(() => {
@@ -212,8 +232,9 @@ export default function RapportsPage() {
       // Heures mensuelles de référence
       const heuresMensuellesRef = Math.round(contrat.heures_semaine * 52 / 12 * 100) / 100;
 
-      // Solde RC = cumul rc_acquis sur le mois (pas de tracking inter-mois pour l'instant)
-      const soldeRC = bilan.rc_acquis;
+      // Solde RC = solde mois précédent + rc_acquis du mois courant
+      const prevSolde = prevRcByEmp.get(emp.id) ?? 0;
+      const soldeRC = Math.round((prevSolde + bilan.rc_acquis) * 100) / 100;
 
       return genererExportSilae(bilan, mat, contrat.type, dateDebut, dateFin, abs, soldeRC, {
         dateEntree,
@@ -235,6 +256,45 @@ export default function RapportsPage() {
     downloadCSV([header, ...lines].join("\n"), `recap-heures-${year}-${String(month + 1).padStart(2, "0")}.csv`);
   };
 
+  /* ── Save compteurs ── */
+  const handleSaveCompteurs = async () => {
+    if (!empBilans.length) return;
+    setSaving(true);
+    const periode = `${year}-${String(month + 1).padStart(2, "0")}`;
+
+    const compteurs = empBilans.map(({ emp, bilan, contrat }) => ({
+      employe_id: emp.id,
+      periode,
+      heures_contractuelles: contrat.heures_semaine * 52 / 12,
+      heures_travaillees: bilan.heures_travaillees,
+      heures_normales: bilan.heures_normales,
+      heures_comp_10: bilan.heures_comp_10,
+      heures_comp_25: bilan.heures_comp_25,
+      heures_supp_10: bilan.heures_supp_10,
+      heures_supp_20: bilan.heures_supp_20,
+      heures_supp_25: bilan.heures_supp_25,
+      heures_supp_50: bilan.heures_supp_50,
+      jours_travailles: bilan.jours_travailles,
+      nb_repas: bilan.nb_repas,
+      rc_acquis: bilan.rc_acquis,
+    }));
+
+    try {
+      const res = await fetchApi("/api/rh/compteurs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ compteurs }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(`Erreur: ${err.error ?? "inconnue"}`);
+      }
+    } catch {
+      alert("Erreur réseau");
+    }
+    setSaving(false);
+  };
+
   /* ── Month navigation ── */
   const goMonth = (delta: number) => {
     let m = month + delta;
@@ -251,6 +311,7 @@ export default function RapportsPage() {
         backHref="/rh/equipe"
         backLabel="Equipe"
         menuItems={canWrite ? [
+          { label: saving ? "Enregistrement..." : "Valider compteurs", onClick: handleSaveCompteurs },
           { label: "Export SILAE", onClick: handleExportSilae },
           { label: "Export recap CSV", onClick: handleExportRecap },
         ] : undefined}
@@ -344,7 +405,14 @@ export default function RapportsPage() {
                         {bilan.heures_supp_50 > 0 && <DetailItem label="HS 50%" value={`${bilan.heures_supp_50.toFixed(1)}h`} color="#DC2626" />}
                         {bilan.heures_comp_10 > 0 && <DetailItem label="HC 10%" value={`${bilan.heures_comp_10.toFixed(1)}h`} color="#2563eb" />}
                         {bilan.heures_comp_25 > 0 && <DetailItem label="HC 25%" value={`${bilan.heures_comp_25.toFixed(1)}h`} color="#2563eb" />}
-                        {bilan.rc_acquis > 0 && <DetailItem label="RC acquis" value={`${bilan.rc_acquis.toFixed(1)}h`} color="#4a6741" />}
+                        {bilan.rc_acquis > 0 && <DetailItem label="RC acquis" value={`${bilan.rc_acquis.toFixed(2)}h`} color="#4a6741" />}
+                        {(bilan.rc_acquis > 0 || (prevRcByEmp.get(emp.id) ?? 0) > 0) && (
+                          <DetailItem
+                            label="Solde RC"
+                            value={`${((prevRcByEmp.get(emp.id) ?? 0) + bilan.rc_acquis).toFixed(2)}h`}
+                            color="#4a6741"
+                          />
+                        )}
                       </div>
 
                       {/* Week-by-week breakdown */}
