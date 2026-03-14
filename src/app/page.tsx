@@ -438,6 +438,39 @@ export default function Home() {
           </Link>
           )}
 
+          {/* ── Separator RH & PLANNING ── */}
+          {role && role !== "cuisine" && <SectionSeparator label="RH & PLANNING" />}
+
+          {/* ─── PLANNING ─── */}
+          {role && role !== "cuisine" && (
+          <Link href="/plannings" style={{ textDecoration: "none", color: "inherit" }}>
+            <div className="dash-card" style={{ "--accent": "#D4775A" } as React.CSSProperties}>
+              <div style={row}>
+                <div>
+                  <p style={titleOf("#D4775A")}>PLANNING</p>
+                  <p style={sub}>Shifts · Heures · Alertes légales</p>
+                </div>
+                <span className="dash-pill">Ouvrir →</span>
+              </div>
+            </div>
+          </Link>
+          )}
+
+          {/* ─── ÉQUIPE ─── */}
+          {role && role !== "cuisine" && (
+          <Link href="/rh/equipe" style={{ textDecoration: "none", color: "inherit" }}>
+            <div className="dash-card" style={{ "--accent": "#D4775A" } as React.CSSProperties}>
+              <div style={row}>
+                <div>
+                  <p style={titleOf("#D4775A")}>ÉQUIPE</p>
+                  <p style={sub}>Collaborateurs · Contrats · DPAE</p>
+                </div>
+                <span className="dash-pill">Ouvrir →</span>
+              </div>
+            </div>
+          </Link>
+          )}
+
           {/* ─── ADMIN ─── */}
           {isAdmin && (
           <Link href="/admin/utilisateurs" style={{ textDecoration: "none", color: "inherit" }}>
