@@ -10,6 +10,8 @@ import {
   formatDateFR,
   formatValeur,
   getISOWeekKey,
+  joursOuvres,
+  calculerEntreeSortie,
   type ShiftInput,
   type ContratInput,
 } from '../useConventionLegale';
@@ -64,14 +66,17 @@ describe('formatDateFR', () => {
 });
 
 describe('formatValeur', () => {
-  it('entier sans décimales', () => {
-    expect(formatValeur(36)).toBe('36');
+  it('entier avec 1 décimale (format SILAE)', () => {
+    expect(formatValeur(36)).toBe('36.0');
   });
   it('décimal avec 2 chiffres', () => {
     expect(formatValeur(9.42)).toBe('9.42');
   });
-  it('supprime les zéros trailing', () => {
+  it('supprime un seul zéro trailing', () => {
     expect(formatValeur(177.80)).toBe('177.8');
+  });
+  it('zéro → 0.0', () => {
+    expect(formatValeur(0)).toBe('0.0');
   });
 });
 
@@ -115,10 +120,11 @@ describe('calculerBilanSemaine HCR', () => {
 
     // Total = 7 + 7.25 + 7.25 + 7.33 + 7 + 8 = 43.83h
     expect(bilan.heures_travaillees).toBeCloseTo(43.83, 1);
-    // Heures normales = 35h
-    expect(bilan.heures_normales).toBe(35);
-    // Sup 25% = 43 - 35 = 8h
-    expect(bilan.heures_supp_25).toBe(8);
+    // Heures normales = 43h (contract-aware: normal up to contract hours)
+    expect(bilan.heures_normales).toBe(43);
+    // Pas de HS10/HS20 pour contrat 43h
+    expect(bilan.heures_supp_10).toBe(0);
+    expect(bilan.heures_supp_20).toBe(0);
     // Sup 50% = 43.83 - 43 = 0.83h
     expect(bilan.heures_supp_50).toBeCloseTo(0.83, 1);
     // Delta = 43.83 - 43 = +0.83
@@ -147,8 +153,9 @@ describe('calculerBilanSemaine HCR', () => {
     expect(bilan.heures_travaillees).toBe(37.5);
     // Delta = 37.5 - 39 = -1.5
     expect(bilan.delta_contrat).toBe(-1.5);
-    // Sup 25% = 37.5 - 35 = 2.5h
-    expect(bilan.heures_supp_25).toBe(2.5);
+    // Pas d'heures sup : en-dessous du contrat 39h
+    expect(bilan.heures_supp_10).toBe(0);
+    expect(bilan.heures_supp_20).toBe(0);
     expect(bilan.heures_supp_50).toBe(0);
     expect(bilan.nb_repas).toBe(5);
   });
@@ -249,7 +256,84 @@ describe('calculerBilanSemaine HCR', () => {
     expect(bilan.heures_comp_10).toBeCloseTo(2.4, 1);
     // Le reste = 3 - 2.4 = 0.6 → heures_comp_25
     expect(bilan.heures_comp_25).toBeCloseTo(0.6, 1);
-    expect(bilan.heures_supp_25).toBe(0);
+    expect(bilan.heures_supp_10).toBe(0);
+    expect(bilan.heures_supp_50).toBe(0);
+  });
+
+  // --- Test : contrat 39h, 42h travaillées → HS20 uniquement ---
+  it('contrat 39h, 42h → HS20 = 3h', () => {
+    const shifts: ShiftInput[] = [];
+    // 6 jours * 7h = 42h
+    for (let i = 9; i <= 14; i++) {
+      shifts.push({
+        date: `2026-03-${i.toString().padStart(2, '0')}`,
+        heure_debut: '09:00',
+        heure_fin: '16:30',
+        pause_minutes: 30,
+      });
+    }
+
+    const bilan = calculerBilanSemaine(shifts, contrat39h, 'test-39h-ot');
+
+    expect(bilan.heures_travaillees).toBe(42);
+    expect(bilan.heures_normales).toBe(39);
+    // Pas de HS10 pour contrat 39h (seuil déjà à 39h)
+    expect(bilan.heures_supp_10).toBe(0);
+    // HS20 = 42 - 39 = 3h
+    expect(bilan.heures_supp_20).toBe(3);
+    expect(bilan.heures_supp_50).toBe(0);
+  });
+
+  // --- Test : contrat 35h, 41h travaillées → HS10 + HS20 ---
+  it('contrat 35h, 41h → HS10 = 4h, HS20 = 2h', () => {
+    const contrat35h: ContratInput = { type: 'CDI', heures_semaine: 35, convention: 'HCR_1979' };
+    const shifts: ShiftInput[] = [];
+    // ~41h : 5 jours * 7h + 1 jour * 6h = 41h
+    for (let i = 9; i <= 13; i++) {
+      shifts.push({
+        date: `2026-03-${i.toString().padStart(2, '0')}`,
+        heure_debut: '09:00',
+        heure_fin: '16:30',
+        pause_minutes: 30, // 7h
+      });
+    }
+    shifts.push({
+      date: '2026-03-14',
+      heure_debut: '09:00',
+      heure_fin: '15:30',
+      pause_minutes: 30, // 6h
+    });
+
+    const bilan = calculerBilanSemaine(shifts, contrat35h, 'test-35h-ot');
+
+    expect(bilan.heures_travaillees).toBe(41);
+    expect(bilan.heures_normales).toBe(35);
+    // HS10 = 39 - 35 = 4h
+    expect(bilan.heures_supp_10).toBe(4);
+    // HS20 = 41 - 39 = 2h
+    expect(bilan.heures_supp_20).toBe(2);
+    expect(bilan.heures_supp_50).toBe(0);
+  });
+
+  // --- Test : extra 42h → HS20 = 3h (extras treated as 39h threshold) ---
+  it('extra 42h → HS20 = 3h', () => {
+    const contratExtra: ContratInput = { type: 'extra', heures_semaine: 39, convention: 'HCR_1979' };
+    const shifts: ShiftInput[] = [];
+    for (let i = 9; i <= 14; i++) {
+      shifts.push({
+        date: `2026-03-${i.toString().padStart(2, '0')}`,
+        heure_debut: '09:00',
+        heure_fin: '16:30',
+        pause_minutes: 30, // 7h
+      });
+    }
+
+    const bilan = calculerBilanSemaine(shifts, contratExtra, 'test-extra-ot');
+
+    expect(bilan.heures_travaillees).toBe(42);
+    expect(bilan.heures_normales).toBe(39);
+    expect(bilan.heures_supp_10).toBe(0); // extras start at 39h
+    expect(bilan.heures_supp_20).toBe(3);
     expect(bilan.heures_supp_50).toBe(0);
   });
 
@@ -301,7 +385,7 @@ describe('calculerBilanSemaine IDCC 1501', () => {
     // Sup 20% = 40 - 39 = 1h
     expect(bilan.heures_supp_20).toBe(1);
     expect(bilan.heures_supp_50).toBe(0);
-    expect(bilan.heures_supp_25).toBe(0); // pas en 1501
+    expect(bilan.heures_supp_25).toBe(0); // HS25 n'existe dans aucune convention
   });
 
   it('44h travaillées → sup 10% = 4h, sup 20% = 4h, sup 50% = 1h', () => {
@@ -353,11 +437,11 @@ describe('genererExportSilae', () => {
 
     expect(rows).toHaveLength(5);
 
-    // Vérifier le format
+    // Vérifier le format (SILAE: toujours au moins 1 décimale sauf jours)
     expect(rows[0]).toEqual({
       matricule: '00001',
       code: 'EV-A01',
-      valeur: '36',
+      valeur: '36.0',
       date_debut: '01/02/2026',
       date_fin: '28/02/2026',
     });
@@ -418,7 +502,7 @@ describe('genererExportSilae', () => {
 
     const absRow = rows.find(r => r.code === 'AB-300');
     expect(absRow).toBeDefined();
-    expect(absRow!.valeur).toBe('4');
+    expect(absRow!.valeur).toBe('4.0');
     expect(absRow!.date_debut).toBe('11/02/2026');
     expect(absRow!.date_fin).toBe('14/02/2026');
   });
@@ -443,10 +527,147 @@ describe('genererExportSilae', () => {
   });
 });
 
+// ============================================================
+// RC (Repos Compensateur)
+// ============================================================
+
+describe('RC acquis HCR', () => {
+  it('contrat 43h, 45h → rc_acquis = 2 * 50% = 1.0', () => {
+    const contrat43h: ContratInput = { type: 'CDI', heures_semaine: 43, convention: 'HCR_1979' };
+    // 5 jours * 9h = 45h
+    const shifts: ShiftInput[] = [];
+    for (let i = 9; i <= 13; i++) {
+      shifts.push({
+        date: `2026-03-${i.toString().padStart(2, '0')}`,
+        heure_debut: '08:00',
+        heure_fin: '17:30',
+        pause_minutes: 30,
+      });
+    }
+    const bilan = calculerBilanSemaine(shifts, contrat43h, 'test-rc');
+    expect(bilan.heures_supp_50).toBe(2);
+    // RC = 2h * 50% = 1h
+    expect(bilan.rc_acquis).toBe(1);
+  });
+
+  it('contrat 35h, 41h → rc = 4*10% + 2*20% = 0.8', () => {
+    const contrat35h: ContratInput = { type: 'CDI', heures_semaine: 35, convention: 'HCR_1979' };
+    // Need exactly 41h: 5 days * 7h + 1 day * 6h = 41h
+    const shifts: ShiftInput[] = [];
+    for (let i = 9; i <= 13; i++) {
+      shifts.push({
+        date: `2026-03-${i.toString().padStart(2, '0')}`,
+        heure_debut: '09:00',
+        heure_fin: '16:30',
+        pause_minutes: 30, // 7h
+      });
+    }
+    shifts.push({
+      date: '2026-03-14',
+      heure_debut: '09:00',
+      heure_fin: '15:30',
+      pause_minutes: 30, // 6h
+    });
+    const bilan = calculerBilanSemaine(shifts, contrat35h, 'test-rc-35');
+    expect(bilan.heures_travaillees).toBe(41);
+    expect(bilan.heures_supp_10).toBe(4);
+    expect(bilan.heures_supp_20).toBe(2);
+    // RC = 4*0.10 + 2*0.20 = 0.4 + 0.4 = 0.8
+    expect(bilan.rc_acquis).toBe(0.8);
+  });
+
+  it('contrat 39h, pas de dépassement → rc = 0', () => {
+    const contrat39h: ContratInput = { type: 'CDI', heures_semaine: 39, convention: 'HCR_1979' };
+    const shifts: ShiftInput[] = [
+      { date: '2026-03-09', heure_debut: '09:00', heure_fin: '17:00', pause_minutes: 30 },
+    ];
+    const bilan = calculerBilanSemaine(shifts, contrat39h, 'test-rc-no');
+    expect(bilan.rc_acquis).toBe(0);
+  });
+});
+
+// ============================================================
+// Jours ouvrés & Entrée/Sortie
+// ============================================================
+
+describe('joursOuvres', () => {
+  it('février 2026 complet = 20 jours ouvrés', () => {
+    // Feb 1 (dim) to Feb 28 (sam) → 20 jours lun-ven
+    expect(joursOuvres('2026-02-01', '2026-02-28')).toBe(20);
+  });
+
+  it('du 23/02 au 28/02 = 5 jours', () => {
+    // 23(lun), 24(mar), 25(mer), 26(jeu), 27(ven) = 5, 28(sam) = 0
+    expect(joursOuvres('2026-02-23', '2026-02-28')).toBe(5);
+  });
+
+  it('une seule journée (lundi) = 1', () => {
+    expect(joursOuvres('2026-03-09', '2026-03-09')).toBe(1);
+  });
+
+  it('weekend = 0', () => {
+    // March 14 2026 = Saturday, March 15 = Sunday
+    expect(joursOuvres('2026-03-14', '2026-03-15')).toBe(0);
+  });
+});
+
+describe('calculerEntreeSortie', () => {
+  it('entrée le 23/02 avec contrat 39h → prorata correct', () => {
+    // Feb 2026: 20 jours ouvrés, présent 5 jours → absent 15
+    // Ref heures = 39 * 52/12 = 169h
+    // Entree/Sortie = 15/20 * 169 = 126.75
+    const val = calculerEntreeSortie('2026-02-01', '2026-02-28', '2026-02-23', undefined, 169);
+    expect(val).toBe(126.75);
+  });
+
+  it('mois complet → 0', () => {
+    const val = calculerEntreeSortie('2026-02-01', '2026-02-28', undefined, undefined, 169);
+    expect(val).toBe(0);
+  });
+
+  it('sortie le 15/02 → prorata jours après sortie', () => {
+    // Présent du 1er au 15 fév
+    // Jours ouvrés 1-15: Feb 2-6 (5) + Feb 9-13 (5) = 10
+    // Absent: 20 - 10 = 10
+    // 10/20 * 151.67 = 75.835 → round2 = 75.84 or 75.83 depending on float
+    const val = calculerEntreeSortie('2026-02-01', '2026-02-28', undefined, '2026-02-15', 151.67);
+    expect(val).toBeCloseTo(75.84, 1);
+  });
+});
+
+describe('genererExportSilae avec entrée en cours de mois', () => {
+  it('génère la ligne Entree / Sortie avec dates restreintes', () => {
+    const bilan = {
+      heures_travaillees: 41.08,
+      heures_normales: 41.08,
+      heures_supp_25: 0, heures_supp_50: 0, heures_supp_10: 0, heures_supp_20: 0,
+      heures_comp_10: 0, heures_comp_25: 0,
+      delta_contrat: 0, rc_acquis: 0, nb_repas: 9, jours_travailles: 5,
+      alertes: [], bilans_semaines: [],
+    };
+
+    const rows = genererExportSilae(bilan, '45', 'CDI', '2026-02-01', '2026-02-28', undefined, undefined, {
+      dateEntree: '2026-02-23',
+      heuresMensuellesRef: 169,
+    });
+
+    // Dates = 23/02 → 28/02
+    const repasRow = rows.find(r => r.code === 'EV-A01');
+    expect(repasRow!.date_debut).toBe('23/02/2026');
+    expect(repasRow!.date_fin).toBe('28/02/2026');
+
+    // Entree / Sortie line
+    const esRow = rows.find(r => r.code === 'Entree / Sortie');
+    expect(esRow).toBeDefined();
+    expect(esRow!.valeur).toBe('126.75');
+    expect(esRow!.date_debut).toBe('23/02/2026');
+  });
+});
+
 describe('exportSilaeToCSV', () => {
   it('génère le bon format CSV', () => {
     const rows = [
-      { matricule: '00001', code: 'EV-A01', valeur: '36', date_debut: '01/02/2026', date_fin: '28/02/2026' },
+      { matricule: '00001', code: 'EV-A01', valeur: '36.0', date_debut: '01/02/2026', date_fin: '28/02/2026' },
       { matricule: '00001', code: 'HS-HS50', valeur: '9.42', date_debut: '01/02/2026', date_fin: '28/02/2026' },
     ];
 
@@ -454,7 +675,7 @@ describe('exportSilaeToCSV', () => {
     const lines = csv.split('\n');
 
     expect(lines[0]).toBe('Matricule;Code;Valeur;Date debut;Date fin');
-    expect(lines[1]).toBe('00001;EV-A01;36;01/02/2026;28/02/2026');
+    expect(lines[1]).toBe('00001;EV-A01;36.0;01/02/2026;28/02/2026');
     expect(lines[2]).toBe('00001;HS-HS50;9.42;01/02/2026;28/02/2026');
   });
 });

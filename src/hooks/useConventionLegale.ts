@@ -37,10 +37,10 @@ export type Alerte = {
 export type BilanSemaine = {
   heures_travaillees: number;
   heures_normales: number;
-  heures_supp_25: number;   // HCR : 36h-43h
-  heures_supp_50: number;   // HCR : >43h / IDCC 1501 : >43h
-  heures_supp_10: number;   // IDCC 1501 : 36h-39h
-  heures_supp_20: number;   // IDCC 1501 : 39h-43h
+  heures_supp_25: number;   // legacy (toujours 0, ni HCR ni RAPIDE n'utilisent 25%)
+  heures_supp_50: number;   // >43h (les deux conventions)
+  heures_supp_10: number;   // HCR : contrat→39h / RAPIDE : 35→39h
+  heures_supp_20: number;   // 39h→43h (les deux conventions)
   heures_comp_10: number;   // temps partiel <1/10
   heures_comp_25: number;   // temps partiel 1/10-1/3
   delta_contrat: number;    // positif = dépassement, négatif = manque
@@ -54,7 +54,8 @@ export type BilanSemaine = {
 // ============================================================
 
 const HCR_SEUIL_LEGAL = 35;
-const HCR_SEUIL_SUP_25 = 43; // de 35h01 à 43h
+const HCR_SEUIL_SUP_10 = 39; // de contrat+1 à 39h (HS 10%)
+const HCR_SEUIL_SUP_20 = 43; // de 39h01 à 43h (HS 20%)
 const HCR_AMPLITUDE_MAX = 13; // heures
 const HCR_REPOS_MIN = 11;     // heures entre deux jours
 const HCR_DUREE_MAX_JOUR = 10; // heures nettes
@@ -301,56 +302,81 @@ function calculerHeuresSupHCR(
   isTempsPartiel: boolean
 ): Omit<BilanSemaine, 'heures_travaillees' | 'delta_contrat' | 'nb_repas' | 'alertes'> {
   let heures_normales = 0;
-  let heures_supp_25 = 0;
+  let heures_supp_10 = 0;
+  let heures_supp_20 = 0;
   let heures_supp_50 = 0;
   let heures_comp_10 = 0;
   let heures_comp_25 = 0;
-  const rc_acquis = 0;
+  let rc_acquis = 0;
 
   if (isTempsPartiel) {
     // Temps partiel : heures complémentaires
-    const seuilComp10 = contrat.heures_semaine * 1.1; // +10% du contractuel
-    const seuilComp25 = contrat.heures_semaine * (1 + 1 / 3); // +1/3 du contractuel
+    const seuilComp10 = contrat.heures_semaine * 1.1;
+    const seuilComp25 = contrat.heures_semaine * (1 + 1 / 3);
 
     heures_normales = Math.min(heures, contrat.heures_semaine);
 
     if (heures > contrat.heures_semaine) {
-      const depassement = heures - contrat.heures_semaine;
-
       if (heures <= seuilComp10) {
-        heures_comp_10 = round2(depassement);
+        heures_comp_10 = round2(heures - contrat.heures_semaine);
       } else if (heures <= seuilComp25) {
         heures_comp_10 = round2(seuilComp10 - contrat.heures_semaine);
         heures_comp_25 = round2(heures - seuilComp10);
       } else {
         heures_comp_10 = round2(seuilComp10 - contrat.heures_semaine);
         heures_comp_25 = round2(seuilComp25 - seuilComp10);
-        // Au-delà de 1/3, ce sont des heures sup si > 35h
+        // Au-delà de 1/3, heures sup selon seuils HCR
         if (heures > HCR_SEUIL_LEGAL) {
-          heures_supp_25 = round2(Math.min(heures, HCR_SEUIL_SUP_25) - HCR_SEUIL_LEGAL);
-          heures_supp_50 = round2(Math.max(0, heures - HCR_SEUIL_SUP_25));
+          heures_supp_10 = round2(Math.min(heures, HCR_SEUIL_SUP_10) - HCR_SEUIL_LEGAL);
+          heures_supp_20 = round2(Math.max(0, Math.min(heures, HCR_SEUIL_SUP_20) - HCR_SEUIL_SUP_10));
+          heures_supp_50 = round2(Math.max(0, heures - HCR_SEUIL_SUP_20));
         }
       }
     }
   } else {
     // Temps plein : heures supplémentaires
-    // Normales = min(heures, seuil_legal=35h)
-    heures_normales = Math.min(heures, HCR_SEUIL_LEGAL);
+    // Contract-aware: normal hours = up to contract hours (which is >= 35h)
+    // HS bands start from contract hours, not from 35h
+    //
+    // 43h contract: normal up to 43h, >43h = HS50
+    // 39h contract: normal up to 39h, 39→43h = HS20, >43h = HS50
+    // 35h contract: normal up to 35h, 35→39h = HS10, 39→43h = HS20, >43h = HS50
+    // Extra: treated as 39h threshold (normal up to 39h)
+    const seuil = contrat.type === 'extra'
+      ? HCR_SEUIL_SUP_10 // extras: seuil = 39h
+      : contrat.heures_semaine;
 
-    if (heures > HCR_SEUIL_LEGAL) {
-      // Sup 25% : de 35h01 à 43h
-      heures_supp_25 = round2(Math.min(heures, HCR_SEUIL_SUP_25) - HCR_SEUIL_LEGAL);
-      // Sup 50% : au-delà de 43h
-      heures_supp_50 = round2(Math.max(0, heures - HCR_SEUIL_SUP_25));
+    heures_normales = Math.min(heures, seuil);
+
+    if (heures > seuil) {
+      // HS10: from seuil to 39h (only if seuil < 39)
+      if (seuil < HCR_SEUIL_SUP_10) {
+        heures_supp_10 = round2(Math.min(heures, HCR_SEUIL_SUP_10) - seuil);
+      }
+      // HS20: from max(seuil, 39) to 43h
+      const seuil20 = Math.max(seuil, HCR_SEUIL_SUP_10);
+      if (heures > seuil20 && seuil20 < HCR_SEUIL_SUP_20) {
+        heures_supp_20 = round2(Math.min(heures, HCR_SEUIL_SUP_20) - seuil20);
+      }
+      // HS50: above 43h
+      heures_supp_50 = round2(Math.max(0, heures - HCR_SEUIL_SUP_20));
     }
+
+    // RC acquis : majoration convertie en repos
+    // HS10 → 10% en repos, HS20 → 20%, HS50 → 50%
+    rc_acquis = round2(
+      heures_supp_10 * 0.10 +
+      heures_supp_20 * 0.20 +
+      heures_supp_50 * 0.50
+    );
   }
 
   return {
     heures_normales: round2(heures_normales),
-    heures_supp_25: round2(heures_supp_25),
+    heures_supp_25: 0, // HCR n'utilise pas HS25
     heures_supp_50: round2(heures_supp_50),
-    heures_supp_10: 0, // HCR n'a pas de sup 10%
-    heures_supp_20: 0, // HCR n'a pas de sup 20%
+    heures_supp_10: round2(heures_supp_10),
+    heures_supp_20: round2(heures_supp_20),
     heures_comp_10: round2(heures_comp_10),
     heures_comp_25: round2(heures_comp_25),
     rc_acquis,
@@ -529,46 +555,63 @@ export function genererExportSilae(
   dateDebut: string, // YYYY-MM-DD (premier jour du mois)
   dateFin: string,   // YYYY-MM-DD (dernier jour du mois)
   absences?: Array<{ type: string; code_silae?: string; date_debut: string; date_fin: string; nb_jours: number }>,
-  soldeRC?: number
+  soldeRC?: number,
+  options?: {
+    dateEntree?: string;   // YYYY-MM-DD — date d'entrée si en cours de mois
+    dateSortie?: string;   // YYYY-MM-DD — date de sortie si en cours de mois
+    heuresMensuellesRef?: number; // heures mensuelles contractuelles (ex: 169 pour 39h)
+  }
 ): ExportSilaeRow[] {
   const rows: ExportSilaeRow[] = [];
   const mat = matricule.padStart(5, '0');
   const ddFr = formatDateFR(dateDebut);
   const dfFr = formatDateFR(dateFin);
 
+  // Dates effectives (restreintes si entrée/sortie en cours de mois)
+  const ddEff = options?.dateEntree ? formatDateFR(options.dateEntree) : ddFr;
+  const dfEff = options?.dateSortie ? formatDateFR(options.dateSortie) : dfFr;
+
   // Avantage en nature repas
   if (bilan.nb_repas > 0) {
-    rows.push({ matricule: mat, code: 'EV-A01', valeur: formatValeur(bilan.nb_repas), date_debut: ddFr, date_fin: dfFr });
+    rows.push({ matricule: mat, code: 'EV-A01', valeur: formatValeur(bilan.nb_repas), date_debut: ddEff, date_fin: dfEff });
+  }
+
+  // Entrée / Sortie (prorata heures contractuelles non travaillées)
+  if (options?.dateEntree || options?.dateSortie) {
+    const entreeSortie = calculerEntreeSortie(dateDebut, dateFin, options.dateEntree, options.dateSortie, options.heuresMensuellesRef);
+    if (entreeSortie > 0) {
+      rows.push({ matricule: mat, code: 'Entree / Sortie', valeur: formatValeur(entreeSortie), date_debut: ddEff, date_fin: dfEff });
+    }
   }
 
   // Heures sup
   if (bilan.heures_supp_10 > 0) {
-    rows.push({ matricule: mat, code: 'HS-HS10', valeur: formatValeur(bilan.heures_supp_10), date_debut: ddFr, date_fin: dfFr });
+    rows.push({ matricule: mat, code: 'HS-HS10', valeur: formatValeur(bilan.heures_supp_10), date_debut: ddEff, date_fin: dfEff });
   }
   if (bilan.heures_supp_20 > 0) {
-    rows.push({ matricule: mat, code: 'HS-HS20', valeur: formatValeur(bilan.heures_supp_20), date_debut: ddFr, date_fin: dfFr });
+    rows.push({ matricule: mat, code: 'HS-HS20', valeur: formatValeur(bilan.heures_supp_20), date_debut: ddEff, date_fin: dfEff });
   }
   if (bilan.heures_supp_25 > 0) {
-    rows.push({ matricule: mat, code: 'HS-HS25', valeur: formatValeur(bilan.heures_supp_25), date_debut: ddFr, date_fin: dfFr });
+    rows.push({ matricule: mat, code: 'HS-HS25', valeur: formatValeur(bilan.heures_supp_25), date_debut: ddEff, date_fin: dfEff });
   }
   if (bilan.heures_supp_50 > 0) {
-    rows.push({ matricule: mat, code: 'HS-HS50', valeur: formatValeur(bilan.heures_supp_50), date_debut: ddFr, date_fin: dfFr });
+    rows.push({ matricule: mat, code: 'HS-HS50', valeur: formatValeur(bilan.heures_supp_50), date_debut: ddEff, date_fin: dfEff });
   }
 
-  // Jours travaillés
+  // Jours travaillés (format entier, pas de décimale)
   if (bilan.jours_travailles > 0) {
-    rows.push({ matricule: mat, code: 'Nombre total de jours travailles', valeur: String(bilan.jours_travailles), date_debut: ddFr, date_fin: dfFr });
+    rows.push({ matricule: mat, code: 'Nombre total de jours travailles', valeur: String(Math.round(bilan.jours_travailles)), date_debut: ddEff, date_fin: dfEff });
   }
 
   // Heures travaillées
   if (bilan.heures_travaillees > 0) {
     const codeHeures = contratType === 'extra' ? 'Heures travaillees (extra)' : 'Heures travaillees';
-    rows.push({ matricule: mat, code: codeHeures, valeur: formatValeur(bilan.heures_travaillees), date_debut: ddFr, date_fin: dfFr });
+    rows.push({ matricule: mat, code: codeHeures, valeur: formatValeur(bilan.heures_travaillees), date_debut: ddEff, date_fin: dfEff });
   }
 
   // Solde RC
   if (soldeRC !== undefined && soldeRC > 0) {
-    rows.push({ matricule: mat, code: 'Nouveau solde RCR', valeur: formatValeur(soldeRC), date_debut: ddFr, date_fin: dfFr });
+    rows.push({ matricule: mat, code: 'Nouveau solde RCR', valeur: formatValeur(soldeRC), date_debut: ddEff, date_fin: dfEff });
   }
 
   // Absences
@@ -596,6 +639,54 @@ export function exportSilaeToCSV(rows: ExportSilaeRow[]): string {
 }
 
 // ============================================================
+// Entrée / Sortie en cours de mois
+// ============================================================
+
+/** Compte les jours ouvrés (lun-ven) entre deux dates incluses */
+function joursOuvres(debut: string, fin: string): number {
+  let count = 0;
+  const d = new Date(debut + 'T00:00:00');
+  const end = new Date(fin + 'T00:00:00');
+  while (d <= end) {
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) count++;
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
+}
+
+/**
+ * Calcule la valeur "Entree / Sortie" = heures contractuelles non travaillées
+ * du fait d'une entrée tardive ou sortie anticipée dans le mois.
+ *
+ * Méthode : prorata des jours ouvrés absents sur le total du mois
+ * × heures mensuelles de référence (heures_semaine × 52/12)
+ */
+function calculerEntreeSortie(
+  debutMois: string,
+  finMois: string,
+  dateEntree?: string,
+  dateSortie?: string,
+  heuresMensuellesRef?: number
+): number {
+  const joursTotal = joursOuvres(debutMois, finMois);
+  if (joursTotal === 0) return 0;
+
+  // Jours ouvrés effectivement présent
+  const debutPresence = dateEntree ?? debutMois;
+  const finPresence = dateSortie ?? finMois;
+  const joursPresent = joursOuvres(debutPresence, finPresence);
+
+  const joursAbsent = joursTotal - joursPresent;
+  if (joursAbsent <= 0) return 0;
+
+  // Heures mensuelles de référence (par défaut 151.67h = 35h × 52/12)
+  const heuresRef = heuresMensuellesRef ?? 151.67;
+
+  return round2((joursAbsent / joursTotal) * heuresRef);
+}
+
+// ============================================================
 // Helpers
 // ============================================================
 
@@ -616,9 +707,9 @@ function formatDateFR(dateISO: string): string {
 }
 
 function formatValeur(v: number): string {
-  // Entier → pas de décimale, sinon 2 décimales max
-  if (Number.isInteger(v)) return String(v);
-  return v.toFixed(2).replace(/\.?0+$/, '') || '0';
+  // SILAE format: always at least 1 decimal place
+  // 36 → "36.0", 9.42 → "9.42", 163 → "163.0", 0 → "0.0"
+  return v.toFixed(2).replace(/0$/, '');
 }
 
 /** Retourne la clé de semaine ISO (YYYY-WXX) */
@@ -636,7 +727,8 @@ function getISOWeekKey(dateStr: string): string {
 // Export constants for testing
 export const CONSTANTS = {
   HCR_SEUIL_LEGAL,
-  HCR_SEUIL_SUP_25,
+  HCR_SEUIL_SUP_10,
+  HCR_SEUIL_SUP_20,
   HCR_AMPLITUDE_MAX,
   HCR_REPOS_MIN,
   HCR_DUREE_MAX_JOUR,
@@ -648,4 +740,4 @@ export const CONSTANTS = {
 };
 
 // Export utilities for testing
-export { timeToMinutes, shiftDureeNette, shiftDureeBrute, formatHeures, formatDateFR, formatValeur, getISOWeekKey };
+export { timeToMinutes, shiftDureeNette, shiftDureeBrute, formatHeures, formatDateFR, formatValeur, getISOWeekKey, joursOuvres, calculerEntreeSortie };

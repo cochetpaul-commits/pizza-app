@@ -8,6 +8,10 @@
 import type { ParseResult } from "./types";
 import { detectSupplier } from "./detectSupplier";
 import { parseMetro } from "./metro";
+import { parseMael } from "./mael";
+import { parseCozigou } from "./cozigou";
+import { parseSum } from "./sum";
+import { parseArmor } from "./armor";
 import { parseGeneric } from "./generic";
 
 export type { ParseResult, ParsedIngredient, ParseLog, Categorie, Confidence } from "./types";
@@ -20,9 +24,11 @@ type ParserOptions = {
 
 const PARSERS: Record<string, (text: string, etab: string) => ParseResult> = {
   metro: parseMetro,
-  // mael: parseMael,       // ⏳ à implémenter
+  mael: parseMael,
+  cozigou: parseCozigou,
+  sum: parseSum,
+  armor: parseArmor,
   // masse: parseMasse,     // ⏳ à implémenter
-  // cozigou: parseCozigou, // ⏳ à implémenter
   // vinoflo: parseVinoflo, // ⏳ à implémenter
   // carniato: parseCarniato, // ⏳ à implémenter
 };

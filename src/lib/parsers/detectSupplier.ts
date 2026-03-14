@@ -17,6 +17,8 @@ const SUPPLIER_KEYWORDS: Record<string, string[]> = {
   cozigou: ["COZIGOU"],
   vinoflo: ["VINOFLO"],
   carniato: ["CARNIATO"],
+  sum: ["SUM SARL", "SUM ", "BUSSY-SAINT-GEORGES"],
+  armor: ["ARMOR EMBALLAGES", "ARMOR-EMBALLAGES", "CAUDAN"],
 };
 
 function containsKeyword(text: string, keywords: string[]): boolean {

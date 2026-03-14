@@ -28,6 +28,8 @@ type Employe = {
   contrats: {
     type: string;
     heures_semaine: number;
+    date_debut: string | null;
+    date_fin: string | null;
     actif: boolean;
   }[];
 };
@@ -44,7 +46,7 @@ type Absence = {
 type EmpBilan = {
   emp: Employe;
   bilan: BilanMensuel;
-  contrat: { type: string; heures_semaine: number };
+  contrat: { type: string; heures_semaine: number; date_debut: string | null; date_fin: string | null };
 };
 
 /* ── Helpers ───────────────────────────────────────────────────── */
@@ -103,7 +105,7 @@ export default function RapportsPage() {
       const [empRes, shiftsRes, absRes] = await Promise.all([
         supabase
           .from("employes")
-          .select("id, prenom, nom, initiales, matricule, actif, contrats(type, heures_semaine, actif)")
+          .select("id, prenom, nom, initiales, matricule, actif, contrats(type, heures_semaine, date_debut, date_fin, actif)")
           .eq("etablissement_id", etab.id)
           .eq("actif", true)
           .order("nom"),
@@ -176,17 +178,16 @@ export default function RapportsPage() {
 
   /* ── Totals ── */
   const totals = useMemo(() => {
-    let h = 0, s25 = 0, s50 = 0, s10 = 0, s20 = 0, repas = 0, jours = 0;
+    let h = 0, s50 = 0, s10 = 0, s20 = 0, repas = 0, jours = 0;
     for (const { bilan } of empBilans) {
       h += bilan.heures_travaillees;
-      s25 += bilan.heures_supp_25;
       s50 += bilan.heures_supp_50;
       s10 += bilan.heures_supp_10;
       s20 += bilan.heures_supp_20;
       repas += bilan.nb_repas;
       jours += bilan.jours_travailles;
     }
-    return { h, s25, s50, s10, s20, repas, jours };
+    return { h, s50, s10, s20, repas, jours };
   }, [empBilans]);
 
   /* ── Export SILAE ── */
@@ -200,7 +201,25 @@ export default function RapportsPage() {
         date_fin: a.date_fin,
         nb_jours: a.nb_jours ?? 0,
       }));
-      return genererExportSilae(bilan, mat, contrat.type, dateDebut, dateFin, abs);
+
+      // Entrée en cours de mois ?
+      const dateEntree = contrat.date_debut && contrat.date_debut > dateDebut && contrat.date_debut <= dateFin
+        ? contrat.date_debut : undefined;
+      // Sortie en cours de mois ?
+      const dateSortie = contrat.date_fin && contrat.date_fin >= dateDebut && contrat.date_fin < dateFin
+        ? contrat.date_fin : undefined;
+
+      // Heures mensuelles de référence
+      const heuresMensuellesRef = Math.round(contrat.heures_semaine * 52 / 12 * 100) / 100;
+
+      // Solde RC = cumul rc_acquis sur le mois (pas de tracking inter-mois pour l'instant)
+      const soldeRC = bilan.rc_acquis;
+
+      return genererExportSilae(bilan, mat, contrat.type, dateDebut, dateFin, abs, soldeRC, {
+        dateEntree,
+        dateSortie,
+        heuresMensuellesRef,
+      });
     });
 
     const csv = exportSilaeToCSV(allRows);
@@ -209,9 +228,9 @@ export default function RapportsPage() {
 
   /* ── Export recap CSV ── */
   const handleExportRecap = () => {
-    const header = "Employe;Heures;H.Normales;HS25;HS50;HS10;HS20;Repas;Jours;Delta";
+    const header = "Employe;Heures;H.Normales;HS10;HS20;HS50;Repas;Jours;Delta";
     const lines = empBilans.map(({ emp, bilan }) =>
-      `${emp.prenom} ${emp.nom};${bilan.heures_travaillees};${bilan.heures_normales};${bilan.heures_supp_25};${bilan.heures_supp_50};${bilan.heures_supp_10};${bilan.heures_supp_20};${bilan.nb_repas};${bilan.jours_travailles};${bilan.delta_contrat}`
+      `${emp.prenom} ${emp.nom};${bilan.heures_travaillees};${bilan.heures_normales};${bilan.heures_supp_10};${bilan.heures_supp_20};${bilan.heures_supp_50};${bilan.nb_repas};${bilan.jours_travailles};${bilan.delta_contrat}`
     );
     downloadCSV([header, ...lines].join("\n"), `recap-heures-${year}-${String(month + 1).padStart(2, "0")}.csv`);
   };
@@ -254,12 +273,11 @@ export default function RapportsPage() {
         </div>
 
         {/* ── Overtime summary ── */}
-        {(totals.s25 > 0 || totals.s50 > 0 || totals.s10 > 0 || totals.s20 > 0) && (
+        {(totals.s50 > 0 || totals.s10 > 0 || totals.s20 > 0) && (
           <div style={otRow}>
-            {totals.s25 > 0 && <span style={otPill}>HS 25% : {totals.s25.toFixed(1)}h</span>}
-            {totals.s50 > 0 && <span style={otPill}>HS 50% : {totals.s50.toFixed(1)}h</span>}
             {totals.s10 > 0 && <span style={otPill}>HS 10% : {totals.s10.toFixed(1)}h</span>}
             {totals.s20 > 0 && <span style={otPill}>HS 20% : {totals.s20.toFixed(1)}h</span>}
+            {totals.s50 > 0 && <span style={otPill}>HS 50% : {totals.s50.toFixed(1)}h</span>}
           </div>
         )}
 
@@ -321,10 +339,9 @@ export default function RapportsPage() {
                         <DetailItem label="H. normales" value={`${bilan.heures_normales.toFixed(1)}h`} />
                         <DetailItem label="Jours" value={String(bilan.jours_travailles)} />
                         <DetailItem label="Repas" value={String(bilan.nb_repas)} />
-                        {bilan.heures_supp_25 > 0 && <DetailItem label="HS 25%" value={`${bilan.heures_supp_25.toFixed(1)}h`} color="#D4775A" />}
-                        {bilan.heures_supp_50 > 0 && <DetailItem label="HS 50%" value={`${bilan.heures_supp_50.toFixed(1)}h`} color="#DC2626" />}
                         {bilan.heures_supp_10 > 0 && <DetailItem label="HS 10%" value={`${bilan.heures_supp_10.toFixed(1)}h`} color="#D4775A" />}
                         {bilan.heures_supp_20 > 0 && <DetailItem label="HS 20%" value={`${bilan.heures_supp_20.toFixed(1)}h`} color="#D4775A" />}
+                        {bilan.heures_supp_50 > 0 && <DetailItem label="HS 50%" value={`${bilan.heures_supp_50.toFixed(1)}h`} color="#DC2626" />}
                         {bilan.heures_comp_10 > 0 && <DetailItem label="HC 10%" value={`${bilan.heures_comp_10.toFixed(1)}h`} color="#2563eb" />}
                         {bilan.heures_comp_25 > 0 && <DetailItem label="HC 25%" value={`${bilan.heures_comp_25.toFixed(1)}h`} color="#2563eb" />}
                         {bilan.rc_acquis > 0 && <DetailItem label="RC acquis" value={`${bilan.rc_acquis.toFixed(1)}h`} color="#4a6741" />}
