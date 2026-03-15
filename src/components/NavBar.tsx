@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+
 import { EtablissementSelector } from "@/components/EtablissementSelector";
+import { useEtablissement } from "@/lib/EtablissementContext";
 
 export type MenuItem = {
   label: string;
@@ -22,8 +23,14 @@ type NavBarProps = {
   menuItems?: MenuItem[];
 };
 
+function getHubHref(slug: string | undefined): string {
+  if (slug === "piccola-mia" || slug === "piccola_mia") return "/piccola-mia";
+  if (slug === "bello-mio" || slug === "bello_mia") return "/bello-mio";
+  return "/groupe";
+}
+
 export function NavBar({ backHref, backLabel, right, primaryAction, menuItems }: NavBarProps) {
-  const router = useRouter();
+  const { current } = useEtablissement();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -53,7 +60,7 @@ export function NavBar({ backHref, backLabel, right, primaryAction, menuItems }:
               <Link href={backHref} style={navBtn} className="nav-back-icon" aria-label={backLabel ?? "Retour"}>&larr;</Link>
             </>
           ) : (
-            <button type="button" onClick={() => router.back()} style={navBtn}>&larr; Retour</button>
+            <Link href={getHubHref(current?.slug)} style={navBtn}>&larr; Retour</Link>
           )}
         </div>
 
