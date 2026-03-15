@@ -171,7 +171,11 @@ export default function GroupePage() {
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#F5E642", display: "inline-block" }} />
                   <span style={etabName}>Piccola Mia</span>
                 </div>
-                <p style={{ margin: "0 0 8px", fontSize: 12, color: "#999" }}>A configurer</p>
+                {ca && (
+                  <span style={{ fontSize: 20, fontWeight: 700, color: "#b8a800", fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
+                    &mdash;
+                  </span>
+                )}
                 <span style={etabPill("#b8a800")}>Ouvrir &rarr;</span>
               </div>
             </Link>

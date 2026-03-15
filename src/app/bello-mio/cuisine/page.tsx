@@ -1,6 +1,9 @@
 "use client";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppNav } from "@/components/AppNav";
+import { useEtablissement } from "@/lib/EtablissementContext";
+import { supabase } from "@/lib/supabaseClient";
 import { T } from "@/lib/tokens";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -57,6 +60,30 @@ function Tile({ href, icon, title, sub, value, accent, wide }: {
 }
 
 export default function CuisineHubBM() {
+  const { etablissements, setCurrent, current } = useEtablissement();
+  const [recipesCount, setRecipesCount] = useState<number | null>(null);
+  const [ingredientsCount, setIngredientsCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const bm = etablissements.find(e => e.slug === "bello_mio");
+    if (bm) setCurrent(bm);
+  }, [etablissements, setCurrent]);
+
+  useEffect(() => {
+    if (!current?.id) return;
+    const eid = current.id;
+    Promise.all([
+      supabase.from("ingredients").select("id", { count: "exact", head: true }).eq("etablissement_id", eid),
+      supabase.from("pizza_recipes").select("id", { count: "exact", head: true }).contains("establishments", [current.slug]),
+      supabase.from("kitchen_recipes").select("id", { count: "exact", head: true }).contains("establishments", [current.slug]),
+      supabase.from("prep_recipes").select("id", { count: "exact", head: true }).contains("establishments", [current.slug]),
+      supabase.from("cocktails").select("id", { count: "exact", head: true }),
+    ]).then(([ing, pz, kr, pr, co]) => {
+      setIngredientsCount(ing.count ?? 0);
+      setRecipesCount((pz.count ?? 0) + (kr.count ?? 0) + (pr.count ?? 0) + (co.count ?? 0));
+    });
+  }, [current]);
+
   return (
     <div style={{ minHeight: "100dvh", background: T.creme, animation: "slideUp 0.25s ease" }}>
       <AppNav />
@@ -68,8 +95,8 @@ export default function CuisineHubBM() {
 
         <SectionLabel>Bibliotheque</SectionLabel>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-          <Tile href="/recettes"    title="Recettes"    sub="Pizze · Cuisine · Cocktails · Empatements" value="75"  accent={T.terracotta} />
-          <Tile href="/ingredients" title="Ingredients" sub="Catalogue produits & prix"                  value="700" accent={T.terracotta} />
+          <Tile href="/recettes"    title="Recettes"    sub="Pizze · Cuisine · Cocktails · Empatements" value={recipesCount != null ? String(recipesCount) : "…"}  accent={T.terracotta} />
+          <Tile href="/ingredients" title="Ingredients" sub="Catalogue produits & prix"                  value={ingredientsCount != null ? String(ingredientsCount) : "…"} accent={T.terracotta} />
         </div>
 
         <SectionLabel>Approvisionnement</SectionLabel>

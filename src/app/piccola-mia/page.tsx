@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { AppNav } from "@/components/AppNav";
 import { useProfile } from "@/lib/ProfileContext";
+import { useEtablissement } from "@/lib/EtablissementContext";
 import { T } from "@/lib/tokens";
 
 function Tile({ href, icon, title, sub, accent }: {
@@ -45,6 +47,12 @@ function Tile({ href, icon, title, sub, accent }: {
 
 export default function PiccolaMiaHub() {
   const { isGroupAdmin } = useProfile();
+  const { etablissements, setCurrent } = useEtablissement();
+
+  useEffect(() => {
+    const pm = etablissements.find(e => e.slug === "piccola");
+    if (pm) setCurrent(pm);
+  }, [etablissements, setCurrent]);
 
   return (
     <div style={{ minHeight: "100dvh", background: T.creme, animation: "slideUp 0.25s ease" }}>
