@@ -27,6 +27,9 @@ const FOURNISSEURS = [
   { value: "cozigou", label: "Cozigou" },
   { value: "vinoflo", label: "Vinoflo" },
   { value: "carniato", label: "Carniato" },
+  { value: "bar_spirits", label: "Bar Spirits" },
+  { value: "sum", label: "Sum" },
+  { value: "armor", label: "Armor" },
 ];
 
 const ETABLISSEMENTS = [

@@ -122,7 +122,7 @@ return new NextResponse(new Uint8Array(buffer), {
 ```
 
 ### Conventions legales (RH)
-- Bello Mio : HCR IDCC 1979 (seuils 35h/43h, HS 25%/50%)
+- Bello Mio : HCR IDCC 1979 (seuils 35h/39h/43h, HS 10%/20%/50%)
 - Piccola Mia : RAPIDE IDCC 1501 (seuils 35h/39h/43h, HS 10%/20%/50%)
 
 ## Tables Supabase (principales)

@@ -55,6 +55,13 @@ type Shift = {
   statut: string;
 };
 
+type Absence = {
+  employe_id: string;
+  type: string;
+  date_debut: string;
+  date_fin: string;
+};
+
 type EquipeFilter = "tous" | "Cuisine" | "Salle" | "Shop";
 
 /* ── Helpers ───────────────────────────────────────────────────── */
@@ -100,6 +107,27 @@ function fmtH(t: string): string {
   return t.slice(0, 5);
 }
 
+function shiftsOverlap(a: { heure_debut: string; heure_fin: string }, b: { heure_debut: string; heure_fin: string }): boolean {
+  const aStart = timeToMin(a.heure_debut);
+  let aEnd = timeToMin(a.heure_fin);
+  const bStart = timeToMin(b.heure_debut);
+  let bEnd = timeToMin(b.heure_fin);
+  if (aEnd <= aStart) aEnd += 1440;
+  if (bEnd <= bStart) bEnd += 1440;
+  return aStart < bEnd && bStart < aEnd;
+}
+
+const ABSENCE_LABELS: Record<string, string> = {
+  conge_paye: "CP",
+  rtt: "RTT",
+  maladie: "Maladie",
+  accident_travail: "AT",
+  maternite: "Maternite",
+  sans_solde: "Abs.",
+  formation: "Form.",
+  repos_compensateur: "RC",
+};
+
 /* ── Component ─────────────────────────────────────────────────── */
 
 export default function PlanningPage() {
@@ -110,6 +138,7 @@ export default function PlanningPage() {
   const [employes, setEmployes] = useState<Employe[]>([]);
   const [postes, setPostes] = useState<Poste[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [absences, setAbsences] = useState<Absence[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
@@ -145,7 +174,7 @@ export default function PlanningPage() {
       const mondayISO = toISO(weekStart);
       const sundayISO = toISO(addDays(weekStart, 6));
 
-      const [empRes, postesRes, shiftsRes] = await Promise.all([
+      const [empRes, postesRes, shiftsRes, absRes] = await Promise.all([
         supabase
           .from("employes")
           .select("id, prenom, nom, initiales, actif, equipes_access, contrats(type, heures_semaine, actif)")
@@ -165,12 +194,19 @@ export default function PlanningPage() {
           .eq("etablissement_id", etab.id)
           .gte("date", mondayISO)
           .lte("date", sundayISO),
+        supabase
+          .from("absences")
+          .select("employe_id, type, date_debut, date_fin")
+          .eq("etablissement_id", etab.id)
+          .lte("date_debut", sundayISO)
+          .gte("date_fin", mondayISO),
       ]);
 
       if (cancelled) return;
       setEmployes(empRes.data ?? []);
       setPostes(postesRes.data ?? []);
       setShifts(shiftsRes.data ?? []);
+      setAbsences((absRes.data ?? []) as Absence[]);
       setLoading(false);
     })();
 
@@ -204,6 +240,23 @@ export default function PlanningPage() {
     }
     return m;
   }, [shifts]);
+
+  /* ── Absences by cell (employe:date → type) ── */
+  const absenceByCell = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const a of absences) {
+      // Expand date range to individual days within the visible week
+      const start = new Date(a.date_debut + "T00:00:00");
+      const end = new Date(a.date_fin + "T00:00:00");
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const iso = toISO(d);
+        if (weekISOs.includes(iso)) {
+          m.set(`${a.employe_id}:${iso}`, a.type);
+        }
+      }
+    }
+    return m;
+  }, [absences, weekISOs]);
 
   /* ── Bilan per employee (TNS exclus) ── */
   const bilans = useMemo(() => {
@@ -342,6 +395,67 @@ export default function PlanningPage() {
     setSaving(false);
   };
 
+  /* ── Duplicate a single day → next day ── */
+  const duplicateDay = async (dayIndex: number) => {
+    if (!etab) return;
+    const srcISO = weekISOs[dayIndex];
+    const dstIndex = dayIndex < 6 ? dayIndex + 1 : 0;
+    const dstISO = dayIndex < 6 ? weekISOs[dstIndex] : toISO(addDays(weekStart, 7));
+    const dayShifts = shifts.filter((s) => s.date === srcISO);
+    if (dayShifts.length === 0) { alert("Aucun shift ce jour."); return; }
+    if (!confirm(`Dupliquer ${dayShifts.length} shift(s) de ${DAY_NAMES[dayIndex]} vers ${dayIndex < 6 ? DAY_NAMES[dstIndex] : "Lun. suivant"} ?`)) return;
+
+    setSaving(true);
+    const newShifts = dayShifts.map((s) => ({
+      employe_id: s.employe_id,
+      etablissement_id: etab.id,
+      poste_id: s.poste_id,
+      date: dstISO,
+      heure_debut: s.heure_debut,
+      heure_fin: s.heure_fin,
+      pause_minutes: s.pause_minutes,
+      note: s.note,
+      statut: "brouillon",
+    }));
+    const { data: inserted } = await supabase.from("shifts").insert(newShifts).select();
+    if (inserted) setShifts((prev) => [...prev, ...inserted]);
+    setSaving(false);
+  };
+
+  /* ── Duplicate all shifts for one employee (S-1 → current week) ── */
+  const duplicateEmployee = async (empId: string) => {
+    if (!etab) return;
+    const prevMonday = toISO(addDays(weekStart, -7));
+    const prevSunday = toISO(addDays(weekStart, -1));
+
+    const { data: prevShifts } = await supabase
+      .from("shifts")
+      .select("employe_id, poste_id, date, heure_debut, heure_fin, pause_minutes, note")
+      .eq("etablissement_id", etab.id)
+      .eq("employe_id", empId)
+      .gte("date", prevMonday)
+      .lte("date", prevSunday);
+
+    if (!prevShifts || prevShifts.length === 0) { alert("Aucun shift S-1 pour cet employe."); return; }
+    const emp = employes.find((e) => e.id === empId);
+    if (!confirm(`Dupliquer ${prevShifts.length} shift(s) S-1 de ${emp?.prenom ?? ""} ?`)) return;
+
+    setSaving(true);
+    const newShifts = prevShifts.map((s) => {
+      const oldDate = new Date(s.date + "T00:00:00");
+      const dayOffset = Math.round((oldDate.getTime() - new Date(prevMonday + "T00:00:00").getTime()) / 86400000);
+      return {
+        ...s,
+        etablissement_id: etab.id,
+        date: toISO(addDays(weekStart, dayOffset)),
+        statut: "brouillon",
+      };
+    });
+    const { data: inserted } = await supabase.from("shifts").insert(newShifts).select();
+    if (inserted) setShifts((prev) => [...prev, ...inserted]);
+    setSaving(false);
+  };
+
   /* ── Drag & Drop ── */
   const onDragEnd = async (result: DropResult) => {
     if (!result.destination) return;
@@ -361,6 +475,23 @@ export default function PlanningPage() {
 
     await supabase.from("shifts").update({ employe_id: newEmpId, date: newDate }).eq("id", shiftId);
   };
+
+  /* ── Overlap detection for modal ── */
+  const modalOverlap = useMemo(() => {
+    if (!showModal || !mEmployeId || !mDate || !mDebut || !mFin) return null;
+    const existing = shifts.filter(
+      (s) => s.employe_id === mEmployeId && s.date === mDate && s.id !== editShiftId,
+    );
+    const current = { heure_debut: mDebut, heure_fin: mFin };
+    const conflicts = existing.filter((s) => shiftsOverlap(current, s));
+    return conflicts.length > 0 ? conflicts : null;
+  }, [showModal, mEmployeId, mDate, mDebut, mFin, editShiftId, shifts]);
+
+  /* ── Absence on modal date ── */
+  const modalAbsence = useMemo(() => {
+    if (!showModal || !mEmployeId || !mDate) return null;
+    return absenceByCell.get(`${mEmployeId}:${mDate}`) ?? null;
+  }, [showModal, mEmployeId, mDate, absenceByCell]);
 
   /* ── Postes for current equipe filter ── */
   const filteredPostes = equipeFilter === "tous"
@@ -422,19 +553,32 @@ export default function PlanningPage() {
               <div style={gridContainer()}>
                 {/* ── Header row ── */}
                 <div style={headerCell} />
-                {weekDates.map((d, di) => (
-                  <div key={di} style={{
-                    ...headerCell,
-                    ...(isToday(weekISOs[di]) ? todayHeader : {}),
-                  }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>
-                      {DAY_NAMES[di]}
+                {weekDates.map((d, di) => {
+                  const dayShiftCount = shifts.filter((s) => s.date === weekISOs[di]).length;
+                  return (
+                    <div key={di} style={{
+                      ...headerCell,
+                      ...(isToday(weekISOs[di]) ? todayHeader : {}),
+                    }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>
+                        {DAY_NAMES[di]}
+                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: isToday(weekISOs[di]) ? "#D4775A" : "#1a1a1a" }}>
+                        {d.getDate()}
+                      </div>
+                      {canWrite && dayShiftCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => duplicateDay(di)}
+                          title={`Dupliquer ${DAY_NAMES[di]} → ${di < 6 ? DAY_NAMES[di + 1] : "Lun."}`}
+                          style={copyDayBtn}
+                        >
+                          Copier →
+                        </button>
+                      )}
                     </div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: isToday(weekISOs[di]) ? "#D4775A" : "#1a1a1a" }}>
-                      {d.getDate()}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {/* Hours column header */}
                 <div style={{ ...headerCell, fontSize: 10, color: "#999" }}>H.</div>
 
@@ -451,7 +595,7 @@ export default function PlanningPage() {
                     /* Employee name cell */
                     <div key={`name-${emp.id}`} style={empCell}>
                       <div style={empAvatar}>{initials}</div>
-                      <div style={{ minWidth: 0 }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                           <span style={empName}>{emp.prenom} {emp.nom.charAt(0)}.</span>
                           {isTNS && <span style={tnsBadge}>TNS</span>}
@@ -460,6 +604,16 @@ export default function PlanningPage() {
                           <div style={{ fontSize: 10, color: "#999" }}>{contrat.heures_semaine}h</div>
                         )}
                       </div>
+                      {canWrite && !isTNS && (
+                        <button
+                          type="button"
+                          onClick={() => duplicateEmployee(emp.id)}
+                          title="Dupliquer S-1"
+                          style={copyEmpBtn}
+                        >
+                          S-1
+                        </button>
+                      )}
                     </div>,
 
                     /* Day cells */
@@ -467,6 +621,7 @@ export default function PlanningPage() {
                       const iso = weekISOs[di];
                       const cellKey = `${emp.id}:${iso}`;
                       const cellShifts = shiftsByCell.get(cellKey) ?? [];
+                      const absType = absenceByCell.get(cellKey);
 
                       return (
                         <Droppable key={cellKey} droppableId={cellKey}>
@@ -477,6 +632,7 @@ export default function PlanningPage() {
                               style={{
                                 ...dayCell,
                                 ...(isToday(iso) ? todayCol : {}),
+                                ...(absType ? absenceCell : {}),
                                 ...(snapshot.isDraggingOver ? { background: "rgba(212,119,90,0.08)" } : {}),
                               }}
                               onClick={(e) => {
@@ -484,6 +640,11 @@ export default function PlanningPage() {
                                 if (canWrite) openCreateShift(emp.id, iso);
                               }}
                             >
+                              {absType && cellShifts.length === 0 && (
+                                <div style={absenceBadge}>
+                                  {ABSENCE_LABELS[absType] ?? absType}
+                                </div>
+                              )}
                               {cellShifts.map((s, si) => {
                                 const poste = s.poste_id ? posteMap.get(s.poste_id) : null;
                                 const dur = shiftDuration(s);
@@ -501,6 +662,7 @@ export default function PlanningPage() {
                                         }}
                                         style={{
                                           ...shiftBlock(poste?.couleur ?? "#ddd6c8"),
+                                          ...(absType ? { opacity: 0.5 } : {}),
                                           ...drag.draggableProps.style,
                                         }}
                                       >
@@ -629,6 +791,19 @@ export default function PlanningPage() {
                 Duree : <strong>{((timeToMin(mFin) - timeToMin(mDebut) + 1440) % 1440 - mPause) / 60 > 0
                   ? (((timeToMin(mFin) - timeToMin(mDebut) + 1440) % 1440 - mPause) / 60).toFixed(1)
                   : "0"}h</strong> (pause {mPause}min deduite)
+              </div>
+            )}
+
+            {/* Warnings */}
+            {modalAbsence && (
+              <div style={warningBox}>
+                Cet employe est en <strong>{ABSENCE_LABELS[modalAbsence] ?? modalAbsence}</strong> ce jour.
+              </div>
+            )}
+            {modalOverlap && (
+              <div style={warningBox}>
+                Chevauchement avec {modalOverlap.length > 1 ? `${modalOverlap.length} shifts` : "un shift"} existant{modalOverlap.length > 1 ? "s" : ""} :
+                {modalOverlap.map((s) => ` ${fmtH(s.heure_debut)}-${fmtH(s.heure_fin)}`).join(",")}
               </div>
             )}
 
@@ -869,4 +1044,35 @@ const deleteBtnStyle: React.CSSProperties = {
   padding: "8px 14px", borderRadius: 8,
   border: "1px solid rgba(220,38,38,0.3)", background: "rgba(220,38,38,0.06)",
   color: "#DC2626", fontSize: 13, fontWeight: 700, cursor: "pointer",
+};
+
+const warningBox: React.CSSProperties = {
+  padding: "8px 12px", borderRadius: 8, marginBottom: 10,
+  background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.2)",
+  fontSize: 12, color: "#DC2626", fontWeight: 600,
+};
+
+const absenceCell: React.CSSProperties = {
+  background: "repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(37,99,235,0.06) 4px, rgba(37,99,235,0.06) 8px)",
+};
+
+const absenceBadge: React.CSSProperties = {
+  padding: "2px 6px", borderRadius: 4,
+  background: "rgba(37,99,235,0.10)", color: "#2563eb",
+  fontSize: 10, fontWeight: 700, textAlign: "center",
+  letterSpacing: 0.3,
+};
+
+const copyDayBtn: React.CSSProperties = {
+  fontSize: 9, fontWeight: 700, padding: "1px 6px",
+  borderRadius: 4, border: "1px solid #ddd6c8",
+  background: "#fff", color: "#999", cursor: "pointer",
+  marginTop: 2,
+};
+
+const copyEmpBtn: React.CSSProperties = {
+  fontSize: 9, fontWeight: 700, padding: "2px 5px",
+  borderRadius: 4, border: "1px solid #ddd6c8",
+  background: "#fff", color: "#999", cursor: "pointer",
+  flexShrink: 0,
 };
