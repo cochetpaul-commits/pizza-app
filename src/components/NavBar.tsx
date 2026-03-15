@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { EtablissementSelector } from "@/components/EtablissementSelector";
+
+function getDefaultBack(pathname: string): { href: string; label: string } {
+  if (pathname.startsWith("/bello-mio/"))   return { href: "/bello-mio",   label: "Bello Mio" };
+  if (pathname.startsWith("/piccola-mia/")) return { href: "/piccola-mia", label: "Piccola Mia" };
+  if (pathname === "/bello-mio")            return { href: "/groupe", label: "Groupe" };
+  if (pathname === "/piccola-mia")          return { href: "/groupe", label: "Groupe" };
+  return { href: "/groupe", label: "Accueil" };
+}
 
 export type MenuItem = {
   label: string;
@@ -22,6 +31,7 @@ type NavBarProps = {
 };
 
 export function NavBar({ backHref, backLabel, right, primaryAction, menuItems }: NavBarProps) {
+  const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -51,7 +61,9 @@ export function NavBar({ backHref, backLabel, right, primaryAction, menuItems }:
               <Link href={backHref} style={navBtn} className="nav-back-icon" aria-label={backLabel ?? "Retour"}>←</Link>
             </>
           ) : (
-            <Link href="/" style={navBtn}>← Accueil</Link>
+            (() => { const def = getDefaultBack(pathname); return (
+              <Link href={def.href} style={navBtn}>&larr; {def.label}</Link>
+            ); })()
           )}
         </div>
 
