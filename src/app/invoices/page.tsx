@@ -212,7 +212,7 @@ export default function InvoicesPage() {
               <input
                 ref={fileRef}
                 type="file"
-                accept=".pdf"
+                accept="application/pdf,.pdf"
                 style={{ display: "none" }}
                 onChange={(e) => {
                   const f = e.target.files?.[0];

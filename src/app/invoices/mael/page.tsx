@@ -161,7 +161,7 @@ export default function MaelInvoicePage() {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf"
+          accept="application/pdf,.pdf"
           style={{ display: "none" }}
           onChange={(e) => {
             const f = e.target.files?.[0] ?? null;
