@@ -2,16 +2,8 @@
 
 import Link from "next/link";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { EtablissementSelector } from "@/components/EtablissementSelector";
-
-function getDefaultBack(pathname: string): { href: string; label: string } {
-  if (pathname.startsWith("/bello-mio/"))   return { href: "/bello-mio",   label: "Bello Mio" };
-  if (pathname.startsWith("/piccola-mia/")) return { href: "/piccola-mia", label: "Piccola Mia" };
-  if (pathname === "/bello-mio")            return { href: "/groupe", label: "Groupe" };
-  if (pathname === "/piccola-mia")          return { href: "/groupe", label: "Groupe" };
-  return { href: "/groupe", label: "Accueil" };
-}
 
 export type MenuItem = {
   label: string;
@@ -31,7 +23,7 @@ type NavBarProps = {
 };
 
 export function NavBar({ backHref, backLabel, right, primaryAction, menuItems }: NavBarProps) {
-  const pathname = usePathname();
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -56,14 +48,12 @@ export function NavBar({ backHref, backLabel, right, primaryAction, menuItems }:
           {backHref ? (
             <>
               {/* Desktop: "← Recettes" */}
-              <Link href={backHref} style={navBtn} className="nav-back-full">← {backLabel ?? "Retour"}</Link>
+              <Link href={backHref} style={navBtn} className="nav-back-full">&larr; {backLabel ?? "Retour"}</Link>
               {/* Mobile: just "←" */}
-              <Link href={backHref} style={navBtn} className="nav-back-icon" aria-label={backLabel ?? "Retour"}>←</Link>
+              <Link href={backHref} style={navBtn} className="nav-back-icon" aria-label={backLabel ?? "Retour"}>&larr;</Link>
             </>
           ) : (
-            (() => { const def = getDefaultBack(pathname); return (
-              <Link href={def.href} style={navBtn}>&larr; {def.label}</Link>
-            ); })()
+            <button type="button" onClick={() => router.back()} style={navBtn}>&larr; Retour</button>
           )}
         </div>
 

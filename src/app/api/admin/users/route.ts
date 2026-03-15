@@ -24,7 +24,7 @@ async function getCallerRole(req: NextRequest): Promise<string | null> {
 /** GET — list all users with profiles */
 export async function GET(req: NextRequest) {
   const role = await getCallerRole(req);
-  if (role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (role !== "group_admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { data: profiles, error } = await supabaseAdmin
     .from("profiles")
@@ -54,11 +54,11 @@ export async function GET(req: NextRequest) {
 /** PATCH — update user role */
 export async function PATCH(req: NextRequest) {
   const callerRole = await getCallerRole(req);
-  if (callerRole !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (callerRole !== "group_admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
   const { userId, role } = body as { userId?: string; role?: string };
-  if (!userId || !role || !["group_admin", "cuisine", "salle"].includes(role)) {
+  if (!userId || !role || !["group_admin", "cuisine", "salle", "plonge"].includes(role)) {
     return NextResponse.json({ error: "Invalid params" }, { status: 400 });
   }
 
@@ -74,7 +74,7 @@ export async function PATCH(req: NextRequest) {
 /** DELETE — delete user */
 export async function DELETE(req: NextRequest) {
   const callerRole = await getCallerRole(req);
-  if (callerRole !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (callerRole !== "group_admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
   const { userId } = body as { userId?: string };
