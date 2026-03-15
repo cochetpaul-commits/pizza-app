@@ -1,4 +1,7 @@
+import path from "node:path";
+
 // Polyfill DOMMatrix for Node.js / Vercel serverless (pdfjs-dist requires it)
+// Must run BEFORE pdfjs-dist is imported — hence dynamic import below
 if (typeof globalThis.DOMMatrix === "undefined") {
   globalThis.DOMMatrix = class DOMMatrix {
     m11 = 1; m12 = 0; m13 = 0; m14 = 0;
@@ -15,7 +18,6 @@ if (typeof globalThis.DOMMatrix === "undefined") {
         this.m41 = this.e; this.m42 = this.f;
       }
     }
-    // pdfjs only needs basic matrix ops for text extraction
     multiply() { return new DOMMatrix(); }
     inverse() { return new DOMMatrix(); }
     translate() { return new DOMMatrix(); }
@@ -26,18 +28,23 @@ if (typeof globalThis.DOMMatrix === "undefined") {
   } as unknown as typeof globalThis.DOMMatrix;
 }
 
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
-import path from "node:path";
+// Dynamic import — polyfill must be registered before pdfjs-dist loads
+let pdfjsLib: typeof import("pdfjs-dist/legacy/build/pdf.mjs") | null = null;
 
-// Pointer vers le vrai worker pour le mode fake (Node.js / serverless)
-// On utilise require.resolve qui fonctionne même après bundling Turbopack
-pdfjsLib.GlobalWorkerOptions.workerSrc = path.join(
-  process.cwd(),
-  "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"
-);
+async function getPdfjs() {
+  if (!pdfjsLib) {
+    pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = path.join(
+      process.cwd(),
+      "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"
+    );
+  }
+  return pdfjsLib;
+}
 
 export async function pdfToText(pdfBytes: Uint8Array): Promise<string> {
-  const loadingTask = pdfjsLib.getDocument({ data: pdfBytes, useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true });
+  const pdfjs = await getPdfjs();
+  const loadingTask = pdfjs.getDocument({ data: pdfBytes, useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true });
   const pdf = await loadingTask.promise;
   const pages: string[] = [];
   for (let i = 1; i <= pdf.numPages; i++) {
