@@ -30,7 +30,6 @@ export default function RootPage() {
     if (first?.slug === "piccola-mia" || first?.slug === "piccola_mia") {
       router.replace("/piccola-mia/cuisine");
     } else {
-      // Default to bello-mio
       router.replace("/bello-mio/cuisine");
     }
   }, [profileLoading, etabLoading, role, etablissements, router]);

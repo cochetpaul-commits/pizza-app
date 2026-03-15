@@ -1,23 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { AppNav } from "@/components/AppNav";
+import { HubTile } from "@/components/HubTile";
 import { RequireRole } from "@/components/RequireRole";
-
-const tiles = [
-  { label: "Pilotage", sub: "CA Popina, indicateurs", href: "/pilotage" },
-  { label: "Finances", sub: "Comptes & flux", href: "/finances" },
-  { label: "Factures", sub: "Import fournisseurs", href: "/invoices" },
-  { label: "Variations & Alertes", sub: "Ecarts prix, seuils", href: "/variations-prix" },
-  { label: "Masse salariale", sub: "Charges, simulateur", href: "/rh/masse-salariale" },
-  { label: "Rapports RH", sub: "Bilans mensuels, export SILAE", href: "/rh/rapports" },
-  { label: "Admin", sub: "Utilisateurs, roles", href: "/admin/utilisateurs" },
-];
+import { TOKENS } from "@/lib/tokens";
 
 export default function GestionHubBM() {
+  const accent = TOKENS.color.terracotta;
+
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <div style={{ minHeight: "100dvh", background: "#f2ede4" }}>
+      <div style={{ minHeight: "100dvh", background: TOKENS.color.creme }}>
         <AppNav />
         <div style={{ maxWidth: 600, margin: "0 auto", padding: "24px 16px 40px" }}>
 
@@ -25,17 +18,14 @@ export default function GestionHubBM() {
           <p style={subheading}>Bello Mio</p>
 
           <div style={{ display: "grid", gap: 12, marginTop: 20 }}>
-            {tiles.map(t => (
-              <Link key={t.href} href={t.href} style={{ textDecoration: "none", color: "inherit" }}>
-                <div style={tileStyle}>
-                  <div>
-                    <p style={tileTitle}>{t.label}</p>
-                    <p style={tileSub}>{t.sub}</p>
-                  </div>
-                  <span style={pill}>Ouvrir &rarr;</span>
-                </div>
-              </Link>
-            ))}
+            <HubTile href="/pilotage" label="Pilotage" sub="CA Popina, indicateurs" accent={accent} />
+            <HubTile href="/finances" label="Finances" sub="Comptes & flux" accent={accent} />
+            <HubTile href="/invoices" label="Factures" sub="Import fournisseurs" accent={accent} />
+            <HubTile href="/variations-prix" label="Variations & Alertes" sub="Ecarts prix, seuils" accent={accent} />
+            <HubTile href="/rh/masse-salariale" label="Masse salariale" sub="Charges, simulateur" accent={accent} />
+            <HubTile href="/rh/rapports" label="Rapports RH" sub="Bilans mensuels, export SILAE" accent={accent} />
+            <HubTile href="/settings" label="Parametres" sub="Configuration etablissement" accent={accent} />
+            <HubTile href="/admin/utilisateurs" label="Admin" sub="Utilisateurs, roles" accent={accent} />
           </div>
         </div>
       </div>
@@ -47,8 +37,8 @@ const heading: React.CSSProperties = {
   margin: 0,
   fontSize: 28,
   fontWeight: 700,
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-  color: "#1a1a1a",
+  fontFamily: TOKENS.font.oswald,
+  color: TOKENS.color.dark,
   letterSpacing: 1,
   textTransform: "uppercase",
 };
@@ -56,47 +46,6 @@ const heading: React.CSSProperties = {
 const subheading: React.CSSProperties = {
   margin: "4px 0 0",
   fontSize: 13,
-  color: "#D4775A",
+  color: TOKENS.color.terracotta,
   fontWeight: 600,
-};
-
-const tileStyle: React.CSSProperties = {
-  background: "#fff",
-  borderRadius: 14,
-  padding: "18px 20px",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  cursor: "pointer",
-};
-
-const tileTitle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 14,
-  fontWeight: 700,
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-  color: "#1a1a1a",
-  letterSpacing: 0.5,
-  textTransform: "uppercase",
-};
-
-const tileSub: React.CSSProperties = {
-  margin: "3px 0 0",
-  fontSize: 12,
-  color: "#999",
-};
-
-const pill: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  height: 28,
-  padding: "0 12px",
-  borderRadius: 20,
-  background: "rgba(212,119,90,0.08)",
-  border: "1px solid rgba(212,119,90,0.20)",
-  color: "#D4775A",
-  fontSize: 11,
-  fontWeight: 700,
-  whiteSpace: "nowrap",
 };

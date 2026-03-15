@@ -4,8 +4,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { RequireRole } from "@/components/RequireRole";
+import { AppNav } from "@/components/AppNav";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
+import { TOKENS } from "@/lib/tokens";
 
 type CaData = { totalSales: number; guestsNumber: number } | null;
 type UpcomingEvent = { id: string; name: string; date: string | null; status: string; covers: number };
@@ -65,39 +67,38 @@ export default function GroupePage() {
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <div style={{ minHeight: "100dvh", background: "#f2ede4" }}>
+      <div style={{ minHeight: "100dvh", background: TOKENS.color.creme }}>
+        <AppNav />
 
-        {/* Header */}
+        {/* Hero */}
         <div style={{
-          background: "#1a1a1a",
-          padding: "16px 20px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+          background: TOKENS.color.dark,
+          padding: "24px 20px",
+          marginBottom: 0,
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ maxWidth: 600, margin: "0 auto", display: "flex", alignItems: "center", gap: 14 }}>
             <Image
               src="/logo-ifratelli.png"
               alt="iFratelli Group"
-              width={40}
-              height={40}
-              style={{ height: 44, width: "auto", objectFit: "contain", filter: "brightness(1.8)" }}
+              width={44}
+              height={44}
+              style={{ height: 48, width: "auto", objectFit: "contain", filter: "brightness(1.8)" }}
               priority
             />
             <div>
               <span style={{
-                fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif",
-                fontSize: 20,
+                fontFamily: TOKENS.font.display,
+                fontSize: 22,
                 fontWeight: 600,
                 fontStyle: "italic",
-                color: "#D4775A",
+                color: TOKENS.color.terracotta,
                 lineHeight: 1.1,
               }}>
                 iFratelli
               </span>
               <span style={{
                 display: "block",
-                fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+                fontFamily: TOKENS.font.body,
                 fontSize: 9,
                 fontWeight: 700,
                 letterSpacing: 3,
@@ -109,7 +110,6 @@ export default function GroupePage() {
             </div>
             <span style={adminBadge}>ADMIN</span>
           </div>
-          <Link href="/" style={retourBtn}>&larr; Retour</Link>
         </div>
 
         <div style={{ maxWidth: 600, margin: "0 auto", padding: "24px 16px 40px" }}>
@@ -274,16 +274,6 @@ const adminBadge: React.CSSProperties = {
   fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
 };
 
-const retourBtn: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 600,
-  color: "#999",
-  textDecoration: "none",
-  padding: "6px 14px",
-  borderRadius: 20,
-  border: "1px solid #333",
-  background: "rgba(255,255,255,0.05)",
-};
 
 const kpiBlock: React.CSSProperties = {
   background: "#1a1a1a",

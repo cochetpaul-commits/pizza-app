@@ -19,12 +19,14 @@ const ROLE_LABELS: Record<Role, string> = {
   group_admin: "Group Admin",
   cuisine: "Cuisine",
   salle: "Salle",
+  plonge: "Plonge",
 };
 
 const ROLE_COLORS: Record<Role, string> = {
   group_admin: "#D4775A",
   cuisine: "#1a1a1a",
   salle: "#4a6741",
+  plonge: "#6b7280",
 };
 
 function fmtDate(iso: string) {
@@ -186,6 +188,7 @@ function UsersContent() {
                   >
                     <option value="cuisine">Cuisine</option>
                     <option value="salle">Salle</option>
+                    <option value="plonge">Plonge</option>
                     <option value="group_admin">Group Admin</option>
                   </select>
                 </div>

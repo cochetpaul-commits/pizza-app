@@ -1,155 +1,258 @@
 "use client";
 
 import Link from "next/link";
-import React from "react";
+import React, { useState } from "react";
 import { usePathname } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
+import { TOKENS } from "@/lib/tokens";
 
-type NavLink = { label: string; href: string; adminOnly?: boolean };
+type NavItem = {
+  label: string;
+  href: string;
+  adminOnly?: boolean;
+  indent?: boolean;
+  group?: string;
+};
 
-const BM_LINKS: NavLink[] = [
-  { label: "Cuisine", href: "/bello-mio/cuisine" },
-  { label: "Planning", href: "/bello-mio/planning" },
-  { label: "Gestion", href: "/bello-mio/gestion", adminOnly: true },
+const NAV_ITEMS: NavItem[] = [
+  { label: "Groupe", href: "/groupe", adminOnly: true },
+  { label: "Bello Mio", href: "/bello-mio", group: "bm" },
+  { label: "Cuisine", href: "/bello-mio/cuisine", indent: true },
+  { label: "Planning", href: "/bello-mio/planning", indent: true },
+  { label: "Gestion", href: "/bello-mio/gestion", adminOnly: true, indent: true },
+  { label: "Piccola Mia", href: "/piccola-mia", group: "pm" },
+  { label: "Cuisine", href: "/piccola-mia/cuisine", indent: true },
+  { label: "Planning", href: "/piccola-mia/planning", indent: true },
+  { label: "Evenements", href: "/piccola-mia/evenements", indent: true },
+  { label: "Gestion", href: "/piccola-mia/gestion", adminOnly: true, indent: true },
 ];
 
-const PM_LINKS: NavLink[] = [
-  { label: "Cuisine", href: "/piccola-mia/cuisine" },
-  { label: "Planning", href: "/piccola-mia/planning" },
-  { label: "Evenements", href: "/piccola-mia/evenements", adminOnly: true },
-  { label: "Gestion", href: "/piccola-mia/gestion", adminOnly: true },
-];
+const PAGE_LABELS: Record<string, string> = {
+  "/groupe": "Groupe",
+  "/bello-mio": "Bello Mio",
+  "/bello-mio/cuisine": "Cuisine",
+  "/bello-mio/planning": "Planning",
+  "/bello-mio/gestion": "Gestion",
+  "/piccola-mia": "Piccola Mia",
+  "/piccola-mia/cuisine": "Cuisine",
+  "/piccola-mia/planning": "Planning",
+  "/piccola-mia/evenements": "Evenements",
+  "/piccola-mia/gestion": "Gestion",
+};
 
-const GROUP_LINKS: NavLink[] = [
-  { label: "Groupe", href: "/groupe" },
-  { label: "Bello Mio", href: "/bello-mio" },
-  { label: "Piccola Mia", href: "/piccola-mia" },
-];
-
-function resolveContext(pathname: string): {
-  accent: string;
-  links: NavLink[];
-  backHref: string;
-  backLabel: string;
-} {
-  if (pathname.startsWith("/bello-mio")) {
-    const isHub = pathname === "/bello-mio";
-    return {
-      accent: "#D4775A",
-      links: isHub ? [] : BM_LINKS,
-      backHref: isHub ? "/groupe" : "/bello-mio",
-      backLabel: isHub ? "Groupe" : "Bello Mio",
-    };
+function getPageTitle(pathname: string): string {
+  // Exact match first
+  if (PAGE_LABELS[pathname]) return PAGE_LABELS[pathname];
+  // Prefix match for sub-pages
+  const keys = Object.keys(PAGE_LABELS).sort((a, b) => b.length - a.length);
+  for (const key of keys) {
+    if (pathname.startsWith(key + "/") || pathname === key) return PAGE_LABELS[key];
   }
-  if (pathname.startsWith("/piccola-mia")) {
-    const isHub = pathname === "/piccola-mia";
-    return {
-      accent: "#F5E642",
-      links: isHub ? [] : PM_LINKS,
-      backHref: isHub ? "/groupe" : "/piccola-mia",
-      backLabel: isHub ? "Groupe" : "Piccola Mia",
-    };
+  return "";
+}
+
+function getAccent(pathname: string): string {
+  if (pathname.startsWith("/piccola-mia")) return TOKENS.color.jaune;
+  return TOKENS.color.terracotta;
+}
+
+function getBackLink(pathname: string): { href: string; label: string } | null {
+  if (pathname === "/groupe") return null;
+  if (pathname === "/bello-mio" || pathname === "/piccola-mia") {
+    return { href: "/groupe", label: "Groupe" };
   }
-  // /groupe or fallback
-  return {
-    accent: "#D4775A",
-    links: GROUP_LINKS,
-    backHref: "/",
-    backLabel: "Accueil",
-  };
+  if (pathname.startsWith("/bello-mio/")) return { href: "/bello-mio", label: "Bello Mio" };
+  if (pathname.startsWith("/piccola-mia/")) return { href: "/piccola-mia", label: "Piccola Mia" };
+  return { href: "/", label: "Accueil" };
+}
+
+function getInitials(name: string | null | undefined): string {
+  if (!name) return "?";
+  return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 }
 
 export function AppNav() {
   const pathname = usePathname();
-  const { isGroupAdmin } = useProfile();
-  const ctx = resolveContext(pathname);
+  const { isGroupAdmin, displayName } = useProfile();
+  const [open, setOpen] = useState(false);
 
-  const visibleLinks = ctx.links.filter(l => !l.adminOnly || isGroupAdmin);
+  const accent = getAccent(pathname);
+  const title = getPageTitle(pathname);
+  const back = getBackLink(pathname);
+
+  const visibleItems = NAV_ITEMS.filter(item => !item.adminOnly || isGroupAdmin);
 
   return (
-    <nav style={navStyle}>
-      <div style={inner}>
-        <Link href={ctx.backHref} style={backBtn}>
-          <span style={{ marginRight: 4 }}>&larr;</span>
-          {ctx.backLabel}
-        </Link>
+    <>
+      {/* Top bar */}
+      <nav style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 100,
+        width: "100%",
+        background: TOKENS.color.dark,
+        borderBottom: `2px solid ${accent}`,
+      }}>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          maxWidth: 900,
+          margin: "0 auto",
+          padding: "0 16px",
+          height: 48,
+        }}>
+          {/* Left: burger */}
+          <button
+            onClick={() => setOpen(true)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#fff",
+              fontSize: 22,
+              cursor: "pointer",
+              padding: "4px 8px",
+              lineHeight: 1,
+            }}
+            aria-label="Menu"
+          >
+            &#9776;
+          </button>
 
-        {visibleLinks.length > 0 && (
-          <div style={linksRow}>
-            {visibleLinks.map(link => {
-              const active = pathname === link.href || pathname.startsWith(link.href + "/");
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  style={{
-                    ...linkStyle,
-                    color: active ? ctx.accent : "#999",
-                    borderBottom: active ? `2px solid ${ctx.accent}` : "2px solid transparent",
-                  }}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
+          {/* Center: title */}
+          <span style={{
+            fontFamily: TOKENS.font.oswald,
+            fontSize: 14,
+            fontWeight: 700,
+            letterSpacing: 1,
+            textTransform: "uppercase",
+            color: "#fff",
+          }}>
+            {title}
+          </span>
+
+          {/* Right: avatar */}
+          <div style={{
+            width: 30,
+            height: 30,
+            borderRadius: "50%",
+            background: accent,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 11,
+            fontWeight: 700,
+            color: accent === TOKENS.color.jaune ? TOKENS.color.dark : "#fff",
+          }}>
+            {getInitials(displayName)}
           </div>
-        )}
-      </div>
-    </nav>
+        </div>
+      </nav>
+
+      {/* Back link (under nav bar) */}
+      {back && (
+        <div style={{
+          maxWidth: 900,
+          margin: "0 auto",
+          padding: "10px 16px 0",
+        }}>
+          <Link href={back.href} style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: 12,
+            fontWeight: 600,
+            color: TOKENS.color.muted,
+            textDecoration: "none",
+          }}>
+            &larr; {back.label}
+          </Link>
+        </div>
+      )}
+
+      {/* Drawer overlay */}
+      {open && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 200,
+            background: "rgba(0,0,0,0.5)",
+            animation: "fadeIn 0.15s ease",
+          }}
+          onClick={() => setOpen(false)}
+        >
+          {/* Drawer panel */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              bottom: 0,
+              width: 240,
+              background: TOKENS.color.dark,
+              padding: "20px 0",
+              overflowY: "auto",
+              boxShadow: "4px 0 20px rgba(0,0,0,0.3)",
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <div style={{ padding: "0 16px 16px", borderBottom: "1px solid #333" }}>
+              <button
+                onClick={() => setOpen(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#999",
+                  fontSize: 18,
+                  cursor: "pointer",
+                  padding: "4px 8px",
+                }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Nav items */}
+            <div style={{ padding: "12px 0" }}>
+              {visibleItems.map(item => {
+                const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                const isGroup = !!item.group;
+                return (
+                  <Link
+                    key={item.href + item.label}
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    style={{
+                      display: "block",
+                      padding: isGroup
+                        ? "12px 20px 4px"
+                        : item.indent
+                          ? "8px 20px 8px 36px"
+                          : "8px 20px",
+                      textDecoration: "none",
+                      fontFamily: TOKENS.font.oswald,
+                      fontSize: isGroup ? 13 : 12,
+                      fontWeight: isGroup ? 700 : 600,
+                      letterSpacing: isGroup ? 1.5 : 0.5,
+                      textTransform: "uppercase",
+                      color: active
+                        ? (item.href.startsWith("/piccola-mia") ? TOKENS.color.jaune : TOKENS.color.terracotta)
+                        : isGroup ? "#fff" : "#999",
+                      borderLeft: active ? `3px solid ${item.href.startsWith("/piccola-mia") ? TOKENS.color.jaune : TOKENS.color.terracotta}` : "3px solid transparent",
+                      background: active ? "rgba(255,255,255,0.05)" : "transparent",
+                      transition: "color 0.15s, background 0.15s",
+                    }}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
-
-const navStyle: React.CSSProperties = {
-  position: "sticky",
-  top: 0,
-  zIndex: 50,
-  width: "100%",
-  background: "#f2ede4",
-  borderBottom: "1px solid #ddd6c8",
-};
-
-const inner: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 12,
-  maxWidth: 900,
-  margin: "0 auto",
-  padding: "0 16px",
-  height: 48,
-};
-
-const backBtn: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  height: 32,
-  padding: "0 12px",
-  borderRadius: 20,
-  border: "1px solid #ddd6c8",
-  textDecoration: "none",
-  color: "#1a1a1a",
-  fontSize: 11,
-  fontWeight: 600,
-  background: "#fff",
-  whiteSpace: "nowrap",
-  flexShrink: 0,
-};
-
-const linksRow: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 4,
-  flex: 1,
-  overflow: "auto",
-};
-
-const linkStyle: React.CSSProperties = {
-  textDecoration: "none",
-  fontSize: 12,
-  fontWeight: 700,
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-  letterSpacing: 0.5,
-  textTransform: "uppercase",
-  padding: "12px 10px",
-  whiteSpace: "nowrap",
-  transition: "color 0.15s",
-};

@@ -1,4 +1,4 @@
-export type AppRole = "group_admin" | "cuisine" | "salle";
+export type AppRole = "group_admin" | "cuisine" | "salle" | "plonge";
 
 export const PERMISSIONS: Record<AppRole, string[]> = {
   group_admin: [
@@ -14,13 +14,19 @@ export const PERMISSIONS: Record<AppRole, string[]> = {
     "dashboard", "catalogue.view",
     "ingredients.view", "recettes.view", "recettes.edit",
     "commandes.saisir", "fournisseurs.view",
-    "planning.view", "cocktails.edit",
+    "planning.view", "cocktails.edit", "evenements.view",
   ],
   salle: [
     "dashboard", "catalogue.view",
     "ingredients.view", "recettes.view",
     "commandes.saisir", "fournisseurs.view",
-    "planning.view", "cocktails.edit",
+    "planning.view", "cocktails.edit", "evenements.view",
+  ],
+  plonge: [
+    "dashboard", "catalogue.view",
+    "ingredients.view", "recettes.view",
+    "commandes.saisir", "fournisseurs.view",
+    "planning.view", "evenements.view",
   ],
 };
 

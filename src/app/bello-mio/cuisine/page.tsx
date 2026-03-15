@@ -1,19 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { AppNav } from "@/components/AppNav";
-
-const tiles = [
-  { label: "Recettes", sub: "Pizze, Cuisine, Cocktails, Empatements", href: "/recettes", count: "75 fiches" },
-  { label: "Ingredients", sub: "Catalogue produits & prix", href: "/ingredients", count: "700 ref." },
-  { label: "Commander", sub: "Nouvelle commande fournisseur", href: "/commandes" },
-  { label: "Mercuriale", sub: "Prix du marche", href: "/mercuriale" },
-  { label: "Fournisseurs", sub: "Contacts & tarifs", href: "/fournisseurs" },
-];
+import { HubTile } from "@/components/HubTile";
+import { TOKENS } from "@/lib/tokens";
 
 export default function CuisineHubBM() {
+  const accent = TOKENS.color.terracotta;
+
   return (
-    <div style={{ minHeight: "100dvh", background: "#f2ede4" }}>
+    <div style={{ minHeight: "100dvh", background: TOKENS.color.creme }}>
       <AppNav />
       <div style={{ maxWidth: 600, margin: "0 auto", padding: "24px 16px 40px" }}>
 
@@ -21,20 +16,11 @@ export default function CuisineHubBM() {
         <p style={subheading}>Bello Mio</p>
 
         <div style={{ display: "grid", gap: 12, marginTop: 20 }}>
-          {tiles.map(t => (
-            <Link key={t.href} href={t.href} style={{ textDecoration: "none", color: "inherit" }}>
-              <div style={tileStyle}>
-                <div>
-                  <p style={tileTitle}>{t.label}</p>
-                  <p style={tileSub}>{t.sub}</p>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  {t.count && <span style={countStyle}>{t.count}</span>}
-                  <span style={pill}>Ouvrir &rarr;</span>
-                </div>
-              </div>
-            </Link>
-          ))}
+          <HubTile href="/recettes" label="Recettes" sub="Pizze, Cuisine, Cocktails, Empatements" accent={accent} count="75 fiches" />
+          <HubTile href="/ingredients" label="Ingredients" sub="Catalogue produits & prix" accent={accent} count="700 ref." />
+          <HubTile href="/commandes" label="Commander" sub="Nouvelle commande fournisseur" accent={accent} />
+          <HubTile href="/mercuriale" label="Mercuriale" sub="Prix du marche" accent={accent} />
+          <HubTile href="/fournisseurs" label="Fournisseurs" sub="Contacts & tarifs" accent={accent} />
         </div>
       </div>
     </div>
@@ -56,51 +42,4 @@ const subheading: React.CSSProperties = {
   fontSize: 13,
   color: "#D4775A",
   fontWeight: 600,
-};
-
-const tileStyle: React.CSSProperties = {
-  background: "#fff",
-  borderRadius: 14,
-  padding: "18px 20px",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  cursor: "pointer",
-};
-
-const tileTitle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 14,
-  fontWeight: 700,
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-  color: "#1a1a1a",
-  letterSpacing: 0.5,
-  textTransform: "uppercase",
-};
-
-const tileSub: React.CSSProperties = {
-  margin: "3px 0 0",
-  fontSize: 12,
-  color: "#999",
-};
-
-const countStyle: React.CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
-  color: "#D4775A",
-};
-
-const pill: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  height: 28,
-  padding: "0 12px",
-  borderRadius: 20,
-  background: "rgba(212,119,90,0.08)",
-  border: "1px solid rgba(212,119,90,0.20)",
-  color: "#D4775A",
-  fontSize: 11,
-  fontWeight: 700,
-  whiteSpace: "nowrap",
 };

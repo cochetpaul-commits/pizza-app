@@ -1,4 +1,4 @@
-export type Role = "group_admin" | "cuisine" | "salle";
+export type Role = "group_admin" | "cuisine" | "salle" | "plonge";
 
 /** Routes and which roles can access them (prefix match) */
 export const ROUTE_ACCESS: Record<string, Role[]> = {
@@ -12,18 +12,18 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/epicerie":     ["group_admin"],
   "/variations-prix": ["group_admin"],
   "/rh":           ["group_admin"],
-  "/plannings":    ["group_admin", "cuisine", "salle"],
+  "/plannings":    ["group_admin", "cuisine", "salle", "plonge"],
   "/recettes":     ["group_admin", "cuisine", "salle"],
   "/ingredients":  ["group_admin", "cuisine", "salle"],
   "/commandes":    ["group_admin", "cuisine", "salle"],
   "/finances":     ["group_admin"],
   "/settings":     ["group_admin"],
   // Hub routes
-  "/bello-mio":    ["group_admin", "cuisine", "salle"],
-  "/piccola-mia":  ["group_admin", "cuisine", "salle"],
+  "/bello-mio":    ["group_admin", "cuisine", "salle", "plonge"],
+  "/piccola-mia":  ["group_admin", "cuisine", "salle", "plonge"],
   "/bello-mio/gestion":    ["group_admin"],
   "/piccola-mia/gestion":  ["group_admin"],
-  "/piccola-mia/evenements": ["group_admin"],
+  "/piccola-mia/evenements": ["group_admin", "cuisine", "salle", "plonge"],
 };
 
 /** Check if a role can access a given path (prefix match) */

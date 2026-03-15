@@ -1,27 +1,28 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
 import { AppNav } from "@/components/AppNav";
+import { HubTile } from "@/components/HubTile";
 import { useProfile } from "@/lib/ProfileContext";
+import { TOKENS } from "@/lib/tokens";
 
 export default function PiccolaMiaHub() {
   const { isGroupAdmin } = useProfile();
-
-  const tiles = [
-    { label: "Cuisine", sub: "Recettes, ingredients, commandes", href: "/piccola-mia/cuisine", show: true },
-    { label: "Planning", sub: "Shifts, equipe, horaires", href: "/piccola-mia/planning", show: true },
-    { label: "Evenements", sub: "Mariages, seminaires, traiteur", href: "/piccola-mia/evenements", show: isGroupAdmin },
-    { label: "Gestion", sub: "Pilotage, finances, admin", href: "/piccola-mia/gestion", show: isGroupAdmin },
-  ];
+  const accent = TOKENS.color.jauneDark;
 
   return (
-    <div style={{ minHeight: "100dvh", background: "#f2ede4" }}>
+    <div style={{ minHeight: "100dvh", background: TOKENS.color.creme }}>
       <AppNav />
       <div style={{ maxWidth: 600, margin: "0 auto", padding: "24px 16px 40px" }}>
 
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 28 }}>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 14,
+          marginBottom: 8,
+          padding: "20px 18px",
+        }}>
           <Image
             src="/logo-ifratelli.png"
             alt="Piccola Mia"
@@ -35,8 +36,8 @@ export default function PiccolaMiaHub() {
               margin: 0,
               fontSize: 28,
               fontWeight: 700,
-              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-              color: "#1a1a1a",
+              fontFamily: TOKENS.font.oswald,
+              color: TOKENS.color.dark,
               letterSpacing: 1,
               lineHeight: 1.1,
             }}>
@@ -47,7 +48,7 @@ export default function PiccolaMiaHub() {
               width: 40,
               height: 3,
               borderRadius: 2,
-              background: "#F5E642",
+              background: TOKENS.color.jaune,
             }} />
           </div>
         </div>
@@ -57,66 +58,39 @@ export default function PiccolaMiaHub() {
           height: 6,
           borderRadius: 3,
           marginBottom: 20,
-          background: "repeating-linear-gradient(90deg, #fff 0px, #fff 10px, #FAF0A0 10px, #FAF0A0 20px)",
+          background: TOKENS.pattern.stripedPM,
         }} />
 
         {/* Tiles */}
         <div style={{ display: "grid", gap: 12 }}>
-          {tiles.filter(t => t.show).map(t => (
-            <Link key={t.href} href={t.href} style={{ textDecoration: "none", color: "inherit" }}>
-              <div style={tileStyle}>
-                <div>
-                  <p style={tileTitle}>{t.label}</p>
-                  <p style={tileSub}>{t.sub}</p>
-                </div>
-                <span style={pillStyle}>Ouvrir &rarr;</span>
-              </div>
-            </Link>
-          ))}
+          <HubTile
+            href="/piccola-mia/cuisine"
+            label="Cuisine"
+            sub="Recettes, ingredients, commandes"
+            accent={accent}
+          />
+          <HubTile
+            href="/piccola-mia/planning"
+            label="Planning"
+            sub="Shifts, equipe, horaires"
+            accent={accent}
+          />
+          <HubTile
+            href="/piccola-mia/evenements"
+            label="Evenements"
+            sub="Mariages, seminaires, traiteur"
+            accent={accent}
+          />
+          {isGroupAdmin && (
+            <HubTile
+              href="/piccola-mia/gestion"
+              label="Gestion"
+              sub="Pilotage, finances, admin"
+              accent={accent}
+            />
+          )}
         </div>
       </div>
     </div>
   );
 }
-
-const tileStyle: React.CSSProperties = {
-  background: "#fff",
-  borderRadius: 14,
-  padding: "18px 20px",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  cursor: "pointer",
-};
-
-const tileTitle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 15,
-  fontWeight: 700,
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-  color: "#1a1a1a",
-  letterSpacing: 0.5,
-  textTransform: "uppercase",
-};
-
-const tileSub: React.CSSProperties = {
-  margin: "4px 0 0",
-  fontSize: 12,
-  color: "#999",
-};
-
-const pillStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  height: 30,
-  padding: "0 14px",
-  borderRadius: 20,
-  background: "rgba(245,230,66,0.12)",
-  border: "1px solid rgba(245,230,66,0.30)",
-  color: "#b8a800",
-  fontSize: 11,
-  fontWeight: 700,
-  whiteSpace: "nowrap",
-  flexShrink: 0,
-};
