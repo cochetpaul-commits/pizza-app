@@ -16,6 +16,7 @@ import { parseCarniato } from "./carniato";
 import { parseBarSpirits } from "./barspirits";
 import { parseVinoflo } from "./vinoflo";
 import { parseMasse } from "./masse";
+import { parseLmdw } from "./lmdw";
 import { parseGeneric } from "./generic";
 
 export type { ParseResult, ParsedIngredient, ParseLog, Categorie, Confidence } from "./types";
@@ -36,6 +37,7 @@ const PARSERS: Record<string, (text: string, etab: string) => ParseResult> = {
   bar_spirits: parseBarSpirits,
   vinoflo: parseVinoflo,
   masse: parseMasse,
+  lmdw: parseLmdw,
 };
 
 export function parseInvoice(options: ParserOptions): ParseResult {

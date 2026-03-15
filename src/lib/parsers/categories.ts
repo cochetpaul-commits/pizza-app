@@ -19,7 +19,7 @@ const CATEGORIE_KEYWORDS: Record<Categorie, string[]> = {
   ],
   maree: [
     "thon", "saumon", "crevette", "seiche", "poulpe",
-    "dorade", "bar", "loup", "cabillaud", "daurade",
+    "dorade", "bar ", "loup", "cabillaud", "daurade",
   ],
   legumes_herbes: [
     "tomate", "basilic", "poivron", "ail", "oignon",
@@ -50,6 +50,7 @@ const CATEGORIE_KEYWORDS: Record<Categorie, string[]> = {
     "whisky", "whiskey", "tequila", "mezcal", "liqueur",
     "amaro", "sambuca", "fernet", "spritz", "bitter",
     "champagne", "cava", "spumante", "lambrusco",
+    "frangelico", "amaretto", "dolcetto", "aperitivo",
   ],
   surgele: [
     "surgelé", "surgele", "congelé", "congele", "ivp",

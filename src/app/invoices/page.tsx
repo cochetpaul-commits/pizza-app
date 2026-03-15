@@ -52,6 +52,7 @@ const SUPPLIERS = [
   { slug: "barspirits", name: "Bar Spirits" },
   { slug: "sum", name: "Sum" },
   { slug: "armor", name: "Armor" },
+  { slug: "lmdw", name: "LMDW" },
 ];
 
 const ETABS = [

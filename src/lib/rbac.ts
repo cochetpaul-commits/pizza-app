@@ -18,6 +18,12 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/commandes":    ["group_admin", "cuisine", "salle"],
   "/finances":     ["group_admin"],
   "/settings":     ["group_admin"],
+  // Hub routes
+  "/bello-mio":    ["group_admin", "cuisine", "salle"],
+  "/piccola-mia":  ["group_admin", "cuisine", "salle"],
+  "/bello-mio/gestion":    ["group_admin"],
+  "/piccola-mia/gestion":  ["group_admin"],
+  "/piccola-mia/evenements": ["group_admin"],
 };
 
 /** Check if a role can access a given path (prefix match) */

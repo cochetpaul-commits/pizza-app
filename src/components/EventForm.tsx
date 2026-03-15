@@ -117,6 +117,10 @@ export default function EventForm({ eventId }: { eventId?: string }) {
   const [sellPrice, setSellPrice] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
 
+  // Client
+  const [clientId, setClientId] = useState<string | null>(null);
+  const [clientsList, setClientsList] = useState<{ id: string; nom: string; prenom: string | null; email: string | null; telephone: string | null; notes: string | null }[]>([]);
+
   // Contact
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
@@ -172,6 +176,14 @@ export default function EventForm({ eventId }: { eventId?: string }) {
     })();
   }, [etab]);
 
+  // ── Load clients ─────────────────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("clients").select("id,nom,prenom,email,telephone,notes").order("nom");
+      setClientsList(data ?? []);
+    })();
+  }, []);
+
   // ── Load existing event ───────────────────────────────────────────────
   useEffect(() => {
     if (!eventId) return;
@@ -194,6 +206,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
       setContactPhone(ev.contact_phone ?? "");
       setContactEmail(ev.contact_email ?? "");
       setContactNotes(ev.contact_notes ?? "");
+      setClientId(ev.client_id ?? null);
 
       const { data: recs } = await supabase
         .from("event_recipes")
@@ -332,6 +345,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
         contact_phone: contactPhone.trim() || null,
         contact_email: contactEmail.trim() || null,
         contact_notes: contactNotes.trim() || null,
+        client_id: clientId || null,
         updated_at: new Date().toISOString(),
       };
 
@@ -531,6 +545,35 @@ export default function EventForm({ eventId }: { eventId?: string }) {
         {/* ═══ 2. CONTACT CLIENT ═══ */}
         <div style={sectionStyle}>
           {sectionTitle("Contact client", "#4a6741")}
+
+          <div style={{ marginBottom: 12 }}>
+            <label style={labelStyle}>Client (carnet)</label>
+            <select
+              style={inputStyle}
+              value={clientId ?? ""}
+              onChange={(e) => {
+                const id = e.target.value || null;
+                setClientId(id);
+                if (id) {
+                  const c = clientsList.find(cl => cl.id === id);
+                  if (c) {
+                    setContactName([c.nom, c.prenom].filter(Boolean).join(" "));
+                    if (c.telephone) setContactPhone(c.telephone);
+                    if (c.email) setContactEmail(c.email);
+                    if (c.notes) setContactNotes(c.notes);
+                  }
+                }
+              }}
+            >
+              <option value="">— Saisie libre —</option>
+              {clientsList.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.nom}{c.prenom ? ` ${c.prenom}` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
             <div>
               <label style={labelStyle}>Nom</label>

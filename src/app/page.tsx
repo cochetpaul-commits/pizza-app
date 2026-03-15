@@ -135,14 +135,21 @@ export default function Home() {
   const [counts, setCounts] = useState<Counts | null>(null);
   const [caJour, setCaJour] = useState<number | null>(null);
   const { role, displayName, isGroupAdmin, can, loading: profileLoading } = useProfile();
-  const { current: etab, isGroupView } = useEtablissement();
+  const { current: etab } = useEtablissement();
 
-  // Redirect group_admin to /groupe when in group view (first login)
+  // Redirect based on role
   useEffect(() => {
-    if (!profileLoading && isGroupAdmin && isGroupView) {
+    if (profileLoading) return;
+    if (isGroupAdmin) {
       router.replace("/groupe");
+      return;
     }
-  }, [profileLoading, isGroupAdmin, isGroupView, router]);
+    // Non-admin: redirect to their restaurant's cuisine hub
+    // Default to bello-mio if no specific restaurant
+    if (role === "cuisine" || role === "salle") {
+      router.replace("/bello-mio/cuisine");
+    }
+  }, [profileLoading, isGroupAdmin, role, router]);
 
   // CA du jour Popina — auto-refresh toutes les 5 min
   useEffect(() => {
