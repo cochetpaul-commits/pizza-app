@@ -105,6 +105,12 @@ export default function InvoicesPage() {
       console.log("[invoices] calling detect API...");
       const res = await fetchApi("/api/invoices/detect", { method: "POST", body: form });
       console.log("[invoices] response status:", res.status);
+      if (!res.ok) {
+        const text = await res.text();
+        let msg = `Erreur ${res.status}`;
+        try { const j = JSON.parse(text); msg = j.error ?? msg; } catch { /* not JSON */ }
+        throw new Error(msg);
+      }
       const data = await res.json();
       console.log("[invoices] detection result:", data);
       setDetection(data.detection);

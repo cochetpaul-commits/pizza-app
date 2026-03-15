@@ -9,19 +9,29 @@ export const runtime = "nodejs";
  * Accept a PDF file, extract text, and detect supplier + establishment.
  */
 export async function POST(req: Request) {
-  const form = await req.formData();
-  const file = form.get("file") as File | null;
+  try {
+    const form = await req.formData();
+    const file = form.get("file") as File | null;
 
-  if (!file) {
-    return NextResponse.json({ error: "Fichier requis" }, { status: 400 });
+    if (!file) {
+      return NextResponse.json({ error: "Fichier requis" }, { status: 400 });
+    }
+
+    if (!file.name.toLowerCase().endsWith(".pdf") && file.type !== "application/pdf") {
+      return NextResponse.json({ error: "Seuls les fichiers PDF sont acceptés." }, { status: 400 });
+    }
+
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const rawText = await pdfToText(bytes);
+    const detection = detectInvoice(rawText);
+
+    return NextResponse.json({
+      detection,
+      textPreview: rawText.slice(0, 500),
+    });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[detect] error:", msg);
+    return NextResponse.json({ error: `Erreur analyse PDF: ${msg}` }, { status: 500 });
   }
-
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const rawText = await pdfToText(bytes);
-  const detection = detectInvoice(rawText);
-
-  return NextResponse.json({
-    detection,
-    textPreview: rawText.slice(0, 500),
-  });
 }
