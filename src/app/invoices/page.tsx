@@ -102,15 +102,20 @@ export default function InvoicesPage() {
     try {
       const form = new FormData();
       form.append("file", f);
+      console.log("[invoices] calling detect API...");
       const res = await fetchApi("/api/invoices/detect", { method: "POST", body: form });
+      console.log("[invoices] response status:", res.status);
       const data = await res.json();
+      console.log("[invoices] detection result:", data);
       setDetection(data.detection);
       setSelectedSupplier(data.detection?.supplier?.slug ?? null);
       if (data.detection?.etablissement?.slug === "bello_mio") setSelectedEtab("bellomio");
       else if (data.detection?.etablissement?.slug === "piccola_mia") setSelectedEtab("piccola");
       setStep("confirm");
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      console.error("[invoices] upload error:", e, "type:", typeof e);
+      if (e instanceof Error) console.error("[invoices] stack:", e.stack);
+      setError(e instanceof Error ? `${e.name}: ${e.message}` : String(e));
     } finally {
       setLoading(false);
     }
