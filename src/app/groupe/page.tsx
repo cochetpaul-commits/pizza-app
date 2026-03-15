@@ -70,47 +70,22 @@ export default function GroupePage() {
       <div style={{ minHeight: "100dvh", background: TOKENS.color.creme }}>
         <AppNav />
 
-        {/* Hero */}
+        {/* Header — logo centre */}
         <div style={{
-          background: TOKENS.color.creme,
-          borderBottom: `2px solid ${TOKENS.color.border}`,
-          padding: "24px 20px",
-          marginBottom: 0,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: "16px 20px 20px",
+          borderBottom: `1px solid ${TOKENS.color.border}`,
         }}>
-          <div style={{ maxWidth: 600, margin: "0 auto", display: "flex", alignItems: "center", gap: 14 }}>
-            <Image
-              src="/logo-ifratelli.png"
-              alt="iFratelli Group"
-              width={56}
-              height={56}
-              style={{ height: 56, width: "auto", objectFit: "contain" }}
-              priority
-            />
-            <div>
-              <span style={{
-                fontFamily: TOKENS.font.display,
-                fontSize: 22,
-                fontWeight: 600,
-                fontStyle: "italic",
-                color: TOKENS.color.dark,
-                lineHeight: 1.1,
-              }}>
-                iFratelli
-              </span>
-              <span style={{
-                display: "block",
-                fontFamily: TOKENS.font.body,
-                fontSize: 9,
-                fontWeight: 700,
-                letterSpacing: 3,
-                textTransform: "uppercase",
-                color: TOKENS.color.muted,
-              }}>
-                GROUP
-              </span>
-            </div>
-            <span style={adminBadge}>ADMIN</span>
-          </div>
+          <Image
+            src="/logo-ifratelli.png"
+            alt="iFratelli Group"
+            width={80}
+            height={80}
+            style={{ objectFit: "contain", mixBlendMode: "multiply" }}
+            priority
+          />
         </div>
 
         <div style={{ maxWidth: 600, margin: "0 auto", padding: "24px 16px 40px" }}>
@@ -264,16 +239,6 @@ export default function GroupePage() {
 
 // Styles
 
-const adminBadge: React.CSSProperties = {
-  fontSize: 9,
-  fontWeight: 700,
-  letterSpacing: 1.5,
-  padding: "3px 8px",
-  borderRadius: 6,
-  background: "rgba(212,119,90,0.15)",
-  color: "#D4775A",
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-};
 
 
 const kpiBlock: React.CSSProperties = {
