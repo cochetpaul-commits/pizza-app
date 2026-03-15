@@ -72,7 +72,8 @@ export default function GroupePage() {
 
         {/* Hero */}
         <div style={{
-          background: TOKENS.color.dark,
+          background: TOKENS.color.creme,
+          borderBottom: `2px solid ${TOKENS.color.border}`,
           padding: "24px 20px",
           marginBottom: 0,
         }}>
@@ -80,9 +81,9 @@ export default function GroupePage() {
             <Image
               src="/logo-ifratelli.png"
               alt="iFratelli Group"
-              width={44}
-              height={44}
-              style={{ height: 48, width: "auto", objectFit: "contain", filter: "brightness(1.8)" }}
+              width={56}
+              height={56}
+              style={{ height: 56, width: "auto", objectFit: "contain" }}
               priority
             />
             <div>
@@ -91,7 +92,7 @@ export default function GroupePage() {
                 fontSize: 22,
                 fontWeight: 600,
                 fontStyle: "italic",
-                color: TOKENS.color.terracotta,
+                color: TOKENS.color.dark,
                 lineHeight: 1.1,
               }}>
                 iFratelli
@@ -103,7 +104,7 @@ export default function GroupePage() {
                 fontWeight: 700,
                 letterSpacing: 3,
                 textTransform: "uppercase",
-                color: "#888",
+                color: TOKENS.color.muted,
               }}>
                 GROUP
               </span>
@@ -122,7 +123,7 @@ export default function GroupePage() {
                 {ca ? `${fmtEur(ca.totalSales)} \u20AC` : "\u2014"}
               </span>
               {ca && ca.guestsNumber > 0 && (
-                <span style={{ fontSize: 13, color: "#888" }}>
+                <span style={{ fontSize: 13, color: "#999" }}>
                   {ca.guestsNumber} couverts
                 </span>
               )}
@@ -276,7 +277,8 @@ const adminBadge: React.CSSProperties = {
 
 
 const kpiBlock: React.CSSProperties = {
-  background: "#1a1a1a",
+  background: "#fff",
+  border: "1px solid #ddd6c8",
   borderRadius: 16,
   padding: "20px 24px",
   marginBottom: 20,
@@ -288,14 +290,14 @@ const kpiLabel: React.CSSProperties = {
   fontWeight: 700,
   letterSpacing: 2,
   textTransform: "uppercase",
-  color: "#888",
+  color: "#999",
   fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
 };
 
 const kpiValue: React.CSSProperties = {
   fontSize: 36,
   fontWeight: 700,
-  color: "#fff",
+  color: "#1a1a1a",
   fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif",
   lineHeight: 1,
 };
