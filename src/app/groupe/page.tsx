@@ -81,8 +81,8 @@ export default function GroupePage() {
           <Image
             src="/logo-ifratelli.png"
             alt="iFratelli Group"
-            width={80}
-            height={80}
+            width={160}
+            height={160}
             style={{ objectFit: "contain", mixBlendMode: "multiply" }}
             priority
           />
