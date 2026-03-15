@@ -1,7 +1,6 @@
 /**
  * Wrapper around fetch() that automatically injects:
  * - x-etablissement-id header (from localStorage)
- * - Authorization header (from Supabase session)
  *
  * Use this instead of raw fetch() for all /api/* calls.
  */
@@ -12,15 +11,26 @@ export async function fetchApi(
   url: string,
   init?: RequestInit,
 ): Promise<Response> {
-  const headers = new Headers(init?.headers);
+  // Build headers as plain object to avoid iOS Safari issues
+  // with new Headers() + FormData body (breaks multipart boundary)
+  const existing: Record<string, string> = {};
+  if (init?.headers) {
+    if (init.headers instanceof Headers) {
+      init.headers.forEach((v, k) => { existing[k] = v; });
+    } else if (Array.isArray(init.headers)) {
+      for (const [k, v] of init.headers) existing[k] = v;
+    } else {
+      Object.assign(existing, init.headers);
+    }
+  }
 
   // Inject etablissement_id from localStorage
   const etabId = typeof window !== "undefined"
     ? localStorage.getItem(LS_KEY)
     : null;
-  if (etabId && !headers.has("x-etablissement-id")) {
-    headers.set("x-etablissement-id", etabId);
+  if (etabId && !existing["x-etablissement-id"]) {
+    existing["x-etablissement-id"] = etabId;
   }
 
-  return fetch(url, { ...init, headers });
+  return fetch(url, { ...init, headers: existing });
 }
