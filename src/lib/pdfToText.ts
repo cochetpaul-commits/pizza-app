@@ -50,9 +50,41 @@ export async function pdfToText(pdfBytes: Uint8Array): Promise<string> {
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const pageText = content.items
-      .map((item: unknown) => (item as { str?: string }).str ?? "")
-      .join(" ");
+    // Sort items by Y (descending = top-to-bottom) then X (left-to-right)
+    // Insert newline when Y coordinate changes significantly (new row)
+    type TextItem = { str?: string; transform?: number[] };
+    const items = (content.items as TextItem[]).filter(
+      (it) => it.str && it.str.trim() !== ""
+    );
+
+    if (items.length === 0) {
+      pages.push("");
+      continue;
+    }
+
+    // Group by Y coordinate (transform[5]) — items within ~2pt are same line
+    const lines: { y: number; chunks: { x: number; str: string }[] }[] = [];
+    for (const it of items) {
+      const y = it.transform?.[5] ?? 0;
+      const x = it.transform?.[4] ?? 0;
+      const str = it.str ?? "";
+      const existing = lines.find((l) => Math.abs(l.y - y) < 2);
+      if (existing) {
+        existing.chunks.push({ x, str });
+      } else {
+        lines.push({ y, chunks: [{ x, str }] });
+      }
+    }
+
+    // Sort lines top-to-bottom (higher Y = higher on page in PDF coords)
+    lines.sort((a, b) => b.y - a.y);
+
+    const pageText = lines
+      .map((line) => {
+        line.chunks.sort((a, b) => a.x - b.x);
+        return line.chunks.map((c) => c.str).join(" ");
+      })
+      .join("\n");
     pages.push(pageText);
   }
   return pages.join("\n");
