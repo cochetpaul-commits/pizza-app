@@ -54,22 +54,33 @@ const sCls = "w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[
 const lCls = "text-[12px] opacity-75 mb-1.5";
 
 // ─── Skeleton loader ──────────────────────────────────────────────────────
-function SkeletonCategoryHeader() {
+function SkeletonCard() {
   return (
-    <div style={{ padding: "7px 16px", background: "#f5f0e8", borderBottom: "1px solid #e5ddd0", display: "flex", alignItems: "center", gap: 10 }}>
-      <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#d4cdc0" }} />
-      <div style={{ height: 11, borderRadius: 3, background: "#d4cdc0", width: 120, animation: "pulse 1.5s ease-in-out infinite" }} />
+    <div style={{
+      background: "white", borderRadius: 12, border: "1.5px solid #ddd6c8",
+      borderLeft: "3px solid #ddd6c8", padding: "14px 16px", marginBottom: 6,
+      display: "flex", alignItems: "center", gap: 12,
+    }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ height: 13, borderRadius: 4, background: "#e5ddd0", width: "60%", marginBottom: 6, animation: "pulse 1.5s ease-in-out infinite" }} />
+        <div style={{ height: 10, borderRadius: 3, background: "#ede6d9", width: "40%", animation: "pulse 1.5s ease-in-out infinite" }} />
+      </div>
+      <div style={{ height: 16, borderRadius: 4, background: "#e5ddd0", width: 60, animation: "pulse 1.5s ease-in-out infinite" }} />
     </div>
   );
 }
 
 function SkeletonTable() {
   return (
-    <div style={{ background: "white", border: "1px solid #e5ddd0", borderRadius: 10, overflow: "hidden", marginTop: 12 }}>
-      {[0, 1, 2, 3, 4].map(i => (
+    <div style={{ marginTop: 16, padding: "0 4px" }}>
+      {[0, 1, 2].map(i => (
         <div key={i}>
-          <SkeletonCategoryHeader />
-          {/* Show 0 rows inside — categories are collapsed by default */}
+          <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, marginTop: 12, marginBottom: 6 }}>
+            <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#ddd6c8" }} />
+            <div style={{ height: 9, borderRadius: 3, background: "#ddd6c8", width: 100, animation: "pulse 1.5s ease-in-out infinite" }} />
+          </div>
+          <SkeletonCard />
+          <SkeletonCard />
         </div>
       ))}
     </div>
@@ -618,28 +629,28 @@ function IngredientsPageInner() {
   ] as const;
 
   const headerBtnStyle: CSSProperties = {
-    height: 34, padding: "0 14px", borderRadius: 10, fontSize: 13, fontWeight: 600,
-    cursor: "pointer", border: "1.5px solid #e5ddd0", background: "white", color: "#1a1a1a",
+    height: 34, padding: "0 14px", borderRadius: 20, fontSize: 13, fontWeight: 600,
+    cursor: "pointer", border: "1.5px solid #ddd6c8", background: "white", color: "#1a1a1a",
     display: "inline-flex", alignItems: "center",
   };
 
   // Shared select style — appearance:none is required for Chrome/Safari to respect border/radius
   const selStyle: CSSProperties = {
     appearance: "none", WebkitAppearance: "none",
-    borderRadius: 10, border: "1.5px solid #e5ddd0",
+    borderRadius: 20, border: "1.5px solid #ddd6c8",
     padding: "8px 14px", fontSize: 13,
     background: "white", color: "#1a1a1a", cursor: "pointer",
   };
 
   return (
-    <div style={{ background: "#f5f0e8", minHeight: "100vh" }}>
+    <div style={{ background: "#f2ede4", minHeight: "100vh" }}>
 
       {/* ══════════════════════════════════════════════
           HEADER
       ══════════════════════════════════════════════ */}
       <header style={{
         position: "sticky", top: 0, zIndex: 50,
-        background: "#ffffff", borderBottom: "1.5px solid #e5ddd0",
+        background: "#fff", borderBottom: "1.5px solid #ddd6c8",
         height: 56, display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 20px", boxSizing: "border-box",
       }}>
@@ -648,8 +659,8 @@ function IngredientsPageInner() {
           <Link href={backUrl ?? "/"} style={{ color: "#999", fontSize: 13, textDecoration: "none", flexShrink: 0, fontWeight: 500 }}>
             ← {backUrl ? "Retour" : "Accueil"}
           </Link>
-          <span style={{ fontFamily: "var(--font-dm-serif-display), 'DM Serif Display', Georgia, serif", fontSize: 22, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            Index ingrédients
+          <span style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontSize: 22, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: 0.5 }}>
+            Ingredients
           </span>
         </div>
 
@@ -662,7 +673,7 @@ function IngredientsPageInner() {
             Doublons
             {duplicatePairs.length > 0 && (
               <span style={{
-                background: "#8B1A1A", color: "white", borderRadius: 10,
+                background: "#D4775A", color: "white", borderRadius: 10,
                 fontSize: 10, padding: "1px 6px", marginLeft: 5,
               }}>
                 {duplicatePairs.length}
@@ -679,9 +690,9 @@ function IngredientsPageInner() {
                 return next;
               });
             }}
-            style={{ background: "#8B1A1A", color: "white", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 13, padding: "8px 16px", whiteSpace: "nowrap" }}
+            style={{ background: "#D4775A", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: 700, fontSize: 13, padding: "8px 16px", whiteSpace: "nowrap" }}
           >
-            {showCreateForm ? "✕ Fermer" : "+ Ingrédient"}
+            {showCreateForm ? "✕ Fermer" : "+ Ingredient"}
           </button>
           )}
         </div>
@@ -690,24 +701,28 @@ function IngredientsPageInner() {
       {/* ══════════════════════════════════════════════
           TOOLBAR
       ══════════════════════════════════════════════ */}
-      <div style={{ position: "sticky", top: 56, zIndex: 40, background: "white", borderBottom: "1px solid #e5ddd0" }}>
+      <div style={{ position: "sticky", top: 56, zIndex: 40, background: "#f2ede4", borderBottom: "1px solid #ddd6c8" }}>
 
-        {/* Tabs — underline scrollable (all sizes) */}
-        <div style={{ overflowX: "auto", display: "flex", background: "white", borderBottom: "1px solid #e5ddd0" }}>
+        {/* Tabs — pill toggle scrollable */}
+        <div style={{ overflowX: "auto", display: "flex", gap: 6, padding: "10px 20px", background: "#f2ede4" }}>
           {TABS_MAIN.map(({ t, label, count }) => (
             <button key={t} onClick={() => setTab(t)} style={{
-              flexShrink: 0, padding: "10px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer",
-              border: "none", background: "none", whiteSpace: "nowrap",
-              color: tab === t ? "#8B1A1A" : "#999",
-              borderBottom: tab === t ? "2px solid #8B1A1A" : "2px solid transparent",
+              flexShrink: 0, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+              borderRadius: 20, whiteSpace: "nowrap",
+              border: tab === t ? "1.5px solid #D4775A" : "1.5px solid #ddd6c8",
+              background: tab === t ? "#D4775A" : "#fff",
+              color: tab === t ? "#fff" : "#999",
+              transition: "all 0.15s",
             }}>{label} ({count})</button>
           ))}
           {userId && (
             <button onClick={() => setTab("variations" as Tab)} style={{
-              flexShrink: 0, padding: "10px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer",
-              border: "none", background: "none", whiteSpace: "nowrap",
-              color: isVariations ? "#8B1A1A" : "#999",
-              borderBottom: isVariations ? "2px solid #8B1A1A" : "2px solid transparent",
+              flexShrink: 0, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+              borderRadius: 20, whiteSpace: "nowrap",
+              border: isVariations ? "1.5px solid #D4775A" : "1.5px solid #ddd6c8",
+              background: isVariations ? "#D4775A" : "#fff",
+              color: isVariations ? "#fff" : "#999",
+              transition: "all 0.15s",
             }}>Variations prix</button>
           )}
         </div>
@@ -717,7 +732,7 @@ function IngredientsPageInner() {
             {/* Desktop filter row */}
             <div className="hidden md:grid" style={{ gridTemplateColumns: "1fr 1fr 1fr auto auto auto", gap: 8, padding: "10px 20px" }}>
               <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value as "all" | Category)} style={selStyle}>
-                <option value="all">Toutes catégories</option>
+                <option value="all">Toutes categories</option>
                 {CATEGORIES.map((c) => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
               </select>
               <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)} style={selStyle}>
@@ -725,19 +740,19 @@ function IngredientsPageInner() {
                 {suppliers.filter((s) => s.is_active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
               <select value={filterEstablishment} onChange={(e) => setFilterEstablishment(e.target.value as "all" | "bellomio" | "piccola" | "both")} style={selStyle}>
-                <option value="all">Tous établissements</option>
+                <option value="all">Tous etablissements</option>
                 <option value="bellomio">Bello Mio</option>
                 <option value="piccola">Piccola Mia</option>
                 <option value="both">Les deux</option>
               </select>
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} style={{ accentColor: "#8B1A1A" }} />
+                <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} style={{ accentColor: "#D4775A" }} />
                 Sans offre
               </label>
-              <button onClick={toggleAll} style={{ padding: "8px 14px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                {allCollapsed ? "Tout déplier" : "Tout replier"}
+              <button onClick={toggleAll} style={{ padding: "8px 14px", borderRadius: 20, border: "1.5px solid #ddd6c8", background: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                {allCollapsed ? "Tout deplier" : "Tout replier"}
               </button>
-              <button onClick={reload} style={{ padding: "8px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "white", fontSize: 14, cursor: "pointer" }}>
+              <button onClick={reload} style={{ padding: "8px 12px", borderRadius: 20, border: "1.5px solid #ddd6c8", background: "white", fontSize: 14, cursor: "pointer" }}>
                 ↺
               </button>
             </div>
@@ -745,16 +760,16 @@ function IngredientsPageInner() {
             {/* Search bar — all sizes */}
             <div style={{ padding: "8px 20px 10px", display: "flex", gap: 8 }}>
               <input
-                placeholder="Rechercher un ingrédient…"
+                placeholder="Rechercher un ingredient…"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                style={{ flex: 1, borderRadius: 10, border: "1.5px solid #e5ddd0", padding: "10px 16px", fontSize: 13, background: "white", outline: "none", color: "#1a1a1a" }}
+                style={{ flex: 1, borderRadius: 20, border: "1.5px solid #ddd6c8", padding: "10px 16px", fontSize: 13, background: "white", outline: "none", color: "#1a1a1a" }}
               />
               {/* Mobile only: Filtres + compact */}
-              <button className="md:hidden" onClick={() => setShowFilters(true)} style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+              <button className="md:hidden" onClick={() => setShowFilters(true)} style={{ padding: "10px 14px", borderRadius: 20, border: "1.5px solid #ddd6c8", background: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 Filtres{filterActive ? " ●" : ""}
               </button>
-              <button className="md:hidden" onClick={toggleCompact} style={{ padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "white", fontSize: 14, cursor: "pointer" }}>
+              <button className="md:hidden" onClick={toggleCompact} style={{ padding: "10px 12px", borderRadius: 20, border: "1.5px solid #ddd6c8", background: "white", fontSize: 14, cursor: "pointer" }}>
                 {compactMode ? "⊞" : "☰"}
               </button>
             </div>
@@ -874,23 +889,9 @@ function IngredientsPageInner() {
               </div>
             )}
 
-            {/* ── Virtualised table container ── */}
+            {/* ── Card-based list container ── */}
             {!loading && !dataError && (
-              <div style={{ background: "white", border: "1px solid #e5ddd0", borderRadius: 10, overflow: "hidden", marginTop: 12 }}>
-
-                {/* Desktop thead */}
-                <div className="hidden md:flex" style={{ background: "#ede6d9", padding: "8px 16px", alignItems: "center", gap: 8, borderBottom: "1px solid #e5ddd0" }}>
-                  {[
-                    { label: "Désignation", flex: "3" },
-                    { label: "Prix", flex: "1" },
-                    { label: "Conditionnement", flex: "1" },
-                    { label: "Statut", flex: "1" },
-                    { label: "Fournisseur", flex: "1" },
-                  ].map(({ label, flex }) => (
-                    <div key={label} style={{ flex, fontSize: 10, fontWeight: 700, color: "#999999", textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
-                  ))}
-                  <div style={{ width: 80, fontSize: 10, fontWeight: 700, color: "#999999", textTransform: "uppercase", letterSpacing: 1 }}>Actions</div>
-                </div>
+              <div style={{ marginTop: 4 }}>
 
                 {/* Rows */}
                 {grouped.map(({ cat, items: catItems }) => (
@@ -934,7 +935,7 @@ function IngredientsPageInner() {
 
                 {grouped.length === 0 && !loading && (
                   <div style={{ padding: "40px 20px", textAlign: "center", color: "#999", fontSize: 14 }}>
-                    Aucun ingrédient trouvé.
+                    Aucun ingredient trouve.
                   </div>
                 )}
               </div>
@@ -1139,11 +1140,11 @@ function IngredientsPageInner() {
                 </select>
               </div>
               <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} style={{ accentColor: "#8B1A1A" }} />
+                <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} style={{ accentColor: "#D4775A" }} />
                 Inclure sans offre
               </label>
             </div>
-            <button onClick={() => setShowFilters(false)} style={{ width: "100%", height: 44, marginTop: 16, borderRadius: 10, border: "none", background: "#8B1A1A", color: "white", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+            <button onClick={() => setShowFilters(false)} style={{ width: "100%", height: 44, marginTop: 16, borderRadius: 10, border: "none", background: "#D4775A", color: "white", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
               Appliquer
             </button>
           </div>

@@ -58,19 +58,27 @@ export type CategoryHeaderProps = {
 export const CategoryHeader = React.memo(function CategoryHeader({
   cat, count, isCollapsed, onToggle,
 }: CategoryHeaderProps) {
+  const accent = CAT_COLORS[cat];
   return (
     <button
       onClick={() => onToggle(cat)}
       style={{
         width: "100%", display: "flex", alignItems: "center", gap: 10,
-        padding: "7px 16px", background: "#f5f0e8", border: "none",
-        borderBottom: "1px solid #e5ddd0", cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+        padding: "10px 16px", background: "transparent", border: "none",
+        cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+        marginTop: 16, marginBottom: 6,
       }}
     >
-      <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAT_COLORS[cat], flexShrink: 0 }} />
-      <span style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: 1.5, color: "#1a1a1a" }}>{CAT_LABELS[cat]}</span>
-      <span style={{ fontSize: 12, fontWeight: 400, color: "#999" }}>({count})</span>
-      <span style={{ marginLeft: "auto", fontSize: 10, color: "#999" }}>{isCollapsed ? "▶" : "▼"}</span>
+      <span style={{ width: 10, height: 10, borderRadius: "50%", background: accent, flexShrink: 0 }} />
+      <span style={{
+        fontFamily: "DM Sans, sans-serif", fontSize: 9, fontWeight: 700,
+        letterSpacing: "0.18em", textTransform: "uppercase", color: accent,
+      }}>{CAT_LABELS[cat]}</span>
+      <span style={{
+        fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 6,
+        background: `${accent}18`, color: accent,
+      }}>{count}</span>
+      <span style={{ marginLeft: "auto", fontSize: 10, color: "#b0a894", transition: "transform 0.2s", transform: isCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
     </button>
   );
 });
@@ -114,7 +122,7 @@ export const IngredientRow = React.memo(function IngredientRow({
   const price = formatIngredientPrice(x, offer ?? null);
   const estab = offer?.establishment ?? "both";
   const estabBadge = estab === "bellomio"
-    ? { label: "BM", bg: "#FEF2F2", color: "#8B1A1A" }
+    ? { label: "BM", bg: "#FEF2F2", color: "#D4775A" }
     : estab === "piccola"
     ? { label: "PM", bg: "#F5F3FF", color: "#6B21A8" }
     : { label: "BM·PM", bg: "#F3F4F6", color: "#6B7280" };
@@ -129,14 +137,23 @@ export const IngredientRow = React.memo(function IngredientRow({
     : x.purchase_unit_name === "l" ? `${x.density_g_per_ml ?? 1} kg/L`
     : x.piece_weight_g ? `${x.piece_weight_g} g/pc` : "—";
 
+  const catAccent = CAT_COLORS[x.category];
+
   return (
-    <div style={{ borderBottom: "1px solid #e5ddd0" }}>
+    <div style={{
+      background: "#fff", borderRadius: 12, border: "1.5px solid #ddd6c8",
+      borderLeft: `3px solid ${catAccent}`,
+      marginBottom: 6, overflow: "hidden",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+      transition: "box-shadow 0.2s, border-color 0.2s",
+    }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; e.currentTarget.style.borderColor = catAccent; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor = "#ddd6c8"; e.currentTarget.style.borderLeftColor = catAccent; }}
+    >
       {/* ── DESKTOP ROW ── */}
       <div
         className="hidden md:flex"
         style={{ alignItems: "center", padding: "10px 16px", gap: 8, background: "white", transition: "background 0.1s" }}
-        onMouseEnter={e => (e.currentTarget.style.background = "#ede6d9")}
-        onMouseLeave={e => (e.currentTarget.style.background = "white")}
       >
         {/* Désignation */}
         <div style={{ flex: 3, minWidth: 0 }}>
@@ -203,7 +220,7 @@ export const IngredientRow = React.memo(function IngredientRow({
             <button onClick={() => onCreateDerived(x)} title="Créer un dérivé" style={{ ...BTN_ACTION, background: "rgba(124,58,237,0.10)", color: "#7C3AED", fontSize: 12, fontWeight: 700 }}>⚗</button>
           )}
           {!isEditing
-            ? <button onClick={() => onStartEdit(x)} title="Modifier" style={{ ...BTN_ACTION, background: "#8B1A1A", color: "white", fontWeight: 700 }}>→</button>
+            ? <button onClick={() => onStartEdit(x)} title="Modifier" style={{ ...BTN_ACTION, background: "#D4775A", color: "white", fontWeight: 700 }}>→</button>
             : <button onClick={onSaveEdit} style={{ ...BTN_ACTION, background: "#4a6741", color: "white", fontSize: 11, fontWeight: 700 }}>OK</button>}
           <button onClick={() => onDelete(x.id, x.name)} title="Supprimer" style={{ ...BTN_ACTION, background: "#ede6d9", color: "#aaa" }}>✕</button>
         </div>
@@ -212,7 +229,7 @@ export const IngredientRow = React.memo(function IngredientRow({
       {/* ── MOBILE ROW ── */}
       <div
         className="md:hidden"
-        style={{ padding: "12px 14px", background: st === "to_check" ? "#fffbeb" : "white", borderBottom: st === "to_check" ? "1px solid #fde68a" : "none" }}
+        style={{ padding: "12px 14px", background: "white" }}
       >
         {compactMode ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -220,7 +237,7 @@ export const IngredientRow = React.memo(function IngredientRow({
             <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", flexShrink: 0 }}>{price}</span>
             {alert && <span style={{ fontSize: 10, color: alert.direction === "up" ? "#DC2626" : "#16A34A", flexShrink: 0 }}>{alert.direction === "up" ? "↑" : "↓"}</span>}
             {!isEditing
-              ? <button onClick={() => onStartEdit(x)} style={{ ...BTN_ACTION, background: "#8B1A1A", color: "white", fontWeight: 700 }}>→</button>
+              ? <button onClick={() => onStartEdit(x)} style={{ ...BTN_ACTION, background: "#D4775A", color: "white", fontWeight: 700 }}>→</button>
               : <button onClick={onSaveEdit} style={{ ...BTN_ACTION, background: "#4a6741", color: "white", fontSize: 10, fontWeight: 700 }}>OK</button>}
             <button onClick={() => onDelete(x.id, x.name)} style={{ ...BTN_ACTION, background: "#ede6d9", color: "#aaa" }}>✕</button>
           </div>
@@ -257,7 +274,7 @@ export const IngredientRow = React.memo(function IngredientRow({
             <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
               {st !== "validated" && <button onClick={() => { if (!canValidate) return; onSetStatus(x.id, "validated"); }} disabled={!canValidate} style={{ flex: 1, height: 30, borderRadius: 7, border: "1px solid #4a6741", background: "rgba(74,103,65,0.08)", fontSize: 11, fontWeight: 700, cursor: canValidate ? "pointer" : "not-allowed", color: "#4a6741", opacity: !canValidate ? 0.4 : 1 }}>Valider</button>}
               {!isEditing
-                ? <button onClick={() => onStartEdit(x)} style={{ flex: 1, height: 30, borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", color: "#8B1A1A", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Modifier</button>
+                ? <button onClick={() => onStartEdit(x)} style={{ flex: 1, height: 30, borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", color: "#D4775A", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Modifier</button>
                 : <button onClick={onSaveEdit} style={{ flex: 1, height: 30, borderRadius: 7, border: "none", background: "#4a6741", color: "white", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>OK</button>}
               {!x.is_derived && onCreateDerived && (
                 <button onClick={() => onCreateDerived(x)} title="Créer un dérivé" style={{ width: 30, height: 30, borderRadius: 7, border: "1px solid rgba(124,58,237,0.25)", background: "rgba(124,58,237,0.08)", color: "#7C3AED", fontSize: 13, cursor: "pointer" }}>⚗</button>
@@ -302,7 +319,7 @@ export const IngredientRow = React.memo(function IngredientRow({
             <div className="flex items-center gap-2.5">
               <span className="font-extrabold">Offre fournisseur</span>
               <label className="flex items-center gap-2">
-                <input type="checkbox" checked={edit.useOffer} onChange={(e) => onEditChange({ ...edit, useOffer: e.target.checked })} style={{ accentColor: "#8B1A1A" }} />
+                <input type="checkbox" checked={edit.useOffer} onChange={(e) => onEditChange({ ...edit, useOffer: e.target.checked })} style={{ accentColor: "#D4775A" }} />
                 <span className="muted">recommandé</span>
               </label>
             </div>
