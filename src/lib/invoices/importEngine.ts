@@ -125,7 +125,7 @@ export async function runImport(options: {
   if (etabId) supplierRow.etablissement_id = etabId;
   const { data: supRows, error: supErr } = await supabase
     .from("suppliers")
-    .upsert(supplierRow, { onConflict: "user_id,name" })
+    .upsert(supplierRow, { onConflict: "etablissement_id,name" })
     .select("id")
     .limit(1);
 
