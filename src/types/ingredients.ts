@@ -95,6 +95,8 @@ export type Ingredient = {
   validated_at?: string | null;
   validated_by?: string | null;
 
+  etablissement_id?: string | null;
+
   cost_per_unit?: number | null;
   cost_per_kg?: number | null;
 

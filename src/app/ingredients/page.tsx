@@ -358,11 +358,12 @@ function IngredientsPageInner() {
     density_kg_per_l?: number | null; piece_weight_g?: number | null;
   };
 
-  function buildOfferFromCreate(ingredient_id: string, uid: string): SupplierOfferPayload | null {
+  function buildOfferFromCreate(ingredient_id: string, uid: string, ingEtabId?: string | null): SupplierOfferPayload | null {
     const supplier_id = normalizeSupplierId(newSupplierId);
     if (!supplier_id) { alert("Fournisseur obligatoire pour enregistrer une offre."); return null; }
     if (!uid) { alert("Utilisateur non connecté. Impossible d'enregistrer l'offre."); return null; }
-    const etabExtra = etab?.id ? { etablissement_id: etab.id } : {};
+    const resolvedEtabId = etab?.id ?? ingEtabId;
+    const etabExtra = resolvedEtabId ? { etablissement_id: resolvedEtabId } : {};
     if (priceKind === "unit") {
       const p = parseNum(newUnitPrice);
       if (p == null || p <= 0) { alert("Prix unitaire invalide."); return null; }
@@ -457,13 +458,14 @@ function IngredientsPageInner() {
     });
   }, [offersByIngredientId]);
 
-  function buildOfferFromEdit(ingredient_id: string, uid: string): OfferPayload | null {
+  function buildOfferFromEdit(ingredient_id: string, uid: string, ingEtabId?: string | null): OfferPayload | null {
     if (!edit) return null;
     if (!edit.useOffer) return null;
     const supplier_id = edit.category === "preparation" ? null : (normalizeSupplierId(edit.supplierId) || null);
     if (!supplier_id) { alert("Fournisseur obligatoire pour l'offre."); return null; }
     if (!uid) { alert("Utilisateur non connecté. Impossible d'enregistrer l'offre."); return null; }
-    const etabExtra = etab?.id ? { etablissement_id: etab.id } : {};
+    const resolvedEtabId = etab?.id ?? ingEtabId;
+    const etabExtra = resolvedEtabId ? { etablissement_id: resolvedEtabId } : {};
     if (edit.priceKind === "unit") {
       const p = parseNum(edit.unitPrice);
       if (p == null || p <= 0) { alert("Prix unitaire invalide."); return null; }
@@ -525,7 +527,8 @@ function IngredientsPageInner() {
     if (u1.error) { alert(u1.error.message); return; }
     if (edit.useOffer && supplier_id) {
       if (!userId) { alert("Utilisateur non connecté. Impossible d'enregistrer l'offre."); return; }
-      const offerPayload = buildOfferFromEdit(editingId, userId);
+      const editedIng = items.find((i) => i.id === editingId);
+      const offerPayload = buildOfferFromEdit(editingId, userId, editedIng?.etablissement_id);
       if (!offerPayload) return;
       const dPrev = await supabase.from("supplier_offers").update({ is_active: false }).eq("ingredient_id", editingId).eq("supplier_id", supplier_id).eq("is_active", true);
       if (dPrev.error) { alert(dPrev.error.message); return; }
