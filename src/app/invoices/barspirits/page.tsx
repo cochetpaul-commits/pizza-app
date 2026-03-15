@@ -153,10 +153,13 @@ export default function BarSpiritsInvoicePage() {
         <input
           ref={fileInputRef}
           type="file"
-          accept="application/pdf,.pdf"
           style={{ display: "none" }}
           onChange={(e) => {
             const f = e.target.files?.[0] ?? null;
+            if (f && !f.name.toLowerCase().endsWith(".pdf") && f.type !== "application/pdf") {
+              setError("Seuls les fichiers PDF sont acceptes");
+              return;
+            }
             setFile(f);
             setPreview(null);
             setCommitResult(null);

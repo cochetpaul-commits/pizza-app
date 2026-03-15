@@ -761,11 +761,15 @@ export default function EventForm({ eventId }: { eventId?: string }) {
               <input
                 ref={fileRef}
                 type="file"
-                accept="application/pdf,.pdf"
                 style={{ display: "none" }}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) handleUpload(f);
+                  if (!f) return;
+                  if (!f.name.toLowerCase().endsWith(".pdf") && f.type !== "application/pdf") {
+                    alert("Seuls les fichiers PDF sont acceptes.");
+                    return;
+                  }
+                  handleUpload(f);
                 }}
               />
               <button

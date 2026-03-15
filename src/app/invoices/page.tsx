@@ -212,11 +212,15 @@ export default function InvoicesPage() {
               <input
                 ref={fileRef}
                 type="file"
-                accept="application/pdf,.pdf"
                 style={{ display: "none" }}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) handleFileUpload(f);
+                  if (!f) return;
+                  if (!f.name.toLowerCase().endsWith(".pdf") && f.type !== "application/pdf") {
+                    setError("Seuls les fichiers PDF sont acceptes.");
+                    return;
+                  }
+                  handleFileUpload(f);
                 }}
               />
               <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
