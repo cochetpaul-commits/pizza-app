@@ -362,29 +362,30 @@ function IngredientsPageInner() {
     const supplier_id = normalizeSupplierId(newSupplierId);
     if (!supplier_id) { alert("Fournisseur obligatoire pour enregistrer une offre."); return null; }
     if (!uid) { alert("Utilisateur non connecté. Impossible d'enregistrer l'offre."); return null; }
+    const etabExtra = etab?.id ? { etablissement_id: etab.id } : {};
     if (priceKind === "unit") {
       const p = parseNum(newUnitPrice);
       if (p == null || p <= 0) { alert("Prix unitaire invalide."); return null; }
-      if (newUnit === "pc") { const pw = parseNum(newPieceWeightG) ?? null; return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "pc", unit_price: p, price: p, piece_weight_g: pw, density_kg_per_l: null, is_active: true }; }
-      if (newUnit === "l") { const d = parseNum(newDensity); if (d == null || d <= 0) { alert("Densité obligatoire (kg/L)."); return null; } return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "l", unit_price: p, price: p, density_kg_per_l: d, piece_weight_g: null, is_active: true }; }
-      return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "kg", unit_price: p, price: p, density_kg_per_l: null, piece_weight_g: null, is_active: true };
+      if (newUnit === "pc") { const pw = parseNum(newPieceWeightG) ?? null; return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "pc", unit_price: p, price: p, piece_weight_g: pw, density_kg_per_l: null, is_active: true, ...etabExtra }; }
+      if (newUnit === "l") { const d = parseNum(newDensity); if (d == null || d <= 0) { alert("Densité obligatoire (kg/L)."); return null; } return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "l", unit_price: p, price: p, density_kg_per_l: d, piece_weight_g: null, is_active: true, ...etabExtra }; }
+      return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "kg", unit_price: p, price: p, density_kg_per_l: null, piece_weight_g: null, is_active: true, ...etabExtra };
     }
     if (priceKind === "pack_simple") {
       const pp = parseNum(packPrice); const qty = parseNum(packTotalQty);
       if (pp == null || pp <= 0) { alert("Prix du pack invalide."); return null; }
       if (qty == null || qty <= 0) { alert("Quantité totale du pack invalide."); return null; }
-      if (newUnit === "l") { const d = parseNum(newDensity); if (d == null || d <= 0) { alert("Densité obligatoire (kg/L)."); return null; } return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_simple", pack_price: pp, price: pp, pack_total_qty: qty, pack_unit: "l", density_kg_per_l: d, piece_weight_g: null, is_active: true }; }
-      return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_simple", pack_price: pp, price: pp, pack_total_qty: qty, pack_unit: "kg", density_kg_per_l: null, piece_weight_g: null, is_active: true };
+      if (newUnit === "l") { const d = parseNum(newDensity); if (d == null || d <= 0) { alert("Densité obligatoire (kg/L)."); return null; } return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_simple", pack_price: pp, price: pp, pack_total_qty: qty, pack_unit: "l", density_kg_per_l: d, piece_weight_g: null, is_active: true, ...etabExtra }; }
+      return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_simple", pack_price: pp, price: pp, pack_total_qty: qty, pack_unit: "kg", density_kg_per_l: null, piece_weight_g: null, is_active: true, ...etabExtra };
     }
     if (priceKind === "pack_composed") {
       const pp = parseNum(packPrice); const c = parseNum(packCount);
       if (pp == null || pp <= 0) { alert("Prix du pack invalide."); return null; }
       if (c == null || c <= 0) { alert("Nombre d'unités invalide."); return null; }
-      if (packEachUnit === "pc") { const pw = parseNum(packPieceWeightG); if (pw == null || pw <= 0) { alert("Poids pièce obligatoire (g)."); return null; } return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_unit: "pc", piece_weight_g: pw, density_kg_per_l: null, is_active: true }; }
+      if (packEachUnit === "pc") { const pw = parseNum(packPieceWeightG); if (pw == null || pw <= 0) { alert("Poids pièce obligatoire (g)."); return null; } return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_unit: "pc", piece_weight_g: pw, density_kg_per_l: null, is_active: true, ...etabExtra }; }
       const each = parseNum(packEachQty);
       if (each == null || each <= 0) { alert("Quantité par élément invalide."); return null; }
-      if (packEachUnit === "l") { const d = parseNum(newDensity); if (d == null || d <= 0) { alert("Densité obligatoire (kg/L)."); return null; } return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_qty: each, pack_each_unit: "l", density_kg_per_l: d, piece_weight_g: null, is_active: true }; }
-      return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_qty: each, pack_each_unit: "kg", density_kg_per_l: null, piece_weight_g: null, is_active: true };
+      if (packEachUnit === "l") { const d = parseNum(newDensity); if (d == null || d <= 0) { alert("Densité obligatoire (kg/L)."); return null; } return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_qty: each, pack_each_unit: "l", density_kg_per_l: d, piece_weight_g: null, is_active: true, ...etabExtra }; }
+      return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_qty: each, pack_each_unit: "kg", density_kg_per_l: null, piece_weight_g: null, is_active: true, ...etabExtra };
     }
     return null;
   }
@@ -462,29 +463,30 @@ function IngredientsPageInner() {
     const supplier_id = edit.category === "preparation" ? null : (normalizeSupplierId(edit.supplierId) || null);
     if (!supplier_id) { alert("Fournisseur obligatoire pour l'offre."); return null; }
     if (!uid) { alert("Utilisateur non connecté. Impossible d'enregistrer l'offre."); return null; }
+    const etabExtra = etab?.id ? { etablissement_id: etab.id } : {};
     if (edit.priceKind === "unit") {
       const p = parseNum(edit.unitPrice);
       if (p == null || p <= 0) { alert("Prix unitaire invalide."); return null; }
-      if (edit.unit === "pc") { const pw = parseNum(edit.pieceWeightG) ?? null; return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "pc", unit_price: p, price: p, piece_weight_g: pw, density_kg_per_l: null, is_active: true }; }
-      if (edit.unit === "l") { const d = parseNum(edit.density); if (d == null || d <= 0) { alert("Densité obligatoire (kg/L)."); return null; } return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "l", unit_price: p, price: p, density_kg_per_l: d, piece_weight_g: null, is_active: true }; }
-      return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "kg", unit_price: p, price: p, density_kg_per_l: null, piece_weight_g: null, is_active: true };
+      if (edit.unit === "pc") { const pw = parseNum(edit.pieceWeightG) ?? null; return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "pc", unit_price: p, price: p, piece_weight_g: pw, density_kg_per_l: null, is_active: true, ...etabExtra }; }
+      if (edit.unit === "l") { const d = parseNum(edit.density); if (d == null || d <= 0) { alert("Densité obligatoire (kg/L)."); return null; } return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "l", unit_price: p, price: p, density_kg_per_l: d, piece_weight_g: null, is_active: true, ...etabExtra }; }
+      return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "kg", unit_price: p, price: p, density_kg_per_l: null, piece_weight_g: null, is_active: true, ...etabExtra };
     }
     if (edit.priceKind === "pack_simple") {
       const pp = parseNum(edit.packPrice); const qty = parseNum(edit.packTotalQty);
       if (pp == null || pp <= 0) { alert("Prix du pack invalide."); return null; }
       if (qty == null || qty <= 0) { alert("Quantité totale du pack invalide."); return null; }
-      if (edit.packUnit === "l") { const d = parseNum(edit.density); if (d == null || d <= 0) { alert("Densité obligatoire (kg/L)."); return null; } return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_simple", pack_price: pp, price: pp, pack_total_qty: qty, pack_unit: "l", density_kg_per_l: d, piece_weight_g: null, is_active: true }; }
-      return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_simple", pack_price: pp, price: pp, pack_total_qty: qty, pack_unit: "kg", density_kg_per_l: null, piece_weight_g: null, is_active: true };
+      if (edit.packUnit === "l") { const d = parseNum(edit.density); if (d == null || d <= 0) { alert("Densité obligatoire (kg/L)."); return null; } return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_simple", pack_price: pp, price: pp, pack_total_qty: qty, pack_unit: "l", density_kg_per_l: d, piece_weight_g: null, is_active: true, ...etabExtra }; }
+      return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_simple", pack_price: pp, price: pp, pack_total_qty: qty, pack_unit: "kg", density_kg_per_l: null, piece_weight_g: null, is_active: true, ...etabExtra };
     }
     if (edit.priceKind === "pack_composed") {
       const pp = parseNum(edit.packPrice); const c = parseNum(edit.packCount);
       if (pp == null || pp <= 0) { alert("Prix du pack invalide."); return null; }
       if (c == null || c <= 0) { alert("Nombre d'unités invalide."); return null; }
-      if (edit.packEachUnit === "pc") { const pw = parseNum(edit.packPieceWeightG); if (pw == null || pw <= 0) { alert("Poids pièce obligatoire (g)."); return null; } return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_unit: "pc", piece_weight_g: pw, density_kg_per_l: null, is_active: true }; }
+      if (edit.packEachUnit === "pc") { const pw = parseNum(edit.packPieceWeightG); if (pw == null || pw <= 0) { alert("Poids pièce obligatoire (g)."); return null; } return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_unit: "pc", piece_weight_g: pw, density_kg_per_l: null, is_active: true, ...etabExtra }; }
       const each = parseNum(edit.packEachQty);
       if (each == null || each <= 0) { alert("Quantité par élément invalide."); return null; }
-      if (edit.packEachUnit === "l") { const d = parseNum(edit.density); if (d == null || d <= 0) { alert("Densité obligatoire (kg/L)."); return null; } return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_qty: each, pack_each_unit: "l", density_kg_per_l: d, piece_weight_g: null, is_active: true }; }
-      return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_qty: each, pack_each_unit: "kg", density_kg_per_l: null, piece_weight_g: null, is_active: true };
+      if (edit.packEachUnit === "l") { const d = parseNum(edit.density); if (d == null || d <= 0) { alert("Densité obligatoire (kg/L)."); return null; } return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_qty: each, pack_each_unit: "l", density_kg_per_l: d, piece_weight_g: null, is_active: true, ...etabExtra }; }
+      return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_qty: each, pack_each_unit: "kg", density_kg_per_l: null, piece_weight_g: null, is_active: true, ...etabExtra };
     }
     return null;
   }
