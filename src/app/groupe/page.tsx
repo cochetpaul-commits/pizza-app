@@ -22,6 +22,7 @@ function fmtDateShort(iso: string) {
 
 export default function GroupePage() {
   const [ca, setCa] = useState<CaData>(null);
+  const [caPM, setCaPM] = useState<number | null>(null);
   const [events, setEvents] = useState<UpcomingEvent[]>([]);
   const [notifCount, setNotifCount] = useState(0);
 
@@ -35,6 +36,22 @@ export default function GroupePage() {
       } catch { /* silencieux */ }
     }
     fetchCa();
+  }, []);
+
+  // Fetch Piccola Mia CA from daily_sales (Kezia)
+  useEffect(() => {
+    async function fetchCaPM() {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data } = await supabase
+        .from("daily_sales")
+        .select("ca_ttc")
+        .eq("date", today)
+        .eq("source", "kezia_pdf")
+        .limit(1)
+        .maybeSingle();
+      if (data?.ca_ttc != null) setCaPM(data.ca_ttc);
+    }
+    fetchCaPM();
   }, []);
 
   useEffect(() => {
@@ -95,7 +112,7 @@ export default function GroupePage() {
             <p style={kpiLabel}>CA GROUPE AUJOURD&apos;HUI</p>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 8 }}>
               <span style={kpiValue}>
-                {ca ? `${fmtEur(ca.totalSales)} \u20AC` : "\u2014"}
+                {(ca || caPM != null) ? `${fmtEur((ca?.totalSales ?? 0) + (caPM ?? 0))} \u20AC` : "\u2014"}
               </span>
               {ca && ca.guestsNumber > 0 && (
                 <span style={{ fontSize: 13, color: "#999" }}>
@@ -171,11 +188,9 @@ export default function GroupePage() {
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#F5E642", display: "inline-block" }} />
                   <span style={etabName}>Piccola Mia</span>
                 </div>
-                {ca && (
-                  <span style={{ fontSize: 20, fontWeight: 700, color: "#b8a800", fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
-                    &mdash;
-                  </span>
-                )}
+                <span style={{ fontSize: 20, fontWeight: 700, color: "#b8a800", fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
+                  {caPM != null ? `${fmtEur(caPM)} \u20ac` : "\u2014"}
+                </span>
                 <span style={etabPill("#b8a800")}>Ouvrir &rarr;</span>
               </div>
             </Link>

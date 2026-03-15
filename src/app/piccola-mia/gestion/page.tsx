@@ -65,7 +65,8 @@ export default function GestionHubPM() {
 
           <SectionLabel>Pilotage</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-            <Tile href="/pilotage"        icon="&#x1F4CA;" title="Pilotage"           sub="CA Popina, indicateurs"     />
+            <Tile href="/kezia"           icon="&#x1F4CB;" title="Import Kezia"       sub="Synthese CA journalier"     />
+            <Tile href="/pilotage"        icon="&#x1F4CA;" title="Pilotage"           sub="CA, indicateurs"            />
             <Tile href="/finances"        icon="&#x1F4B0;" title="Finances"           sub="Comptes & flux"             />
             <Tile href="/variations-prix" icon="&#x1F4C9;" title="Variations & Alertes" sub="Ecarts prix, seuils"      />
             <Tile href="/invoices"        icon="&#x1F9FE;" title="Factures"           sub="Import fournisseurs"        />
