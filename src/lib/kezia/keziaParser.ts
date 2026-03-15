@@ -139,7 +139,6 @@ export function parseKeziaSynthese(text: string): KeziaDaily {
   const caTtc = findValueAfterLabel(lines, /Total\s+Global\s+R[eé]glements/i);
   const tickets = findValueAfterLabel(lines, /Nbre\s+factures?\s*\/?\s*tickets?\s+ventes?/i);
   const couverts = findValueAfterLabel(lines, /(?<!Moy\.\s*)Couverts(?!\s+Moy)/i);
-  const couvertsMoy = findValueAfterLabel(lines, /Couverts\s+Moy/i);
   const panierMoyen = findValueAfterLabel(lines, /Panier\s+Moyen/i);
 
   // Use integer parsing for tickets and couverts (they are counts)
