@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
@@ -27,7 +26,6 @@ type FormData = {
 const empty: FormData = { nom: "", prenom: "", email: "", telephone: "", notes: "" };
 
 export default function ClientsPage() {
-  const router = useRouter();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -35,16 +33,23 @@ export default function ClientsPage() {
   const [form, setForm] = useState<FormData>(empty);
   const [saving, setSaving] = useState(false);
 
-  const load = useCallback(async () => {
-    const { data } = await supabase
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase
       .from("clients")
       .select("*")
-      .order("nom");
-    setClients((data ?? []) as Client[]);
-    setLoading(false);
-  }, []);
+      .order("nom")
+      .then(({ data }) => {
+        if (cancelled) return;
+        setClients((data ?? []) as Client[]);
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [reloadKey]);
 
-  useEffect(() => { load(); }, [load]);
+  const reload = () => setReloadKey(k => k + 1);
 
   const openNew = () => {
     setEditing(null);
@@ -81,13 +86,13 @@ export default function ClientsPage() {
     }
     setSaving(false);
     setShowForm(false);
-    load();
+    reload();
   };
 
   const remove = async (id: string) => {
     if (!confirm("Supprimer ce client ?")) return;
     await supabase.from("clients").delete().eq("id", id);
-    load();
+    reload();
   };
 
   const set = (k: keyof FormData, v: string) => setForm(f => ({ ...f, [k]: v }));
