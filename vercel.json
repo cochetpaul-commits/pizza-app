@@ -5,5 +5,11 @@
       "main": true,
       "develop": true
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/invoices/email-import",
+      "schedule": "0 */3 * * *"
+    }
+  ]
 }
