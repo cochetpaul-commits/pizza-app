@@ -49,6 +49,68 @@ export type Shift = {
   created_at: string
 }
 
+export type Employe = {
+  id: string
+  etablissement_id: string
+  prenom: string
+  nom: string
+  initiales: string | null
+  email: string | null
+  tel_mobile: string | null
+  tel_fixe: string | null
+  adresse: string | null
+  code_postal: string | null
+  ville: string | null
+  genre: string | null
+  date_naissance: string | null
+  lieu_naissance: string | null
+  departement_naissance: string | null
+  nationalite: string
+  situation_familiale: string | null
+  nb_personnes_charge: number
+  contact_urgence_prenom: string | null
+  contact_urgence_nom: string | null
+  contact_urgence_lien: string | null
+  contact_urgence_tel: string | null
+  numero_secu: string | null
+  handicap: boolean
+  type_handicap: string | null
+  date_visite_medicale: string | null
+  visite_renforcee: boolean
+  prochaine_visite_medicale: string | null
+  iban: string | null
+  bic: string | null
+  titulaire_compte: string | null
+  matricule: string | null
+  date_anciennete: string | null
+  travailleur_etranger: boolean
+  avatar_url: string | null
+  actif: boolean
+  equipe_access: string[]
+  role: "employe" | "manager" | "proprietaire"
+  poste_rh: string | null
+  contrat_type: "CDI" | "CDD" | "extra" | "interim" | "apprenti" | "stagiaire" | "TNS" | null
+  heures_semaine: number | null
+  nom_usage: string | null
+  civilite: "M" | "Mme" | null
+  created_at: string
+}
+
+export type Contrat = {
+  id: string
+  employe_id: string
+  type: "CDI" | "CDD" | "extra" | "interim" | "apprenti" | "stagiaire"
+  date_debut: string
+  date_fin: string | null
+  remuneration: number
+  emploi: string | null
+  qualification: string | null
+  heures_semaine: number
+  jours_semaine: number
+  actif: boolean
+  created_at: string
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const ERROR_MESSAGES: Record<string, string> = {
