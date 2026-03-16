@@ -3,7 +3,6 @@
 import { Suspense, useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { NavBar } from "@/components/NavBar";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -272,9 +271,9 @@ function IngredientDetailInner() {
 
         {/* ── Header ── */}
         <div style={{ marginBottom: 20, display: "flex", gap: 16, alignItems: "flex-start" }}>
-          {/* Photo */}
-          <div
-            onClick={() => fileRef.current?.click()}
+          {/* Photo — label+input pour compatibilité iOS Safari */}
+          <label
+            htmlFor="ingredient-photo-input"
             style={{
               width: 64, height: 64, borderRadius: "50%", flexShrink: 0,
               overflow: "hidden", cursor: "pointer", position: "relative",
@@ -284,14 +283,14 @@ function IngredientDetailInner() {
             }}
           >
             {photoUrl && !photoError ? (
-              <Image
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
                 src={photoUrl}
                 alt={ingredient.name}
                 width={64}
                 height={64}
                 style={{ objectFit: "cover", width: 64, height: 64 }}
                 onError={() => setPhotoError(true)}
-                unoptimized
               />
             ) : (
               <span style={{
@@ -303,24 +302,24 @@ function IngredientDetailInner() {
                   : ingredient.name.trim().slice(0, 2).toUpperCase()}
               </span>
             )}
-            {/* Overlay */}
+            {/* Overlay upload */}
             <div style={{
               position: "absolute", inset: 0, borderRadius: "50%",
-              background: "rgba(0,0,0,0.35)", display: "flex",
-              alignItems: "center", justifyContent: "center",
-              opacity: uploading ? 1 : 0, transition: "opacity 0.2s",
-              pointerEvents: "none",
+              background: uploading ? "rgba(0,0,0,0.45)" : "rgba(0,0,0,0.15)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "background 0.2s",
             }}>
-              <span style={{ color: "#fff", fontSize: 10, fontWeight: 700 }}>
-                {uploading ? "..." : ""}
+              <span style={{ color: "#fff", fontSize: uploading ? 10 : 16, fontWeight: 700 }}>
+                {uploading ? "..." : "📷"}
               </span>
             </div>
-          </div>
+          </label>
           <input
+            id="ingredient-photo-input"
             ref={fileRef}
             type="file"
             accept="image/*"
-            style={{ display: "none" }}
+            style={{ position: "absolute", width: 1, height: 1, opacity: 0, overflow: "hidden" }}
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (f) handlePhotoUpload(f);
