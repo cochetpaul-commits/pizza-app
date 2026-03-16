@@ -2,7 +2,7 @@
 import { useState, useId } from "react";
 import { CAT_COLORS, type Category } from "@/types/ingredients";
 import { supabase } from "@/lib/supabaseClient";
-import { compressImage } from "@/lib/compressImage";
+import { ImageCropModal } from "@/components/ImageCropModal";
 
 type Props = {
   ingredientId: string;
@@ -18,6 +18,7 @@ export function IngredientAvatar({ ingredientId, name, category, size = 36, edit
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/ingredients/${ingredientId}.jpg`
   );
   const [uploading, setUploading] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const inputId = useId();
   const catColor = CAT_COLORS[category] ?? "#999";
 
@@ -26,13 +27,21 @@ export function IngredientAvatar({ ingredientId, name, category, size = 36, edit
     ? `${words[0][0]}${words[1][0]}`.toUpperCase()
     : words[0].slice(0, 2).toUpperCase();
 
-  async function handleUpload(file: File) {
+  function handleFileSelect(file: File) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropSrc(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function handleCropConfirm(croppedBlob: Blob) {
+    setCropSrc(null);
     setUploading(true);
     try {
-      const compressed = await compressImage(file, 200, 0.8);
       const { error } = await supabase.storage
         .from("ingredients")
-        .upload(`${ingredientId}.jpg`, compressed, { upsert: true, contentType: "image/jpeg" });
+        .upload(`${ingredientId}.jpg`, croppedBlob, { upsert: true, contentType: "image/jpeg" });
       if (error) throw error;
       setImgUrl(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/ingredients/${ingredientId}.jpg?t=${Date.now()}`);
       setImgError(false);
@@ -97,10 +106,17 @@ export function IngredientAvatar({ ingredientId, name, category, size = 36, edit
         style={{ position: "absolute", width: 1, height: 1, opacity: 0, overflow: "hidden", pointerEvents: "none" }}
         onChange={(e) => {
           const f = e.target.files?.[0];
-          if (f) handleUpload(f);
+          if (f) handleFileSelect(f);
           e.target.value = "";
         }}
       />
+      {cropSrc && (
+        <ImageCropModal
+          imageSrc={cropSrc}
+          onConfirm={handleCropConfirm}
+          onCancel={() => setCropSrc(null)}
+        />
+      )}
     </>
   );
 }
