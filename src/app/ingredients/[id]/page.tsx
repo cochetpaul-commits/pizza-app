@@ -1,13 +1,16 @@
 "use client";
 
-import { Suspense, useState, useEffect, useMemo } from "react";
+import { Suspense, useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { NavBar } from "@/components/NavBar";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { StepperInput } from "@/components/StepperInput";
+import { compressImage } from "@/lib/compressImage";
 import { computeDerivedPrice, computeRendement } from "@/lib/rendement";
+import { CAT_COLORS } from "@/types/ingredients";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
@@ -76,6 +79,37 @@ function IngredientDetailInner() {
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Photo upload
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/ingredients/${id}.jpg`;
+    setPhotoUrl(url);
+    setPhotoError(false);
+  }, [id]);
+
+  async function handlePhotoUpload(file: File) {
+    if (!id) return;
+    setUploading(true);
+    try {
+      const compressed = await compressImage(file, 200, 0.8);
+      const { error: upErr } = await supabase.storage
+        .from("ingredients")
+        .upload(`${id}.jpg`, compressed, { upsert: true, contentType: "image/jpeg" });
+      if (upErr) throw upErr;
+      setPhotoUrl(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/ingredients/${id}.jpg?t=${Date.now()}`);
+      setPhotoError(false);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Erreur upload");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   // Derived ingredients
   const [derivedList, setDerivedList] = useState<DerivedIngredient[]>([]);
@@ -237,10 +271,67 @@ function IngredientDetailInner() {
       <main className="container safe-bottom">
 
         {/* ── Header ── */}
-        <div style={{ marginBottom: 20 }}>
-          <h1 className="h1" style={{ marginBottom: 4 }}>{ingredient.name}</h1>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontSize: 13, opacity: 0.65 }}>{ingredient.category}</span>
+        <div style={{ marginBottom: 20, display: "flex", gap: 16, alignItems: "flex-start" }}>
+          {/* Photo */}
+          <div
+            onClick={() => fileRef.current?.click()}
+            style={{
+              width: 64, height: 64, borderRadius: "50%", flexShrink: 0,
+              overflow: "hidden", cursor: "pointer", position: "relative",
+              border: `2px solid ${CAT_COLORS[ingredient.category as keyof typeof CAT_COLORS] ?? "#ddd6c8"}`,
+              background: `${CAT_COLORS[ingredient.category as keyof typeof CAT_COLORS] ?? "#999"}22`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            {photoUrl && !photoError ? (
+              <Image
+                src={photoUrl}
+                alt={ingredient.name}
+                width={64}
+                height={64}
+                style={{ objectFit: "cover", width: 64, height: 64 }}
+                onError={() => setPhotoError(true)}
+                unoptimized
+              />
+            ) : (
+              <span style={{
+                fontFamily: "Oswald, sans-serif", fontWeight: 700,
+                fontSize: 20, color: CAT_COLORS[ingredient.category as keyof typeof CAT_COLORS] ?? "#999",
+              }}>
+                {ingredient.name.trim().split(/\s+/).length >= 2
+                  ? `${ingredient.name.trim().split(/\s+/)[0][0]}${ingredient.name.trim().split(/\s+/)[1][0]}`.toUpperCase()
+                  : ingredient.name.trim().slice(0, 2).toUpperCase()}
+              </span>
+            )}
+            {/* Overlay */}
+            <div style={{
+              position: "absolute", inset: 0, borderRadius: "50%",
+              background: "rgba(0,0,0,0.35)", display: "flex",
+              alignItems: "center", justifyContent: "center",
+              opacity: uploading ? 1 : 0, transition: "opacity 0.2s",
+              pointerEvents: "none",
+            }}>
+              <span style={{ color: "#fff", fontSize: 10, fontWeight: 700 }}>
+                {uploading ? "..." : ""}
+              </span>
+            </div>
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handlePhotoUpload(f);
+              e.target.value = "";
+            }}
+          />
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h1 className="h1" style={{ marginBottom: 4 }}>{ingredient.name}</h1>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ fontSize: 13, opacity: 0.65 }}>{ingredient.category}</span>
             {ingredient.is_derived && (
               <span style={{
                 fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 8,
@@ -263,6 +354,7 @@ function IngredientDetailInner() {
             {ingredient.allergens && (
               <span style={{ fontSize: 11, opacity: 0.55 }}>Allergènes: {ingredient.allergens}</span>
             )}
+          </div>
           </div>
         </div>
 

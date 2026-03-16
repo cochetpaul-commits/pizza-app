@@ -21,6 +21,7 @@ import {
 import { formatIngredientPrice } from "@/lib/formatPrice";
 import { ALLERGENS, ALLERGEN_SHORT, parseAllergens } from "@/lib/allergens";
 import type { PriceAlert } from "@/lib/priceAlerts";
+import { IngredientAvatar } from "@/components/IngredientAvatar";
 
 // ─── shared input style helpers ─────────────────────────────────────────────
 const inputStyle: CSSProperties = {
@@ -153,8 +154,11 @@ export const IngredientRow = React.memo(function IngredientRow({
       {/* ── DESKTOP ROW ── */}
       <div
         className="hidden md:flex"
-        style={{ alignItems: "center", padding: "10px 16px", gap: 8, background: "white", transition: "background 0.1s" }}
+        style={{ alignItems: "center", padding: "10px 16px", gap: 10, background: "white", transition: "background 0.1s" }}
       >
+        {/* Avatar */}
+        <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={36} />
+
         {/* Désignation */}
         <div style={{ flex: 3, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
@@ -244,6 +248,7 @@ export const IngredientRow = React.memo(function IngredientRow({
         ) : (
           <>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+              <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={36} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <span style={{ fontWeight: 600, fontSize: 13, color: CAT_COLORS[x.category] }}>{x.name}</span>
