@@ -7,9 +7,10 @@ import { AppNav } from "@/components/AppNav";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { T } from "@/lib/tokens";
+import { TileIcon } from "@/components/TileIcon";
 
-function Tile({ href, icon, title, sub, accent }: {
-  href: string; icon?: string; title: string; sub?: string; accent?: string;
+function Tile({ href, iconName, title, sub, accent }: {
+  href: string; iconName?: React.ComponentProps<typeof TileIcon>["name"]; title: string; sub?: string; accent?: string;
 }) {
   return (
     <Link href={href} style={{ textDecoration: "none" }}>
@@ -32,7 +33,7 @@ function Tile({ href, icon, title, sub, accent }: {
         }}
       >
         <div>
-          {icon && <div style={{ fontSize: 22, marginBottom: 8 }}>{icon}</div>}
+          {iconName && <div style={{ marginBottom: 8 }}><TileIcon name={iconName} size={22} color={accent || T.jauneDark} /></div>}
           <div style={{
             fontFamily: "Oswald, sans-serif", fontWeight: 600,
             fontSize: 14, letterSpacing: "0.08em", textTransform: "uppercase",
@@ -92,13 +93,13 @@ export default function PiccolaMiaHub() {
 
         {/* Tiles */}
         <div style={{ display: "grid", gap: 12 }}>
-          <Tile href="/piccola-mia/cuisine"     icon="&#x1F373;" title="Cuisine"     sub="Recettes, ingredients, commandes" />
-          <Tile href="/piccola-mia/planning"    icon="&#x1F4C5;" title="Planning"    sub="Shifts, equipe, horaires"         />
-          <Tile href="/mes-shifts"              icon="&#x1F4CB;" title="Mon planning" sub="Mes shifts de la semaine"         />
-          <Tile href="/messagerie"              icon="&#x1F4AC;" title="Messagerie"   sub="Chat interne equipe"              />
-          <Tile href="/piccola-mia/evenements"  icon="&#x1F389;" title="Evenements"  sub="Mariages, seminaires, traiteur"   />
+          <Tile href="/piccola-mia/cuisine"     iconName="cuisine"     title="Cuisine"      sub="Recettes, ingredients, commandes" />
+          <Tile href="/piccola-mia/planning"    iconName="planning"    title="Planning"     sub="Shifts, equipe, horaires"         />
+          <Tile href="/mes-shifts"              iconName="horloge"     title="Mon planning" sub="Mes shifts de la semaine"         />
+          <Tile href="/messagerie"              iconName="messagerie"  title="Messagerie"   sub="Chat interne equipe"              />
+          <Tile href="/piccola-mia/evenements"  iconName="evenements"  title="Evenements"   sub="Mariages, seminaires, traiteur"   />
           {isGroupAdmin && (
-            <Tile href="/piccola-mia/gestion"   icon="&#x1F4CA;" title="Gestion"    sub="Pilotage, finances, admin"        />
+            <Tile href="/piccola-mia/gestion"   iconName="gestion"     title="Gestion"      sub="Pilotage, finances, admin"        />
           )}
         </div>
       </div>
