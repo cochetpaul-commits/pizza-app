@@ -5,6 +5,7 @@ import { AppNav } from "@/components/AppNav";
 import { useProfile } from "@/lib/ProfileContext";
 import { supabase } from "@/lib/supabaseClient";
 import { T } from "@/lib/tokens";
+import { TileIcon } from "@/components/TileIcon";
 
 type UpcomingEvent = {
   id: string;
@@ -28,8 +29,8 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Tile({ href, icon, title, sub, value, accent, wide }: {
-  href: string; icon?: string; title: string; sub?: string;
+function Tile({ href, iconName, title, sub, value, accent, wide }: {
+  href: string; iconName?: React.ComponentProps<typeof TileIcon>["name"]; title: string; sub?: string;
   value?: string; accent?: string; wide?: boolean;
 }) {
   return (
@@ -53,7 +54,7 @@ function Tile({ href, icon, title, sub, value, accent, wide }: {
         }}
       >
         <div>
-          {icon && <div style={{ fontSize: 20, marginBottom: 8 }}>{icon}</div>}
+          {iconName && <div style={{ marginBottom: 8 }}><TileIcon name={iconName} size={20} color={accent || T.jauneDark} /></div>}
           <div style={{
             fontFamily: "Oswald, sans-serif", fontWeight: 600,
             fontSize: 13, letterSpacing: "0.08em", textTransform: "uppercase",
@@ -115,9 +116,9 @@ export default function EvenementsHubPM() {
           <>
             <SectionLabel>Actions</SectionLabel>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-              <Tile href="/evenements/new"     icon="&#x1F4DD;" title="Creer un devis"  sub="Nouveau devis evenement" wide />
-              <Tile href="/evenements"         icon="&#x1F4C5;" title="Evenements"       value={total > 0 ? String(total) : undefined} sub="A venir" />
-              <Tile href="/evenements/clients" icon="&#x1F465;" title="Clients"          sub="Carnet de contacts" />
+              <Tile href="/evenements/new"     iconName="devis"      title="Creer un devis"  sub="Nouveau devis evenement" wide />
+              <Tile href="/evenements"         iconName="evenements" title="Evenements"       value={total > 0 ? String(total) : undefined} sub="A venir" />
+              <Tile href="/evenements/clients" iconName="clients"    title="Clients"          sub="Carnet de contacts" />
             </div>
           </>
         )}

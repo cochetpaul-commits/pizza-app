@@ -24,7 +24,9 @@ type IconName =
   | "pointer"
   | "equipe"
   | "recettes"
-  | "ingredients";
+  | "ingredients"
+  | "devis"
+  | "clients";
 
 const paths: Record<IconName, React.ReactNode> = {
   cuisine: (
@@ -212,6 +214,22 @@ const paths: Record<IconName, React.ReactNode> = {
     <>
       <path d="M12 22c5.5-3 8-7.5 8-13-3 0-5.5 1-8 4-2.5-3-5-4-8-4 0 5.5 2.5 10 8 13z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
       <path d="M12 22V9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </>
+  ),
+  devis: (
+    // Document avec stylo
+    <>
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M10 18l-2 .5.5-2L14 11l1.5 1.5L10 18z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </>
+  ),
+  clients: (
+    // Carnet de contacts
+    <>
+      <circle cx="12" cy="10" r="3" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M6 20v-1c0-2.2 2.7-4 6-4s6 1.8 6 4v1" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
     </>
   ),
 };

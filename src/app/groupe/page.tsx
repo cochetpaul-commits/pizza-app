@@ -50,7 +50,7 @@ export default function GroupePage() {
         .eq("source", "kezia_pdf")
         .limit(1)
         .maybeSingle();
-      if (data?.ca_ttc != null) setCaPM(data.ca_ttc);
+      setCaPM(data?.ca_ttc ?? 0);
     }
     fetchCaPM();
   }, []);

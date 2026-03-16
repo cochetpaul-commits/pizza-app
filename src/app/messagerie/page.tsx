@@ -83,7 +83,7 @@ export default function MessageriePage() {
 
   return (
     <>
-      <NavBar backHref="/" backLabel="Accueil" />
+      <NavBar backHref={etab?.slug === "piccola_mia" ? "/piccola-mia" : "/bello-mio"} backLabel="Accueil" />
       <main style={S.main}>
         <div style={S.container}>
           {/* ── Sidebar (channels) ── */}
