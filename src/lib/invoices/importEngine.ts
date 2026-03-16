@@ -120,8 +120,12 @@ export async function runImport(options: {
     filterLine,
   } = options;
 
-  // 1. Upsert supplier
-  const supplierRow: Record<string, unknown> = { user_id: userId, name: supplierName, is_active: true };
+  // 1. Upsert supplier (normalize name to Title Case to avoid duplicates)
+  const normalizedName = supplierName
+    .split(/\s+/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+  const supplierRow: Record<string, unknown> = { user_id: userId, name: normalizedName, is_active: true };
   if (etabId) supplierRow.etablissement_id = etabId;
   const { data: supRows, error: supErr } = await supabase
     .from("suppliers")
@@ -131,7 +135,7 @@ export async function runImport(options: {
 
   if (supErr) throw new Error(supErr.message);
   const supplierId = (supRows?.[0]?.id as string | undefined) ?? null;
-  if (!supplierId) throw new Error(`Supplier ${supplierName}: id manquant`);
+  if (!supplierId) throw new Error(`Supplier ${normalizedName}: id manquant`);
 
   // 2. Déduplication facture
   const invoiceNumber = payload.invoice_number ?? null;
@@ -161,7 +165,7 @@ export async function runImport(options: {
     const invoiceRow: Record<string, unknown> = {
         user_id: userId,
         supplier_id: supplierId,
-        supplier_name: supplierName,
+        supplier_name: normalizedName,
         invoice_number: invoiceNumber,
         invoice_date: invoiceDateIso,
         total_ht: payload.total_ht,
@@ -229,7 +233,7 @@ export async function runImport(options: {
   if (catErr) throw new Error(catErr.message);
   const fallbackCategory = (catRows?.[0]?.category as string | undefined) ?? "autre";
 
-  const statusNote = `import ${supplierName}${invoiceNumber ? " " + invoiceNumber : ""}${payload.invoice_date ? " " + payload.invoice_date : ""}`.trim();
+  const statusNote = `import ${normalizedName}${invoiceNumber ? " " + invoiceNumber : ""}${payload.invoice_date ? " " + payload.invoice_date : ""}`.trim();
 
   let ingredientsCreated = 0;
   let offersInserted = 0;
@@ -321,7 +325,7 @@ export async function runImport(options: {
         allergens: allergens.length ? allergens : null,
         is_active: true,
         default_unit: defaultUnit,
-        supplier: supplierName,
+        supplier: normalizedName,
         supplier_id: supplierId,
         default_supplier_id: supplierId,
         supplier_sku: sku || null,
