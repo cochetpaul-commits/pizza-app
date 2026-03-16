@@ -94,7 +94,7 @@ function IngredientsPageInner() {
 
   const [q, setQ] = useState("");
   const debouncedQ = useDebounce(q, 300);
-  const { items, suppliers, offers, alertMap, loading, loadingMore, hasMore, loadMore, error: dataError, mutate } = useIngredientsData(debouncedQ, etab?.id);
+  const { items, suppliers, supplierAliases, offers, alertMap, loading, loadingMore, hasMore, loadMore, error: dataError, mutate } = useIngredientsData(debouncedQ, etab?.id);
 
   const [session, setSession] = useState<Session | null>(null);
 
@@ -162,14 +162,15 @@ function IngredientsPageInner() {
       });
     }
     if (filterSupplier !== "all") {
+      const aliasIds = supplierAliases.get(filterSupplier) ?? new Set([filterSupplier]);
       base = base.filter((x) => {
         const off = offersByIngredientId.get(x.id);
         const supplierForFilter = (off?.supplier_id ?? x.supplier_id ?? null) as string | null;
-        return supplierForFilter != null && supplierForFilter === filterSupplier;
+        return supplierForFilter != null && aliasIds.has(supplierForFilter);
       });
     }
     return base;
-  }, [items, tab, filterCategory, filterSupplier, filterEstablishment, includeNoOffer, offersByIngredientId]);
+  }, [items, tab, filterCategory, filterSupplier, supplierAliases, filterEstablishment, includeNoOffer, offersByIngredientId]);
 
   const grouped = useMemo(() => {
     const byCategory = new Map<Category, Ingredient[]>();

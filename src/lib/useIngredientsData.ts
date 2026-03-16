@@ -85,6 +85,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
   const [items, setItems] = useState<Ingredient[]>([]);
   const [offers, setOffers] = useState<LatestOffer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierAliases, setSupplierAliases] = useState<Map<string, Set<string>>>(new Map());
   const [alertMap, setAlertMap] = useState<Map<string, PriceAlert>>(new Map());
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -103,7 +104,24 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
       .select("id,name,is_active")
       .order("name", { ascending: true })
       .then(({ data, error: err }) => {
-        if (!err) setSuppliers((data ?? []) as Supplier[]);
+        if (!err) {
+          // Deduplicate suppliers by name (case-insensitive) — keep the first entry as canonical
+          const seen = new Map<string, Supplier>();
+          const aliases = new Map<string, Set<string>>();
+          for (const s of (data ?? []) as Supplier[]) {
+            const key = s.name.toLowerCase();
+            if (!seen.has(key)) {
+              seen.set(key, s);
+              aliases.set(s.id, new Set([s.id]));
+            } else {
+              // Add this duplicate's ID to the canonical entry's alias set
+              const canonical = seen.get(key)!;
+              aliases.get(canonical.id)!.add(s.id);
+            }
+          }
+          setSuppliers(Array.from(seen.values()));
+          setSupplierAliases(aliases);
+        }
       });
 
     supabase.auth.getUser().then(({ data }) => {
@@ -182,6 +200,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
   return {
     items,
     suppliers,
+    supplierAliases,
     offers,
     alertMap,
     loading,
