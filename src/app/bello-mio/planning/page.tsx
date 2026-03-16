@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AppNav } from "@/components/AppNav";
 import { useProfile } from "@/lib/ProfileContext";
 import { T } from "@/lib/tokens";
+import { TileIcon } from "@/components/TileIcon";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -14,8 +15,8 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Tile({ href, icon, title, sub, accent, wide }: {
-  href: string; icon?: string; title: string; sub?: string;
+function Tile({ href, iconName, title, sub, accent, wide }: {
+  href: string; iconName?: React.ComponentProps<typeof TileIcon>["name"]; title: string; sub?: string;
   accent?: string; wide?: boolean;
 }) {
   return (
@@ -39,7 +40,7 @@ function Tile({ href, icon, title, sub, accent, wide }: {
         }}
       >
         <div>
-          {icon && <div style={{ fontSize: 20, marginBottom: 8 }}>{icon}</div>}
+          {iconName && <div style={{ marginBottom: 8 }}><TileIcon name={iconName} size={20} color={accent || T.terracotta} /></div>}
           <div style={{
             fontFamily: "Oswald, sans-serif", fontWeight: 600,
             fontSize: 13, letterSpacing: "0.08em", textTransform: "uppercase",
@@ -66,15 +67,15 @@ export default function PlanningHubBM() {
 
         <SectionLabel>Quotidien</SectionLabel>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-          <Tile href="/plannings" icon="&#x1F4CB;" title="Pointer"  sub="Presences du jour"       accent={T.terracotta} />
-          <Tile href="/plannings" icon="&#x1F4C5;" title="Shifts"   sub="Creneaux de la semaine"   accent={T.terracotta} />
+          <Tile href="/plannings" iconName="pointer"  title="Pointer"  sub="Presences du jour"       accent={T.terracotta} />
+          <Tile href="/plannings" iconName="planning" title="Shifts"   sub="Creneaux de la semaine"   accent={T.terracotta} />
         </div>
 
         {isGroupAdmin && (
           <>
             <SectionLabel>Administration</SectionLabel>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-              <Tile href="/rh/equipe" icon="&#x1F465;" title="Equipe" sub="Membres, roles, contrats" accent={T.terracotta} wide />
+              <Tile href="/rh/equipe" iconName="equipe" title="Equipe" sub="Membres, roles, contrats" accent={T.terracotta} wide />
             </div>
           </>
         )}

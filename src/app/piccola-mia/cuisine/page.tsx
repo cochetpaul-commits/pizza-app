@@ -5,6 +5,7 @@ import { AppNav } from "@/components/AppNav";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { T } from "@/lib/tokens";
+import { TileIcon } from "@/components/TileIcon";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -16,8 +17,8 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Tile({ href, icon, title, sub, value, accent, wide }: {
-  href: string; icon?: string; title: string; sub?: string;
+function Tile({ href, iconName, title, sub, value, accent, wide }: {
+  href: string; iconName?: React.ComponentProps<typeof TileIcon>["name"]; title: string; sub?: string;
   value?: string; accent?: string; wide?: boolean;
 }) {
   return (
@@ -41,7 +42,7 @@ function Tile({ href, icon, title, sub, value, accent, wide }: {
         }}
       >
         <div>
-          {icon && <div style={{ fontSize: 20, marginBottom: 8 }}>{icon}</div>}
+          {iconName && <div style={{ marginBottom: 8 }}><TileIcon name={iconName} size={20} color={accent || T.jauneDark} /></div>}
           <div style={{
             fontFamily: "Oswald, sans-serif", fontWeight: 600,
             fontSize: 13, letterSpacing: "0.08em", textTransform: "uppercase",
@@ -101,9 +102,9 @@ export default function CuisineHubPM() {
 
         <SectionLabel>Approvisionnement</SectionLabel>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-          <Tile href="/commandes"    icon="&#x1F6D2;" title="Commander"    sub="Mael · Metro · Masse"  wide />
-          <Tile href="/mercuriale"   icon="&#x1F4B6;" title="Mercuriale"   sub="Prix du marche"        />
-          <Tile href="/fournisseurs" icon="&#x1F69A;" title="Fournisseurs" sub="Contacts & tarifs"     />
+          <Tile href="/commandes"    iconName="commandes"    title="Commander"    sub="Mael · Metro · Masse"  wide />
+          <Tile href="/mercuriale"   iconName="mercuriale"   title="Mercuriale"   sub="Prix du marche"        />
+          <Tile href="/fournisseurs" iconName="fournisseurs" title="Fournisseurs" sub="Contacts & tarifs"     />
         </div>
       </div>
     </div>

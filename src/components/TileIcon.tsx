@@ -18,7 +18,13 @@ type IconName =
   | "admin"
   | "upload"
   | "epicerie"
-  | "parametres";
+  | "parametres"
+  | "commandes"
+  | "fournisseurs"
+  | "pointer"
+  | "equipe"
+  | "recettes"
+  | "ingredients";
 
 const paths: Record<IconName, React.ReactNode> = {
   cuisine: (
@@ -158,6 +164,54 @@ const paths: Record<IconName, React.ReactNode> = {
     <>
       <path d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z" fill="none" stroke="currentColor" strokeWidth="1.4" />
       <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.4" />
+    </>
+  ),
+  commandes: (
+    // Panier de courses
+    <>
+      <path d="M6 6h15l-1.5 9H7.5L6 6z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M6 6L5 2H2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="9" cy="19" r="1.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="18" cy="19" r="1.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+    </>
+  ),
+  fournisseurs: (
+    // Camion livraison
+    <>
+      <rect x="1" y="6" width="14" height="10" rx="1" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M15 10h4l3 3v3h-7V10z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <circle cx="6" cy="18" r="2" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="19" cy="18" r="2" fill="none" stroke="currentColor" strokeWidth="1.4" />
+    </>
+  ),
+  pointer: (
+    // Check / pointage
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M8 12l3 3 5-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </>
+  ),
+  equipe: (
+    // Groupe de personnes
+    <>
+      <circle cx="9" cy="7" r="3" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M3 21v-2c0-2.2 2.7-4 6-4s6 1.8 6 4v2" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="17" cy="8" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M21 21v-1.5c0-1.5-1.5-2.8-3.5-3.3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </>
+  ),
+  recettes: (
+    // Livre ouvert
+    <>
+      <path d="M2 4c2-1 4-1.5 6-1.5S12 3 12 4v16c-1-1-3-1.5-4-1.5S4 19 2 20V4z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M22 4c-2-1-4-1.5-6-1.5S12 3 12 4v16c1-1 3-1.5 4-1.5s4 .5 6 1.5V4z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    </>
+  ),
+  ingredients: (
+    // Feuille / ingredient
+    <>
+      <path d="M12 22c5.5-3 8-7.5 8-13-3 0-5.5 1-8 4-2.5-3-5-4-8-4 0 5.5 2.5 10 8 13z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M12 22V9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </>
   ),
 };
