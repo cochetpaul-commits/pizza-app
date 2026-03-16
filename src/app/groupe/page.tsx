@@ -8,6 +8,7 @@ import { AppNav } from "@/components/AppNav";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
 import { TOKENS } from "@/lib/tokens";
+import { fetchPriceAlerts } from "@/lib/priceAlerts";
 
 type CaData = { totalSales: number; guestsNumber: number } | null;
 type UpcomingEvent = { id: string; name: string; date: string | null; status: string; covers: number };
@@ -70,16 +71,15 @@ export default function GroupePage() {
   }, []);
 
   useEffect(() => {
-    async function fetchNotifs() {
+    async function fetchAlertCount() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
       try {
-        const { count } = await supabase
-          .from("notifications")
-          .select("*", { count: "exact", head: true })
-          .eq("statut", "non_lu");
-        setNotifCount(count ?? 0);
-      } catch { /* table may not exist yet */ }
+        const alerts = await fetchPriceAlerts(supabase, user.id);
+        setNotifCount(alerts.length);
+      } catch { /* silencieux */ }
     }
-    fetchNotifs();
+    fetchAlertCount();
   }, []);
 
   return (
@@ -122,38 +122,41 @@ export default function GroupePage() {
             </div>
           </div>
 
-          {/* Alertes / Demandes */}
-          <div style={{
-            ...whiteCard,
-            marginBottom: 20,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={cardTitle}>Alertes / Demandes</span>
-              {notifCount > 0 && (
-                <span style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  minWidth: 20,
-                  height: 20,
-                  borderRadius: 10,
-                  background: "#D4775A",
-                  color: "#fff",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  padding: "0 6px",
-                }}>
-                  {notifCount}
-                </span>
-              )}
+          {/* Alertes Prix */}
+          <Link href="/variations-prix" style={{ textDecoration: "none", color: "inherit" }}>
+            <div style={{
+              ...whiteCard,
+              marginBottom: 20,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              cursor: "pointer",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={cardTitle}>Alertes Prix</span>
+                {notifCount > 0 && (
+                  <span style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: 20,
+                    height: 20,
+                    borderRadius: 10,
+                    background: "#D4775A",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "0 6px",
+                  }}>
+                    {notifCount}
+                  </span>
+                )}
+              </div>
+              <span style={{ fontSize: 12, color: "#999" }}>
+                {notifCount === 0 ? "Aucune alerte" : `${notifCount} variation${notifCount > 1 ? "s" : ""}`}
+              </span>
             </div>
-            <span style={{ fontSize: 12, color: "#999" }}>
-              {notifCount === 0 ? "Aucune alerte" : `${notifCount} non lue${notifCount > 1 ? "s" : ""}`}
-            </span>
-          </div>
+          </Link>
 
           {/* Etablissements */}
           <p style={sectionLabel}>ETABLISSEMENTS</p>
