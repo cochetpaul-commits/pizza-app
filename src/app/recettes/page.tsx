@@ -305,6 +305,9 @@ function RecettesInner() {
   const { can } = useProfile();
   const canWrite = can("recettes.edit");
   const { current: etabCtx } = useEtablissement();
+  const slug = etabCtx?.slug;
+  const cuisineHref = (slug === "piccola_mia" || slug === "piccola-mia") ? "/piccola-mia/cuisine"
+    : (slug === "bello_mio" || slug === "bello-mio") ? "/bello-mio/cuisine" : "/";
   const [authOk, setAuthOk] = useState<boolean | null>(null);
   const [pizzas,    setPizzas]    = useState<PizzaRow[]>([]);
   const [kitchens,  setKitchens]  = useState<KitchenRow[]>([]);
@@ -431,7 +434,7 @@ function RecettesInner() {
   if (authOk === null || loading) {
     return (
       <>
-        <NavBar />
+        <NavBar backHref={cuisineHref} backLabel="Cuisine" />
         <main className="container"><TopNav title="Recettes" subtitle="Chargement…" /></main>
       </>
     );
@@ -439,7 +442,7 @@ function RecettesInner() {
   if (!authOk) {
     return (
       <>
-        <NavBar />
+        <NavBar backHref={cuisineHref} backLabel="Cuisine" />
         <main className="container">
           <TopNav title="Recettes" />
           <Link className="btn btnPrimary" href="/login">Se connecter</Link>
@@ -450,7 +453,7 @@ function RecettesInner() {
 
   return (
     <>
-      <NavBar right={
+      <NavBar backHref={cuisineHref} backLabel="Cuisine" right={
         <button className="btn" onClick={refresh} disabled={loading} style={{ fontSize: 12 }}>
           {loading ? "…" : "↻"}
         </button>
