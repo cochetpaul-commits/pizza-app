@@ -15,29 +15,37 @@ export async function GET(req: NextRequest) {
     throw e;
   }
 
+  const supplierIdParam = req.nextUrl.searchParams.get("supplier_id");
   const supplierName = req.nextUrl.searchParams.get("supplier");
-  if (!supplierName) {
-    return NextResponse.json({ error: "supplier requis" }, { status: 400 });
+  if (!supplierIdParam && !supplierName) {
+    return NextResponse.json({ error: "supplier ou supplier_id requis" }, { status: 400 });
   }
 
-  // Trouver le fournisseur par nom (case-insensitive)
-  const { data: supplier } = await supabaseAdmin
-    .from("suppliers")
-    .select("id")
-    .ilike("name", `%${supplierName}%`)
-    .eq("is_active", true)
-    .limit(1)
-    .maybeSingle();
+  let supplierId: string;
 
-  if (!supplier) {
-    return NextResponse.json({ session: null, supplier_id: null });
+  if (supplierIdParam) {
+    supplierId = supplierIdParam;
+  } else {
+    // Trouver le fournisseur par nom (case-insensitive, accent-insensitive via unaccent)
+    const { data: supplier } = await supabaseAdmin
+      .from("suppliers")
+      .select("id")
+      .ilike("name", `%${supplierName}%`)
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (!supplier) {
+      return NextResponse.json({ session: null, supplier_id: null });
+    }
+    supplierId = supplier.id;
   }
 
   // Chercher session active (brouillon ou validee)
   const { data: session } = await supabaseAdmin
     .from("commande_sessions")
     .select("*")
-    .eq("supplier_id", supplier.id)
+    .eq("supplier_id", supplierId)
     .eq("etablissement_id", etabId)
     .in("status", ["brouillon", "en_attente", "validee"])
     .order("created_at", { ascending: false })
@@ -45,7 +53,7 @@ export async function GET(req: NextRequest) {
     .maybeSingle();
 
   if (!session) {
-    return NextResponse.json({ session: null, supplier_id: supplier.id });
+    return NextResponse.json({ session: null, supplier_id: supplierId });
   }
 
   // Charger les lignes avec nom ingrédient
@@ -57,6 +65,6 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     session: { ...session, lignes: lignes ?? [] },
-    supplier_id: supplier.id,
+    supplier_id: supplierId,
   });
 }
