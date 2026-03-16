@@ -32,6 +32,23 @@ export type Profile = {
   updated_at: string
 }
 
+export type Shift = {
+  id: string
+  employe_id: string
+  etablissement_id: string
+  poste_id: string | null
+  date: string
+  heure_debut: string
+  heure_fin: string
+  pause_minutes: number
+  note: string | null
+  statut: "brouillon" | "publié" | "validé"
+  heures_reelles_debut: string | null
+  heures_reelles_fin: string | null
+  pause_reelle_minutes: number | null
+  created_at: string
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const ERROR_MESSAGES: Record<string, string> = {
