@@ -649,3 +649,107 @@ export const CONSTANTS = {
 
 // Export utilities for testing
 export { timeToMinutes, shiftDureeNette, shiftDureeBrute, formatHeures, formatDateFR, formatValeur, getISOWeekKey };
+
+// ============================================================
+// Ajouts v2 — Convention, BilanMois, jours fériés, hook wrapper
+// ============================================================
+
+export type Convention = "HCR_1979" | "RAPIDE_1501"
+
+export type TypeAlerte = Alerte["type"]
+
+export const JOURS_FERIES_2026 = new Set([
+  "2026-01-01","2026-04-06","2026-05-01","2026-05-08",
+  "2026-05-14","2026-05-25","2026-07-14","2026-08-15",
+  "2026-11-01","2026-11-11","2026-12-25",
+])
+
+export type BilanMois = {
+  periode: string
+  heures_contractuelles: number
+  heures_travaillees: number
+  heures_normales: number
+  heures_comp_10: number; heures_comp_25: number
+  heures_supp_10: number; heures_supp_20: number
+  heures_supp_25: number; heures_supp_50: number
+  jours_feries_travailles: number
+  jours_travailles: number
+  solde_rc: number
+  nb_repas: number
+  alertes: Alerte[]
+}
+
+/**
+ * Convertit un BilanMensuel (v1) en BilanMois (v2) pour compatibilité.
+ */
+function toBilanMois(bm: BilanMensuel, contrat: ContratInput, periode: string): BilanMois {
+  const parJour = new Set(bm.bilans_semaines.flatMap(b => b.alertes.map(a => a.date)))
+  let jours_feries = 0
+  for (const d of parJour) if (JOURS_FERIES_2026.has(d)) jours_feries++
+
+  return {
+    periode,
+    heures_contractuelles: round2(contrat.heures_semaine * 52 / 12),
+    heures_travaillees: bm.heures_travaillees,
+    heures_normales: bm.heures_normales,
+    heures_comp_10: bm.heures_comp_10, heures_comp_25: bm.heures_comp_25,
+    heures_supp_10: bm.heures_supp_10, heures_supp_20: bm.heures_supp_20,
+    heures_supp_25: bm.heures_supp_25, heures_supp_50: bm.heures_supp_50,
+    jours_feries_travailles: jours_feries,
+    jours_travailles: bm.jours_travailles,
+    solde_rc: bm.rc_acquis,
+    nb_repas: bm.nb_repas,
+    alertes: bm.alertes,
+  }
+}
+
+export const VALEUR_REPAS_AN = 3.57
+
+/**
+ * Hook principal — wrapper autour des fonctions existantes.
+ * Fournit une API unifiée pour le moteur légal.
+ */
+export function useConventionLegale() {
+  const calculerBilanMois = (
+    shifts: ShiftInput[],
+    contrat: ContratInput,
+    periode: string,
+    employe_id?: string
+  ): BilanMois => {
+    const moisShifts = shifts.filter(s => s.date.startsWith(periode))
+    const bm = calculerBilanMensuel(moisShifts, contrat, employe_id ?? "")
+    return toBilanMois(bm, contrat, periode)
+  }
+
+  const hasAlerteJour = (shifts: ShiftInput[]): boolean => {
+    if (!shifts.length) return false
+    const debuts = shifts.map(s => timeToMinutes(s.heures_reelles_debut ?? s.heure_debut))
+    const fins = shifts.map(s => {
+      let f = timeToMinutes(s.heures_reelles_fin ?? s.heure_fin)
+      if (f <= timeToMinutes(s.heures_reelles_debut ?? s.heure_debut)) f += 1440
+      return f
+    })
+    const amp = (Math.max(...fins) - Math.min(...debuts)) / 60
+    const dur = shifts.reduce((a, s) => a + shiftDureeNette(s), 0)
+    return amp > HCR_AMPLITUDE_MAX || dur > HCR_DUREE_MAX_JOUR
+  }
+
+  const dureeShift = (debut: string, fin: string, pause: number): number => {
+    let minutes = timeToMinutes(fin) - timeToMinutes(debut)
+    if (minutes < 0) minutes += 1440
+    return round2(Math.max(0, minutes - pause) / 60)
+  }
+
+  const isJourFerie = (date: string): boolean => JOURS_FERIES_2026.has(date)
+
+  return {
+    calculerBilanSemaine,
+    calculerBilanMois,
+    hasAlerteJour,
+    dureeShift,
+    isJourFerie,
+    genererExportSilae,
+    exportSilaeToCSV,
+    VALEUR_REPAS_AN,
+  }
+}
