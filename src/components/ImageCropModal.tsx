@@ -87,6 +87,7 @@ export function ImageCropModal({ imageSrc, onConfirm, onCancel }: Props) {
             image={imageSrc}
             crop={crop}
             zoom={zoom}
+            minZoom={0.3}
             aspect={1}
             cropShape="round"
             showGrid={false}
@@ -101,7 +102,7 @@ export function ImageCropModal({ imageSrc, onConfirm, onCancel }: Props) {
           <span style={{ fontSize: 11, color: "#999", flexShrink: 0 }}>Zoom</span>
           <input
             type="range"
-            min={1}
+            min={0.3}
             max={3}
             step={0.05}
             value={zoom}
