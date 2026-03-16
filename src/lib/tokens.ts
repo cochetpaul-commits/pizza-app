@@ -12,6 +12,13 @@ export const T = {
   white: "#fff",
   green: "#22c55e",
 
+  // Section accents
+  sauge: "#4a6741",       // achats, approvisionnement
+  dore: "#b8860b",        // prix & marges, finances
+  bleu: "#2563eb",        // RH
+  ardoise: "#64748b",     // admin
+  violet: "#7B1FA2",      // evenements
+
   // Shadows
   tileShadow: "0 2px 8px rgba(0,0,0,0.04)",
   tileShadowHover: "0 4px 16px rgba(0,0,0,0.08)",

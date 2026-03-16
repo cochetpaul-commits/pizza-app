@@ -102,9 +102,9 @@ export default function CuisineHubBM() {
 
         <SectionLabel>Approvisionnement</SectionLabel>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-          <Tile href="/commandes"    iconName="commandes"    title="Commander"    sub="Mael · Metro · Masse"  accent={T.terracotta} wide />
-          <Tile href="/mercuriale"   iconName="mercuriale"   title="Mercuriale"   sub="Prix du marche"        accent={T.terracotta} />
-          <Tile href="/fournisseurs" iconName="fournisseurs" title="Fournisseurs" sub="Contacts & tarifs"     accent={T.terracotta} />
+          <Tile href="/commandes"    iconName="commandes"    title="Commander"    sub="Mael · Metro · Masse"  accent={T.sauge} wide />
+          <Tile href="/mercuriale"   iconName="mercuriale"   title="Mercuriale"   sub="Prix du marche"        accent={T.sauge} />
+          <Tile href="/fournisseurs" iconName="fournisseurs" title="Fournisseurs" sub="Contacts & tarifs"     accent={T.sauge} />
         </div>
       </div>
     </div>

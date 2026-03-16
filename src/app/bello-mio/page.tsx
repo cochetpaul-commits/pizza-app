@@ -93,11 +93,11 @@ export default function BelloMioHub() {
         {/* Tiles */}
         <div style={{ display: "grid", gap: 12 }}>
           <Tile href="/bello-mio/cuisine"  iconName="cuisine"     title="Cuisine"      sub="Recettes, ingredients, commandes" accent={T.terracotta} />
-          <Tile href="/bello-mio/planning" iconName="planning"    title="Planning"     sub="Shifts, equipe, horaires"         accent={T.terracotta} />
-          <Tile href="/mes-shifts"         iconName="horloge"     title="Mon planning" sub="Mes shifts de la semaine"         accent={T.terracotta} />
-          <Tile href="/messagerie"         iconName="messagerie"  title="Messagerie"   sub="Chat interne equipe"              accent={T.terracotta} />
+          <Tile href="/bello-mio/planning" iconName="planning"    title="Planning"     sub="Shifts, equipe, horaires"         accent={T.bleu} />
+          <Tile href="/mes-shifts"         iconName="horloge"     title="Mon planning" sub="Mes shifts de la semaine"         accent={T.bleu} />
+          <Tile href="/messagerie"         iconName="messagerie"  title="Messagerie"   sub="Chat interne equipe"              accent={T.sauge} />
           {isGroupAdmin && (
-            <Tile href="/bello-mio/gestion" iconName="gestion"   title="Gestion"      sub="Pilotage, finances, admin"        accent={T.terracotta} />
+            <Tile href="/bello-mio/gestion" iconName="gestion"   title="Gestion"      sub="Pilotage, finances, admin"        accent={T.ardoise} />
           )}
         </div>
       </div>

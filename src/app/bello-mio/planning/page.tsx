@@ -68,14 +68,14 @@ export default function PlanningHubBM() {
         <SectionLabel>Quotidien</SectionLabel>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
           <Tile href="/plannings" iconName="pointer"  title="Pointer"  sub="Presences du jour"       accent={T.terracotta} />
-          <Tile href="/plannings" iconName="planning" title="Shifts"   sub="Creneaux de la semaine"   accent={T.terracotta} />
+          <Tile href="/plannings" iconName="planning" title="Shifts"   sub="Creneaux de la semaine"  accent={T.terracotta} />
         </div>
 
         {isGroupAdmin && (
           <>
             <SectionLabel>Administration</SectionLabel>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-              <Tile href="/rh/equipe" iconName="equipe" title="Equipe" sub="Membres, roles, contrats" accent={T.terracotta} wide />
+              <Tile href="/rh/equipe" iconName="equipe" title="Equipe" sub="Membres, roles, contrats" accent={T.bleu} wide />
             </div>
           </>
         )}

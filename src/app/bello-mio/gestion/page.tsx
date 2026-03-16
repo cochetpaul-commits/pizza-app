@@ -71,26 +71,26 @@ export default function GestionHubBM() {
 
           <SectionLabel>Achats</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-            <Tile href="/invoices"        iconName="factures"   title="Factures"              sub="Import fournisseurs"   accent={T.terracotta} />
-            <Tile href="/variations-prix" iconName="variations" title="Variations & Alertes"  sub="Ecarts prix, seuils"   accent={T.terracotta} />
+            <Tile href="/invoices"        iconName="factures"   title="Factures"              sub="Import fournisseurs"   accent={T.sauge} />
+            <Tile href="/variations-prix" iconName="variations" title="Variations & Alertes"  sub="Ecarts prix, seuils"   accent={T.sauge} />
           </div>
 
           <SectionLabel>Prix & Marges</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-            <Tile href="/finances"   iconName="finances"   title="Finances"       sub="P&L, food cost"               accent={T.terracotta} />
-            <Tile href="/mercuriale" iconName="mercuriale" title="Mercuriale"     sub="Prix fournisseurs, export PDF" accent={T.terracotta} />
-            <Tile href="/epicerie"   iconName="prix"       title="Prix de vente"  sub="CPU, coefficients, TVA"       accent={T.terracotta} />
+            <Tile href="/finances"   iconName="finances"   title="Finances"       sub="P&L, food cost"               accent={T.dore} />
+            <Tile href="/mercuriale" iconName="mercuriale" title="Mercuriale"     sub="Prix fournisseurs, export PDF" accent={T.dore} />
+            <Tile href="/epicerie"   iconName="prix"       title="Prix de vente"  sub="CPU, coefficients, TVA"       accent={T.dore} />
           </div>
 
           <SectionLabel>Ressources humaines</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-            <Tile href="/rh/masse-salariale" iconName="masse-salariale" title="Masse salariale" sub="Charges, simulateur"          accent={T.terracotta} />
-            <Tile href="/rh/rapports"        iconName="rapports"        title="Rapports RH"     sub="Bilans mensuels, export SILAE" accent={T.terracotta} />
+            <Tile href="/rh/masse-salariale" iconName="masse-salariale" title="Masse salariale" sub="Charges, simulateur"          accent={T.bleu} />
+            <Tile href="/rh/rapports"        iconName="rapports"        title="Rapports RH"     sub="Bilans mensuels, export SILAE" accent={T.bleu} />
           </div>
 
           <SectionLabel>Administration</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-            <Tile href="/admin/utilisateurs" iconName="admin" title="Admin" sub="Utilisateurs, roles" accent={T.terracotta} />
+            <Tile href="/admin/utilisateurs" iconName="admin" title="Admin" sub="Utilisateurs, roles" accent={T.ardoise} />
           </div>
         </div>
       </div>

@@ -93,13 +93,13 @@ export default function PiccolaMiaHub() {
 
         {/* Tiles */}
         <div style={{ display: "grid", gap: 12 }}>
-          <Tile href="/piccola-mia/cuisine"     iconName="cuisine"     title="Cuisine"      sub="Recettes, ingredients, commandes" />
-          <Tile href="/piccola-mia/planning"    iconName="planning"    title="Planning"     sub="Shifts, equipe, horaires"         />
-          <Tile href="/mes-shifts"              iconName="horloge"     title="Mon planning" sub="Mes shifts de la semaine"         />
-          <Tile href="/messagerie"              iconName="messagerie"  title="Messagerie"   sub="Chat interne equipe"              />
-          <Tile href="/piccola-mia/evenements"  iconName="evenements"  title="Evenements"   sub="Mariages, seminaires, traiteur"   />
+          <Tile href="/piccola-mia/cuisine"     iconName="cuisine"     title="Cuisine"      sub="Recettes, ingredients, commandes" accent={T.jauneDark} />
+          <Tile href="/piccola-mia/planning"    iconName="planning"    title="Planning"     sub="Shifts, equipe, horaires"         accent={T.bleu} />
+          <Tile href="/mes-shifts"              iconName="horloge"     title="Mon planning" sub="Mes shifts de la semaine"         accent={T.bleu} />
+          <Tile href="/messagerie"              iconName="messagerie"  title="Messagerie"   sub="Chat interne equipe"              accent={T.sauge} />
+          <Tile href="/piccola-mia/evenements"  iconName="evenements"  title="Evenements"   sub="Mariages, seminaires, traiteur"   accent={T.violet} />
           {isGroupAdmin && (
-            <Tile href="/piccola-mia/gestion"   iconName="gestion"     title="Gestion"      sub="Pilotage, finances, admin"        />
+            <Tile href="/piccola-mia/gestion"   iconName="gestion"     title="Gestion"      sub="Pilotage, finances, admin"        accent={T.ardoise} />
           )}
         </div>
       </div>
