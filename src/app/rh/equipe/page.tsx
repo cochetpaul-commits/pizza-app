@@ -1,34 +1,24 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { NavBar } from "@/components/NavBar";
-import { TopNav } from "@/components/TopNav";
-import { useProfile } from "@/lib/ProfileContext";
-import { supabase } from "@/lib/supabaseClient";
-import { AddCollaborateurModal } from "@/components/rh/AddCollaborateurModal";
+import { useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
+import { NavBar } from "@/components/NavBar"
+import { TopNav } from "@/components/TopNav"
+import { useProfile } from "@/lib/ProfileContext"
+import { useEtablissement } from "@/lib/EtablissementContext"
+import { useEmployes, type EmployeAvecContrat } from "@/hooks/useEmployes"
+import { AddCollaborateurModal } from "@/components/rh/AddCollaborateurModal"
 
-type Employe = {
-  id: string;
-  prenom: string;
-  nom: string;
-  initiales: string | null;
-  matricule: string | null;
-  equipe_access: string[];
-  role: string;
-  poste_rh: string | null;
-  contrat_type: string | null;
-  heures_semaine: number | null;
-  actif: boolean;
-  email: string | null;
-  tel_mobile: string | null;
-};
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-type FilterEquipe = "Tous" | "Cuisine" | "Salle";
+type FilterEquipe = "Tous" | "Cuisine" | "Salle" | "Shop"
+type FilterContrat = "Tous" | "CDI" | "CDD" | "extra" | "TNS" | "interim" | "apprenti" | "stagiaire"
 
 const EQUIPE_COLORS: Record<string, string> = {
   Cuisine: "#E74C3C",
   Salle: "#A9CCE3",
-};
+  Shop: "#F4D03F",
+}
 
 const CONTRAT_LABELS: Record<string, { label: string; color: string }> = {
   CDI: { label: "CDI", color: "#4a6741" },
@@ -38,137 +28,143 @@ const CONTRAT_LABELS: Record<string, { label: string; color: string }> = {
   interim: { label: "Intérim", color: "#95A5A6" },
   apprenti: { label: "Apprenti", color: "#F4D03F" },
   stagiaire: { label: "Stagiaire", color: "#B8D4E8" },
-};
+}
+
+const CONTRAT_FILTERS: { value: FilterContrat; label: string }[] = [
+  { value: "Tous", label: "Tous" },
+  { value: "CDI", label: "CDI" },
+  { value: "CDD", label: "CDD" },
+  { value: "extra", label: "Extra" },
+  { value: "TNS", label: "TNS" },
+  { value: "interim", label: "Intérim" },
+  { value: "apprenti", label: "Apprenti" },
+  { value: "stagiaire", label: "Stagiaire" },
+]
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function EquipePage() {
-  const { canWrite } = useProfile();
-  const [employes, setEmployes] = useState<Employe[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<FilterEquipe>("Tous");
-  const [search, setSearch] = useState("");
-  const [showAdd, setShowAdd] = useState(false);
-  const [etablissementId, setEtablissementId] = useState<string | null>(null);
-  const [fetchKey, setFetchKey] = useState(0);
+  const router = useRouter()
+  const { canWrite } = useProfile()
+  const { current: etablissement } = useEtablissement()
+  const { employes, loading, refetch } = useEmployes(etablissement?.id ?? null)
 
-  // Fetch etablissement id (Bello Mio par défaut)
-  useEffect(() => {
-    supabase
-      .from("etablissements")
-      .select("id")
-      .eq("slug", "bellomio")
-      .single()
-      .then(({ data }) => {
-        if (data) setEtablissementId(data.id);
-      });
-  }, []);
+  const [filterEquipe, setFilterEquipe] = useState<FilterEquipe>("Tous")
+  const [filterContrat, setFilterContrat] = useState<FilterContrat>("Tous")
+  const [search, setSearch] = useState("")
+  const [showAdd, setShowAdd] = useState(false)
 
-  useEffect(() => {
-    async function fetchEmployes() {
-      const { data, error } = await supabase
-        .from("employes")
-        .select("id, prenom, nom, initiales, matricule, equipe_access, role, poste_rh, contrat_type, heures_semaine, actif, email, tel_mobile")
-        .eq("actif", true)
-        .order("nom", { ascending: true });
+  // ── KPI counts ──────────────────────────────────────────────────────────────
+  const kpis = useMemo(() => {
+    const total = employes.length
+    const cuisine = employes.filter(e => e.equipe_access?.includes("Cuisine")).length
+    const salle = employes.filter(e => e.equipe_access?.includes("Salle")).length
+    const extras = employes.filter(e => e.contrat_type === "extra").length
+    return { total, cuisine, salle, extras }
+  }, [employes])
 
-      if (error) {
-        console.error("[EquipePage] fetch error:", error.message);
+  // ── Filtering ───────────────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    return employes.filter(e => {
+      if (filterEquipe !== "Tous" && !e.equipe_access?.includes(filterEquipe)) return false
+      if (filterContrat !== "Tous" && e.contrat_type !== filterContrat) return false
+      if (search) {
+        const q = search.toLowerCase()
+        const haystack = [e.prenom, e.nom, e.email, e.matricule].filter(Boolean).join(" ").toLowerCase()
+        if (!haystack.includes(q)) return false
       }
-      setEmployes(data ?? []);
-      setLoading(false);
-    }
-    fetchEmployes();
-  }, [fetchKey]);
-
-  const filtered = employes.filter((e) => {
-    if (filter !== "Tous" && !e.equipe_access?.includes(filter)) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return (
-        e.prenom.toLowerCase().includes(q) ||
-        e.nom.toLowerCase().includes(q) ||
-        (e.matricule ?? "").includes(q) ||
-        (e.poste_rh ?? "").toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
-
-  const countCuisine = employes.filter(e => e.equipe_access?.includes("Cuisine")).length;
-  const countSalle = employes.filter(e => e.equipe_access?.includes("Salle")).length;
+      return true
+    })
+  }, [employes, filterEquipe, filterContrat, search])
 
   return (
     <>
       <NavBar backHref="/" backLabel="Accueil" />
-      <main style={{ maxWidth: 700, margin: "0 auto", padding: "0 16px 40px" }}>
+      <main style={{ maxWidth: 900, margin: "0 auto", padding: "0 16px 40px" }}>
         <TopNav
           title="ÉQUIPE"
-          subtitle={`${employes.length} collaborateurs actifs`}
+          subtitle={`${employes.length} collaborateur${employes.length > 1 ? "s" : ""} actif${employes.length > 1 ? "s" : ""}`}
           eyebrow="Ressources humaines"
         />
 
-        {/* Filtres + recherche */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-          {(["Tous", "Cuisine", "Salle"] as FilterEquipe[]).map((f) => {
-            const count = f === "Tous" ? employes.length : f === "Cuisine" ? countCuisine : countSalle;
+        {/* ── KPI Cards ──────────────────────────────────────────────── */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 20 }}>
+          <KpiCard label="Total actifs" value={kpis.total} color="#1a1a1a" />
+          <KpiCard label="Cuisine" value={kpis.cuisine} color="#E74C3C" />
+          <KpiCard label="Salle" value={kpis.salle} color="#3498DB" />
+          <KpiCard label="Extras" value={kpis.extras} color="#A0845C" />
+        </div>
+
+        {/* ── Filters Row ────────────────────────────────────────────── */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
+          {(["Tous", "Cuisine", "Salle", "Shop"] as FilterEquipe[]).map(f => {
+            const active = filterEquipe === f
             return (
               <button
                 key={f}
                 type="button"
-                onClick={() => setFilter(f)}
+                onClick={() => setFilterEquipe(f)}
                 style={{
-                  padding: "6px 14px",
-                  borderRadius: 20,
-                  border: filter === f ? "2px solid #D4775A" : "1px solid #ddd6c8",
-                  background: filter === f ? "rgba(212,119,90,0.08)" : "#fff",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: filter === f ? "#D4775A" : "#666",
-                  cursor: "pointer",
+                  padding: "5px 12px", borderRadius: 20,
+                  border: active ? "2px solid #D4775A" : "1px solid #ddd6c8",
+                  background: active ? "rgba(212,119,90,0.08)" : "#fff",
+                  fontSize: 11, fontWeight: 700, cursor: "pointer",
+                  color: active ? "#D4775A" : "#666",
                   fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                  letterSpacing: 1,
-                  textTransform: "uppercase",
+                  letterSpacing: 1, textTransform: "uppercase",
                 }}
               >
-                {f} <span style={{ fontWeight: 400, opacity: 0.7 }}>({count})</span>
+                {f}
               </button>
-            );
+            )
           })}
 
-          <input
-            type="text"
-            placeholder="Rechercher..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+          <span style={{ width: 1, height: 20, background: "#ddd6c8" }} />
+
+          <select
+            value={filterContrat}
+            onChange={e => setFilterContrat(e.target.value as FilterContrat)}
             style={{
-              flex: 1,
-              minWidth: 120,
-              padding: "6px 12px",
-              borderRadius: 20,
-              border: "1px solid #ddd6c8",
-              fontSize: 12,
-              background: "#fff",
-              outline: "none",
+              padding: "5px 10px", borderRadius: 20, border: "1px solid #ddd6c8",
+              fontSize: 11, fontWeight: 700, background: "#fff", cursor: "pointer",
+              color: filterContrat !== "Tous" ? "#D4775A" : "#666",
+              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+              letterSpacing: 1, textTransform: "uppercase",
             }}
-          />
+          >
+            {CONTRAT_FILTERS.map(c => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </select>
         </div>
 
-        {/* Bouton ajouter */}
+        {/* ── Search + Add ───────────────────────────────────────────── */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
+          <input
+            type="text"
+            placeholder="Rechercher (nom, prénom, email, matricule)..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{
+              flex: 1, minWidth: 160, padding: "8px 14px", borderRadius: 20,
+              border: "1px solid #ddd6c8", fontSize: 12, background: "#fff", outline: "none",
+            }}
+          />
+          <span style={{ fontSize: 11, color: "#999", whiteSpace: "nowrap" }}>
+            {filtered.length} résultat{filtered.length > 1 ? "s" : ""}
+          </span>
+        </div>
+
         {canWrite && (
           <div style={{ marginBottom: 16 }}>
             <button
               type="button"
               onClick={() => setShowAdd(true)}
               style={{
-                width: "100%",
-                padding: "12px 16px",
-                borderRadius: 12,
-                border: "2px dashed #ddd6c8",
-                background: "transparent",
-                fontSize: 13,
-                fontWeight: 700,
-                color: "#D4775A",
-                cursor: "pointer",
-                letterSpacing: 0.5,
+                width: "100%", padding: "12px 16px", borderRadius: 12,
+                border: "2px dashed #ddd6c8", background: "transparent",
+                fontSize: 13, fontWeight: 700, color: "#D4775A",
+                cursor: "pointer", letterSpacing: 0.5,
               }}
             >
               + Ajouter un collaborateur
@@ -176,16 +172,15 @@ export default function EquipePage() {
           </div>
         )}
 
-        {/* Modal ajout */}
         {showAdd && (
           <AddCollaborateurModal
             onClose={() => setShowAdd(false)}
-            onCreated={() => { setFetchKey(k => k + 1); }}
-            etablissementId={etablissementId}
+            onCreated={() => { refetch(); setShowAdd(false) }}
+            etablissementId={etablissement?.id ?? null}
           />
         )}
 
-        {/* Liste */}
+        {/* ── Table ──────────────────────────────────────────────────── */}
         {loading ? (
           <div style={{ textAlign: "center", padding: 40, color: "#999", fontSize: 13 }}>
             Chargement...
@@ -195,109 +190,167 @@ export default function EquipePage() {
             Aucun collaborateur trouvé.
           </div>
         ) : (
-          <div style={{ display: "grid", gap: 8 }}>
-            {filtered.map((emp) => (
-              <EmployeRow key={emp.id} employe={emp} />
-            ))}
-          </div>
+          <>
+            {/* Header (desktop) */}
+            <div style={{
+              display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1.2fr 1fr 1fr 24px",
+              gap: 8, padding: "8px 14px", fontSize: 10, fontWeight: 700,
+              color: "#999", letterSpacing: 1, textTransform: "uppercase",
+              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+              borderBottom: "1px solid #ece6db",
+            }}>
+              <span>Collaborateur</span>
+              <span>Contrat</span>
+              <span>Équipe</span>
+              <span>Email</span>
+              <span>Téléphone</span>
+              <span>Rattachement</span>
+              <span />
+            </div>
+
+            <div style={{ display: "grid", gap: 0 }}>
+              {filtered.map(emp => (
+                <EmployeRow
+                  key={emp.id}
+                  employe={emp}
+                  onClick={() => router.push(`/rh/employe/${emp.id}`)}
+                />
+              ))}
+            </div>
+          </>
         )}
       </main>
     </>
-  );
+  )
 }
 
-function EmployeRow({ employe }: { employe: Employe }) {
-  const e = employe;
-  const contrat = CONTRAT_LABELS[e.contrat_type ?? ""] ?? { label: e.contrat_type, color: "#999" };
+// ── KPI Card ──────────────────────────────────────────────────────────────────
+
+function KpiCard({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div style={{
+      padding: "14px 12px", background: "#fff", borderRadius: 12,
+      border: "1px solid #ece6db", textAlign: "center",
+    }}>
+      <div style={{
+        fontSize: 28, fontWeight: 700, color,
+        fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif",
+        lineHeight: 1,
+      }}>
+        {value}
+      </div>
+      <div style={{
+        fontSize: 10, fontWeight: 700, color: "#999", marginTop: 4,
+        fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+        letterSpacing: 1, textTransform: "uppercase",
+      }}>
+        {label}
+      </div>
+    </div>
+  )
+}
+
+// ── Employee Row ──────────────────────────────────────────────────────────────
+
+function EmployeRow({ employe: e, onClick }: { employe: EmployeAvecContrat; onClick: () => void }) {
+  const contrat = CONTRAT_LABELS[e.contrat_type ?? ""] ?? { label: e.contrat_type ?? "—", color: "#999" }
+  const isMultiEtab = (e.equipe_access?.length ?? 0) > 1
+  const isTNS = e.contrat_type === "TNS"
 
   return (
     <div
+      onClick={onClick}
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        padding: "12px 14px",
-        background: "#fff",
-        borderRadius: 12,
-        border: "1px solid #ece6db",
-        transition: "box-shadow 0.15s",
-        cursor: "pointer",
+        display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1.2fr 1fr 1fr 24px",
+        gap: 8, padding: "12px 14px", alignItems: "center",
+        background: "#fff", borderBottom: "1px solid #ece6db",
+        cursor: "pointer", transition: "background 0.1s",
       }}
+      onMouseEnter={ev => { (ev.currentTarget as HTMLElement).style.background = "rgba(212,119,90,0.03)" }}
+      onMouseLeave={ev => { (ev.currentTarget as HTMLElement).style.background = "#fff" }}
     >
-      {/* Avatar / Initiales */}
-      <div style={{
-        width: 40,
-        height: 40,
-        borderRadius: "50%",
-        background: e.role === "proprietaire" ? "linear-gradient(135deg, #9B8EC4, #7B6FA4)" : "linear-gradient(135deg, #D4775A, #C4674A)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 14,
-        fontWeight: 700,
-        color: "#fff",
-        flexShrink: 0,
-        fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-      }}>
-        {e.initiales ?? (e.prenom[0] + e.nom[0]).toUpperCase()}
-      </div>
-
-      {/* Info */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-          <span style={{
-            fontSize: 14,
-            fontWeight: 700,
-            color: "#1a1a1a",
-          }}>
-            {e.prenom} {e.nom}
-          </span>
-
-          {/* Badge contrat */}
-          <span style={{
-            fontSize: 9,
-            fontWeight: 700,
-            padding: "2px 7px",
-            borderRadius: 6,
-            background: `${contrat.color}14`,
-            color: contrat.color,
-            border: `1px solid ${contrat.color}30`,
-          }}>
-            {contrat.label}
-          </span>
-
-          {/* Badge équipe */}
-          {e.equipe_access?.map((eq) => (
-            <span key={eq} style={{
-              fontSize: 9,
-              fontWeight: 600,
-              padding: "2px 7px",
-              borderRadius: 6,
-              background: `${EQUIPE_COLORS[eq] ?? "#999"}14`,
-              color: EQUIPE_COLORS[eq] ?? "#999",
-              border: `1px solid ${EQUIPE_COLORS[eq] ?? "#999"}30`,
-            }}>
-              {eq}
-            </span>
-          ))}
-        </div>
-
+      {/* Collaborateur */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
         <div style={{
-          fontSize: 11,
-          color: "#999",
-          marginTop: 2,
-          display: "flex",
-          gap: 8,
-          flexWrap: "wrap",
+          width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+          background: isTNS
+            ? "linear-gradient(135deg, #9B8EC4, #7B6FA4)"
+            : "linear-gradient(135deg, #D4775A, #C4674A)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 12, fontWeight: 700, color: "#fff",
+          fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
         }}>
-          {e.poste_rh && <span>{e.poste_rh}</span>}
-          {e.matricule && <span style={{ color: "#ccc" }}>#{e.matricule}</span>}
-          {e.heures_semaine && <span>{e.heures_semaine}h/sem</span>}
+          {e.initiales ?? (e.prenom[0] + e.nom[0]).toUpperCase()}
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {e.prenom} {e.nom}
+          </div>
+          {e.poste_rh && (
+            <div style={{ fontSize: 10, color: "#999", marginTop: 1 }}>{e.poste_rh}</div>
+          )}
         </div>
       </div>
 
-      {/* Flèche */}
-      <span style={{ color: "#ccc", fontSize: 16, flexShrink: 0 }}>›</span>
+      {/* Contrat */}
+      <div>
+        <span style={{
+          fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 6,
+          background: `${contrat.color}14`, color: contrat.color,
+          border: `1px solid ${contrat.color}30`,
+        }}>
+          {contrat.label}
+        </span>
+        {e.heures_semaine && (
+          <span style={{ fontSize: 10, color: "#999", marginLeft: 4 }}>{e.heures_semaine}h</span>
+        )}
+      </div>
+
+      {/* Équipe */}
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+        {e.equipe_access?.map(eq => (
+          <span key={eq} style={{
+            fontSize: 9, fontWeight: 600, padding: "2px 7px", borderRadius: 6,
+            background: `${EQUIPE_COLORS[eq] ?? "#999"}14`,
+            color: EQUIPE_COLORS[eq] ?? "#999",
+            border: `1px solid ${EQUIPE_COLORS[eq] ?? "#999"}30`,
+          }}>
+            {eq}
+          </span>
+        ))}
+      </div>
+
+      {/* Email */}
+      <div style={{ fontSize: 11, color: "#666", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {e.email ?? "—"}
+      </div>
+
+      {/* Téléphone */}
+      <div style={{ fontSize: 11, color: "#666" }}>
+        {e.tel_mobile ?? "—"}
+      </div>
+
+      {/* Rattachement */}
+      <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+        {e.matricule && (
+          <span style={{ fontSize: 10, color: "#b0a894" }}>#{e.matricule}</span>
+        )}
+        {isMultiEtab && (
+          <span title="Multi-établissements" style={{ fontSize: 12 }}>🔀</span>
+        )}
+        {isTNS && (
+          <span style={{
+            fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
+            background: "rgba(155,142,196,0.12)", color: "#9B8EC4",
+            border: "1px solid rgba(155,142,196,0.3)",
+          }}>
+            TNS
+          </span>
+        )}
+      </div>
+
+      {/* Arrow */}
+      <span style={{ color: "#ccc", fontSize: 16, textAlign: "right" }}>›</span>
     </div>
-  );
+  )
 }
