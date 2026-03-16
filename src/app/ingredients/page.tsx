@@ -114,7 +114,10 @@ function IngredientsPageInner() {
   const userId = session?.user?.id ?? null;
 
   const searchParams = useSearchParams();
-  const backUrl = searchParams.get("back");
+  const backUrl = searchParams.get("back") ?? (
+    etab?.slug === "piccola_mia" ? "/piccola-mia/cuisine" :
+    etab?.slug === "bello_mio" ? "/bello-mio/cuisine" : "/"
+  );
   const editParam = searchParams.get("edit");
   const supplierParam = searchParams.get("supplier");
 
