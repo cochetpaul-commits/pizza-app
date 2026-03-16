@@ -111,6 +111,17 @@ export type Contrat = {
   created_at: string
 }
 
+export type Poste = {
+  id: string
+  etablissement_id: string
+  equipe: "Cuisine" | "Salle" | "Shop"
+  nom: string
+  couleur: string
+  emoji: string | null
+  actif: boolean
+  created_at: string
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const ERROR_MESSAGES: Record<string, string> = {
