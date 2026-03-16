@@ -41,17 +41,17 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   userScalable: false,
-  themeColor: "#ffffff",
+  themeColor: "#D4775A",
 };
 
 export const metadata: Metadata = {
-  title: "pizza-app",
-  description: "Gestion recettes, achats, coûts",
+  title: "BelloMio — iFratelli Group",
+  description: "Gestion restaurant : planning, RH, recettes, ingrédients",
   manifest: "/manifest.json",
-  applicationName: "pizza-app",
+  applicationName: "BelloMio",
   appleWebApp: {
     capable: true,
-    title: "pizza-app",
+    title: "BelloMio",
     statusBarStyle: "default",
   },
   icons: {

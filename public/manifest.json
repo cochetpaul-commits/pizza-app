@@ -1,15 +1,38 @@
 {
-  "name": "iFratelliGroup — Pizza App",
-  "short_name": "iFratelli",
+  "name": "BelloMio — iFratelli Group",
+  "short_name": "BelloMio",
+  "description": "Gestion restaurant : planning, RH, recettes, ingrédients",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f6efe7",
-  "theme_color": "#f6efe7",
+  "background_color": "#f2ede4",
+  "theme_color": "#D4775A",
+  "categories": ["business", "food"],
+  "lang": "fr",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Planning",
+      "short_name": "Planning",
+      "url": "/plannings",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Équipe RH",
+      "short_name": "Équipe",
+      "url": "/rh/equipe",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Mes Shifts",
+      "short_name": "Shifts",
+      "url": "/mes-shifts",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
   ]
 }

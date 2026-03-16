@@ -3,6 +3,7 @@
 import Link from "next/link";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { EtablissementSelector } from "@/components/EtablissementSelector";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export type MenuItem = {
   label: string;
@@ -55,9 +56,10 @@ export function NavBar({ backHref, backLabel, right, primaryAction, menuItems }:
           )}
         </div>
 
-        {/* ── Center: establishment selector ── */}
-        <div style={{ flex: "0 0 auto" }}>
+        {/* ── Center: establishment selector + notifications ── */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "0 0 auto" }}>
           <EtablissementSelector />
+          <NotificationBell />
         </div>
 
         {/* ── Right: structured or legacy ── */}
