@@ -71,11 +71,11 @@ export const CategoryHeader = React.memo(function CategoryHeader({
     >
       <span style={{ width: 10, height: 10, borderRadius: "50%", background: accent, flexShrink: 0 }} />
       <span style={{
-        fontFamily: "DM Sans, sans-serif", fontSize: 9, fontWeight: 700,
-        letterSpacing: "0.18em", textTransform: "uppercase", color: accent,
+        fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700,
+        letterSpacing: "0.14em", textTransform: "uppercase", color: accent,
       }}>{CAT_LABELS[cat]}</span>
       <span style={{
-        fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 6,
+        fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
         background: `${accent}18`, color: accent,
       }}>{count}</span>
       <span style={{ marginLeft: "auto", fontSize: 10, color: "#b0a894", transition: "transform 0.2s", transform: isCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
