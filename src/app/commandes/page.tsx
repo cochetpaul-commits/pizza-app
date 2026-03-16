@@ -7,6 +7,7 @@ import { StepperInput } from "@/components/StepperInput";
 import { useProfile } from "@/lib/ProfileContext";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
+import { useEtablissement } from "@/lib/EtablissementContext";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -219,6 +220,7 @@ const statusBannerBg: Record<string, string> = {
 export default function CommandesPage() {
   const { can } = useProfile();
   const canValidate = can("commandes.valider");
+  const { current: etab } = useEtablissement();
 
   // All suppliers
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -246,18 +248,20 @@ export default function CommandesPage() {
 
   useEffect(() => {
     async function init() {
-      const { data } = await supabase
+      const q = supabase
         .from("suppliers")
         .select("id, name")
         .eq("is_active", true)
         .order("name");
+      if (etab?.id) q.eq("etablissement_id", etab.id);
+      const { data } = await q;
       const list = (data ?? []) as Supplier[];
       setSuppliers(list);
       if (list.length > 0) setSelectedSupplierId(list[0].id);
       setLoading(false);
     }
     init();
-  }, []);
+  }, [etab?.id]);
 
   // ── Load session + catalog when supplier changes ──────────────────────
 

@@ -99,11 +99,12 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
 
   // Suppliers + alerts: load once (independent of pagination)
   useEffect(() => {
-    supabase
+    const supQuery = supabase
       .from("suppliers")
       .select("id,name,is_active")
-      .order("name", { ascending: true })
-      .then(({ data, error: err }) => {
+      .order("name", { ascending: true });
+    if (etablissementId) supQuery.eq("etablissement_id", etablissementId);
+    supQuery.then(({ data, error: err }) => {
         if (!err) {
           // Deduplicate suppliers by name (case-insensitive) — keep the first entry as canonical
           const seen = new Map<string, Supplier>();
@@ -135,7 +136,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
           .catch(() => {});
       }
     });
-  }, []);
+  }, [etablissementId]);
 
   const doLoad = useCallback(async (q: string, fetchId: number) => {
     setLoading(true);
