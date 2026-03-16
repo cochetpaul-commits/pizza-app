@@ -4,6 +4,7 @@ import Link from "next/link";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import { EtablissementSelector } from "@/components/EtablissementSelector";
+import { NotificationBell } from "@/components/NotificationBell";
 import { useEtablissement } from "@/lib/EtablissementContext";
 
 export type MenuItem = {
@@ -68,6 +69,9 @@ export function NavBar({ backHref, backLabel, right, primaryAction, menuItems }:
         <div style={{ flex: "0 0 auto" }}>
           <EtablissementSelector />
         </div>
+
+        {/* ── Notification bell ── */}
+        <NotificationBell />
 
         {/* ── Right: structured or legacy ── */}
         {hasStructuredRight ? (
