@@ -167,7 +167,7 @@ export default function GroupePage() {
                   <span style={etabName}>Bello Mio</span>
                 </div>
                 {ca && (
-                  <span style={{ fontSize: 20, fontWeight: 700, color: "#D4775A", fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
+                  <span style={{ fontSize: 20, fontWeight: 700, color: "#D4775A", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
                     {fmtEur(ca.totalSales)} &euro;
                   </span>
                 )}
@@ -188,7 +188,7 @@ export default function GroupePage() {
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#F5E642", display: "inline-block" }} />
                   <span style={etabName}>Piccola Mia</span>
                 </div>
-                <span style={{ fontSize: 20, fontWeight: 700, color: "#b8a800", fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif" }}>
+                <span style={{ fontSize: 20, fontWeight: 700, color: "#b8a800", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
                   {caPM != null ? `${fmtEur(caPM)} \u20ac` : "\u2014"}
                 </span>
                 <span style={etabPill("#b8a800")}>Ouvrir &rarr;</span>
@@ -282,7 +282,7 @@ const kpiValue: React.CSSProperties = {
   fontSize: 36,
   fontWeight: 700,
   color: "#1a1a1a",
-  fontFamily: "var(--font-cormorant), 'Cormorant Garamond', serif",
+  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
   lineHeight: 1,
 };
 
