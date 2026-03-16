@@ -251,6 +251,18 @@ export default function GroupePage() {
                 </div>
               </div>
             </Link>
+
+            <Link href="/messagerie" style={{ textDecoration: "none", color: "inherit" }}>
+              <div style={whiteCard}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <span style={cardTitle}>Messagerie</span>
+                    <p style={{ margin: "3px 0 0", fontSize: 12, color: "#999" }}>Chat interne equipe</p>
+                  </div>
+                  <span style={gestionPill}>Ouvrir &rarr;</span>
+                </div>
+              </div>
+            </Link>
           </div>
 
         </div>

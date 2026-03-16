@@ -93,6 +93,8 @@ export default function BelloMioHub() {
         <div style={{ display: "grid", gap: 12 }}>
           <Tile href="/bello-mio/cuisine"  icon="&#x1F373;" title="Cuisine"  sub="Recettes, ingredients, commandes" accent={T.terracotta} />
           <Tile href="/bello-mio/planning" icon="&#x1F4C5;" title="Planning" sub="Shifts, equipe, horaires"         accent={T.terracotta} />
+          <Tile href="/mes-shifts"         icon="&#x1F4CB;" title="Mon planning" sub="Mes shifts de la semaine"      accent={T.terracotta} />
+          <Tile href="/messagerie"         icon="&#x1F4AC;" title="Messagerie"   sub="Chat interne equipe"           accent={T.terracotta} />
           {isGroupAdmin && (
             <Tile href="/bello-mio/gestion" icon="&#x1F4CA;" title="Gestion" sub="Pilotage, finances, admin"       accent={T.terracotta} />
           )}

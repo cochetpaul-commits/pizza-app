@@ -94,6 +94,8 @@ export default function PiccolaMiaHub() {
         <div style={{ display: "grid", gap: 12 }}>
           <Tile href="/piccola-mia/cuisine"     icon="&#x1F373;" title="Cuisine"     sub="Recettes, ingredients, commandes" />
           <Tile href="/piccola-mia/planning"    icon="&#x1F4C5;" title="Planning"    sub="Shifts, equipe, horaires"         />
+          <Tile href="/mes-shifts"              icon="&#x1F4CB;" title="Mon planning" sub="Mes shifts de la semaine"         />
+          <Tile href="/messagerie"              icon="&#x1F4AC;" title="Messagerie"   sub="Chat interne equipe"              />
           <Tile href="/piccola-mia/evenements"  icon="&#x1F389;" title="Evenements"  sub="Mariages, seminaires, traiteur"   />
           {isGroupAdmin && (
             <Tile href="/piccola-mia/gestion"   icon="&#x1F4CA;" title="Gestion"    sub="Pilotage, finances, admin"        />
