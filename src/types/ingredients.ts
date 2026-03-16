@@ -25,7 +25,7 @@ export const CAT_LABELS: Record<Category, string> = {
   cremerie_fromage:   "Crémerie / Fromage",
   charcuterie_viande: "Charcuterie / Viande",
   maree:              "Marée",
-  alcool_spiritueux:  "Alcool / Spiritueux",
+  alcool_spiritueux:  "Vins / Spiritueux",
   boisson:            "Boissons",
   legumes_herbes:     "Légumes / Herbes",
   fruit:              "Fruits",
