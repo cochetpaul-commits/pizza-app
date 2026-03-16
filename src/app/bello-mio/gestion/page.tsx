@@ -65,10 +65,20 @@ export default function GestionHubBM() {
 
           <SectionLabel>Pilotage</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-            <Tile href="/pilotage"        icon="&#x1F4CA;" title="Pilotage"           sub="CA Popina, indicateurs"     accent={T.terracotta} />
-            <Tile href="/finances"        icon="&#x1F4B0;" title="Finances"           sub="Comptes & flux"             accent={T.terracotta} />
-            <Tile href="/variations-prix" icon="&#x1F4C9;" title="Variations & Alertes" sub="Ecarts prix, seuils"      accent={T.terracotta} />
-            <Tile href="/invoices"        icon="&#x1F9FE;" title="Factures"           sub="Import fournisseurs"        accent={T.terracotta} />
+            <Tile href="/pilotage" icon="&#x1F4CA;" title="Pilotage" sub="CA Popina, indicateurs" accent={T.terracotta} wide />
+          </div>
+
+          <SectionLabel>Achats</SectionLabel>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+            <Tile href="/invoices"        icon="&#x1F9FE;" title="Factures"              sub="Import fournisseurs"   accent={T.terracotta} />
+            <Tile href="/variations-prix" icon="&#x1F4C9;" title="Variations & Alertes"  sub="Ecarts prix, seuils"   accent={T.terracotta} />
+          </div>
+
+          <SectionLabel>Prix & Marges</SectionLabel>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+            <Tile href="/finances"   icon="&#x1F4B0;" title="Finances"      sub="P&L, food cost"              accent={T.terracotta} />
+            <Tile href="/mercuriale" icon="&#x1F4C4;" title="Mercuriale"    sub="Prix fournisseurs, export PDF" accent={T.terracotta} />
+            <Tile href="/epicerie"   icon="&#x1F6CD;&#xFE0F;" title="Prix de vente" sub="CPU, coefficients, TVA" accent={T.terracotta} />
           </div>
 
           <SectionLabel>Ressources humaines</SectionLabel>
@@ -79,8 +89,7 @@ export default function GestionHubBM() {
 
           <SectionLabel>Administration</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-            <Tile href="/settings"           icon="&#x2699;&#xFE0F;" title="Parametres" sub="Configuration etablissement" accent={T.terracotta} />
-            <Tile href="/admin/utilisateurs" icon="&#x1F464;"        title="Admin"       sub="Utilisateurs, roles"         accent={T.terracotta} />
+            <Tile href="/admin/utilisateurs" icon="&#x1F464;" title="Admin" sub="Utilisateurs, roles" accent={T.terracotta} />
           </div>
         </div>
       </div>

@@ -81,6 +81,7 @@ function downloadCSV(csv: string, filename: string) {
 
 export default function RapportsPage() {
   const { current: etab } = useEtablissement();
+  const gestionHref = etab?.slug === "piccola_mia" ? "/piccola-mia/gestion" : "/bello-mio/gestion";
   const { canWrite } = useProfile();
 
   const now = new Date();
@@ -308,8 +309,8 @@ export default function RapportsPage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <NavBar
-        backHref="/rh/equipe"
-        backLabel="Equipe"
+        backHref={gestionHref}
+        backLabel="Gestion"
         menuItems={canWrite ? [
           { label: saving ? "Enregistrement..." : "Valider compteurs", onClick: handleSaveCompteurs },
           { label: "Export SILAE", onClick: handleExportSilae },

@@ -121,6 +121,7 @@ function AlertCard({
 
 export default function VariationsPrixPage() {
   const { current: etab } = useEtablissement();
+  const gestionHref = etab?.slug === "piccola_mia" ? "/piccola-mia/gestion" : "/bello-mio/gestion";
   const [tab, setTab] = useState<"variations" | "alertes">("variations");
 
   // Shared loading
@@ -274,7 +275,7 @@ export default function VariationsPrixPage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
     <>
-      <NavBar backHref="/" />
+      <NavBar backHref={gestionHref} backLabel="Gestion" />
       <main className="container safe-bottom">
 
         <div style={{ marginBottom: 16 }}>

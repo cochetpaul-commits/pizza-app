@@ -11,6 +11,7 @@ type Supplier = { id: string; name: string };
 
 export default function MercurialePage() {
   const { current: etab } = useEtablissement();
+  const gestionHref = etab?.slug === "piccola_mia" ? "/piccola-mia/gestion" : "/bello-mio/gestion";
   const [groupBy, setGroupBy] = useState<"category" | "supplier" | "alpha">("category");
   const [establishment, setEstablishment] = useState<"all" | "bellomio" | "piccola">("all");
   const [filterSupplier, setFilterSupplier] = useState<string>("all");
@@ -75,7 +76,7 @@ export default function MercurialePage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
     <>
-    <NavBar />
+    <NavBar backHref={gestionHref} backLabel="Gestion" />
     <main style={{ maxWidth: 600, margin: "0 auto", padding: "2rem" }}>
       <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, marginBottom: 24 }}>Mercuriale des prix</h1>
 

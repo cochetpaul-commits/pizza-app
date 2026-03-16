@@ -65,28 +65,32 @@ export default function GestionHubPM() {
 
           <SectionLabel>Pilotage</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-            <Tile href="/kezia"           icon="&#x1F4CB;" title="Import Kezia"       sub="Synthese CA journalier"     />
-            <Tile href="/pilotage"        icon="&#x1F4CA;" title="Pilotage"           sub="CA, indicateurs"            />
-            <Tile href="/finances"        icon="&#x1F4B0;" title="Finances"           sub="Comptes & flux"             />
-            <Tile href="/variations-prix" icon="&#x1F4C9;" title="Variations & Alertes" sub="Ecarts prix, seuils"      />
-            <Tile href="/invoices"        icon="&#x1F9FE;" title="Factures"           sub="Import fournisseurs"        />
+            <Tile href="/kezia"    icon="&#x1F4CB;" title="Import Kezia" sub="Synthese CA journalier" />
+            <Tile href="/pilotage" icon="&#x1F4CA;" title="Pilotage"     sub="CA, indicateurs" />
           </div>
 
-          <SectionLabel>Commerce</SectionLabel>
+          <SectionLabel>Achats</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-            <Tile href="/epicerie" icon="&#x1F6CD;&#xFE0F;" title="Epicerie" sub="Prix vente, CPU, TVA" wide />
+            <Tile href="/invoices"        icon="&#x1F9FE;" title="Factures"              sub="Import fournisseurs" />
+            <Tile href="/variations-prix" icon="&#x1F4C9;" title="Variations & Alertes"  sub="Ecarts prix, seuils" />
+          </div>
+
+          <SectionLabel>Prix & Marges</SectionLabel>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+            <Tile href="/finances"   icon="&#x1F4B0;" title="Finances"      sub="P&L, food cost" />
+            <Tile href="/mercuriale" icon="&#x1F4C4;" title="Mercuriale"    sub="Prix fournisseurs, export PDF" />
+            <Tile href="/epicerie"   icon="&#x1F6CD;&#xFE0F;" title="Prix de vente" sub="CPU, coefficients, TVA" />
           </div>
 
           <SectionLabel>Ressources humaines</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-            <Tile href="/rh/masse-salariale" icon="&#x1F4B5;" title="Masse salariale" sub="Charges, simulateur"          />
+            <Tile href="/rh/masse-salariale" icon="&#x1F4B5;" title="Masse salariale" sub="Charges, simulateur" />
             <Tile href="/rh/rapports"        icon="&#x1F4C4;" title="Rapports RH"     sub="Bilans mensuels, export SILAE" />
           </div>
 
           <SectionLabel>Administration</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-            <Tile href="/settings"           icon="&#x2699;&#xFE0F;" title="Parametres" sub="Configuration etablissement" />
-            <Tile href="/admin/utilisateurs" icon="&#x1F464;"        title="Admin"       sub="Utilisateurs, roles"         />
+            <Tile href="/admin/utilisateurs" icon="&#x1F464;" title="Admin" sub="Utilisateurs, roles" />
           </div>
         </div>
       </div>

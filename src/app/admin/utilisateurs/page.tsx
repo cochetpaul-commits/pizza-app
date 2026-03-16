@@ -6,6 +6,7 @@ import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
 import type { Role } from "@/lib/rbac";
 import { fetchApi } from "@/lib/fetchApi";
+import { useEtablissement } from "@/lib/EtablissementContext";
 
 type UserRow = {
   id: string;
@@ -34,6 +35,8 @@ function fmtDate(iso: string) {
 }
 
 function UsersContent() {
+  const { current: etab } = useEtablissement();
+  const gestionHref = etab?.slug === "piccola_mia" ? "/piccola-mia/gestion" : "/bello-mio/gestion";
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,7 +117,7 @@ function UsersContent() {
 
   return (
     <>
-      <NavBar />
+      <NavBar backHref={gestionHref} backLabel="Gestion" />
       <main style={{ maxWidth: 700, margin: "0 auto", padding: "24px 16px 40px", boxSizing: "border-box" }}>
         <div style={{ marginBottom: 24 }}>
           <p style={{

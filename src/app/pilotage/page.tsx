@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
@@ -9,6 +8,7 @@ import {
   CartesianGrid, Cell, PieChart, Pie,
 } from "recharts";
 import { fetchApi } from "@/lib/fetchApi";
+import { useEtablissement } from "@/lib/EtablissementContext";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -402,16 +402,12 @@ const deltaStyle: React.CSSProperties = {
   fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
 };
 
-const SECTIONS = [
-  { href: "/finances", label: "CONTRÔLE FINANCIER", sub: "P&L · Rentabilité produits · Suivi coûts matières", color: "#4a6741" },
-  { href: "/mercuriale", label: "MERCURIALE", sub: "Prix fournisseurs · Export PDF", color: "#D4775A" },
-  { href: "/epicerie", label: "ÉPICERIE", sub: "Prix de vente · Export CSV", color: "#D4775A" },
-  { href: "/variations-prix", label: "VARIATIONS & ALERTES", sub: "Historique · Hausses & baisses · Veille 30 j", color: ACCENT },
-];
 
 // ── Component ─────────────────────────────────────────────────────────────
 
 export default function PilotagePage() {
+  const { current: etab } = useEtablissement();
+  const gestionHref = etab?.slug === "piccola_mia" ? "/piccola-mia/gestion" : "/bello-mio/gestion";
   const currentWeek = useMemo(() => getCurrentWeek(), []);
   const [weekStr, setWeekStr] = useState(currentWeek);
   const [stats, setStats] = useState<StatsData | null>(null);
@@ -501,7 +497,7 @@ export default function PilotagePage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <>
-        <NavBar />
+        <NavBar backHref={gestionHref} backLabel="Gestion" />
         <main style={{ maxWidth: 720, margin: "0 auto", padding: "20px 16px 56px", boxSizing: "border-box" }}>
 
           {/* ── BLOC 0 : WEEK SELECTOR ─────────────────────────── */}
@@ -815,26 +811,6 @@ export default function PilotagePage() {
           ) : (
             <div style={{ textAlign: "center", padding: "32px 0", fontSize: 13, color: "#bbb" }}>Données indisponibles</div>
           )}
-
-          {/* ── OUTILS ───────────────────────────────────────────────── */}
-          <p style={sectionLabel}>OUTILS</p>
-          <div style={{ display: "grid", gap: 10 }}>
-            {SECTIONS.map((sec) => (
-              <Link key={sec.href} href={sec.href} style={{ textDecoration: "none", color: "inherit" }}>
-                <div style={{ background: "#fff", borderRadius: 14, borderLeft: `4px solid ${sec.color}`, padding: "16px 20px", cursor: "pointer" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <p style={{ margin: 0, fontSize: 12, fontWeight: 800, letterSpacing: 2, textTransform: "uppercase", color: sec.color, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{sec.label}</p>
-                      <p style={{ margin: "3px 0 0", fontSize: 14, color: "#999" }}>{sec.sub}</p>
-                    </div>
-                    <span style={{ display: "inline-block", padding: "7px 14px", borderRadius: 10, background: sec.color, color: "#fff", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0 }}>
-                      Ouvrir →
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
 
         </main>
 

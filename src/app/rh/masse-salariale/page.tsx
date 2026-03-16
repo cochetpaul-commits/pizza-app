@@ -122,6 +122,7 @@ function calcCostLine(emp: Employe, tauxCharges: number): EmpCost {
 
 export default function MasseSalarialePage() {
   const { current: etab } = useEtablissement();
+  const gestionHref = etab?.slug === "piccola_mia" ? "/piccola-mia/gestion" : "/bello-mio/gestion";
 
   const [employes, setEmployes] = useState<Employe[]>([]);
   const [settings, setSettings] = useState<EtabSettings>({
@@ -242,7 +243,7 @@ export default function MasseSalarialePage() {
   if (loading) {
     return (
       <RequireRole allowedRoles={["group_admin"]}>
-        <NavBar backHref="/rh/equipe" backLabel="RH" />
+        <NavBar backHref={gestionHref} backLabel="Gestion" />
         <div style={pageStyle}><div style={{ textAlign: "center", padding: 40, color: "#999" }}>Chargement...</div></div>
       </RequireRole>
     );
@@ -250,7 +251,7 @@ export default function MasseSalarialePage() {
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <NavBar backHref="/rh/equipe" backLabel="RH" />
+      <NavBar backHref={gestionHref} backLabel="Gestion" />
 
       <div style={pageStyle}>
         <div style={{ marginBottom: 16 }}>
