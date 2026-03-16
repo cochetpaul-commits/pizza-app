@@ -30,6 +30,7 @@ const FOURNISSEURS = [
   { value: "bar_spirits", label: "Bar Spirits" },
   { value: "sum", label: "Sum" },
   { value: "armor", label: "Armor" },
+  { value: "sdpf", label: "SDPF" },
 ];
 
 const ETABLISSEMENTS = [

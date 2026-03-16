@@ -53,6 +53,7 @@ const SUPPLIERS = [
   { slug: "sum", name: "Sum" },
   { slug: "armor", name: "Armor" },
   { slug: "lmdw", name: "LMDW" },
+  { slug: "sdpf", name: "SDPF" },
 ];
 
 const ETABS = [

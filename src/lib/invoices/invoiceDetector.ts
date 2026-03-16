@@ -41,6 +41,7 @@ const SUPPLIER_KEYWORDS: Record<string, { name: string; keywords: string[] }> = 
   sum:      { name: "Sum",      keywords: ["SUM SARL", "SUM "] },
   armor:    { name: "Armor",    keywords: ["ARMOR"] },
   lmdw:     { name: "LMDW",    keywords: ["LMDW", "MAISON DU WHISKY", "SOCIETE NOUVELLE DE PRODUITS ALIMENTAIRES"] },
+  sdpf:     { name: "SDPF",    keywords: ["S.D.P.F", "SDPF", "PROGOURMANDS", "PRODUITS FINS"] },
 };
 
 /**
@@ -88,6 +89,7 @@ export function supplierSlugToRoute(slug: string): string {
     sum: "sum",
     armor: "armor",
     lmdw: "lmdw",
+    sdpf: "sdpf",
   };
   return map[slug] ?? slug;
 }
