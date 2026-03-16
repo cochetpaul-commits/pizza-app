@@ -157,7 +157,7 @@ export const IngredientRow = React.memo(function IngredientRow({
         style={{ alignItems: "center", padding: "10px 16px", gap: 10, background: "white", transition: "background 0.1s" }}
       >
         {/* Avatar */}
-        <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={36} />
+        <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={36} editable />
 
         {/* Désignation */}
         <div style={{ flex: 3, minWidth: 0 }}>
@@ -248,7 +248,7 @@ export const IngredientRow = React.memo(function IngredientRow({
         ) : (
           <>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-              <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={36} />
+              <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={36} editable />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <span style={{ fontWeight: 600, fontSize: 13, color: CAT_COLORS[x.category] }}>{x.name}</span>
