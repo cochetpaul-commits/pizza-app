@@ -50,10 +50,10 @@ function extractMeta(text: string) {
 }
 
 // ── Product line regex ──────────────────────────────────────────────────────
-// REF  NAME  QTY(comma,1-3dec)  PU(comma,2dec)  TOTAL(comma,2dec)€  LOT  PUNET(comma,2dec)
+// REF  NAME  QTY(comma,1-3dec)  LOT  PU_HT(comma,2dec)  [REMISE]  PU_NET(comma,2dec)  TOTAL(comma,2dec)€
 // Quantities always use comma. Names may contain periods (0.2, 2.5kg) but not commas.
 
-const RE_PRODUCT = /\b([A-Z]{2,6}\d{1,3})(?!\s+RUPTURE)\s+(.*?)\s+(\d+,\d{1,3})\s+(\d+,\d{2})\s+(\d+,\d{2})€\s+(\S+)\s+(\d+,\d{2})/g;
+const RE_PRODUCT = /\b([A-Z]{2,6}\d{1,3})(?!\s+RUPTURE)\s+(.*?)\s+(\d+,\d{1,3})\s+(\S+)\s+(\d+,\d{2})\s+(\d+,\d{2})\s+(\d+,\d{2})€/g;
 
 // RUPTURE: "Name REF RUPTURE" — skip these
 const RE_RUPTURE = /\b([A-Z]{2,6}\d{1,3})\s+RUPTURE\b/g;
@@ -88,7 +88,7 @@ export function parseSum(text: string, etablissement: string): ParseResult {
 
   while ((match = RE_PRODUCT.exec(text)) !== null) {
     matchCount++;
-    const [fullMatch, ref, nameRaw, qtyStr, puHtStr, totalStr, _lot, puNetStr] = match;
+    const [fullMatch, ref, nameRaw, qtyStr, _lot, puHtStr, puNetStr, totalStr] = match;
     void _lot;
 
     // Clean name: collapse whitespace
