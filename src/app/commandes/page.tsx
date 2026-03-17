@@ -376,7 +376,7 @@ export default function CommandesPage() {
 
   // ── Save ligne ────────────────────────────────────────────────────────
 
-  async function saveLigne(sessionId: string, ingredientId: string, qty: number | "") {
+  async function saveLigne(sessionId: string, ingredientId: string, qty: number | "", unite: string | null) {
     await fetchApi("/api/commandes/ligne", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -384,6 +384,7 @@ export default function CommandesPage() {
         session_id: sessionId,
         ingredient_id: ingredientId,
         quantite: qty === "" ? 0 : Math.floor(qty as number),
+        unite: unite ?? undefined,
       }),
     });
   }
@@ -391,7 +392,10 @@ export default function CommandesPage() {
   function handleQtyChange(ingredientId: string, val: number | "") {
     const qty = val === "" ? "" : Math.floor(val as number);
     setQuantities((prev) => ({ ...prev, [ingredientId]: qty }));
-    if (session) saveLigne(session.id, ingredientId, qty);
+    if (session) {
+      const item = catalog.find((c) => c.id === ingredientId);
+      saveLigne(session.id, ingredientId, qty, item?.order_unit ?? item?.default_unit ?? null);
+    }
   }
 
   // ── Toggle favorite ───────────────────────────────────────────────────
@@ -774,7 +778,7 @@ export default function CommandesPage() {
                           <span style={{
                             fontSize: 13, fontWeight: Number(quantities[item.id] ?? 0) > 0 ? 700 : 500,
                             color: Number(quantities[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            lineHeight: 1.3, wordBreak: "break-word",
                           }}>{item.name}</span>
                           {unitBadge(item)}
                         </div>
@@ -811,7 +815,14 @@ export default function CommandesPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin", "cuisine", "salle"]}>
-      <NavBar />
+      <NavBar
+        backHref={
+          (etab?.slug === "piccola_mia" || etab?.slug === "piccola-mia") ? "/piccola-mia/cuisine"
+          : (etab?.slug === "bello_mio" || etab?.slug === "bello-mio") ? "/bello-mio/cuisine"
+          : "/"
+        }
+        backLabel="Cuisine"
+      />
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px", background: "#f2ede4", minHeight: "100vh" }}>
         <h1 style={{
           fontFamily: "var(--font-oswald), 'Oswald', sans-serif",

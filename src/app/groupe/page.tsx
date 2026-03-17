@@ -37,6 +37,7 @@ export default function GroupePage() {
   const [caPM, setCaPM] = useState<number | null>(null);
   const [events, setEvents] = useState<UpcomingEvent[]>([]);
   const [notifCount, setNotifCount] = useState(0);
+  const [pendingCommandes, setPendingCommandes] = useState(0);
 
   useEffect(() => {
     async function fetchCa() {
@@ -90,6 +91,17 @@ export default function GroupePage() {
       } catch { /* silencieux */ }
     }
     fetchAlertCount();
+  }, []);
+
+  useEffect(() => {
+    async function fetchPending() {
+      const { count } = await supabase
+        .from("commande_sessions")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "en_attente");
+      setPendingCommandes(count ?? 0);
+    }
+    fetchPending();
   }, []);
 
   const caTotal = (ca?.totalSales ?? 0) + (caPM ?? 0);
@@ -329,6 +341,40 @@ export default function GroupePage() {
 
           {/* Gestion */}
           <SectionLabel>Gestion</SectionLabel>
+          {/* Commandes */}
+          <Link href="/commandes" style={{ textDecoration: "none", color: "inherit" }}>
+            <div style={{
+              background: T.white, borderRadius: 16, padding: "14px 18px",
+              border: `1.5px solid ${T.border}`,
+              borderLeft: `4px solid ${T.sauge}`,
+              marginBottom: 20, cursor: "pointer",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              boxShadow: T.tileShadow,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <TileIcon name="commandes" size={20} color={T.sauge} />
+                <span style={{
+                  fontFamily: "Oswald, sans-serif", fontWeight: 600,
+                  fontSize: 13, letterSpacing: "0.08em", textTransform: "uppercase",
+                  color: T.sauge,
+                }}>Commandes</span>
+                {pendingCommandes > 0 && (
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    minWidth: 20, height: 20, borderRadius: 10,
+                    background: T.terracotta, color: "#fff",
+                    fontSize: 10, fontWeight: 700, padding: "0 6px",
+                  }}>
+                    {pendingCommandes}
+                  </span>
+                )}
+              </div>
+              <span style={{ fontSize: 11, color: T.muted }}>
+                {pendingCommandes === 0 ? "Aucune en attente" : `${pendingCommandes} a valider`}
+              </span>
+            </div>
+          </Link>
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
             <GestionTile href="/invoices"        iconName="factures"   title="Factures"   sub="Import fournisseurs"   accent={T.sauge} />
             <GestionTile href="/messagerie"      iconName="messagerie" title="Messagerie" sub="Chat interne equipe"   accent={T.sauge} />
