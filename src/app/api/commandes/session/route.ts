@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
+import { notifyGroupAdmins } from "@/lib/pushNotify";
 
 /**
  * POST /api/commandes/session
@@ -127,6 +128,42 @@ export async function PATCH(req: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Notification quand une commande passe en "en_attente"
+  if (status === "en_attente" && session) {
+    const { data: supplier } = await supabaseAdmin
+      .from("suppliers")
+      .select("name")
+      .eq("id", session.supplier_id)
+      .single();
+    const supplierName = supplier?.name ?? "fournisseur";
+
+    // In-app notifications pour tous les group_admin
+    const { data: admins } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("role", "group_admin");
+
+    if (admins?.length) {
+      await supabaseAdmin.from("notifications").insert(
+        admins.map((a: { id: string }) => ({
+          user_id: a.id,
+          type: "alerte",
+          titre: `Commande ${supplierName} a valider`,
+          corps: `Une commande ${supplierName} attend votre validation.`,
+          lien: "/commandes",
+          lu: false,
+        })),
+      );
+    }
+
+    // Push notification (fire & forget)
+    void notifyGroupAdmins({
+      title: `Commande ${supplierName}`,
+      body: `Une commande ${supplierName} attend votre validation.`,
+      url: "/commandes",
+    });
   }
 
   return NextResponse.json({ session });

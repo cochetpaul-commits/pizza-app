@@ -1,7 +1,16 @@
 "use client";
 
+import { useEffect, useState, useCallback } from "react";
 import { NavBar } from "@/components/NavBar";
 import { useNotifications, type Notification } from "@/hooks/useNotifications";
+import { fetchApi } from "@/lib/fetchApi";
+import {
+  registerServiceWorker,
+  subscribeToPush,
+  getCurrentSubscription,
+  getPushPermission,
+  isPwaInstalled,
+} from "@/lib/pushSubscription";
 
 const TYPE_LABELS: Record<string, string> = {
   info: "Info",
@@ -24,6 +33,117 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
+function PushToggle() {
+  const [swReg, setSwReg] = useState<ServiceWorkerRegistration | null>(null);
+  const [subscribed, setSubscribed] = useState(false);
+  const [permission, setPermission] = useState<string>("default");
+  const [busy, setBusy] = useState(false);
+  const [pwa, setPwa] = useState(true);
+
+  useEffect(() => {
+    setPwa(isPwaInstalled());
+    setPermission(getPushPermission());
+    registerServiceWorker().then((reg) => {
+      if (!reg) return;
+      setSwReg(reg);
+      getCurrentSubscription(reg).then((sub) => setSubscribed(!!sub));
+    });
+  }, []);
+
+  const handleToggle = useCallback(async () => {
+    if (!swReg || busy) return;
+    setBusy(true);
+    try {
+      if (subscribed) {
+        const sub = await getCurrentSubscription(swReg);
+        if (sub) {
+          await fetchApi("/api/push/subscribe", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          });
+          await sub.unsubscribe();
+        }
+        setSubscribed(false);
+      } else {
+        const sub = await subscribeToPush(swReg);
+        if (sub) {
+          const json = sub.toJSON();
+          await fetchApi("/api/push/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              endpoint: sub.endpoint,
+              keys: { p256dh: json.keys?.p256dh, auth: json.keys?.auth },
+            }),
+          });
+          setSubscribed(true);
+          setPermission("granted");
+        }
+      }
+    } catch (e) {
+      console.error("Push toggle error:", e);
+    } finally {
+      setBusy(false);
+    }
+  }, [swReg, subscribed, busy]);
+
+  const unsupported = getPushPermission() === "unsupported";
+  const denied = permission === "denied";
+  const isIos = typeof navigator !== "undefined" && /iP(hone|ad)/.test(navigator.userAgent);
+
+  if (unsupported) return null;
+
+  return (
+    <div style={{
+      background: "#fff", borderRadius: 12, border: "1px solid #ddd6c8",
+      padding: "14px 16px", marginBottom: 20,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>
+            Notifications push
+          </div>
+          <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>
+            {subscribed
+              ? "Actives — vous recevez les alertes sur cet appareil"
+              : denied
+                ? "Bloquees — reactivez dans les reglages du navigateur"
+                : "Recevez une alerte quand une commande est envoyee"}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleToggle}
+          disabled={busy || denied}
+          style={{
+            width: 50, height: 28, borderRadius: 14,
+            background: subscribed ? "#4a6741" : "#ddd6c8",
+            border: "none", cursor: denied ? "not-allowed" : "pointer",
+            position: "relative", transition: "background 0.2s",
+            opacity: busy ? 0.5 : 1, flexShrink: 0,
+          }}
+        >
+          <span style={{
+            position: "absolute", top: 3, left: subscribed ? 25 : 3,
+            width: 22, height: 22, borderRadius: "50%",
+            background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+            transition: "left 0.2s",
+          }} />
+        </button>
+      </div>
+      {isIos && !pwa && !subscribed && (
+        <div style={{
+          marginTop: 10, padding: "8px 10px", borderRadius: 8,
+          background: "#fef2f2", fontSize: 12, color: "#b91c1c", lineHeight: 1.4,
+        }}>
+          Sur iPhone, ajoutez d&apos;abord l&apos;app a l&apos;ecran d&apos;accueil (bouton Partager &rarr; &quot;Sur l&apos;ecran d&apos;accueil&quot;) pour recevoir les notifications.
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function NotificationsPage() {
   const { notifications, unreadCount, loading, markAsRead, markAllAsRead, remove } = useNotifications();
 
@@ -39,6 +159,7 @@ export default function NotificationsPage() {
     <>
       <NavBar backHref="/" backLabel="Accueil" />
       <main style={{ maxWidth: 600, margin: "0 auto", padding: "16px 16px 60px" }}>
+        <PushToggle />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div>
             <h1 style={S.h1}>Notifications</h1>
