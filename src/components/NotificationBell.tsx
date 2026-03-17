@@ -1,8 +1,16 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useNotifications, type Notification } from "@/hooks/useNotifications";
+import { fetchApi } from "@/lib/fetchApi";
+import {
+  registerServiceWorker,
+  subscribeToPush,
+  getCurrentSubscription,
+  getPushPermission,
+  isPwaInstalled,
+} from "@/lib/pushSubscription";
 
 const TYPE_COLORS: Record<string, string> = {
   info: "#6b7280",
@@ -28,6 +36,60 @@ export function NotificationBell() {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  // Push state
+  const [swReg, setSwReg] = useState<ServiceWorkerRegistration | null>(null);
+  const [pushOn, setPushOn] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const pushSupported = typeof window !== "undefined" && "PushManager" in window && "Notification" in window; // eslint-disable-line @typescript-eslint/no-unused-vars
+  const pushDenied = getPushPermission() === "denied"; // eslint-disable-line @typescript-eslint/no-unused-vars
+  const isIos = typeof navigator !== "undefined" && /iP(hone|ad)/.test(navigator.userAgent);
+  const needsPwa = isIos && !isPwaInstalled(); // eslint-disable-line @typescript-eslint/no-unused-vars
+
+  useEffect(() => {
+    registerServiceWorker().then((reg) => {
+      if (!reg) return;
+      setSwReg(reg);
+      getCurrentSubscription(reg).then((sub) => setPushOn(!!sub));
+    });
+  }, []);
+
+  const togglePush = useCallback(async () => {
+    if (!swReg || pushBusy) return;
+    setPushBusy(true);
+    try {
+      if (pushOn) {
+        const sub = await getCurrentSubscription(swReg);
+        if (sub) {
+          await fetchApi("/api/push/subscribe", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          });
+          await sub.unsubscribe();
+        }
+        setPushOn(false);
+      } else {
+        const sub = await subscribeToPush(swReg);
+        if (sub) {
+          const json = sub.toJSON();
+          await fetchApi("/api/push/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              endpoint: sub.endpoint,
+              keys: { p256dh: json.keys?.p256dh, auth: json.keys?.auth },
+            }),
+          });
+          setPushOn(true);
+        }
+      }
+    } catch (e) {
+      console.error("Push toggle:", e);
+    } finally {
+      setPushBusy(false);
+    }
+  }, [swReg, pushOn, pushBusy]);
 
   // Click outside → close
   useEffect(() => {
@@ -75,6 +137,50 @@ export function NotificationBell() {
               </button>
             )}
           </div>
+
+          {/* Push toggle */}
+          {pushSupported && (
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "8px 14px", borderBottom: "1px solid #f0ebe3",
+              background: "#faf8f4",
+            }}>
+              <div>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a" }}>
+                  Notifications push
+                </span>
+                {needsPwa && (
+                  <div style={{ fontSize: 10, color: "#b91c1c", marginTop: 1 }}>
+                    Ajoutez l&apos;app a l&apos;ecran d&apos;accueil d&apos;abord
+                  </div>
+                )}
+                {pushDenied && (
+                  <div style={{ fontSize: 10, color: "#b91c1c", marginTop: 1 }}>
+                    Bloquees — reactivez dans Reglages
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); togglePush(); }}
+                disabled={pushBusy || pushDenied || needsPwa}
+                style={{
+                  width: 40, height: 22, borderRadius: 11,
+                  background: pushOn ? "#4a6741" : "#ddd6c8",
+                  border: "none", cursor: pushDenied || needsPwa ? "not-allowed" : "pointer",
+                  position: "relative", transition: "background 0.2s",
+                  opacity: pushBusy ? 0.5 : 1, flexShrink: 0,
+                }}
+              >
+                <span style={{
+                  position: "absolute", top: 2, left: pushOn ? 20 : 2,
+                  width: 18, height: 18, borderRadius: "50%",
+                  background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                  transition: "left 0.2s",
+                }} />
+              </button>
+            </div>
+          )}
 
           {recent.length === 0 ? (
             <div style={{ padding: 20, textAlign: "center", color: "#999", fontSize: 13 }}>
