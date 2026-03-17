@@ -100,6 +100,8 @@ export type Ingredient = {
   cost_per_unit?: number | null;
   cost_per_kg?: number | null;
 
+  order_unit_label?: string | null;
+
   // Ingrédients dérivés (rendement)
   parent_ingredient_id?: string | null;
   rendement?: number | null;
@@ -149,4 +151,5 @@ export type IngredientUpsert = {
   piece_volume_ml: number | null;
 
   supplier_id: string | null;
+  order_unit_label?: string | null;
 };

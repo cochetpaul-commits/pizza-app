@@ -92,6 +92,7 @@ export type EditState = {
   density: string; pieceWeightG: string; packTotalQty: string; packPrice: string;
   packUnit: "kg" | "l"; packCount: string; packEachQty: string; packEachUnit: "kg" | "l" | "pc";
   packPieceWeightG: string; pieceVolumeMl: string; allergens: string[];
+  orderUnitLabel: string;
 };
 
 // ─── IngredientRow ──────────────────────────────────────────────────────────
@@ -386,6 +387,19 @@ export const IngredientRow = React.memo(function IngredientRow({
               )}
             </>
           )}
+          {/* Unité de commande */}
+          <div className="pt-1" style={{ marginBottom: 8 }}>
+            <div className="text-[11px] font-extrabold opacity-60 mb-1 uppercase tracking-wide">Unité de commande</div>
+            <input
+              style={{
+                height: 32, borderRadius: 8, border: "1.5px solid #e5ddd0",
+                padding: "4px 10px", fontSize: 13, background: "#fff", width: 220,
+              }}
+              value={edit.orderUnitLabel}
+              onChange={(e) => onEditChange({ ...edit, orderUnitLabel: e.target.value })}
+              placeholder="ex: pcs, carton de 6, seau 5kg…"
+            />
+          </div>
           {/* Allergènes */}
           <div className="pt-1">
             <div className="text-[11px] font-extrabold opacity-60 mb-2 uppercase tracking-wide">Allergènes</div>

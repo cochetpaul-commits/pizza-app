@@ -470,6 +470,7 @@ function IngredientsPageInner() {
       packEachUnit: (off?.pack_each_unit ?? "l") as "kg" | "l" | "pc",
       packPieceWeightG: off?.piece_weight_g != null ? String(off.piece_weight_g) : "",
       allergens: parseAllergens(x.allergens),
+      orderUnitLabel: x.order_unit_label ?? "",
     });
   }, [offersByIngredientId]);
 
@@ -537,6 +538,7 @@ function IngredientsPageInner() {
       name, category: edit.category, is_active: edit.is_active, supplier_id,
       piece_volume_ml: parseNum(edit.pieceVolumeMl) ?? null,
       allergens: edit.allergens.length ? edit.allergens : null,
+      order_unit_label: edit.orderUnitLabel.trim() || null,
     };
     const u1 = await supabase.from("ingredients").update(up).eq("id", editingId);
     if (u1.error) { alert(u1.error.message); return; }
