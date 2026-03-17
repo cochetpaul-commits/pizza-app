@@ -1,9 +1,12 @@
 /**
  * Wrapper around fetch() that automatically injects:
  * - x-etablissement-id header (from localStorage)
+ * - Authorization: Bearer <token> (from Supabase session)
  *
  * Use this instead of raw fetch() for all /api/* calls.
  */
+
+import { supabase } from "@/lib/supabaseClient";
 
 const LS_KEY = "etab_current_id";
 
@@ -30,6 +33,16 @@ export async function fetchApi(
     : null;
   if (etabId && !existing["x-etablissement-id"]) {
     existing["x-etablissement-id"] = etabId;
+  }
+
+  // Inject auth token from Supabase session
+  if (!existing["authorization"] && !existing["Authorization"]) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        existing["Authorization"] = `Bearer ${session.access_token}`;
+      }
+    } catch { /* silencieux */ }
   }
 
   return fetch(url, { ...init, headers: existing });

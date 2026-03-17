@@ -8,6 +8,8 @@ import { useProfile } from "@/lib/ProfileContext";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { IngredientAvatar } from "@/components/IngredientAvatar";
+import type { Category } from "@/types/ingredients";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -768,6 +770,7 @@ export default function CommandesPage() {
                       <div key={item.id} style={tile}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
                           <button type="button" onClick={() => toggleFavori(item.id, true)} style={starBtnStyle(true)} title="Retirer des habituels">&#x2B50;</button>
+                          <IngredientAvatar ingredientId={item.id} name={item.name} category={(item.category ?? "autre") as Category} size={28} />
                           <span style={{
                             fontSize: 13, fontWeight: Number(quantities[item.id] ?? 0) > 0 ? 700 : 500,
                             color: Number(quantities[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
@@ -785,6 +788,7 @@ export default function CommandesPage() {
                   <div key={item.id} style={tile}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
                       <button type="button" onClick={() => toggleFavori(item.id, false)} style={starBtnStyle(false)} title="Ajouter aux habituels">&#x2B50;</button>
+                      <IngredientAvatar ingredientId={item.id} name={item.name} category={(item.category ?? "autre") as Category} size={28} />
                       <span style={{
                         fontSize: 13, fontWeight: Number(quantities[item.id] ?? 0) > 0 ? 700 : 500,
                         color: Number(quantities[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
