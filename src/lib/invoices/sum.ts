@@ -38,11 +38,11 @@ function extractMeta(
     ? `${invMatch[2]}/${invMatch[3]}/20${invMatch[4]}`
     : null;
 
-  // "2 292,07€ 0,00€ 2 418,13€ 0,00€ 2 418,13€"
-  // HT | Acompte=0 | TTC | Escompte=0 | NET A PAYER
-  const totalMatch = text.match(/^([\d ]+,\d{2})€\s+0,00€\s+([\d ]+,\d{2})€/m);
+  // "C2 1 300,69€ 5,5% 71,54€ 1 300,69€ 0,00€ 1 372,23€ 0,00€ 1 372,23€"
+  // C2 BASE_HT€ TVA% TVA€ TOTAL_HT€ ESCOMPTE€ TOTAL_TTC€ ACOMPTE€ NET€
+  const totalMatch = text.match(/\bC2\s+([\d ]+,\d{2})€.*?([\d ]+,\d{2})€\s+0,00€\s+([\d ]+,\d{2})€/);
   const total_ht = totalMatch ? parseFrenchNumber(totalMatch[1]) : null;
-  const total_ttc = totalMatch ? parseFrenchNumber(totalMatch[2]) : null;
+  const total_ttc = totalMatch ? parseFrenchNumber(totalMatch[3]) : null;
 
   return { invoice_number, invoice_date, total_ht, total_ttc };
 }
@@ -58,9 +58,10 @@ const RUPTURE_CODE_TAIL_RE = /^(.*?)\s+([A-Z]{2,}[A-Z0-9]*\d{2,}[A-Z]?)$/;
 function parseLines(text: string): ParsedLine[] {
   const rows = text.split(/\r?\n/).map((r) => r.trim()).filter(Boolean);
 
-  const SECTION_START_RE = /PU Net\s+Désignation/;
-  const SECTION_END_RE = /^Conformément à la loi/;
-  const SKIP_RE = /Exemplaire provisoire|^PU Net\s+Désignation/;
+  // Header: "Référence Désignation Qté N° Lot PU HT Remise PU Net Mt HT"
+  const SECTION_START_RE = /Désignation.*(?:PU|Mt)\s+HT/;
+  const SECTION_END_RE = /^(?:Conformément à la loi|Port HT|Code\s+Base\s+Taux)/;
+  const SKIP_RE = /^Exemplaire provisoire$|^Désignation/;
 
   // Collect section lines
   let inSection = false;
@@ -70,7 +71,7 @@ function parseLines(text: string): ParsedLine[] {
       if (SECTION_START_RE.test(row)) inSection = true;
       continue;
     }
-    if (SECTION_END_RE.test(row)) break;
+    if (SECTION_END_RE.test(row)) { inSection = false; continue; }
     if (SKIP_RE.test(row)) continue;
     sectionRows.push(row);
   }
@@ -128,19 +129,38 @@ function parseLines(text: string): ParsedLine[] {
       continue;
     }
 
-    // Normal product line: contains € and starts with a product code
+    // Normal product line: CODE NAME... QTY LOT PU_HT [REMISE] PU_NET TOTAL€
     if (row.includes("€")) {
       const tokens = row.split(/\s+/);
       const eurIdx = tokens.findIndex((t) => /^[\d,]+€$/.test(t));
 
-      if (eurIdx >= 3 && CODE_RE.test(tokens[0])) {
+      if (eurIdx >= 5 && CODE_RE.test(tokens[0])) {
         const code = tokens[0];
         const total = parseFrenchNumber(tokens[eurIdx].replace("€", ""));
-        const pu = parseFrenchNumber(tokens[eurIdx - 1]);
-        const qty = parseFrenchNumber(tokens[eurIdx - 2]);
-        const name = tokens.slice(1, eurIdx - 2).join(" ").trim();
+        // PU Net is right before total
+        const puNet = parseFrenchNumber(tokens[eurIdx - 1]);
+        // PU HT is before PU Net
+        const puHt = parseFrenchNumber(tokens[eurIdx - 2]);
+        // LOT is before PU HT (non-numeric token like L251007, L304/25)
+        // Walk backwards to find it
+        let lotIdx = eurIdx - 3;
+        // If there's a Remise value between PU HT and PU Net, adjust
+        // Remise would be numeric — if tokens[eurIdx-2] is a lot code, shift
+        if (puHt == null && lotIdx > 0) {
+          // No remise, lot is at eurIdx-3
+          lotIdx = eurIdx - 2;
+        }
+        // QTY is before LOT — find the comma-decimal number before the lot token
+        let qtyIdx = lotIdx - 1;
+        // Walk back to find the quantity (comma-decimal number)
+        while (qtyIdx > 0 && parseFrenchNumber(tokens[qtyIdx]) == null) {
+          qtyIdx--;
+        }
+        const qty = parseFrenchNumber(tokens[qtyIdx]);
+        const name = tokens.slice(1, qtyIdx).join(" ").trim();
+        const pu = puNet ?? puHt ?? 0;
 
-        if (name && qty != null && pu != null) {
+        if (name && qty != null) {
           result.push({
             sku: code,
             name,
