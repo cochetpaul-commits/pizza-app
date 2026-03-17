@@ -40,11 +40,15 @@ function parseFrenchNumber(s: string): number | null {
 }
 
 function cleanName(raw: string): string {
-  return toText(raw)
-    .replace(/\s+/g, " ")
-    .replace(/^(NC|DLUO|DLC)\s+/i, "")
-    .replace(/^\d{2}\/\d{2}(?:\/\d{2,4})?\s+/, "")
-    .trim();
+  let s = toText(raw).replace(/\s+/g, " ").trim();
+  // Strip leading labels (NC, DLUO, DLC)
+  s = s.replace(/^(NC|DLUO|DLC)\s+/i, "");
+  // Strip leading noise: dates (DD/MM/YY, D/M/YY), numbers with *, bare numbers
+  // before the actual product name (starts with a letter).
+  // Examples: "05/0/26 PARMESAN..." → "PARMESAN..."
+  //           "10* 15/02/26 14* 22/02/26 MOZZARELLA..." → "MOZZARELLA..."
+  s = s.replace(/^(?:\d{1,2}(?:[/*]\d{0,2}(?:\/\d{2,4})?)?\*?\s+)+/, "").trim();
+  return s;
 }
 
 function stripTrailingUnitCount(s: string): string {
