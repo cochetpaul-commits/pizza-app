@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { email, role, displayName } = body as { email?: string; role?: string; displayName?: string };
 
-  if (!email || !role || !["group_admin", "cuisine", "salle"].includes(role)) {
+  if (!email || !role || !["group_admin", "cuisine", "salle", "plonge"].includes(role)) {
     return NextResponse.json({ error: "Invalid params" }, { status: 400 });
   }
 

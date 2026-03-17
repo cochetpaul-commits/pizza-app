@@ -17,7 +17,7 @@ type UserRow = {
 };
 
 const ROLE_LABELS: Record<Role, string> = {
-  group_admin: "Group Admin",
+  group_admin: "Direction",
   cuisine: "Cuisine",
   salle: "Salle",
   plonge: "Plonge",
@@ -192,7 +192,7 @@ function UsersContent() {
                     <option value="cuisine">Cuisine</option>
                     <option value="salle">Salle</option>
                     <option value="plonge">Plonge</option>
-                    <option value="group_admin">Group Admin</option>
+                    <option value="group_admin">Direction</option>
                   </select>
                 </div>
               </div>
