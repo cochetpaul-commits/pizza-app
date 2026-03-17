@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
-import { NavBar } from "@/components/NavBar";
+import { useTopBarSetter } from "@/components/layout";
 import { useEtablissement } from "@/lib/EtablissementContext";
 
 // Mapping nom fournisseur → route import facture
@@ -32,6 +32,7 @@ type SupplierFull = {
   phone: string | null;
   contact_name: string | null;
   notes: string | null;
+  franco_minimum: number | null;
 };
 
 type Invoice = {
@@ -63,7 +64,7 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const [form, setForm] = useState({ email: "", phone: "", contact_name: "", notes: "" });
+  const [form, setForm] = useState({ email: "", phone: "", contact_name: "", notes: "", franco_minimum: "" });
 
   useEffect(() => {
     async function load() {
@@ -95,6 +96,7 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
           phone:        s.phone        ?? "",
           contact_name: s.contact_name ?? "",
           notes:        s.notes        ?? "",
+          franco_minimum: s.franco_minimum != null ? String(s.franco_minimum) : "",
         });
       }
 
@@ -110,11 +112,13 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
   async function save() {
     if (!supplier) return;
     setSaving(true);
+    const francoVal = form.franco_minimum.trim();
     const { error } = await supabase.from("suppliers").update({
-      email:        form.email.trim()        || null,
-      phone:        form.phone.trim()        || null,
-      contact_name: form.contact_name.trim() || null,
-      notes:        form.notes.trim()        || null,
+      email:           form.email.trim()        || null,
+      phone:           form.phone.trim()        || null,
+      contact_name:    form.contact_name.trim() || null,
+      notes:           form.notes.trim()        || null,
+      franco_minimum:  francoVal ? parseFloat(francoVal) : null,
     }).eq("id", id);
     setSaving(false);
     if (error) { alert(error.message); return; }
@@ -123,39 +127,37 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
   }
 
   const invoiceRoute = supplier ? getInvoiceRoute(supplier.name) : null;
+  const { setTopBar } = useTopBarSetter();
+
+  useEffect(() => {
+    if (!supplier) return;
+    setTopBar({
+      title: supplier.name,
+      actions: (
+        <>
+          {invoiceRoute && (
+            <Link href={invoiceRoute} className="btn btnPrimary">Importer facture</Link>
+          )}
+          <Link href={`/ingredients?supplier=${id}`} className="btn">Ingredients</Link>
+        </>
+      ),
+    });
+  }, [supplier, invoiceRoute, id, setTopBar]);
 
   if (loading) return (
-    <>
-      <NavBar backHref="/fournisseurs" backLabel="Fournisseurs" />
-      <main style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
-        <div className="muted">Chargement…</div>
-      </main>
-    </>
+    <main style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
+      <div className="muted">Chargement…</div>
+    </main>
   );
 
   if (!supplier) return (
-    <>
-      <NavBar backHref="/fournisseurs" backLabel="Fournisseurs" />
-      <main style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
-        <div className="muted">Fournisseur introuvable.</div>
-      </main>
-    </>
+    <main style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
+      <div className="muted">Fournisseur introuvable.</div>
+    </main>
   );
 
   return (
-    <>
-      <NavBar
-        backHref="/fournisseurs"
-        backLabel="Fournisseurs"
-        right={<>
-          {invoiceRoute && (
-            <Link href={invoiceRoute} className="btn btnPrimary">Importer facture →</Link>
-          )}
-          <Link href={`/ingredients?supplier=${id}`} className="btn">Ingrédients</Link>
-        </>}
-      />
-
-      <main style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
+    <main style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
         {/* Header */}
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -223,6 +225,26 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
                 />
               </div>
 
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 4 }}>Franco minimum (€ HT)</div>
+                  <input
+                    className="input"
+                    value={form.franco_minimum}
+                    onChange={(e) => setForm((f) => ({ ...f, franco_minimum: e.target.value }))}
+                    placeholder="ex: 800"
+                    type="number"
+                    min="0"
+                    step="50"
+                  />
+                </div>
+                <div style={{ display: "flex", alignItems: "flex-end" }}>
+                  <div style={{ fontSize: 11, color: "#999", paddingBottom: 10 }}>
+                    Montant min. pour livraison gratuite
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 4 }}>Notes</div>
                 <textarea
@@ -287,7 +309,6 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
           </div>
 
         </div>
-      </main>
-    </>
+    </main>
   );
 }

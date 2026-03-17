@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { NavBar } from "@/components/NavBar";
+
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import {
@@ -290,8 +290,7 @@ type SortKey = "ca" | "foodCostPct" | "margin" | "quantity";
 // ── Component ─────────────────────────────────────────────────────────────
 
 export default function FinancesPage() {
-  const { current: etab } = useEtablissement();
-  const gestionHref = etab?.slug === "piccola_mia" ? "/piccola-mia/gestion" : "/bello-mio/gestion";
+  const { current: _etab } = useEtablissement(); // eslint-disable-line @typescript-eslint/no-unused-vars
   const currentWeek = useMemo(() => getCurrentWeek(), []);
   const currentMonth = useMemo(() => getCurrentMonth(), []);
 
@@ -356,7 +355,6 @@ export default function FinancesPage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <>
-        <NavBar backHref={gestionHref} backLabel="Gestion" />
         <main style={{ maxWidth: 720, margin: "0 auto", padding: "20px 16px 56px", boxSizing: "border-box" }}>
 
           {/* Title */}
