@@ -23,7 +23,7 @@ async function getCallerRole(req: NextRequest): Promise<string | null> {
 /** POST — invite a new user by email */
 export async function POST(req: NextRequest) {
   const callerRole = await getCallerRole(req);
-  if (callerRole !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (callerRole !== "admin" && callerRole !== "group_admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
   const { email, role, displayName } = body as { email?: string; role?: string; displayName?: string };
