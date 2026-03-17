@@ -106,11 +106,11 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     if (etablissementId) supQuery.eq("etablissement_id", etablissementId);
     supQuery.then(({ data, error: err }) => {
         if (!err) {
-          // Deduplicate suppliers by name (case-insensitive) — keep the first entry as canonical
+          // Deduplicate suppliers by name (case+accent insensitive) — keep the first entry as canonical
           const seen = new Map<string, Supplier>();
           const aliases = new Map<string, Set<string>>();
           for (const s of (data ?? []) as Supplier[]) {
-            const key = s.name.toLowerCase();
+            const key = s.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
             if (!seen.has(key)) {
               seen.set(key, s);
               aliases.set(s.id, new Set([s.id]));
