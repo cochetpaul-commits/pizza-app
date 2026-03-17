@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
 import { StepperInput } from "@/components/StepperInput";
@@ -13,7 +14,7 @@ import type { Category } from "@/types/ingredients";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type Supplier = { id: string; name: string };
+type Supplier = { id: string; name: string; franco_minimum: number | null };
 
 type Ligne = {
   id: string;
@@ -41,6 +42,8 @@ type CatalogItem = {
   category: string | null;
   default_unit: string | null;
   order_unit: string | null;
+  order_unit_label: string | null;
+  prix_commande: number | null;
   favori_commande?: boolean;
 };
 
@@ -219,10 +222,19 @@ const statusBannerBg: Record<string, string> = {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function CommandesPage() {
+export default function CommandesPageWrapper() {
+  return (
+    <Suspense fallback={<div style={{ textAlign: "center", padding: 40, color: "#999" }}>Chargement...</div>}>
+      <CommandesPage />
+    </Suspense>
+  );
+}
+
+function CommandesPage() {
   const { can } = useProfile();
   const canValidate = can("commandes.valider");
   const { current: etab } = useEtablissement();
+  const searchParams = useSearchParams();
 
   // All suppliers
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -252,7 +264,7 @@ export default function CommandesPage() {
     async function init() {
       const q = supabase
         .from("suppliers")
-        .select("id, name")
+        .select("id, name, franco_minimum")
         .eq("is_active", true)
         .order("name");
       if (etab?.id) q.eq("etablissement_id", etab.id);
@@ -265,11 +277,17 @@ export default function CommandesPage() {
       }
       const list = Array.from(seen.values());
       setSuppliers(list);
-      if (list.length > 0) setSelectedSupplierId(list[0].id);
+      // Pre-select from URL param or default to first
+      const urlSupplierId = searchParams.get("supplier_id");
+      if (urlSupplierId && list.some((s) => s.id === urlSupplierId)) {
+        setSelectedSupplierId(urlSupplierId);
+      } else if (list.length > 0) {
+        setSelectedSupplierId(list[0].id);
+      }
       setLoading(false);
     }
     init();
-  }, [etab?.id]);
+  }, [etab?.id, searchParams]);
 
   // ── Load session + catalog when supplier changes ──────────────────────
 
@@ -297,7 +315,7 @@ export default function CommandesPage() {
     // Load catalog: ingredients linked to this supplier (via offers or supplier_id)
     const { data: offerData } = await supabase
       .from("supplier_offers")
-      .select("ingredient_id, unit, pack_unit, pack_count, pack_each_qty, pack_each_unit, pack_total_qty")
+      .select("ingredient_id, unit, unit_price, pack_price, pack_unit, pack_count, pack_each_qty, pack_each_unit, pack_total_qty")
       .eq("supplier_id", supplierId)
       .eq("is_active", true);
 
@@ -322,15 +340,20 @@ export default function CommandesPage() {
     if (allIds.length > 0) {
       const { data: ingData } = await supabase
         .from("ingredients")
-        .select("id, name, category, default_unit, favori_commande")
+        .select("id, name, category, default_unit, favori_commande, order_unit_label")
         .in("id", allIds)
         .order("category")
         .order("name");
 
-      items = (ingData ?? []).map((ing: { id: string; name: string; category: string | null; default_unit: string | null; favori_commande?: boolean }) => ({
-        ...ing,
-        order_unit: deriveOrderUnit(offerMap.get(ing.id) ?? null) ?? ing.default_unit,
-      }));
+      items = (ingData ?? []).map((ing: { id: string; name: string; category: string | null; default_unit: string | null; favori_commande?: boolean; order_unit_label?: string | null }) => {
+        const offer = offerMap.get(ing.id) ?? null;
+        return {
+          ...ing,
+          order_unit_label: ing.order_unit_label ?? null,
+          order_unit: ing.order_unit_label ?? deriveOrderUnit(offer) ?? ing.default_unit,
+          prix_commande: offer ? (offer.pack_price ?? offer.unit_price ?? null) : null,
+        };
+      });
     }
     setCatalog(items);
     setLoadingSupplier(false);
@@ -544,8 +567,27 @@ export default function CommandesPage() {
   // ── Computed ──────────────────────────────────────────────────────────
 
   const activeCount = Object.values(quantities).filter((v) => v !== "" && Number(v) > 0).length;
-  const supplierLabel = suppliers.find((s) => s.id === selectedSupplierId)?.name ?? "";
+  const currentSupplier = suppliers.find((s) => s.id === selectedSupplierId);
+  const supplierLabel = currentSupplier?.name ?? "";
   const readOnly = session?.status === "en_attente" || session?.status === "validee" || session?.status === "recue";
+
+  // Franco calculation
+  const francoMin = currentSupplier?.franco_minimum ?? null;
+  const orderTotal = catalog.reduce((sum, item) => {
+    const qty = Number(quantities[item.id] ?? 0);
+    if (qty <= 0 || !item.prix_commande) return sum;
+    return sum + qty * item.prix_commande;
+  }, 0);
+  const francoPercent = francoMin && francoMin > 0 ? Math.min(100, (orderTotal / francoMin) * 100) : null;
+
+  // Save order unit label
+  async function saveOrderUnit(ingredientId: string, label: string) {
+    const trimmed = label.trim() || null;
+    setCatalog((prev) =>
+      prev.map((i) => (i.id === ingredientId ? { ...i, order_unit_label: trimmed, order_unit: trimmed ?? i.order_unit } : i))
+    );
+    await supabase.from("ingredients").update({ order_unit_label: trimmed }).eq("id", ingredientId);
+  }
 
   function fmtDate(iso: string) {
     return new Date(iso).toLocaleDateString("fr-FR", {
@@ -555,16 +597,44 @@ export default function CommandesPage() {
 
   // ── Render: unit badge ────────────────────────────────────────────────
 
+  const [editingUnit, setEditingUnit] = useState<string | null>(null);
+  const [editUnitValue, setEditUnitValue] = useState("");
+
   function unitBadge(item: CatalogItem) {
     const u = item.order_unit;
-    if (!u) return null;
+    const isEditing = editingUnit === item.id;
+
+    if (isEditing) {
+      return (
+        <input
+          autoFocus
+          value={editUnitValue}
+          onChange={(e) => setEditUnitValue(e.target.value)}
+          onBlur={() => { saveOrderUnit(item.id, editUnitValue); setEditingUnit(null); }}
+          onKeyDown={(e) => { if (e.key === "Enter") { saveOrderUnit(item.id, editUnitValue); setEditingUnit(null); } }}
+          style={{
+            fontSize: 10, color: "#666", background: "#fff", border: "1.5px solid #D4775A",
+            padding: "2px 6px", borderRadius: 4, width: 80, outline: "none",
+          }}
+          placeholder="ex: pcs, carton..."
+        />
+      );
+    }
+
     return (
-      <span style={{
-        fontSize: 10, color: "#999", background: "#f5f0e8",
-        padding: "2px 6px", borderRadius: 4, flexShrink: 0, whiteSpace: "nowrap",
-      }}>
-        {u}
-      </span>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setEditingUnit(item.id); setEditUnitValue(item.order_unit_label ?? item.order_unit ?? ""); }}
+        style={{
+          fontSize: 10, color: item.order_unit_label ? "#D4775A" : "#999",
+          background: item.order_unit_label ? "#FFF0EB" : "#f5f0e8",
+          padding: "2px 6px", borderRadius: 4, flexShrink: 0, whiteSpace: "nowrap",
+          border: "none", cursor: "pointer",
+        }}
+        title="Modifier l'unité de commande"
+      >
+        {u || "unité"}
+      </button>
     );
   }
 
@@ -863,6 +933,37 @@ export default function CommandesPage() {
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
+          </div>
+        )}
+
+        {/* Franco progress bar */}
+        {francoMin && session?.status === "brouillon" && (
+          <div style={{ marginTop: 12, background: "#fff", borderRadius: 10, padding: "10px 14px", border: "1px solid #e5ddd0" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: "#666" }}>
+                Franco {supplierLabel}
+              </span>
+              <span style={{
+                fontSize: 12, fontWeight: 700,
+                color: orderTotal >= francoMin ? "#16a34a" : "#D4775A",
+              }}>
+                {orderTotal.toFixed(0)} € / {francoMin} €
+              </span>
+            </div>
+            <div style={{ height: 6, background: "#f0ebe2", borderRadius: 3, overflow: "hidden" }}>
+              <div style={{
+                height: "100%", borderRadius: 3, transition: "width 0.3s ease",
+                width: `${francoPercent ?? 0}%`,
+                background: orderTotal >= francoMin
+                  ? "linear-gradient(90deg, #16a34a, #22c55e)"
+                  : "linear-gradient(90deg, #D4775A, #E8956F)",
+              }} />
+            </div>
+            {orderTotal < francoMin && (
+              <div style={{ fontSize: 10, color: "#999", marginTop: 4, textAlign: "right" }}>
+                Encore {(francoMin - orderTotal).toFixed(0)} € pour atteindre le franco
+              </div>
+            )}
           </div>
         )}
 

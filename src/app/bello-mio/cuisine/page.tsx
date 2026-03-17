@@ -60,10 +60,13 @@ function Tile({ href, iconName, title, sub, value, accent, wide }: {
   );
 }
 
+type ActiveSession = { id: string; supplier_id: string; status: string; suppliers?: { name: string }[] | { name: string } | null };
+
 export default function CuisineHubBM() {
   const { etablissements, setCurrent, current } = useEtablissement();
   const [recipesCount, setRecipesCount] = useState<number | null>(null);
   const [ingredientsCount, setIngredientsCount] = useState<number | null>(null);
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
 
   useEffect(() => {
     const bm = etablissements.find(e => e.slug === "bello_mio");
@@ -79,9 +82,12 @@ export default function CuisineHubBM() {
       supabase.from("kitchen_recipes").select("id", { count: "exact", head: true }).contains("establishments", [current.slug]),
       supabase.from("prep_recipes").select("id", { count: "exact", head: true }).contains("establishments", [current.slug]),
       supabase.from("cocktails").select("id", { count: "exact", head: true }),
-    ]).then(([ing, pz, kr, pr, co]) => {
+      supabase.from("commande_sessions").select("id, supplier_id, status, suppliers(name)")
+        .eq("etablissement_id", eid).in("status", ["brouillon", "en_attente", "validee"]),
+    ]).then(([ing, pz, kr, pr, co, sess]) => {
       setIngredientsCount(ing.count ?? 0);
       setRecipesCount((pz.count ?? 0) + (kr.count ?? 0) + (pr.count ?? 0) + (co.count ?? 0));
+      setActiveSessions((sess.data ?? []) as ActiveSession[]);
     });
   }, [current]);
 
@@ -102,7 +108,20 @@ export default function CuisineHubBM() {
 
         <SectionLabel>Approvisionnement</SectionLabel>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-          <Tile href="/commandes"    iconName="commandes"    title="Commander"    sub="Mael · Metro · Masse"  accent={T.sauge} wide />
+          {activeSessions.length > 0 ? (
+            activeSessions.map((s) => (
+              <Tile
+                key={s.id}
+                href={`/commandes?supplier_id=${s.supplier_id}`}
+                iconName="commandes"
+                title={(() => { const sup = s.suppliers; const n = Array.isArray(sup) ? sup[0]?.name : sup?.name; return n ?? "Commande"; })()}
+                sub={s.status === "brouillon" ? "Brouillon en cours" : s.status === "en_attente" ? "En attente de validation" : "Validée"}
+                accent={s.status === "en_attente" ? "#2563EB" : s.status === "validee" ? "#16a34a" : T.sauge}
+              />
+            ))
+          ) : (
+            <Tile href="/commandes" iconName="commandes" title="Commander" sub="Nouvelle commande" accent={T.sauge} wide />
+          )}
           <Tile href="/mercuriale"   iconName="mercuriale"   title="Mercuriale"   sub="Prix du marche"        accent={T.sauge} />
           <Tile href="/fournisseurs" iconName="fournisseurs" title="Fournisseurs" sub="Contacts & tarifs"     accent={T.sauge} />
         </div>
