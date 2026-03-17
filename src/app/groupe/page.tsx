@@ -7,7 +7,8 @@ import { RequireRole } from "@/components/RequireRole";
 import { AppNav } from "@/components/AppNav";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
-import { TOKENS } from "@/lib/tokens";
+import { T } from "@/lib/tokens";
+import { TileIcon } from "@/components/TileIcon";
 import { fetchPriceAlerts } from "@/lib/priceAlerts";
 
 type CaData = { totalSales: number; guestsNumber: number } | null;
@@ -19,6 +20,16 @@ function fmtEur(n: number) {
 
 function fmtDateShort(iso: string) {
   return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      fontFamily: "DM Sans, sans-serif", fontSize: 9, fontWeight: 700,
+      letterSpacing: "0.18em", textTransform: "uppercase",
+      color: T.mutedLight, marginBottom: 10, marginTop: 4,
+    }}>{children}</div>
+  );
 }
 
 export default function GroupePage() {
@@ -39,7 +50,6 @@ export default function GroupePage() {
     fetchCa();
   }, []);
 
-  // Fetch Piccola Mia CA from daily_sales (Kezia)
   useEffect(() => {
     async function fetchCaPM() {
       const today = new Date().toISOString().slice(0, 10);
@@ -82,119 +92,194 @@ export default function GroupePage() {
     fetchAlertCount();
   }, []);
 
+  const caTotal = (ca?.totalSales ?? 0) + (caPM ?? 0);
+  const hasCa = ca || caPM != null;
+
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <div style={{ minHeight: "100dvh", background: TOKENS.color.creme }}>
+      <div style={{ minHeight: "100dvh", background: T.creme }}>
         <AppNav />
-
-        {/* Header — logo centre */}
-        <div style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          padding: "16px 20px 20px",
-          borderBottom: `1px solid ${TOKENS.color.border}`,
-        }}>
-          <Image
-            src="/logo-ifratelli.png"
-            alt="iFratelli Group"
-            width={160}
-            height={160}
-            style={{ objectFit: "contain", mixBlendMode: "multiply" }}
-            priority
-          />
-        </div>
 
         <div style={{ maxWidth: 600, margin: "0 auto", padding: "24px 16px 40px" }}>
 
-          {/* CA Groupe */}
-          <div style={kpiBlock}>
-            <p style={kpiLabel}>CA GROUPE AUJOURD&apos;HUI</p>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 8 }}>
-              <span style={kpiValue}>
-                {(ca || caPM != null) ? `${fmtEur((ca?.totalSales ?? 0) + (caPM ?? 0))} \u20AC` : "\u2014"}
-              </span>
-              {ca && ca.guestsNumber > 0 && (
-                <span style={{ fontSize: 13, color: "#999" }}>
-                  {ca.guestsNumber} couverts
-                </span>
-              )}
+          {/* Header */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 16,
+            marginBottom: 24, padding: "20px 18px",
+            background: `linear-gradient(135deg, ${T.terracotta}12 0%, transparent 60%)`,
+            borderRadius: 16,
+          }}>
+            <Image
+              src="/logo-ifratelli.png"
+              alt="iFratelli Group"
+              width={64}
+              height={64}
+              style={{ height: 64, width: "auto", objectFit: "contain", mixBlendMode: "multiply" }}
+              priority
+            />
+            <div>
+              <h1 style={{
+                margin: 0, fontSize: 26, fontWeight: 700,
+                fontFamily: "Oswald, sans-serif",
+                color: T.dark, letterSpacing: 1, lineHeight: 1.1,
+              }}>
+                iFratelli Group
+              </h1>
+              <div style={{ marginTop: 4, width: 40, height: 3, borderRadius: 2, background: T.terracotta }} />
             </div>
+          </div>
+
+          {/* CA Groupe */}
+          <div style={{
+            background: T.white, border: `1.5px solid ${T.border}`,
+            borderRadius: 16, padding: "18px 22px", marginBottom: 16,
+            borderLeft: `4px solid ${T.terracotta}`,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <p style={{
+                  margin: 0, fontSize: 9, fontWeight: 700,
+                  letterSpacing: "0.18em", textTransform: "uppercase",
+                  color: T.muted, fontFamily: "DM Sans, sans-serif",
+                }}>CA Groupe aujourd&apos;hui</p>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 6 }}>
+                  <span style={{
+                    fontSize: 34, fontWeight: 700, color: T.dark,
+                    fontFamily: "Oswald, sans-serif", lineHeight: 1,
+                  }}>
+                    {hasCa ? `${fmtEur(caTotal)} \u20AC` : "\u2014"}
+                  </span>
+                  {ca && ca.guestsNumber > 0 && (
+                    <span style={{ fontSize: 12, color: T.muted }}>{ca.guestsNumber} couv.</span>
+                  )}
+                </div>
+              </div>
+              <TileIcon name="pilotage" size={24} color={T.terracotta} />
+            </div>
+
+            {/* Mini breakdown */}
+            {hasCa && (
+              <div style={{ display: "flex", gap: 16, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.terracotta, flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, color: T.muted }}>Bello Mio</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: T.terracotta, fontFamily: "Oswald, sans-serif" }}>
+                    {fmtEur(ca?.totalSales ?? 0)} &euro;
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.jauneDark, flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, color: T.muted }}>Piccola Mia</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: T.jauneDark, fontFamily: "Oswald, sans-serif" }}>
+                    {fmtEur(caPM ?? 0)} &euro;
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Alertes Prix */}
           <Link href="/variations-prix" style={{ textDecoration: "none", color: "inherit" }}>
             <div style={{
-              ...whiteCard,
-              marginBottom: 20,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              cursor: "pointer",
+              background: T.white, borderRadius: 16, padding: "14px 18px",
+              border: `1.5px solid ${T.border}`,
+              borderLeft: `4px solid ${T.sauge}`,
+              marginBottom: 20, cursor: "pointer",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              boxShadow: T.tileShadow,
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={cardTitle}>Alertes Prix</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <TileIcon name="variations" size={20} color={T.sauge} />
+                <span style={{
+                  fontFamily: "Oswald, sans-serif", fontWeight: 600,
+                  fontSize: 13, letterSpacing: "0.08em", textTransform: "uppercase",
+                  color: T.sauge,
+                }}>Alertes Prix</span>
                 {notifCount > 0 && (
                   <span style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    minWidth: 20,
-                    height: 20,
-                    borderRadius: 10,
-                    background: "#D4775A",
-                    color: "#fff",
-                    fontSize: 10,
-                    fontWeight: 700,
-                    padding: "0 6px",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    minWidth: 20, height: 20, borderRadius: 10,
+                    background: T.terracotta, color: "#fff",
+                    fontSize: 10, fontWeight: 700, padding: "0 6px",
                   }}>
                     {notifCount}
                   </span>
                 )}
               </div>
-              <span style={{ fontSize: 12, color: "#999" }}>
+              <span style={{ fontSize: 11, color: T.muted }}>
                 {notifCount === 0 ? "Aucune alerte" : `${notifCount} variation${notifCount > 1 ? "s" : ""}`}
               </span>
             </div>
           </Link>
 
           {/* Etablissements */}
-          <p style={sectionLabel}>ETABLISSEMENTS</p>
-
+          <SectionLabel>Etablissements</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
-            {/* Bello Mio */}
             <Link href="/bello-mio" style={{ textDecoration: "none", color: "inherit" }}>
-              <div style={etabCard("#D4775A")}>
+              <div style={{
+                background: T.white, borderRadius: 16, padding: "16px 18px",
+                borderTop: `4px solid ${T.terracotta}`,
+                boxShadow: T.tileShadow,
+                display: "flex", flexDirection: "column", minHeight: 120, cursor: "pointer",
+                transition: "all 0.2s",
+              }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = T.tileShadowHover; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = T.tileShadow; }}
+              >
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
-                  <span style={etabName}>Bello Mio</span>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: T.green, display: "inline-block" }} />
+                  <span style={{
+                    fontSize: 14, fontWeight: 700, color: T.dark,
+                    fontFamily: "Oswald, sans-serif", letterSpacing: 0.5,
+                  }}>Bello Mio</span>
                 </div>
-                {ca && (
-                  <span style={{ fontSize: 20, fontWeight: 700, color: "#D4775A", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                    {fmtEur(ca.totalSales)} &euro;
-                  </span>
-                )}
-                <span style={etabPill("#D4775A")}>Ouvrir &rarr;</span>
+                <span style={{
+                  fontSize: 22, fontWeight: 700, color: T.terracotta,
+                  fontFamily: "Oswald, sans-serif",
+                }}>
+                  {ca ? `${fmtEur(ca.totalSales)} \u20ac` : "\u2014"}
+                </span>
+                <span style={{
+                  display: "inline-flex", alignItems: "center", alignSelf: "flex-start",
+                  height: 26, padding: "0 12px", borderRadius: 20, marginTop: "auto",
+                  background: `${T.terracotta}14`, border: `1px solid ${T.terracotta}30`,
+                  color: T.terracotta, fontSize: 10, fontWeight: 700,
+                }}>Ouvrir &rarr;</span>
               </div>
             </Link>
 
-            {/* Piccola Mia */}
             <Link href="/piccola-mia" style={{ textDecoration: "none", color: "inherit" }}>
               <div style={{
-                ...etabCard("#F5E642"),
-                backgroundImage: "repeating-linear-gradient(90deg, #fff 0px, #fff 10px, #FAF0A0 10px, #FAF0A0 20px)",
-                backgroundSize: "100% 6px",
-                backgroundPosition: "0 0",
-                backgroundRepeat: "no-repeat",
-              }}>
+                background: T.white, borderRadius: 16, padding: "16px 18px",
+                borderTop: `4px solid ${T.jaune}`,
+                backgroundImage: T.stripedPM,
+                backgroundSize: "100% 6px", backgroundPosition: "0 0", backgroundRepeat: "no-repeat",
+                boxShadow: T.tileShadow,
+                display: "flex", flexDirection: "column", minHeight: 120, cursor: "pointer",
+                transition: "all 0.2s",
+              }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = T.tileShadowHover; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = T.tileShadow; }}
+              >
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#F5E642", display: "inline-block" }} />
-                  <span style={etabName}>Piccola Mia</span>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: T.jaune, display: "inline-block" }} />
+                  <span style={{
+                    fontSize: 14, fontWeight: 700, color: T.dark,
+                    fontFamily: "Oswald, sans-serif", letterSpacing: 0.5,
+                  }}>Piccola Mia</span>
                 </div>
-                <span style={{ fontSize: 20, fontWeight: 700, color: "#b8a800", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
+                <span style={{
+                  fontSize: 22, fontWeight: 700, color: T.jauneDark,
+                  fontFamily: "Oswald, sans-serif",
+                }}>
                   {caPM != null ? `${fmtEur(caPM)} \u20ac` : "\u2014"}
                 </span>
-                <span style={etabPill("#b8a800")}>Ouvrir &rarr;</span>
+                <span style={{
+                  display: "inline-flex", alignItems: "center", alignSelf: "flex-start",
+                  height: 26, padding: "0 12px", borderRadius: 20, marginTop: "auto",
+                  background: `${T.jauneDark}14`, border: `1px solid ${T.jauneDark}30`,
+                  color: T.jauneDark, fontSize: 10, fontWeight: 700,
+                }}>Ouvrir &rarr;</span>
               </div>
             </Link>
           </div>
@@ -202,18 +287,35 @@ export default function GroupePage() {
           {/* Evenements */}
           {events.length > 0 && (
             <>
-              <p style={sectionLabel}>EVENEMENTS</p>
+              <SectionLabel>Evenements</SectionLabel>
               <Link href="/evenements" style={{ textDecoration: "none", color: "inherit" }}>
-                <div style={whiteCard}>
+                <div style={{
+                  background: T.white, borderRadius: 16, padding: "16px 18px",
+                  border: `1.5px solid ${T.border}`,
+                  borderLeft: `4px solid ${T.violet}`,
+                  boxShadow: T.tileShadow, marginBottom: 20, cursor: "pointer",
+                }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                    <span style={cardTitle}>Evenements</span>
-                    <span style={badgeSmall}>{events.length} a venir</span>
+                    <TileIcon name="evenements" size={18} color={T.violet} />
+                    <span style={{
+                      fontFamily: "Oswald, sans-serif", fontWeight: 600,
+                      fontSize: 13, letterSpacing: "0.08em", textTransform: "uppercase",
+                      color: T.violet,
+                    }}>Evenements</span>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 6,
+                      background: `${T.violet}14`, color: T.violet,
+                    }}>{events.length} a venir</span>
                   </div>
                   <div style={{ display: "grid", gap: 6 }}>
                     {events.map(ev => (
-                      <div key={ev.id} style={eventRow}>
-                        <span style={{ fontWeight: 700, fontSize: 12, color: "#2f3a33" }}>{ev.name}</span>
-                        <span style={{ fontSize: 10, color: "#999" }}>
+                      <div key={ev.id} style={{
+                        display: "flex", justifyContent: "space-between", alignItems: "center",
+                        padding: "8px 12px", background: `${T.violet}08`, borderRadius: 10,
+                        border: `1px solid ${T.violet}15`,
+                      }}>
+                        <span style={{ fontWeight: 700, fontSize: 12, color: T.dark }}>{ev.name}</span>
+                        <span style={{ fontSize: 10, color: T.muted, flexShrink: 0 }}>
                           {ev.date ? fmtDateShort(ev.date) : "\u2014"}
                           {ev.covers > 0 ? ` \u00B7 ${ev.covers} couv.` : ""}
                         </span>
@@ -225,44 +327,12 @@ export default function GroupePage() {
             </>
           )}
 
-          {/* Factures */}
-          <p style={sectionLabel}>GESTION</p>
-          <div style={{ display: "grid", gap: 12 }}>
-            <Link href="/invoices" style={{ textDecoration: "none", color: "inherit" }}>
-              <div style={whiteCard}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <span style={cardTitle}>Factures</span>
-                    <p style={{ margin: "3px 0 0", fontSize: 12, color: "#999" }}>Import fournisseurs</p>
-                  </div>
-                  <span style={gestionPill}>Ouvrir &rarr;</span>
-                </div>
-              </div>
-            </Link>
-
-            <Link href="/admin/utilisateurs" style={{ textDecoration: "none", color: "inherit" }}>
-              <div style={whiteCard}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <span style={cardTitle}>Admin</span>
-                    <p style={{ margin: "3px 0 0", fontSize: 12, color: "#999" }}>Utilisateurs & roles</p>
-                  </div>
-                  <span style={gestionPill}>Ouvrir &rarr;</span>
-                </div>
-              </div>
-            </Link>
-
-            <Link href="/messagerie" style={{ textDecoration: "none", color: "inherit" }}>
-              <div style={whiteCard}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <span style={cardTitle}>Messagerie</span>
-                    <p style={{ margin: "3px 0 0", fontSize: 12, color: "#999" }}>Chat interne equipe</p>
-                  </div>
-                  <span style={gestionPill}>Ouvrir &rarr;</span>
-                </div>
-              </div>
-            </Link>
+          {/* Gestion */}
+          <SectionLabel>Gestion</SectionLabel>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+            <GestionTile href="/invoices"        iconName="factures"   title="Factures"   sub="Import fournisseurs"   accent={T.sauge} />
+            <GestionTile href="/messagerie"      iconName="messagerie" title="Messagerie" sub="Chat interne equipe"   accent={T.sauge} />
+            <GestionTile href="/admin/utilisateurs" iconName="admin"   title="Admin"      sub="Utilisateurs, roles"   accent={T.ardoise} />
           </div>
 
         </div>
@@ -271,130 +341,39 @@ export default function GroupePage() {
   );
 }
 
-// Styles
-
-
-
-const kpiBlock: React.CSSProperties = {
-  background: "#fff",
-  border: "1px solid #ddd6c8",
-  borderRadius: 16,
-  padding: "20px 24px",
-  marginBottom: 20,
-};
-
-const kpiLabel: React.CSSProperties = {
-  margin: 0,
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: 2,
-  textTransform: "uppercase",
-  color: "#999",
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-};
-
-const kpiValue: React.CSSProperties = {
-  fontSize: 36,
-  fontWeight: 700,
-  color: "#1a1a1a",
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-  lineHeight: 1,
-};
-
-const sectionLabel: React.CSSProperties = {
-  margin: "0 0 10px 4px",
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: 2,
-  textTransform: "uppercase",
-  color: "#b0a894",
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-};
-
-function etabCard(accent: string): React.CSSProperties {
-  return {
-    background: "#fff",
-    borderRadius: 14,
-    padding: "16px 18px",
-    borderTop: `4px solid ${accent}`,
-    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-    display: "flex",
-    flexDirection: "column",
-    minHeight: 120,
-    cursor: "pointer",
-  };
+function GestionTile({ href, iconName, title, sub, accent }: {
+  href: string; iconName: React.ComponentProps<typeof TileIcon>["name"]; title: string; sub: string; accent: string;
+}) {
+  return (
+    <Link href={href} style={{ textDecoration: "none" }}>
+      <div style={{
+        background: T.white, borderRadius: 16, padding: "16px 18px",
+        border: `1.5px solid ${T.border}`,
+        borderLeft: `3px solid ${accent}`,
+        minHeight: 90, display: "flex", flexDirection: "column",
+        justifyContent: "space-between", cursor: "pointer",
+        transition: "all 0.2s", boxShadow: T.tileShadow,
+      }}
+        onMouseEnter={e => {
+          e.currentTarget.style.boxShadow = T.tileShadowHover;
+          e.currentTarget.style.borderColor = accent;
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.boxShadow = T.tileShadow;
+          e.currentTarget.style.borderColor = T.border;
+          e.currentTarget.style.borderLeftColor = accent;
+        }}
+      >
+        <div>
+          <div style={{ marginBottom: 8 }}><TileIcon name={iconName} size={20} color={accent} /></div>
+          <div style={{
+            fontFamily: "Oswald, sans-serif", fontWeight: 600,
+            fontSize: 13, letterSpacing: "0.08em", textTransform: "uppercase",
+            color: accent,
+          }}>{title}</div>
+          <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, color: T.muted, marginTop: 3, lineHeight: 1.4 }}>{sub}</div>
+        </div>
+      </div>
+    </Link>
+  );
 }
-
-const etabName: React.CSSProperties = {
-  fontSize: 14,
-  fontWeight: 700,
-  color: "#1a1a1a",
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-  letterSpacing: 0.5,
-};
-
-function etabPill(color: string): React.CSSProperties {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    height: 26,
-    padding: "0 12px",
-    borderRadius: 20,
-    background: `${color}14`,
-    border: `1px solid ${color}30`,
-    color,
-    fontSize: 10,
-    fontWeight: 700,
-    marginTop: "auto",
-  };
-}
-
-const whiteCard: React.CSSProperties = {
-  background: "#fff",
-  borderRadius: 14,
-  padding: "18px 20px",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-};
-
-const cardTitle: React.CSSProperties = {
-  fontSize: 14,
-  fontWeight: 700,
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-  color: "#1a1a1a",
-  letterSpacing: 0.5,
-  textTransform: "uppercase",
-};
-
-const badgeSmall: React.CSSProperties = {
-  display: "inline-block",
-  fontSize: 10,
-  fontWeight: 700,
-  padding: "2px 7px",
-  borderRadius: 6,
-  background: "rgba(212,119,90,0.10)",
-  color: "#D4775A",
-};
-
-const eventRow: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  padding: "7px 12px",
-  background: "rgba(245,237,228,0.5)",
-  borderRadius: 10,
-  border: "1px solid rgba(221,214,200,0.25)",
-};
-
-const gestionPill: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  height: 28,
-  padding: "0 12px",
-  borderRadius: 20,
-  background: "rgba(160,132,92,0.10)",
-  color: "#A0845C",
-  fontSize: 11,
-  fontWeight: 700,
-  whiteSpace: "nowrap",
-};
