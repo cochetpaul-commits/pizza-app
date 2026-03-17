@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { NavBar } from "@/components/NavBar";
+import { useTopBarSetter } from "@/components/layout";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { StepperInput } from "@/components/StepperInput";
@@ -20,6 +20,7 @@ type Ingredient = {
   allergens: string | null; status: string | null; status_note: string | null;
   supplier_id: string | null; establishments: string[] | null;
   unit?: string | null;
+  order_unit_label?: string | null;
   parent_ingredient_id?: string | null;
   rendement?: number | null;
   is_derived?: boolean;
@@ -70,9 +71,7 @@ function IngredientDetailInner() {
   const fromVariations = searchParams.get("from") === "variations-prix";
   const { current: etab } = useEtablissement();
 
-  const variationsBtn = fromVariations
-    ? <Link href="/variations-prix" className="btn">← Variations prix</Link>
-    : undefined;
+  const { setTopBar } = useTopBarSetter();
 
   const [ingredient, setIngredient] = useState<Ingredient | null>(null);
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -111,6 +110,10 @@ function IngredientDetailInner() {
   }
 
   // Derived ingredients
+  // Order unit editing
+  const [orderUnit, setOrderUnit] = useState("");
+  const [orderUnitSaved, setOrderUnitSaved] = useState(false);
+
   const [derivedList, setDerivedList] = useState<DerivedIngredient[]>([]);
   const [parentInfo, setParentInfo] = useState<ParentInfo | null>(null);
   const [showDerivePanel, setShowDerivePanel] = useState(false);
@@ -146,7 +149,9 @@ function IngredientDetailInner() {
 
         if (e1) throw new Error(e1.message);
         if (e2) throw new Error(e2.message);
-        setIngredient(ing as Ingredient);
+        const ingTyped = ing as Ingredient;
+        setIngredient(ingTyped);
+        setOrderUnit(ingTyped.order_unit_label ?? "");
 
         // Fetch supplier names
         const supplierIds = [...new Set((offerData ?? []).map((o: { supplier_id: string }) => o.supplier_id))];
@@ -248,25 +253,27 @@ function IngredientDetailInner() {
   // Recent history (last 20 entries, newest first)
   const recentHistory = useMemo(() => [...offers].reverse().slice(0, 20), [offers]);
 
+  useEffect(() => {
+    setTopBar({
+      title: ingredient?.name ?? "Article",
+      actions: fromVariations
+        ? <Link href="/variations-prix" className="btn">Variations prix</Link>
+        : undefined,
+    });
+  }, [ingredient?.name, fromVariations, setTopBar]);
+
   if (loading) return (
-    <>
-      <NavBar backHref="/ingredients" right={variationsBtn} />
-      <main className="container"><div className="card" style={{ textAlign: "center", padding: 40, color: "var(--muted)" }}>Chargement…</div></main>
-    </>
+    <main className="container"><div className="card" style={{ textAlign: "center", padding: 40, color: "var(--muted)" }}>Chargement…</div></main>
   );
 
   if (error || !ingredient) return (
-    <>
-      <NavBar backHref="/ingredients" right={variationsBtn} />
-      <main className="container">
-        <div className="errorBox">{error ?? "Ingrédient introuvable"}</div>
-      </main>
-    </>
+    <main className="container">
+      <div className="errorBox">{error ?? "Ingredient introuvable"}</div>
+    </main>
   );
 
   return (
     <>
-      <NavBar backHref="/ingredients" backLabel="Ingrédients" right={variationsBtn} />
       <main className="container safe-bottom">
 
         {/* ── Header ── */}
@@ -355,6 +362,29 @@ function IngredientDetailInner() {
             )}
           </div>
           </div>
+        </div>
+
+        {/* ── Unité de commande ── */}
+        <div className="card" style={{ marginBottom: 12, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, opacity: 0.65, whiteSpace: "nowrap" }}>Unité de commande</span>
+          <input
+            type="text"
+            value={orderUnit}
+            onChange={(e) => { setOrderUnit(e.target.value); setOrderUnitSaved(false); }}
+            onBlur={async () => {
+              const val = orderUnit.trim() || null;
+              await supabase.from("ingredients").update({ order_unit_label: val }).eq("id", id);
+              setOrderUnitSaved(true);
+              setTimeout(() => setOrderUnitSaved(false), 2000);
+            }}
+            placeholder="ex: pcs, carton de 6, seau 5kg…"
+            style={{
+              flex: 1, height: 32, borderRadius: 8,
+              border: "1.5px solid #e5ddd0", padding: "4px 10px",
+              fontSize: 13, background: "#fff",
+            }}
+          />
+          {orderUnitSaved && <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 600 }}>Enregistre</span>}
         </div>
 
         {/* ── Meilleur prix ── */}
@@ -706,12 +736,9 @@ function IngredientDetailInner() {
 export default function IngredientDetailPage() {
   return (
     <Suspense fallback={
-      <>
-        <NavBar backHref="/ingredients" />
-        <main className="container">
-          <div className="card" style={{ textAlign: "center", padding: 40, color: "var(--muted)" }}>Chargement…</div>
-        </main>
-      </>
+      <main className="container">
+        <div className="card" style={{ textAlign: "center", padding: 40, color: "var(--muted)" }}>Chargement…</div>
+      </main>
     }>
       <IngredientDetailInner />
     </Suspense>
