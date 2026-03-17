@@ -50,7 +50,19 @@ export default function FournisseursPage() {
         invQuery,
       ]);
 
-      const rows = (supRes.data ?? []) as SupplierRow[];
+      const rawRows = (supRes.data ?? []) as SupplierRow[];
+
+      // Deduplicate by name (accent+case insensitive) — keep the one with most data
+      const seen = new Map<string, { canonical: SupplierRow; aliasIds: string[] }>();
+      for (const s of rawRows) {
+        const key = s.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        if (!seen.has(key)) {
+          seen.set(key, { canonical: s, aliasIds: [s.id] });
+        } else {
+          seen.get(key)!.aliasIds.push(s.id);
+        }
+      }
+      const rows = Array.from(seen.values()).map((v) => v.canonical);
       setSuppliers(rows);
 
       // Ref counts from latest offers
@@ -67,14 +79,21 @@ export default function FournisseursPage() {
         }
       }
 
+      // Merge stats across aliases
       const m = new Map<string, SupplierStats>();
-      for (const s of rows) {
-        const li = lastImports.get(s.id);
-        m.set(s.id, {
-          refCount: offerCounts.get(s.id) ?? 0,
-          lastImport: li?.created_at ?? null,
-          lastImportNumber: li?.invoice_number ?? null,
-        });
+      for (const { canonical, aliasIds } of seen.values()) {
+        let refCount = 0;
+        let lastImport: string | null = null;
+        let lastImportNumber: string | null = null;
+        for (const aid of aliasIds) {
+          refCount += offerCounts.get(aid) ?? 0;
+          const li = lastImports.get(aid);
+          if (li && (!lastImport || li.created_at > lastImport)) {
+            lastImport = li.created_at;
+            lastImportNumber = li.invoice_number;
+          }
+        }
+        m.set(canonical.id, { refCount, lastImport, lastImportNumber });
       }
 
       setStats(m);
