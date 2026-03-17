@@ -41,10 +41,10 @@ export function NotificationBell() {
   const [swReg, setSwReg] = useState<ServiceWorkerRegistration | null>(null);
   const [pushOn, setPushOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
-  const pushSupported = typeof window !== "undefined" && "PushManager" in window && "Notification" in window; // eslint-disable-line @typescript-eslint/no-unused-vars
-  const pushDenied = getPushPermission() === "denied"; // eslint-disable-line @typescript-eslint/no-unused-vars
+  const pushSupported = typeof window !== "undefined" && "PushManager" in window && "Notification" in window;
+  const pushDenied = getPushPermission() === "denied";
   const isIos = typeof navigator !== "undefined" && /iP(hone|ad)/.test(navigator.userAgent);
-  const needsPwa = isIos && !isPwaInstalled(); // eslint-disable-line @typescript-eslint/no-unused-vars
+  const needsPwa = isIos && !isPwaInstalled();
 
   useEffect(() => {
     registerServiceWorker().then((reg) => {
