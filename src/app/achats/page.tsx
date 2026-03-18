@@ -95,15 +95,15 @@ export default function AchatsPage() {
     })();
   }, [etab]);
 
-  // Group invoices by supplier
+  // Group invoices by supplier (normalize name to handle duplicates like COZIGOU/Cozigou)
   const grouped: Record<string, { name: string; invoices: InvoiceRow[] }> = {};
   for (const inv of invoices) {
-    const sid = inv.supplier_id ?? "unknown";
-    const name = inv.suppliers?.name ?? "Inconnu";
-    if (!grouped[sid]) grouped[sid] = { name, invoices: [] };
-    grouped[sid].invoices.push(inv);
+    const rawName = inv.suppliers?.name ?? "Inconnu";
+    const key = rawName.toLowerCase().trim();
+    if (!grouped[key]) grouped[key] = { name: rawName, invoices: [] };
+    grouped[key].invoices.push(inv);
   }
-  const folders = Object.entries(grouped).sort((a, b) => a[1].name.localeCompare(b[1].name));
+  const folders = Object.entries(grouped).sort((a, b) => a[1].name.localeCompare(b[1].name, "fr"));
 
   // Load invoice lines
   const loadLines = async (invoiceId: string) => {

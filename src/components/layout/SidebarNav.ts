@@ -51,7 +51,6 @@ export const SIDEBAR_NAV: NavSection[] = [
       { label: "Operations", href: "/pilotage" },
       { label: "Fournisseurs", href: "/fournisseurs" },
       { label: "Articles", href: "/ingredients" },
-      { label: "Factures", href: "/invoices" },
       { label: "Commandes", href: "/commandes" },
       { label: "Inventaire", href: "/inventaire" },
       { label: "Fiches techniques", href: "/recettes" },
