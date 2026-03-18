@@ -297,7 +297,114 @@ export default function DashboardPage() {
     );
   }
 
-  // ─── Admin / Direction dashboard ───
+  // ─── Admin / Direction: GROUP VIEW (synthese financiere) ───
+  if (isGroupView) {
+    return (
+      <div style={{ maxWidth: 600, margin: "0 auto", padding: "16px 16px 40px" }}>
+
+        {/* CA Groupe aujourd'hui */}
+        {hasCa && (
+          <div style={{
+            background: T.white, border: `1.5px solid ${T.border}`,
+            borderRadius: 14, padding: "16px 18px", marginBottom: 16,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <p style={{
+                  margin: 0, fontSize: 9, fontWeight: 700,
+                  letterSpacing: "0.16em", textTransform: "uppercase",
+                  color: T.muted, fontFamily: "DM Sans, sans-serif",
+                }}>CA Groupe aujourd&apos;hui</p>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 6 }}>
+                  <span style={{
+                    fontSize: 30, fontWeight: 700, color: T.dark,
+                    fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1,
+                  }}>
+                    {fmtEur(caTotal)} &euro;
+                  </span>
+                  {ca && ca.guestsNumber > 0 && (
+                    <span style={{ fontSize: 12, color: T.muted }}>{ca.guestsNumber} couv.</span>
+                  )}
+                </div>
+              </div>
+              <TileIcon name="pilotage" size={22} color={T.ifratelli} />
+            </div>
+
+            <div style={{ display: "flex", gap: 16, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.belloMio, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: T.muted }}>Bello Mio</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: T.belloMio, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
+                  {fmtEur(ca?.totalSales ?? 0)} &euro;
+                </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.piccolaMiaText, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: T.muted }}>Piccola Mia</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: T.piccolaMiaText, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
+                  {fmtEur(caPM ?? 0)} &euro;
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* KPI Cards — CA hier par etab */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: 10,
+          marginBottom: 20,
+        }}>
+          <KpiCard
+            label="CA hier groupe"
+            value={caYesterday != null ? `${fmtEur(caYesterday)}\u00A0\u20AC` : "\u2014"}
+            accent={T.terracotta}
+          />
+          <KpiCard
+            label="En service ce soir"
+            value={String(shiftsToday)}
+            accent={T.bleu}
+          />
+          <KpiCard
+            label="Ratio MS/CA"
+            value={"\u2014"}
+            sub="bientot"
+            accent={T.dore}
+          />
+        </div>
+
+        {/* Alertes (transversal) */}
+        {(alertCount > 0 || pendingCommandes > 0) && (
+          <div style={{ display: "grid", gap: 8, marginBottom: 20 }}>
+            {pendingCommandes > 0 && (
+              <TaskCard
+                href="/commandes"
+                icon="commandes"
+                title="Commandes en attente"
+                subtitle={`${pendingCommandes} commande${pendingCommandes > 1 ? "s" : ""} a valider`}
+                accent={T.sauge}
+                count={pendingCommandes}
+              />
+            )}
+            {alertCount > 0 && (
+              <TaskCard
+                href="/variations-prix"
+                icon="variations"
+                title="Alertes prix"
+                subtitle={`${alertCount} variation${alertCount > 1 ? "s" : ""} de prix detectee${alertCount > 1 ? "s" : ""}`}
+                accent={T.terracotta}
+                count={alertCount}
+              />
+            )}
+          </div>
+        )}
+
+      </div>
+    );
+  }
+
+  // ─── Admin / Direction: SINGLE ETAB VIEW (operationnel) ───
   return (
     <div style={{ maxWidth: 600, margin: "0 auto", padding: "16px 16px 40px" }}>
 
@@ -352,53 +459,6 @@ export default function DashboardPage() {
           accent={T.dore}
         />
       </div>
-
-      {/* CA Groupe (group view) */}
-      {isGroupView && hasCa && (
-        <div style={{
-          background: T.white, border: `1.5px solid ${T.border}`,
-          borderRadius: 14, padding: "16px 18px", marginBottom: 16,
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div>
-              <p style={{
-                margin: 0, fontSize: 9, fontWeight: 700,
-                letterSpacing: "0.16em", textTransform: "uppercase",
-                color: T.muted, fontFamily: "DM Sans, sans-serif",
-              }}>CA Groupe aujourd&apos;hui</p>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 6 }}>
-                <span style={{
-                  fontSize: 30, fontWeight: 700, color: T.dark,
-                  fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1,
-                }}>
-                  {fmtEur(caTotal)} &euro;
-                </span>
-                {ca && ca.guestsNumber > 0 && (
-                  <span style={{ fontSize: 12, color: T.muted }}>{ca.guestsNumber} couv.</span>
-                )}
-              </div>
-            </div>
-            <TileIcon name="pilotage" size={22} color={T.ifratelli} />
-          </div>
-
-          <div style={{ display: "flex", gap: 16, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.belloMio, flexShrink: 0 }} />
-              <span style={{ fontSize: 11, color: T.muted }}>Bello Mio</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: T.belloMio, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
-                {fmtEur(ca?.totalSales ?? 0)} &euro;
-              </span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.piccolaMiaText, flexShrink: 0 }} />
-              <span style={{ fontSize: 11, color: T.muted }}>Piccola Mia</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: T.piccolaMiaText, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
-                {fmtEur(caPM ?? 0)} &euro;
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Taches du jour section */}
       <SectionLabel>Taches du jour</SectionLabel>
