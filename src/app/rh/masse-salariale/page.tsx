@@ -8,20 +8,24 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
+type Contrat = {
+  id: string;
+  employe_id: string;
+  type: string;
+  heures_semaine: number;
+  salaire_brut: number | null;
+  remuneration: number | null;
+  taux_horaire: number | null;
+  actif: boolean;
+};
+
 type Employe = {
   id: string;
   prenom: string;
   nom: string;
   matricule: string | null;
   actif: boolean;
-  contrats: {
-    type: string;
-    heures_semaine: number;
-    salaire_brut: number | null;
-    remuneration: number | null;
-    taux_horaire: number | null;
-    actif: boolean;
-  }[];
+  contrats: Contrat[];
 };
 
 type EmpCost = {
@@ -136,15 +140,26 @@ export default function MasseSalarialePage() {
 
     (async () => {
       setLoading(true);
-      const { data } = await supabase
-        .from("employes")
-        .select("*, contrats(type, heures_semaine, salaire_brut, remuneration, taux_horaire, actif)")
-        .eq("etablissement_id", etab.id)
-        .eq("actif", true)
-        .order("nom");
+      const [empRes, contratRes] = await Promise.all([
+        supabase
+          .from("employes")
+          .select("*")
+          .eq("etablissement_id", etab.id)
+          .eq("actif", true)
+          .order("nom"),
+        supabase
+          .from("contrats")
+          .select("id, employe_id, type, heures_semaine, salaire_brut, remuneration, taux_horaire, actif")
+          .eq("actif", true),
+      ]);
 
       if (cancelled) return;
-      setEmployes((data ?? []) as Employe[]);
+      const contrats = (contratRes.data ?? []) as Contrat[];
+      const emps = (empRes.data ?? []).map((e: Record<string, unknown>) => ({
+        ...e,
+        contrats: contrats.filter((c) => c.employe_id === e.id),
+      })) as Employe[];
+      setEmployes(emps);
       setLoading(false);
     })();
 

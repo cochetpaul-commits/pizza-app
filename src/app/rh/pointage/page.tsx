@@ -7,13 +7,20 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
+type ContratPointage = {
+  id: string;
+  employe_id: string;
+  emploi: string | null;
+  actif: boolean;
+};
+
 type Employe = {
   id: string;
   prenom: string;
   nom: string;
   initiales: string | null;
   actif: boolean;
-  contrats: { emploi: string | null; actif: boolean }[] | null;
+  contrats: ContratPointage[] | null;
 };
 
 type Pointage = {
@@ -250,16 +257,24 @@ export default function PointagePage() {
     setLoading(true);
     setTableError(false);
 
-    const { data: empData } = await supabase
-      .from("employes")
-      .select(
-        "*, contrats(emploi, actif)"
-      )
-      .eq("etablissement_id", etab.id)
-      .eq("actif", true)
-      .order("nom");
+    const [empRes, contratRes] = await Promise.all([
+      supabase
+        .from("employes")
+        .select("*")
+        .eq("etablissement_id", etab.id)
+        .eq("actif", true)
+        .order("nom"),
+      supabase
+        .from("contrats")
+        .select("id, employe_id, emploi, actif")
+        .eq("actif", true),
+    ]);
 
-    const employes: Employe[] = (empData as Employe[] | null) ?? [];
+    const contratsData = (contratRes.data ?? []) as ContratPointage[];
+    const employes: Employe[] = (empRes.data ?? []).map((e: Record<string, unknown>) => ({
+      ...e,
+      contrats: contratsData.filter((c) => c.employe_id === e.id),
+    })) as Employe[];
     setAllEmployes(employes);
 
     // Fetch pointages
@@ -300,17 +315,25 @@ export default function PointagePage() {
       setLoading(true);
       setTableError(false);
 
-      const { data: empData } = await supabase
-        .from("employes")
-        .select(
-          "*, contrats(emploi, actif)"
-        )
-        .eq("etablissement_id", etab.id)
-        .eq("actif", true)
-        .order("nom");
+      const [empRes2, contratRes2] = await Promise.all([
+        supabase
+          .from("employes")
+          .select("*")
+          .eq("etablissement_id", etab.id)
+          .eq("actif", true)
+          .order("nom"),
+        supabase
+          .from("contrats")
+          .select("id, employe_id, emploi, actif")
+          .eq("actif", true),
+      ]);
 
       if (cancelled) return;
-      const employes: Employe[] = (empData as Employe[] | null) ?? [];
+      const contratsData2 = (contratRes2.data ?? []) as ContratPointage[];
+      const employes: Employe[] = (empRes2.data ?? []).map((e: Record<string, unknown>) => ({
+        ...e,
+        contrats: contratsData2.filter((c) => c.employe_id === e.id),
+      })) as Employe[];
       setAllEmployes(employes);
 
       const { data: pointages, error: pErr } = await supabase

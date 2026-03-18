@@ -18,6 +18,16 @@ import {
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
+type ContratRapport = {
+  id: string;
+  employe_id: string;
+  type: string;
+  heures_semaine: number;
+  date_debut: string | null;
+  date_fin: string | null;
+  actif: boolean;
+};
+
 type Employe = {
   id: string;
   prenom: string;
@@ -25,13 +35,7 @@ type Employe = {
   initiales: string | null;
   matricule: string | null;
   actif: boolean;
-  contrats: {
-    type: string;
-    heures_semaine: number;
-    date_debut: string | null;
-    date_fin: string | null;
-    actif: boolean;
-  }[];
+  contrats: ContratRapport[];
 };
 
 type Absence = {
@@ -109,13 +113,17 @@ export default function RapportsPage() {
       const prevYear = month === 0 ? year - 1 : year;
       const prevPeriode = `${prevYear}-${String(prevMonth + 1).padStart(2, "0")}`;
 
-      const [empRes, shiftsRes, absRes, compteursRes] = await Promise.all([
+      const [empRes, contratRes, shiftsRes, absRes, compteursRes] = await Promise.all([
         supabase
           .from("employes")
-          .select("*, contrats(type, heures_semaine, date_debut, date_fin, actif)")
+          .select("*")
           .eq("etablissement_id", etab.id)
           .eq("actif", true)
           .order("nom"),
+        supabase
+          .from("contrats")
+          .select("id, employe_id, type, heures_semaine, date_debut, date_fin, actif")
+          .eq("actif", true),
         supabase
           .from("shifts")
           .select("employe_id, date, heure_debut, heure_fin, pause_minutes")
@@ -137,7 +145,11 @@ export default function RapportsPage() {
 
       if (cancelled) return;
 
-      const employes = (empRes.data ?? []) as Employe[];
+      const contratsData = (contratRes.data ?? []) as ContratRapport[];
+      const employes = (empRes.data ?? []).map((e: Record<string, unknown>) => ({
+        ...e,
+        contrats: contratsData.filter((c) => c.employe_id === e.id),
+      })) as Employe[];
       const shifts = (shiftsRes.data ?? []) as (ShiftInput & { employe_id: string })[];
       const absences = (absRes.data ?? []) as Absence[];
 
