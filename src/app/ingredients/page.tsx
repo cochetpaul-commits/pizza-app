@@ -140,12 +140,11 @@ function IngredientsPageInner() {
   }, [offers]);
 
   const counts = useMemo(() => {
-    const c = { to_check: 0, validated: 0, unknown: 0, all: items.length };
+    const c = { to_check: 0, validated: 0, all: items.length };
     for (const x of items) {
       const s = (x.status ?? "to_check") as IngredientStatus;
-      if (s === "to_check") c.to_check += 1;
-      else if (s === "validated") c.validated += 1;
-      else if (s === "unknown") c.unknown += 1;
+      if (s === "validated") c.validated += 1;
+      else c.to_check += 1;
     }
     return c;
   }, [items]);
@@ -259,11 +258,6 @@ function IngredientsPageInner() {
       patch.status_note = null;
     }
     if (next === "to_check") { patch.status_note = null; patch.validated_at = null; patch.validated_by = null; }
-    if (next === "unknown") {
-      const note = prompt("Pourquoi incompris ? (optionnel)") ?? "";
-      patch.status_note = note.trim() ? note.trim() : null;
-      patch.validated_at = null; patch.validated_by = null;
-    }
     const r = await supabase.from("ingredients").update(patch).eq("id", id);
     if (r.error) { alert(r.error.message); return; }
     await mutate();
@@ -449,6 +443,25 @@ function IngredientsPageInner() {
     await mutate();
   }
 
+  const guessOrderUnit = useCallback((off: LatestOffer | undefined): string => {
+    if (!off) return "";
+    const kind = off.price_kind;
+    if (kind === "pack_composed" && off.pack_count && off.pack_each_qty && off.pack_each_unit) {
+      const u = off.pack_each_unit === "kg" ? "kg" : off.pack_each_unit === "l" ? "L" : "pcs";
+      return `colis ${off.pack_count} × ${off.pack_each_qty}${u}`;
+    }
+    if (kind === "pack_simple" && off.pack_total_qty && off.pack_unit) {
+      const u = off.pack_unit === "kg" ? "kg" : "L";
+      return `${off.pack_total_qty}${u}`;
+    }
+    if (kind === "unit") {
+      if (off.unit === "kg") return "kg";
+      if (off.unit === "l") return "L";
+      if (off.unit === "pc") return "pièce";
+    }
+    return "";
+  }, []);
+
   const startEdit = useCallback((x: Ingredient) => {
     const off = offersByIngredientId.get(x.id);
     const isPrep = x.category === "preparation";
@@ -470,9 +483,9 @@ function IngredientsPageInner() {
       packEachUnit: (off?.pack_each_unit ?? "l") as "kg" | "l" | "pc",
       packPieceWeightG: off?.piece_weight_g != null ? String(off.piece_weight_g) : "",
       allergens: parseAllergens(x.allergens),
-      orderUnitLabel: x.order_unit_label ?? "",
+      orderUnitLabel: x.order_unit_label || guessOrderUnit(off),
     });
-  }, [offersByIngredientId]);
+  }, [offersByIngredientId, guessOrderUnit]);
 
   function buildOfferFromEdit(ingredient_id: string, uid: string, ingEtabId?: string | null): OfferPayload | null {
     if (!edit) return null;
@@ -631,7 +644,6 @@ function IngredientsPageInner() {
     { t: "all"       as Tab, label: "Tous",         count: counts.all },
     { t: "validated" as Tab, label: "Validés",      count: counts.validated },
     { t: "to_check"  as Tab, label: "À contrôler",  count: counts.to_check },
-    { t: "unknown"   as Tab, label: "Incompris",    count: counts.unknown },
   ] as const;
 
   const headerBtnStyle: CSSProperties = {
@@ -721,16 +733,7 @@ function IngredientsPageInner() {
               transition: "all 0.15s",
             }}>{label} ({count})</button>
           ))}
-          {userId && (
-            <button onClick={() => setTab("variations" as Tab)} style={{
-              flexShrink: 0, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
-              borderRadius: 20, whiteSpace: "nowrap",
-              border: isVariations ? "1.5px solid #D4775A" : "1.5px solid #ddd6c8",
-              background: isVariations ? "#D4775A" : "#fff",
-              color: isVariations ? "#fff" : "#999",
-              transition: "all 0.15s",
-            }}>Variations prix</button>
-          )}
+          {/* Variations prix tab removed — accessible via sidebar */}
         </div>
 
         {!isVariations && (
@@ -755,8 +758,8 @@ function IngredientsPageInner() {
                 <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} style={{ accentColor: "#D4775A" }} />
                 Sans offre
               </label>
-              <button onClick={toggleAll} style={{ padding: "8px 14px", borderRadius: 20, border: "1.5px solid #ddd6c8", background: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                {allCollapsed ? "Tout deplier" : "Tout replier"}
+              <button onClick={toggleAll} title={allCollapsed ? "Tout déplier" : "Tout replier"} style={{ width: 34, height: 34, borderRadius: 20, border: "1.5px solid #ddd6c8", background: "white", fontSize: 16, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
+                {allCollapsed ? "▸▸" : "▾▾"}
               </button>
               <button onClick={reload} style={{ padding: "8px 12px", borderRadius: 20, border: "1.5px solid #ddd6c8", background: "white", fontSize: 14, cursor: "pointer" }}>
                 ↺

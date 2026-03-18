@@ -44,7 +44,6 @@ const BTN_ACTION: CSSProperties = {
 
 function stBadge(st: IngredientStatus) {
   if (st === "validated") return { bg: "#d1fae5", color: "#065f46", label: "Validé" };
-  if (st === "unknown")   return { bg: "rgba(234,88,12,0.10)", color: "#EA580C", label: "Incompris" };
   return { bg: "#fef3c7", color: "#92400e", label: "À contrôler" };
 }
 
@@ -193,7 +192,6 @@ export const IngredientRow = React.memo(function IngredientRow({
             <div style={{ display: "flex", gap: 4, marginTop: 5, flexWrap: "wrap" }}>
               <button onClick={() => onSetStatus(x.id, "to_check")} style={{ height: 22, padding: "0 8px", borderRadius: 5, border: "1px solid #e5ddd0", background: "white", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>À contrôler</button>
               <button disabled={!canValidate} onClick={() => { if (!canValidate) return; onSetStatus(x.id, "validated"); }} style={{ height: 22, padding: "0 8px", borderRadius: 5, border: "1px solid #4a6741", background: "rgba(74,103,65,0.08)", fontSize: 10, fontWeight: 600, cursor: canValidate ? "pointer" : "not-allowed", color: "#4a6741", opacity: !canValidate ? 0.4 : 1 }}>Valider</button>
-              <button onClick={() => onSetStatus(x.id, "unknown")} style={{ height: 22, padding: "0 8px", borderRadius: 5, border: "1px solid #e5ddd0", background: "white", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>Incompris</button>
             </div>
           )}
         </div>

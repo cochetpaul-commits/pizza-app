@@ -18,7 +18,7 @@ export const CATEGORIES = [
 export type Category = (typeof CATEGORIES)[number];
 
 export type PriceKind = "unit" | "pack_simple" | "pack_composed";
-export type IngredientStatus = "to_check" | "validated" | "unknown";
+export type IngredientStatus = "to_check" | "validated";
 export type Tab = IngredientStatus | "all";
 
 export const CAT_LABELS: Record<Category, string> = {
