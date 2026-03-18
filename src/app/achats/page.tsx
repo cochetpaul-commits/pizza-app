@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -28,11 +29,17 @@ type InvoiceLine = {
   total_price: number | null;
 };
 
-type Tab = "factures" | "stats";
+type Tab = "factures" | "stats" | "fournisseurs";
 type PeriodKey = "1" | "3" | "6" | "12";
 
 type SupplierStat = { name: string; totalHT: number; nbFactures: number; pct: number };
 type MonthBar = { label: string; total: number; pct: number };
+
+type SupplierRow = {
+  id: string; name: string; is_active: boolean;
+  email: string | null; phone: string | null; contact_name: string | null;
+};
+type SupplierInfo = { refCount: number; lastImport: string | null; lastImportNumber: string | null };
 
 /* ── Helpers ── */
 
@@ -80,6 +87,11 @@ export default function AchatsPage() {
     totalHT: number; avgMonthly: number; nbSuppliers: number; nbFactures: number;
     topSuppliers: SupplierStat[]; monthBars: MonthBar[];
   }>({ totalHT: 0, avgMonthly: 0, nbSuppliers: 0, nbFactures: 0, topSuppliers: [], monthBars: [] });
+
+  // ── Fournisseurs state ──
+  const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
+  const [supplierStats, setSupplierStats] = useState<Map<string, SupplierInfo>>(new Map());
+  const [suppliersLoading, setSuppliersLoading] = useState(false);
 
   // ── Load factures ──
   useEffect(() => {
@@ -188,6 +200,51 @@ export default function AchatsPage() {
     })();
   }, [tab, period, etab]);
 
+  // ── Load fournisseurs ──
+  useEffect(() => {
+    if (tab !== "fournisseurs") return;
+    (async () => {
+      setSuppliersLoading(true);
+      const [supRes, offRes, invRes] = await Promise.all([
+        supabase.from("suppliers").select("id,name,is_active,email,phone,contact_name").order("name"),
+        supabase.from("v_latest_offers").select("supplier_id"),
+        supabase.from("supplier_invoices").select("supplier_id,created_at,invoice_number").order("created_at", { ascending: false }),
+      ]);
+
+      const rawRows = (supRes.data ?? []) as SupplierRow[];
+      const seen = new Map<string, { canonical: SupplierRow; aliasIds: string[] }>();
+      for (const s of rawRows) {
+        const key = s.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        if (!seen.has(key)) seen.set(key, { canonical: s, aliasIds: [s.id] });
+        else seen.get(key)!.aliasIds.push(s.id);
+      }
+      setSuppliers(Array.from(seen.values()).map((v) => v.canonical));
+
+      const offerCounts = new Map<string, number>();
+      for (const o of (offRes.data ?? [])) {
+        if (o.supplier_id) offerCounts.set(o.supplier_id, (offerCounts.get(o.supplier_id) ?? 0) + 1);
+      }
+      const lastImports = new Map<string, { created_at: string; invoice_number: string | null }>();
+      for (const inv of (invRes.data ?? [])) {
+        if (inv.supplier_id && !lastImports.has(inv.supplier_id))
+          lastImports.set(inv.supplier_id, { created_at: inv.created_at, invoice_number: inv.invoice_number });
+      }
+
+      const m = new Map<string, SupplierInfo>();
+      for (const { canonical, aliasIds } of seen.values()) {
+        let refCount = 0; let lastImport: string | null = null; let lastImportNumber: string | null = null;
+        for (const aid of aliasIds) {
+          refCount += offerCounts.get(aid) ?? 0;
+          const li = lastImports.get(aid);
+          if (li && (!lastImport || li.created_at > lastImport)) { lastImport = li.created_at; lastImportNumber = li.invoice_number; }
+        }
+        m.set(canonical.id, { refCount, lastImport, lastImportNumber });
+      }
+      setSupplierStats(m);
+      setSuppliersLoading(false);
+    })();
+  }, [tab, etab]);
+
   // ── Folders ──
   const folders = useMemo(() => {
     const grouped: Record<string, { name: string; invoices: InvoiceRow[] }> = {};
@@ -244,6 +301,7 @@ export default function AchatsPage() {
         <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
           {tabBtn("factures", "Factures")}
           {tabBtn("stats", "Statistiques")}
+          {tabBtn("fournisseurs", "Fournisseurs")}
         </div>
 
         {/* ═══ TAB: FACTURES ═══ */}
@@ -494,6 +552,59 @@ export default function AchatsPage() {
               </>
             )}
           </>
+        )}
+
+        {/* ═══ TAB: FOURNISSEURS ═══ */}
+        {tab === "fournisseurs" && (
+          suppliersLoading ? (
+            <p style={{ color: "#999", fontSize: 14, textAlign: "center", marginTop: 40 }}>Chargement...</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {suppliers.filter((s) => s.is_active).map((s) => {
+                const st = supplierStats.get(s.id);
+                return (
+                  <div key={s.id} style={{ border: "1px solid #ddd6c8", borderRadius: 10, padding: "14px 16px", background: "#fff" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <Link
+                          href={`/fournisseurs/${s.id}`}
+                          style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 700, fontSize: 15, color: "#D4775A", textDecoration: "none" }}
+                        >
+                          {s.name}
+                        </Link>
+                        <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginTop: 4 }}>
+                          {s.contact_name || s.email || s.phone
+                            ? [s.contact_name, s.email, s.phone].filter(Boolean).join(" · ")
+                            : "Coordonnees non renseignees"}
+                        </div>
+                        <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, marginTop: 6, display: "flex", gap: 12, flexWrap: "wrap" }}>
+                          <span><strong>{st?.refCount ?? 0}</strong> <span style={{ color: "#999" }}>ref.</span></span>
+                          <span style={{ color: "#999", fontSize: 12 }}>
+                            {st?.lastImport
+                              ? `Import : ${new Date(st.lastImport).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}${st.lastImportNumber ? ` · ${st.lastImportNumber}` : ""}`
+                              : "Aucun import"}
+                          </span>
+                        </div>
+                      </div>
+                      <Link
+                        href={`/fournisseurs/${s.id}`}
+                        style={{
+                          fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600,
+                          background: "#e27f57", color: "#fff", borderRadius: 20,
+                          padding: "7px 16px", textDecoration: "none", whiteSpace: "nowrap",
+                        }}
+                      >
+                        Fiche
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+              {suppliers.filter((s) => s.is_active).length === 0 && (
+                <p style={{ color: "#999", fontSize: 14, textAlign: "center" }}>Aucun fournisseur actif.</p>
+              )}
+            </div>
+          )
         )}
       </div>
     </RequireRole>

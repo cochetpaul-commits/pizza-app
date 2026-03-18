@@ -48,7 +48,6 @@ export const SIDEBAR_NAV: NavSection[] = [
       { label: "Achats", href: "/achats" },
       { label: "Variations & alertes", href: "/variations-prix" },
       { label: "Pilotage", href: "/pilotage" },
-      { label: "Fournisseurs", href: "/fournisseurs" },
       { label: "Articles", href: "/ingredients" },
       { label: "Commandes", href: "/commandes" },
       { label: "Inventaire", href: "/inventaire" },
