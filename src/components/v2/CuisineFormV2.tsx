@@ -18,6 +18,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
 import { PricingBlock } from "./PricingBlock";
+import { GestionTab } from "./GestionTab";
 import { StepperInput } from "@/components/StepperInput";
 import type { Ingredient, Category } from "@/types/ingredients";
 import type { CpuByUnit } from "@/lib/offerPricing";
@@ -81,6 +82,9 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
   const [prodMode, setProdMode] = useState(initialProdMode ?? false);
   const [pivotIngredientId, setPivotIngredientId] = useState<string | null>(null);
   const [prodQty, setProdQty] = useState<number | "">("");
+
+  // Main tab
+  const [mainTab, setMainTab] = useState<"recette" | "gestion">("recette");
 
   // Save state
   const [saving, setSaving] = useState(false);
@@ -583,8 +587,43 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
           {actionButtons}
         </div>
 
+        {/* ── Main tab bar ── */}
+        {isEdit && (
+          <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
+            {(["recette", "gestion"] as const).map((t) => (
+              <button key={t} type="button" onClick={() => setMainTab(t)} style={{
+                padding: "8px 18px", borderRadius: 20, fontSize: 13, fontWeight: 700,
+                cursor: "pointer", transition: "all 0.15s",
+                border: mainTab === t ? "2px solid #D4775A" : "1.5px solid #ddd6c8",
+                background: mainTab === t ? "#D4775A" : "#fff",
+                color: mainTab === t ? "#fff" : "#666",
+              }}>
+                {t === "recette" ? "Recette" : "Gestion"}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ── GESTION TAB ── */}
+        {mainTab === "gestion" && isEdit && recipeId && (
+          <GestionTab
+            recipeId={recipeId}
+            recipeType="cuisine"
+            lines={lines}
+            ingredients={ingredients}
+            priceByIngredient={priceByIngredient}
+            totalCost={totalCost}
+            sellPrice={typeof sellPrice === "number" ? sellPrice : null}
+            onSellPriceChange={(p) => setSellPrice(p)}
+            portionsCount={typeof portionsCount === "number" ? portionsCount : null}
+            yieldGrams={typeof yieldGrams === "number" ? yieldGrams : null}
+            etablissementId={etab?.id}
+            recipeName={name}
+          />
+        )}
+
         {/* ── MODE PRODUCTION ── */}
-        {prodMode ? (
+        {mainTab !== "recette" ? null : prodMode ? (
           <>
             {/* Banner */}
             <div style={{

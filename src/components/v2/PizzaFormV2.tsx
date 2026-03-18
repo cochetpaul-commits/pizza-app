@@ -18,6 +18,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
 import { PricingBlock } from "./PricingBlock";
+import { GestionTab } from "./GestionTab";
 import { StepperInput } from "@/components/StepperInput";
 import type { Ingredient } from "@/types/ingredients";
 import type { CpuByUnit } from "@/lib/offerPricing";
@@ -85,6 +86,9 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   // Pricing
   const [vatRate, setVatRate] = useState(0.1);
   const [marginRate, setMarginRate] = useState("75");
+
+  // Tabs
+  const [mainTab, setMainTab] = useState<"recette" | "gestion">("recette");
 
   // Production mode
   const [prodMode, setProdMode] = useState(initialProdMode ?? false);
@@ -491,8 +495,41 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
           {actionButtons}
         </div>
 
+        {isEdit && (
+          <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
+            {(["recette", "gestion"] as const).map((t) => (
+              <button key={t} type="button" onClick={() => setMainTab(t)} style={{
+                padding: "8px 18px", borderRadius: 20, fontSize: 13, fontWeight: 700,
+                cursor: "pointer", transition: "all 0.15s",
+                border: mainTab === t ? "2px solid #D4775A" : "1.5px solid #ddd6c8",
+                background: mainTab === t ? "#D4775A" : "#fff",
+                color: mainTab === t ? "#fff" : "#666",
+              }}>
+                {t === "recette" ? "Recette" : "Gestion"}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {mainTab === "gestion" && isEdit && pizzaId && (
+          <GestionTab
+            recipeId={pizzaId}
+            recipeType="pizza"
+            lines={allLines}
+            ingredients={ingredients}
+            priceByIngredient={priceByIngredient}
+            totalCost={totalCost}
+            sellPrice={typeof sellPrice === "number" ? sellPrice : null}
+            onSellPriceChange={(p) => setSellPrice(p)}
+            portionsCount={null}
+            yieldGrams={ballWeightG !== "" ? Number(ballWeightG) : null}
+            etablissementId={etab?.id}
+            recipeName={name}
+          />
+        )}
+
         {/* ── MODE PRODUCTION ── */}
-        {prodMode ? (
+        {mainTab !== "recette" ? null : prodMode ? (
           <>
             <div style={{
               background: "#4a6741", color: "white", borderRadius: 12,

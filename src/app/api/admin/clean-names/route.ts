@@ -2,6 +2,44 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 /**
+ * GET /api/admin/clean-names
+ * Diagnose ingredients with date-like names — show linked offers/invoice lines to identify them.
+ */
+export async function GET() {
+  const { data: allIngredients } = await supabaseAdmin
+    .from("ingredients")
+    .select("id, name, supplier_id, supplier_sku");
+
+  // Find ingredients whose name looks like a date or is very short/numeric
+  const suspect = (allIngredients ?? []).filter((i) =>
+    /^\d{1,2}\/\d/.test(i.name) || /^\d+$/.test(i.name.trim())
+  );
+
+  const results = [];
+  for (const ing of suspect) {
+    // Get linked supplier_offers
+    const { data: offers } = await supabaseAdmin
+      .from("supplier_offers")
+      .select("id, supplier_label, supplier_sku, unit_price, price_kind, unit")
+      .eq("ingredient_id", ing.id);
+
+    // Get linked invoice lines by sku
+    const { data: invoiceLines } = await supabaseAdmin
+      .from("supplier_invoice_lines")
+      .select("id, name, sku, quantity, unit_price, invoice_id")
+      .eq("ingredient_id", ing.id);
+
+    results.push({
+      ingredient: ing,
+      offers: offers ?? [],
+      invoice_lines: invoiceLines ?? [],
+    });
+  }
+
+  return NextResponse.json({ suspect_count: results.length, results });
+}
+
+/**
  * POST /api/admin/clean-names
  * One-shot: clean ingredient names that have leading date/number noise from MAEL imports.
  * Also cleans supplier_offers.supplier_label and supplier_invoice_lines.name.
