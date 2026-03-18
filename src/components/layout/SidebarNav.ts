@@ -46,7 +46,6 @@ export const SIDEBAR_NAV: NavSection[] = [
     roles: ["group_admin"],
     items: [
       { label: "Achats", href: "/achats" },
-      { label: "Stats d'achats", href: "/stats-achats" },
       { label: "Variations & alertes", href: "/variations-prix" },
       { label: "Operations", href: "/pilotage" },
       { label: "Fournisseurs", href: "/fournisseurs" },
