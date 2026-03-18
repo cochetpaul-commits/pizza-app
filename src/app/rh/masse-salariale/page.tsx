@@ -138,7 +138,7 @@ export default function MasseSalarialePage() {
       setLoading(true);
       const { data } = await supabase
         .from("employes")
-        .select("id, prenom, nom, matricule, actif, contrats(type, heures_semaine, salaire_brut, remuneration, taux_horaire, actif)")
+        .select("*, contrats(type, heures_semaine, salaire_brut, remuneration, taux_horaire, actif)")
         .eq("etablissement_id", etab.id)
         .eq("actif", true)
         .order("nom");

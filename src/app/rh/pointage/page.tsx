@@ -253,7 +253,7 @@ export default function PointagePage() {
     const { data: empData } = await supabase
       .from("employes")
       .select(
-        "id, prenom, nom, initiales, actif, contrats(emploi, actif)"
+        "*, contrats(emploi, actif)"
       )
       .eq("etablissement_id", etab.id)
       .eq("actif", true)
@@ -303,7 +303,7 @@ export default function PointagePage() {
       const { data: empData } = await supabase
         .from("employes")
         .select(
-          "id, prenom, nom, initiales, actif, contrats(emploi, actif)"
+          "*, contrats(emploi, actif)"
         )
         .eq("etablissement_id", etab.id)
         .eq("actif", true)

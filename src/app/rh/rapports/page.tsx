@@ -112,7 +112,7 @@ export default function RapportsPage() {
       const [empRes, shiftsRes, absRes, compteursRes] = await Promise.all([
         supabase
           .from("employes")
-          .select("id, prenom, nom, initiales, matricule, actif, contrats(type, heures_semaine, date_debut, date_fin, actif)")
+          .select("*, contrats(type, heures_semaine, date_debut, date_fin, actif)")
           .eq("etablissement_id", etab.id)
           .eq("actif", true)
           .order("nom"),
