@@ -586,6 +586,12 @@ function IngredientsPageInner() {
 
   const del = useCallback(async (id: string, name: string) => {
     if (!confirm(`Supprimer "${name}" ?`)) return;
+    // Check if ingredient is used in commande_lignes
+    const { count } = await supabase.from("commande_lignes").select("id", { count: "exact", head: true }).eq("ingredient_id", id);
+    if (count && count > 0) {
+      alert(`Impossible de supprimer "${name}" : utilisé dans ${count} ligne(s) de commande. Supprimez d'abord les commandes associées ou changez le statut en "inactif".`);
+      return;
+    }
     const d1 = await supabase.from("supplier_offers").delete().eq("ingredient_id", id);
     if (d1.error) { alert(d1.error.message); return; }
     const d2 = await supabase.from("ingredients").delete().eq("id", id);
