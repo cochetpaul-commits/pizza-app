@@ -2,13 +2,11 @@
 
 import { offerRowToCpu } from "@/lib/offerPricing";
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { calculerPate } from "@/lib/pateEngine";
 import { TopNav } from "@/components/TopNav";
-import { NavBar } from "@/components/NavBar";
 import NumberStepper from "@/components/NumberStepper";
-import { fetchApi } from "@/lib/fetchApi";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 
 function isUuid(v: string) {
@@ -132,7 +130,6 @@ function bestMatchByAliases(ings: IngredientRow[], aliases: string[]) {
 export default function RecipePage() {
   const params = useParams();
   const id = (params?.id as string) || "";
-  const router = useRouter();
   const isNew = id === "new";
 
   const [state, setState] = useState<{
@@ -162,8 +159,8 @@ export default function RecipePage() {
     procedure: string;
   } | null>(null);
 
-  const [saveState, setSaveState] = useState<{ saving: boolean; error?: unknown; ok?: boolean }>({ saving: false });
-  const [pdfState, setPdfState] = useState<{ exporting: boolean; error?: unknown; ok?: boolean }>({ exporting: false });
+  const [saveState] = useState<{ saving: boolean; error?: unknown; ok?: boolean }>({ saving: false });
+  const [pdfState] = useState<{ exporting: boolean; error?: unknown; ok?: boolean }>({ exporting: false });
 
   const [vatRate, setVatRate] = useState<string>("10");
   const [marginRate, setMarginRate] = useState<string>("75");
@@ -484,197 +481,44 @@ export default function RecipePage() {
     run();
   }, [id, isNew]);
 
-  const saveRecipe = async () => {
-    // IMPORTANT: aucun autosave ici. Cette fonction ne doit être appelée QUE par le bouton.
-    if (state.status !== "OK") return;
-    if (!form) return;
-
-    if (!form.name || !form.name.trim()) {
-      setSaveState({ saving: false, error: { message: "Le nom de l'empâtement est obligatoire" } });
-      return;
-    }
-
-    setSaveState({ saving: true, error: null, ok: false });
-
-    const hydration = clamp(toNumSafe(form.hydration_total, 65), 0, 120);
-    const salt = clamp(toNumSafe(form.salt_percent, 2), 0, 10);
-    const honey = clamp(toNumSafe(form.honey_percent, 0), 0, 20);
-    const oil = clamp(toNumSafe(form.oil_percent, 0), 0, 20);
-    const yeastUi = clamp(toNumSafe(form.yeast_ui, 0), 0, 10);
-
-    const aPctRaw = clamp(toNumSafe(form.flourA_percent, 80), 0, 100);
-    const bPctRaw = clamp(toNumSafe(form.flourB_percent, 20), 0, 100);
-    const norm = normalize2To100(aPctRaw, bPctRaw);
-
-    const aId = String(form.flourA_id ?? "");
-    const bId = String(form.flourB_id ?? "");
-    const aName = ingredients.find((x) => String(x.id) === aId)?.name ?? "Farine A";
-    const bName = ingredients.find((x) => String(x.id) === bId)?.name ?? "Farine B";
-
-    const flour_mix: FlourMixItem[] = [
-      { name: String(aName), percent: norm.a, ingredient_id: aId || null },
-      { name: String(bName), percent: norm.b, ingredient_id: bId || null },
-    ];
-
-    const payload: Record<string, unknown> = {
-      name: form.name.trim(),
-      type: form.type,
-      hydration_total: hydration,
-      salt_percent: salt,
-      honey_percent: honey,
-      oil_percent: oil,
-      flour_mix,
-      balls_count: nbPatons,
-      ball_weight: poidsPaton,
-      procedure: (form.procedure ?? "").toString(),
-      total_cost: round2(costing.totalCost),
-      yield_grams: Math.round(costing.yieldGrams),
-      updated_at: new Date().toISOString(),
-    };
-
-    if (form.type === "biga") {
-      payload.biga_yeast_percent = yeastUi;
-      payload.yeast_percent = 0;
-    } else {
-      payload.yeast_percent = yeastUi;
-      payload.biga_yeast_percent = 0;
-    }
-
-    if (isNew) {
-      const { data: authData } = await supabase.auth.getUser();
-      const uid = authData.user?.id ?? null;
-      const res = await supabase.from("recipes").insert({ ...payload, user_id: uid }).select("id").single();
-      if (res.error) { setSaveState({ saving: false, error: res.error }); return; }
-      const newId = res.data ? (res.data as Record<string, string>).id : null;
-      if (!newId) { setSaveState({ saving: false, error: { message: "ID manquant" } }); return; }
-      router.replace("/recipes/" + newId);
-      return;
-    }
-
-    const { error } = await supabase.from("recipes").update(payload).eq("id", id);
-    if (error) {
-      setSaveState({ saving: false, error });
-      return;
-    }
-
-    // met à jour le titre "officiel" (r.name) uniquement après sauvegarde
-    setState((p) => (p.status === "OK" && p.recipe ? { ...p, recipe: { ...p.recipe, name: form.name.trim(), type: form.type } } : p));
-
-    setSaveState({ saving: false, ok: true });
-    setTimeout(() => setSaveState((p) => ({ ...p, ok: false })), 1200);
-  };
-
-  const exportPdf = async () => {
-    try {
-      if (!id) return;
-      setPdfState({ exporting: true, error: null, ok: false });
-
-      const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
-      if (sessErr) throw new Error(sessErr.message);
-
-      const token = sessionData.session?.access_token;
-      if (!token) throw new Error("Session invalide (token manquant)");
-
-      const res = await fetchApi("/api/recipes/pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ recipeId: id, nbPatons, poidsPaton }),
-      });
-
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        throw new Error(txt ? `HTTP ${res.status} — ${txt}` : `HTTP ${res.status}`);
-      }
-
-      const blob = await res.blob();
-      const cd = res.headers.get("content-disposition") || "";
-      const match = cd.match(/filename="([^"]+)"/i);
-      const filename = match?.[1] || `empatement-${id}.pdf`;
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 800);
-
-      setPdfState({ exporting: false, ok: true });
-      setTimeout(() => setPdfState((p) => ({ ...p, ok: false })), 900);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : String(e);
-      setPdfState({ exporting: false, error: { message: "Export PDF impossible", details: msg } });
-    }
-  };
-
   if (state.status === "loading") {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=empatement" backLabel="Empâtement" />
-        <main className="container">
-          <TopNav title="Empâtement" subtitle="Chargement…" />
-          <p className="muted">Chargement…</p>
-        </main>
-      </>
+      <main className="container">
+        <TopNav title="Empâtement" subtitle="Chargement…" />
+        <p className="muted">Chargement…</p>
+      </main>
     );
   }
 
   if (state.status === "NOT_LOGGED") {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=empatement" backLabel="Empâtement" />
-        <main className="container">
-          <TopNav title="Empâtement" subtitle="Connexion requise" />
-          <p className="muted">NOT_LOGGED</p>
-        </main>
-      </>
+      <main className="container">
+        <TopNav title="Empâtement" subtitle="Connexion requise" />
+        <p className="muted">NOT_LOGGED</p>
+      </main>
     );
   }
 
   if (state.status === "ERROR") {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=empatement" backLabel="Empâtement" />
-        <main className="container">
-          <TopNav title="Empâtement" subtitle="Erreur" />
-          <pre className="code">{JSON.stringify(state.error, null, 2)}</pre>
-        </main>
-      </>
+      <main className="container">
+        <TopNav title="Empâtement" subtitle="Erreur" />
+        <pre className="code">{JSON.stringify(state.error, null, 2)}</pre>
+      </main>
     );
   }
 
   const r = state.recipe ?? null;
   if (!form) {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=empatement" backLabel="Empâtement" />
-        <main className="container">
-          <TopNav title={r?.name ?? "Empâtement"} subtitle="Chargement…" />
-          <p className="muted">Chargement…</p>
-        </main>
-      </>
+      <main className="container">
+        <TopNav title={r?.name ?? "Empâtement"} subtitle="Chargement…" />
+        <p className="muted">Chargement…</p>
+      </main>
     );
   }
 
   return (
-    <>
-    <NavBar
-      backHref="/recettes?tab=empatement"
-      backLabel="Empâtement"
-      right={
-        <>
-          <button className="btn btnPrimary" type="button" onClick={saveRecipe} disabled={saveState.saving || pdfState.exporting}>
-            {saveState.saving ? "Sauvegarde…" : saveState.ok ? "OK" : "Sauvegarder"}
-          </button>
-          {!isNew && (
-            <button className="btn" type="button" onClick={exportPdf} disabled={saveState.saving || pdfState.exporting}>
-              {pdfState.exporting ? "PDF…" : pdfState.ok ? "OK" : "Télécharger (PDF)"}
-            </button>
-          )}
-        </>
-      }
-    />
     <main className="container">
       <TopNav
         title={r ? r.name : (form.name.trim() || "Nouvel empâtement")}
@@ -976,6 +820,5 @@ export default function RecipePage() {
       </div>
 
     </main>
-    </>
   );
 }

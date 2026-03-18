@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { NavBar } from "@/components/NavBar";
+
 import { useNotifications, type Notification } from "@/hooks/useNotifications";
 import { fetchApi } from "@/lib/fetchApi";
 import {
@@ -157,7 +157,6 @@ export default function NotificationsPage() {
 
   return (
     <>
-      <NavBar backHref="/" backLabel="Accueil" />
       <main style={{ maxWidth: 600, margin: "0 auto", padding: "16px 16px 60px" }}>
         <PushToggle />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { NavBar } from "@/components/NavBar";
+
 import { RequireRole } from "@/components/RequireRole";
 import { fetchApi } from "@/lib/fetchApi";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -65,8 +65,7 @@ type Step = "upload" | "confirm" | "preview" | "done";
 
 export default function InvoicesPage() {
   const fileRef = useRef<HTMLInputElement>(null);
-  const { current: etab, etablissements } = useEtablissement();
-  const gestionHref = etab?.slug === "piccola_mia" ? "/piccola-mia/gestion" : "/bello-mio/gestion";
+  const { etablissements } = useEtablissement();
 
   const [step, setStep] = useState<Step>("upload");
   const [file, setFile] = useState<File | null>(null);
@@ -201,7 +200,6 @@ export default function InvoicesPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <NavBar backHref={gestionHref} backLabel="Gestion" />
       <div style={pageStyle}>
         <h1 style={h1Style}>Import factures</h1>
 

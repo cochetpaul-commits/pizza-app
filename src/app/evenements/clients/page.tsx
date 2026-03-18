@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { NavBar } from "@/components/NavBar";
+
 import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -34,6 +34,7 @@ export default function ClientsPage() {
   const [saving, setSaving] = useState(false);
 
   const [reloadKey, setReloadKey] = useState(0);
+  const [tableError, setTableError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,8 +42,13 @@ export default function ClientsPage() {
       .from("clients")
       .select("*")
       .order("nom")
-      .then(({ data }) => {
+      .then(({ data, error }) => {
         if (cancelled) return;
+        if (error) {
+          setTableError(true);
+          setLoading(false);
+          return;
+        }
         setClients((data ?? []) as Client[]);
         setLoading(false);
       });
@@ -50,12 +56,6 @@ export default function ClientsPage() {
   }, [reloadKey]);
 
   const reload = () => setReloadKey(k => k + 1);
-
-  const openNew = () => {
-    setEditing(null);
-    setForm(empty);
-    setShowForm(true);
-  };
 
   const openEdit = (c: Client) => {
     setEditing(c.id);
@@ -99,17 +99,14 @@ export default function ClientsPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <NavBar
-        backHref="/piccola-mia/evenements"
-        backLabel="Evenements"
-        primaryAction={
-          <button type="button" className="btn" style={addBtn} onClick={openNew}>
-            + Client
-          </button>
-        }
-      />
       <div style={{ maxWidth: 600, margin: "0 auto", padding: "20px 16px 40px" }}>
         <h1 style={heading}>Clients</h1>
+
+        {tableError && (
+          <div style={{ background: "#FFF3E0", border: "1px solid #FFB74D", borderRadius: 10, padding: "10px 16px", marginBottom: 16, fontSize: 13, color: "#E65100" }}>
+            Table &quot;clients&quot; non configuree — cette fonctionnalite n&apos;est pas encore disponible.
+          </div>
+        )}
 
         {loading && <p style={{ color: "#999", fontSize: 13 }}>Chargement...</p>}
 
@@ -209,17 +206,6 @@ const heading: React.CSSProperties = {
   textTransform: "uppercase",
 };
 
-const addBtn: React.CSSProperties = {
-  background: "#D4775A",
-  color: "#fff",
-  border: "none",
-  borderRadius: 20,
-  padding: "0 16px",
-  height: 32,
-  fontSize: 12,
-  fontWeight: 700,
-  cursor: "pointer",
-};
 
 const tableStyle: React.CSSProperties = {
   width: "100%",

@@ -1,4 +1,4 @@
-export type AppRole = "group_admin" | "cuisine" | "salle" | "plonge";
+export type AppRole = "group_admin" | "manager" | "cuisine" | "salle" | "plonge";
 
 export const PERMISSIONS: Record<AppRole, string[]> = {
   group_admin: [
@@ -9,6 +9,15 @@ export const PERMISSIONS: Record<AppRole, string[]> = {
     "planning.view", "planning.edit",
     "pilotage", "finances", "evenements", "admin",
     "rh", "factures",
+  ],
+  manager: [
+    "dashboard", "catalogue.view",
+    "ingredients.view", "recettes.view", "recettes.edit",
+    "commandes.view", "commandes.saisir", "commandes.valider",
+    "fournisseurs.view",
+    "planning.view", "planning.edit",
+    "rh.pointage", "rh.conges", "rh.equipe.view",
+    "evenements.view",
   ],
   cuisine: [
     "dashboard", "catalogue.view",

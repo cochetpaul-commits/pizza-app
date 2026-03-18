@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { NavBar } from "@/components/NavBar";
+
 import { RequireRole } from "@/components/RequireRole";
 import { StepperInput } from "@/components/StepperInput";
 import { useProfile } from "@/lib/ProfileContext";
@@ -885,14 +885,6 @@ function CommandesPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin", "cuisine", "salle"]}>
-      <NavBar
-        backHref={
-          (etab?.slug === "piccola_mia" || etab?.slug === "piccola-mia") ? "/piccola-mia/cuisine"
-          : (etab?.slug === "bello_mio" || etab?.slug === "bello-mio") ? "/bello-mio/cuisine"
-          : "/"
-        }
-        backLabel="Cuisine"
-      />
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px", background: "#f2ede4", minHeight: "100vh" }}>
         <h1 style={{
           fontFamily: "var(--font-oswald), 'Oswald', sans-serif",

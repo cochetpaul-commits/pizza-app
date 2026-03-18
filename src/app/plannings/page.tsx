@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { NavBar } from "@/components/NavBar";
+
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
@@ -359,42 +359,6 @@ export default function PlanningPage() {
     setShowModal(false);
   };
 
-  /* ── Duplicate previous week ── */
-  const duplicateWeek = async () => {
-    if (!etab || !confirm("Dupliquer les shifts de la semaine precedente ?")) return;
-    setSaving(true);
-    const prevMonday = toISO(addDays(weekStart, -7));
-    const prevSunday = toISO(addDays(weekStart, -1));
-
-    const { data: prevShifts } = await supabase
-      .from("shifts")
-      .select("employe_id, poste_id, date, heure_debut, heure_fin, pause_minutes, note")
-      .eq("etablissement_id", etab.id)
-      .gte("date", prevMonday)
-      .lte("date", prevSunday);
-
-    if (!prevShifts || prevShifts.length === 0) {
-      alert("Aucun shift la semaine precedente.");
-      setSaving(false);
-      return;
-    }
-
-    const newShifts = prevShifts.map((s) => {
-      const oldDate = new Date(s.date + "T00:00:00");
-      const dayOffset = Math.round((oldDate.getTime() - new Date(prevMonday + "T00:00:00").getTime()) / 86400000);
-      return {
-        ...s,
-        etablissement_id: etab.id,
-        date: toISO(addDays(weekStart, dayOffset)),
-        statut: "brouillon",
-      };
-    });
-
-    const { data: inserted } = await supabase.from("shifts").insert(newShifts).select();
-    if (inserted) setShifts((prev) => [...prev, ...inserted]);
-    setSaving(false);
-  };
-
   /* ── Duplicate a single day → next day ── */
   const duplicateDay = async (dayIndex: number) => {
     if (!etab) return;
@@ -509,14 +473,6 @@ export default function PlanningPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin", "cuisine", "salle"]}>
-      <NavBar
-        backHref="/rh/equipe"
-        backLabel="Equipe"
-        menuItems={canWrite ? [
-          { label: "Dupliquer S-1", onClick: duplicateWeek, disabled: saving },
-        ] : undefined}
-      />
-
       <div style={pageStyle}>
         {/* ── Week navigation ── */}
         <div style={weekNav}>

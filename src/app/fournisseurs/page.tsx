@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
-import { NavBar } from "@/components/NavBar";
+
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 
@@ -167,7 +167,6 @@ export default function FournisseursPage() {
   return (
     <RequireRole allowedRoles={["group_admin", "cuisine", "salle"]}>
     <>
-      <NavBar />
       <main style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 26, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", letterSpacing: 1.5, textTransform: "uppercase" as const }}>Fournisseurs</div>

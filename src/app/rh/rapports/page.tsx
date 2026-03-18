@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
@@ -81,7 +80,6 @@ function downloadCSV(csv: string, filename: string) {
 
 export default function RapportsPage() {
   const { current: etab } = useEtablissement();
-  const gestionHref = etab?.slug === "piccola_mia" ? "/piccola-mia/gestion" : "/bello-mio/gestion";
   const { canWrite } = useProfile();
 
   const now = new Date();
@@ -308,17 +306,18 @@ export default function RapportsPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <NavBar
-        backHref={gestionHref}
-        backLabel="Gestion"
-        menuItems={canWrite ? [
-          { label: saving ? "Enregistrement..." : "Valider compteurs", onClick: handleSaveCompteurs },
-          { label: "Export SILAE", onClick: handleExportSilae },
-          { label: "Export recap CSV", onClick: handleExportRecap },
-        ] : undefined}
-      />
-
       <div style={pageStyle}>
+        {/* ── Action buttons ── */}
+        {canWrite && (
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+            <button type="button" className="btn" onClick={handleSaveCompteurs} disabled={saving}>
+              {saving ? "Enregistrement..." : "Valider compteurs"}
+            </button>
+            <button type="button" className="btn" onClick={handleExportSilae}>Export SILAE</button>
+            <button type="button" className="btn" onClick={handleExportRecap}>Export recap CSV</button>
+          </div>
+        )}
+
         {/* ── Month navigation ── */}
         <div style={monthNav}>
           <button type="button" onClick={() => goMonth(-1)} style={navArrow}>←</button>

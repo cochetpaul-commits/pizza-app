@@ -10,7 +10,6 @@ import { useParams } from "next/navigation";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
-import { NavBar } from "@/components/NavBar";
 import { AllergenBadges } from "@/components/AllergenBadges";
 import { parseAllergens, mergeAllergens } from "@/lib/allergens";
 
@@ -71,11 +70,6 @@ function n2(v: unknown) {
   return Number.isFinite(x) ? x : 0;
 }
 
-function round2(v: number) {
-  const x = n2(v);
-  return Math.round(x * 100) / 100;
-}
-
 function fmtMoney(v: number) {
   const x = n2(v);
   return x.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -122,8 +116,6 @@ export default function PrepRecipeDetailPage() {
   const id = String(params?.id ?? "");
 
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [savingIndex, setSavingIndex] = useState(false);
   const [error, setError] = useState<AppError | null>(null);
 
   const [recipe, setRecipe] = useState<PrepRecipe | null>(null);
@@ -257,14 +249,6 @@ export default function PrepRecipeDetailPage() {
 
     return { pvKgHT, pvKgTTC, vatPct, marginPct: marginPctNum };
   }, [computed.costPerKg, vatPct, marginPctNum]);
-
-  const isDraft = useMemo(() => {
-    if (!recipe) return true;
-    const nameBlank = !String(recipe.name ?? "").trim();
-    const noLines = (lines ?? []).length === 0;
-    const noOutput = !recipe.output_ingredient_id;
-    return nameBlank && noLines && noOutput;
-  }, [recipe, lines]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -479,13 +463,6 @@ export default function PrepRecipeDetailPage() {
     void load();
   }, [id, load]);
 
-  const canSaveRecipe = useMemo(() => {
-    if (!recipe) return false;
-    const nameOk = !!String(recipe.name ?? "").trim();
-    const pivotOk = !!String(recipe.pivot_ingredient_id ?? "").trim();
-    return nameOk && pivotOk;
-  }, [recipe]);
-
   async function uploadPhoto(file: File) {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) throw new Error("NOT_LOGGED");
@@ -531,119 +508,6 @@ export default function PrepRecipeDetailPage() {
     setRecipe((p) => (p ? { ...p, photo_url: null } : p));
   }
 
-  const saveRecipe = async () => {
-    if (!recipe) return;
-    if (saving) return;
-
-    if (!canSaveRecipe) {
-      setError({ message: "Renseigne au minimum : Nom + Pivot.", details: null });
-      return;
-    }
-
-    setSaving(true);
-    setError(null);
-
-    try {
-      const payload = {
-        name: String(recipe.name ?? "").trim(),
-        pivot_ingredient_id: recipe.pivot_ingredient_id,
-        pivot_unit: recipe.pivot_unit,
-        pivot_amount: pivotAmountNum > 0 ? pivotAmountNum : null,
-        photo_url: recipe.photo_url ?? null,
-        updated_at: new Date().toISOString(),
-      };
-
-      const { error: e } = await supabase.from("prep_recipes").update(payload).eq("id", recipe.id);
-      if (e) throw e;
-
-      await load();
-    } catch (e: unknown) {
-      setError({ message: getErrMessage(e, "Erreur sauvegarde"), details: e });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const saveAsIngredient = async () => {
-    if (!recipe) return;
-    if (savingIndex) return;
-
-    setSavingIndex(true);
-    setError(null);
-
-    try {
-      const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) throw new Error("NOT_LOGGED");
-
-      if (!pivotIngredient) throw new Error("Pivot introuvable.");
-      if (pivotAmountNum <= 0) throw new Error("Quantité pivot invalide.");
-
-      const pivotCpu = pickCpu(pivotIngredient.id, recipe.pivot_unit, pivotIngredient.cost_per_unit);
-      if (pivotCpu <= 0) throw new Error("Pivot : coût manquant. Ajoute un prix dans les offers.");
-
-      const pivotCost = pivotCpu * pivotAmountNum;
-
-      const rows = (lines ?? []).map((l) => {
-        const qty = n2(l.amount_per_1_pivot) * pivotAmountNum;
-        const cpuPicked = pickCpu(String(l.ingredient_id ?? ""), l.unit ?? "g", l.ingredient_cost_per_unit ?? null);
-        const cpu = cpuPicked > 0 ? cpuPicked : null;
-        const cost = cpu != null ? cpu * qty : 0;
-        return { qty, cost, cpu };
-      });
-
-      const missing = rows.find((r) => r.cpu == null);
-      if (missing) throw new Error("Impossible d'enregistrer : un ingrédient n'a pas de prix.");
-
-      const totalCost = round2(pivotCost + rows.reduce((acc, r) => acc + n2(r.cost), 0));
-      const totalQty = Math.round((pivotAmountNum > 0 ? pivotAmountNum : 0) + rows.reduce((acc, r) => acc + n2(r.qty), 0));
-
-      if (!Number.isFinite(totalCost) || totalCost <= 0) throw new Error("Coût total invalide.");
-      if (!Number.isFinite(totalQty) || totalQty <= 0) throw new Error("Quantité totale invalide.");
-
-      const name = (String(recipe.name ?? "").trim() || "Recette pivot").slice(0, 120);
-
-      const ingredientPayload: Record<string, unknown> = {
-        name,
-        category: "autre",
-        is_active: true,
-        default_unit: recipe.pivot_unit,
-        purchase_price: totalCost,
-        purchase_unit: totalQty,
-        purchase_unit_label: recipe.pivot_unit,
-        purchase_unit_name: recipe.pivot_unit,
-        source_prep_recipe_id: recipe.id,
-        source_prep_recipe_name: name,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (recipe.output_ingredient_id) {
-        const { error: eUpd } = await supabase.from("ingredients").update(ingredientPayload).eq("id", recipe.output_ingredient_id);
-        if (eUpd) throw eUpd;
-        await load();
-        return;
-      }
-
-      const { data: ins, error: eIns } = await supabase.from("ingredients").insert(ingredientPayload).select("id").single();
-      if (eIns) throw eIns;
-
-      const insObj = getObj(ins);
-      const newId = insObj ? getString(insObj["id"]) : "";
-      if (!newId) throw new Error("ID ingrédient manquant après création");
-
-      const { error: eBind } = await supabase
-        .from("prep_recipes")
-        .update({ output_ingredient_id: newId, updated_at: new Date().toISOString() })
-        .eq("id", recipe.id);
-
-      if (eBind) throw eBind;
-
-      await load();
-    } catch (e: unknown) {
-      setError({ message: getErrMessage(e, "Erreur enregistrement index"), details: e });
-    } finally {
-      setSavingIndex(false);
-    }
-  };
 
   const addLine = async () => {
     if (!recipe) return;
@@ -726,61 +590,39 @@ export default function PrepRecipeDetailPage() {
 
   if (loading) {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=pivot" backLabel="Préparations" />
-        <main className="container">
-          <TopNav title="Préparation" />
-          <p className="muted">Chargement…</p>
-        </main>
-      </>
+      <main className="container">
+        <TopNav title="Préparation" />
+        <p className="muted">Chargement…</p>
+      </main>
     );
   }
 
   if (error && !recipe) {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=pivot" backLabel="Préparations" />
-        <main className="container">
-          <TopNav title="Préparation" />
-          <div style={{ marginTop: 12 }}>
-            <p className="muted">Recette introuvable.</p>
-            <pre className="code" style={{ marginTop: 10 }}>
-              {JSON.stringify(error, null, 2)}
-            </pre>
-          </div>
-        </main>
-      </>
+      <main className="container">
+        <TopNav title="Préparation" />
+        <div style={{ marginTop: 12 }}>
+          <p className="muted">Recette introuvable.</p>
+          <pre className="code" style={{ marginTop: 10 }}>
+            {JSON.stringify(error, null, 2)}
+          </pre>
+        </div>
+      </main>
     );
   }
 
   if (!recipe) {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=pivot" backLabel="Préparations" />
-        <main className="container">
-          <TopNav title="Préparation" />
-          <p className="muted">Recette introuvable.</p>
-        </main>
-      </>
+      <main className="container">
+        <TopNav title="Préparation" />
+        <p className="muted">Recette introuvable.</p>
+      </main>
     );
   }
 
   const pageTitle = String(recipe.name ?? "").trim() || "Recette pivot";
 
-  const topActions = (
-    <>
-      <button className="btn" type="button" onClick={saveAsIngredient} disabled={savingIndex || isDraft}>
-        {savingIndex ? "Index…" : recipe.output_ingredient_id ? "Mettre à jour l'index" : "Enregistrer dans l'index"}
-      </button>
-      <button className="btn btnPrimary" type="button" onClick={saveRecipe} disabled={saving || !canSaveRecipe}>
-        {saving ? "Sauvegarde…" : "Sauvegarder"}
-      </button>
-    </>
-  );
-
   return (
-    <>
-    <NavBar backHref="/recettes?tab=pivot" backLabel="Préparations" right={topActions} />
     <main className="container">
       <TopNav title={pageTitle} />
 
@@ -1082,6 +924,5 @@ export default function PrepRecipeDetailPage() {
       </div>
 
     </main>
-    </>
   );
 }

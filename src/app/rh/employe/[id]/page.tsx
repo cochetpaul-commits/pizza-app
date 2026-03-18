@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
+import Image from "next/image";
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
@@ -15,12 +15,14 @@ type Contrat = {
   type: string;
   date_debut: string;
   date_fin: string | null;
+  date_fin_essai: string | null;
   remuneration: number;
   emploi: string | null;
   qualification: string | null;
   heures_semaine: number;
   jours_semaine: number;
   actif: boolean;
+  statut: string | null;
 };
 
 type ContratElement = {
@@ -44,7 +46,15 @@ type Absence = {
   note: string | null;
 };
 
-type Tab = "identite" | "contrat" | "absences" | "admin";
+type Shift = {
+  employe_id: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+};
+
+type MainTab = "infos" | "dossier" | "acces";
+type DossierSubTab = "perso" | "contrats" | "temps" | "conges" | "notes" | "primes" | "dispo";
 
 /* ── Constants ─────────────────────────────────────────────────── */
 
@@ -76,6 +86,14 @@ const ELEMENT_LABELS: Record<string, string> = {
   acompte: "Acompte", mutuelle_dispense: "Dispense mutuelle",
 };
 
+/* ── Completion fields ─────────────────────────────────────────── */
+
+const COMPLETION_FIELDS = [
+  "prenom", "nom", "email", "tel_mobile", "date_naissance",
+  "adresse", "code_postal", "ville", "nationalite", "numero_secu",
+  "genre", "iban", "contact_urgence_tel",
+] as const;
+
 /* ── Component ─────────────────────────────────────────────────── */
 
 export default function EmployeDetailPage() {
@@ -86,9 +104,11 @@ export default function EmployeDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
-  const [tab, setTab] = useState<Tab>("identite");
+  const [mainTab, setMainTab] = useState<MainTab>("infos");
+  const [dossierSub, setDossierSub] = useState<DossierSubTab>("perso");
 
   // ── Employee fields ──
+  const [emp, setEmp] = useState<Record<string, unknown>>({});
   const [prenom, setPrenom] = useState("");
   const [nom, setNom] = useState("");
   const [initiales, setInitiales] = useState("");
@@ -122,11 +142,15 @@ export default function EmployeDetailPage() {
   const [dateAnciennete, setDateAnciennete] = useState("");
   const [travailleurEtranger, setTravailleurEtranger] = useState(false);
   const [actif, setActif] = useState(true);
+  const [photoUrl, setPhotoUrl] = useState("");
+  const [role, setRole] = useState("");
+  const [note, setNote] = useState("");
 
   // ── Related data ──
   const [contrats, setContrats] = useState<Contrat[]>([]);
   const [elements, setElements] = useState<ContratElement[]>([]);
   const [absences, setAbsences] = useState<Absence[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
 
   // ── Contrat modal ──
   const [showContratModal, setShowContratModal] = useState(false);
@@ -149,64 +173,87 @@ export default function EmployeDetailPage() {
   const [aNbJours, setANbJours] = useState<number | "">("");
   const [aNote, setANote] = useState("");
 
+  // ── Salary visibility ──
+  const [showSalary, setShowSalary] = useState(false);
+
+  /* ── Completion % ── */
+  const completionPct = useMemo(() => {
+    const values: Record<string, unknown> = {
+      prenom, nom, email, tel_mobile: telMobile, date_naissance: dateNaissance,
+      adresse, code_postal: codePostal, ville, nationalite, numero_secu: numeroSecu,
+      genre, iban, contact_urgence_tel: contactUrgTel,
+    };
+    let filled = 0;
+    for (const k of COMPLETION_FIELDS) {
+      if (values[k]) filled++;
+    }
+    return Math.round((filled / COMPLETION_FIELDS.length) * 100);
+  }, [prenom, nom, email, telMobile, dateNaissance, adresse, codePostal, ville, nationalite, numeroSecu, genre, iban, contactUrgTel]);
+
   /* ── Load ── */
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const { data: emp } = await supabase
+      const { data: empData } = await supabase
         .from("employes")
         .select("*")
         .eq("id", id)
         .single();
 
-      if (cancelled || !emp) { setLoading(false); return; }
+      if (cancelled || !empData) { setLoading(false); return; }
+      setEmp(empData);
 
-      setPrenom(emp.prenom ?? "");
-      setNom(emp.nom ?? "");
-      setInitiales(emp.initiales ?? "");
-      setEmail(emp.email ?? "");
-      setTelMobile(emp.tel_mobile ?? "");
-      setTelFixe(emp.tel_fixe ?? "");
-      setAdresse(emp.adresse ?? "");
-      setCodePostal(emp.code_postal ?? "");
-      setVille(emp.ville ?? "");
-      setGenre(emp.genre ?? "");
-      setDateNaissance(emp.date_naissance ?? "");
-      setLieuNaissance(emp.lieu_naissance ?? "");
-      setDeptNaissance(emp.departement_naissance ?? "");
-      setNationalite(emp.nationalite ?? "France");
-      setSituationFamiliale(emp.situation_familiale ?? "");
-      setNbPersonnesCharge(emp.nb_personnes_charge ?? 0);
-      setContactUrgPrenom(emp.contact_urgence_prenom ?? "");
-      setContactUrgNom(emp.contact_urgence_nom ?? "");
-      setContactUrgLien(emp.contact_urgence_lien ?? "");
-      setContactUrgTel(emp.contact_urgence_tel ?? "");
-      setNumeroSecu(emp.numero_secu ?? "");
-      setHandicap(emp.handicap ?? false);
-      setTypeHandicap(emp.type_handicap ?? "");
-      setDateVisiteMedicale(emp.date_visite_medicale ?? "");
-      setVisiteRenforcee(emp.visite_renforcee ?? false);
-      setProchaineVisite(emp.prochaine_visite_medicale ?? "");
-      setIban(emp.iban ?? "");
-      setBic(emp.bic ?? "");
-      setTitulaireCompte(emp.titulaire_compte ?? "");
-      setMatricule(emp.matricule ?? "");
-      setDateAnciennete(emp.date_anciennete ?? "");
-      setTravailleurEtranger(emp.travailleur_etranger ?? false);
-      setActif(emp.actif ?? true);
+      setPrenom(empData.prenom ?? "");
+      setNom(empData.nom ?? "");
+      setInitiales(empData.initiales ?? "");
+      setEmail(empData.email ?? "");
+      setTelMobile(empData.tel_mobile ?? "");
+      setTelFixe(empData.tel_fixe ?? "");
+      setAdresse(empData.adresse ?? "");
+      setCodePostal(empData.code_postal ?? "");
+      setVille(empData.ville ?? "");
+      setGenre(empData.genre ?? "");
+      setDateNaissance(empData.date_naissance ?? "");
+      setLieuNaissance(empData.lieu_naissance ?? "");
+      setDeptNaissance(empData.departement_naissance ?? "");
+      setNationalite(empData.nationalite ?? "France");
+      setSituationFamiliale(empData.situation_familiale ?? "");
+      setNbPersonnesCharge(empData.nb_personnes_charge ?? 0);
+      setContactUrgPrenom(empData.contact_urgence_prenom ?? "");
+      setContactUrgNom(empData.contact_urgence_nom ?? "");
+      setContactUrgLien(empData.contact_urgence_lien ?? "");
+      setContactUrgTel(empData.contact_urgence_tel ?? "");
+      setNumeroSecu(empData.numero_secu ?? "");
+      setHandicap(empData.handicap ?? false);
+      setTypeHandicap(empData.type_handicap ?? "");
+      setDateVisiteMedicale(empData.date_visite_medicale ?? "");
+      setVisiteRenforcee(empData.visite_renforcee ?? false);
+      setProchaineVisite(empData.prochaine_visite_medicale ?? "");
+      setIban(empData.iban ?? "");
+      setBic(empData.bic ?? "");
+      setTitulaireCompte(empData.titulaire_compte ?? "");
+      setMatricule(empData.matricule ?? "");
+      setDateAnciennete(empData.date_anciennete ?? "");
+      setTravailleurEtranger(empData.travailleur_etranger ?? false);
+      setActif(empData.actif ?? true);
+      setPhotoUrl(empData.photo_url ?? "");
+      setRole(empData.role ?? "");
+      setNote(empData.note ?? "");
 
       // Load related
-      const [contratsRes, absRes] = await Promise.all([
+      const [contratsRes, absRes, shiftsRes] = await Promise.all([
         supabase.from("contrats").select("*").eq("employe_id", id).order("date_debut", { ascending: false }),
         supabase.from("absences").select("*").eq("employe_id", id).order("date_debut", { ascending: false }),
+        supabase.from("shifts").select("*").eq("employe_id", id).order("date", { ascending: false }).limit(200),
       ]);
 
       if (cancelled) return;
       const cList = contratsRes.data ?? [];
       setContrats(cList);
       setAbsences(absRes.data ?? []);
+      setShifts(shiftsRes.data ?? []);
 
       // Load elements for all contrats
       if (cList.length > 0) {
@@ -230,35 +277,51 @@ export default function EmployeDetailPage() {
     setSaving(true);
     setSaveOk(false);
 
+    const payload: Record<string, unknown> = {
+      prenom, nom, email: email || null,
+      tel_mobile: telMobile || null, tel_fixe: telFixe || null,
+      adresse: adresse || null, code_postal: codePostal || null, ville: ville || null,
+      genre: genre || null, date_naissance: dateNaissance || null,
+      lieu_naissance: lieuNaissance || null, departement_naissance: deptNaissance || null,
+      nationalite: nationalite || null, situation_familiale: situationFamiliale || null,
+      nb_personnes_charge: nbPersonnesCharge,
+      contact_urgence_prenom: contactUrgPrenom || null,
+      contact_urgence_nom: contactUrgNom || null,
+      contact_urgence_lien: contactUrgLien || null,
+      contact_urgence_tel: contactUrgTel || null,
+      numero_secu: numeroSecu || null,
+      handicap, type_handicap: typeHandicap || null,
+      date_visite_medicale: dateVisiteMedicale || null,
+      visite_renforcee: visiteRenforcee,
+      prochaine_visite_medicale: prochaineVisite || null,
+      iban: iban || null, bic: bic || null, titulaire_compte: titulaireCompte || null,
+      matricule: matricule || null, date_anciennete: dateAnciennete || null,
+      travailleur_etranger: travailleurEtranger, actif,
+    };
+
+    // Only include note if the column exists (graceful handling)
+    try {
+      payload.note = note || null;
+    } catch { /* ignore */ }
+
     const { error } = await supabase
       .from("employes")
-      .update({
-        prenom, nom, email: email || null,
-        tel_mobile: telMobile || null, tel_fixe: telFixe || null,
-        adresse: adresse || null, code_postal: codePostal || null, ville: ville || null,
-        genre: genre || null, date_naissance: dateNaissance || null,
-        lieu_naissance: lieuNaissance || null, departement_naissance: deptNaissance || null,
-        nationalite: nationalite || null, situation_familiale: situationFamiliale || null,
-        nb_personnes_charge: nbPersonnesCharge,
-        contact_urgence_prenom: contactUrgPrenom || null,
-        contact_urgence_nom: contactUrgNom || null,
-        contact_urgence_lien: contactUrgLien || null,
-        contact_urgence_tel: contactUrgTel || null,
-        numero_secu: numeroSecu || null,
-        handicap, type_handicap: typeHandicap || null,
-        date_visite_medicale: dateVisiteMedicale || null,
-        visite_renforcee: visiteRenforcee,
-        prochaine_visite_medicale: prochaineVisite || null,
-        iban: iban || null, bic: bic || null, titulaire_compte: titulaireCompte || null,
-        matricule: matricule || null, date_anciennete: dateAnciennete || null,
-        travailleur_etranger: travailleurEtranger, actif,
-      })
+      .update(payload)
       .eq("id", id);
 
     setSaving(false);
     if (error) { alert("Erreur : " + error.message); return; }
     setSaveOk(true);
     setTimeout(() => setSaveOk(false), 2000);
+  };
+
+  /* ── Archive employee ── */
+  const handleArchive = async () => {
+    if (!id) return;
+    if (!confirm("Archiver cet employe ? Il sera marque comme inactif.")) return;
+    const { error } = await supabase.from("employes").update({ actif: false }).eq("id", id);
+    if (error) { alert("Erreur : " + error.message); return; }
+    setActif(false);
   };
 
   /* ── Save contrat ── */
@@ -291,6 +354,15 @@ export default function EmployeDetailPage() {
     setShowContratModal(false);
     setEditContratId(null);
     setSaving(false);
+  };
+
+  /* ── Terminate contrat ── */
+  const handleTerminateContrat = async (contratId: string) => {
+    if (!confirm("Terminer ce contrat ? La date de fin sera fixee a aujourd'hui.")) return;
+    const today = new Date().toISOString().slice(0, 10);
+    await supabase.from("contrats").update({ actif: false, date_fin: today }).eq("id", contratId);
+    const { data } = await supabase.from("contrats").select("*").eq("employe_id", id).order("date_debut", { ascending: false });
+    setContrats(data ?? []);
   };
 
   /* ── Save absence ── */
@@ -355,252 +427,172 @@ export default function EmployeDetailPage() {
     setShowContratModal(true);
   };
 
+  /* ── Computed: weekly hours from shifts ── */
+  const weeklyHours = useMemo(() => {
+    if (shifts.length === 0) return [];
+    const byWeek: Record<string, number> = {};
+    for (const s of shifts) {
+      try {
+        const d = new Date(s.date + "T00:00:00");
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(d);
+        monday.setDate(diff);
+        const weekKey = monday.toISOString().slice(0, 10);
+
+        const [sh, sm] = (s.start_time || "").split(":").map(Number);
+        const [eh, em] = (s.end_time || "").split(":").map(Number);
+        if (!isNaN(sh) && !isNaN(eh)) {
+          let hours = (eh + em / 60) - (sh + sm / 60);
+          if (hours < 0) hours += 24;
+          byWeek[weekKey] = (byWeek[weekKey] ?? 0) + hours;
+        }
+      } catch { /* skip malformed */ }
+    }
+    return Object.entries(byWeek)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .slice(0, 12)
+      .map(([week, hours]) => ({ week, hours: Math.round(hours * 100) / 100 }));
+  }, [shifts]);
+
+  /* ── CP / RC counters ── */
+  const cpCount = useMemo(() => {
+    return absences.filter(a => a.type === "CP").reduce((sum, a) => sum + (a.nb_jours ?? 0), 0);
+  }, [absences]);
+  const rcCount = useMemo(() => {
+    return absences.filter(a => a.type === "repos_compensateur").reduce((sum, a) => sum + (a.nb_jours ?? 0), 0);
+  }, [absences]);
+
+  /* ── Role label ── */
+  const roleLabel = useMemo(() => {
+    const r = role || (emp as Record<string, unknown>)?.role as string || "";
+    if (r === "admin" || r === "group_admin") return "Administrateur";
+    if (r === "direction" || r === "manager") return "Manager";
+    return "Employe";
+  }, [role, emp]);
+
+  /* ── Avatar color from name ── */
+  const avatarColor = useMemo(() => {
+    const colors = ["#D4775A", "#5A8FD4", "#6B9E5A", "#9B6BD4", "#D4A55A", "#5AD4C3"];
+    const hash = (prenom + nom).split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+    return colors[hash % colors.length];
+  }, [prenom, nom]);
+
   if (loading) {
     return (
       <RequireRole allowedRoles={["group_admin"]}>
-        <NavBar backHref="/rh/equipe" backLabel="Equipe" />
         <div style={{ textAlign: "center", padding: 60, color: "#999" }}>Chargement...</div>
       </RequireRole>
     );
   }
 
   const activeContrat = contrats.find((c) => c.actif);
+  const initDisplay = initiales || ((prenom?.[0] ?? "") + (nom?.[0] ?? "")).toUpperCase();
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <NavBar
-        backHref="/rh/equipe"
-        backLabel="Equipe"
-        primaryAction={
-          canWrite ? (
-            <button type="button" onClick={handleSave} disabled={saving} style={saveBtnStyle}>
-              {saving ? "..." : saveOk ? "OK" : "Sauvegarder"}
-            </button>
-          ) : undefined
-        }
-      />
-
       <div style={pageStyle}>
         {/* ── Header card ── */}
         <div style={headerCard}>
-          <div style={avatarLarge}>
-            {initiales || ((prenom?.[0] ?? "") + (nom?.[0] ?? "")).toUpperCase()}
-          </div>
-          <div>
-            <h1 style={nameStyle}>{prenom} {nom}</h1>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
-              {activeContrat && (
-                <>
-                  <span style={contratPill(activeContrat.type)}>
-                    {CONTRAT_LABELS[activeContrat.type] ?? activeContrat.type}
-                  </span>
-                  <span style={{ fontSize: 13, color: "#6f6a61" }}>
-                    {activeContrat.heures_semaine}h/sem
-                  </span>
-                  {activeContrat.emploi && (
-                    <span style={{ fontSize: 13, color: "#999" }}>· {activeContrat.emploi}</span>
-                  )}
-                </>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1 }}>
+            {/* Photo or avatar */}
+            {photoUrl ? (
+              <Image src={photoUrl} alt={`${prenom} ${nom}`} width={56} height={56} style={{ ...avatarImg, objectFit: "cover" }} />
+            ) : (
+              <div style={{ ...avatarLarge, background: avatarColor }}>
+                {initDisplay}
+              </div>
+            )}
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <h1 style={nameStyle}>{prenom} {nom}</h1>
+                <span style={rolePill}>{roleLabel}</span>
+                <span style={statutPill(actif)}>{actif ? "Actif" : "Inactif"}</span>
+              </div>
+              {matricule && (
+                <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>
+                  Matricule : {matricule}
+                </div>
               )}
-              <span style={statutPill(actif)}>{actif ? "Actif" : "Inactif"}</span>
+              <div style={{ display: "flex", gap: 16, marginTop: 6, fontSize: 13, color: "#6f6a61", flexWrap: "wrap" }}>
+                {email && <span>{email}</span>}
+                {telMobile && <span>{telMobile}</span>}
+              </div>
+
+              {/* Completion bar */}
+              <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={completionBarBg}>
+                  <div style={{ ...completionBarFill, width: `${completionPct}%` }} />
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: completionPct === 100 ? "#4a6741" : "#e27f57" }}>
+                  {completionPct}% {completionPct === 100 ? "Complet" : "Incomplet"}
+                </span>
+              </div>
             </div>
+          </div>
+
+          {/* Actions */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+            {canWrite && (
+              <button type="button" onClick={handleSave} disabled={saving} style={saveBtnStyle}>
+                {saving ? "..." : saveOk ? "OK" : "Sauvegarder"}
+              </button>
+            )}
+            {canWrite && actif && (
+              <button type="button" onClick={handleArchive} style={archiveBtnStyle}>
+                Archiver
+              </button>
+            )}
           </div>
         </div>
 
-        {/* ── Tabs ── */}
+        {/* ── Main Tabs (3) ── */}
         <div style={tabsRow}>
           {([
-            ["identite", "Identite"],
-            ["contrat", "Contrat"],
-            ["absences", "Absences"],
-            ["admin", "Admin"],
-          ] as [Tab, string][]).map(([key, label]) => (
+            ["infos", "Informations generales"],
+            ["dossier", "Dossier RH"],
+            ["acces", "Acces"],
+          ] as [MainTab, string][]).map(([key, label]) => (
             <button
               key={key}
               type="button"
-              onClick={() => setTab(key)}
-              style={tabBtn(tab === key)}
+              onClick={() => setMainTab(key)}
+              style={tabBtn(mainTab === key)}
             >
               {label}
-              {key === "contrat" && contrats.length > 0 && (
-                <span style={tabCount}>{contrats.length}</span>
-              )}
-              {key === "absences" && absences.length > 0 && (
-                <span style={tabCount}>{absences.length}</span>
-              )}
             </button>
           ))}
         </div>
 
-        {/* ═══ TAB: IDENTITE ═══ */}
-        {tab === "identite" && (
+        {/* ═══ TAB: INFORMATIONS GENERALES ═══ */}
+        {mainTab === "infos" && (
           <>
-            {/* Infos personnelles */}
             <div style={section}>
-              <p style={sectionTitle}>Informations personnelles</p>
+              <p style={sectionTitle}>Identite</p>
               <div style={grid2}>
                 <Field label="Prenom" value={prenom} onChange={setPrenom} disabled={!canWrite} />
                 <Field label="Nom" value={nom} onChange={setNom} disabled={!canWrite} />
               </div>
-              <div style={grid3}>
-                <FieldSelect label="Genre" value={genre} onChange={setGenre} disabled={!canWrite}
-                  options={[["", "—"], ["H", "Homme"], ["F", "Femme"]]} />
-                <Field label="Date de naissance" type="date" value={dateNaissance} onChange={setDateNaissance} disabled={!canWrite} />
-                <Field label="Nationalite" value={nationalite} onChange={setNationalite} disabled={!canWrite} />
-              </div>
-              <div style={grid2}>
-                <Field label="Lieu de naissance" value={lieuNaissance} onChange={setLieuNaissance} disabled={!canWrite} />
-                <Field label="Dept. naissance" value={deptNaissance} onChange={setDeptNaissance} disabled={!canWrite} />
-              </div>
-              <div style={grid2}>
-                <FieldSelect label="Situation familiale" value={situationFamiliale} onChange={setSituationFamiliale} disabled={!canWrite}
-                  options={[["", "—"], ["celibataire", "Celibataire"], ["marie", "Marie(e)"], ["pacse", "Pacse(e)"], ["divorce", "Divorce(e)"], ["veuf", "Veuf(ve)"]]} />
-                <Field label="Personnes a charge" type="number" value={String(nbPersonnesCharge)} onChange={(v) => setNbPersonnesCharge(Number(v) || 0)} disabled={!canWrite} />
-              </div>
-            </div>
-
-            {/* Coordonnees */}
-            <div style={section}>
-              <p style={sectionTitle}>Coordonnees</p>
               <div style={grid2}>
                 <Field label="Email" type="email" value={email} onChange={setEmail} disabled={!canWrite} />
-                <Field label="Tel. mobile" value={telMobile} onChange={setTelMobile} disabled={!canWrite} />
+                <Field label="Telephone" value={telMobile} onChange={setTelMobile} disabled={!canWrite} />
               </div>
-              <Field label="Tel. fixe" value={telFixe} onChange={setTelFixe} disabled={!canWrite} />
-              <Field label="Adresse" value={adresse} onChange={setAdresse} disabled={!canWrite} />
-              <div style={grid2}>
-                <Field label="Code postal" value={codePostal} onChange={setCodePostal} disabled={!canWrite} />
-                <Field label="Ville" value={ville} onChange={setVille} disabled={!canWrite} />
-              </div>
+              <Field label="Telephone fixe" value={telFixe} onChange={setTelFixe} disabled={!canWrite} />
             </div>
 
-            {/* Contact urgence */}
             <div style={section}>
-              <p style={sectionTitle}>Contact d&apos;urgence</p>
-              <div style={grid2}>
-                <Field label="Prenom" value={contactUrgPrenom} onChange={setContactUrgPrenom} disabled={!canWrite} />
-                <Field label="Nom" value={contactUrgNom} onChange={setContactUrgNom} disabled={!canWrite} />
-              </div>
-              <div style={grid2}>
-                <Field label="Lien" value={contactUrgLien} onChange={setContactUrgLien} disabled={!canWrite} placeholder="Conjoint, parent..." />
-                <Field label="Telephone" value={contactUrgTel} onChange={setContactUrgTel} disabled={!canWrite} />
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ═══ TAB: CONTRAT ═══ */}
-        {tab === "contrat" && (
-          <>
-            {canWrite && (
-              <div style={{ marginBottom: 12 }}>
-                <button type="button" onClick={openNewContrat} style={addBtnStyle}>+ Nouveau contrat</button>
-              </div>
-            )}
-
-            {contrats.length === 0 ? (
-              <div style={{ ...section, textAlign: "center", color: "#999" }}>Aucun contrat</div>
-            ) : contrats.map((c) => {
-              const cElems = elements.filter((e) => e.contrat_id === c.id);
-              return (
-                <div key={c.id} style={{ ...section, borderLeft: c.actif ? "3px solid #D4775A" : "3px solid #ddd6c8" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <span style={contratPill(c.type)}>{CONTRAT_LABELS[c.type] ?? c.type}</span>
-                      {c.actif && <span style={{ fontSize: 11, fontWeight: 700, color: "#4a6741" }}>ACTIF</span>}
-                      {!c.actif && <span style={{ fontSize: 11, color: "#bbb" }}>Termine</span>}
-                    </div>
-                    {canWrite && (
-                      <button type="button" onClick={() => openEditContrat(c)} style={editBtnSmall}>Modifier</button>
-                    )}
-                  </div>
-
-                  <div style={grid3}>
-                    <div><span style={miniLabel}>Debut</span><br />{fmtDate(c.date_debut)}</div>
-                    <div><span style={miniLabel}>Fin</span><br />{c.date_fin ? fmtDate(c.date_fin) : "—"}</div>
-                    <div><span style={miniLabel}>Remuneration</span><br />{c.remuneration.toLocaleString("fr-FR")} EUR</div>
-                  </div>
-                  <div style={{ ...grid3, marginTop: 8 }}>
-                    <div><span style={miniLabel}>Emploi</span><br />{c.emploi ?? "—"}</div>
-                    <div><span style={miniLabel}>Heures/sem</span><br />{c.heures_semaine}h</div>
-                    <div><span style={miniLabel}>Jours/sem</span><br />{c.jours_semaine}j</div>
-                  </div>
-
-                  {cElems.length > 0 && (
-                    <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid #f0ebe3" }}>
-                      <span style={{ ...miniLabel, marginBottom: 6, display: "block" }}>Elements</span>
-                      {cElems.map((el) => (
-                        <div key={el.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13 }}>
-                          <span>{ELEMENT_LABELS[el.type] ?? el.type} — {el.libelle}</span>
-                          <span style={{ fontWeight: 700 }}>{el.montant != null ? `${el.montant.toLocaleString("fr-FR")} EUR` : "—"}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </>
-        )}
-
-        {/* ═══ TAB: ABSENCES ═══ */}
-        {tab === "absences" && (
-          <>
-            {canWrite && (
-              <div style={{ marginBottom: 12 }}>
-                <button type="button" onClick={() => {
-                  setADebut(new Date().toISOString().slice(0, 10));
-                  setAFin("");
-                  setAType("CP");
-                  setANbJours("");
-                  setANote("");
-                  setShowAbsenceModal(true);
-                }} style={addBtnStyle}>+ Nouvelle absence</button>
-              </div>
-            )}
-
-            {absences.length === 0 ? (
-              <div style={{ ...section, textAlign: "center", color: "#999" }}>Aucune absence enregistree</div>
-            ) : (
-              <div style={section}>
-                {absences.map((a) => {
-                  const c = ABSENCE_COLORS[a.type] ?? { bg: "#e8e0d0", fg: "#999" };
-                  return (
-                    <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #f0ebe3" }}>
-                      <div>
-                        <span style={{ ...absencePill, background: c.bg, color: c.fg }}>
-                          {ABSENCE_LABELS[a.type] ?? a.type}
-                        </span>
-                        <span style={{ fontSize: 13, marginLeft: 10, color: "#6f6a61" }}>
-                          {fmtDate(a.date_debut)}
-                          {a.date_fin !== a.date_debut && ` → ${fmtDate(a.date_fin)}`}
-                        </span>
-                        {a.nb_jours != null && (
-                          <span style={{ fontSize: 12, marginLeft: 8, color: "#999" }}>{a.nb_jours}j</span>
-                        )}
-                        {a.note && <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>{a.note}</div>}
-                      </div>
-                      {canWrite && (
-                        <button type="button" onClick={() => deleteAbsence(a.id)} style={{ ...editBtnSmall, color: "#DC2626", borderColor: "rgba(220,38,38,0.3)" }}>Suppr.</button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </>
-        )}
-
-        {/* ═══ TAB: ADMIN ═══ */}
-        {tab === "admin" && (
-          <>
-            <div style={section}>
-              <p style={sectionTitle}>Identifiants</p>
+              <p style={sectionTitle}>Poste</p>
               <div style={grid2}>
                 <Field label="Matricule" value={matricule} onChange={setMatricule} disabled={!canWrite} />
                 <Field label="Date anciennete" type="date" value={dateAnciennete} onChange={setDateAnciennete} disabled={!canWrite} />
               </div>
-              <Field label="Numero securite sociale" value={numeroSecu} onChange={setNumeroSecu} disabled={!canWrite} />
+              {activeContrat && (
+                <div style={grid3}>
+                  <div><span style={miniLabel}>Type contrat</span><br />{CONTRAT_LABELS[activeContrat.type] ?? activeContrat.type}</div>
+                  <div><span style={miniLabel}>Emploi</span><br />{activeContrat.emploi ?? "---"}</div>
+                  <div><span style={miniLabel}>Heures/sem</span><br />{activeContrat.heures_semaine}h</div>
+                </div>
+              )}
             </div>
 
             <div style={section}>
@@ -631,6 +623,373 @@ export default function EmployeDetailPage() {
             <div style={section}>
               <p style={sectionTitle}>Statut</p>
               <Checkbox label="Employe actif" checked={actif} onChange={setActif} disabled={!canWrite} />
+            </div>
+          </>
+        )}
+
+        {/* ═══ TAB: DOSSIER RH ═══ */}
+        {mainTab === "dossier" && (
+          <>
+            {/* Sub-tabs (pill style) */}
+            <div style={subTabsRow}>
+              {([
+                ["perso", "Infos personnelles"],
+                ["contrats", "Contrats"],
+                ["temps", "Temps travailles"],
+                ["conges", "Conges"],
+                ["notes", "Notes & documents"],
+                ["primes", "Primes & avances"],
+                ["dispo", "Disponibilite"],
+              ] as [DossierSubTab, string][]).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setDossierSub(key)}
+                  style={subTabPill(dossierSub === key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* ─── SUB: Informations personnelles ─── */}
+            {dossierSub === "perso" && (
+              <>
+                <div style={section}>
+                  <p style={sectionTitle}>Etat civil</p>
+                  <div style={grid3}>
+                    <FieldSelect label="Genre" value={genre} onChange={setGenre} disabled={!canWrite}
+                      options={[["", "---"], ["H", "Homme"], ["F", "Femme"]]}
+                      tag="DPAE" />
+                    <Field label="Date de naissance" type="date" value={dateNaissance} onChange={setDateNaissance} disabled={!canWrite} tag="DPAE" />
+                    <Field label="Nationalite" value={nationalite} onChange={setNationalite} disabled={!canWrite} tag="DPAE" />
+                  </div>
+                  <div style={grid2}>
+                    <Field label="Lieu de naissance" value={lieuNaissance} onChange={setLieuNaissance} disabled={!canWrite} tag="DPAE" />
+                    <Field label="Dept. naissance" value={deptNaissance} onChange={setDeptNaissance} disabled={!canWrite} tag="DPAE" />
+                  </div>
+                  <Field label="Numero securite sociale" value={numeroSecu} onChange={setNumeroSecu} disabled={!canWrite} tag="DPAE" />
+                  <div style={grid2}>
+                    <FieldSelect label="Situation familiale" value={situationFamiliale} onChange={setSituationFamiliale} disabled={!canWrite}
+                      options={[["", "---"], ["celibataire", "Celibataire"], ["marie", "Marie(e)"], ["pacse", "Pacse(e)"], ["divorce", "Divorce(e)"], ["veuf", "Veuf(ve)"]]} />
+                    <Field label="Personnes a charge" type="number" value={String(nbPersonnesCharge)} onChange={(v) => setNbPersonnesCharge(Number(v) || 0)} disabled={!canWrite} />
+                  </div>
+                </div>
+
+                <div style={section}>
+                  <p style={sectionTitle}>Adresse</p>
+                  <Field label="Adresse" value={adresse} onChange={setAdresse} disabled={!canWrite} tag="DPAE" />
+                  <div style={grid2}>
+                    <Field label="Code postal" value={codePostal} onChange={setCodePostal} disabled={!canWrite} tag="DPAE" />
+                    <Field label="Ville" value={ville} onChange={setVille} disabled={!canWrite} tag="DPAE" />
+                  </div>
+                </div>
+
+                <div style={section}>
+                  <p style={sectionTitle}>Contact d&apos;urgence</p>
+                  <div style={grid2}>
+                    <Field label="Prenom" value={contactUrgPrenom} onChange={setContactUrgPrenom} disabled={!canWrite} tag="RUP" />
+                    <Field label="Nom" value={contactUrgNom} onChange={setContactUrgNom} disabled={!canWrite} tag="RUP" />
+                  </div>
+                  <div style={grid2}>
+                    <Field label="Lien" value={contactUrgLien} onChange={setContactUrgLien} disabled={!canWrite} placeholder="Conjoint, parent..." />
+                    <Field label="Telephone" value={contactUrgTel} onChange={setContactUrgTel} disabled={!canWrite} tag="RUP" />
+                  </div>
+                </div>
+
+                <div style={section}>
+                  <p style={sectionTitle}>Note interne</p>
+                  <textarea
+                    style={{ ...inputSt, minHeight: 80, resize: "vertical" }}
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    disabled={!canWrite}
+                    placeholder="Notes internes sur l'employe..."
+                  />
+                </div>
+              </>
+            )}
+
+            {/* ─── SUB: Contrats ─── */}
+            {dossierSub === "contrats" && (
+              <>
+                {canWrite && (
+                  <div style={{ marginBottom: 12, display: "flex", gap: 8 }}>
+                    <button type="button" onClick={openNewContrat} style={addBtnStyle}>+ Nouveau contrat</button>
+                    <button type="button" onClick={() => alert("Generation de contrat : fonctionnalite a venir")} style={{ ...addBtnStyle, borderColor: "#999", color: "#999", background: "transparent" }}>
+                      Generer contrat
+                    </button>
+                  </div>
+                )}
+
+                {contrats.length === 0 ? (
+                  <div style={{ ...section, textAlign: "center", color: "#999" }}>Aucun contrat</div>
+                ) : contrats.map((c) => {
+                  const cElems = elements.filter((e) => e.contrat_id === c.id);
+                  return (
+                    <div key={c.id} style={{ ...section, borderLeft: c.actif ? "3px solid #e27f57" : "3px solid #ddd6c8" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <span style={contratPill(c.type)}>{CONTRAT_LABELS[c.type] ?? c.type}</span>
+                          {c.actif && <span style={{ fontSize: 11, fontWeight: 700, color: "#4a6741" }}>ACTIF</span>}
+                          {!c.actif && <span style={{ fontSize: 11, color: "#bbb" }}>Termine</span>}
+                        </div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {canWrite && c.actif && (
+                            <button type="button" onClick={() => handleTerminateContrat(c.id)} style={{ ...editBtnSmall, color: "#DC2626", borderColor: "rgba(220,38,38,0.3)" }}>
+                              Terminer
+                            </button>
+                          )}
+                          {canWrite && (
+                            <button type="button" onClick={() => openEditContrat(c)} style={editBtnSmall}>Modifier</button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={grid3}>
+                        <div><span style={miniLabel}>Debut</span><br />{fmtDate(c.date_debut)}</div>
+                        <div><span style={miniLabel}>Fin</span><br />{c.date_fin ? fmtDate(c.date_fin) : "---"}</div>
+                        <div>
+                          <span style={miniLabel}>
+                            Remuneration brute
+                            <button type="button" onClick={() => setShowSalary(!showSalary)} style={eyeBtn}>
+                              {showSalary ? "masquer" : "voir"}
+                            </button>
+                          </span>
+                          <br />{showSalary ? `${c.remuneration.toLocaleString("fr-FR")} EUR` : "****"}
+                        </div>
+                      </div>
+                      <div style={{ ...grid3, marginTop: 8 }}>
+                        <div><span style={miniLabel}>Emploi</span><br />{c.emploi ?? "---"}</div>
+                        <div><span style={miniLabel}>Qualification</span><br />{c.qualification ?? "---"}</div>
+                        <div><span style={miniLabel}>Heures/sem</span><br />{c.heures_semaine}h / {c.jours_semaine}j</div>
+                      </div>
+
+                      {cElems.length > 0 && (
+                        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid #f0ebe3" }}>
+                          <span style={{ ...miniLabel, marginBottom: 6, display: "block" }}>Elements</span>
+                          {cElems.map((el) => (
+                            <div key={el.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13 }}>
+                              <span>{ELEMENT_LABELS[el.type] ?? el.type} --- {el.libelle}</span>
+                              <span style={{ fontWeight: 700 }}>{el.montant != null ? `${el.montant.toLocaleString("fr-FR")} EUR` : "---"}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+
+            {/* ─── SUB: Temps travailles ─── */}
+            {dossierSub === "temps" && (
+              <div style={section}>
+                <p style={sectionTitle}>Heures par semaine</p>
+                {weeklyHours.length === 0 ? (
+                  <div style={{ textAlign: "center", color: "#999", padding: 20 }}>Aucun shift enregistre</div>
+                ) : (
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead>
+                      <tr>
+                        <th style={thStyle}>Semaine du</th>
+                        <th style={{ ...thStyle, textAlign: "right" }}>Heures</th>
+                        <th style={{ ...thStyle, textAlign: "right" }}>Heures sup.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {weeklyHours.map((w) => {
+                        const contractHours = activeContrat?.heures_semaine ?? 35;
+                        const overtime = Math.max(0, w.hours - contractHours);
+                        return (
+                          <tr key={w.week} style={{ borderBottom: "1px solid #f0ebe3" }}>
+                            <td style={{ padding: "6px 8px" }}>{fmtDate(w.week)}</td>
+                            <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 600 }}>
+                              {w.hours.toFixed(1)}h
+                            </td>
+                            <td style={{ padding: "6px 8px", textAlign: "right", color: overtime > 0 ? "#e27f57" : "#999" }}>
+                              {overtime > 0 ? `+${overtime.toFixed(1)}h` : "---"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+
+            {/* ─── SUB: Conges ─── */}
+            {dossierSub === "conges" && (
+              <>
+                <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+                  <div style={counterCard}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5 }}>CP pris</span>
+                    <span style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{cpCount}j</span>
+                  </div>
+                  <div style={counterCard}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5 }}>RC pris</span>
+                    <span style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{rcCount}j</span>
+                  </div>
+                </div>
+
+                {canWrite && (
+                  <div style={{ marginBottom: 12 }}>
+                    <button type="button" onClick={() => {
+                      setADebut(new Date().toISOString().slice(0, 10));
+                      setAFin("");
+                      setAType("CP");
+                      setANbJours("");
+                      setANote("");
+                      setShowAbsenceModal(true);
+                    }} style={addBtnStyle}>+ Nouvelle absence</button>
+                  </div>
+                )}
+
+                {absences.length === 0 ? (
+                  <div style={{ ...section, textAlign: "center", color: "#999" }}>Aucune absence enregistree</div>
+                ) : (
+                  <div style={section}>
+                    {absences.map((a) => {
+                      const c = ABSENCE_COLORS[a.type] ?? { bg: "#e8e0d0", fg: "#999" };
+                      return (
+                        <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #f0ebe3" }}>
+                          <div>
+                            <span style={{ ...absencePill, background: c.bg, color: c.fg }}>
+                              {ABSENCE_LABELS[a.type] ?? a.type}
+                            </span>
+                            <span style={{ fontSize: 13, marginLeft: 10, color: "#6f6a61" }}>
+                              {fmtDate(a.date_debut)}
+                              {a.date_fin !== a.date_debut && ` -> ${fmtDate(a.date_fin)}`}
+                            </span>
+                            {a.nb_jours != null && (
+                              <span style={{ fontSize: 12, marginLeft: 8, color: "#999" }}>{a.nb_jours}j</span>
+                            )}
+                            {a.note && <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>{a.note}</div>}
+                          </div>
+                          {canWrite && (
+                            <button type="button" onClick={() => deleteAbsence(a.id)} style={{ ...editBtnSmall, color: "#DC2626", borderColor: "rgba(220,38,38,0.3)" }}>Suppr.</button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ─── SUB: Notes et documents ─── */}
+            {dossierSub === "notes" && (
+              <div style={section}>
+                <p style={sectionTitle}>Notes internes</p>
+                <textarea
+                  style={{ ...inputSt, minHeight: 120, resize: "vertical" }}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  disabled={!canWrite}
+                  placeholder="Notes internes, observations, remarques..."
+                />
+
+                <p style={{ ...sectionTitle, marginTop: 20 }}>Documents</p>
+                <div style={placeholderBox}>
+                  <span style={{ color: "#999" }}>Zone de depot de fichiers (a venir)</span>
+                  <button type="button" disabled style={{ ...addBtnStyle, opacity: 0.5, cursor: "default", marginTop: 10 }}>
+                    + Ajouter un document
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ─── SUB: Primes et avances ─── */}
+            {dossierSub === "primes" && (
+              <div style={section}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                  <p style={{ ...sectionTitle, margin: 0 }}>Primes & avances</p>
+                  <button type="button" onClick={() => alert("Ajout de prime : fonctionnalite a venir")} style={addBtnStyle}>
+                    + Ajouter
+                  </button>
+                </div>
+
+                {elements.length === 0 ? (
+                  <div style={{ textAlign: "center", color: "#999", padding: 20 }}>Aucune prime ou avance enregistree</div>
+                ) : (
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead>
+                      <tr>
+                        <th style={thStyle}>Type</th>
+                        <th style={thStyle}>Libelle</th>
+                        <th style={{ ...thStyle, textAlign: "right" }}>Montant</th>
+                        <th style={thStyle}>Periode</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {elements.map((el) => (
+                        <tr key={el.id} style={{ borderBottom: "1px solid #f0ebe3" }}>
+                          <td style={{ padding: "6px 8px" }}>
+                            <span style={{ ...absencePill, background: "#f6eedf", color: "#e27f57" }}>
+                              {ELEMENT_LABELS[el.type] ?? el.type}
+                            </span>
+                          </td>
+                          <td style={{ padding: "6px 8px" }}>{el.libelle}</td>
+                          <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 700 }}>
+                            {el.montant != null ? `${el.montant.toLocaleString("fr-FR")} EUR` : "---"}
+                          </td>
+                          <td style={{ padding: "6px 8px", color: "#999" }}>
+                            {el.date_debut ? fmtDate(el.date_debut) : ""}
+                            {el.date_fin ? ` -> ${fmtDate(el.date_fin)}` : ""}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+
+            {/* ─── SUB: Disponibilite ─── */}
+            {dossierSub === "dispo" && (
+              <div style={section}>
+                <p style={sectionTitle}>Disponibilite</p>
+                <div style={placeholderBox}>
+                  <span style={{ color: "#999" }}>Gestion des creneaux de disponibilite (a venir)</span>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 14, width: "100%" }}>
+                    {["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"].map(day => (
+                      <div key={day} style={{ background: "#f6eedf", borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "#6f6a61" }}>{day}</span>
+                        <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>---</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ═══ TAB: ACCES ═══ */}
+        {mainTab === "acces" && (
+          <>
+            <div style={section}>
+              <p style={sectionTitle}>Code PIN</p>
+              <p style={{ fontSize: 13, color: "#6f6a61", margin: "0 0 12px" }}>
+                Le code PIN est utilise pour pointer sur le terminal.
+              </p>
+              <div style={{ maxWidth: 200 }}>
+                <Field label="Code PIN" value={(emp as Record<string, unknown>)?.pin_code as string ?? ""} onChange={() => {}} disabled placeholder="----" />
+              </div>
+            </div>
+
+            <div style={section}>
+              <p style={sectionTitle}>Invitation</p>
+              <p style={{ fontSize: 13, color: "#6f6a61", margin: "0 0 12px" }}>
+                Envoyer une invitation par email pour acceder a l&apos;application.
+              </p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="button" onClick={() => alert("Envoi d'invitation : fonctionnalite a venir")} style={addBtnStyle} disabled={!email}>
+                  Envoyer une invitation
+                </button>
+              </div>
+              {!email && <p style={{ fontSize: 12, color: "#e27f57", marginTop: 6 }}>Ajoutez un email pour pouvoir envoyer une invitation.</p>}
             </div>
           </>
         )}
@@ -748,13 +1107,16 @@ export default function EmployeDetailPage() {
 
 /* ── Reusable field components ─────────────────────────────────── */
 
-function Field({ label, value, onChange, type = "text", disabled = false, placeholder }: {
+function Field({ label, value, onChange, type = "text", disabled = false, placeholder, tag }: {
   label: string; value: string; onChange: (v: string) => void;
-  type?: string; disabled?: boolean; placeholder?: string;
+  type?: string; disabled?: boolean; placeholder?: string; tag?: string;
 }) {
   return (
     <div style={fieldRow}>
-      <label style={labelSt}>{label}</label>
+      <label style={labelSt}>
+        {label}
+        {tag && <span style={tagStyle(tag)}>{tag}</span>}
+      </label>
       <input
         type={type}
         style={{ ...inputSt, opacity: disabled ? 0.6 : 1 }}
@@ -767,13 +1129,16 @@ function Field({ label, value, onChange, type = "text", disabled = false, placeh
   );
 }
 
-function FieldSelect({ label, value, onChange, options, disabled = false }: {
+function FieldSelect({ label, value, onChange, options, disabled = false, tag }: {
   label: string; value: string; onChange: (v: string) => void;
-  options: [string, string][]; disabled?: boolean;
+  options: [string, string][]; disabled?: boolean; tag?: string;
 }) {
   return (
     <div style={fieldRow}>
-      <label style={labelSt}>{label}</label>
+      <label style={labelSt}>
+        {label}
+        {tag && <span style={tagStyle(tag)}>{tag}</span>}
+      </label>
       <select style={{ ...inputSt, opacity: disabled ? 0.6 : 1 }} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
         {options.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
       </select>
@@ -795,7 +1160,7 @@ function Checkbox({ label, checked, onChange, disabled = false }: {
 /* ── Helpers ── */
 
 function fmtDate(d: string) {
-  if (!d) return "—";
+  if (!d) return "---";
   return new Date(d + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
 }
 
@@ -809,18 +1174,18 @@ const pageStyle: React.CSSProperties = {
 
 const headerCard: React.CSSProperties = {
   display: "flex",
-  alignItems: "center",
+  alignItems: "flex-start",
   gap: 16,
   background: "#fff",
-  borderRadius: 14,
+  borderRadius: 10,
   border: "1px solid #ddd6c8",
-  padding: "18px 20px",
+  padding: "20px 22px",
   marginBottom: 16,
 };
 
 const avatarLarge: React.CSSProperties = {
-  width: 52,
-  height: 52,
+  width: 56,
+  height: 56,
   borderRadius: "50%",
   background: "#D4775A",
   color: "#fff",
@@ -833,12 +1198,30 @@ const avatarLarge: React.CSSProperties = {
   flexShrink: 0,
 };
 
+const avatarImg: React.CSSProperties = {
+  width: 56,
+  height: 56,
+  borderRadius: "50%",
+  objectFit: "cover",
+  flexShrink: 0,
+};
+
 const nameStyle: React.CSSProperties = {
   margin: 0,
   fontSize: 22,
   fontWeight: 700,
   fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
   color: "#1a1a1a",
+};
+
+const rolePill: React.CSSProperties = {
+  display: "inline-block",
+  padding: "2px 10px",
+  borderRadius: 8,
+  fontSize: 11,
+  fontWeight: 700,
+  background: "#f6eedf",
+  color: "#e27f57",
 };
 
 const contratPill = (type: string): React.CSSProperties => {
@@ -859,6 +1242,21 @@ const statutPill = (actif: boolean): React.CSSProperties => ({
   background: actif ? "#e8ede6" : "#f0f0f0", color: actif ? "#4a6741" : "#bbb",
 });
 
+const completionBarBg: React.CSSProperties = {
+  width: 120,
+  height: 6,
+  borderRadius: 3,
+  background: "#f0ebe3",
+  overflow: "hidden",
+};
+
+const completionBarFill: React.CSSProperties = {
+  height: "100%",
+  borderRadius: 3,
+  background: "#e27f57",
+  transition: "width 0.3s ease",
+};
+
 const tabsRow: React.CSSProperties = {
   display: "flex",
   gap: 4,
@@ -870,9 +1268,9 @@ const tabsRow: React.CSSProperties = {
 const tabBtn = (active: boolean): React.CSSProperties => ({
   padding: "8px 16px",
   border: "none",
-  borderBottom: active ? "2px solid #D4775A" : "2px solid transparent",
+  borderBottom: active ? "2px solid #e27f57" : "2px solid transparent",
   background: "none",
-  color: active ? "#D4775A" : "#999",
+  color: active ? "#e27f57" : "#999",
   fontSize: 13,
   fontWeight: 700,
   cursor: "pointer",
@@ -884,23 +1282,29 @@ const tabBtn = (active: boolean): React.CSSProperties => ({
   gap: 6,
 });
 
-const tabCount: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  width: 18,
-  height: 18,
-  borderRadius: "50%",
-  background: "#f0ebe3",
-  fontSize: 10,
-  fontWeight: 700,
-  color: "#999",
+const subTabsRow: React.CSSProperties = {
+  display: "flex",
+  gap: 6,
+  marginBottom: 16,
+  flexWrap: "wrap",
 };
+
+const subTabPill = (active: boolean): React.CSSProperties => ({
+  padding: "6px 14px",
+  borderRadius: 20,
+  border: active ? "1px solid #e27f57" : "1px solid #ddd6c8",
+  background: active ? "rgba(226,127,87,0.10)" : "#fff",
+  color: active ? "#e27f57" : "#6f6a61",
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+});
 
 const section: React.CSSProperties = {
   background: "#fff",
   border: "1px solid #ddd6c8",
-  borderRadius: 14,
+  borderRadius: 10,
   padding: "16px 18px 20px",
   marginBottom: 14,
 };
@@ -910,7 +1314,7 @@ const sectionTitle: React.CSSProperties = {
   fontSize: 12,
   fontWeight: 800,
   letterSpacing: 1,
-  color: "#D4775A",
+  color: "#e27f57",
   textTransform: "uppercase",
   fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
 };
@@ -928,7 +1332,7 @@ const labelSt: React.CSSProperties = {
 const inputSt: React.CSSProperties = {
   width: "100%", padding: "7px 10px", borderRadius: 8,
   border: "1px solid #ddd6c8", fontSize: 14, background: "#fff",
-  outline: "none", boxSizing: "border-box",
+  outline: "none", boxSizing: "border-box", fontFamily: "inherit",
 };
 
 const miniLabel: React.CSSProperties = {
@@ -937,18 +1341,24 @@ const miniLabel: React.CSSProperties = {
 
 const saveBtnStyle: React.CSSProperties = {
   display: "inline-flex", alignItems: "center", height: 32, padding: "0 16px",
-  borderRadius: 20, border: "none", background: "#D4775A", color: "#fff",
+  borderRadius: 6, border: "none", background: "#e27f57", color: "#fff",
   fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
 };
 
+const archiveBtnStyle: React.CSSProperties = {
+  display: "inline-flex", alignItems: "center", height: 28, padding: "0 12px",
+  borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff", color: "#999",
+  fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+};
+
 const cancelBtn: React.CSSProperties = {
-  padding: "8px 18px", borderRadius: 8, border: "1px solid #ddd6c8",
+  padding: "8px 18px", borderRadius: 6, border: "1px solid #ddd6c8",
   background: "#fff", color: "#1a1a1a", fontSize: 14, fontWeight: 600, cursor: "pointer",
 };
 
 const addBtnStyle: React.CSSProperties = {
-  padding: "7px 16px", borderRadius: 10, border: "1px solid #D4775A",
-  background: "rgba(212,119,90,0.08)", color: "#D4775A",
+  padding: "7px 16px", borderRadius: 6, border: "1px solid #e27f57",
+  background: "rgba(226,127,87,0.08)", color: "#e27f57",
   fontSize: 13, fontWeight: 700, cursor: "pointer",
 };
 
@@ -957,10 +1367,39 @@ const editBtnSmall: React.CSSProperties = {
   background: "#fff", color: "#6f6a61", fontSize: 11, fontWeight: 600, cursor: "pointer",
 };
 
+const eyeBtn: React.CSSProperties = {
+  marginLeft: 6, padding: "0 4px", border: "none", background: "none",
+  color: "#e27f57", fontSize: 10, fontWeight: 600, cursor: "pointer", textDecoration: "underline",
+};
+
 const absencePill: React.CSSProperties = {
   display: "inline-block", padding: "2px 10px", borderRadius: 8,
   fontSize: 12, fontWeight: 700,
 };
+
+const counterCard: React.CSSProperties = {
+  flex: 1, background: "#fff", border: "1px solid #ddd6c8", borderRadius: 10,
+  padding: "14px 16px", display: "flex", flexDirection: "column", gap: 4,
+};
+
+const placeholderBox: React.CSSProperties = {
+  background: "#f6eedf", borderRadius: 10, padding: "24px 20px",
+  display: "flex", flexDirection: "column", alignItems: "center",
+  textAlign: "center",
+};
+
+const thStyle: React.CSSProperties = {
+  textAlign: "left", padding: "6px 8px", fontSize: 10, fontWeight: 700,
+  color: "#999", textTransform: "uppercase", letterSpacing: 0.5,
+  borderBottom: "1px solid #ddd6c8",
+};
+
+const tagStyle = (tag: string): React.CSSProperties => ({
+  marginLeft: 6, padding: "1px 5px", borderRadius: 4, fontSize: 9, fontWeight: 700,
+  background: tag === "DPAE" ? "rgba(37,99,235,0.10)" : "rgba(226,127,87,0.10)",
+  color: tag === "DPAE" ? "#2563eb" : "#e27f57",
+  verticalAlign: "middle",
+});
 
 const overlayStyle: React.CSSProperties = {
   position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",

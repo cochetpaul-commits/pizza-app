@@ -1,16 +1,24 @@
 /** Flat design tokens — used directly as T.xxx in hub pages */
 export const T = {
-  // Colors
-  creme: "#f2ede4",
-  terracotta: "#D4775A",
-  jaune: "#F5E642",
-  jauneDark: "#b8a800",
+  // Colors (updated brief Komia)
+  creme: "#f6eedf",
+  cremeLegacy: "#f2ede4",
+  terracotta: "#e27f57",
+  jaune: "#efd199",
+  jauneDark: "#a8893a",
   dark: "#1a1a1a",
   muted: "#999",
   mutedLight: "#b0a894",
   border: "#ddd6c8",
   white: "#fff",
   green: "#22c55e",
+
+  // Brand
+  sidebar: "#1a1512",
+  ifratelli: "#b45f57",
+  belloMio: "#e27f57",
+  piccolaMia: "#efd199",
+  piccolaMiaText: "#a8893a",
 
   // Section accents
   sauge: "#4a6741",       // achats, approvisionnement
@@ -59,9 +67,9 @@ export const TOKENS = {
 export type Restaurant = "bello-mio" | "piccola-mia";
 
 export function accentFor(resto: Restaurant): string {
-  return resto === "piccola-mia" ? T.jaune : T.terracotta;
+  return resto === "piccola-mia" ? T.piccolaMia : T.belloMio;
 }
 
 export function accentDarkFor(resto: Restaurant): string {
-  return resto === "piccola-mia" ? T.jauneDark : T.terracotta;
+  return resto === "piccola-mia" ? T.piccolaMiaText : T.belloMio;
 }

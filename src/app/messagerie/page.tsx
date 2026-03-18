@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { NavBar } from "@/components/NavBar";
+
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
 import { useChannels, useMessages, type ChatChannel } from "@/hooks/useMessages";
@@ -39,7 +39,7 @@ function avatarColor(name: string): string {
 export default function MessageriePage() {
   const { current: etab } = useEtablissement();
   const { isGroupAdmin } = useProfile();
-  const { channels, loading: chLoading, createChannel } = useChannels(etab?.id ?? null);
+  const { channels, loading: chLoading, error: chError, createChannel } = useChannels(etab?.id ?? null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
@@ -83,7 +83,6 @@ export default function MessageriePage() {
 
   return (
     <>
-      <NavBar backHref={etab?.slug === "piccola_mia" ? "/piccola-mia" : "/bello-mio"} backLabel="Accueil" />
       <main style={S.main}>
         <div style={S.container}>
           {/* ── Sidebar (channels) ── */}
@@ -112,7 +111,11 @@ export default function MessageriePage() {
               </div>
             )}
 
-            {chLoading ? (
+            {chError ? (
+              <div style={{ padding: 16, color: "#E65100", fontSize: 12, textAlign: "center", background: "#FFF3E0", borderRadius: 8, margin: "10px 10px 0" }}>
+                Messagerie non disponible — table manquante
+              </div>
+            ) : chLoading ? (
               <div style={{ padding: 20, color: "#999", fontSize: 13, textAlign: "center" }}>Chargement...</div>
             ) : channels.length === 0 ? (
               <div style={{ padding: 20, color: "#999", fontSize: 13, textAlign: "center" }}>Aucun canal</div>

@@ -1,8 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
-import { NavBar } from "@/components/NavBar";
+
 import { fetchApi } from "@/lib/fetchApi";
 
 type InvoiceLine = {
@@ -122,8 +121,6 @@ export default function LmdwInvoicePage() {
   const parsed = preview?.parsed;
 
   return (
-    <>
-    <NavBar backHref="/invoices" backLabel="Factures" right={<Link href="/ingredients" className="btn">Index ingredients</Link>} />
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "2rem" }}>
 
       <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1.5rem" }}>
@@ -312,7 +309,6 @@ export default function LmdwInvoicePage() {
         </div>
       )}
     </div>
-    </>
   );
 }
 

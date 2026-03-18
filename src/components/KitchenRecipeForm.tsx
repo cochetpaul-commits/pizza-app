@@ -4,12 +4,11 @@ import { offerRowToCpu } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
 import Link from "next/link";
-import { NavBar } from "@/components/NavBar";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { fetchApi } from "@/lib/fetchApi";
+
 import type { Ingredient } from "@/lib/types";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { AllergenBadges } from "@/components/AllergenBadges";
@@ -61,7 +60,7 @@ type LineUI = {
   ingredient_cost_per_unit?: number | null;
 };
 
-type PgError = { code?: string; message?: string };
+
 
 type DbLine = {
   id?: unknown;
@@ -172,10 +171,10 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
     establishments: string[];
   } | null>(null);
 
-  const [saving, setSaving] = useState(false);
-  const [saveOk, setSaveOk] = useState(false);
+  const [saving] = useState(false);
+
   const [saveError, setSaveError] = useState<unknown>(null);
-  const [savingIndex, setSavingIndex] = useState(false);
+
 
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -754,329 +753,53 @@ if (supplierIds.length) {
     setPhotoError(null);
   }
 
-  const exportPdf = async () => {
-    try {
-      if (!recipeId) {
-        setSaveError({ message: "PDF: sauvegarde d’abord la recette (il faut un ID)." });
-        return;
-      }
-
-      const { data: session } = await supabase.auth.getSession();
-      const token = session.session?.access_token;
-      if (!token) throw new Error("Token manquant (session)");
-
-      const res = await fetchApi("/api/kitchen/pdf", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ recipeId: recipeId }),
-      });
-
-      if (!res.ok) {
-        const j = await res.json().catch(() => null);
-        throw new Error(j?.message ? `${j.message}${j.details ? ` — ${j.details}` : ""}` : `HTTP ${res.status}`);
-      }
-
-      const blob = await res.blob();
-      const cd = res.headers.get("content-disposition") || "";
-      const match = cd.match(/filename="([^"]+)"/);
-      const filename = match?.[1] || "recette-cuisine.pdf";
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 800);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "";
-      setSaveError({ message: "Export PDF cuisine impossible", details: msg });
-    }
-  };
-
-  const save = async () => {
-    if (!form) return;
-    if (saving) return;
-
-    setSaveError(null);
-    setSaveOk(false);
-
-    const nm = form.name.trim();
-    if (!nm) {
-      setSaveError({ message: "Nom obligatoire" });
-      return;
-    }
-
-    if (!form.category) {
-      setSaveError({ message: "Catégorie obligatoire" });
-      return;
-    }
-
-    if (yieldGramsNum <= 0) {
-      setSaveError({ message: "Rendement (g) invalide" });
-      return;
-    }
-    if (portionsNum <= 0) {
-      setSaveError({ message: "Nombre de portions invalide" });
-      return;
-    }
-
-    const { data: auth, error: authErr } = await supabase.auth.getUser();
-    if (authErr) {
-      setSaveError(authErr);
-      return;
-    }
-    if (!auth.user) {
-      setSaveError({ message: "NOT_LOGGED" });
-      return;
-    }
-
-    setSaving(true);
-
-    let id = recipeId;
-
-    const recipePayload: Record<string, unknown> = {
-      name: nm,
-      category: form.category || "plat_cuisine",
-      yield_grams: round0(yieldGramsNum),
-      portions_count: round0(portionsNum),
-      vat_rate: form.vat_rate,
-      margin_rate: round2(marginPct),
-      notes: form.notes?.trim() || null,
-      procedure: form.procedure?.trim() || null,
-      output_ingredient_id: form.output_ingredient_id ?? null,
-      photo_url: photoUrl || null,
-      establishments: form.establishments,
-      updated_at: new Date().toISOString(),
-      is_active: true,
-      is_draft: false,
-      total_cost: round2(computed.totalCost),
-      cost_per_kg: round2(computed.costPerKg),
-      cost_per_portion: round2(computed.costPerPortion),
-    };
-
-    if (!id) {
-      recipePayload.user_id = auth.user.id;
-      const { data, error: insErr } = await supabase
-        .from("kitchen_recipes")
-        .insert(recipePayload)
-        .select("id")
-        .single<{ id: string }>();
-      if (insErr) {
-        setSaving(false);
-        setSaveError(insErr);
-        return;
-      }
-      id = data?.id;
-      if (!id) {
-        setSaving(false);
-        setSaveError({ message: "ID manquant après création" });
-        return;
-      }
-    } else {
-      const { error: updErr } = await supabase.from("kitchen_recipes").update(recipePayload).eq("id", id);
-      if (updErr) {
-        setSaving(false);
-        setSaveError(updErr);
-        return;
-      }
-    }
-
-    const { error: delErr } = await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", id);
-    if (delErr) {
-      setSaving(false);
-      setSaveError(delErr);
-      return;
-    }
-
-    const cleaned = (lines ?? [])
-      .slice()
-      .filter((l) => l.ingredient_id && n2(l.qty) > 0)
-      .sort((a, b) => n2(a.sort_order) - n2(b.sort_order))
-      .map((l, idx) => ({
-        recipe_id: id,
-        ingredient_id: l.ingredient_id,
-        qty: n2(l.qty),
-        unit: l.unit,
-        sort_order: idx,
-      }));
-
-    if (cleaned.length) {
-      const { error: insLinesErr } = await supabase.from("kitchen_recipe_lines").insert(cleaned);
-      if (insLinesErr) {
-        setSaving(false);
-        setSaveError(insLinesErr);
-        return;
-      }
-    }
-
-    setSaving(false);
-    setSaveOk(true);
-    setTimeout(() => setSaveOk(false), 900);
-
-    if (!recipeId) {
-      router.replace(`/kitchen/${id}`);
-    }
-  };
-
-  const saveAsIngredient = async () => {
-    if (!form) return;
-    if (!recipeId) {
-      setSaveError({ message: "Sauvegarde d’abord la fiche avant enregistrement dans l???index." });
-      return;
-    }
-    if (savingIndex) return;
-
-    setSavingIndex(true);
-    setSaveError(null);
-
-    try {
-      if (computed.missing) throw new Error("Un ou plusieurs ingrédients n’ont pas de prix (cost_per_unit manquant).");
-      if (yieldGramsNum <= 0) throw new Error("Rendement (g) invalide.");
-      if (computed.totalCost <= 0) throw new Error("Coût total invalide.");
-
-      const totalCost = round2(computed.totalCost);
-      const totalWeight = round0(yieldGramsNum);
-      const name = (form.name.trim() || "Recette cuisine").slice(0, 120);
-      const cpu = totalWeight > 0 ? totalCost / totalWeight : 0; // €/g
-      if (!(cpu > 0)) throw new Error("Coût/unité invalide (???/g).");
-
-      const ingredientPayload: Record<string, unknown> = {
-        name,
-        category: "preparation",
-        is_active: true,
-        default_unit: "g",
-        purchase_price: totalCost,
-        purchase_unit: totalWeight,
-        purchase_unit_label: "g",
-        updated_at: new Date().toISOString(),
-      };
-
-      const bindToRecipe = async (ingredientId: string) => {
-        const { error: eBind } = await supabase
-          .from("kitchen_recipes")
-          .update({ output_ingredient_id: ingredientId, updated_at: new Date().toISOString() })
-          .eq("id", recipeId);
-        if (eBind) throw eBind;
-        setForm((p) => (p ? { ...p, output_ingredient_id: ingredientId } : p));
-      };
-
-      if (form.output_ingredient_id) {
-        const { error: eUpd } = await supabase.from("ingredients").update(ingredientPayload).eq("id", form.output_ingredient_id);
-        if (eUpd) throw eUpd;
-        return;
-      }
-
-      const { data: ins, error: eIns } = await supabase.from("ingredients").insert(ingredientPayload).select("id").single();
-
-      if (eIns) {
-        const pgCode = (eIns as PgError | null)?.code;
-        const msg = String((eIns as PgError | null)?.message ?? "");
-        if (pgCode === "23505" || msg.includes("duplicate key")) {
-          const { data: existing, error: eFind } = await supabase.from("ingredients").select("id").eq("name", name).maybeSingle();
-          if (eFind) throw eFind;
-          const existingId = getString(getObj(existing)?.["id"], "");
-          if (!existingId) throw eIns;
-
-          const { error: eUpd2 } = await supabase.from("ingredients").update(ingredientPayload).eq("id", existingId);
-          if (eUpd2) throw eUpd2;
-
-          await bindToRecipe(existingId);
-          return;
-        }
-        throw eIns;
-      }
-
-      const newId = getString(getObj(ins)?.["id"], "");
-      if (!newId) throw new Error("ID ingrédient manquant après création");
-
-      await bindToRecipe(newId);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : JSON.stringify(e);
-      setSaveError({ message: "Index impossible", details: msg });
-    } finally {
-      setSavingIndex(false);
-    }
-  };
-
   if (status === "loading") {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=cuisine" backLabel="Cuisine" />
-        <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
-          <div style={{ maxWidth: 980, margin: "0 auto", color: theme.muted }}>Chargement…</div>
-        </main>
-      </>
+      <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
+        <div style={{ maxWidth: 980, margin: "0 auto", color: theme.muted }}>Chargement…</div>
+      </main>
     );
   }
 
   if (status === "NOT_LOGGED") {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=cuisine" backLabel="Cuisine" />
-        <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
-          <div style={{ maxWidth: 980, margin: "0 auto" }}>
-            <div style={{ color: theme.muted }}>NOT_LOGGED</div>
-            <Link
-              href="/login"
-              style={{
-                display: "inline-block",
-                marginTop: 12,
-                padding: "10px 14px",
-                borderRadius: 12,
-                background: theme.primary,
-                color: theme.primaryText,
-                textDecoration: "none",
-                fontWeight: 900,
-              }}
-            >
-              Aller sur /login
-            </Link>
-          </div>
-        </main>
-      </>
+      <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
+        <div style={{ maxWidth: 980, margin: "0 auto" }}>
+          <div style={{ color: theme.muted }}>NOT_LOGGED</div>
+          <Link
+            href="/login"
+            style={{
+              display: "inline-block",
+              marginTop: 12,
+              padding: "10px 14px",
+              borderRadius: 12,
+              background: theme.primary,
+              color: theme.primaryText,
+              textDecoration: "none",
+              fontWeight: 900,
+            }}
+          >
+            Aller sur /login
+          </Link>
+        </div>
+      </main>
     );
   }
 
   if (status === "ERROR" || !form) {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=cuisine" backLabel="Cuisine" />
-        <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
-          <div style={{ maxWidth: 980, margin: "0 auto" }}>
-            <h1 style={{ marginTop: 14, marginBottom: 10 }}>Erreur</h1>
-            <pre style={{ background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, overflow: "auto" }}>
-              {JSON.stringify(error, null, 2)}
-            </pre>
-          </div>
-        </main>
-      </>
+      <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
+        <div style={{ maxWidth: 980, margin: "0 auto" }}>
+          <h1 style={{ marginTop: 14, marginBottom: 10 }}>Erreur</h1>
+          <pre style={{ background: "#fff", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, overflow: "auto" }}>
+            {JSON.stringify(error, null, 2)}
+          </pre>
+        </div>
+      </main>
     );
   }
 
   return (
-    <>
-      <NavBar
-        backHref="/recettes?tab=cuisine"
-        backLabel="Cuisine"
-        right={
-          <>
-            <button type="button" onClick={exportPdf} disabled={saving || !isEdit} style={btn}>
-              PDF
-            </button>
-            <button type="button" onClick={saveAsIngredient} disabled={savingIndex || saving || !isEdit} style={btn}>
-              {savingIndex ? "Index…" : form.output_ingredient_id ? "MAJ index" : "Index"}
-            </button>
-            <button type="button" onClick={save} disabled={saving} style={btnPrimary}>
-              {saving ? "Sauvegarde…" : saveOk ? "OK" : "Sauvegarder"}
-            </button>
-          </>
-        }
-      />
       <main style={{ background: theme.bg, minHeight: "100vh", padding: 16, color: theme.text }}>
       <div style={{ maxWidth: 980, margin: "0 auto" }}>
         <div style={{ marginTop: 10 }}>
@@ -1438,6 +1161,5 @@ if (supplierIds.length) {
         <div style={{ height: 28 }} />
       </div>
     </main>
-    </>
   );
 }

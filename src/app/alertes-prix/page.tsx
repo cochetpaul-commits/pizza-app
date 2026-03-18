@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { NavBar } from "@/components/NavBar";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchPriceAlerts, PriceAlert, ALERT_THRESHOLD } from "@/lib/priceAlerts";
 import Link from "next/link";
@@ -91,14 +90,7 @@ export default function AleretesPrixPage() {
   const active = [...activeUp, ...activeDown];
 
   return (
-    <>
-      <NavBar
-        backHref="/"
-        right={
-          <Link href="/variations-prix" className="btn">Variations</Link>
-        }
-      />
-      <main className="container safe-bottom">
+    <main className="container safe-bottom">
         <div style={{ marginBottom: 20 }}>
           <h1 className="h1" style={{ display: "flex", alignItems: "center", gap: 10 }}>
             Alertes prix
@@ -172,8 +164,7 @@ export default function AleretesPrixPage() {
             )}
           </>
         )}
-      </main>
-    </>
+    </main>
   );
 }
 

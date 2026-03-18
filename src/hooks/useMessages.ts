@@ -23,6 +23,7 @@ export type ChatMessage = {
 export function useChannels(etablissementId: string | null) {
   const [channels, setChannels] = useState<ChatChannel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const fetchChannels = useCallback(async () => {
     const query = supabase
@@ -34,7 +35,8 @@ export function useChannels(etablissementId: string | null) {
       query.or(`etablissement_id.eq.${etablissementId},etablissement_id.is.null`);
     }
 
-    const { data } = await query;
+    const { data, error: err } = await query;
+    if (err) setError(true);
     setChannels((data ?? []) as ChatChannel[]);
     setLoading(false);
   }, [etablissementId]);
@@ -57,7 +59,7 @@ export function useChannels(etablissementId: string | null) {
     return ch;
   }, [etablissementId]);
 
-  return { channels, loading, createChannel, refetch: fetchChannels };
+  return { channels, loading, error, createChannel, refetch: fetchChannels };
 }
 
 export function useMessages(channelId: string | null) {

@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
-import { NavBar } from "@/components/NavBar";
 
 export default function NewPrepRecipePage() {
   const router = useRouter();
@@ -39,23 +38,17 @@ export default function NewPrepRecipePage() {
 
   if (errorMsg) {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=pivot" backLabel="Préparations" />
-        <main className="container">
-          <TopNav title="Nouvelle recette pivot" />
-          <p className="muted" style={{ marginTop: 12 }}>{errorMsg}</p>
-        </main>
-      </>
+      <main className="container">
+        <TopNav title="Nouvelle recette pivot" />
+        <p className="muted" style={{ marginTop: 12 }}>{errorMsg}</p>
+      </main>
     );
   }
 
   return (
-    <>
-      <NavBar backHref="/recettes?tab=pivot" backLabel="Préparations" />
-      <main className="container">
-        <TopNav title="Nouvelle recette pivot" />
-        <p className="muted" style={{ marginTop: 12 }}>Création…</p>
-      </main>
-    </>
+    <main className="container">
+      <TopNav title="Nouvelle recette pivot" />
+      <p className="muted" style={{ marginTop: 12 }}>Création…</p>
+    </main>
   );
 }

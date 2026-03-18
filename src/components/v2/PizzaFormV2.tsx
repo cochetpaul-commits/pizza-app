@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
-import { NavBar } from "@/components/NavBar";
 import { TopNav } from "@/components/TopNav";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { AllergenBadges } from "@/components/AllergenBadges";
@@ -449,55 +448,49 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
   const title = name || (isEdit ? "Fiche pizza" : "Nouvelle pizza");
 
+  const actionButtons = (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+      <button type="button" className="btn" onClick={() => { setProdMode(m => !m); setProdQty(""); }}
+        style={prodMode ? { background: "#4a6741", color: "white", borderColor: "#4a6741" } : undefined}>
+        {prodMode ? "Mode normal" : "Mode production"}
+      </button>
+      {isEdit && (
+        <button type="button" className="btn" onClick={handleExportPdf} disabled={pdfLoading}>
+          {pdfLoading ? "Export\u2026" : "Exporter PDF"}
+        </button>
+      )}
+      {!prodMode && isEdit && userCanWrite && (
+        <button type="button" className="btn" onClick={handleDelete} style={{ color: "#d93f3f" }}>Supprimer</button>
+      )}
+      {!prodMode && userCanWrite && (
+        <button onClick={handleSave} disabled={saving} className="btn btnPrimary">
+          {saving ? "Sauvegarde\u2026" : "Sauvegarder"}
+        </button>
+      )}
+    </div>
+  );
+
   if (status === "loading") {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=pizza" backLabel="Recettes" />
-        <main className="container"><div className="muted" style={{ marginTop: 40, textAlign: "center" }}>Chargement…</div></main>
-      </>
+      <main className="container"><div className="muted" style={{ marginTop: 40, textAlign: "center" }}>Chargement…</div></main>
     );
   }
   if (status === "error") {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=pizza" backLabel="Recettes" />
-        <main className="container"><pre className="errorBox">{JSON.stringify(error, null, 2)}</pre></main>
-      </>
+      <main className="container"><pre className="errorBox">{JSON.stringify(error, null, 2)}</pre></main>
     );
   }
 
   return (
     <>
-      <NavBar
-        backHref="/recettes?tab=pizza"
-        backLabel="Recettes"
-        menuItems={[
-          {
-            label: prodMode ? "Mode normal" : "Mode production",
-            onClick: () => { setProdMode(m => !m); setProdQty(""); },
-            style: prodMode
-              ? { background: "#4a6741", color: "white", borderColor: "#4a6741" }
-              : undefined,
-          },
-          ...(isEdit ? [{
-            label: pdfLoading ? "Export…" : "Exporter PDF",
-            onClick: handleExportPdf,
-            disabled: pdfLoading,
-          }] : []),
-          ...(!prodMode && isEdit && userCanWrite ? [{
-            label: "Supprimer",
-            onClick: handleDelete,
-            style: { color: "#d93f3f" } as React.CSSProperties,
-          }] : []),
-        ]}
-        primaryAction={!prodMode && userCanWrite ? (
-          <button onClick={handleSave} disabled={saving} className="btn btnPrimary">
-            {saving ? "Sauvegarde…" : "Sauvegarder"}
-          </button>
-        ) : undefined}
-      />
 
       <main className="container safe-bottom">
+        {/* ── Inline actions ── */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a" }}>{title}</h1>
+          {actionButtons}
+        </div>
+
         {/* ── MODE PRODUCTION ── */}
         {prodMode ? (
           <>

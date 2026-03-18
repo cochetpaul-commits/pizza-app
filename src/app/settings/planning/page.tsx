@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { NavBar } from "@/components/NavBar";
+
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 
@@ -245,7 +245,6 @@ export default function SettingsPlanningPage() {
   if (loading) {
     return (
       <RequireRole allowedRoles={["group_admin"]}>
-        <NavBar backHref="/rh/equipe" backLabel="RH" />
         <div style={pageStyle}>
           <div style={{ textAlign: "center", padding: 40, color: "#999" }}>Chargement...</div>
         </div>
@@ -255,8 +254,6 @@ export default function SettingsPlanningPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <NavBar backHref="/rh/equipe" backLabel="RH" />
-
       <div style={pageStyle}>
         {/* Header */}
         <div style={{ marginBottom: 16 }}>

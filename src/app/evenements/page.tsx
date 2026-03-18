@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { NavBar } from "@/components/NavBar";
+
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 
@@ -165,15 +165,6 @@ export default function EventsPage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
     <>
-      <NavBar
-        backHref="/"
-        backLabel="Dashboard"
-        primaryAction={
-          <Link href="/evenements/new" className="btn btnPrimary" style={{ background: "#D4775A", borderColor: "#D4775A" }}>
-            + Événement
-          </Link>
-        }
-      />
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "12px 16px 40px" }}>
         <h1 style={{ fontSize: "1.4rem", fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", letterSpacing: 1.5, textTransform: "uppercase" as const, color: "#2f3a33", margin: "0 0 16px" }}>
           Événements

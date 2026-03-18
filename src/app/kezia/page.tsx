@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { NavBar } from "@/components/NavBar";
+
 import { fetchApi } from "@/lib/fetchApi";
 import type { KeziaDaily } from "@/lib/kezia/keziaParser";
 
@@ -97,7 +97,6 @@ export default function KeziaImportPage() {
 
   return (
     <>
-      <NavBar backHref="/piccola-mia/gestion" backLabel="Gestion" />
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "2rem" }}>
         <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "0.5rem" }}>
           Import Kezia

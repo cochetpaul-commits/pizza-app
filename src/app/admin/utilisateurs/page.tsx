@@ -18,6 +18,7 @@ type UserRow = {
 
 const ROLE_LABELS: Record<Role, string> = {
   group_admin: "Direction",
+  manager: "Manager",
   cuisine: "Cuisine",
   salle: "Salle",
   plonge: "Plonge",
@@ -25,6 +26,7 @@ const ROLE_LABELS: Record<Role, string> = {
 
 const ROLE_COLORS: Record<Role, string> = {
   group_admin: "#D4775A",
+  manager: "#2563eb",
   cuisine: "#1a1a1a",
   salle: "#4a6741",
   plonge: "#6b7280",
@@ -190,6 +192,7 @@ function UsersContent() {
                     <option value="cuisine">Cuisine</option>
                     <option value="salle">Salle</option>
                     <option value="plonge">Plonge</option>
+                    <option value="manager">Manager</option>
                     <option value="group_admin">Direction</option>
                   </select>
                 </div>

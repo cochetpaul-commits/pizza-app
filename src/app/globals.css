@@ -2,11 +2,13 @@
 @import "tailwindcss";
 
 :root{
-  --creme: #f2ede4;
+  --creme: #f6eedf;
   --creme-dark: #e8e0d0;
-  --terre: #D4775A;
+  --terre: #e27f57;
   --terre-light: #c9b99a;
   --noir: #1a1a1a;
+  --sidebar-width: 240px;
+  --etab-color: #b45f57;
   --sauge: #4a6741;
   --sauge-light: #e8ede6;
   --bordeaux: #8B1A1A;
@@ -56,6 +58,34 @@ html, body{
 
 .page-root {
   background: var(--creme) !important;
+}
+
+/* ── AppShell Layout ───────────────────────────────── */
+
+.sidebar-desktop {
+  display: block;
+}
+
+.topbar-mobile {
+  display: none !important;
+}
+
+.app-main {
+  margin-left: var(--sidebar-width);
+  min-height: 100dvh;
+  background: var(--creme);
+}
+
+@media (max-width: 767px) {
+  .sidebar-desktop {
+    display: none;
+  }
+  .topbar-mobile {
+    display: flex !important;
+  }
+  .app-main {
+    margin-left: 0;
+  }
 }
 
 /* selects : même look que les inputs */

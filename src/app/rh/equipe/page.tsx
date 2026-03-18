@@ -3,13 +3,21 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
 import { AddCollaborateurModal } from "@/components/rh/AddCollaborateurModal";
 
 /* ── Types ─────────────────────────────────────────────────────── */
+
+type Contrat = {
+  id: string;
+  employe_id: string;
+  type: string;
+  heures_semaine: number;
+  emploi: string | null;
+  actif: boolean;
+};
 
 type Employe = {
   id: string;
@@ -20,50 +28,78 @@ type Employe = {
   actif: boolean;
   etablissement_id: string;
   equipes_access: string[];
-  contrats: {
-    type: string;
-    heures_semaine: number;
-    emploi: string | null;
-    actif: boolean;
-  }[];
+  email: string | null;
+  tel_mobile: string | null;
+  date_naissance: string | null;
+  adresse: string | null;
+  code_postal: string | null;
+  ville: string | null;
+  role: string | null;
+  code_pin: string | null;
 };
 
-type Poste = {
-  id: string;
-  equipe: string;
-  nom: string;
-  couleur: string;
-  emoji: string | null;
-  actif: boolean;
-};
-
-type EquipeFilter = "tous" | "Cuisine" | "Salle" | "Shop";
 type StatutFilter = "actif" | "inactif" | "tous";
 
 /* ── Helpers ───────────────────────────────────────────────────── */
 
-const CONTRAT_LABELS: Record<string, string> = {
-  CDI: "CDI",
-  CDD: "CDD",
-  extra: "Extra",
-  interim: "Intérim",
-  apprenti: "Apprenti",
-  stagiaire: "Stagiaire",
-  TNS: "TNS",
-};
-
-const CONTRAT_COLORS: Record<string, { bg: string; fg: string }> = {
-  CDI: { bg: "#e8ede6", fg: "#4a6741" },
-  CDD: { bg: "rgba(37,99,235,0.10)", fg: "#2563eb" },
-  extra: { bg: "#FFF3E0", fg: "#E65100" },
-  interim: { bg: "#F3E5F5", fg: "#7B1FA2" },
-  TNS: { bg: "rgba(160,132,92,0.12)", fg: "#A0845C" },
-  apprenti: { bg: "#E0F7FA", fg: "#00695C" },
-  stagiaire: { bg: "#e8e0d0", fg: "#999999" },
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Administrateur",
+  manager: "Manager",
+  employe: "Employe",
 };
 
 function getInitials(prenom: string, nom: string): string {
   return ((prenom?.[0] ?? "") + (nom?.[0] ?? "")).toUpperCase();
+}
+
+function getEtabColor(etabSlug?: string): string {
+  if (etabSlug === "piccola-mia" || etabSlug === "piccola_mia" || etabSlug === "piccola") return "#efd199";
+  if (etabSlug === "bello-mio" || etabSlug === "bello_mia") return "#e27f57";
+  return "#D4775A";
+}
+
+function computeCompletude(emp: Employe, hasActiveContrat: boolean): number {
+  let filled = 0;
+  const total = 9;
+  // Basic (4)
+  if (emp.prenom) filled++;
+  if (emp.nom) filled++;
+  if (emp.email) filled++;
+  if (emp.tel_mobile) filled++;
+  // Personal (4)
+  if (emp.date_naissance) filled++;
+  if (emp.adresse) filled++;
+  if (emp.code_postal) filled++;
+  if (emp.ville) filled++;
+  // Contract (1)
+  if (hasActiveContrat) filled++;
+  return Math.round((filled / total) * 100);
+}
+
+function progressColor(pct: number): string {
+  if (pct >= 80) return "#4a6741";
+  if (pct >= 50) return "#d4920a";
+  return "#c0392b";
+}
+
+/* ── Eye Icon SVG ──────────────────────────────────────────────── */
+
+function EyeIcon({ open }: { open: boolean }) {
+  if (open) {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  );
 }
 
 /* ── Component ─────────────────────────────────────────────────── */
@@ -74,11 +110,11 @@ export default function EquipePage() {
   const { canWrite } = useProfile();
 
   const [employes, setEmployes] = useState<Employe[]>([]);
-  const [postes, setPostes] = useState<Poste[]>([]);
+  const [contrats, setContrats] = useState<Contrat[]>([]);
   const [loading, setLoading] = useState(true);
-  const [equipeFilter, setEquipeFilter] = useState<EquipeFilter>("tous");
   const [statutFilter, setStatutFilter] = useState<StatutFilter>("actif");
   const [search, setSearch] = useState("");
+  const [revealedPins, setRevealedPins] = useState<Set<string>>(new Set());
 
   // ── Modal state ──
   const [showModal, setShowModal] = useState(false);
@@ -89,122 +125,83 @@ export default function EquipePage() {
     (async () => {
       if (!etab) return;
       setLoading(true);
-      const [empRes, postesRes] = await Promise.all([
+      const [empRes, contratRes] = await Promise.all([
         supabase
           .from("employes")
-          .select("id, prenom, nom, initiales, avatar_url, actif, etablissement_id, equipes_access, contrats(type, heures_semaine, emploi, actif)")
+          .select("id, prenom, nom, initiales, avatar_url, actif, etablissement_id, equipes_access, email, tel_mobile, date_naissance, adresse, code_postal, ville, role, code_pin")
           .eq("etablissement_id", etab.id)
           .order("nom", { ascending: true }),
         supabase
-          .from("postes")
-          .select("id, equipe, nom, couleur, emoji, actif")
-          .eq("etablissement_id", etab.id)
-          .eq("actif", true)
-          .order("equipe")
-          .order("nom"),
+          .from("contrats")
+          .select("id, employe_id, type, heures_semaine, emploi, actif")
+          .eq("actif", true),
       ]);
       if (cancelled) return;
       setEmployes(empRes.data ?? []);
-      setPostes(postesRes.data ?? []);
+      setContrats(contratRes.data ?? []);
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [etab]);
 
+  /* ── Helpers for contrats ── */
+  const hasActiveContrat = (empId: string) => {
+    return contrats.some((c) => c.employe_id === empId && c.actif);
+  };
+
   /* ── Filtered list ── */
   const filtered = employes.filter((e) => {
-    // Statut
     if (statutFilter === "actif" && !e.actif) return false;
     if (statutFilter === "inactif" && e.actif) return false;
-
-    // Equipe
-    if (equipeFilter !== "tous") {
-      const access = e.equipes_access ?? [];
-      if (access.length > 0 && !access.includes(equipeFilter)) return false;
-    }
-
-    // Search
     if (search) {
       const q = search.toLowerCase();
       const full = `${e.prenom} ${e.nom}`.toLowerCase();
       if (!full.includes(q)) return false;
     }
-
     return true;
   });
+
+  const togglePin = (id: string) => {
+    setRevealedPins((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const loadData = () => {
     window.location.reload();
   };
 
-  /* ── Postes by equipe (for summary) ── */
-  const equipes = ["Cuisine", "Salle", "Shop"] as const;
-  const postesByEquipe = equipes.reduce(
-    (acc, eq) => {
-      acc[eq] = postes.filter((p) => p.equipe === eq);
-      return acc;
-    },
-    {} as Record<string, Poste[]>,
-  );
-
   /* ── Counts ── */
   const countActif = employes.filter((e) => e.actif).length;
   const countInactif = employes.filter((e) => !e.actif).length;
 
+  const etabColor = getEtabColor(etab?.slug);
+
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <NavBar
-        backHref="/"
-        backLabel="Accueil"
-        primaryAction={
-          canWrite ? (
-            <button
-              type="button"
-              onClick={() => setShowModal(true)}
-              style={primaryBtnStyle}
-            >
-              + Employe
-            </button>
-          ) : undefined
-        }
-        menuItems={canWrite ? [
-          { label: "Rapports", onClick: () => router.push("/rh/rapports") },
-          { label: "Masse salariale", onClick: () => router.push("/rh/masse-salariale") },
-          { label: "Parametres", onClick: () => router.push("/settings/planning") },
-        ] : undefined}
-      />
-
       <div style={pageStyle}>
         {/* ── Header ── */}
-        <div style={{ marginBottom: 20 }}>
-          <h1 style={h1Style}>Equipe</h1>
-          <p style={subtitleStyle}>
-            {countActif} actif{countActif > 1 ? "s" : ""}
-            {countInactif > 0 && (
-              <span style={{ color: "#bbb" }}> · {countInactif} inactif{countInactif > 1 ? "s" : ""}</span>
-            )}
-          </p>
-        </div>
-
-        {/* ── Postes summary ── */}
-        <div style={postesSummaryStyle}>
-          {equipes.map((eq) => {
-            const list = postesByEquipe[eq] ?? [];
-            if (list.length === 0) return null;
-            return (
-              <div key={eq} style={{ marginBottom: 8 }}>
-                <div style={equipeLabelStyle}>{eq}</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {list.map((p) => (
-                    <span key={p.id} style={postePillStyle(p.couleur)}>
-                      {p.emoji && <span style={{ marginRight: 4 }}>{p.emoji}</span>}
-                      {p.nom}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+          <div>
+            <h1 style={h1Style}>Equipe</h1>
+            <p style={subtitleStyle}>
+              {countActif} actif{countActif > 1 ? "s" : ""}
+              {countInactif > 0 && (
+                <span style={{ color: "#bbb" }}> · {countInactif} inactif{countInactif > 1 ? "s" : ""}</span>
+              )}
+            </p>
+          </div>
+          {canWrite && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+              <button type="button" className="btn" onClick={() => router.push("/rh/rapports")}>Rapports</button>
+              <button type="button" className="btn" onClick={() => router.push("/rh/masse-salariale")}>Masse salariale</button>
+              <button type="button" className="btn" onClick={() => router.push("/settings/planning")}>Parametres</button>
+              <button type="button" onClick={() => setShowModal(true)} style={primaryBtnStyle}>+ Employe</button>
+            </div>
+          )}
         </div>
 
         {/* ── Filters ── */}
@@ -214,23 +211,9 @@ export default function EquipePage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher..."
+            placeholder="Rechercher par nom..."
             style={searchStyle}
           />
-
-          {/* Equipe filter */}
-          <div style={{ display: "flex", gap: 4 }}>
-            {(["tous", "Cuisine", "Salle", "Shop"] as EquipeFilter[]).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setEquipeFilter(f)}
-                style={pillBtn(equipeFilter === f)}
-              >
-                {f === "tous" ? "Tous" : f}
-              </button>
-            ))}
-          </div>
 
           {/* Statut filter */}
           <div style={{ display: "flex", gap: 4 }}>
@@ -259,18 +242,20 @@ export default function EquipePage() {
             <table style={tableStyle}>
               <thead>
                 <tr>
-                  <th style={thStyle}></th>
                   <th style={{ ...thStyle, textAlign: "left" }}>Nom</th>
-                  <th style={{ ...thStyle, textAlign: "left" }} className="hide-mobile">Emploi</th>
-                  <th style={{ ...thStyle, textAlign: "center" }} className="hide-mobile">Contrat</th>
-                  <th style={{ ...thStyle, textAlign: "center" }} className="hide-mobile">Heures</th>
-                  <th style={{ ...thStyle, textAlign: "center" }}>Statut</th>
+                  <th style={{ ...thStyle, textAlign: "left" }} className="hide-mobile">Role</th>
+                  <th style={{ ...thStyle, textAlign: "center" }} className="hide-mobile">Code PIN</th>
+                  <th style={{ ...thStyle, textAlign: "left" }} className="hide-mobile">Email</th>
+                  <th style={{ ...thStyle, textAlign: "left" }} className="hide-mobile">Telephone</th>
+                  <th style={{ ...thStyle, textAlign: "center" }} className="hide-mobile">Dossier RH</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((emp) => {
-                  const contrat = emp.contrats?.find((c) => c.actif) ?? emp.contrats?.[0];
                   const initials = emp.initiales || getInitials(emp.prenom, emp.nom);
+                  const pct = computeCompletude(emp, hasActiveContrat(emp.id));
+                  const pinRevealed = revealedPins.has(emp.id);
+                  const role = emp.role ?? "employe";
 
                   return (
                     <tr
@@ -284,57 +269,78 @@ export default function EquipePage() {
                         (e.currentTarget as HTMLElement).style.background = "transparent";
                       }}
                     >
-                      {/* Avatar */}
-                      <td style={{ ...tdStyle, width: 44, paddingRight: 0 }}>
-                        {emp.avatar_url ? (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img
-                            src={emp.avatar_url}
-                            alt=""
-                            style={avatarImgStyle}
-                          />
-                        ) : (
-                          <div style={avatarStyle}>
-                            {initials}
+                      {/* Nom + Avatar + badge */}
+                      <td style={{ ...tdStyle, minWidth: 180 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          {emp.avatar_url ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={emp.avatar_url}
+                              alt=""
+                              style={avatarImgStyle}
+                            />
+                          ) : (
+                            <div style={{ ...avatarStyle, background: etabColor }}>
+                              {initials}
+                            </div>
+                          )}
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 14, color: "#1a1a1a" }}>
+                              {emp.prenom} {emp.nom}
+                            </div>
+                            <span style={statutBadge(emp.actif)}>
+                              {emp.actif ? "Actif" : "Inactif"}
+                            </span>
                           </div>
-                        )}
+                        </div>
                       </td>
 
-                      {/* Nom */}
-                      <td style={{ ...tdStyle, fontWeight: 600 }}>
-                        <div>{emp.prenom} {emp.nom}</div>
-                        {/* Mobile: show emploi inline */}
-                        {contrat?.emploi && (
-                          <div className="show-mobile" style={{ fontSize: 12, color: "#999", fontWeight: 400, marginTop: 2 }}>
-                            {contrat.emploi}
-                          </div>
-                        )}
+                      {/* Role */}
+                      <td style={{ ...tdStyle, color: "#6f6a61", fontSize: 13 }} className="hide-mobile">
+                        {ROLE_LABELS[role] ?? role}
                       </td>
 
-                      {/* Emploi */}
-                      <td style={{ ...tdStyle, color: "#6f6a61" }} className="hide-mobile">
-                        {contrat?.emploi ?? "—"}
-                      </td>
-
-                      {/* Contrat */}
+                      {/* Code PIN */}
                       <td style={{ ...tdStyle, textAlign: "center" }} className="hide-mobile">
-                        {contrat ? (
-                          <span style={contratBadge(contrat.type)}>
-                            {CONTRAT_LABELS[contrat.type] ?? contrat.type}
+                        {emp.code_pin ? (
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontFamily: "monospace", fontSize: 13, letterSpacing: 2 }}>
+                              {pinRevealed ? emp.code_pin : "••••"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); togglePin(emp.id); }}
+                              style={eyeBtnStyle}
+                              title={pinRevealed ? "Masquer" : "Afficher"}
+                            >
+                              <EyeIcon open={pinRevealed} />
+                            </button>
+                          </div>
+                        ) : (
+                          <span style={{ color: "#ccc" }}>—</span>
+                        )}
+                      </td>
+
+                      {/* Email */}
+                      <td style={{ ...tdStyle, fontSize: 13, color: "#6f6a61", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} className="hide-mobile">
+                        {emp.email ?? <span style={{ color: "#ccc" }}>—</span>}
+                      </td>
+
+                      {/* Telephone */}
+                      <td style={{ ...tdStyle, fontSize: 13, color: "#6f6a61" }} className="hide-mobile">
+                        {emp.tel_mobile ?? <span style={{ color: "#ccc" }}>—</span>}
+                      </td>
+
+                      {/* Dossier RH */}
+                      <td style={{ ...tdStyle, textAlign: "center", minWidth: 120 }} className="hide-mobile">
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                          <div style={progressBarBg}>
+                            <div style={{ ...progressBarFill, width: `${pct}%`, background: progressColor(pct) }} />
+                          </div>
+                          <span style={{ fontSize: 11, color: progressColor(pct), fontWeight: 600 }}>
+                            {pct}% — {pct >= 100 ? "Complet" : "Incomplet"}
                           </span>
-                        ) : "—"}
-                      </td>
-
-                      {/* Heures */}
-                      <td style={{ ...tdStyle, textAlign: "center", fontWeight: 600 }} className="hide-mobile">
-                        {contrat ? `${contrat.heures_semaine}h` : "—"}
-                      </td>
-
-                      {/* Statut */}
-                      <td style={{ ...tdStyle, textAlign: "center" }}>
-                        <span style={statutBadge(emp.actif)}>
-                          {emp.actif ? "Actif" : "Inactif"}
-                        </span>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -345,7 +351,7 @@ export default function EquipePage() {
         )}
       </div>
 
-      {/* ── DPAE Wizard Modal ── */}
+      {/* ── Add Employee Modal ── */}
       {showModal && etab && (
         <AddCollaborateurModal
           etablissementId={etab.id}
@@ -392,36 +398,6 @@ const subtitleStyle: React.CSSProperties = {
   fontFamily: "var(--font-dm), 'DM Sans', sans-serif",
 };
 
-const postesSummaryStyle: React.CSSProperties = {
-  background: "#fff",
-  borderRadius: 12,
-  border: "1px solid #ddd6c8",
-  padding: "14px 16px",
-  marginBottom: 16,
-};
-
-const equipeLabelStyle: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  textTransform: "uppercase",
-  letterSpacing: 1,
-  color: "#999",
-  marginBottom: 6,
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-};
-
-const postePillStyle = (color: string): React.CSSProperties => ({
-  display: "inline-flex",
-  alignItems: "center",
-  padding: "3px 10px",
-  borderRadius: 20,
-  fontSize: 12,
-  fontWeight: 600,
-  background: `${color}18`,
-  color,
-  border: `1px solid ${color}30`,
-});
-
 const filtersRow: React.CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
@@ -431,8 +407,8 @@ const filtersRow: React.CSSProperties = {
 };
 
 const searchStyle: React.CSSProperties = {
-  flex: "1 1 160px",
-  minWidth: 120,
+  flex: "1 1 200px",
+  minWidth: 140,
   padding: "7px 12px",
   borderRadius: 8,
   border: "1px solid #ddd6c8",
@@ -496,6 +472,7 @@ const avatarStyle: React.CSSProperties = {
   fontSize: 13,
   fontWeight: 700,
   fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+  flexShrink: 0,
 };
 
 const avatarImgStyle: React.CSSProperties = {
@@ -503,30 +480,44 @@ const avatarImgStyle: React.CSSProperties = {
   height: 34,
   borderRadius: "50%",
   objectFit: "cover",
-};
-
-const contratBadge = (type: string): React.CSSProperties => {
-  const c = CONTRAT_COLORS[type] ?? { bg: "#e8e0d0", fg: "#999" };
-  return {
-    display: "inline-block",
-    padding: "2px 10px",
-    borderRadius: 8,
-    fontSize: 12,
-    fontWeight: 700,
-    background: c.bg,
-    color: c.fg,
-  };
+  flexShrink: 0,
 };
 
 const statutBadge = (actif: boolean): React.CSSProperties => ({
   display: "inline-block",
-  padding: "2px 10px",
+  padding: "1px 8px",
   borderRadius: 8,
-  fontSize: 12,
+  fontSize: 11,
   fontWeight: 700,
   background: actif ? "#e8ede6" : "#f0f0f0",
   color: actif ? "#4a6741" : "#bbb",
+  marginTop: 2,
 });
+
+const eyeBtnStyle: React.CSSProperties = {
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  padding: 2,
+  color: "#999",
+  display: "inline-flex",
+  alignItems: "center",
+};
+
+const progressBarBg: React.CSSProperties = {
+  width: "100%",
+  maxWidth: 80,
+  height: 4,
+  borderRadius: 2,
+  background: "#eee",
+  overflow: "hidden",
+};
+
+const progressBarFill: React.CSSProperties = {
+  height: "100%",
+  borderRadius: 2,
+  transition: "width 0.3s",
+};
 
 const primaryBtnStyle: React.CSSProperties = {
   display: "inline-flex",

@@ -5,14 +5,13 @@ import { compressImage } from "@/lib/compressImage";
 import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+
 import { supabase } from "@/lib/supabaseClient";
 import PizzaIngredientList from "@/components/PizzaIngredientList";
-import { fetchApi } from "@/lib/fetchApi";
+
 import type { Ingredient, PizzaIngredientRow, UnitType } from "@/lib/types";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { TopNav } from "@/components/TopNav";
-import { NavBar } from "@/components/NavBar";
 import { AllergenBadges } from "@/components/AllergenBadges";
 import { parseAllergens, mergeAllergens } from "@/lib/allergens";
 
@@ -72,59 +71,8 @@ function normalizeUnit(u: unknown): UnitType {
   return allowed.includes(s as UnitType) ? (s as UnitType) : "g";
 }
 
-function normalizeRows(all: PizzaIngredientRow[]) {
-  const cleaned: PizzaIngredientRow[] = all
-    .filter((r) => r.ingredient_id)
-    .map((r) => {
-      const qty: number | "" =
-        r.qty === ""
-          ? ""
-          : typeof r.qty === "number"
-          ? r.qty
-          : (() => {
-              const n = Number(String(r.qty).replace(",", "."));
-              return Number.isFinite(n) ? n : "";
-            })();
-
-      return {
-        ...r,
-        qty,
-        unit: normalizeUnit(r.unit),
-        sort_order: Number.isFinite(Number(r.sort_order)) ? Number(r.sort_order) : 0,
-      } as PizzaIngredientRow;
-    });
-
-  const out: PizzaIngredientRow[] = [];
-  (["pre", "post"] as const).forEach((stage) => {
-    const stageRows = cleaned
-      .filter((r) => r.stage === stage)
-      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-
-    stageRows.forEach((r, i) => out.push({ ...r, sort_order: i }));
-  });
-
-  return out;
-}
-
-function validateRows(rows: PizzaIngredientRow[]) {
-  const seen = new Set<string>();
-
-  for (const r of rows) {
-    if (!r.ingredient_id) return { ok: false as const, message: "Ingrédient manquant dans une ligne." };
-    const qty = typeof r.qty === "number" ? r.qty : NaN;
-    if (!Number.isFinite(qty) || qty <= 0) return { ok: false as const, message: "Quantité invalide (doit être > 0)." };
-    if (!r.unit) return { ok: false as const, message: "Unité manquante." };
-
-    const k = `${r.stage}:${r.ingredient_id}`;
-    if (seen.has(k)) return { ok: false as const, message: "Doublon ingrédient dans la même section (avant/après four)." };
-    seen.add(k);
-  }
-
-  return { ok: true as const };
-}
 
 export default function PizzaForm(props: { pizzaId?: string }) {
-  const router = useRouter();
   const isEdit = Boolean(props.pizzaId);
   const pizzaId = props.pizzaId ?? null;
 
@@ -163,8 +111,6 @@ export default function PizzaForm(props: { pizzaId?: string }) {
   const [vatRate, setVatRate] = useState<string>("10");
   const [marginRate, setMarginRate] = useState<string>("75");
 
-  const [saving, setSaving] = useState(false);
-  const [saveOk, setSaveOk] = useState(false);
   const [saveError, setSaveError] = useState<unknown>(null);
 
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -635,206 +581,42 @@ setPriceLabelByIngredient(priceLabelMap);
     setForm((p) => (p ? { ...p, photo_url: "" } : p));
   }
 
-  const exportPdf = async () => {
-    try {
-      if (!pizzaId) {
-        setSaveError({ message: "Sauvegarde d'abord la pizza avant export PDF." });
-        return;
-      }
-
-      const { data: session } = await supabase.auth.getSession();
-      const token = session.session?.access_token;
-      if (!token) throw new Error("Token manquant (session)");
-
-      const res = await fetchApi("/api/pizzas/pdf", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ pizzaId }),
-      });
-
-      if (!res.ok) {
-        const j = await res.json().catch(() => null);
-        throw new Error(j?.message ? `${j.message}${j.details ? ` — ${j.details}` : ""}` : `HTTP ${res.status}`);
-      }
-
-      const blob = await res.blob();
-      const cd = res.headers.get("content-disposition") || "";
-      const match = cd.match(/filename="([^"]+)"/);
-      const filename = match?.[1] || "pizza.pdf";
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 800);
-    } catch {
-      setSaveError({ message: "Export PDF impossible" });
-    }
-  };
-
-  const save = async () => {
-    if (!form) return;
-    if (saving) return;
-
-    setSaveError(null);
-    setSaveOk(false);
-
-        const nm = form.name.trim();
-    if (!nm) {
-      setSaveError({ message: "Nom obligatoire" });
-      return;
-    }
-
-    if (!form.dough_recipe_id) {
-      setSaveError({ message: "Empâtement obligatoire" });
-      return;
-    }
-
-    setSaving(true);
-
-    const cleaned = normalizeRows(rows);
-    const v = validateRows(cleaned);
-    if (!v.ok) {
-      setSaving(false);
-      setSaveError({ message: v.message });
-      return;
-    }
-
-    let id = pizzaId;
-
-    const payload = {
-      name: nm,
-      dough_recipe_id: form.dough_recipe_id,
-      notes: form.notes?.trim() || null,
-      photo_url: form.photo_url?.trim() || null,
-      establishments: form.establishments,
-      is_draft: false,
-      total_cost: round2(costs.total),
-      updated_at: new Date().toISOString(),
-    };
-
-    if (!id) {
-      const { data, error: insErr } = await supabase.from("pizza_recipes").insert(payload).select("id").single();
-      if (insErr) {
-        setSaving(false);
-        setSaveError(insErr);
-        return;
-      }
-      id = (data as { id: string }).id;
-    } else {
-      const { error: updErr } = await supabase.from("pizza_recipes").update(payload).eq("id", id);
-      if (updErr) {
-        setSaving(false);
-        setSaveError(updErr);
-        return;
-      }
-    }
-
-    const { error: delErr } = await supabase.from("pizza_ingredients").delete().eq("pizza_id", id);
-    if (delErr) {
-      setSaving(false);
-      setSaveError(delErr);
-      return;
-    }
-
-    if (cleaned.length) {
-      const toInsert = cleaned.map((r) => ({
-        pizza_id: id,
-        ingredient_id: r.ingredient_id!,
-        stage: r.stage,
-        qty: r.qty as number,
-        unit: r.unit,
-        sort_order: r.sort_order ?? 0,
-      }));
-
-      const { error: piInsErr } = await supabase.from("pizza_ingredients").insert(toInsert);
-      if (piInsErr) {
-        setSaving(false);
-        setSaveError(piInsErr);
-        return;
-      }
-    }
-
-    setSaving(false);
-    setSaveOk(true);
-    setTimeout(() => setSaveOk(false), 900);
-
-    if (!pizzaId) {
-      router.replace(`/pizzas/${id}`);
-    }
-  };
-
-  const del = async () => {
-    if (!pizzaId) return;
-    const ok = window.confirm("Supprimer cette fiche pizza ?");
-    if (!ok) return;
-
-    setSaving(true);
-    const { error: delErr } = await supabase.from("pizza_recipes").delete().eq("id", pizzaId);
-    setSaving(false);
-
-    if (delErr) {
-      setSaveError(delErr);
-      return;
-    }
-
-    router.replace("/pizzas");
-  };
-
   if (status === "loading") {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=pizza" backLabel="Fiches pizza" />
-        <main className="container">
-          <TopNav title="Pizza" subtitle="Chargement..." />
-          <p className="muted">Chargement...</p>
-        </main>
-      </>
+      <main className="container">
+        <TopNav title="Pizza" subtitle="Chargement..." />
+        <p className="muted">Chargement...</p>
+      </main>
     );
   }
 
   if (status === "NOT_LOGGED") {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=pizza" backLabel="Fiches pizza" />
-        <main className="container">
-          <TopNav title="Pizza" />
-          <p className="muted">NOT_LOGGED</p>
-          <Link className="btn btnPrimary" href="/login" style={{ marginTop: 12, display: "inline-block" }}>
-            Aller sur /login
-          </Link>
-        </main>
-      </>
+      <main className="container">
+        <TopNav title="Pizza" />
+        <p className="muted">NOT_LOGGED</p>
+        <Link className="btn btnPrimary" href="/login" style={{ marginTop: 12, display: "inline-block" }}>
+          Aller sur /login
+        </Link>
+      </main>
     );
   }
 
   if (status === "ERROR") {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=pizza" backLabel="Fiches pizza" />
-        <main className="container">
-          <TopNav title="Erreur" />
-          <pre className="code" style={{ marginTop: 12 }}>{JSON.stringify(error, null, 2)}</pre>
-        </main>
-      </>
+      <main className="container">
+        <TopNav title="Erreur" />
+        <pre className="code" style={{ marginTop: 12 }}>{JSON.stringify(error, null, 2)}</pre>
+      </main>
     );
   }
 
   if (!form) {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=pizza" backLabel="Fiches pizza" />
-        <main className="container">
-          <TopNav title="Pizza" subtitle="Chargement..." />
-          <p className="muted">Chargement...</p>
-        </main>
-      </>
+      <main className="container">
+        <TopNav title="Pizza" subtitle="Chargement..." />
+        <p className="muted">Chargement...</p>
+      </main>
     );
   }
 
@@ -845,33 +627,6 @@ setPriceLabelByIngredient(priceLabelMap);
   const pageSubtitle = !isEdit ? "Non sauvegardee" : costParts.length > 0 ? costParts.join(" · ") : "Fiche pizza";
 
   return (
-    <>
-      <NavBar
-        backHref="/recettes?tab=pizza"
-        backLabel="Fiches pizza"
-        right={
-          <>
-            <button
-              className="btn btnPrimary"
-              type="button"
-              onClick={save}
-              disabled={saving || !form.dough_recipe_id || !form.name.trim()}
-            >
-              {saving ? "Sauvegarde..." : saveOk ? "OK" : "Sauvegarder"}
-            </button>
-            {isEdit && (
-              <button className="btn" type="button" onClick={exportPdf} disabled={saving}>
-                PDF
-              </button>
-            )}
-            {isEdit && (
-              <button className="btn btnDanger" type="button" onClick={del} disabled={saving}>
-                Supprimer
-              </button>
-            )}
-          </>
-        }
-      />
       <main className="container">
         <TopNav title={pageTitle} subtitle={pageSubtitle} />
 
@@ -1090,6 +845,5 @@ setPriceLabelByIngredient(priceLabelMap);
 
       <div style={{ height: 28 }} />
     </main>
-    </>
   );
 }

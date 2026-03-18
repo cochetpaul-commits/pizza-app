@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { NavBar } from "@/components/NavBar";
+
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { shiftDureeNette, formatHeures, type ShiftInput } from "@/hooks/useConventionLegale";
 
@@ -167,7 +167,6 @@ export default function MesShiftsPage() {
 
   return (
     <>
-      <NavBar backHref="/" backLabel="Accueil" />
       <main style={{ maxWidth: 600, margin: "0 auto", padding: "16px 16px 60px" }}>
 
         <h1 style={S.h1}>Mon planning</h1>

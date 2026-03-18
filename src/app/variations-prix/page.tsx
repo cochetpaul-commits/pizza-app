@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { NavBar } from "@/components/NavBar";
+
 import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchPriceAlerts, PriceAlert, ALERT_THRESHOLD } from "@/lib/priceAlerts";
@@ -121,7 +121,6 @@ function AlertCard({
 
 export default function VariationsPrixPage() {
   const { current: etab } = useEtablissement();
-  const gestionHref = etab?.slug === "piccola_mia" ? "/piccola-mia/gestion" : "/bello-mio/gestion";
   const [tab, setTab] = useState<"variations" | "alertes">("variations");
 
   // Shared loading
@@ -275,7 +274,6 @@ export default function VariationsPrixPage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
     <>
-      <NavBar backHref={gestionHref} backLabel="Gestion" />
       <main className="container safe-bottom">
 
         <div style={{ marginBottom: 16 }}>

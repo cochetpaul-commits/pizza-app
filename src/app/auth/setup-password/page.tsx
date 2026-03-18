@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
-import { NavBar } from "@/components/NavBar";
 
 export default function SetupPasswordPage() {
   const router = useRouter();
@@ -78,25 +77,20 @@ export default function SetupPasswordPage() {
 
   if (expired) {
     return (
-      <>
-        <NavBar />
-        <main className="container">
-          <TopNav title="Lien expiré" subtitle="" />
-          <div className="card" style={{ marginTop: 14 }}>
-            <p className="errorBox">
-              Ce lien a expiré ou est invalide. Contactez votre administrateur.
-            </p>
-          </div>
-        </main>
-      </>
+      <main className="container">
+        <TopNav title="Lien expiré" subtitle="" />
+        <div className="card" style={{ marginTop: 14 }}>
+          <p className="errorBox">
+            Ce lien a expiré ou est invalide. Contactez votre administrateur.
+          </p>
+        </div>
+      </main>
     );
   }
 
   return (
-    <>
-      <NavBar />
-      <main className="container">
-        <TopNav title="Créer mon compte" subtitle="Bienvenue" />
+    <main className="container">
+      <TopNav title="Créer mon compte" subtitle="Bienvenue" />
 
         <div className="card" style={{ marginTop: 14 }}>
           <div className="muted">Nouveau mot de passe</div>
@@ -138,7 +132,6 @@ export default function SetupPasswordPage() {
             </button>
           </div>
         </div>
-      </main>
-    </>
+    </main>
   );
 }

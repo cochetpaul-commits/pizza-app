@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { NavBar } from "@/components/NavBar";
+
 import { RequireRole } from "@/components/RequireRole";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -406,8 +406,7 @@ const deltaStyle: React.CSSProperties = {
 // ── Component ─────────────────────────────────────────────────────────────
 
 export default function PilotagePage() {
-  const { current: etab } = useEtablissement();
-  const gestionHref = etab?.slug === "piccola_mia" ? "/piccola-mia/gestion" : "/bello-mio/gestion";
+  useEtablissement();
   const currentWeek = useMemo(() => getCurrentWeek(), []);
   const [weekStr, setWeekStr] = useState(currentWeek);
   const [stats, setStats] = useState<StatsData | null>(null);
@@ -497,7 +496,6 @@ export default function PilotagePage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <>
-        <NavBar backHref={gestionHref} backLabel="Gestion" />
         <main style={{ maxWidth: 720, margin: "0 auto", padding: "20px 16px 56px", boxSizing: "border-box" }}>
 
           {/* ── BLOC 0 : WEEK SELECTOR ─────────────────────────── */}

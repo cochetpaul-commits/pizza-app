@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { NavBar } from "@/components/NavBar";
+
 import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -72,7 +72,6 @@ function StepInput({ value, onChange, step = 0.1, min = 0.1, decimals = 1 }: { v
 
 export default function EpiceriePage() {
   const { current: etab } = useEtablissement();
-  const gestionHref = etab?.slug === "piccola_mia" ? "/piccola-mia/gestion" : "/bello-mio/gestion";
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [offers, setOffers] = useState<Record<string, string>>({});
@@ -183,7 +182,6 @@ export default function EpiceriePage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
     <>
-    <NavBar backHref={gestionHref} backLabel="Gestion" />
     <main style={{ minHeight: "100vh", background: "#FAF7F2", padding: 16, fontFamily: "inherit", overflowX: "hidden" as const, maxWidth: "100vw", position: "relative", boxSizing: "border-box" }}>
       <div style={{ maxWidth: 1400, margin: "0 auto", width: "100%" }}>
 

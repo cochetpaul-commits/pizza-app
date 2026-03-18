@@ -4,7 +4,6 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
-import { NavBar } from "@/components/NavBar";
 import { TopNav } from "@/components/TopNav";
 import { EstabBadge } from "@/components/EstabBadge";
 import { useProfile } from "@/lib/ProfileContext";
@@ -305,9 +304,6 @@ function RecettesInner() {
   const { can } = useProfile();
   const canWrite = can("recettes.edit");
   const { current: etabCtx } = useEtablissement();
-  const slug = etabCtx?.slug;
-  const cuisineHref = (slug === "piccola_mia" || slug === "piccola-mia") ? "/piccola-mia/cuisine"
-    : (slug === "bello_mio" || slug === "bello-mio") ? "/bello-mio/cuisine" : "/";
   const [authOk, setAuthOk] = useState<boolean | null>(null);
   const [pizzas,    setPizzas]    = useState<PizzaRow[]>([]);
   const [kitchens,  setKitchens]  = useState<KitchenRow[]>([]);
@@ -316,7 +312,6 @@ function RecettesInner() {
   const [loading,    setLoading]    = useState(true);
   const [loadErrors, setLoadErrors] = useState<string[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
-
   const [q, setQ]         = useState("");
   const [estab, setEstab] = useState<EstabFilter>("all");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -433,33 +428,29 @@ function RecettesInner() {
 
   if (authOk === null || loading) {
     return (
-      <>
-        <NavBar backHref={cuisineHref} backLabel="Cuisine" />
-        <main className="container"><TopNav title="Recettes" subtitle="Chargement…" /></main>
-      </>
+      <main className="container"><TopNav title="Recettes" subtitle="Chargement…" /></main>
     );
   }
   if (!authOk) {
     return (
-      <>
-        <NavBar backHref={cuisineHref} backLabel="Cuisine" />
-        <main className="container">
-          <TopNav title="Recettes" />
-          <Link className="btn btnPrimary" href="/login">Se connecter</Link>
-        </main>
-      </>
+      <main className="container">
+        <TopNav title="Recettes" />
+        <Link className="btn btnPrimary" href="/login">Se connecter</Link>
+      </main>
     );
   }
 
   return (
     <>
-      <NavBar backHref={cuisineHref} backLabel="Cuisine" right={
-        <button className="btn" onClick={refresh} disabled={loading} style={{ fontSize: 12 }}>
-          {loading ? "…" : "↻"}
-        </button>
-      } />
       <main className="container" style={{ paddingBottom: 40 }}>
-        <TopNav title="Recettes" subtitle={loading ? "Chargement…" : `${totalCount} fiche(s)`} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+          <TopNav title="Recettes" subtitle={loading ? "Chargement…" : `${totalCount} fiche(s)`} />
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <button className="btn" onClick={refresh} disabled={loading} style={{ fontSize: 12 }}>
+              {loading ? "\u2026" : "\u21BB"}
+            </button>
+          </div>
+        </div>
 
         {/* ── Erreurs de chargement ── */}
         {loadErrors.length > 0 && (
@@ -651,10 +642,7 @@ export default function RecettesPage() {
   return (
     <Suspense
       fallback={
-        <>
-          <NavBar />
-          <main className="container"><TopNav title="Recettes" subtitle="Chargement…" /></main>
-        </>
+        <main className="container"><TopNav title="Recettes" subtitle="Chargement…" /></main>
       }
     >
       <RecettesInner />

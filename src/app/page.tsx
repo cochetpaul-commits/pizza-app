@@ -19,25 +19,14 @@ export default function RootPage() {
       return;
     }
 
-    // Admin → groupe
-    if (role === "group_admin") {
-      router.replace("/groupe");
-      return;
-    }
-
-    // Resolve restaurant from user's accessible establishments
-    const first = etablissements[0];
-    if (first?.slug === "piccola-mia" || first?.slug === "piccola_mia") {
-      router.replace("/piccola-mia/cuisine");
-    } else {
-      router.replace("/bello-mio/cuisine");
-    }
+    // All authenticated users → dashboard
+    router.replace("/dashboard");
   }, [profileLoading, etabLoading, role, etablissements, router]);
 
   return (
     <div style={{
       minHeight: "100dvh",
-      background: "#f2ede4",
+      background: "#f6eedf",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",

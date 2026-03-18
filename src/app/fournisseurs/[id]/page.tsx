@@ -3,7 +3,6 @@
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
-import { useTopBarSetter } from "@/components/layout";
 import { useEtablissement } from "@/lib/EtablissementContext";
 
 // Mapping nom fournisseur → route import facture
@@ -127,22 +126,6 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
   }
 
   const invoiceRoute = supplier ? getInvoiceRoute(supplier.name) : null;
-  const { setTopBar } = useTopBarSetter();
-
-  useEffect(() => {
-    if (!supplier) return;
-    setTopBar({
-      title: supplier.name,
-      actions: (
-        <>
-          {invoiceRoute && (
-            <Link href={invoiceRoute} className="btn btnPrimary">Importer facture</Link>
-          )}
-          <Link href={`/ingredients?supplier=${id}`} className="btn">Ingredients</Link>
-        </>
-      ),
-    });
-  }, [supplier, invoiceRoute, id, setTopBar]);
 
   if (loading) return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
@@ -159,17 +142,25 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
         {/* Header */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <div style={{ fontSize: 26, fontWeight: 900 }}>{supplier.name}</div>
-            {!supplier.is_active && (
-              <span style={{
-                fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
-                background: "rgba(0,0,0,0.08)", color: "#999",
-              }}>Inactif</span>
-            )}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 26, fontWeight: 900 }}>{supplier.name}</div>
+              {!supplier.is_active && (
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
+                  background: "rgba(0,0,0,0.08)", color: "#999",
+                }}>Inactif</span>
+              )}
+            </div>
+            <div className="muted" style={{ marginTop: 2 }}>Fiche fournisseur</div>
           </div>
-          <div className="muted" style={{ marginTop: 2 }}>Fiche fournisseur</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            {invoiceRoute && (
+              <Link href={invoiceRoute} className="btn btnPrimary">Importer facture</Link>
+            )}
+            <Link href={`/ingredients?supplier=${id}`} className="btn">Ingredients</Link>
+          </div>
         </div>
 
         <div style={{ display: "grid", gap: 12 }}>

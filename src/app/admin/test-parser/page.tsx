@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { NavBar } from "@/components/NavBar";
+
 import { RequireRole } from "@/components/RequireRole";
 import type { ParsedIngredient, ParseLog, Categorie } from "@/lib/parsers";
 
@@ -168,7 +168,6 @@ export default function TestParserPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <NavBar backHref="/admin/utilisateurs" backLabel="Admin" />
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px", fontFamily: "DM Sans, sans-serif" }}>
         <h1 style={{ fontFamily: "Oswald, sans-serif", fontWeight: 700, color: "#1a1a1a", fontSize: 28, marginBottom: 24 }}>
           Test Parser Factures

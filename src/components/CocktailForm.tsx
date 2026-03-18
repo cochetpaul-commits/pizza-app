@@ -3,12 +3,11 @@
 import { offerRowToCpu } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
-import { NavBar } from "@/components/NavBar";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { fetchApi } from "@/lib/fetchApi";
+
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { formatLiquidQty } from "@/lib/formatUnit";
 
@@ -63,7 +62,7 @@ type Form = {
   image_url: string;
 };
 
-type PgError = { code?: string; message?: string; details?: string };
+
 
 /* ── helpers ──────────────────────────────────────────────────── */
 
@@ -165,9 +164,7 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  const [saving, setSaving] = useState(false);
-  const [saveOk, setSaveOk] = useState(false);
-  const [saveError, setSaveError] = useState<PgError | null>(null);
+
 
   const [vatRate, setVatRate] = useState<string>("20");
   const [marginRateCocktail, setMarginRateCocktail] = useState<string>("80");
@@ -514,131 +511,19 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
     setForm((p) => ({ ...p, image_url: "" }));
   }
 
-  /* ── PDF export ───────────────────────────────────────────── */
-
-  const exportPdf = async () => {
-    try {
-      if (!cocktailId) {
-        setSaveError({ message: "PDF : sauvegarde d'abord le cocktail." });
-        return;
-      }
-      const { data: session } = await supabase.auth.getSession();
-      const token = session.session?.access_token;
-      if (!token) throw new Error("Token manquant");
-
-      const res = await fetchApi("/api/cocktails/pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ cocktailId }),
-      });
-
-      if (!res.ok) {
-        const j = await res.json().catch(() => null);
-        throw new Error(j?.message ?? `HTTP ${res.status}`);
-      }
-
-      const blob = await res.blob();
-      const cd = res.headers.get("content-disposition") || "";
-      const match = cd.match(/filename="([^"]+)"/);
-      const filename = match?.[1] || "cocktail.pdf";
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = filename;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 800);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setSaveError({ message: "Export PDF impossible", details: msg });
-    }
-  };
-
-  /* ── save ─────────────────────────────────────────────────── */
-
-  const save = async () => {
-    if (saving) return;
-    setSaveError(null);
-    setSaveOk(false);
-
-    const nm = form.name.trim();
-    if (!nm) { setSaveError({ message: "Nom obligatoire" }); return; }
-
-    const { data: auth, error: authErr } = await supabase.auth.getUser();
-    if (authErr || !auth.user) { setSaveError(authErr ?? { message: "NOT_LOGGED" }); return; }
-
-    setSaving(true);
-
-    const sp = parseQty(form.sell_price);
-    const payload: Record<string, unknown> = {
-      name: nm,
-      type: form.type || null,
-      glass: form.glass || null,
-      garnish: form.garnish.trim() || null,
-      steps: form.steps.trim() || null,
-      sell_price: sp,
-      image_url: form.image_url.trim() || null,
-      total_cost: totalCost > 0 ? totalCost : null,
-      updated_at: new Date().toISOString(),
-      is_draft: false,
-    };
-
-    let id = cocktailId;
-
-    if (!id) {
-      payload.user_id = auth.user.id;
-      const { data, error: insErr } = await supabase
-        .from("cocktails").insert(payload).select("id").single<{ id: string }>();
-      if (insErr) { setSaving(false); setSaveError(insErr); return; }
-      id = data?.id;
-      if (!id) { setSaving(false); setSaveError({ message: "ID manquant après création" }); return; }
-    } else {
-      const { error: updErr } = await supabase.from("cocktails").update(payload).eq("id", id);
-      if (updErr) { setSaving(false); setSaveError(updErr); return; }
-    }
-
-    const { error: delErr } = await supabase.from("cocktail_ingredients").delete().eq("cocktail_id", id);
-    if (delErr) { setSaving(false); setSaveError(delErr); return; }
-
-    const cleaned = lines
-      .filter((l) => l.ingredient_id && parseQty(l.qty) != null)
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map((l, idx) => ({
-        cocktail_id: id,
-        ingredient_id: l.ingredient_id,
-        qty: parseQty(l.qty),
-        unit: l.unit,
-        sort_order: idx,
-      }));
-
-    if (cleaned.length) {
-      const { error: insLinesErr } = await supabase.from("cocktail_ingredients").insert(cleaned);
-      if (insLinesErr) { setSaving(false); setSaveError(insLinesErr); return; }
-    }
-
-    setSaving(false);
-    setSaveOk(true);
-    setTimeout(() => setSaveOk(false), 900);
-    if (!cocktailId) router.replace(`/cocktails/${id}`);
-  };
-
   /* ── render ───────────────────────────────────────────────── */
 
   if (status === "loading") {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=cocktail" backLabel="Cocktails" />
-        <main className="container"><p className="muted">Chargement…</p></main>
-      </>
+      <main className="container"><p className="muted">Chargement…</p></main>
     );
   }
 
   if (status === "ERROR") {
     return (
-      <>
-        <NavBar backHref="/recettes?tab=cocktail" backLabel="Cocktails" />
-        <main className="container">
-          <pre className="errorBox">{JSON.stringify(error, null, 2)}</pre>
-        </main>
-      </>
+      <main className="container">
+        <pre className="errorBox">{JSON.stringify(error, null, 2)}</pre>
+      </main>
     );
   }
 
@@ -649,23 +534,6 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
       : null;
 
   return (
-    <>
-    <NavBar
-      backHref="/recettes?tab=cocktail"
-      backLabel="Cocktails"
-      right={
-        <>
-          <button className="btn btnPrimary" type="button" onClick={save} disabled={saving}>
-            {saving ? "Enregistrement…" : isEdit ? "Mettre à jour" : "Créer le cocktail"}
-          </button>
-          {isEdit && (
-            <button className="btn" type="button" onClick={exportPdf}>
-              PDF
-            </button>
-          )}
-        </>
-      }
-    />
     <main className="container">
       <h1 style={{ margin: "0 0 16px", fontSize: 36, fontWeight: 800 }}>
         {isEdit ? (form.name || "Cocktail") : "Nouveau cocktail"}
@@ -952,13 +820,6 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
         </div>
       </div>
 
-      {saveOk && <div style={{ marginTop: 8, color: "green", fontWeight: 600 }}>✓ Enregistré</div>}
-      {saveError && (
-        <div className="errorBox" style={{ marginTop: 8 }}>
-          {saveError.message}{saveError.details ? ` — ${saveError.details}` : ""}
-        </div>
-      )}
     </main>
-    </>
   );
 }

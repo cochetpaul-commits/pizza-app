@@ -91,7 +91,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const isGroupAdmin = role === "group_admin";
-  const cw = role === "group_admin";
+  const cw = role === "group_admin" || role === "manager";
   const can = (permission: string) => hasPermission(role, permission);
 
   return (

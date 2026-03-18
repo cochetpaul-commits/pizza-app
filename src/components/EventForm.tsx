@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
-import { NavBar } from "@/components/NavBar";
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -401,38 +400,34 @@ export default function EventForm({ eventId }: { eventId?: string }) {
 
   if (loading) {
     return (
-      <>
-        <NavBar backHref="/evenements" backLabel="Événements" />
-        <div style={{ maxWidth: 900, margin: "0 auto", padding: "2rem", textAlign: "center" }}>
-          <p className="muted">Chargement…</p>
-        </div>
-      </>
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "2rem", textAlign: "center" }}>
+        <p className="muted">Chargement…</p>
+      </div>
     );
   }
 
   return (
     <>
-      <NavBar
-        backHref="/evenements"
-        backLabel="Événements"
-        primaryAction={
-          <button
-            className="btn btnPrimary"
-            style={{ background: "#D4775A", borderColor: "#D4775A" }}
-            onClick={handleSave}
-            disabled={saving}
-          >
-            {saving ? "…" : isNew ? "Créer" : "Enregistrer"}
-          </button>
-        }
-        menuItems={
-          !isNew
-            ? [{ label: "Supprimer", onClick: handleDelete, style: { color: "#DC2626" } }]
-            : undefined
-        }
-      />
-
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "12px 16px 60px" }}>
+
+        {/* ── Inline action buttons ── */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a" }}>
+            {isNew ? "Nouvel evenement" : name || "Evenement"}
+          </h1>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            {!isNew && (
+              <button type="button" className="btn" onClick={handleDelete} style={{ color: "#DC2626" }}>Supprimer</button>
+            )}
+            <button
+              className="btn btnPrimary"
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? "\u2026" : isNew ? "Creer" : "Enregistrer"}
+            </button>
+          </div>
+        </div>
 
         {saveError && (
           <div style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.25)", borderRadius: 10, padding: "10px 14px", marginBottom: 14, color: "#DC2626", fontSize: 13, fontWeight: 600 }}>

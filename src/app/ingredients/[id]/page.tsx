@@ -3,7 +3,6 @@
 import { Suspense, useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useTopBarSetter } from "@/components/layout";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { StepperInput } from "@/components/StepperInput";
@@ -70,8 +69,6 @@ function IngredientDetailInner() {
   const id = params.id as string;
   const fromVariations = searchParams.get("from") === "variations-prix";
   const { current: etab } = useEtablissement();
-
-  const { setTopBar } = useTopBarSetter();
 
   const [ingredient, setIngredient] = useState<Ingredient | null>(null);
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -253,15 +250,6 @@ function IngredientDetailInner() {
   // Recent history (last 20 entries, newest first)
   const recentHistory = useMemo(() => [...offers].reverse().slice(0, 20), [offers]);
 
-  useEffect(() => {
-    setTopBar({
-      title: ingredient?.name ?? "Article",
-      actions: fromVariations
-        ? <Link href="/variations-prix" className="btn">Variations prix</Link>
-        : undefined,
-    });
-  }, [ingredient?.name, fromVariations, setTopBar]);
-
   if (loading) return (
     <main className="container"><div className="card" style={{ textAlign: "center", padding: 40, color: "var(--muted)" }}>Chargement…</div></main>
   );
@@ -277,6 +265,11 @@ function IngredientDetailInner() {
       <main className="container safe-bottom">
 
         {/* ── Header ── */}
+        {fromVariations && (
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+            <Link href="/variations-prix" className="btn">Variations prix</Link>
+          </div>
+        )}
         <div style={{ marginBottom: 20, display: "flex", gap: 16, alignItems: "flex-start" }}>
           {/* Photo — label+input pour compatibilité iOS Safari */}
           <label
