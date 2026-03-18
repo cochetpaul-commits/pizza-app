@@ -23,7 +23,6 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/finances":     ["group_admin"],
   "/achats":       ["group_admin"],
   "/stats-achats": ["group_admin"],
-  "/base-produits": ["group_admin"],
   "/inventaire":   ["group_admin", "manager"],
   "/clients":      ["group_admin"],
   "/devis":        ["group_admin"],
