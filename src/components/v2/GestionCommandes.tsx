@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
 import type { Ingredient } from "@/types/ingredients";
@@ -74,80 +74,88 @@ export function GestionCommandes({ lines, ingredients, etablissementId }: Gestio
       .map((l) => l.ingredient_id),
   [lines]);
 
-  const loadData = useCallback(async () => {
-    if (!recipeIngIds.length) { setLoading(false); return; }
-    setLoading(true);
+  useEffect(() => {
+    let cancelled = false;
 
-    // Get supplier for each ingredient via active offers
-    const { data: offers } = await supabase
-      .from("supplier_offers")
-      .select("ingredient_id, supplier_id")
-      .eq("is_active", true)
-      .in("ingredient_id", recipeIngIds);
+    async function loadData() {
+      if (!recipeIngIds.length) { if (!cancelled) setLoading(false); return; }
+      if (!cancelled) setLoading(true);
 
-    const supplierIds = new Set<string>();
-    const mapping: Record<string, string> = {};
-    for (const o of offers ?? []) {
-      if (o.supplier_id) {
-        supplierIds.add(o.supplier_id);
-        mapping[o.ingredient_id] = o.supplier_id;
+      const { data: offers } = await supabase
+        .from("supplier_offers")
+        .select("ingredient_id, supplier_id")
+        .eq("is_active", true)
+        .in("ingredient_id", recipeIngIds);
+
+      if (cancelled) return;
+
+      const supplierIds = new Set<string>();
+      const mapping: Record<string, string> = {};
+      for (const o of offers ?? []) {
+        if (o.supplier_id) {
+          supplierIds.add(o.supplier_id);
+          mapping[o.ingredient_id] = o.supplier_id;
+        }
       }
-    }
-    setIngToSupplier(mapping);
+      setIngToSupplier(mapping);
 
-    if (supplierIds.size > 0) {
-      const { data: sups } = await supabase.from("suppliers").select("id, name").in("id", Array.from(supplierIds));
-      const map: Record<string, SupplierInfo> = {};
-      for (const s of (sups ?? []) as SupplierInfo[]) map[s.id] = s;
-      setSuppliers(map);
+      if (supplierIds.size > 0) {
+        const { data: sups } = await supabase.from("suppliers").select("id, name").in("id", Array.from(supplierIds));
+        if (!cancelled) {
+          const map: Record<string, SupplierInfo> = {};
+          for (const s of (sups ?? []) as SupplierInfo[]) map[s.id] = s;
+          setSuppliers(map);
+        }
+      }
+
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      const since = sixMonthsAgo.toISOString().slice(0, 10);
+
+      let invQuery = supabase
+        .from("supplier_invoice_lines")
+        .select("ingredient_id, unit_price, supplier_invoices!inner(invoice_date)")
+        .in("ingredient_id", recipeIngIds)
+        .not("unit_price", "is", null)
+        .gte("supplier_invoices.invoice_date", since);
+      if (etablissementId) {
+        invQuery = invQuery.eq("supplier_invoices.etablissement_id", etablissementId);
+      }
+      const { data: invLines } = await invQuery;
+
+      if (cancelled) return;
+
+      const byIngMonth: Record<string, Record<string, number[]>> = {};
+      for (const row of (invLines ?? []) as unknown as Array<{ ingredient_id: string; unit_price: number; supplier_invoices: { invoice_date: string } }>) {
+        const iid = row.ingredient_id;
+        const date = row.supplier_invoices?.invoice_date;
+        if (!iid || !date) continue;
+        const mois = date.slice(0, 7);
+        if (!byIngMonth[iid]) byIngMonth[iid] = {};
+        if (!byIngMonth[iid][mois]) byIngMonth[iid][mois] = [];
+        byIngMonth[iid][mois].push(row.unit_price);
+      }
+
+      const histories: PriceHistory[] = [];
+      for (const iid of Object.keys(byIngMonth)) {
+        const ing = ingMap.get(iid);
+        const months = Object.keys(byIngMonth[iid]).sort();
+        const points: PricePoint[] = months.map((m) => {
+          const prices = byIngMonth[iid][m];
+          return { mois: m, prix_moyen: prices.reduce((a, b) => a + b, 0) / prices.length };
+        });
+        const first = points[0]?.prix_moyen;
+        const last = points[points.length - 1]?.prix_moyen;
+        const evolution = first && last && first > 0 ? ((last - first) / first) * 100 : null;
+        histories.push({ ingredient_id: iid, name: ing?.name ?? "?", points, evolution });
+      }
+      setPriceHistory(histories);
+      setLoading(false);
     }
 
-    // Price history from invoice lines (last 6 months)
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    const since = sixMonthsAgo.toISOString().slice(0, 10);
-
-    let invQuery = supabase
-      .from("supplier_invoice_lines")
-      .select("ingredient_id, unit_price, supplier_invoices!inner(invoice_date)")
-      .in("ingredient_id", recipeIngIds)
-      .not("unit_price", "is", null)
-      .gte("supplier_invoices.invoice_date", since);
-    if (etablissementId) {
-      invQuery = invQuery.eq("supplier_invoices.etablissement_id", etablissementId);
-    }
-    const { data: invLines } = await invQuery;
-
-    // Aggregate by ingredient + month
-    const byIngMonth: Record<string, Record<string, number[]>> = {};
-    for (const row of (invLines ?? []) as unknown as Array<{ ingredient_id: string; unit_price: number; supplier_invoices: { invoice_date: string } }>) {
-      const iid = row.ingredient_id;
-      const date = row.supplier_invoices?.invoice_date;
-      if (!iid || !date) continue;
-      const mois = date.slice(0, 7);
-      if (!byIngMonth[iid]) byIngMonth[iid] = {};
-      if (!byIngMonth[iid][mois]) byIngMonth[iid][mois] = [];
-      byIngMonth[iid][mois].push(row.unit_price);
-    }
-
-    const histories: PriceHistory[] = [];
-    for (const iid of Object.keys(byIngMonth)) {
-      const ing = ingMap.get(iid);
-      const months = Object.keys(byIngMonth[iid]).sort();
-      const points: PricePoint[] = months.map((m) => {
-        const prices = byIngMonth[iid][m];
-        return { mois: m, prix_moyen: prices.reduce((a, b) => a + b, 0) / prices.length };
-      });
-      const first = points[0]?.prix_moyen;
-      const last = points[points.length - 1]?.prix_moyen;
-      const evolution = first && last && first > 0 ? ((last - first) / first) * 100 : null;
-      histories.push({ ingredient_id: iid, name: ing?.name ?? "?", points, evolution });
-    }
-    setPriceHistory(histories);
-    setLoading(false);
+    loadData();
+    return () => { cancelled = true; };
   }, [recipeIngIds, ingMap, etablissementId]);
-
-  useEffect(() => { loadData(); }, [loadData]);
 
   async function addToOrder(ingredientId: string, supplierId: string) {
     setAdding(ingredientId);

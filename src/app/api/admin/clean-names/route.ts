@@ -7,17 +7,6 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
  * Also cleans supplier_offers.supplier_label and supplier_invoice_lines.name.
  */
 export async function POST() {
-  const pattern = "^[0-9]";
-
-  // 1. Clean ingredients
-  const { data: ingredients, error: e1 } = await supabaseAdmin
-    .from("ingredients")
-    .select("id, name")
-    .like("name", "[0-9]%");
-
-  if (e1) return NextResponse.json({ error: e1.message }, { status: 500 });
-
-  // Supabase .like doesn't support regex, so filter in JS
   const { data: allIngredients, error: e1b } = await supabaseAdmin
     .from("ingredients")
     .select("id, name");
