@@ -165,16 +165,19 @@ export default function DashboardPage() {
   // Fetch CA Yesterday (from daily_sales or Popina)
   useEffect(() => {
     async function fetchCaYesterday() {
-      const { data } = await supabase
+      let query = supabase
         .from("daily_sales")
         .select("ca_ttc")
-        .eq("date", yesterday)
-        .limit(10);
+        .eq("date", yesterday);
+      if (!isGroupView && current) {
+        query = query.eq("etablissement_id", current.id);
+      }
+      const { data } = await query.limit(10);
       const total = (data ?? []).reduce((sum: number, r: { ca_ttc: number | null }) => sum + (r.ca_ttc ?? 0), 0);
       setCaYesterday(total > 0 ? total : null);
     }
     if (isAdmin) fetchCaYesterday();
-  }, [isAdmin, yesterday]);
+  }, [isAdmin, yesterday, isGroupView, current]);
 
   // Events
   useEffect(() => {
