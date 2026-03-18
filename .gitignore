@@ -17,6 +17,5 @@ _backup_src/
 # local / generated / scratch
 supabase/remote_schema_live.sql
 scripts/
-src/app/dashboard/
 .vercel
 .env*.local
