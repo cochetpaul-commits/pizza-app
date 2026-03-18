@@ -173,26 +173,58 @@ function starBtnStyle(isFav: boolean): React.CSSProperties {
   };
 }
 
-/** Derive a human-friendly ordering unit label from supplier_offers data */
-function deriveOrderUnit(offer: {
+type OfferRow = {
+  price_kind: string | null;
   unit: string | null;
+  unit_price: number | null;
+  pack_price: number | null;
   pack_unit: string | null;
   pack_count: number | null;
   pack_each_qty: number | null;
   pack_each_unit: string | null;
   pack_total_qty: number | null;
-} | null): string | null {
+};
+
+/** Derive a human-friendly ordering unit label from supplier_offers data */
+function deriveOrderUnit(offer: OfferRow | null): string | null {
   if (!offer) return null;
-  // If pack (colis/carton): "colis 6×75cL", "carton 10kg", etc.
   if (offer.pack_count && offer.pack_each_qty && offer.pack_each_unit) {
     return `${offer.pack_count}×${offer.pack_each_qty}${offer.pack_each_unit}`;
   }
   if (offer.pack_total_qty && offer.pack_unit) {
     return `${offer.pack_total_qty}${offer.pack_unit}`;
   }
-  // Simple unit
   if (offer.unit) return offer.unit;
   return null;
+}
+
+/** Compute the price for one "order unit" (what we actually order: 1 colis, 1 kg, 1 pc, etc.) */
+function computeOrderUnitPrice(offer: OfferRow | null): number | null {
+  if (!offer) return null;
+  const kind = offer.price_kind ?? "unit";
+
+  if (kind === "pack_composed") {
+    // Colis: pack_price is the price for the whole colis
+    if (offer.pack_price) return offer.pack_price;
+    // Fallback: unit_price * total qty in colis
+    if (offer.unit_price && offer.pack_count && offer.pack_each_qty) {
+      return offer.unit_price * offer.pack_count * offer.pack_each_qty;
+    }
+    return null;
+  }
+
+  if (kind === "pack_simple") {
+    // Pack simple: pack_price is the price for the pack
+    if (offer.pack_price) return offer.pack_price;
+    // Fallback: unit_price * total qty
+    if (offer.unit_price && offer.pack_total_qty) {
+      return offer.unit_price * offer.pack_total_qty;
+    }
+    return null;
+  }
+
+  // Unit pricing (kg, L, pc): unit_price is the price per unit ordered
+  return offer.unit_price ?? null;
 }
 
 // ── Status config ────────────────────────────────────────────────────────────
@@ -315,7 +347,7 @@ function CommandesPage() {
     // Load catalog: ingredients linked to this supplier (via offers or supplier_id)
     const { data: offerData } = await supabase
       .from("supplier_offers")
-      .select("ingredient_id, unit, unit_price, pack_price, pack_unit, pack_count, pack_each_qty, pack_each_unit, pack_total_qty")
+      .select("ingredient_id, price_kind, unit, unit_price, pack_price, pack_unit, pack_count, pack_each_qty, pack_each_unit, pack_total_qty")
       .eq("supplier_id", supplierId)
       .eq("is_active", true);
 
@@ -346,12 +378,12 @@ function CommandesPage() {
         .order("name");
 
       items = (ingData ?? []).map((ing: { id: string; name: string; category: string | null; default_unit: string | null; favori_commande?: boolean; order_unit_label?: string | null }) => {
-        const offer = offerMap.get(ing.id) ?? null;
+        const offer = (offerMap.get(ing.id) ?? null) as OfferRow | null;
         return {
           ...ing,
           order_unit_label: ing.order_unit_label ?? null,
           order_unit: ing.order_unit_label ?? deriveOrderUnit(offer) ?? ing.default_unit,
-          prix_commande: offer ? (offer.pack_price ?? offer.unit_price ?? null) : null,
+          prix_commande: computeOrderUnitPrice(offer),
         };
       });
     }
@@ -886,50 +918,47 @@ function CommandesPage() {
   return (
     <RequireRole allowedRoles={["group_admin", "cuisine", "salle"]}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px", background: "#f2ede4", minHeight: "100vh" }}>
-        <h1 style={{
-          fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-          fontSize: 28, fontWeight: 700, color: "#1a1a1a", margin: 0,
-        }}>
-          Commandes fournisseurs
-        </h1>
 
         {confirmation && (
           <div style={{
             background: "#e8ede6", color: "#4a6741",
             padding: "10px 16px", borderRadius: 10,
-            fontSize: 14, fontWeight: 600, marginTop: 16, textAlign: "center",
+            fontSize: 14, fontWeight: 600, marginBottom: 16, textAlign: "center",
           }}>
             {confirmation}
           </div>
         )}
 
-        {/* Dropdown fournisseur */}
+        {/* Supplier pills */}
         {!loading && suppliers.length > 0 && (
-          <div style={{ marginTop: 20 }}>
-            <select
-              value={selectedSupplierId ?? ""}
-              onChange={(e) => setSelectedSupplierId(e.target.value)}
-              style={{
-                width: "100%", padding: "12px 16px", borderRadius: 12,
-                border: "1.5px solid #ddd6c8", background: "#fff",
-                fontSize: 15, fontWeight: 700, color: "#1a1a1a",
-                fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                letterSpacing: 0.5, cursor: "pointer",
-                appearance: "none",
-                backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23999' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")",
-                backgroundRepeat: "no-repeat",
-                backgroundPosition: "right 16px center",
-              }}
-            >
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
+          <div style={{
+            display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4,
+            WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
+          }}>
+            {suppliers.map((s) => {
+              const isSelected = s.id === selectedSupplierId;
+              return (
+                <button key={s.id} type="button"
+                  onClick={() => setSelectedSupplierId(s.id)}
+                  style={{
+                    flexShrink: 0, padding: "10px 18px", borderRadius: 12,
+                    border: isSelected ? "2px solid #D4775A" : "1.5px solid #ddd6c8",
+                    background: isSelected ? "#fff" : "#f9f5ef",
+                    fontSize: 14, fontWeight: isSelected ? 700 : 500,
+                    color: isSelected ? "#D4775A" : "#666",
+                    cursor: "pointer", fontFamily: "inherit",
+                    boxShadow: isSelected ? "0 2px 8px rgba(212,119,90,0.15)" : "none",
+                    transition: "all 0.15s",
+                  }}>
+                  {s.name}
+                </button>
+              );
+            })}
           </div>
         )}
 
         {/* Franco progress bar */}
-        {francoMin && session?.status === "brouillon" && (
+        {francoMin != null && session?.status === "brouillon" && (
           <div style={{ marginTop: 12, background: "#fff", borderRadius: 10, padding: "10px 14px", border: "1px solid #e5ddd0" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: "#666" }}>
@@ -967,15 +996,28 @@ function CommandesPage() {
         {!loading && !loadingSupplier && selectedSupplierId && (
           <div style={{ marginTop: 16 }}>
             {!session && (
-              <div style={{ textAlign: "center", padding: 40 }}>
-                <p style={{ color: "#999", fontSize: 13, marginBottom: 16 }}>Aucune commande en cours</p>
+              <div style={{
+                background: "#fff", borderRadius: 16, border: "1.5px solid #ddd6c8",
+                padding: "48px 24px", textAlign: "center",
+              }}>
+                <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.8 }}>&#x1F4E6;</div>
+                <div style={{
+                  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                  fontSize: 18, fontWeight: 700, color: "#1a1a1a", marginBottom: 6,
+                }}>
+                  Commander chez {supplierLabel}
+                </div>
+                <p style={{ color: "#999", fontSize: 13, marginBottom: 20, maxWidth: 300, margin: "0 auto 20px" }}>
+                  Sélectionnez les articles et quantités, puis envoyez pour validation.
+                </p>
                 <button onClick={() => createSession()} disabled={saving}
                   style={{
                     background: "#D4775A", color: "#fff", border: "none", borderRadius: 12,
-                    padding: "12px 28px", fontSize: 14, fontWeight: 700, cursor: "pointer",
+                    padding: "14px 32px", fontSize: 15, fontWeight: 700, cursor: "pointer",
                     fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                    boxShadow: "0 4px 16px rgba(212,119,90,0.25)",
                   }}>
-                  Nouvelle commande {supplierLabel}
+                  Nouvelle commande
                 </button>
               </div>
             )}
@@ -986,7 +1028,7 @@ function CommandesPage() {
 
         {/* Historique */}
         {!loading && !loadingSupplier && selectedSupplierId && (
-          <div style={{ marginTop: 32 }}>
+          <div style={{ marginTop: 24 }}>
             <button type="button"
               onClick={() => histOpen ? setHistOpen(false) : loadHistorique()}
               style={{
