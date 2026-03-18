@@ -128,7 +128,7 @@ export default function EquipePage() {
       const [empRes, contratRes] = await Promise.all([
         supabase
           .from("employes")
-          .select("id, prenom, nom, initiales, avatar_url, actif, etablissement_id, equipes_access, email, tel_mobile, date_naissance, adresse, code_postal, ville, role, code_pin")
+          .select("*")
           .eq("etablissement_id", etab.id)
           .order("nom", { ascending: true }),
         supabase
