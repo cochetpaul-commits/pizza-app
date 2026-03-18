@@ -122,7 +122,7 @@ export default function RapportsPage() {
           .order("nom"),
         supabase
           .from("contrats")
-          .select("id, employe_id, type, heures_semaine, date_debut, date_fin, actif")
+          .select("*")
           .eq("actif", true),
         supabase
           .from("shifts")

@@ -149,7 +149,7 @@ export default function MasseSalarialePage() {
           .order("nom"),
         supabase
           .from("contrats")
-          .select("id, employe_id, type, heures_semaine, salaire_brut, remuneration, taux_horaire, actif")
+          .select("*")
           .eq("actif", true),
       ]);
 

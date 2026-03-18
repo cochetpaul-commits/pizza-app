@@ -324,7 +324,7 @@ export default function PointagePage() {
           .order("nom"),
         supabase
           .from("contrats")
-          .select("id, employe_id, emploi, actif")
+          .select("*")
           .eq("actif", true),
       ]);
 
