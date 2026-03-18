@@ -40,6 +40,62 @@ export async function GET() {
 }
 
 /**
+ * PUT /api/admin/clean-names
+ * Fix known orphan ingredients by ID + clean their offers with date-like labels.
+ */
+export async function PUT() {
+  const fixes: Record<string, string> = {
+    "641559e0-3351-4dcd-87e6-04bb7d2bb872": "MASCARPONE DE VACHE 41% 500G",
+    "c1f79927-804c-4432-8a26-f6db3b47d7f2": "BEURRE DOUX 500G",
+  };
+
+  const results = [];
+
+  for (const [id, newName] of Object.entries(fixes)) {
+    // Fix ingredient name
+    const { error: e1 } = await supabaseAdmin
+      .from("ingredients")
+      .update({ name: newName })
+      .eq("id", id);
+    if (e1) { results.push({ id, error: e1.message }); continue; }
+
+    // Fix offers with date-like supplier_label
+    const { data: offers } = await supabaseAdmin
+      .from("supplier_offers")
+      .select("id, supplier_label")
+      .eq("ingredient_id", id);
+
+    for (const offer of (offers ?? [])) {
+      if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(offer.supplier_label?.trim() ?? "")) {
+        await supabaseAdmin
+          .from("supplier_offers")
+          .update({ supplier_label: newName })
+          .eq("id", offer.id);
+      }
+    }
+
+    results.push({ id, name: newName, status: "fixed" });
+  }
+
+  // Delete orphan ingredient ART1048 with no offers/lines (if not referenced)
+  const orphanId = "fb963fb3-b9ec-463c-a13f-f57eb59263ec";
+  const { count: refCount } = await supabaseAdmin
+    .from("commande_lignes")
+    .select("id", { count: "exact", head: true })
+    .eq("ingredient_id", orphanId);
+
+  if (!refCount || refCount === 0) {
+    await supabaseAdmin.from("supplier_offers").delete().eq("ingredient_id", orphanId);
+    const { error: delErr } = await supabaseAdmin.from("ingredients").delete().eq("id", orphanId);
+    results.push({ id: orphanId, status: delErr ? `delete failed: ${delErr.message}` : "deleted (orphan ART1048)" });
+  } else {
+    results.push({ id: orphanId, status: `kept — referenced in ${refCount} commande_lignes` });
+  }
+
+  return NextResponse.json({ results });
+}
+
+/**
  * POST /api/admin/clean-names
  * One-shot: clean ingredient names that have leading date/number noise from MAEL imports.
  * Also cleans supplier_offers.supplier_label and supplier_invoice_lines.name.
