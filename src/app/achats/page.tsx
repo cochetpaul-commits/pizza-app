@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { RequireRole } from "@/components/RequireRole";
@@ -17,43 +17,59 @@ type InvoiceRow = {
   suppliers: { name: string } | null;
 };
 
+type InvoiceLine = {
+  id: string;
+  name: string | null;
+  quantity: number | null;
+  unit: string | null;
+  unit_price: number | null;
+  total_price: number | null;
+};
+
 type KPIs = {
   totalHT: number;
   nbFactures: number;
   topSupplier: string;
-  commandesEnCours: number;
 };
 
 const fmt = (n: number | null) =>
   n == null ? "—" : n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 
+const fmtDate = (d: string | null) =>
+  d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+
 export default function AchatsPage() {
   const router = useRouter();
   const etab = useEtablissement();
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
-  const [kpis, setKPIs] = useState<KPIs>({ totalHT: 0, nbFactures: 0, topSupplier: "—", commandesEnCours: 0 });
+  const [kpis, setKPIs] = useState<KPIs>({ totalHT: 0, nbFactures: 0, topSupplier: "—" });
   const [loading, setLoading] = useState(true);
+
+  // Folders: which supplier is open
+  const [openFolder, setOpenFolder] = useState<string | null>(null);
+  // Invoice detail
+  const [selectedInvoice, setSelectedInvoice] = useState<string | null>(null);
+  const [lines, setLines] = useState<InvoiceLine[]>([]);
+  const [linesLoading, setLinesLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
 
-      // Current month boundaries
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
       const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
 
-      // Recent invoices (last 50)
       const { data: recent } = await supabase
         .from("supplier_invoices")
         .select("id, invoice_number, invoice_date, total_ht, total_ttc, supplier_id, suppliers(name)")
         .order("invoice_date", { ascending: false })
-        .limit(50);
+        .limit(200);
 
       const rows = (recent ?? []) as unknown as InvoiceRow[];
       setInvoices(rows);
 
-      // KPI: invoices this month
+      // KPIs this month
       const { data: monthInvoices } = await supabase
         .from("supplier_invoices")
         .select("total_ht, supplier_id, suppliers(name)")
@@ -64,7 +80,6 @@ export default function AchatsPage() {
       const totalHT = mi.reduce((s, r) => s + (r.total_ht ?? 0), 0);
       const nbFactures = mi.length;
 
-      // Top supplier this month
       const bySupplier: Record<string, { name: string; total: number }> = {};
       for (const r of mi) {
         const sid = r.supplier_id ?? "?";
@@ -75,23 +90,42 @@ export default function AchatsPage() {
       const sorted = Object.values(bySupplier).sort((a, b) => b.total - a.total);
       const topSupplier = sorted[0]?.name ?? "—";
 
-      // KPI: commandes en cours
-      const { count } = await supabase
-        .from("commande_sessions")
-        .select("id", { count: "exact", head: true })
-        .neq("status", "recue");
-
-      setKPIs({ totalHT, nbFactures, topSupplier, commandesEnCours: count ?? 0 });
+      setKPIs({ totalHT, nbFactures, topSupplier });
       setLoading(false);
     })();
   }, [etab]);
 
-  const kpiCards: { label: string; value: string }[] = [
-    { label: "Total achats ce mois", value: fmt(kpis.totalHT) },
-    { label: "Factures ce mois", value: String(kpis.nbFactures) },
-    { label: "Fournisseur principal", value: kpis.topSupplier },
-    { label: "Commandes en cours", value: String(kpis.commandesEnCours) },
-  ];
+  // Group invoices by supplier
+  const grouped: Record<string, { name: string; invoices: InvoiceRow[] }> = {};
+  for (const inv of invoices) {
+    const sid = inv.supplier_id ?? "unknown";
+    const name = inv.suppliers?.name ?? "Inconnu";
+    if (!grouped[sid]) grouped[sid] = { name, invoices: [] };
+    grouped[sid].invoices.push(inv);
+  }
+  const folders = Object.entries(grouped).sort((a, b) => a[1].name.localeCompare(b[1].name));
+
+  // Load invoice lines
+  const loadLines = async (invoiceId: string) => {
+    if (selectedInvoice === invoiceId) {
+      setSelectedInvoice(null);
+      setLines([]);
+      return;
+    }
+    setSelectedInvoice(invoiceId);
+    setLinesLoading(true);
+    const { data } = await supabase
+      .from("supplier_invoice_lines")
+      .select("id, name, quantity, unit, unit_price, total_price")
+      .eq("invoice_id", invoiceId)
+      .order("name");
+    setLines((data ?? []) as InvoiceLine[]);
+    setLinesLoading(false);
+  };
+
+  const thStyle: React.CSSProperties = { padding: "8px 10px", fontWeight: 600, color: "#999", fontSize: 11, textAlign: "left" };
+  const tdStyle: React.CSSProperties = { padding: "8px 10px", fontSize: 13 };
+  const tdR: React.CSSProperties = { ...tdStyle, textAlign: "right" };
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
@@ -105,104 +139,161 @@ export default function AchatsPage() {
         ) : (
           <>
             {/* KPI cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 28 }}>
-              {kpiCards.map((k) => (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
+              {[
+                { label: "Total achats ce mois", value: fmt(kpis.totalHT) },
+                { label: "Factures ce mois", value: String(kpis.nbFactures) },
+                { label: "Fournisseur principal", value: kpis.topSupplier },
+              ].map((k) => (
                 <div
                   key={k.label}
-                  style={{
-                    background: "#f6eedf",
-                    borderRadius: 10,
-                    padding: "16px 18px",
-                    border: "1px solid #ddd6c8",
-                  }}
+                  style={{ background: "#f6eedf", borderRadius: 10, padding: "16px 18px", border: "1px solid #ddd6c8" }}
                 >
-                  <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginBottom: 6 }}>
-                    {k.label}
-                  </div>
-                  <div style={{ fontFamily: "Oswald, sans-serif", fontWeight: 700, fontSize: 20, color: "#1a1a1a" }}>
-                    {k.value}
-                  </div>
+                  <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginBottom: 6 }}>{k.label}</div>
+                  <div style={{ fontFamily: "Oswald, sans-serif", fontWeight: 700, fontSize: 20, color: "#1a1a1a" }}>{k.value}</div>
                 </div>
               ))}
             </div>
 
-            {/* Quick actions */}
-            <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
+            {/* Import button */}
+            <div style={{ marginBottom: 24 }}>
               <button
                 onClick={() => router.push("/invoices")}
                 style={{
-                  fontFamily: "DM Sans, sans-serif",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  background: "#e27f57",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 20,
-                  padding: "9px 20px",
-                  cursor: "pointer",
+                  fontFamily: "DM Sans, sans-serif", fontSize: 14, fontWeight: 600,
+                  background: "#e27f57", color: "#fff", border: "none", borderRadius: 20,
+                  padding: "9px 20px", cursor: "pointer",
                 }}
               >
                 Importer une facture
               </button>
-              <button
-                onClick={() => router.push("/commandes")}
-                style={{
-                  fontFamily: "DM Sans, sans-serif",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  background: "#fff",
-                  color: "#1a1a1a",
-                  border: "1px solid #ddd6c8",
-                  borderRadius: 20,
-                  padding: "9px 20px",
-                  cursor: "pointer",
-                }}
-              >
-                Nouvelle commande
-              </button>
             </div>
 
-            {/* Recent invoices table */}
+            {/* Folders by supplier */}
             <h2 style={{ fontFamily: "Oswald, sans-serif", fontWeight: 700, fontSize: 16, color: "#1a1a1a", margin: "0 0 12px" }}>
-              Factures recentes
+              Factures par fournisseur
             </h2>
 
-            {invoices.length === 0 ? (
+            {folders.length === 0 ? (
               <p style={{ color: "#999", fontSize: 14 }}>Aucune facture importee.</p>
             ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "DM Sans, sans-serif", fontSize: 14 }}>
-                  <thead>
-                    <tr style={{ borderBottom: "2px solid #ddd6c8", textAlign: "left" }}>
-                      <th style={{ padding: "8px 10px", fontWeight: 600, color: "#999", fontSize: 12 }}>Date</th>
-                      <th style={{ padding: "8px 10px", fontWeight: 600, color: "#999", fontSize: 12 }}>Fournisseur</th>
-                      <th style={{ padding: "8px 10px", fontWeight: 600, color: "#999", fontSize: 12 }}>N° facture</th>
-                      <th style={{ padding: "8px 10px", fontWeight: 600, color: "#999", fontSize: 12, textAlign: "right" }}>Total HT</th>
-                      <th style={{ padding: "8px 10px", fontWeight: 600, color: "#999", fontSize: 12, textAlign: "right" }}>Total TTC</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {invoices.map((inv) => (
-                      <tr
-                        key={inv.id}
-                        onClick={() => router.push(`/invoices`)}
-                        style={{ borderBottom: "1px solid #ddd6c8", cursor: "pointer" }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f0e8")}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {folders.map(([sid, folder]) => {
+                  const isOpen = openFolder === sid;
+                  const folderTotal = folder.invoices.reduce((s, i) => s + (i.total_ht ?? 0), 0);
+
+                  return (
+                    <div key={sid} style={{ border: "1px solid #ddd6c8", borderRadius: 10, overflow: "hidden" }}>
+                      {/* Folder header */}
+                      <div
+                        onClick={() => setOpenFolder(isOpen ? null : sid)}
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "12px 16px", cursor: "pointer",
+                          background: isOpen ? "#f5f0e8" : "#fff",
+                          transition: "background 0.15s",
+                        }}
+                        onMouseEnter={(e) => { if (!isOpen) e.currentTarget.style.background = "#faf6ef"; }}
+                        onMouseLeave={(e) => { if (!isOpen) e.currentTarget.style.background = "#fff"; }}
                       >
-                        <td style={{ padding: "10px" }}>
-                          {inv.invoice_date
-                            ? new Date(inv.invoice_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" })
-                            : "—"}
-                        </td>
-                        <td style={{ padding: "10px" }}>{inv.suppliers?.name ?? "—"}</td>
-                        <td style={{ padding: "10px", color: "#999" }}>{inv.invoice_number ?? "—"}</td>
-                        <td style={{ padding: "10px", textAlign: "right" }}>{fmt(inv.total_ht)}</td>
-                        <td style={{ padding: "10px", textAlign: "right" }}>{fmt(inv.total_ttc)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ fontSize: 12, color: "#999", transition: "transform 0.2s", transform: isOpen ? "rotate(90deg)" : "rotate(0deg)" }}>
+                            ▶
+                          </span>
+                          <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 600, fontSize: 14, color: "#1a1a1a" }}>
+                            {folder.name}
+                          </span>
+                          <span style={{
+                            fontFamily: "DM Sans, sans-serif", fontSize: 11, color: "#999",
+                            background: "#f2ede4", borderRadius: 8, padding: "2px 8px",
+                          }}>
+                            {folder.invoices.length} facture{folder.invoices.length > 1 ? "s" : ""}
+                          </span>
+                        </div>
+                        <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, color: "#666" }}>
+                          {fmt(folderTotal)} HT
+                        </span>
+                      </div>
+
+                      {/* Folder content: invoice list */}
+                      {isOpen && (
+                        <div style={{ borderTop: "1px solid #ddd6c8" }}>
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "DM Sans, sans-serif" }}>
+                            <thead>
+                              <tr style={{ borderBottom: "1px solid #eee6d8" }}>
+                                <th style={thStyle}>Date</th>
+                                <th style={thStyle}>N° facture</th>
+                                <th style={{ ...thStyle, textAlign: "right" }}>Total HT</th>
+                                <th style={{ ...thStyle, textAlign: "right" }}>Total TTC</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {folder.invoices.map((inv) => {
+                                const isSelected = selectedInvoice === inv.id;
+                                return (
+                                  <React.Fragment key={inv.id}>
+                                    <tr
+                                      onClick={() => loadLines(inv.id)}
+                                      style={{
+                                        borderBottom: "1px solid #eee6d8",
+                                        cursor: "pointer",
+                                        background: isSelected ? "#f5f0e8" : "transparent",
+                                      }}
+                                      onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "#faf6ef"; }}
+                                      onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = isSelected ? "#f5f0e8" : "transparent"; }}
+                                    >
+                                      <td style={tdStyle}>{fmtDate(inv.invoice_date)}</td>
+                                      <td style={{ ...tdStyle, color: "#666" }}>{inv.invoice_number ?? "—"}</td>
+                                      <td style={tdR}>{fmt(inv.total_ht)}</td>
+                                      <td style={tdR}>{fmt(inv.total_ttc)}</td>
+                                    </tr>
+                                    {/* Invoice detail lines */}
+                                    {isSelected && (
+                                      <tr>
+                                        <td colSpan={4} style={{ padding: 0 }}>
+                                          <div style={{ background: "#faf6ef", padding: "12px 16px" }}>
+                                            {linesLoading ? (
+                                              <p style={{ color: "#999", fontSize: 12, margin: 0 }}>Chargement...</p>
+                                            ) : lines.length === 0 ? (
+                                              <p style={{ color: "#999", fontSize: 12, margin: 0 }}>Aucune ligne importee pour cette facture.</p>
+                                            ) : (
+                                              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                                                <thead>
+                                                  <tr style={{ borderBottom: "1px solid #ddd6c8" }}>
+                                                    <th style={{ ...thStyle, fontSize: 10 }}>Article</th>
+                                                    <th style={{ ...thStyle, fontSize: 10, textAlign: "right" }}>Qte</th>
+                                                    <th style={{ ...thStyle, fontSize: 10 }}>Unite</th>
+                                                    <th style={{ ...thStyle, fontSize: 10, textAlign: "right" }}>PU</th>
+                                                    <th style={{ ...thStyle, fontSize: 10, textAlign: "right" }}>Total</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {lines.map((l) => (
+                                                    <tr key={l.id} style={{ borderBottom: "1px solid #eee6d8" }}>
+                                                      <td style={{ padding: "6px 10px", fontSize: 12 }}>{l.name ?? "—"}</td>
+                                                      <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "right" }}>{l.quantity ?? "—"}</td>
+                                                      <td style={{ padding: "6px 10px", fontSize: 12, color: "#999" }}>{l.unit ?? ""}</td>
+                                                      <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "right" }}>{fmt(l.unit_price)}</td>
+                                                      <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "right" }}>{fmt(l.total_price)}</td>
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            )}
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </React.Fragment>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </>
