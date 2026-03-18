@@ -164,6 +164,8 @@ export default function DashboardPage() {
 
   // Fetch CA Yesterday (from daily_sales or Popina)
   useEffect(() => {
+    if (!isAdmin) return;
+    if (!isGroupView && !current) return; // wait for etab to load
     async function fetchCaYesterday() {
       let query = supabase
         .from("daily_sales")
@@ -176,11 +178,15 @@ export default function DashboardPage() {
       const total = (data ?? []).reduce((sum: number, r: { ca_ttc: number | null }) => sum + (r.ca_ttc ?? 0), 0);
       setCaYesterday(total > 0 ? total : null);
     }
-    if (isAdmin) fetchCaYesterday();
+    fetchCaYesterday();
   }, [isAdmin, yesterday, isGroupView, current]);
 
-  // Events
+  // Events (only for Piccola Mia — events are managed there)
   useEffect(() => {
+    if (isGroupView) { setEvents([]); return; } // eslint-disable-line react-hooks/set-state-in-effect
+    if (!current) return;
+    const isPiccola = current.slug?.includes("piccola");
+    if (!isPiccola) { setEvents([]); return; }
     async function fetchEvents() {
       const { data } = await supabase
         .from("events")
@@ -192,7 +198,7 @@ export default function DashboardPage() {
       setEvents((data ?? []) as UpcomingEvent[]);
     }
     fetchEvents();
-  }, [today]);
+  }, [today, isGroupView, current]);
 
   // Price alerts
   useEffect(() => {
