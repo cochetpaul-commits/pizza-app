@@ -47,7 +47,7 @@ export const SIDEBAR_NAV: NavSection[] = [
     items: [
       { label: "Achats", href: "/achats" },
       { label: "Variations & alertes", href: "/variations-prix" },
-      { label: "Operations", href: "/pilotage" },
+      { label: "Pilotage", href: "/pilotage" },
       { label: "Fournisseurs", href: "/fournisseurs" },
       { label: "Articles", href: "/ingredients" },
       { label: "Commandes", href: "/commandes" },
@@ -103,7 +103,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/rh/masse-salariale": "Simulation & Masse Salariale",
   "/rh/rapports": "Rapports RH",
   "/settings/planning": "Parametres RH",
-  "/pilotage": "Operations",
+  "/pilotage": "Pilotage",
   "/achats": "Achats",
   "/mercuriale": "Mercuriale",
   "/stats-achats": "Stats d'achats",
