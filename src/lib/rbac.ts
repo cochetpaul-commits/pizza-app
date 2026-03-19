@@ -31,8 +31,6 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   // Hub routes
   "/bello-mio":    ["group_admin", "manager", "cuisine", "salle", "plonge"],
   "/piccola-mia":  ["group_admin", "manager", "cuisine", "salle", "plonge"],
-  "/bello-mio/gestion":    ["group_admin"],
-  "/piccola-mia/gestion":  ["group_admin"],
   "/piccola-mia/evenements": ["group_admin", "manager", "cuisine", "salle", "plonge"],
 };
 

@@ -71,7 +71,7 @@ export async function fetchPriceAlerts(
 
   let q3 = supabase
     .from("ingredients")
-    .select("id, name, supplier, category")
+    .select("id, name, supplier_id, category")
     .eq("user_id", userId)
     .in("id", ingredientIds);
   if (etabId) q3 = q3.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
@@ -79,9 +79,9 @@ export async function fetchPriceAlerts(
 
   if (e3) throw new Error(e3.message);
 
-  const ingMap = new Map<string, { name: string; supplier: string; category?: string }>();
-  for (const i of (ingredients ?? []) as Array<{ id: string; name: string; supplier: string; category?: string }>) {
-    ingMap.set(i.id, { name: i.name, supplier: i.supplier ?? "—", category: i.category });
+  const ingMap = new Map<string, { name: string; supplier_id: string; category?: string }>();
+  for (const i of (ingredients ?? []) as Array<{ id: string; name: string; supplier_id: string; category?: string }>) {
+    ingMap.set(i.id, { name: i.name, supplier_id: i.supplier_id ?? "—", category: i.category });
   }
 
   const supplierIds = [...new Set((active as RawOffer[]).map(r => r.supplier_id))];
@@ -116,7 +116,7 @@ export async function fetchPriceAlerts(
       ingredient_category:  ing?.category,
       supplier_id:          curr.supplier_id,
       supplier_label:       curr.supplier_label ?? prev.supplier_label ?? "—",
-      supplier_name:        supMap.get(curr.supplier_id) ?? ing?.supplier ?? "—",
+      supplier_name:        supMap.get(curr.supplier_id) ?? ing?.supplier_id ?? "—",
       old_price:            prev.unit_price,
       new_price:            curr.unit_price,
       unit:                 curr.unit,

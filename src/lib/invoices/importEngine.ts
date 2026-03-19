@@ -346,7 +346,7 @@ export async function runImport(options: {
         } else if ((ins.error as { code?: string }).code !== "23505") {
           throw new Error(ins.error.message);
         } else {
-          console.log("skip duplicate:", row.name);
+          // skip duplicate
         }
       }
       ingredientsCreated = created;

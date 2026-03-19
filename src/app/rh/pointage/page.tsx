@@ -180,7 +180,7 @@ export default function PointagePage() {
   const [tableError, setTableError] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [allEmployes, setAllEmployes] = useState<Employe[]>([]);
-  const [selectedDate, setSelectedDate] = useState(todayISO);
+  const [selectedDate, setSelectedDate] = useState(() => todayISO());
   const [savingBulk, setSavingBulk] = useState(false);
 
   // Editable reel times: pointageId -> { arrivee, depart }
@@ -309,68 +309,12 @@ export default function PointagePage() {
 
   useEffect(() => {
     let cancelled = false;
-
     (async () => {
-      if (!etab) return;
-      setLoading(true);
-      setTableError(false);
-
-      const [empRes2, contratRes2] = await Promise.all([
-        supabase
-          .from("employes")
-          .select("*")
-          .eq("etablissement_id", etab.id)
-          .eq("actif", true)
-          .order("nom"),
-        supabase
-          .from("contrats")
-          .select("*")
-          .eq("actif", true),
-      ]);
-
+      await loadData();
       if (cancelled) return;
-      const contratsData2 = (contratRes2.data ?? []) as ContratPointage[];
-      const employes: Employe[] = (empRes2.data ?? []).map((e: Record<string, unknown>) => ({
-        ...e,
-        contrats: contratsData2.filter((c) => c.employe_id === e.id),
-      })) as Employe[];
-      setAllEmployes(employes);
-
-      const { data: pointages, error: pErr } = await supabase
-        .from("pointages")
-        .select(
-          "id, employe_id, date, heure_arrivee, heure_depart, heure_arrivee_reelle, heure_depart_reelle, statut"
-        )
-        .eq("etablissement_id", etab.id)
-        .eq("date", selectedDate);
-
-      if (cancelled) return;
-      if (pErr) {
-        setTableError(true);
-      }
-
-      const { data: shiftsData } = await supabase
-        .from("shifts")
-        .select("employe_id, date, heure_debut, heure_fin")
-        .eq("etablissement_id", etab.id)
-        .eq("date", selectedDate);
-
-      if (cancelled) return;
-
-      const combined = buildRows(
-        employes,
-        pErr ? [] : ((pointages as Pointage[]) ?? []),
-        (shiftsData as Shift[]) ?? []
-      );
-      setRows(combined);
-      setReelEdits({});
-      setLoading(false);
     })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [etab, selectedDate, buildRows]);
+    return () => { cancelled = true; };
+  }, [loadData]);
 
   /* ── Handlers ───────────────────────────────────────────────── */
 

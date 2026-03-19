@@ -103,9 +103,7 @@ export default function InvoicesPage() {
     try {
       const form = new FormData();
       form.append("file", f);
-      console.log("[invoices] calling detect API...");
       const res = await fetchApi("/api/invoices/detect", { method: "POST", body: form });
-      console.log("[invoices] response status:", res.status);
       if (!res.ok) {
         const text = await res.text();
         let msg = `Erreur ${res.status}`;
@@ -113,7 +111,6 @@ export default function InvoicesPage() {
         throw new Error(msg);
       }
       const data = await res.json();
-      console.log("[invoices] detection result:", data);
       setDetection(data.detection);
       setSelectedSupplier(data.detection?.supplier?.slug ?? null);
       if (data.detection?.etablissement?.slug === "bello_mio") setSelectedEtab("bellomio");

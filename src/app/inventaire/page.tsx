@@ -96,7 +96,8 @@ export default function InventairePage() {
       if (etab?.id) {
         q = q.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
       }
-      const { data } = await q;
+      const { data, error } = await q;
+      if (error) { console.error("ingredients query:", error); }
       setIngredients((data ?? []) as Ingredient[]);
     })();
   }, [etab?.id]);
@@ -110,13 +111,14 @@ export default function InventairePage() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const { data } = await supabase
+      const { data, error: invErr } = await supabase
         .from("inventaires")
         .select("id, date, statut, total_valeur, created_at, notes")
         .eq("etablissement_id", reloadKey)
         .order("created_at", { ascending: false })
         .limit(20);
 
+      if (invErr) { console.error("inventaires query:", invErr); }
       if (cancelled) return;
       const list = (data ?? []) as Inventaire[];
       const active = list.find((i) => i.statut === "en_cours") ?? null;
@@ -124,10 +126,11 @@ export default function InventairePage() {
       setHistorique(list.filter((i) => i.statut === "cloture"));
 
       if (active) {
-        const { data: lignes } = await supabase
+        const { data: lignes, error: ligErr } = await supabase
           .from("inventaire_lignes")
           .select("ingredient_id, quantite")
           .eq("inventaire_id", active.id);
+        if (ligErr) { console.error("inventaire_lignes query:", ligErr); }
         if (!cancelled) {
           const q: Record<string, number | ""> = {};
           for (const l of lignes ?? []) {
@@ -228,10 +231,11 @@ export default function InventairePage() {
 
   async function viewInventaire(inv: Inventaire) {
     setViewingId(inv.id);
-    const { data: lignes } = await supabase
+    const { data: lignes, error: ligErr } = await supabase
       .from("inventaire_lignes")
       .select("ingredient_id, quantite")
       .eq("inventaire_id", inv.id);
+    if (ligErr) { console.error("inventaire_lignes view query:", ligErr); }
     const q: Record<string, number | ""> = {};
     for (const l of lignes ?? []) {
       if (l.ingredient_id && l.quantite > 0) q[l.ingredient_id] = l.quantite;

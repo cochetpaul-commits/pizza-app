@@ -90,7 +90,17 @@ export default function MonComptePage() {
           <button
             type="button"
             onClick={logout}
-            className="btn btnDanger"
+            style={{
+              background: "#D4775A",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              padding: "10px 20px",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+              width: "100%",
+            }}
           >
             Se deconnecter
           </button>

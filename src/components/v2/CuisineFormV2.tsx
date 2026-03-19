@@ -150,11 +150,12 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
 
       const ingsQ = supabase.from("ingredients").select("*").eq("is_active", true);
       const offQ = supabase.from("v_latest_offers").select("*");
-      const [{ data: ingsData, error: iErr }, { data: offers }] = await Promise.all([
+      const [{ data: ingsData, error: iErr }, { data: offers, error: oErr }] = await Promise.all([
         ingsQ.order("name"),
         offQ,
       ]);
       if (iErr) { setStatus("error"); setError(iErr); return; }
+      if (oErr) { console.error("offers query:", oErr); }
 
       const ingList = (ingsData ?? []) as Ingredient[];
       setIngredients(ingList);
@@ -163,7 +164,8 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
       const supplierIds = Array.from(new Set(offerList.map(o => String(o.supplier_id ?? "")).filter(Boolean)));
       const supplierNameById: Record<string, string> = {};
       if (supplierIds.length) {
-        const { data: sups } = await supabase.from("suppliers").select("id,name").in("id", supplierIds);
+        const { data: sups, error: supErr } = await supabase.from("suppliers").select("id,name").in("id", supplierIds);
+        if (supErr) { console.error("suppliers query:", supErr); }
         for (const s of (sups ?? []) as { id: string; name: string }[]) {
           if (s.id && s.name) supplierNameById[s.id] = s.name;
         }
@@ -217,7 +219,9 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
         if (missingIds.size > 0) {
           const krQ = supabase.from("kitchen_recipes").select("name,output_ingredient_id,total_cost,yield_grams,cost_per_kg");
           const prQ = supabase.from("prep_recipes").select("name,output_ingredient_id,total_cost,yield_grams");
-          const [{ data: krAll }, { data: prAll }] = await Promise.all([krQ, prQ]);
+          const [{ data: krAll, error: krErr }, { data: prAll, error: prErr }] = await Promise.all([krQ, prQ]);
+          if (krErr) { console.error("kitchen_recipes query:", krErr); }
+          if (prErr) { console.error("prep_recipes query:", prErr); }
           for (const kr of (krAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; total_cost: number | null; yield_grams: number | null; cost_per_kg: number | null }>) {
             let cpuG = 0;
             if (kr.cost_per_kg && kr.cost_per_kg > 0) cpuG = kr.cost_per_kg / 1000;

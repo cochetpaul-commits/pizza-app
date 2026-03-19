@@ -155,6 +155,10 @@ export default function EventForm({ eventId }: { eventId?: string }) {
       let eQ = supabase.from("recipes").select("id,name");
       if (etab) { pQ = pQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`); kQ = kQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`); cQ = cQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`); eQ = eQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`); }
       const [pizzas, kitchens, cocktails, empats] = await Promise.all([pQ, kQ, cQ, eQ]);
+      if (pizzas.error) { console.error("pizza_recipes query:", pizzas.error); }
+      if (kitchens.error) { console.error("kitchen_recipes query:", kitchens.error); }
+      if (cocktails.error) { console.error("cocktails query:", cocktails.error); }
+      if (empats.error) { console.error("recipes query:", empats.error); }
 
       const opts: RecipeOption[] = [];
       for (const r of pizzas.data ?? []) {
@@ -178,7 +182,8 @@ export default function EventForm({ eventId }: { eventId?: string }) {
   // ── Load clients ─────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("clients").select("id,nom,prenom,email,telephone,notes").order("nom");
+      const { data, error } = await supabase.from("clients").select("id,nom,prenom,email,telephone,notes").order("nom");
+      if (error) { console.error("clients query:", error); }
       setClientsList(data ?? []);
     })();
   }, []);

@@ -30,8 +30,6 @@ export async function GET(request: NextRequest) {
   const date = dateParam || getParisDate(0);
   const locationParam = request.nextUrl.searchParams.get("locationId") || undefined;
 
-  console.log(`[ca-jour] date demandée: ${date}, location: ${locationParam ?? LOCATION_ID}`);
-
   // Fetch reports (totaux, produits, catégories) + orders (midi/soir, surPlace/aEmporter)
   const [allReports, allOrders] = await Promise.all([
     fetchReports(apiKey, date, date, locationParam),
@@ -53,9 +51,6 @@ export async function GET(request: NextRequest) {
     // Fallback: try ISO format
     try { return toParisDate(timeRef) === date; } catch { return false; }
   });
-
-  console.log(`[ca-jour] reports bruts: ${allReports.length}, filtrés: ${reports.length}`);
-  console.log(`[ca-jour] orders bruts: ${allOrders.length}, filtrés: ${orders.length}`);
 
   // ── Totaux depuis reports ──
   let totalSalesCentimes = 0;

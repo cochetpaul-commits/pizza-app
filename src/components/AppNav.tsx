@@ -17,27 +17,19 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { label: "Groupe", href: "/groupe", adminOnly: true },
   { label: "Bello Mio", href: "/bello-mio", group: "bm" },
-  { label: "Cuisine", href: "/bello-mio/cuisine", indent: true },
   { label: "Planning", href: "/bello-mio/planning", indent: true },
-  { label: "Gestion", href: "/bello-mio/gestion", adminOnly: true, indent: true },
   { label: "Piccola Mia", href: "/piccola-mia", group: "pm" },
-  { label: "Cuisine", href: "/piccola-mia/cuisine", indent: true },
   { label: "Planning", href: "/piccola-mia/planning", indent: true },
   { label: "Evenements", href: "/piccola-mia/evenements", indent: true },
-  { label: "Gestion", href: "/piccola-mia/gestion", adminOnly: true, indent: true },
 ];
 
 const PAGE_LABELS: Record<string, string> = {
   "/groupe": "Groupe",
   "/bello-mio": "Bello Mio",
-  "/bello-mio/cuisine": "Cuisine",
   "/bello-mio/planning": "Planning",
-  "/bello-mio/gestion": "Gestion",
   "/piccola-mia": "Piccola Mia",
-  "/piccola-mia/cuisine": "Cuisine",
   "/piccola-mia/planning": "Planning",
   "/piccola-mia/evenements": "Evenements",
-  "/piccola-mia/gestion": "Gestion",
 };
 
 function getPageTitle(pathname: string): string {

@@ -127,6 +127,20 @@ export const PAGE_TITLES: Record<string, string> = {
   "/notifications": "Notifications",
   "/kezia": "Import Kezia",
   "/session": "Session",
+  "/recettes/new/pizza": "Nouvelle pizza",
+  "/recettes/new/cuisine": "Nouvelle recette cuisine",
+  "/recettes/new/cocktail": "Nouveau cocktail",
+  "/recettes/new/empatement": "Nouvel empatement",
+  "/recettes/pizza": "Recette pizza",
+  "/recettes/cuisine": "Recette cuisine",
+  "/recettes/cocktail": "Recette cocktail",
+  "/recettes/empatement": "Recette empatement",
+  "/rh/employe": "Fiche employe",
+  "/bello-mio": "Bello Mio",
+  "/bello-mio/planning": "Planning Bello Mio",
+  "/piccola-mia": "Piccola Mia",
+  "/piccola-mia/planning": "Planning Piccola Mia",
+  "/piccola-mia/evenements": "Evenements Piccola Mia",
 };
 
 /** Section name map: pathname → parent section label for TopBar subtitle */
@@ -157,6 +171,18 @@ const PAGE_SECTIONS: Record<string, string> = {
   "/devis": "Gestion des clients",
   "/evenements": "Gestion des clients",
   "/evenements/clients": "Gestion des clients",
+  "/recettes/new/pizza": "Gestion de la finance",
+  "/recettes/new/cuisine": "Gestion de la finance",
+  "/recettes/new/cocktail": "Gestion de la finance",
+  "/recettes/new/empatement": "Gestion de la finance",
+  "/recettes/pizza": "Gestion de la finance",
+  "/recettes/cuisine": "Gestion de la finance",
+  "/recettes/cocktail": "Gestion de la finance",
+  "/recettes/empatement": "Gestion de la finance",
+  "/achats": "Gestion de la finance",
+  "/rh/employe": "Gestion du personnel",
+  "/piccola-mia/evenements": "Gestion des clients",
+  "/devis/new": "Gestion des clients",
 };
 
 export function getPageTitle(pathname: string): string {
