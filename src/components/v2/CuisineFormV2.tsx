@@ -150,9 +150,11 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
 
       let ingsQ = supabase.from("ingredients").select("*").eq("is_active", true);
       if (etab) ingsQ = ingsQ.eq("etablissement_id", etab.id);
+      let offQ = supabase.from("v_latest_offers").select("*");
+      if (etab) offQ = offQ.eq("etablissement_id", etab.id);
       const [{ data: ingsData, error: iErr }, { data: offers }] = await Promise.all([
         ingsQ.order("name"),
-        supabase.from("v_latest_offers").select("*"),
+        offQ,
       ]);
       if (iErr) { setStatus("error"); setError(iErr); return; }
 
@@ -364,7 +366,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
         if (error) throw error;
       } else {
         const { data, error } = await supabase.from("kitchen_recipes")
-          .insert({ ...payload, user_id: auth.user.id })
+          .insert({ ...payload, user_id: auth.user.id, ...(etab ? { etablissement_id: etab.id } : {}) })
           .select("id").single<{ id: string }>();
         if (error) throw error;
         rid = data.id;
@@ -426,6 +428,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
             piece_weight_g: null,
             piece_volume_ml: null,
             supplier_id: null,
+            ...(etab ? { etablissement_id: etab.id } : {}),
           }).select("id").single<{ id: string }>();
           if (newIng) {
             setIndexIngredientId(newIng.id);

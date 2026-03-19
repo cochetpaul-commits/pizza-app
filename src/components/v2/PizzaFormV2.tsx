@@ -201,9 +201,11 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
       let ingsQ = supabase.from("ingredients").select("*").eq("is_active", true);
       let doughQ = supabase.from("recipes").select("id,name,type,total_cost,yield_grams,ball_weight");
       if (etab) { ingsQ = ingsQ.eq("etablissement_id", etab.id); doughQ = doughQ.eq("etablissement_id", etab.id); }
+      let offQ = supabase.from("v_latest_offers").select("*");
+      if (etab) offQ = offQ.eq("etablissement_id", etab.id);
       const [{ data: ingsData, error: iErr }, { data: offers }, { data: doughs }] = await Promise.all([
         ingsQ.order("name"),
-        supabase.from("v_latest_offers").select("*"),
+        offQ,
         doughQ.order("created_at", { ascending: false }),
       ]);
       if (cancelled) return;
@@ -411,7 +413,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         if (error) throw error;
       } else {
         const { data, error } = await supabase.from("pizza_recipes")
-          .insert({ ...payload, user_id: auth.user.id })
+          .insert({ ...payload, user_id: auth.user.id, ...(etab ? { etablissement_id: etab.id } : {}) })
           .select("id").single<{ id: string }>();
         if (error) throw error;
         pid = data.id;

@@ -345,11 +345,13 @@ function CommandesPage() {
     }
 
     // Load catalog: ingredients linked to this supplier (via offers or supplier_id)
-    const { data: offerData } = await supabase
+    let offerQ = supabase
       .from("supplier_offers")
       .select("ingredient_id, price_kind, unit, unit_price, pack_price, pack_unit, pack_count, pack_each_qty, pack_each_unit, pack_total_qty")
       .eq("supplier_id", supplierId)
       .eq("is_active", true);
+    if (etab) offerQ = offerQ.eq("etablissement_id", etab.id);
+    const { data: offerData } = await offerQ;
 
     const offerMap = new Map<string, typeof offerData extends (infer T)[] | null ? T : never>();
     const offerIngIds: string[] = [];
@@ -360,22 +362,26 @@ function CommandesPage() {
       }
     }
 
-    const { data: directIngs } = await supabase
+    let directIngQ = supabase
       .from("ingredients")
       .select("id")
       .eq("supplier_id", supplierId);
+    if (etab) directIngQ = directIngQ.eq("etablissement_id", etab.id);
+    const { data: directIngs } = await directIngQ;
     const directIds = (directIngs ?? []).map((i: { id: string }) => i.id);
 
     const allIds = [...new Set([...offerIngIds, ...directIds])];
 
     let items: CatalogItem[] = [];
     if (allIds.length > 0) {
-      const { data: ingData } = await supabase
+      let ingDataQ = supabase
         .from("ingredients")
         .select("id, name, category, default_unit, favori_commande, order_unit_label")
         .in("id", allIds)
         .order("category")
         .order("name");
+      if (etab) ingDataQ = ingDataQ.eq("etablissement_id", etab.id);
+      const { data: ingData } = await ingDataQ;
 
       items = (ingData ?? []).map((ing: { id: string; name: string; category: string | null; default_unit: string | null; favori_commande?: boolean; order_unit_label?: string | null }) => {
         const offer = (offerMap.get(ing.id) ?? null) as OfferRow | null;
@@ -389,7 +395,7 @@ function CommandesPage() {
     }
     setCatalog(items);
     setLoadingSupplier(false);
-  }, []);
+  }, [etab]);
 
   useEffect(() => {
     if (selectedSupplierId) {

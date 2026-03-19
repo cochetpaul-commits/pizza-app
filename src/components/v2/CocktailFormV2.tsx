@@ -180,9 +180,11 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
       let ingsQ = supabase.from("ingredients").select("*").eq("is_active", true);
       if (etab) ingsQ = ingsQ.eq("etablissement_id", etab.id);
+      let offQ = supabase.from("v_latest_offers").select("*");
+      if (etab) offQ = offQ.eq("etablissement_id", etab.id);
       const [{ data: ingsData, error: iErr }, { data: offers }] = await Promise.all([
         ingsQ.order("name"),
-        supabase.from("v_latest_offers").select("*"),
+        offQ,
       ]);
       if (cancelled) return;
       if (iErr) { setStatus("error"); setError(iErr); return; }
@@ -382,7 +384,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
         if (error) throw error;
       } else {
         const { data, error } = await supabase.from("cocktails")
-          .insert({ ...payload, user_id: auth.user.id })
+          .insert({ ...payload, user_id: auth.user.id, ...(etab ? { etablissement_id: etab.id } : {}) })
           .select("id").single<{ id: string }>();
         if (error) throw error;
         cid = data.id;

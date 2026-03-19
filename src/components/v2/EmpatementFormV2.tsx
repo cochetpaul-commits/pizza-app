@@ -171,12 +171,13 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) { setStatus("error"); setError({ message: "NOT_LOGGED" }); return; }
 
-      const { data: ingsData } = await supabase
+      let ingsQ = supabase
         .from("ingredients")
         .select("*")
         .eq("is_active", true)
-        .in("category", ["epicerie_salee", "autre"])
-        .order("name");
+        .in("category", ["epicerie_salee", "autre"]);
+      if (etab) ingsQ = ingsQ.eq("etablissement_id", etab.id);
+      const { data: ingsData } = await ingsQ.order("name");
       if (cancelled) return;
       setFlourIngredients((ingsData ?? []) as Ingredient[]);
 
@@ -234,7 +235,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     }
     load();
     return () => { cancelled = true; };
-  }, [recipeId]);
+  }, [recipeId, etab]);
 
   async function handleSave() {
     setSaving(true);
@@ -272,7 +273,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         const { error } = await supabase.from("recipes").update(payload).eq("id", rid);
         if (error) throw error;
       } else {
-        const { data, error } = await supabase.from("recipes").insert(payload).select("id").single<{ id: string }>();
+        const { data, error } = await supabase.from("recipes").insert({ ...payload, ...(etab ? { etablissement_id: etab.id } : {}) }).select("id").single<{ id: string }>();
         if (error) throw error;
         rid = data.id;
       }

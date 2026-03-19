@@ -421,7 +421,7 @@ function IngredientsPageInner() {
     };
     const ins = await supabase.from("ingredients").insert(baseIngredient).select("id").single();
     if (ins.error) {
-      if (ins.error.message.includes("ingredients_user_name_uniq")) {
+      if (ins.error.message.includes("ingredients_etab_name")) {
         alert(`Un ingredient "${name}" existe deja. Choisissez un autre nom.`);
       } else {
         alert(ins.error.message);
@@ -559,7 +559,7 @@ function IngredientsPageInner() {
     };
     const u1 = await supabase.from("ingredients").update(up).eq("id", editingId);
     if (u1.error) {
-      if (u1.error.message.includes("ingredients_user_name_uniq")) {
+      if (u1.error.message.includes("ingredients_etab_name")) {
         alert(`Un ingredient "${name}" existe deja. Choisissez un autre nom.`);
       } else {
         alert(u1.error.message);
