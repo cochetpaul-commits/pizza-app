@@ -558,40 +558,55 @@ export default function PlanningPage() {
                     primaryPosteColor = posteMap.get(topPosteId)?.couleur ?? "#999";
                   }
 
+                  // Format hours like Combo: 42h55 instead of 42.9
+                  const fmtHM = (h: number) => {
+                    const hrs = Math.floor(Math.abs(h));
+                    const mins = Math.round((Math.abs(h) - hrs) * 60);
+                    const sign = h < 0 ? "-" : "";
+                    return mins > 0 ? `${sign}${hrs}h${String(mins).padStart(2, "0")}` : `${sign}${hrs}h`;
+                  };
+                  const contractH = contrat?.heures_semaine ?? 0;
+                  const hsTotal = bilan ? bilan.heures_supp_10 + bilan.heures_supp_20 + bilan.heures_supp_50 : 0;
+                  const rcH = bilan?.rc_acquis ?? 0;
+                  const delta = bilan?.delta_contrat ?? 0;
+
                   return [
-                    /* Employee name cell + hours underneath */
+                    /* Employee name cell — Combo style */
                     <div key={`name-${emp.id}`} style={{ ...empCell, background: rowBg }}>
                       <div style={{ ...empAvatar, background: primaryPosteColor }}>{initials}</div>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                          <span style={empName}>{emp.prenom} {emp.nom.charAt(0)}.</span>
+                          <span style={empName}>{emp.prenom} {emp.nom.toUpperCase()}</span>
                           {isTNS && <span style={tnsBadge}>TNS</span>}
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 1 }}>
-                          {contrat && !isTNS && (
-                            <span style={{ fontSize: 10, color: "#999" }}>{contrat.heures_semaine}h</span>
-                          )}
-                          {!isTNS && weekHours > 0 && (
-                            <>
-                              {contrat && <span style={{ fontSize: 10, color: "#ccc" }}>|</span>}
-                              <span style={{
-                                fontSize: 10, fontWeight: 700,
-                                color: hasAlerts ? "#DC2626" : "#1a1a1a",
-                              }}>
-                                {weekHours.toFixed(1)}h
-                              </span>
-                              {hasAlerts && <span title={bilan!.alertes.map((a) => a.message).join("\n")} style={alertDot}>!</span>}
-                              {bilan && bilan.delta_contrat !== 0 && (
+                        {!isTNS && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 0, marginTop: 3, flexWrap: "wrap" }}>
+                            <span style={statItem}>{contractH}h</span>
+                            <span style={statSep}>|</span>
+                            <span style={{ ...statItem, fontWeight: 700 }}>{fmtHM(weekHours)}</span>
+                            <span style={statSep}>|</span>
+                            <span style={statItem}>{fmtHM(hsTotal)}</span>
+                            {delta !== 0 && (
+                              <>
+                                <span style={statSep}>|</span>
                                 <span style={{
-                                  fontSize: 9, fontWeight: 600,
-                                  color: bilan.delta_contrat > 0 ? "#DC2626" : "#2563eb",
+                                  ...deltaBadge,
+                                  background: delta > 0 ? "rgba(220,38,38,0.1)" : "rgba(234,160,60,0.15)",
+                                  color: delta > 0 ? "#DC2626" : "#c47a20",
                                 }}>
-                                  {bilan.delta_contrat > 0 ? "+" : ""}{bilan.delta_contrat.toFixed(1)}
+                                  {delta > 0 ? "+" : ""}{fmtHM(delta)}
                                 </span>
-                              )}
-                            </>
-                          )}
-                        </div>
+                              </>
+                            )}
+                            {rcH > 0 && (
+                              <>
+                                <span style={statSep}>|</span>
+                                <span style={rcBadge}>RC {fmtHM(rcH)}</span>
+                              </>
+                            )}
+                            {hasAlerts && <span title={bilan!.alertes.map((a) => a.message).join("\n")} style={alertDot}>!</span>}
+                          </div>
+                        )}
                       </div>
                       {canWrite && !isTNS && (
                         <button
@@ -865,9 +880,9 @@ const gridWrapper: React.CSSProperties = {
 
 const gridContainer = (): React.CSSProperties => ({
   display: "grid",
-  gridTemplateColumns: "140px repeat(7, 1fr)",
+  gridTemplateColumns: "200px repeat(7, 1fr)",
   gap: 0,
-  minWidth: 800,
+  minWidth: 900,
 });
 
 const headerCell: React.CSSProperties = {
@@ -904,8 +919,27 @@ const empAvatar: React.CSSProperties = {
 };
 
 const empName: React.CSSProperties = {
-  fontSize: 12, fontWeight: 700, color: "#1a1a1a",
+  fontSize: 12, fontWeight: 600, color: "#2D6A4F",
   whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+};
+
+const statItem: React.CSSProperties = {
+  fontSize: 10, color: "#666",
+};
+
+const statSep: React.CSSProperties = {
+  fontSize: 10, color: "#ccc", margin: "0 3px",
+};
+
+const deltaBadge: React.CSSProperties = {
+  fontSize: 9, fontWeight: 700,
+  padding: "1px 5px", borderRadius: 6,
+};
+
+const rcBadge: React.CSSProperties = {
+  fontSize: 9, fontWeight: 700,
+  padding: "1px 5px", borderRadius: 6,
+  background: "rgba(45,106,79,0.1)", color: "#2D6A4F",
 };
 
 const dayCell: React.CSSProperties = {
