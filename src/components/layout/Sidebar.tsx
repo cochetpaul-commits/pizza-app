@@ -80,9 +80,10 @@ function sectionVisible(section: NavSection, role: Role | null, etabSlug?: strin
 
 type SidebarContentProps = {
   onNavigate?: () => void;
+  onCollapse?: () => void;
 };
 
-function SidebarContent({ onNavigate }: SidebarContentProps) {
+function SidebarContent({ onNavigate, onCollapse }: SidebarContentProps) {
   const pathname = usePathname();
   const { role } = useProfile();
   const { current, setCurrent, etablissements, isGroupView, setGroupView, isGroupAdmin } = useEtablissement();
@@ -120,10 +121,26 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
             <span style={{
               fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
               fontSize: 15, fontWeight: 700, color: "#fff",
-              letterSpacing: 0.5, lineHeight: 1,
+              letterSpacing: 0.5, lineHeight: 1, flex: 1,
             }}>
               iFratelli
             </span>
+            {onCollapse && (
+              <button
+                type="button"
+                onClick={onCollapse}
+                title="Replier le menu"
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  padding: 4, display: "flex", color: C.textMuted,
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="11 17 6 12 11 7" />
+                  <polyline points="18 17 13 12 18 7" />
+                </svg>
+              </button>
+            )}
           </div>
           {role && (
             <div style={{
@@ -303,15 +320,139 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
   );
 }
 
-/** Desktop persistent sidebar */
-export function Sidebar() {
+/** Collapsed sidebar: icons only */
+function CollapsedSidebar({ onExpand }: { onExpand: () => void }) {
+  const pathname = usePathname();
+  const { role } = useProfile();
+  const { current, isGroupView } = useEtablissement();
+
+  const etabColor = isGroupView
+    ? C.ifratelli
+    : (current?.couleur ?? getEtabColor(current?.slug));
+
+  const visibleSections = SIDEBAR_NAV.filter(s => sectionVisible(s, role, current?.slug));
+
+  // Collect all visible items with icons
+  const allItems = visibleSections.flatMap(s =>
+    s.items.filter(item => {
+      if (!item.roles) return true;
+      if (!role) return false;
+      return item.roles.includes(role);
+    })
+  );
+
   return (
-    <aside className="sidebar-desktop" style={{
-      position: "fixed", top: 0, left: 0, bottom: 0,
-      width: 240, zIndex: 40,
-      overflowY: "auto",
+    <div style={{
+      display: "flex", flexDirection: "column", height: "100%",
+      background: C.bg, color: C.textNormal, alignItems: "center",
+      fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
     }}>
-      <SidebarContent />
+      {/* Logo + expand button */}
+      <div style={{
+        padding: "16px 0 12px", borderBottom: `1px solid ${C.divider}`,
+        width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+      }}>
+        <button
+          type="button"
+          onClick={onExpand}
+          title="Deplier le menu"
+          style={{
+            background: "none", border: "none", cursor: "pointer",
+            padding: 4, display: "flex",
+          }}
+        >
+          <Image
+            src="/logo-ifratelli.png"
+            alt="iFratelli"
+            width={28}
+            height={28}
+            style={{ width: 28, height: 28, objectFit: "contain", borderRadius: 6 }}
+          />
+        </button>
+        <span style={{
+          width: 8, height: 8, borderRadius: "50%",
+          background: etabColor,
+        }} />
+      </div>
+
+      {/* Icon nav */}
+      <nav style={{ flex: 1, overflowY: "auto", padding: "8px 0", width: "100%" }}>
+        {allItems.map(item => {
+          const active = pathname === item.href || pathname.startsWith(item.href + "/");
+          const IconComp = item.icon ? ICON_MAP[item.icon] : null;
+          if (!IconComp) return null;
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              title={item.label}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                padding: "10px 0", margin: "1px 6px",
+                borderRadius: 6, textDecoration: "none",
+                background: active ? C.bgItemActive : "transparent",
+                borderLeft: active ? `3px solid ${etabColor}` : "3px solid transparent",
+                transition: "background 0.12s",
+              }}
+            >
+              <IconComp size={18} color={active ? etabColor : C.textMuted} />
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Bottom: expand hint */}
+      <div style={{ padding: "12px 0 16px", borderTop: `1px solid ${C.divider}` }}>
+        <button
+          type="button"
+          onClick={onExpand}
+          title="Deplier le menu"
+          style={{
+            background: "none", border: "none", cursor: "pointer",
+            padding: 6, display: "flex", color: C.textMuted,
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="13 17 18 12 13 7" />
+            <polyline points="6 17 11 12 6 7" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Desktop persistent sidebar with collapse/expand */
+export function Sidebar() {
+  const [expanded, setExpanded] = useState(false);
+
+  // Sync CSS variable so .app-main follows
+  React.useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--sidebar-width",
+      expanded ? "240px" : "60px",
+    );
+  }, [expanded]);
+
+  return (
+    <aside
+      className="sidebar-desktop"
+      style={{
+        position: "fixed", top: 0, left: 0, bottom: 0,
+        width: expanded ? 240 : 60,
+        zIndex: 40,
+        overflowY: "auto",
+        overflowX: "hidden",
+        transition: "width 0.2s ease",
+        background: C.bg,
+      }}
+    >
+      {expanded ? (
+        <SidebarContent onNavigate={undefined} onCollapse={() => setExpanded(false)} />
+      ) : (
+        <CollapsedSidebar onExpand={() => setExpanded(true)} />
+      )}
     </aside>
   );
 }

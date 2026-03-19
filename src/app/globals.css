@@ -7,7 +7,8 @@
   --terre: #e27f57;
   --terre-light: #c9b99a;
   --noir: #1a1a1a;
-  --sidebar-width: 240px;
+  --sidebar-width: 60px;
+  --sidebar-width-expanded: 240px;
   --etab-color: #b45f57;
   --sauge: #4a6741;
   --sauge-light: #e8ede6;
@@ -74,6 +75,7 @@ html, body{
   margin-left: var(--sidebar-width);
   min-height: 100dvh;
   background: var(--creme);
+  transition: margin-left 0.2s ease;
 }
 
 @media (max-width: 767px) {
