@@ -53,7 +53,6 @@ export const SIDEBAR_NAV: NavSection[] = [
       { label: "Pilotage", href: "/pilotage" },
       { label: "Inventaire", href: "/inventaire" },
       { label: "Articles en vente", href: "/epicerie" },
-      { label: "Import Kezia", href: "/kezia" },
     ],
   },
   {
@@ -79,6 +78,7 @@ export const SIDEBAR_NAV: NavSection[] = [
       { label: "Creer devis", href: "/devis/new" },
       { label: "Factures", href: "/clients/factures" },
       { label: "Evenements", href: "/evenements" },
+      { label: "Import Kezia", href: "/kezia" },
     ],
   },
   {
