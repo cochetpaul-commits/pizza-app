@@ -425,12 +425,43 @@ export default function PlanningPage() {
     if (!result.destination) return;
     const shiftId = result.draggableId;
     const [newEmpId, newDate] = result.destination.droppableId.split(":");
+    const [srcEmpId, srcDate] = result.source.droppableId.split(":");
 
     const shift = shifts.find((s) => s.id === shiftId);
     if (!shift) return;
-    if (shift.employe_id === newEmpId && shift.date === newDate) return;
 
-    // Optimistic update
+    // Same cell: swap order (swap times with the shift at destination index)
+    if (srcEmpId === newEmpId && srcDate === newDate) {
+      const srcIdx = result.source.index;
+      const destIdx = result.destination.index;
+      if (srcIdx === destIdx) return;
+
+      const cellKey = `${newEmpId}:${newDate}`;
+      const cellShifts = (shiftsByCell.get(cellKey) ?? []);
+      const otherShift = cellShifts[destIdx];
+      if (!otherShift) return;
+
+      // Swap heure_debut / heure_fin / poste_id between the two shifts
+      const aDebut = shift.heure_debut, aFin = shift.heure_fin, aPoste = shift.poste_id;
+      const bDebut = otherShift.heure_debut, bFin = otherShift.heure_fin, bPoste = otherShift.poste_id;
+
+      // Optimistic update
+      setShifts((prev) =>
+        prev.map((s) => {
+          if (s.id === shift.id) return { ...s, heure_debut: bDebut, heure_fin: bFin, poste_id: bPoste };
+          if (s.id === otherShift.id) return { ...s, heure_debut: aDebut, heure_fin: aFin, poste_id: aPoste };
+          return s;
+        }),
+      );
+
+      await Promise.all([
+        supabase.from("shifts").update({ heure_debut: bDebut, heure_fin: bFin, poste_id: bPoste }).eq("id", shift.id),
+        supabase.from("shifts").update({ heure_debut: aDebut, heure_fin: aFin, poste_id: aPoste }).eq("id", otherShift.id),
+      ]);
+      return;
+    }
+
+    // Different cell: move shift
     setShifts((prev) =>
       prev.map((s) =>
         s.id === shiftId ? { ...s, employe_id: newEmpId, date: newDate } : s,
