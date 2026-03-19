@@ -585,6 +585,12 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
         {/* ── Header ── */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {isEdit && (
+              <button type="button" onClick={() => router.push("/recettes")} style={{
+                fontSize: 18, color: "#999", cursor: "pointer", border: "none", background: "transparent",
+                padding: "4px 8px", lineHeight: 1,
+              }}>&#8592;</button>
+            )}
             {photoPreview && (
               <div style={{ width: 32, height: 32, borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>
                 <Image src={photoPreview} alt="" width={32} height={32} style={{ objectFit: "cover", width: 32, height: 32 }} />
@@ -601,6 +607,12 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
             </div>
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {isEdit && pivotIngredientId && (
+              <button type="button" className="btn" onClick={() => { setMainTab("recette"); setProdMode(true); }}
+                style={{ fontSize: 12, background: "#4a6741", borderColor: "#4a6741", color: "#fff" }}>
+                Production
+              </button>
+            )}
             {isEdit && (
               <button type="button" className="btn" onClick={handleExportPdf} disabled={pdfLoading}
                 style={{ fontSize: 12 }}>

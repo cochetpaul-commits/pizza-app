@@ -9,6 +9,7 @@ import path from "path";
 import { POLE_COLORS } from "@/lib/poleColors";
 import { parseAllergens, mergeAllergens } from "@/lib/allergens";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ function round2(v: number) {
 
 function readLogoBase64(): string | null {
   try {
-    const logoPath = path.join(process.cwd(), "public", "logo.png");
+    const logoPath = path.join(process.cwd(), "public", "logo-ifratelli.png");
     const buf = fs.readFileSync(logoPath);
     return `data:image/png;base64,${buf.toString("base64")}`;
   } catch {
@@ -56,6 +57,8 @@ type KitchenRow = {
   notes: string | null;
   procedure: string | null;
   photo_url: string | null;
+  sell_price: number | null;
+  establishments: string[] | null;
 };
 
 type LineRow = {
@@ -70,6 +73,10 @@ type IngRow = {
   name: string | null;
   cost_per_unit: number | null;
   allergens: unknown;
+  supplier_id: string | null;
+  rendement: number | null;
+  source: string | null;
+  recipe_id: string | null;
 };
 
 export async function POST(req: Request) {
@@ -104,7 +111,7 @@ export async function POST(req: Request) {
 
     const { data: recipe, error: rErr } = await supabase
       .from("kitchen_recipes")
-      .select("id,name,category,yield_grams,portions_count,notes,procedure,photo_url")
+      .select("id,name,category,yield_grams,portions_count,notes,procedure,photo_url,sell_price,establishments")
       .eq("id", kitchenId)
       .eq("etablissement_id", etabId)
       .maybeSingle();
@@ -125,21 +132,64 @@ export async function POST(req: Request) {
     const lineRows = ((ln ?? []) as LineRow[]).slice();
     const ingredientIds = Array.from(new Set(lineRows.map((r) => String(r.ingredient_id || "")).filter(Boolean)));
 
-    const ingMap = new Map<string, { name: string | null; cpu: number }>();
+    type IngMeta = {
+      name: string | null;
+      cpu: number;
+      supplierId: string | null;
+      rendement: number;
+      isSubRecipe: boolean;
+    };
+    const ingMap = new Map<string, IngMeta>();
     const ingAllergens: string[][] = [];
 
     if (ingredientIds.length) {
       const { data: ings, error: iErr } = await supabase
         .from("ingredients")
-        .select("id,name,cost_per_unit,allergens")
+        .select("id,name,cost_per_unit,allergens,supplier_id,rendement,source,recipe_id")
         .in("id", ingredientIds);
 
       if (iErr) return NextResponse.json({ message: iErr.message, details: iErr.details ?? null }, { status: 500 });
 
       for (const it of (ings ?? []) as IngRow[]) {
-        ingMap.set(String(it.id), { name: it.name ?? null, cpu: n2(it.cost_per_unit) });
+        ingMap.set(String(it.id), {
+          name: it.name ?? null,
+          cpu: n2(it.cost_per_unit),
+          supplierId: it.supplier_id ?? null,
+          rendement: it.rendement != null && it.rendement > 0 && it.rendement <= 1 ? it.rendement : 1,
+          isSubRecipe: it.source === "recette_maison" || it.recipe_id != null,
+        });
         ingAllergens.push(parseAllergens(it.allergens));
       }
+    }
+
+    // Resolve supplier names from supplier_ids
+    const supplierIds = Array.from(
+      new Set(
+        Array.from(ingMap.values())
+          .map((m) => m.supplierId)
+          .filter((s): s is string => !!s)
+      )
+    );
+    const supplierNameById: Record<string, string> = {};
+    if (supplierIds.length) {
+      const { data: sups } = await supabase
+        .from("suppliers")
+        .select("id,name")
+        .in("id", supplierIds);
+      for (const s of (sups ?? []) as { id: string; name: string }[]) {
+        if (s.id && s.name) supplierNameById[s.id] = s.name;
+      }
+    }
+
+    // Resolve establishment name
+    let establishmentLabel: string | null = null;
+    {
+      const { data: etabRow } = await supabaseAdmin
+        .from("etablissements")
+        .select("nom")
+        .eq("id", etabId)
+        .maybeSingle();
+      if (etabRow?.nom) establishmentLabel = etabRow.nom as string;
     }
 
     const rows = lineRows.map((r) => {
@@ -149,7 +199,16 @@ export async function POST(req: Request) {
       const unit = (r.unit ?? "g").toString();
       const cpu = ing?.cpu ?? 0;
       const cost = qty == null ? 0 : qty * cpu;
-      return { name: ing?.name ?? "—", qty, unit, cost };
+      const supplierName = ing?.supplierId ? (supplierNameById[ing.supplierId] ?? null) : null;
+      return {
+        name: ing?.name ?? "\u2014",
+        qty,
+        unit,
+        cost,
+        supplier: supplierName,
+        rendement: ing?.rendement ?? 1,
+        isSubRecipe: ing?.isSubRecipe ?? false,
+      };
     });
 
     const yieldG = n2(rr.yield_grams);
@@ -157,6 +216,21 @@ export async function POST(req: Request) {
     const totalCost = round2(rows.reduce((acc, r) => acc + n2(r.cost), 0));
     const costPerKg = yieldG > 0 ? round2(totalCost / (yieldG / 1000)) : null;
     const costPerPortion = portionsCount != null && portionsCount > 0 ? round2(totalCost / portionsCount) : null;
+
+    // Generate a synthetic ref: FT-CUI-<short id>
+    const CATEGORY_REF_PREFIXES: Record<string, string> = {
+      plat_cuisine: "CUI",
+      preparation: "PREP",
+      entree: "ENT",
+      accompagnement: "ACC",
+      sauce: "SAU",
+      dessert: "DES",
+      cocktail: "COC",
+      autre: "AUT",
+    };
+    const refPrefix = CATEGORY_REF_PREFIXES[rr.category ?? ""] ?? "CUI";
+    const shortId = kitchenId.slice(0, 6).toUpperCase();
+    const ref = `FT-${refPrefix}-${shortId}`;
 
     const exportedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
     const logoBase64 = readLogoBase64();
@@ -170,16 +244,16 @@ export async function POST(req: Request) {
       totalCost,
       portionsCount: portionsCount ?? null,
       yieldGrams: yieldG > 0 ? yieldG : null,
-      sellPrice: null,
-      ref: null,
-      establishment: null,
+      sellPrice: rr.sell_price != null ? n2(rr.sell_price) : null,
+      ref,
+      establishment: establishmentLabel,
       lines: rows.map((r) => ({
         name: r.name ?? null,
         qty: r.qty == null ? null : round2(r.qty),
         unit: r.unit ?? null,
-        supplier: null,
-        rendement: 1,
-        isSubRecipe: false,
+        supplier: r.supplier,
+        rendement: r.rendement,
+        isSubRecipe: r.isSubRecipe,
       })),
       notes: rr.notes ?? null,
       procedure: rr.procedure ?? null,

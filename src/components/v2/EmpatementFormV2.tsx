@@ -337,7 +337,14 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
 
         {/* ── Header ── */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-          <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {isEdit && (
+              <button type="button" onClick={() => router.push("/recettes")} style={{
+                fontSize: 18, color: "#999", cursor: "pointer", border: "none", background: "transparent",
+                padding: "4px 8px", lineHeight: 1,
+              }}>&#8592;</button>
+            )}
+            <div>
             <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a" }}>{title}</h1>
             {isEdit && (
               <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
@@ -346,6 +353,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                 <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 8px", borderRadius: 6, background: "#f2ede4", color: "#666" }}>{TYPE_OPTIONS.find(t => t.id === type)?.label ?? type}</span>
               </div>
             )}
+            </div>
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {isEdit && (
