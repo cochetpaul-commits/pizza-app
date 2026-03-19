@@ -535,8 +535,6 @@ export default function PlanningPage() {
                     </div>
                   );
                 })}
-                {/* Hours column header */}
-                <div style={{ ...headerCell, fontSize: 10, color: "#999" }}>H.</div>
 
                 {/* ── Employee rows ── */}
                 {filteredEmployes.map((emp, empIdx) => {
@@ -548,18 +546,52 @@ export default function PlanningPage() {
                   const hasAlerts = bilan && bilan.alertes.length > 0;
                   const rowBg = empIdx % 2 === 0 ? "#fff" : "#f9f7f3";
 
+                  // Determine primary poste color from most frequent poste in this week's shifts
+                  const empWeekShifts = shifts.filter(s => s.employe_id === emp.id);
+                  const posteCounts = new Map<string, number>();
+                  for (const s of empWeekShifts) {
+                    if (s.poste_id) posteCounts.set(s.poste_id, (posteCounts.get(s.poste_id) ?? 0) + 1);
+                  }
+                  let primaryPosteColor = "#999";
+                  if (posteCounts.size > 0) {
+                    const topPosteId = [...posteCounts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+                    primaryPosteColor = posteMap.get(topPosteId)?.couleur ?? "#999";
+                  }
+
                   return [
-                    /* Employee name cell */
+                    /* Employee name cell + hours underneath */
                     <div key={`name-${emp.id}`} style={{ ...empCell, background: rowBg }}>
-                      <div style={empAvatar}>{initials}</div>
+                      <div style={{ ...empAvatar, background: primaryPosteColor }}>{initials}</div>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                           <span style={empName}>{emp.prenom} {emp.nom.charAt(0)}.</span>
                           {isTNS && <span style={tnsBadge}>TNS</span>}
                         </div>
-                        {contrat && !isTNS && (
-                          <div style={{ fontSize: 10, color: "#999" }}>{contrat.heures_semaine}h</div>
-                        )}
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 1 }}>
+                          {contrat && !isTNS && (
+                            <span style={{ fontSize: 10, color: "#999" }}>{contrat.heures_semaine}h</span>
+                          )}
+                          {!isTNS && weekHours > 0 && (
+                            <>
+                              {contrat && <span style={{ fontSize: 10, color: "#ccc" }}>|</span>}
+                              <span style={{
+                                fontSize: 10, fontWeight: 700,
+                                color: hasAlerts ? "#DC2626" : "#1a1a1a",
+                              }}>
+                                {weekHours.toFixed(1)}h
+                              </span>
+                              {hasAlerts && <span title={bilan!.alertes.map((a) => a.message).join("\n")} style={alertDot}>!</span>}
+                              {bilan && bilan.delta_contrat !== 0 && (
+                                <span style={{
+                                  fontSize: 9, fontWeight: 600,
+                                  color: bilan.delta_contrat > 0 ? "#DC2626" : "#2563eb",
+                                }}>
+                                  {bilan.delta_contrat > 0 ? "+" : ""}{bilan.delta_contrat.toFixed(1)}
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </div>
                       {canWrite && !isTNS && (
                         <button
@@ -640,33 +672,6 @@ export default function PlanningPage() {
                         </Droppable>
                       );
                     }),
-
-                    /* Hours total cell */
-                    <div key={`h-${emp.id}`} style={{ ...hoursCell, background: rowBg }}>
-                      {isTNS ? (
-                        <span style={{ fontSize: 10, color: "#A0845C", fontWeight: 700 }}>TNS</span>
-                      ) : (
-                        <>
-                          <span style={{
-                            fontWeight: 700,
-                            fontSize: 13,
-                            color: hasAlerts ? "#DC2626" : weekHours > 0 ? "#1a1a1a" : "#ccc",
-                          }}>
-                            {weekHours > 0 ? `${weekHours.toFixed(1)}h` : "—"}
-                          </span>
-                          {hasAlerts && <span title={bilan.alertes.map((a) => a.message).join("\n")} style={alertDot}>!</span>}
-                          {bilan && bilan.delta_contrat !== 0 && (
-                            <div style={{
-                              fontSize: 10,
-                              color: bilan.delta_contrat > 0 ? "#DC2626" : "#2563eb",
-                              fontWeight: 600,
-                            }}>
-                              {bilan.delta_contrat > 0 ? "+" : ""}{bilan.delta_contrat.toFixed(1)}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>,
                   ];
                 })}
               </div>
@@ -854,7 +859,7 @@ const gridWrapper: React.CSSProperties = {
 
 const gridContainer = (): React.CSSProperties => ({
   display: "grid",
-  gridTemplateColumns: "120px repeat(7, 1fr) 60px",
+  gridTemplateColumns: "140px repeat(7, 1fr)",
   gap: 0,
   minWidth: 800,
 });
@@ -874,7 +879,7 @@ const empCell: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 8,
-  padding: "8px 6px",
+  padding: "10px 8px",
   borderBottom: "1px solid #f0ebe3",
   borderRight: "1px solid #f0ebe3",
   background: "#fff",
@@ -897,8 +902,8 @@ const empName: React.CSSProperties = {
 };
 
 const dayCell: React.CSSProperties = {
-  minHeight: 52,
-  padding: 3,
+  minHeight: 72,
+  padding: 4,
   borderBottom: "1px solid #f0ebe3",
   borderRight: "1px solid #f5f0e8",
   cursor: "pointer",
@@ -926,15 +931,6 @@ const shiftBlock = (color: string): React.CSSProperties => ({
   overflow: "hidden",
 });
 
-const hoursCell: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "6px 4px",
-  borderBottom: "1px solid #f0ebe3",
-  background: "#faf7f2",
-};
 
 const tnsBadge: React.CSSProperties = {
   display: "inline-block",
