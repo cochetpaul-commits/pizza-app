@@ -386,6 +386,7 @@ function RecettesInner() {
   const [cuisineCatFilter, setCuisineCatFilter] = useState<CuisineCatFilter>("all");
   const [foodCostFilter, setFoodCostFilter] = useState<FoodCostFilter>("all");
   const [showFab, setShowFab] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   function refresh() { setLoading(true); setRefreshKey(k => k + 1); }
 
@@ -540,13 +541,6 @@ function RecettesInner() {
   const showCocktail = mainTab === "tous" || mainTab === "cocktail";
   const showEmp = mainTab === "tous" || mainTab === "empatement";
 
-  // Sort toggle
-  function toggleSort(key: SortKey) {
-    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortKey(key); setSortDir("asc"); }
-  }
-
-  const [showFilters, setShowFilters] = useState(false);
   const hasActiveFilter = foodCostFilter !== "all" || cuisineCatFilter !== "all";
 
   return (
