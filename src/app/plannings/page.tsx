@@ -519,7 +519,7 @@ export default function PlanningPage() {
                       <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>
                         {DAY_NAMES[di]}
                       </div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: isToday(weekISOs[di]) ? "#D4775A" : "#1a1a1a" }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: isToday(weekISOs[di]) ? "#2D6A4F" : "#1a1a1a" }}>
                         {d.getDate()}
                       </div>
                       {canWrite && dayShiftCount > 0 && (
@@ -589,7 +589,7 @@ export default function PlanningPage() {
                                 ...dayCell,
                                 ...(isToday(iso) ? todayCol : {}),
                                 ...(absType ? absenceCell : {}),
-                                ...(snapshot.isDraggingOver ? { background: "rgba(212,119,90,0.08)" } : {}),
+                                ...(snapshot.isDraggingOver ? { background: "rgba(45,106,79,0.08)" } : {}),
                               }}
                               onClick={(e) => {
                                 if ((e.target as HTMLElement).closest("[data-shift]")) return;
@@ -656,7 +656,7 @@ export default function PlanningPage() {
                           {bilan && bilan.delta_contrat !== 0 && (
                             <div style={{
                               fontSize: 10,
-                              color: bilan.delta_contrat > 0 ? "#D4775A" : "#2563eb",
+                              color: bilan.delta_contrat > 0 ? "#DC2626" : "#2563eb",
                               fontWeight: 600,
                             }}>
                               {bilan.delta_contrat > 0 ? "+" : ""}{bilan.delta_contrat.toFixed(1)}
@@ -711,8 +711,8 @@ export default function PlanningPage() {
                       padding: "5px 12px",
                       borderRadius: 20,
                       border: mPosteId === p.id ? `2px solid ${p.couleur}` : "1px solid #ddd6c8",
-                      background: mPosteId === p.id ? `${p.couleur}18` : "#fff",
-                      color: mPosteId === p.id ? p.couleur : "#6f6a61",
+                      background: mPosteId === p.id ? `${p.couleur}25` : "#fff",
+                      color: mPosteId === p.id ? "#1a1a1a" : "#6f6a61",
                       fontSize: 12,
                       fontWeight: 700,
                       cursor: "pointer",
@@ -821,8 +821,8 @@ const navArrow: React.CSSProperties = {
 
 const todayBtn: React.CSSProperties = {
   padding: "4px 12px", borderRadius: 20,
-  border: "1px solid #D4775A", background: "rgba(212,119,90,0.08)",
-  color: "#D4775A", fontSize: 12, fontWeight: 700, cursor: "pointer",
+  border: "1px solid #2D6A4F", background: "rgba(45,106,79,0.08)",
+  color: "#2D6A4F", fontSize: 12, fontWeight: 700, cursor: "pointer",
 };
 
 const weekLabelStyle: React.CSSProperties = {
@@ -839,8 +839,8 @@ const filtersRow: React.CSSProperties = {
 
 const pillBtn = (active: boolean): React.CSSProperties => ({
   padding: "5px 12px", borderRadius: 20,
-  border: active ? "1px solid #D4775A" : "1px solid #ddd6c8",
-  background: active ? "#D4775A" : "#fff",
+  border: active ? "1px solid #2D6A4F" : "1px solid #ddd6c8",
+  background: active ? "#2D6A4F" : "#fff",
   color: active ? "#fff" : "#1a1a1a",
   fontSize: 12, fontWeight: 600, cursor: "pointer",
 });
@@ -864,8 +864,8 @@ const headerCell: React.CSSProperties = {
 };
 
 const todayHeader: React.CSSProperties = {
-  background: "rgba(212,119,90,0.06)",
-  borderBottom: "2px solid #D4775A",
+  background: "rgba(45,106,79,0.06)",
+  borderBottom: "2px solid #2D6A4F",
 };
 
 const empCell: React.CSSProperties = {
@@ -883,7 +883,7 @@ const empCell: React.CSSProperties = {
 
 const empAvatar: React.CSSProperties = {
   width: 28, height: 28, borderRadius: "50%",
-  background: "#D4775A", color: "#fff",
+  background: "#2D6A4F", color: "#fff",
   display: "flex", alignItems: "center", justifyContent: "center",
   fontSize: 10, fontWeight: 700, flexShrink: 0,
   fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
@@ -906,7 +906,7 @@ const dayCell: React.CSSProperties = {
 };
 
 const todayCol: React.CSSProperties = {
-  background: "rgba(212,119,90,0.03)",
+  background: "rgba(45,106,79,0.04)",
 };
 
 const shiftBlock = (color: string): React.CSSProperties => ({
@@ -914,9 +914,9 @@ const shiftBlock = (color: string): React.CSSProperties => ({
   alignItems: "center",
   gap: 2,
   padding: "3px 6px",
-  borderRadius: 6,
-  background: `${color}20`,
-  border: `1px solid ${color}40`,
+  borderRadius: 8,
+  background: `${color}30`,
+  borderLeft: `3px solid ${color}`,
   fontSize: 11,
   color: "#1a1a1a",
   cursor: "pointer",
@@ -987,7 +987,7 @@ const inputSt: React.CSSProperties = {
 
 const saveBtnStyle: React.CSSProperties = {
   padding: "8px 18px", borderRadius: 20, border: "none",
-  background: "#D4775A", color: "#fff",
+  background: "#2D6A4F", color: "#fff",
   fontSize: 13, fontWeight: 700, cursor: "pointer",
 };
 
