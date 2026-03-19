@@ -394,7 +394,6 @@ export default function DashboardPage() {
   }, [isAdmin, isGroupView, etablissements]);
 
   const caTotal = (ca?.totalSales ?? 0) + (caPM?.ca ?? 0);
-  const hasCa = ca || caPM != null;
 
   // ─── Non-admin: simple dashboard with quick links ───
   if (role && role !== "group_admin") {
