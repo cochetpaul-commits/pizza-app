@@ -400,7 +400,7 @@ export default function DashboardPage() {
     return (
       <div style={{ maxWidth: 600, margin: "0 auto", padding: "24px 16px 40px" }}>
         <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
-          <QuickTile href="/recettes" title="Recettes" sub="Fiches techniques" accent={T.terracotta} iconName="cuisine" />
+          <QuickTile href="/recettes" title="Recettes" sub="Toutes les recettes" accent={T.terracotta} iconName="cuisine" />
           <QuickTile href="/plannings" title="Planning" sub="Planning de la semaine" accent={T.bleu} iconName="planning" />
           <QuickTile href="/mes-shifts" title="Mon planning" sub="Mes shifts" accent={T.dore} iconName="horloge" />
           <QuickTile href="/commandes" title="Commandes" sub="Commandes fournisseurs" accent={T.sauge} iconName="commandes" />

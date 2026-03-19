@@ -46,7 +46,7 @@ export const SIDEBAR_NAV: NavSection[] = [
     roles: ["group_admin"],
     items: [
       { label: "Base ingredients", href: "/ingredients" },
-      { label: "Fiches techniques", href: "/recettes" },
+      { label: "Recettes", href: "/recettes" },
       { label: "Commandes", href: "/commandes" },
       { label: "Achats", href: "/achats" },
       { label: "Variations & alertes", href: "/variations-prix" },
@@ -113,7 +113,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/invoices": "Factures",
   "/commandes": "Commandes",
   "/inventaire": "Inventaire",
-  "/recettes": "Fiches techniques",
+  "/recettes": "Recettes",
   "/epicerie": "Articles en vente",
   "/finances": "Finances",
   "/evenements": "Evenements",
