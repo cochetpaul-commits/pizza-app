@@ -586,12 +586,24 @@ function IngredientsPageInner() {
 
   const del = useCallback(async (id: string, name: string) => {
     if (!confirm(`Supprimer "${name}" ?`)) return;
-    // Check if ingredient is used in commande_lignes
-    const { count } = await supabase.from("commande_lignes").select("id", { count: "exact", head: true }).eq("ingredient_id", id);
-    if (count && count > 0) {
-      alert(`Impossible de supprimer "${name}" : utilisé dans ${count} ligne(s) de commande. Supprimez d'abord les commandes associées ou changez le statut en "inactif".`);
-      return;
+    // Check if ingredient is used in any recipe
+    const recipeTables = [
+      { table: "pizza_ingredients", label: "pizza" },
+      { table: "kitchen_recipe_lines", label: "recette cuisine" },
+      { table: "prep_recipe_lines", label: "préparation" },
+      { table: "cocktail_ingredients", label: "cocktail" },
+      { table: "recipe_ingredients", label: "empâtement" },
+    ] as const;
+    for (const { table, label } of recipeTables) {
+      const { count } = await supabase.from(table).select("id", { count: "exact", head: true }).eq("ingredient_id", id);
+      if (count && count > 0) {
+        alert(`Impossible de supprimer "${name}" : utilisé dans ${count} ${label}(s).`);
+        return;
+      }
     }
+    // Cascade delete related rows that are not recipes
+    await supabase.from("commande_lignes").delete().eq("ingredient_id", id);
+    await supabase.from("supplier_invoice_lines").delete().eq("ingredient_id", id);
     const d1 = await supabase.from("supplier_offers").delete().eq("ingredient_id", id);
     if (d1.error) { alert(d1.error.message); return; }
     const d2 = await supabase.from("ingredients").delete().eq("id", id);

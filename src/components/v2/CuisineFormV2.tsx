@@ -4,8 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
-import { TopNav } from "@/components/TopNav";
-
 import { AllergenBadges } from "@/components/AllergenBadges";
 import { parseAllergens, mergeAllergens } from "@/lib/allergens";
 import { offerRowToCpu, enrichCpuWithConversions } from "@/lib/offerPricing";
@@ -18,7 +16,9 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
 import { PricingBlock } from "./PricingBlock";
-import { GestionTab } from "./GestionTab";
+import { GestionFoodCost } from "./GestionFoodCost";
+import { GestionCommandes } from "./GestionCommandes";
+import { GestionPilotage } from "./GestionPilotage";
 import { StepperInput } from "@/components/StepperInput";
 import type { Ingredient, Category } from "@/types/ingredients";
 import type { CpuByUnit } from "@/lib/offerPricing";
@@ -68,6 +68,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, CpuByUnit>>({});
   const [priceLabelByIngredient, setPriceLabelByIngredient] = useState<Record<string, string>>({});
+  const [supplierByIngredient, setSupplierByIngredient] = useState<Record<string, string | null>>({});
   const [lines, setLines] = useState<IngredientLine[]>([]);
 
   // Steps
@@ -84,7 +85,8 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
   const [prodQty, setProdQty] = useState<number | "">("");
 
   // Main tab
-  const [mainTab, setMainTab] = useState<"recette" | "gestion">("recette");
+  type MainTab = "fc" | "recette" | "cmd" | "pop";
+  const [mainTab, setMainTab] = useState<MainTab>("fc");
 
   // Save state
   const [saving, setSaving] = useState(false);
@@ -245,6 +247,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
       }
 
       setPriceByIngredient(pm);
+      setSupplierByIngredient(supplierByIng);
 
       const labelMap: Record<string, string> = {};
       for (const i of ingList) {
@@ -545,27 +548,24 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
     return unit === "g" ? acc + qty : acc;
   }, 0);
 
-  const actionButtons = (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-      <button type="button" className="btn" onClick={() => { setProdMode(m => !m); setProdQty(""); }}
-        style={prodMode ? { background: "#4a6741", color: "white", borderColor: "#4a6741" } : undefined}>
-        {prodMode ? "Mode normal" : "Mode production"}
-      </button>
-      {isEdit && (
-        <button type="button" className="btn" onClick={handleExportPdf} disabled={pdfLoading}>
-          {pdfLoading ? "Export\u2026" : "Exporter PDF"}
-        </button>
-      )}
-      {!prodMode && isEdit && userCanWrite && (
-        <button type="button" className="btn" onClick={handleDelete} style={{ color: "#d93f3f" }}>Supprimer</button>
-      )}
-      {!prodMode && userCanWrite && (
-        <button onClick={handleSave} disabled={saving} className="btn btnPrimary">
-          {saving ? "Sauvegarde\u2026" : "Sauvegarder"}
-        </button>
-      )}
-    </div>
-  );
+  // ── KPI computations ──────────────────────────────────────────
+  const sp = typeof sellPrice === "number" && sellPrice > 0 ? sellPrice : null;
+  const effectiveCostPerPortion = costPerPortion ?? (totalCost > 0 ? totalCost : null);
+  const foodCostPct = sp && effectiveCostPerPortion ? (effectiveCostPerPortion / sp) * 100 : null;
+  const margeBrute = sp && effectiveCostPerPortion ? sp - effectiveCostPerPortion : null;
+  const prixTTC = sp ? sp * (1 + vatRate) : null;
+
+  const categoryLabel = CATEGORIES.find(c => c.id === category)?.label ?? category;
+
+  // Tab definitions
+  const MAIN_TABS: { key: MainTab; label: string }[] = isEdit ? [
+    { key: "fc", label: "Food cost & Marges" },
+    { key: "recette", label: "Recette & Procede" },
+    { key: "cmd", label: "Commandes fournisseurs" },
+    { key: "pop", label: "Pilotage CA — Popina" },
+  ] : [
+    { key: "recette", label: "Recette" },
+  ];
 
   if (status === "loading") {
     return (
@@ -581,345 +581,446 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
   return (
     <>
       <main className="container safe-bottom">
-        {/* ── Inline actions ── */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a" }}>{title}</h1>
-          {actionButtons}
+
+        {/* ── Header ── */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {photoPreview && (
+              <div style={{ width: 32, height: 32, borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>
+                <Image src={photoPreview} alt="" width={32} height={32} style={{ objectFit: "cover", width: 32, height: 32 }} />
+              </div>
+            )}
+            <div>
+              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a" }}>{title}</h1>
+              {isEdit && (
+                <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
+                  {etab && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 8px", borderRadius: 6, background: "#D4775A", color: "#fff" }}>{etab.nom ?? "Etablissement"}</span>}
+                  <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 8px", borderRadius: 6, background: "#f2ede4", color: "#666" }}>{categoryLabel}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {isEdit && (
+              <button type="button" className="btn" onClick={handleExportPdf} disabled={pdfLoading}
+                style={{ fontSize: 12 }}>
+                {pdfLoading ? "Export\u2026" : "Apercu PDF"}
+              </button>
+            )}
+            {userCanWrite && (
+              <button onClick={handleSave} disabled={saving} className="btn btnPrimary">
+                {saving ? "Sauvegarde\u2026" : "Enregistrer"}
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* ── Main tab bar ── */}
+        {/* ── KPI Banner ── */}
         {isEdit && (
-          <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
-            {(["recette", "gestion"] as const).map((t) => (
-              <button key={t} type="button" onClick={() => setMainTab(t)} style={{
-                padding: "8px 18px", borderRadius: 20, fontSize: 13, fontWeight: 700,
-                cursor: "pointer", transition: "all 0.15s",
-                border: mainTab === t ? "2px solid #D4775A" : "1.5px solid #ddd6c8",
-                background: mainTab === t ? "#D4775A" : "#fff",
-                color: mainTab === t ? "#fff" : "#666",
-              }}>
-                {t === "recette" ? "Recette" : "Gestion"}
-              </button>
-            ))}
+          <div style={{
+            display: "flex", gap: 0, marginBottom: 16, borderRadius: 10,
+            border: "1px solid #ddd6c8", overflow: "hidden", background: "#fff",
+          }}>
+            <KpiBannerItem label="COUT REVIENT" value={effectiveCostPerPortion ? `${fmtMoney(effectiveCostPerPortion)}\u00A0\u20AC` : "-"} sub="par portion" color="#D4775A" />
+            <KpiBannerItem
+              label="FOOD COST"
+              value={foodCostPct != null ? `${foodCostPct.toFixed(1)}%` : "-"}
+              sub="objectif \u2264 32%"
+              color={foodCostPct == null ? "#999" : foodCostPct <= 28 ? "#16a34a" : foodCostPct <= 32 ? "#D97706" : "#DC2626"}
+            />
+            <KpiBannerItem label="PRIX DE VENTE HT" value={sp ? `${fmtMoney(sp)}\u00A0\u20AC` : "-"} sub={prixTTC ? `${fmtMoney(prixTTC)}\u00A0\u20AC TTC` : ""} color="#1a1a1a" />
+            <KpiBannerItem label="MARGE BRUTE" value={margeBrute != null ? `${fmtMoney(margeBrute)}\u00A0\u20AC` : "-"} sub="par portion" color="#16a34a" />
           </div>
         )}
 
-        {/* ── GESTION TAB ── */}
-        {mainTab === "gestion" && isEdit && recipeId && (
-          <GestionTab
+        {/* ── Tab bar ── */}
+        <div style={{ display: "flex", gap: 0, borderBottom: "1.5px solid #ddd6c8", marginBottom: 16, overflowX: "auto" }}>
+          {MAIN_TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setMainTab(t.key)}
+              style={{
+                padding: "10px 16px", fontSize: 13, fontWeight: mainTab === t.key ? 700 : 500,
+                cursor: "pointer", border: "none", background: "transparent",
+                color: mainTab === t.key ? "#D4775A" : "#999",
+                borderBottom: mainTab === t.key ? "2.5px solid #D4775A" : "2.5px solid transparent",
+                transition: "all 0.15s", whiteSpace: "nowrap",
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {saveError && <div className="errorBox" style={{ marginBottom: 12 }}>{saveError}</div>}
+
+        {/* ── TAB: FOOD COST & MARGES ── */}
+        {mainTab === "fc" && isEdit && recipeId && (
+          <GestionFoodCost
             recipeId={recipeId}
             recipeType="cuisine"
             lines={lines}
             ingredients={ingredients}
             priceByIngredient={priceByIngredient}
+            supplierByIngredient={supplierByIngredient}
             totalCost={totalCost}
-            sellPrice={typeof sellPrice === "number" ? sellPrice : null}
+            sellPrice={sp}
             onSellPriceChange={(p) => setSellPrice(p)}
             portionsCount={typeof portionsCount === "number" ? portionsCount : null}
             yieldGrams={typeof yieldGrams === "number" ? yieldGrams : null}
-            etablissementId={etab?.id}
-            recipeName={name}
           />
         )}
 
-        {/* ── MODE PRODUCTION ── */}
-        {mainTab !== "recette" ? null : prodMode ? (
+        {/* ── TAB: COMMANDES ── */}
+        {mainTab === "cmd" && isEdit && recipeId && (
+          <GestionCommandes
+            recipeId={recipeId}
+            recipeType="cuisine"
+            lines={lines}
+            ingredients={ingredients}
+            etablissementId={etab?.id}
+          />
+        )}
+
+        {/* ── TAB: PILOTAGE ── */}
+        {mainTab === "pop" && isEdit && (
+          <GestionPilotage recipeName={name} recipeType="cuisine" />
+        )}
+
+        {/* ── TAB: RECETTE & PROCEDE ── */}
+        {mainTab === "recette" && (
           <>
-            {/* Banner */}
-            <div style={{
-              background: "#4a6741", color: "white", borderRadius: 12,
-              padding: "12px 16px", marginBottom: 16,
-            }}>
-              <div style={{ fontSize: 15, fontWeight: 800 }}>Mode Production</div>
-              <div style={{ fontSize: 13, opacity: 0.85 }}>
-                {prodPivotIng
-                  ? `Modifie ${prodPivotIng.name}, tout se recalcule`
-                  : `${title} — appuie sur ☆ en mode normal pour choisir un pivot`}
+            {/* Production mode toggle */}
+            {isEdit && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
+                <button type="button" className="btn" onClick={() => { setProdMode(m => !m); setProdQty(""); }}
+                  style={prodMode ? { background: "#4a6741", color: "white", borderColor: "#4a6741" } : undefined}>
+                  {prodMode ? "Mode normal" : "Mode production"}
+                </button>
+                {!prodMode && isEdit && userCanWrite && (
+                  <button type="button" className="btn" onClick={handleDelete} style={{ color: "#d93f3f", fontSize: 12 }}>Supprimer</button>
+                )}
               </div>
-            </div>
+            )}
 
-            {!pivotIngredientId || !prodPivotLine ? (
-              <div style={{
-                padding: "24px 16px", background: "rgba(0,0,0,0.03)", borderRadius: 12,
-                textAlign: "center", color: "#6f6a61", fontSize: 14, lineHeight: 1.7,
-                marginBottom: 16,
-              }}>
-                Aucun ingrédient pivot défini.<br />
-                Appuyez sur ☆ en mode normal pour en choisir un.
-              </div>
-            ) : (
+            {prodMode ? (
               <>
-                {/* Pivot card */}
+                {/* Banner */}
                 <div style={{
-                  background: "#FFFBEB", border: "2px solid #D97706",
-                  borderRadius: 12, padding: 16, marginBottom: 12,
+                  background: "#4a6741", color: "white", borderRadius: 12,
+                  padding: "12px 16px", marginBottom: 16,
                 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#D97706", marginBottom: 6 }}>★ Ingrédient pivot</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: "#2d2d2d", marginBottom: 12 }}>
-                    {prodPivotIng?.name ?? "—"}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                    <StepperInput
-                      value={prodQty}
-                      onChange={setProdQty}
-                      step={1} min={0}
-                      placeholder={String(prodPivotLine.qty)}
-                    />
-                    <span style={{ fontSize: 16, color: "#6f6a61", fontWeight: 600 }}>{prodPivotLine.unit}</span>
-                  </div>
-                  <div style={{ fontSize: 12, color: "#9a8f84" }}>
-                    Recette de base : {prodPivotLine.qty} {prodPivotLine.unit}
+                  <div style={{ fontSize: 15, fontWeight: 800 }}>Mode Production</div>
+                  <div style={{ fontSize: 13, opacity: 0.85 }}>
+                    {prodPivotIng
+                      ? `Modifie ${prodPivotIng.name}, tout se recalcule`
+                      : `${title} — appuie sur ☆ en mode normal pour choisir un pivot`}
                   </div>
                 </div>
 
-                {/* Secondary ingredients */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-                  {prodValidLines
-                    .filter(l => l.ingredient_id !== pivotIngredientId)
-                    .map(l => {
-                      const ing = ingredients.find(i => i.id === l.ingredient_id);
-                      const newQty = prodFactor !== null ? Math.round(Number(l.qty) * prodFactor) : null;
-                      return (
-                        <div key={l.id} style={{
-                          display: "flex", justifyContent: "space-between", alignItems: "center",
-                          background: "white", border: "1px solid #EFEFEF", borderRadius: 10, padding: "10px 14px",
-                        }}>
-                          <span style={{ fontSize: 14, color: "#2d2d2d" }}>{truncate(ing?.name ?? "—", 35)}</span>
-                          <span style={{ fontSize: 22, fontWeight: 800, color: "#4a6741" }}>
-                            {newQty !== null
-                              ? `${newQty.toLocaleString("fr-FR")} ${l.unit}`
-                              : `${l.qty} ${l.unit}`}
-                          </span>
-                        </div>
-                      );
-                    })
-                  }
-                </div>
-
-                {/* Total */}
-                {prodTotalW > 0 && (
+                {!pivotIngredientId || !prodPivotLine ? (
                   <div style={{
-                    background: "#F0FDF4", border: "1px solid #BBF7D0",
-                    borderRadius: 10, padding: "12px 16px",
-                    color: "#4a6741", fontWeight: 700, fontSize: 15, marginBottom: 16,
+                    padding: "24px 16px", background: "rgba(0,0,0,0.03)", borderRadius: 12,
+                    textAlign: "center", color: "#6f6a61", fontSize: 14, lineHeight: 1.7,
+                    marginBottom: 16,
                   }}>
-                    Poids total estimé : {prodTotalW.toLocaleString("fr-FR")} g
+                    Aucun ingrédient pivot défini.<br />
+                    Appuyez sur ☆ en mode normal pour en choisir un.
+                  </div>
+                ) : (
+                  <>
+                    {/* Pivot card */}
+                    <div style={{
+                      background: "#FFFBEB", border: "2px solid #D97706",
+                      borderRadius: 12, padding: 16, marginBottom: 12,
+                    }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#D97706", marginBottom: 6 }}>★ Ingrédient pivot</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: "#2d2d2d", marginBottom: 12 }}>
+                        {prodPivotIng?.name ?? "—"}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                        <StepperInput
+                          value={prodQty}
+                          onChange={setProdQty}
+                          step={1} min={0}
+                          placeholder={String(prodPivotLine.qty)}
+                        />
+                        <span style={{ fontSize: 16, color: "#6f6a61", fontWeight: 600 }}>{prodPivotLine.unit}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#9a8f84" }}>
+                        Recette de base : {prodPivotLine.qty} {prodPivotLine.unit}
+                      </div>
+                    </div>
+
+                    {/* Secondary ingredients */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+                      {prodValidLines
+                        .filter(l => l.ingredient_id !== pivotIngredientId)
+                        .map(l => {
+                          const ing = ingredients.find(i => i.id === l.ingredient_id);
+                          const newQty = prodFactor !== null ? Math.round(Number(l.qty) * prodFactor) : null;
+                          return (
+                            <div key={l.id} style={{
+                              display: "flex", justifyContent: "space-between", alignItems: "center",
+                              background: "white", border: "1px solid #EFEFEF", borderRadius: 10, padding: "10px 14px",
+                            }}>
+                              <span style={{ fontSize: 14, color: "#2d2d2d" }}>{truncate(ing?.name ?? "—", 35)}</span>
+                              <span style={{ fontSize: 22, fontWeight: 800, color: "#4a6741" }}>
+                                {newQty !== null
+                                  ? `${newQty.toLocaleString("fr-FR")} ${l.unit}`
+                                  : `${l.qty} ${l.unit}`}
+                              </span>
+                            </div>
+                          );
+                        })
+                      }
+                    </div>
+
+                    {/* Total */}
+                    {prodTotalW > 0 && (
+                      <div style={{
+                        background: "#F0FDF4", border: "1px solid #BBF7D0",
+                        borderRadius: 10, padding: "12px 16px",
+                        color: "#4a6741", fontWeight: 700, fontSize: 15, marginBottom: 16,
+                      }}>
+                        Poids total estimé : {prodTotalW.toLocaleString("fr-FR")} g
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Steps (read-only in production) */}
+                {steps.length > 0 && (
+                  <div className="card" style={{ marginBottom: 16 }}>
+                    <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
+                      Étapes
+                    </h3>
+                    <ol style={{ margin: 0, paddingLeft: 20 }}>
+                      {steps.map((s, i) => (
+                        <li key={i} style={{ marginBottom: 6, fontSize: 14, color: "#2d2d2d", lineHeight: 1.5 }}>{s}</li>
+                      ))}
+                    </ol>
                   </div>
                 )}
               </>
-            )}
+            ) : (
+              /* ── MODE NORMAL ── */
+              <>
+                {/* Infos générales */}
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div>
+                      <label className="label">Nom de la recette</label>
+                      <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Nom…" />
+                    </div>
 
-            {/* Steps (read-only in production) */}
-            {steps.length > 0 && (
-              <div className="card" style={{ marginBottom: 16 }}>
-                <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
-                  Étapes
-                </h3>
-                <ol style={{ margin: 0, paddingLeft: 20 }}>
-                  {steps.map((s, i) => (
-                    <li key={i} style={{ marginBottom: 6, fontSize: 14, color: "#2d2d2d", lineHeight: 1.5 }}>{s}</li>
-                  ))}
-                </ol>
-              </div>
-            )}
-          </>
-        ) : (
-          /* ── MODE NORMAL ── */
-          <>
-            <TopNav title={title} subtitle={`Cuisine${isEdit ? " · édition" : " · nouveau"}`} />
+                    <div>
+                      <label className="label">Catégorie</label>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {CATEGORIES.map(c => (
+                          <button
+                            key={c.id} type="button" onClick={() => setCategory(c.id)}
+                            style={{
+                              padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                              border: "1.5px solid",
+                              borderColor: category === c.id ? "#4a6741" : "rgba(217,199,182,0.9)",
+                              background: category === c.id ? "rgba(22,101,52,0.08)" : "rgba(255,255,255,0.7)",
+                              color: category === c.id ? "#4a6741" : "#6f6a61",
+                              cursor: "pointer",
+                            }}
+                          >{c.label}</button>
+                        ))}
+                      </div>
+                    </div>
 
-            {saveError && <div className="errorBox" style={{ marginBottom: 12 }}>{saveError}</div>}
+                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+                      <div>
+                        <label className="label">Rendement (g)</label>
+                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <StepperInput
+                            value={yieldGrams}
+                            onChange={setYieldGrams}
+                            step={50} min={0}
+                            placeholder="ex: 1000"
+                          />
+                          {totalWeightG > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setYieldGrams(Math.round(totalWeightG))}
+                              title={`Utiliser le poids total des ingrédients (${Math.round(totalWeightG)} g)`}
+                              style={{
+                                padding: "0 10px", height: 36, borderRadius: 8, fontSize: 12, fontWeight: 700,
+                                border: "1.5px solid #4a6741", background: "rgba(22,101,52,0.07)",
+                                color: "#4a6741", cursor: "pointer", whiteSpace: "nowrap",
+                              }}
+                            >= Poids ingrédients</button>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="label">Portions</label>
+                        <StepperInput
+                          value={portionsCount}
+                          onChange={setPortionsCount}
+                          step={1} min={1}
+                          placeholder="ex: 4"
+                        />
+                      </div>
+                    </div>
 
-            {/* Infos générales */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <div>
-                  <label className="label">Nom de la recette</label>
-                  <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Nom…" />
-                </div>
-
-                <div>
-                  <label className="label">Catégorie</label>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {CATEGORIES.map(c => (
-                      <button
-                        key={c.id} type="button" onClick={() => setCategory(c.id)}
-                        style={{
-                          padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                          border: "1.5px solid",
-                          borderColor: category === c.id ? "#4a6741" : "rgba(217,199,182,0.9)",
-                          background: category === c.id ? "rgba(22,101,52,0.08)" : "rgba(255,255,255,0.7)",
-                          color: category === c.id ? "#4a6741" : "#6f6a61",
-                          cursor: "pointer",
-                        }}
-                      >{c.label}</button>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
-                  <div>
-                    <label className="label">Rendement (g)</label>
-                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                      <StepperInput
-                        value={yieldGrams}
-                        onChange={setYieldGrams}
-                        step={50} min={0}
-                        placeholder="ex: 1000"
-                      />
-                      {totalWeightG > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setYieldGrams(Math.round(totalWeightG))}
-                          title={`Utiliser le poids total des ingrédients (${Math.round(totalWeightG)} g)`}
-                          style={{
-                            padding: "0 10px", height: 36, borderRadius: 8, fontSize: 12, fontWeight: 700,
-                            border: "1.5px solid #4a6741", background: "rgba(22,101,52,0.07)",
-                            color: "#4a6741", cursor: "pointer", whiteSpace: "nowrap",
-                          }}
-                        >= Poids ingrédients</button>
-                      )}
+                    <div>
+                      <label className="label">Établissements</label>
+                      <EstablishmentPicker value={establishments} onChange={setEstablishments} />
                     </div>
                   </div>
-                  <div>
-                    <label className="label">Portions</label>
-                    <StepperInput
-                      value={portionsCount}
-                      onChange={setPortionsCount}
-                      step={1} min={1}
-                      placeholder="ex: 4"
-                    />
-                  </div>
                 </div>
 
-                <div>
-                  <label className="label">Établissements</label>
-                  <EstablishmentPicker value={establishments} onChange={setEstablishments} />
+                {/* Ingrédients */}
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#4a6741" }}>
+                    Ingrédients
+                  </h3>
+                  <IngredientListDnD
+                    items={lines}
+                    ingredients={ingredients}
+                    priceByIngredient={priceByIngredient}
+                    units={CUISINE_UNITS}
+                    onChange={setLines}
+                    priceLabelByIngredient={priceLabelByIngredient}
+                    pivotId={pivotIngredientId}
+                    onPivotChange={setPivotIngredientId}
+                  />
+                  {totalWeightG > 0 && (
+                    <div style={{ marginTop: 10, fontSize: 13, color: "#6f6a61", display: "flex", gap: 16, flexWrap: "wrap" }}>
+                      <span>Poids total : <strong style={{ color: "#4a6741" }}>{Math.round(totalWeightG).toLocaleString("fr-FR")} g</strong></span>
+                      {totalCost > 0 && <span>Coût total : <strong style={{ color: "#4a6741" }}>{round2(totalCost).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</strong></span>}
+                    </div>
+                  )}
                 </div>
-              </div>
-            </div>
 
-            {/* Ingrédients */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#4a6741" }}>
-                Ingrédients
-              </h3>
-              <IngredientListDnD
-                items={lines}
-                ingredients={ingredients}
-                priceByIngredient={priceByIngredient}
-                units={CUISINE_UNITS}
-                onChange={setLines}
-                priceLabelByIngredient={priceLabelByIngredient}
-                pivotId={pivotIngredientId}
-                onPivotChange={setPivotIngredientId}
-              />
-              {totalWeightG > 0 && (
-                <div style={{ marginTop: 10, fontSize: 13, color: "#6f6a61", display: "flex", gap: 16, flexWrap: "wrap" }}>
-                  <span>Poids total : <strong style={{ color: "#4a6741" }}>{Math.round(totalWeightG).toLocaleString("fr-FR")} g</strong></span>
-                  {totalCost > 0 && <span>Coût total : <strong style={{ color: "#4a6741" }}>{round2(totalCost).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</strong></span>}
+                {/* Étapes */}
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#4a6741" }}>
+                    Étapes
+                  </h3>
+                  <StepsList steps={steps} onChange={setSteps} />
                 </div>
-              )}
-            </div>
 
-            {/* Étapes */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#4a6741" }}>
-                Étapes
-              </h3>
-              <StepsList steps={steps} onChange={setSteps} />
-            </div>
-
-            {/* Prix & Marges */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#4a6741" }}>
-                Prix &amp; Marges
-              </h3>
-              <PricingBlock
-                costPerKg={costPerKg}
-                costPerPortion={costPerPortion}
-                vatRate={vatRate}
-                onVatChange={setVatRate}
-                marginRate={marginRate}
-                onMarginChange={setMarginRate}
-                sellPrice={sellPrice}
-                onSellPriceChange={setSellPrice}
-                accentColor="#D4775A"
-              />
-            </div>
-
-            {/* Index button for preparations */}
-            {category === "preparation" && isEdit && (
-              <div className="card" style={{ marginBottom: 16, borderLeft: "4px solid #4a6741" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-                  <div>
-                    <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: "#4a6741", textTransform: "uppercase", letterSpacing: 0.5 }}>
-                      Index ingrédient
-                    </p>
-                    <p className="muted" style={{ margin: "2px 0 0", fontSize: 11 }}>
-                      {costPerKg ? `Prix calculé : ${fmtMoney(costPerKg)} €/kg` : "Prix non calculé (rendement manquant)"}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleIndexSave}
-                    disabled={indexSaving}
-                    className="btn"
-                    style={{ background: "#4a6741", borderColor: "#4a6741", color: "#fff", fontSize: 12, flexShrink: 0 }}
-                  >
-                    {indexSaving ? "Enregistrement…" : indexIngredientId ? "Mettre à jour l'index" : "Ajouter à l'index"}
-                  </button>
+                {/* Prix & Marges */}
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <h3 style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#4a6741" }}>
+                    Prix &amp; Marges
+                  </h3>
+                  <PricingBlock
+                    costPerKg={costPerKg}
+                    costPerPortion={costPerPortion}
+                    vatRate={vatRate}
+                    onVatChange={setVatRate}
+                    marginRate={marginRate}
+                    onMarginChange={setMarginRate}
+                    sellPrice={sellPrice}
+                    onSellPriceChange={setSellPrice}
+                    accentColor="#D4775A"
+                  />
                 </div>
-                {indexMsg && (
-                  <div style={{
-                    marginTop: 8, fontSize: 12, fontWeight: 600,
-                    color: indexMsg.startsWith("Erreur") ? "#8B1A1A" : "#4a6741",
-                  }}>
-                    {indexMsg}
+
+                {/* Index button for preparations */}
+                {category === "preparation" && isEdit && (
+                  <div className="card" style={{ marginBottom: 16, borderLeft: "4px solid #4a6741" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                      <div>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: "#4a6741", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                          Index ingrédient
+                        </p>
+                        <p className="muted" style={{ margin: "2px 0 0", fontSize: 11 }}>
+                          {costPerKg ? `Prix calculé : ${fmtMoney(costPerKg)} €/kg` : "Prix non calculé (rendement manquant)"}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleIndexSave}
+                        disabled={indexSaving}
+                        className="btn"
+                        style={{ background: "#4a6741", borderColor: "#4a6741", color: "#fff", fontSize: 12, flexShrink: 0 }}
+                      >
+                        {indexSaving ? "Enregistrement…" : indexIngredientId ? "Mettre à jour l'index" : "Ajouter à l'index"}
+                      </button>
+                    </div>
+                    {indexMsg && (
+                      <div style={{
+                        marginTop: 8, fontSize: 12, fontWeight: 600,
+                        color: indexMsg.startsWith("Erreur") ? "#8B1A1A" : "#4a6741",
+                      }}>
+                        {indexMsg}
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* Allergènes */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
-                Allergènes
-              </h3>
-              <AllergenBadges allergens={computedAllergens} />
-            </div>
-
-            {/* Photo */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
-                Photo
-              </h3>
-              {photoPreview && (
-                <div style={{ marginBottom: 10 }}>
-                  <Image src={photoPreview} alt="Photo" width={200} height={150} style={{ borderRadius: 10, objectFit: "cover" }} />
+                {/* Allergènes */}
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
+                    Allergènes
+                  </h3>
+                  <AllergenBadges allergens={computedAllergens} />
                 </div>
-              )}
-              <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoChange} />
-              <button
-                type="button" onClick={() => fileRef.current?.click()} disabled={photoUploading}
-                className="btn"
-              >
-                {photoUploading ? "Envoi…" : photoPreview ? "Changer la photo" : "Ajouter une photo"}
-              </button>
-            </div>
 
-            {/* Bottom save */}
-            <div style={{ paddingBottom: 32 }}>
-              {saveError && <div className="errorBox" style={{ marginBottom: 8 }}>{saveError}</div>}
-              {userCanWrite && (
-                <button onClick={handleSave} disabled={saving} className="btn btnPrimary w-full">
-                  {saving ? "Sauvegarde…" : "Sauvegarder"}
-                </button>
-              )}
-            </div>
+                {/* Photo */}
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
+                    Photo
+                  </h3>
+                  {photoPreview && (
+                    <div style={{ marginBottom: 10 }}>
+                      <Image src={photoPreview} alt="Photo" width={200} height={150} style={{ borderRadius: 10, objectFit: "cover" }} />
+                    </div>
+                  )}
+                  <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoChange} />
+                  <button
+                    type="button" onClick={() => fileRef.current?.click()} disabled={photoUploading}
+                    className="btn"
+                  >
+                    {photoUploading ? "Envoi…" : photoPreview ? "Changer la photo" : "Ajouter une photo"}
+                  </button>
+                </div>
+
+                {/* Bottom save */}
+                <div style={{ paddingBottom: 32 }}>
+                  {saveError && <div className="errorBox" style={{ marginBottom: 8 }}>{saveError}</div>}
+                  {userCanWrite && (
+                    <button onClick={handleSave} disabled={saving} className="btn btnPrimary w-full">
+                      {saving ? "Sauvegarde…" : "Sauvegarder"}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
           </>
         )}
       </main>
     </>
+  );
+}
+
+// ── KPI Banner Item ──────────────────────────────────────────────
+function KpiBannerItem({ label, value, sub, color }: { label: string; value: string; sub?: string; color: string }) {
+  return (
+    <div style={{
+      flex: 1, padding: "12px 14px",
+      borderRight: "1px solid #f0ebe2",
+    }}>
+      <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 18, fontWeight: 700, color, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
+        {value}
+      </div>
+      {sub && (
+        <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>
+          {sub}
+        </div>
+      )}
+    </div>
   );
 }
