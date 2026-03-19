@@ -64,8 +64,8 @@ export const CategoryHeader = React.memo(function CategoryHeader({
       onClick={() => onToggle(cat)}
       style={{
         width: "100%", display: "flex", alignItems: "center", gap: 10,
-        padding: "10px 16px", background: "transparent", border: "none",
-        cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+        padding: "10px 16px", background: `${accent}14`, border: `1px solid ${accent}30`,
+        borderRadius: 12, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
         marginTop: 16, marginBottom: 6,
       }}
     >
@@ -76,7 +76,7 @@ export const CategoryHeader = React.memo(function CategoryHeader({
       }}>{CAT_LABELS[cat]}</span>
       <span style={{
         fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
-        background: `${accent}18`, color: accent,
+        background: `${accent}30`, color: accent,
       }}>{count}</span>
       <span style={{ marginLeft: "auto", fontSize: 10, color: "#b0a894", transition: "transform 0.2s", transform: isCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
     </button>
