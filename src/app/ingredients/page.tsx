@@ -122,7 +122,6 @@ function IngredientsPageInner() {
   const [filterCategory, setFilterCategory] = useState<"all" | Category>("all");
   const [filterSupplier, setFilterSupplier] = useState<"all" | string>(supplierParam ?? "all");
   const [includeNoOffer, setIncludeNoOffer] = useState(true);
-  const [filterEstablishment, setFilterEstablishment] = useState<"all" | "bellomio" | "piccola" | "both">("all");
 
   const suppliersMap = useMemo(() => {
     const m = new Map<string, Supplier>();
@@ -153,13 +152,6 @@ function IngredientsPageInner() {
     if (tab !== "all") base = base.filter((x) => ((x.status ?? "to_check") as IngredientStatus) === tab);
     if (filterCategory !== "all") base = base.filter((x) => x.category === filterCategory);
     if (!includeNoOffer) base = base.filter((x) => offersByIngredientId.has(x.id));
-    if (filterEstablishment !== "all") {
-      base = base.filter((x) => {
-        const off = offersByIngredientId.get(x.id);
-        const est = off?.establishment ?? "both";
-        return est === filterEstablishment || est === "both";
-      });
-    }
     if (filterSupplier !== "all") {
       const aliasIds = supplierAliases.get(filterSupplier) ?? new Set([filterSupplier]);
       base = base.filter((x) => {
@@ -169,7 +161,7 @@ function IngredientsPageInner() {
       });
     }
     return base;
-  }, [items, tab, filterCategory, filterSupplier, supplierAliases, filterEstablishment, includeNoOffer, offersByIngredientId]);
+  }, [items, tab, filterCategory, filterSupplier, supplierAliases, includeNoOffer, offersByIngredientId]);
 
   const grouped = useMemo(() => {
     const byCategory = new Map<Category, Ingredient[]>();
@@ -191,7 +183,7 @@ function IngredientsPageInner() {
   }, [debouncedQ]);
 
   const allCollapsed = grouped.length > 0 && collapsedCats.size >= grouped.length;
-  const filterActive = filterCategory !== "all" || filterSupplier !== "all" || filterEstablishment !== "all";
+  const filterActive = filterCategory !== "all" || filterSupplier !== "all";
 
   const [compactMode, setCompactMode] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -768,7 +760,7 @@ function IngredientsPageInner() {
         {!isVariations && (
           <>
             {/* Desktop filter row */}
-            <div className="hidden md:grid" style={{ gridTemplateColumns: "1fr 1fr 1fr auto auto auto", gap: 8, padding: "10px 20px" }}>
+            <div className="hidden md:grid" style={{ gridTemplateColumns: "1fr 1fr auto auto auto", gap: 8, padding: "10px 20px" }}>
               <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value as "all" | Category)} style={selStyle}>
                 <option value="all">Toutes categories</option>
                 {CATEGORIES.map((c) => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
@@ -776,12 +768,6 @@ function IngredientsPageInner() {
               <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)} style={selStyle}>
                 <option value="all">Tous fournisseurs</option>
                 {suppliers.filter((s) => s.is_active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-              <select value={filterEstablishment} onChange={(e) => setFilterEstablishment(e.target.value as "all" | "bellomio" | "piccola" | "both")} style={selStyle}>
-                <option value="all">Tous etablissements</option>
-                <option value="bellomio">Bello Mio</option>
-                <option value="piccola">Piccola Mia</option>
-                <option value="both">Les deux</option>
               </select>
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} style={{ accentColor: "#D4775A" }} />
@@ -1167,14 +1153,6 @@ function IngredientsPageInner() {
                 <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)} style={{ ...selStyle, width: "100%", padding: "12px 14px", fontSize: 14 }}>
                   <option value="all">Tous</option>
                   {suppliers.filter((s) => s.is_active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
-              <div><div style={{ fontSize: 12, color: "#999", marginBottom: 6 }}>Établissement</div>
-                <select value={filterEstablishment} onChange={(e) => setFilterEstablishment(e.target.value as "all" | "bellomio" | "piccola" | "both")} style={{ ...selStyle, width: "100%", padding: "12px 14px", fontSize: 14 }}>
-                  <option value="all">Tous</option>
-                  <option value="bellomio">Bello Mio</option>
-                  <option value="piccola">Piccola Mia</option>
-                  <option value="both">Les deux</option>
                 </select>
               </div>
               <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
