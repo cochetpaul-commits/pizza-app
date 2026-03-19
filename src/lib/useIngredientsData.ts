@@ -51,7 +51,7 @@ async function fetchPage(page: number, etabId?: string | null): Promise<{ items:
     .range(from, from + PAGE_SIZE - 1);
 
   if (etabId) {
-    query = query.eq("etablissement_id", etabId);
+    query = query.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
   }
 
   const { data, error } = await query;
@@ -70,7 +70,7 @@ async function searchIngredients(q: string, etabId?: string | null): Promise<{ i
     .order("name", { ascending: true });
 
   if (etabId) {
-    query = query.eq("etablissement_id", etabId);
+    query = query.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
   }
 
   const { data, error } = await query;
@@ -103,7 +103,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
       .from("suppliers")
       .select("id,name,is_active")
       .order("name", { ascending: true });
-    if (etablissementId) supQuery.eq("etablissement_id", etablissementId);
+    if (etablissementId) supQuery.or(`etablissement_id.eq.${etablissementId},etablissement_id.is.null`);
     supQuery.then(({ data, error: err }) => {
         if (!err) {
           // Deduplicate suppliers by name (case+accent insensitive) — keep the first entry as canonical

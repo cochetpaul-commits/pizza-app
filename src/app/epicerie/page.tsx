@@ -94,9 +94,9 @@ export default function EpiceriePage() {
       let supQ = supabase.from("suppliers").select("id,name").eq("is_active", true);
       let offQ = supabase.from("v_latest_offers").select("ingredient_id,supplier_id,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g");
       if (etab) {
-        ingQ = ingQ.eq("etablissement_id", etab.id);
-        supQ = supQ.eq("etablissement_id", etab.id);
-        offQ = offQ.eq("etablissement_id", etab.id);
+        ingQ = ingQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
+        supQ = supQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
+        offQ = offQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
       }
       const [{ data: ings }, { data: sups }, { data: offs }] = await Promise.all([
         ingQ.order("name"),

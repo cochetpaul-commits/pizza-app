@@ -299,7 +299,7 @@ function CommandesPage() {
         .select("id, name, franco_minimum")
         .eq("is_active", true)
         .order("name");
-      if (etab?.id) q.eq("etablissement_id", etab.id);
+      if (etab?.id) q.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
       const { data } = await q;
       // Deduplicate by name (accent+case insensitive)
       const seen = new Map<string, Supplier>();
@@ -350,7 +350,7 @@ function CommandesPage() {
       .select("ingredient_id, price_kind, unit, unit_price, pack_price, pack_unit, pack_count, pack_each_qty, pack_each_unit, pack_total_qty")
       .eq("supplier_id", supplierId)
       .eq("is_active", true);
-    if (etab) offerQ = offerQ.eq("etablissement_id", etab.id);
+    if (etab) offerQ = offerQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
     const { data: offerData } = await offerQ;
 
     const offerMap = new Map<string, typeof offerData extends (infer T)[] | null ? T : never>();
@@ -366,7 +366,7 @@ function CommandesPage() {
       .from("ingredients")
       .select("id")
       .eq("supplier_id", supplierId);
-    if (etab) directIngQ = directIngQ.eq("etablissement_id", etab.id);
+    if (etab) directIngQ = directIngQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
     const { data: directIngs } = await directIngQ;
     const directIds = (directIngs ?? []).map((i: { id: string }) => i.id);
 
@@ -380,7 +380,7 @@ function CommandesPage() {
         .in("id", allIds)
         .order("category")
         .order("name");
-      if (etab) ingDataQ = ingDataQ.eq("etablissement_id", etab.id);
+      if (etab) ingDataQ = ingDataQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
       const { data: ingData } = await ingDataQ;
 
       items = (ingData ?? []).map((ing: { id: string; name: string; category: string | null; default_unit: string | null; favori_commande?: boolean; order_unit_label?: string | null }) => {

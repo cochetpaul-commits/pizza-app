@@ -145,7 +145,7 @@ export default function EventsPage() {
         .from("events")
         .select("id,name,type,date,time,location,covers,establishment,status,contact_name,sell_price")
         .order("date", { ascending: true, nullsFirst: false });
-      if (etab) q.eq("etablissement_id", etab.id);
+      if (etab) q.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
       const { data } = await q;
       setEvents(data ?? []);
       setLoading(false);

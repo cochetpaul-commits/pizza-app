@@ -129,7 +129,7 @@ function IngredientDetailInner() {
         if (!user) throw new Error("Non connecté");
 
         const ingQuery = supabase.from("ingredients").select("*").eq("id", id).eq("user_id", user.id);
-        if (etab) ingQuery.eq("etablissement_id", etab.id);
+        if (etab) ingQuery.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
 
         const offQuery = supabase.from("supplier_offers")
           .select("id, supplier_id, unit, unit_price, supplier_label, is_active, created_at, establishment, price_kind")
@@ -137,7 +137,7 @@ function IngredientDetailInner() {
           .eq("user_id", user.id)
           .not("unit_price", "is", null)
           .order("created_at", { ascending: true });
-        if (etab) offQuery.eq("etablissement_id", etab.id);
+        if (etab) offQuery.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
 
         const [{ data: ing, error: e1 }, { data: offerData, error: e2 }] = await Promise.all([
           ingQuery.single(),

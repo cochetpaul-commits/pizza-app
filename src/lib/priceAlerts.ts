@@ -42,7 +42,7 @@ export async function fetchPriceAlerts(
     .eq("is_active", true)
     .not("unit_price", "is", null);
   if (since) q = q.gte("created_at", since);
-  if (etabId) q = q.eq("etablissement_id", etabId);
+  if (etabId) q = q.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
   const { data: active, error: e1 } = await q;
 
   if (e1) throw new Error(e1.message);
@@ -58,7 +58,7 @@ export async function fetchPriceAlerts(
     .in("ingredient_id", ingredientIds)
     .not("unit_price", "is", null)
     .order("created_at", { ascending: false });
-  if (etabId) q2 = q2.eq("etablissement_id", etabId);
+  if (etabId) q2 = q2.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
   const { data: previous, error: e2 } = await q2;
 
   if (e2) throw new Error(e2.message);
@@ -74,7 +74,7 @@ export async function fetchPriceAlerts(
     .select("id, name, supplier, category")
     .eq("user_id", userId)
     .in("id", ingredientIds);
-  if (etabId) q3 = q3.eq("etablissement_id", etabId);
+  if (etabId) q3 = q3.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
   const { data: ingredients, error: e3 } = await q3;
 
   if (e3) throw new Error(e3.message);
@@ -89,7 +89,7 @@ export async function fetchPriceAlerts(
     .from("suppliers")
     .select("id, name")
     .in("id", supplierIds);
-  if (etabId) q4 = q4.eq("etablissement_id", etabId);
+  if (etabId) q4 = q4.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
   const { data: suppliers } = await q4;
 
   const supMap = new Map<string, string>();
