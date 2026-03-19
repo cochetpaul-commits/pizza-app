@@ -10,8 +10,11 @@ import { T } from "@/lib/tokens";
 import { TileIcon } from "@/components/TileIcon";
 import { fetchPriceAlerts } from "@/lib/priceAlerts";
 
-type CaData = { totalSales: number; guestsNumber: number } | null;
+type CaData = { totalSales: number; guestsNumber: number; ticketMoyen: number; soir: { ca: number; couverts: number } } | null;
+type PmData = { ca: number; couverts: number; panier_moyen: number } | null;
 type UpcomingEvent = { id: string; name: string; date: string | null; status: string; covers: number };
+type EtabDayData = { ca: number; couverts: number };
+type GroupAlert = { text: string; etab: string; badge: string; color: string };
 
 function fmtEur(n: number) {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -39,8 +42,10 @@ function getNextWeekSunday(): string {
 
 /* ───────── Sub-components ───────── */
 
-function KpiCard({ label, value, sub, accent }: {
+function KpiCard({ label, value, sub, accent, subColor, progress }: {
   label: string; value: string; sub?: string; accent?: string;
+  subColor?: string;
+  progress?: { value: number; max: number; color: string };
 }) {
   return (
     <div style={{
@@ -60,7 +65,12 @@ function KpiCard({ label, value, sub, accent }: {
         lineHeight: 1.15, marginTop: 4,
       }}>{value}</span>
       {sub && (
-        <span style={{ fontSize: 10, color: T.muted, marginTop: 2 }}>{sub}</span>
+        <span style={{ fontSize: 10, color: subColor ?? T.muted, marginTop: 2 }}>{sub}</span>
+      )}
+      {progress && (
+        <div style={{ marginTop: 4, height: 4, borderRadius: 2, background: T.border, overflow: "hidden" }}>
+          <div style={{ height: "100%", borderRadius: 2, background: progress.color, width: `${Math.min(100, (progress.value / progress.max) * 100)}%` }} />
+        </div>
       )}
     </div>
   );
@@ -115,17 +125,22 @@ function TaskCard({ href, icon, title, subtitle, accent, count }: {
 
 export default function DashboardPage() {
   const { role, isGroupAdmin } = useProfile();
-  const { isGroupView, current } = useEtablissement();
+  const { isGroupView, current, etablissements, setCurrent, setGroupView } = useEtablissement();
   const isAdmin = isGroupAdmin;
 
   const [ca, setCa] = useState<CaData>(null);
-  const [caPM, setCaPM] = useState<number | null>(null);
+  const [caPM, setCaPM] = useState<PmData>(null);
   const [caYesterday, setCaYesterday] = useState<number | null>(null);
+  const [caYesterdayBM, setCaYesterdayBM] = useState<EtabDayData | null>(null);
+  const [caYesterdayPM, setCaYesterdayPM] = useState<EtabDayData | null>(null);
   const [events, setEvents] = useState<UpcomingEvent[]>([]);
   const [alertCount, setAlertCount] = useState(0);
   const [pendingCommandes, setPendingCommandes] = useState(0);
   const [shiftsToday, setShiftsToday] = useState(0);
   const [nextWeekHasShifts, setNextWeekHasShifts] = useState<boolean | null>(null);
+  const [heuresBM, setHeuresBM] = useState<number | null>(null);
+  const [heuresPM, setHeuresPM] = useState<number | null>(null);
+  const [groupAlerts, setGroupAlerts] = useState<GroupAlert[]>([]);
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const yesterday = useMemo(() => {
@@ -141,7 +156,12 @@ export default function DashboardPage() {
         const res = await fetchApi("/api/popina/ca-jour");
         if (!res.ok) return;
         const d = await res.json();
-        setCa({ totalSales: d.totalSales ?? 0, guestsNumber: d.guestsNumber ?? 0 });
+        setCa({
+          totalSales: d.totalSales ?? 0,
+          guestsNumber: d.guestsNumber ?? 0,
+          ticketMoyen: d.ticketMoyen ?? 0,
+          soir: { ca: d.soir?.ca ?? 0, couverts: d.soir?.couverts ?? 0 },
+        });
       } catch { /* silencieux */ }
     }
     if (isAdmin) fetchCa();
@@ -152,12 +172,12 @@ export default function DashboardPage() {
     async function fetchCaPM() {
       const { data } = await supabase
         .from("daily_sales")
-        .select("ca_ttc")
+        .select("ca_ttc, couverts, panier_moyen")
         .eq("date", today)
         .eq("source", "kezia_pdf")
         .limit(1)
         .maybeSingle();
-      setCaPM(data?.ca_ttc ?? 0);
+      setCaPM(data ? { ca: data.ca_ttc ?? 0, couverts: data.couverts ?? 0, panier_moyen: data.panier_moyen ?? 0 } : { ca: 0, couverts: 0, panier_moyen: 0 });
     }
     if (isAdmin) fetchCaPM();
   }, [isAdmin, today]);
@@ -165,21 +185,32 @@ export default function DashboardPage() {
   // Fetch CA Yesterday (from daily_sales or Popina)
   useEffect(() => {
     if (!isAdmin) return;
-    if (!isGroupView && !current) return; // wait for etab to load
+    if (!isGroupView && !current) return;
     async function fetchCaYesterday() {
-      let query = supabase
+      const { data } = await supabase
         .from("daily_sales")
-        .select("ca_ttc")
-        .eq("date", yesterday);
-      if (!isGroupView && current) {
-        query = query.eq("etablissement_id", current.id);
+        .select("ca_ttc, couverts, etablissement_id")
+        .eq("date", yesterday)
+        .limit(10);
+      const rows = data ?? [];
+      if (isGroupView) {
+        const total = rows.reduce((s: number, r: { ca_ttc: number | null }) => s + (r.ca_ttc ?? 0), 0);
+        setCaYesterday(total > 0 ? total : null);
+        // Per-establishment yesterday
+        for (const etab of etablissements) {
+          const row = rows.find((r: { etablissement_id: string }) => r.etablissement_id === etab.id);
+          const d = row ? { ca: row.ca_ttc ?? 0, couverts: row.couverts ?? 0 } : null;
+          if (etab.slug?.includes("bello")) setCaYesterdayBM(d);
+          else setCaYesterdayPM(d);
+        }
+      } else if (current) {
+        const filtered = rows.filter((r: { etablissement_id: string }) => r.etablissement_id === current!.id);
+        const total = filtered.reduce((s: number, r: { ca_ttc: number | null }) => s + (r.ca_ttc ?? 0), 0);
+        setCaYesterday(total > 0 ? total : null);
       }
-      const { data } = await query.limit(10);
-      const total = (data ?? []).reduce((sum: number, r: { ca_ttc: number | null }) => sum + (r.ca_ttc ?? 0), 0);
-      setCaYesterday(total > 0 ? total : null);
     }
     fetchCaYesterday();
-  }, [isAdmin, yesterday, isGroupView, current]);
+  }, [isAdmin, yesterday, isGroupView, current, etablissements]);
 
   // Events (only for Piccola Mia — events are managed there)
   useEffect(() => {
@@ -260,7 +291,109 @@ export default function DashboardPage() {
     if (isAdmin) checkNextWeek();
   }, [isAdmin, isGroupView, current]);
 
-  const caTotal = (ca?.totalSales ?? 0) + (caPM ?? 0);
+  // Fetch heures planifiees per establishment (current week)
+  useEffect(() => {
+    if (!isAdmin || !isGroupView || etablissements.length === 0) return;
+    async function fetchHeures() {
+      const d = new Date();
+      const day = d.getDay();
+      const mon = new Date(d);
+      mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+      const monStr = mon.toISOString().slice(0, 10);
+      const sunStr = sun.toISOString().slice(0, 10);
+
+      const { data } = await supabase
+        .from("shifts")
+        .select("etablissement_id, heure_debut, heure_fin, pause_minutes")
+        .gte("date", monStr)
+        .lte("date", sunStr);
+
+      if (!data) return;
+      const byEtab: Record<string, number> = {};
+      for (const s of data) {
+        const [hd, md] = (s.heure_debut as string).split(":").map(Number);
+        const [hf, mf] = (s.heure_fin as string).split(":").map(Number);
+        let dur = (hf * 60 + mf) - (hd * 60 + md);
+        if (dur < 0) dur += 1440;
+        dur -= s.pause_minutes ?? 0;
+        byEtab[s.etablissement_id] = (byEtab[s.etablissement_id] ?? 0) + Math.max(0, dur / 60);
+      }
+      for (const etab of etablissements) {
+        const h = Math.round(byEtab[etab.id] ?? 0);
+        if (etab.slug?.includes("bello")) setHeuresBM(h);
+        else setHeuresPM(h);
+      }
+    }
+    fetchHeures();
+  }, [isAdmin, isGroupView, etablissements]);
+
+  // Fetch group alerts
+  useEffect(() => {
+    if (!isAdmin || !isGroupView) return;
+    async function fetchGroupAlerts() {
+      const alerts: GroupAlert[] = [];
+
+      // Commandes en attente
+      const { data: cmdData } = await supabase
+        .from("commande_sessions")
+        .select("id, etablissement_id")
+        .eq("status", "en_attente");
+      if (cmdData && cmdData.length > 0) {
+        const etabName = (eid: string) => etablissements.find(e => e.id === eid)?.nom ?? "Groupe";
+        const grouped: Record<string, number> = {};
+        for (const c of cmdData) {
+          const n = etabName(c.etablissement_id);
+          grouped[n] = (grouped[n] ?? 0) + 1;
+        }
+        for (const [name, count] of Object.entries(grouped)) {
+          alerts.push({ text: `${count} commande${count > 1 ? "s" : ""} fournisseur en attente`, etab: name, badge: "commandes", color: T.dore });
+        }
+      }
+
+      // Events demain
+      const tmrw = new Date();
+      tmrw.setDate(tmrw.getDate() + 1);
+      const tmrwStr = tmrw.toISOString().slice(0, 10);
+      const { data: evData } = await supabase
+        .from("events")
+        .select("id, name, covers, etablissement_id")
+        .eq("date", tmrwStr)
+        .not("status", "in", '("termine","annule")');
+      if (evData && evData.length > 0) {
+        for (const ev of evData) {
+          const etabName = etablissements.find(e => e.id === ev.etablissement_id)?.nom ?? "";
+          alerts.push({ text: `Evenement demain \u2014 ${ev.covers ?? 0} couverts reserves`, etab: etabName, badge: "evenement", color: T.bleu });
+        }
+      }
+
+      // Absences en attente
+      const { data: absData } = await supabase
+        .from("absences")
+        .select("id, employe_id")
+        .eq("statut", "en_attente");
+      if (absData && absData.length > 0) {
+        alerts.push({ text: `${absData.length} demande${absData.length > 1 ? "s" : ""} de conge en attente de validation`, etab: "", badge: "RH", color: T.bleu });
+      }
+
+      // Price alerts
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const pa = await fetchPriceAlerts(supabase, user.id);
+          if (pa.length > 0) {
+            alerts.push({ text: `${pa.length} variation${pa.length > 1 ? "s" : ""} de prix detectee${pa.length > 1 ? "s" : ""}`, etab: "", badge: "prix", color: T.terracotta });
+          }
+        }
+      } catch { /* silencieux */ }
+
+      setGroupAlerts(alerts);
+    }
+    fetchGroupAlerts();
+  }, [isAdmin, isGroupView, etablissements]);
+
+  const caTotal = (ca?.totalSales ?? 0) + (caPM?.ca ?? 0);
   const hasCa = ca || caPM != null;
 
   // ─── Non-admin: simple dashboard with quick links ───
@@ -305,104 +438,152 @@ export default function DashboardPage() {
 
   // ─── Admin / Direction: GROUP VIEW (synthese financiere) ───
   if (isGroupView) {
+    const couvTotal = (ca?.guestsNumber ?? 0) + (caPM?.couverts ?? 0);
+    const ticketMoyenGroupe = couvTotal > 0 ? caTotal / couvTotal : 0;
+    const caYestTotal = (caYesterdayBM?.ca ?? 0) + (caYesterdayPM?.ca ?? 0);
+    const deltaCa = caYestTotal > 0 ? Math.round(((caTotal - caYestTotal) / caYestTotal) * 100) : null;
+    const couvYest = (caYesterdayBM?.couverts ?? 0) + (caYesterdayPM?.couverts ?? 0);
+    const deltaCouverts = couvYest > 0 ? couvTotal - couvYest : null;
+    const ticketYest = couvYest > 0 ? caYestTotal / couvYest : 0;
+    const deltaTicket = ticketYest > 0 ? ticketMoyenGroupe - ticketYest : null;
+
+    // Per-establishment deltas
+    const deltaCaBM = caYesterdayBM && caYesterdayBM.ca > 0 ? Math.round((((ca?.totalSales ?? 0) - caYesterdayBM.ca) / caYesterdayBM.ca) * 100) : null;
+    const deltaCaPM = caYesterdayPM && caYesterdayPM.ca > 0 ? Math.round(((caPM?.ca ?? 0) - caYesterdayPM.ca) / caYesterdayPM.ca * 100) : null;
+    const deltaCouvBM = caYesterdayBM ? (ca?.guestsNumber ?? 0) - (caYesterdayBM.couverts ?? 0) : null;
+    const deltaCouvPM = caYesterdayPM ? (caPM?.couverts ?? 0) - (caYesterdayPM.couverts ?? 0) : null;
+
+    // Masse salariale estimates per establishment
+    const bmEtab = etablissements.find(e => e.slug?.includes("bello"));
+    const pmEtab = etablissements.find(e => !e.slug?.includes("bello"));
+    const masseSalBM = bmEtab && heuresBM != null ? Math.round(bmEtab.taux_horaire_moyen * heuresBM * (1 + bmEtab.cotisations_patronales / 100)) : null;
+    const masseSalPM = pmEtab && heuresPM != null ? Math.round(pmEtab.taux_horaire_moyen * heuresPM * (1 + pmEtab.cotisations_patronales / 100)) : null;
+
+    // Ratio MS placeholder (would need weekly CA)
+    const ratioMSBM = masseSalBM != null && (ca?.totalSales ?? 0) > 0 ? Math.round((masseSalBM / (ca!.totalSales * 7)) * 100) : null;
+    const ratioMSPM = masseSalPM != null && (caPM?.ca ?? 0) > 0 ? Math.round((masseSalPM / ((caPM?.ca ?? 0) * 7)) * 100) : null;
+    const ratioMSGroupe = masseSalBM != null && masseSalPM != null && caTotal > 0
+      ? Math.round(((masseSalBM + masseSalPM) / (caTotal * 7)) * 100) : null;
+    const objMS = bmEtab?.objectif_cout_ventes ?? 37;
+
+    const fmtDelta = (v: number | null, suffix = "") => {
+      if (v == null) return null;
+      const sign = v > 0 ? "+" : "";
+      return `${sign}${v}${suffix}`;
+    };
+    const deltaColor = (v: number | null) => v == null ? T.muted : v > 0 ? T.sauge : v < 0 ? "#DC2626" : T.muted;
+
     return (
-      <div style={{ maxWidth: 600, margin: "0 auto", padding: "16px 16px 40px" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "16px 16px 40px" }}>
 
-        {/* CA Groupe aujourd'hui */}
-        {hasCa && (
-          <div style={{
-            background: T.white, border: `1.5px solid ${T.border}`,
-            borderRadius: 14, padding: "16px 18px", marginBottom: 16,
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div>
-                <p style={{
-                  margin: 0, fontSize: 9, fontWeight: 700,
-                  letterSpacing: "0.16em", textTransform: "uppercase",
-                  color: T.muted, fontFamily: "DM Sans, sans-serif",
-                }}>CA Groupe aujourd&apos;hui</p>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 6 }}>
-                  <span style={{
-                    fontSize: 30, fontWeight: 700, color: T.dark,
-                    fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1,
-                  }}>
-                    {fmtEur(caTotal)} &euro;
-                  </span>
-                  {ca && ca.guestsNumber > 0 && (
-                    <span style={{ fontSize: 12, color: T.muted }}>{ca.guestsNumber} couv.</span>
-                  )}
-                </div>
-              </div>
-              <TileIcon name="pilotage" size={22} color={T.ifratelli} />
-            </div>
+        <SectionLabel>Vue groupe &mdash; aujourd&apos;hui</SectionLabel>
 
-            <div style={{ display: "flex", gap: 16, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.belloMio, flexShrink: 0 }} />
-                <span style={{ fontSize: 11, color: T.muted }}>Bello Mio</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: T.belloMio, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
-                  {fmtEur(ca?.totalSales ?? 0)} &euro;
-                </span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.piccolaMiaText, flexShrink: 0 }} />
-                <span style={{ fontSize: 11, color: T.muted }}>Piccola Mia</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: T.piccolaMiaText, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
-                  {fmtEur(caPM ?? 0)} &euro;
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* KPI Cards — CA hier par etab */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: 10,
-          marginBottom: 20,
-        }}>
-          <KpiCard
-            label="CA hier groupe"
-            value={caYesterday != null ? `${fmtEur(caYesterday)}\u00A0\u20AC` : "\u2014"}
-            accent={T.terracotta}
-          />
-          <KpiCard
-            label="En service ce soir"
-            value={String(shiftsToday)}
-            accent={T.bleu}
-          />
-          <KpiCard
-            label="Ratio MS/CA"
-            value={"\u2014"}
-            sub="bientot"
-            accent={T.dore}
-          />
+        {/* ── 4 KPI Cards ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 20 }}>
+          <KpiCard label="CA Groupe" value={`${fmtEur(caTotal)}\u00A0\u20AC`} accent={T.terracotta}
+            sub={fmtDelta(deltaCa, "% vs hier") ?? undefined} subColor={deltaColor(deltaCa)} />
+          <KpiCard label="Couverts" value={String(couvTotal)} accent={T.dark}
+            sub={fmtDelta(deltaCouverts, " vs hier") ?? undefined} subColor={deltaColor(deltaCouverts)} />
+          <KpiCard label="Ticket moyen" value={`${ticketMoyenGroupe.toFixed(1).replace(".", ",")}\u00A0\u20AC`} accent={T.dark}
+            sub={deltaTicket != null ? `${deltaTicket > 0 ? "+" : ""}${deltaTicket.toFixed(1).replace(".", ",")} \u20AC vs hier` : undefined}
+            subColor={deltaColor(deltaTicket != null ? Math.round(deltaTicket * 10) : null)} />
+          <KpiCard label="Ratio MS Groupe" value={ratioMSGroupe != null ? `${ratioMSGroupe}%` : "\u2014"}
+            accent={ratioMSGroupe != null && ratioMSGroupe > objMS ? "#DC2626" : T.dore}
+            sub={`obj. ${objMS}%`} subColor={T.dore}
+            progress={ratioMSGroupe != null ? { value: ratioMSGroupe, max: objMS + 20, color: ratioMSGroupe > objMS ? "#DC2626" : T.dore } : undefined} />
         </div>
 
-        {/* Alertes (transversal) */}
-        {(alertCount > 0 || pendingCommandes > 0) && (
-          <div style={{ display: "grid", gap: 8, marginBottom: 20 }}>
-            {pendingCommandes > 0 && (
-              <TaskCard
-                href="/commandes"
-                icon="commandes"
-                title="Commandes en attente"
-                subtitle={`${pendingCommandes} commande${pendingCommandes > 1 ? "s" : ""} a valider`}
-                accent={T.sauge}
-                count={pendingCommandes}
-              />
-            )}
-            {alertCount > 0 && (
-              <TaskCard
-                href="/variations-prix"
-                icon="variations"
-                title="Alertes prix"
-                subtitle={`${alertCount} variation${alertCount > 1 ? "s" : ""} de prix detectee${alertCount > 1 ? "s" : ""}`}
-                accent={T.terracotta}
-                count={alertCount}
-              />
-            )}
+        {/* ── 2 Establishment Cards ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+          {/* Bello Mio */}
+          <div style={{ background: T.white, borderRadius: 14, border: `1.5px solid ${T.border}`, padding: "18px 20px", display: "flex", flexDirection: "column" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: T.belloMio }} />
+              <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 16, color: T.dark }}>Bello Mio</span>
+            </div>
+            <EtabStatRow label="CA du jour" value={`${fmtEur(ca?.totalSales ?? 0)}\u00A0\u20AC`} delta={fmtDelta(deltaCaBM, "%")} deltaColor={deltaColor(deltaCaBM)} />
+            <EtabStatRow label="Couverts" value={String(ca?.guestsNumber ?? 0)} delta={fmtDelta(deltaCouvBM)} deltaColor={deltaColor(deltaCouvBM)} />
+            <EtabStatRow label="Soir" value={`${fmtEur(ca?.soir.ca ?? 0)}\u00A0\u20AC`} />
+            <div style={{ display: "flex", gap: 14, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
+              <MiniStat label="planifiees" value={heuresBM != null ? `${heuresBM} h` : "\u2014"} />
+              <MiniStat label="ratio MS" value={ratioMSBM != null ? `${ratioMSBM}%` : "\u2014"} valueColor={ratioMSBM != null && ratioMSBM > objMS ? "#DC2626" : T.sauge} />
+              <MiniStat label="masse sal." value={masseSalBM != null ? `${fmtEur(masseSalBM)}\u00A0\u20AC` : "\u2014"} />
+            </div>
+            <button
+              onClick={() => {
+                const bm = etablissements.find(e => e.slug?.includes("bello"));
+                if (bm) { setCurrent(bm); setGroupView(false); }
+              }}
+              style={{
+                marginTop: 16, width: "100%", padding: "10px 0", borderRadius: 10,
+                border: `1.5px solid ${T.border}`, background: "transparent",
+                fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600,
+                color: T.belloMio, cursor: "pointer",
+              }}
+            >
+              Entrer dans Bello Mio &rarr;
+            </button>
+          </div>
+
+          {/* Piccola Mia */}
+          <div style={{ background: T.white, borderRadius: 14, border: `1.5px solid ${T.border}`, padding: "18px 20px", display: "flex", flexDirection: "column" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: T.bleu }} />
+              <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 16, color: T.dark }}>Piccola Mia</span>
+            </div>
+            <EtabStatRow label="CA du jour" value={`${fmtEur(caPM?.ca ?? 0)}\u00A0\u20AC`} delta={fmtDelta(deltaCaPM, "%")} deltaColor={deltaColor(deltaCaPM)} />
+            <EtabStatRow label="Couverts" value={String(caPM?.couverts ?? 0)} delta={fmtDelta(deltaCouvPM)} deltaColor={deltaColor(deltaCouvPM)} />
+            <EtabStatRow label="Soir" value={"\u2014"} />
+            <div style={{ display: "flex", gap: 14, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
+              <MiniStat label="planifiees" value={heuresPM != null ? `${heuresPM} h` : "\u2014"} />
+              <MiniStat label="ratio MS" value={ratioMSPM != null ? `${ratioMSPM}%` : "\u2014"} valueColor={ratioMSPM != null && ratioMSPM > objMS ? "#DC2626" : T.sauge} />
+              <MiniStat label="masse sal." value={masseSalPM != null ? `${fmtEur(masseSalPM)}\u00A0\u20AC` : "\u2014"} />
+            </div>
+            <button
+              onClick={() => {
+                const pm = etablissements.find(e => !e.slug?.includes("bello"));
+                if (pm) { setCurrent(pm); setGroupView(false); }
+              }}
+              style={{
+                marginTop: 16, width: "100%", padding: "10px 0", borderRadius: 10,
+                border: `1.5px solid ${T.border}`, background: "transparent",
+                fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600,
+                color: T.bleu, cursor: "pointer",
+              }}
+            >
+              Entrer dans Piccola Mia &rarr;
+            </button>
+          </div>
+        </div>
+
+        {/* ── Alertes Groupe ── */}
+        {groupAlerts.length > 0 && (
+          <div style={{
+            background: T.white, borderRadius: 14, border: `1.5px solid ${T.border}`,
+            padding: "18px 20px",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <SectionLabel>Alertes groupe</SectionLabel>
+              <span style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                minWidth: 24, height: 24, borderRadius: 12,
+                background: `${T.sauge}18`, color: T.sauge,
+                fontSize: 12, fontWeight: 700,
+              }}>{groupAlerts.length}</span>
+            </div>
+            <div style={{ display: "grid", gap: 10 }}>
+              {groupAlerts.map((a, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: a.color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: T.dark, fontFamily: "DM Sans, sans-serif", flex: 1 }}>{a.text}</span>
+                  {a.etab && <span style={{ fontSize: 11, color: T.muted, flexShrink: 0 }}>{a.etab}</span>}
+                  <span style={{
+                    fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6,
+                    background: `${a.color}15`, color: a.color, flexShrink: 0,
+                  }}>{a.badge}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -699,6 +880,36 @@ function ZoneChecklist() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ───────── Establishment card sub-components ───────── */
+
+function EtabStatRow({ label, value, delta, deltaColor }: {
+  label: string; value: string; delta?: string | null; deltaColor?: string;
+}) {
+  return (
+    <div style={{
+      display: "flex", justifyContent: "space-between", alignItems: "baseline",
+      padding: "7px 0", borderBottom: `1px solid ${T.border}08`,
+    }}>
+      <span style={{ fontSize: 13, color: T.muted, fontFamily: "DM Sans, sans-serif" }}>{label}</span>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+        <span style={{ fontSize: 16, fontWeight: 700, color: T.dark, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{value}</span>
+        {delta && <span style={{ fontSize: 11, fontWeight: 600, color: deltaColor ?? T.muted }}>{delta}</span>}
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({ label, value, valueColor }: {
+  label: string; value: string; valueColor?: string;
+}) {
+  return (
+    <div style={{ flex: 1 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: valueColor ?? T.dark, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{value}</div>
+      <div style={{ fontSize: 10, color: T.muted }}>{label}</div>
     </div>
   );
 }
