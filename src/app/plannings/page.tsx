@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 import { RequireRole } from "@/components/RequireRole";
@@ -143,6 +143,9 @@ export default function PlanningPage() {
 
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
   const [equipeFilter, setEquipeFilter] = useState<EquipeFilter>("tous");
+
+  // Track mousedown on shift to prevent cell click from opening create modal
+  const shiftMouseDown = useRef(false);
 
   // ── Shift modal ──
   const [showModal, setShowModal] = useState(false);
@@ -671,8 +674,8 @@ export default function PlanningPage() {
                                 ...(absType ? absenceCell : {}),
                                 ...(snapshot.isDraggingOver ? { background: "rgba(45,106,79,0.08)" } : {}),
                               }}
-                              onClick={(e) => {
-                                if ((e.target as HTMLElement).closest("[data-shift]")) return;
+                              onClick={() => {
+                                if (shiftMouseDown.current) { shiftMouseDown.current = false; return; }
                                 if (canWrite) openCreateShift(emp.id, iso);
                               }}
                             >
@@ -692,8 +695,11 @@ export default function PlanningPage() {
                                         {...drag.draggableProps}
                                         {...drag.dragHandleProps}
                                         data-shift="1"
+                                        onMouseDown={() => { shiftMouseDown.current = true; }}
+                                        onTouchStart={() => { shiftMouseDown.current = true; }}
                                         onClick={(e) => {
                                           e.stopPropagation();
+                                          shiftMouseDown.current = false;
                                           if (canWrite) openEditShift(s);
                                         }}
                                         style={{
@@ -703,11 +709,11 @@ export default function PlanningPage() {
                                         }}
                                       >
                                         {poste && (
-                                          <div style={{ fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", pointerEvents: "none" }}>
+                                          <div style={{ fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                                             {poste.nom} {poste.emoji ?? ""}
                                           </div>
                                         )}
-                                        <div style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 10, color: "rgba(0,0,0,0.6)", pointerEvents: "none" }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 10, color: "rgba(0,0,0,0.6)" }}>
                                           <span style={{ fontWeight: 600 }}>{fmtH(s.heure_debut)}</span>
                                           <span>-</span>
                                           <span>{fmtH(s.heure_fin)}</span>
