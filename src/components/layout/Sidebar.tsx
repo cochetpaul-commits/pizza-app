@@ -3,7 +3,7 @@
 import React, { useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { SIDEBAR_NAV, type NavSection } from "./SidebarNav";
@@ -84,6 +84,7 @@ type SidebarContentProps = {
 
 function SidebarContent({ onNavigate }: SidebarContentProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { role } = useProfile();
   const { current, setCurrent, etablissements, isGroupView, setGroupView, isGroupAdmin } = useEtablissement();
   // Sections with a label start collapsed
@@ -105,7 +106,10 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
     : (current?.couleur ?? getEtabColor(current?.slug));
   const etabLabel = isGroupView ? "iFratelli Group" : current?.nom ?? "Etablissement";
 
-  const visibleSections = SIDEBAR_NAV.filter(s => sectionVisible(s, role, current?.slug));
+  // In group view, only show dashboard
+  const visibleSections = isGroupView
+    ? SIDEBAR_NAV.filter(s => s.label === "" && s.items.some(i => i.href === "/dashboard"))
+    : SIDEBAR_NAV.filter(s => sectionVisible(s, role, current?.slug));
 
   return (
     <div style={{
@@ -175,7 +179,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
                 {isGroupAdmin && (
                   <button
                     type="button"
-                    onClick={() => { setGroupView(true); setEtabOpen(false); }}
+                    onClick={() => { setGroupView(true); setEtabOpen(false); router.push("/dashboard"); }}
                     style={etabItemStyle(isGroupView)}
                   >
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: C.ifratelli }} />
