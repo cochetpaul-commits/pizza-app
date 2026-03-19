@@ -420,7 +420,14 @@ function IngredientsPageInner() {
       import_name: name,
     };
     const ins = await supabase.from("ingredients").insert(baseIngredient).select("id").single();
-    if (ins.error) { alert(ins.error.message); return; }
+    if (ins.error) {
+      if (ins.error.message.includes("ingredients_user_name_uniq")) {
+        alert(`Un ingredient "${name}" existe deja. Choisissez un autre nom.`);
+      } else {
+        alert(ins.error.message);
+      }
+      return;
+    }
     const ingredient_id = ins.data.id as string;
     if (supplier_id && newCategory !== "preparation") {
       if (!userId) { alert("Utilisateur non connecté. Impossible d'enregistrer l'offre."); return; }
@@ -551,7 +558,14 @@ function IngredientsPageInner() {
       order_unit_label: edit.orderUnitLabel.trim() || null,
     };
     const u1 = await supabase.from("ingredients").update(up).eq("id", editingId);
-    if (u1.error) { alert(u1.error.message); return; }
+    if (u1.error) {
+      if (u1.error.message.includes("ingredients_user_name_uniq")) {
+        alert(`Un ingredient "${name}" existe deja. Choisissez un autre nom.`);
+      } else {
+        alert(u1.error.message);
+      }
+      return;
+    }
     if (edit.useOffer && supplier_id) {
       if (!userId) { alert("Utilisateur non connecté. Impossible d'enregistrer l'offre."); return; }
       const editedIng = items.find((i) => i.id === editingId);
