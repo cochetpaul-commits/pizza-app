@@ -672,11 +672,11 @@ export default function PlanningPage() {
                                         }}
                                       >
                                         {poste && (
-                                          <div style={{ fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                          <div style={{ fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", pointerEvents: "none" }}>
                                             {poste.nom} {poste.emoji ?? ""}
                                           </div>
                                         )}
-                                        <div style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 10, color: "rgba(0,0,0,0.6)" }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 10, color: "rgba(0,0,0,0.6)", pointerEvents: "none" }}>
                                           <span style={{ fontWeight: 600 }}>{fmtH(s.heure_debut)}</span>
                                           <span>-</span>
                                           <span>{fmtH(s.heure_fin)}</span>
@@ -967,8 +967,8 @@ const shiftBlock = (color: string): React.CSSProperties => ({
   borderLeft: `3px solid ${color}`,
   fontSize: 11,
   color: "#1a1a1a",
-  cursor: "pointer",
-  overflow: "hidden",
+  cursor: "grab",
+  userSelect: "none",
 });
 
 
