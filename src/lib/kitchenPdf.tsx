@@ -164,7 +164,15 @@ function createStyles(ACCENT: string) {
       marginBottom: 16,
     },
 
-    /* RECIPE TITLE */
+    /* RECIPE TITLE + PHOTO */
+    titlePhotoRow: {
+      flexDirection: "row",
+      gap: 16,
+      marginBottom: 16,
+    },
+    titleBlock: {
+      flex: 1,
+    },
     recipeName: {
       fontSize: 28,
       fontWeight: "bold",
@@ -174,7 +182,22 @@ function createStyles(ACCENT: string) {
     badgeRow: {
       flexDirection: "row",
       gap: 8,
-      marginBottom: 16,
+      marginBottom: 0,
+    },
+    photoBox: {
+      width: 110,
+      height: 110,
+      borderRadius: 8,
+      overflow: "hidden",
+      backgroundColor: SOFT,
+      borderWidth: 1,
+      borderColor: BORDER,
+      borderStyle: "solid",
+    },
+    photo: {
+      width: 110,
+      height: 110,
+      objectFit: "cover",
     },
     badge: {
       flexDirection: "row",
@@ -424,22 +447,32 @@ export function KitchenPdfDocument({ data }: { data: KitchenPdfData }) {
         </View>
         <View style={styles.headerLine} />
 
-        {/* RECIPE TITLE */}
-        <Text style={styles.recipeName}>{data.recipeName}</Text>
-        <View style={styles.badgeRow}>
-          {categoryLabel && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{categoryLabel}</Text>
+        {/* RECIPE TITLE + PHOTO */}
+        <View style={styles.titlePhotoRow}>
+          <View style={styles.titleBlock}>
+            <Text style={styles.recipeName}>{data.recipeName}</Text>
+            <View style={styles.badgeRow}>
+              {categoryLabel && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{categoryLabel}</Text>
+                </View>
+              )}
+              {yieldLabel && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{yieldLabel}</Text>
+                </View>
+              )}
+              {portionsLabel && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{portionsLabel}</Text>
+                </View>
+              )}
             </View>
-          )}
-          {yieldLabel && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{yieldLabel}</Text>
-            </View>
-          )}
-          {portionsLabel && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{portionsLabel}</Text>
+          </View>
+          {data.photoUrl && (
+            <View style={styles.photoBox}>
+              {/* eslint-disable-next-line jsx-a11y/alt-text */}
+              <Image src={data.photoUrl} style={styles.photo} />
             </View>
           )}
         </View>
