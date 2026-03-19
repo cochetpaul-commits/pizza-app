@@ -249,7 +249,7 @@ function RecipeCard({
           )}
           {cost != null && cost > 0 && (
             <span style={{ fontSize: 11, color: "#999" }}>
-              {subtitle ? "\u00b7 " : ""}{fmt(cost)} \u20ac{costLabel ?? ""}
+              {subtitle ? "\u00b7 " : ""}{fmt(cost)}{" \u20ac"}{costLabel ?? ""}
             </span>
           )}
         </div>
@@ -265,7 +265,7 @@ function RecipeCard({
             color: isConseille ? "#b0a89e" : "#1a1a1a",
             whiteSpace: "nowrap",
           }}>
-            {fmt(effectivePrice)} \u20ac
+            {fmt(effectivePrice)}{" \u20ac"}
             {pvLabel && <span style={{ fontSize: 9, fontWeight: 500, color: "#999", marginLeft: 2 }}>{pvLabel}</span>}
             {isConseille && <span style={{ fontSize: 9, fontWeight: 500, color: "#b0a89e", marginLeft: 2 }}>(c)</span>}
           </div>
@@ -546,16 +546,32 @@ function RecettesInner() {
     else { setSortKey(key); setSortDir("asc"); }
   }
 
+  const [showFilters, setShowFilters] = useState(false);
+  const hasActiveFilter = foodCostFilter !== "all" || cuisineCatFilter !== "all";
+
   return (
     <>
       <main className="container" style={{ paddingBottom: 80 }}>
         {/* ── Header ── */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 4 }}>
-          <TopNav title="Recettes" subtitle={`${totalCount} fiche${totalCount > 1 ? "s" : ""}`} />
-          <button className="btn" onClick={refresh} disabled={loading}
-            style={{ fontSize: 18, width: 36, height: 36, borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #ddd6c8", background: "#fff" }}>
-            {loading ? "\u2026" : "\u21BB"}
-          </button>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a", textTransform: "uppercase", letterSpacing: 1 }}>
+              Recettes
+            </h1>
+            <span style={{ fontSize: 13, color: "#999" }}>{totalCount} fiche{totalCount > 1 ? "s" : ""}</span>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {alertCount > 0 && (
+              <button type="button" onClick={() => { setFoodCostFilter("alerte"); }}
+                style={{ padding: "4px 10px", borderRadius: 8, border: "none", background: "rgba(139,26,26,0.10)", color: "#8B1A1A", fontSize: 11, fontWeight: 800, cursor: "pointer" }}>
+                {alertCount} alerte{alertCount > 1 ? "s" : ""}
+              </button>
+            )}
+            <button onClick={refresh} disabled={loading}
+              style={{ width: 36, height: 36, borderRadius: "50%", border: "1.5px solid #ddd6c8", background: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {loading ? "\u2026" : "\u21BB"}
+            </button>
+          </div>
         </div>
 
         {/* ── Erreurs ── */}
@@ -566,26 +582,56 @@ function RecettesInner() {
           </div>
         )}
 
-        {/* ── Search ── */}
-        <div style={{ position: "relative", marginBottom: 12 }}>
-          <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", fontSize: 16, color: "#999", pointerEvents: "none" }}>
-            &#x1F50D;
-          </span>
-          <input
-            type="search"
-            placeholder="Rechercher une recette..."
-            value={q}
-            onChange={e => setQ(e.target.value)}
+        {/* ── Search + filter toggle ── */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          <div style={{ position: "relative", flex: 1 }}>
+            <input
+              type="search"
+              placeholder="Rechercher..."
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              style={{
+                width: "100%", padding: "10px 14px", borderRadius: 12,
+                border: "1.5px solid #ddd6c8", background: "#fff",
+                fontSize: 14, outline: "none", boxSizing: "border-box",
+              }}
+            />
+          </div>
+          <button type="button" onClick={() => setShowFilters(f => !f)}
             style={{
-              width: "100%", padding: "12px 14px 12px 40px", borderRadius: 12,
-              border: "1.5px solid #ddd6c8", background: "#fff",
-              fontSize: 14, outline: "none", boxSizing: "border-box",
+              width: 42, height: 42, borderRadius: 12, flexShrink: 0,
+              border: hasActiveFilter ? "1.5px solid #D4775A" : "1.5px solid #ddd6c8",
+              background: hasActiveFilter ? "#D4775A10" : "#fff",
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 18, color: hasActiveFilter ? "#D4775A" : "#999",
+            }}>
+            {hasActiveFilter ? "\u2731" : "\u2630"}
+          </button>
+          {/* Sort dropdown */}
+          <select
+            value={`${sortKey}-${sortDir}`}
+            onChange={e => {
+              const [k, d] = e.target.value.split("-") as [SortKey, SortDir];
+              setSortKey(k); setSortDir(d);
             }}
-          />
+            style={{
+              padding: "0 10px", borderRadius: 12, height: 42,
+              border: "1.5px solid #ddd6c8", background: "#fff",
+              fontSize: 12, fontWeight: 600, color: "#1a1a1a", cursor: "pointer",
+            }}>
+            <option value="name-asc">A-Z</option>
+            <option value="name-desc">Z-A</option>
+            <option value="cost-asc">{"Co\u00fbt \u2191"}</option>
+            <option value="cost-desc">{"Co\u00fbt \u2193"}</option>
+            <option value="fc-asc">{"FC \u2191"}</option>
+            <option value="fc-desc">{"FC \u2193"}</option>
+            <option value="price-asc">{"Prix \u2191"}</option>
+            <option value="price-desc">{"Prix \u2193"}</option>
+          </select>
         </div>
 
         {/* ── Main tabs ── */}
-        <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 8, marginBottom: 4 }}>
+        <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 6 }}>
           {([
             { key: "tous" as MainTab, label: "Tous", color: "#1a1a1a" },
             { key: "pizza" as MainTab, label: "Pizza", color: PIZZA_COLOR },
@@ -595,67 +641,55 @@ function RecettesInner() {
           ]).map(t => (
             <button key={t.key} type="button" onClick={() => setMainTab(t.key)} style={tabStyle(mainTab === t.key, t.color)}>
               {t.label}
-              <span style={{ marginLeft: 4, fontSize: 11, opacity: 0.8 }}>({tabCounts[t.key]})</span>
+              <span style={{ marginLeft: 4, fontSize: 11, opacity: 0.7 }}>({tabCounts[t.key]})</span>
             </button>
           ))}
         </div>
 
-        {/* ── Sub-filters ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
-          {/* Cuisine sub-categories (only when cuisine tab or tous) */}
-          {(mainTab === "cuisine" || mainTab === "tous") && (
-            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
-              {CUISINE_CAT_FILTERS.map(f => (
-                <button key={f.id} type="button" onClick={() => setCuisineCatFilter(f.id)}
-                  style={filterPill(cuisineCatFilter === f.id, CUISINE_COLOR)}>
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Food cost + sort */}
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#999" }}>FC</span>
-            {FOOD_COST_FILTERS.map(f => (
-              <button key={f.id} type="button" onClick={() => setFoodCostFilter(f.id)}
-                style={filterPill(foodCostFilter === f.id, f.id === "bon" ? "#4a6741" : f.id === "attention" ? "#d97706" : f.id === "alerte" ? "#8B1A1A" : undefined)}>
-                {f.label}
-              </button>
-            ))}
-            {alertCount > 0 && foodCostFilter !== "alerte" && (
-              <span style={{
-                padding: "2px 7px", borderRadius: 6, fontSize: 10, fontWeight: 800,
-                background: "rgba(139,26,26,0.12)", color: "#8B1A1A",
-              }}>
-                {alertCount} alerte{alertCount > 1 ? "s" : ""}
-              </span>
+        {/* ── Filter panel (collapsible) ── */}
+        {showFilters && (
+          <div style={{
+            padding: "12px 14px", marginBottom: 12, borderRadius: 12,
+            background: "#fff", border: "1.5px solid #ddd6c8",
+            display: "flex", flexDirection: "column", gap: 10,
+          }}>
+            {/* Cuisine sub-categories */}
+            {(mainTab === "cuisine" || mainTab === "tous") && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#999", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Cuisine</div>
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                  {CUISINE_CAT_FILTERS.map(f => (
+                    <button key={f.id} type="button" onClick={() => setCuisineCatFilter(f.id)}
+                      style={filterPill(cuisineCatFilter === f.id, CUISINE_COLOR)}>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
-
-            <span style={{ flex: 1 }} />
-
-            {/* Sort buttons */}
-            {(["name", "cost", "fc", "price"] as SortKey[]).map(k => {
-              const labels: Record<SortKey, string> = { name: "A-Z", cost: "Co\u00fbt", fc: "FC", price: "Prix" };
-              const active = sortKey === k;
-              return (
-                <button key={k} type="button" onClick={() => toggleSort(k)}
-                  style={{
-                    padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700,
-                    border: "1px solid", borderColor: active ? "#1a1a1a" : "#ddd6c8",
-                    background: active ? "#1a1a1a" : "transparent",
-                    color: active ? "#fff" : "#999",
-                    cursor: "pointer",
-                  }}>
-                  {labels[k]}{active ? (sortDir === "asc" ? " \u25B2" : " \u25BC") : ""}
-                </button>
-              );
-            })}
+            {/* Food cost */}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#999", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Food cost</div>
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                {FOOD_COST_FILTERS.map(f => (
+                  <button key={f.id} type="button" onClick={() => setFoodCostFilter(f.id)}
+                    style={filterPill(foodCostFilter === f.id, f.id === "bon" ? "#4a6741" : f.id === "attention" ? "#d97706" : f.id === "alerte" ? "#8B1A1A" : undefined)}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {hasActiveFilter && (
+              <button type="button" onClick={() => { setFoodCostFilter("all"); setCuisineCatFilter("all"); }}
+                style={{ fontSize: 12, fontWeight: 600, color: "#D4775A", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
+                Effacer les filtres
+              </button>
+            )}
           </div>
-        </div>
+        )}
 
         {totalCount === 0 && !loading && (
-          <p style={{ textAlign: "center", color: "#999", padding: 40, fontSize: 14 }}>Aucune recette trouv\u00e9e.</p>
+          <p style={{ textAlign: "center", color: "#999", padding: 40, fontSize: 14 }}>Aucune recette trouv{"\u00e9"}e.</p>
         )}
 
         {/* ── Pizza ── */}
