@@ -508,7 +508,7 @@ export default function PlanningPage() {
             <div style={gridWrapper}>
               <div style={gridContainer()}>
                 {/* ── Header row ── */}
-                <div style={headerCell} />
+                <div style={{ ...headerCell, position: "sticky", left: 0, zIndex: 3 }} />
                 {weekDates.map((d, di) => {
                   const dayShiftCount = shifts.filter((s) => s.date === weekISOs[di]).length;
                   return (
@@ -656,11 +656,17 @@ export default function PlanningPage() {
                                           ...drag.draggableProps.style,
                                         }}
                                       >
-                                        {poste?.emoji && <span style={{ marginRight: 2 }}>{poste.emoji}</span>}
-                                        <span style={{ fontWeight: 700 }}>{fmtH(s.heure_debut)}</span>
-                                        <span style={{ color: "rgba(0,0,0,0.4)" }}>-</span>
-                                        <span>{fmtH(s.heure_fin)}</span>
-                                        <span style={{ fontSize: 9, opacity: 0.6, marginLeft: 2 }}>{dur.toFixed(1)}h</span>
+                                        {poste && (
+                                          <div style={{ fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                            {poste.nom} {poste.emoji ?? ""}
+                                          </div>
+                                        )}
+                                        <div style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 10, color: "rgba(0,0,0,0.6)" }}>
+                                          <span style={{ fontWeight: 600 }}>{fmtH(s.heure_debut)}</span>
+                                          <span>-</span>
+                                          <span>{fmtH(s.heure_fin)}</span>
+                                          <span style={{ fontSize: 9, opacity: 0.7, marginLeft: 2 }}>({dur.toFixed(1)}h)</span>
+                                        </div>
                                       </div>
                                     )}
                                   </Draggable>
@@ -865,9 +871,10 @@ const gridContainer = (): React.CSSProperties => ({
 });
 
 const headerCell: React.CSSProperties = {
-  padding: "8px 6px",
+  padding: "10px 6px",
   textAlign: "center",
   borderBottom: "1px solid #ddd6c8",
+  background: "#f5f2ec",
 };
 
 const todayHeader: React.CSSProperties = {
@@ -902,14 +909,14 @@ const empName: React.CSSProperties = {
 };
 
 const dayCell: React.CSSProperties = {
-  minHeight: 72,
+  minHeight: 80,
   padding: 4,
   borderBottom: "1px solid #f0ebe3",
   borderRight: "1px solid #f5f0e8",
   cursor: "pointer",
   display: "flex",
   flexDirection: "column",
-  gap: 2,
+  gap: 3,
 };
 
 const todayCol: React.CSSProperties = {
@@ -918,16 +925,15 @@ const todayCol: React.CSSProperties = {
 
 const shiftBlock = (color: string): React.CSSProperties => ({
   display: "flex",
-  alignItems: "center",
-  gap: 2,
-  padding: "3px 6px",
-  borderRadius: 8,
+  flexDirection: "column",
+  gap: 1,
+  padding: "6px 8px",
+  borderRadius: 10,
   background: `${color}30`,
   borderLeft: `3px solid ${color}`,
   fontSize: 11,
   color: "#1a1a1a",
   cursor: "pointer",
-  whiteSpace: "nowrap",
   overflow: "hidden",
 });
 
