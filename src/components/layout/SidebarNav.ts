@@ -53,6 +53,7 @@ export const SIDEBAR_NAV: NavSection[] = [
       { label: "Pilotage", href: "/pilotage" },
       { label: "Inventaire", href: "/inventaire" },
       { label: "Articles en vente", href: "/epicerie" },
+      { label: "Import Kezia", href: "/kezia" },
     ],
   },
   {
@@ -150,6 +151,7 @@ const PAGE_SECTIONS: Record<string, string> = {
   "/recettes": "Gestion de la finance",
   "/epicerie": "Gestion de la finance",
   "/finances": "Gestion de la finance",
+  "/kezia": "Gestion de la finance",
   "/clients": "Gestion des clients",
   "/clients/factures": "Gestion des clients",
   "/devis": "Gestion des clients",
