@@ -3,14 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { TopNav } from "@/components/TopNav";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { StepsList } from "./StepsList";
 import { PricingBlock } from "./PricingBlock";
 import { StepperInput } from "@/components/StepperInput";
 import { useProfile } from "@/lib/ProfileContext";
+import { useEtablissement } from "@/lib/EtablissementContext";
 import { calculerPate, type EmpatementType, type FlourMixItem } from "@/lib/pateEngine";
-import { GestionTab } from "./GestionTab";
+import { GestionFoodCost } from "./GestionFoodCost";
+import { GestionCommandes } from "./GestionCommandes";
+import { GestionPilotage } from "./GestionPilotage";
 import type { Ingredient } from "@/types/ingredients";
 import { fetchApi } from "@/lib/fetchApi";
 
@@ -26,8 +28,9 @@ function n2(v: unknown) { const x = Number(v); return Number.isFinite(x) ? x : 0
 function round2(v: number) { return Math.round(v * 100) / 100; }
 function roundG(v: number) { return Math.round(v); }
 function fmtG(v: number) { return roundG(v).toLocaleString("fr-FR") + " g"; }
+function fmtMoney(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
-// Virtual ingredient IDs for empâtement pivot
+// Virtual ingredient IDs for empatement pivot
 type EmpItemId = "flour" | "water" | "salt" | "honey" | "oil" | "yeast";
 interface EmpItem { id: EmpItemId; name: string; qty: number; unit: string; }
 
@@ -37,6 +40,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
   const router = useRouter();
   const { can } = useProfile();
   const userCanWrite = can("recettes.edit");
+  const { current: etab } = useEtablissement();
   const isEdit = !!recipeId;
 
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
@@ -72,8 +76,9 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
   const [marginRate, setMarginRate] = useState("75");
   const [sellPrice, setSellPrice] = useState<number | "">("");
 
-  // Tabs
-  const [mainTab, setMainTab] = useState<"recette" | "gestion">("recette");
+  // Main tab
+  type MainTab = "fc" | "recette" | "cmd" | "pop";
+  const [mainTab, setMainTab] = useState<MainTab>(isEdit ? "fc" : "recette");
 
   // Production mode
   const [prodMode, setProdMode] = useState(initialProdMode ?? false);
@@ -143,7 +148,25 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
   const costPerKg: number | null = null;
   const costPerBall: number | null = null;
 
+  // ── KPI computations ──────────────────────────────────────────
+  const sp = typeof sellPrice === "number" && sellPrice > 0 ? sellPrice : null;
+  const effectiveCost = costPerBall ?? 0;
+  const foodCostPct = sp && effectiveCost > 0 ? (effectiveCost / sp) * 100 : null;
+  const margeBrute = sp && effectiveCost > 0 ? sp - effectiveCost : null;
+  const prixTTC = sp ? sp * (1 + vatRate) : null;
+
+  // Tab definitions
+  const MAIN_TABS: { key: MainTab; label: string }[] = isEdit ? [
+    { key: "fc", label: "Food cost & Marges" },
+    { key: "recette", label: "Recette & Procede" },
+    { key: "cmd", label: "Commandes fournisseurs" },
+    { key: "pop", label: "Pilotage CA — Popina" },
+  ] : [
+    { key: "recette", label: "Recette" },
+  ];
+
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) { setStatus("error"); setError({ message: "NOT_LOGGED" }); return; }
@@ -154,11 +177,13 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         .eq("is_active", true)
         .in("category", ["epicerie_salee", "autre"])
         .order("name");
+      if (cancelled) return;
       setFlourIngredients((ingsData ?? []) as Ingredient[]);
 
       if (recipeId) {
         const { data: rec, error: recErr } = await supabase.from("recipes").select("*").eq("id", recipeId).single();
         if (recErr) { setStatus("error"); setError(recErr); return; }
+        if (cancelled) return;
         if (rec) {
           const r = rec as Record<string, unknown>;
           setName(String(r.name ?? ""));
@@ -197,7 +222,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
             try { setSteps(JSON.parse(String(r.procedure)) as string[]); }
             catch { setSteps(String(r.procedure) ? [String(r.procedure)] : []); }
           }
-          // pivot_ingredient_id is stored as TEXT for empâtement virtual IDs
+          // pivot_ingredient_id is stored as TEXT for empatement virtual IDs
           const pid = String(r.pivot_ingredient_id ?? "");
           if (pid && ["flour","water","salt","honey","oil","yeast"].includes(pid)) {
             setPivotItemId(pid as EmpItemId);
@@ -205,9 +230,10 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         }
       }
 
-      setStatus("ok");
+      if (!cancelled) setStatus("ok");
     }
     load();
+    return () => { cancelled = true; };
   }, [recipeId]);
 
   async function handleSave() {
@@ -222,7 +248,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
       const yieldGrams = result?.summary.total_dough_g ?? null;
 
       const payload: Record<string, unknown> = {
-        name: name || `Empâtement ${type}`,
+        name: name || `Empatement ${type}`,
         type,
         balls_count: nbPatons,
         ball_weight: poidsPaton,
@@ -264,7 +290,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
 
   async function handleDelete() {
     if (!recipeId) return;
-    if (!window.confirm("Supprimer cet empâtement ?")) return;
+    if (!window.confirm("Supprimer cet empatement ?")) return;
     await supabase.from("recipes").delete().eq("id", recipeId);
     router.push("/recettes?tab=empatement");
   }
@@ -275,7 +301,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
-      if (!token) { alert("Non authentifié"); return; }
+      if (!token) { alert("Non authentifie"); return; }
       const res = await fetchApi("/api/recipes/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
@@ -292,33 +318,11 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     } finally { setPdfLoading(false); }
   }
 
-  const title = name || (isEdit ? "Empâtement" : "Nouvel empâtement");
-
-  const actionButtons = (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-      <button type="button" className="btn" onClick={() => { setProdMode(m => !m); setProdQty(""); }}
-        style={prodMode ? { background: "#4a6741", color: "white", borderColor: "#4a6741" } : undefined}>
-        {prodMode ? "Mode normal" : "Mode production"}
-      </button>
-      {isEdit && (
-        <button type="button" className="btn" onClick={handleExportPdf} disabled={pdfLoading}>
-          {pdfLoading ? "Export\u2026" : "Exporter PDF"}
-        </button>
-      )}
-      {!prodMode && isEdit && userCanWrite && (
-        <button type="button" className="btn" onClick={handleDelete} style={{ color: "#d93f3f" }}>Supprimer</button>
-      )}
-      {!prodMode && userCanWrite && (
-        <button onClick={handleSave} disabled={saving} className="btn btnPrimary">
-          {saving ? "Sauvegarde\u2026" : "Sauvegarder"}
-        </button>
-      )}
-    </div>
-  );
+  const title = name || (isEdit ? "Empatement" : "Nouvel empatement");
 
   if (status === "loading") {
     return (
-      <main className="container"><div className="muted" style={{ marginTop: 40, textAlign: "center" }}>Chargement…</div></main>
+      <main className="container"><div className="muted" style={{ marginTop: 40, textAlign: "center" }}>Chargement...</div></main>
     );
   }
   if (status === "error") {
@@ -330,396 +334,494 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
   return (
     <>
       <main className="container safe-bottom">
-        {/* ── Inline actions ── */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a" }}>{title}</h1>
-          {actionButtons}
+
+        {/* ── Header ── */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a" }}>{title}</h1>
+            {isEdit && (
+              <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
+                {etab && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 8px", borderRadius: 6, background: "#D4775A", color: "#fff" }}>{etab.nom ?? "Etablissement"}</span>}
+                <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 8px", borderRadius: 6, background: "#f2ede4", color: "#666" }}>Empatement</span>
+                <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 8px", borderRadius: 6, background: "#f2ede4", color: "#666" }}>{TYPE_OPTIONS.find(t => t.id === type)?.label ?? type}</span>
+              </div>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {isEdit && (
+              <button type="button" className="btn" onClick={handleExportPdf} disabled={pdfLoading}
+                style={{ fontSize: 12 }}>
+                {pdfLoading ? "Export\u2026" : "Apercu PDF"}
+              </button>
+            )}
+            {userCanWrite && (
+              <button onClick={handleSave} disabled={saving} className="btn btnPrimary">
+                {saving ? "Sauvegarde\u2026" : "Enregistrer"}
+              </button>
+            )}
+          </div>
         </div>
 
+        {/* ── KPI Banner ── */}
         {isEdit && (
-          <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
-            {(["recette", "gestion"] as const).map((t) => (
-              <button key={t} type="button" onClick={() => setMainTab(t)} style={{
-                padding: "8px 18px", borderRadius: 20, fontSize: 13, fontWeight: 700,
-                cursor: "pointer", transition: "all 0.15s",
-                border: mainTab === t ? "2px solid #D4775A" : "1.5px solid #ddd6c8",
-                background: mainTab === t ? "#D4775A" : "#fff",
-                color: mainTab === t ? "#fff" : "#666",
-              }}>
-                {t === "recette" ? "Recette" : "Gestion"}
-              </button>
-            ))}
+          <div style={{
+            display: "flex", gap: 0, marginBottom: 16, borderRadius: 10,
+            border: "1px solid #ddd6c8", overflow: "hidden", background: "#fff",
+          }}>
+            <KpiBannerItem label="COUT REVIENT" value={effectiveCost > 0 ? `${fmtMoney(effectiveCost)}\u00A0\u20AC` : "-"} sub="par paton" color="#D4775A" />
+            <KpiBannerItem
+              label="FOOD COST"
+              value={foodCostPct != null ? `${foodCostPct.toFixed(1)}%` : "-"}
+              sub="objectif \u2264 32%"
+              color={foodCostPct == null ? "#999" : foodCostPct <= 28 ? "#16a34a" : foodCostPct <= 32 ? "#D97706" : "#DC2626"}
+            />
+            <KpiBannerItem label="PRIX DE VENTE HT" value={sp ? `${fmtMoney(sp)}\u00A0\u20AC` : "-"} sub={prixTTC ? `${fmtMoney(prixTTC)}\u00A0\u20AC TTC` : ""} color="#1a1a1a" />
+            <KpiBannerItem label="MARGE BRUTE" value={margeBrute != null ? `${fmtMoney(margeBrute)}\u00A0\u20AC` : "-"} sub="par paton" color="#16a34a" />
           </div>
         )}
 
-        {mainTab === "gestion" && isEdit && recipeId && (
-          <GestionTab
+        {/* ── Tab bar ── */}
+        <div style={{ display: "flex", gap: 0, borderBottom: "1.5px solid #ddd6c8", marginBottom: 16, overflowX: "auto" }}>
+          {MAIN_TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setMainTab(t.key)}
+              style={{
+                padding: "10px 16px", fontSize: 13, fontWeight: mainTab === t.key ? 700 : 500,
+                cursor: "pointer", border: "none", background: "transparent",
+                color: mainTab === t.key ? "#D4775A" : "#999",
+                borderBottom: mainTab === t.key ? "2.5px solid #D4775A" : "2.5px solid transparent",
+                transition: "all 0.15s", whiteSpace: "nowrap",
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {saveError && <div className="errorBox" style={{ marginBottom: 12 }}>{saveError}</div>}
+
+        {/* ── TAB: FOOD COST & MARGES ── */}
+        {mainTab === "fc" && isEdit && recipeId && (
+          <GestionFoodCost
             recipeId={recipeId}
             recipeType="empatement"
             lines={[]}
             ingredients={[]}
             priceByIngredient={{}}
-            totalCost={result?.summary.total_dough_g ? 0 : 0}
-            sellPrice={typeof sellPrice === "number" ? sellPrice : null}
+            totalCost={0}
+            sellPrice={sp}
             onSellPriceChange={(p) => setSellPrice(p)}
             yieldGrams={result?.summary.total_dough_g ?? null}
-            etablissementId={undefined}
-            recipeName={name}
           />
         )}
 
-        {/* ── MODE PRODUCTION ── */}
-        {mainTab !== "recette" ? null : prodMode ? (
+        {/* ── TAB: COMMANDES ── */}
+        {mainTab === "cmd" && isEdit && recipeId && (
+          <GestionCommandes
+            recipeId={recipeId}
+            recipeType="empatement"
+            lines={[]}
+            ingredients={[]}
+            etablissementId={etab?.id}
+          />
+        )}
+
+        {/* ── TAB: PILOTAGE ── */}
+        {mainTab === "pop" && isEdit && (
+          <GestionPilotage recipeName={name} recipeType="empatement" />
+        )}
+
+        {/* ── TAB: RECETTE & PROCEDE ── */}
+        {mainTab === "recette" && (
           <>
-            <div style={{
-              background: "#4a6741", color: "white", borderRadius: 12,
-              padding: "12px 16px", marginBottom: 16,
-            }}>
-              <div style={{ fontSize: 15, fontWeight: 800 }}>Mode Production</div>
-              <div style={{ fontSize: 13, opacity: 0.85 }}>
-                {prodPivotItem
-                  ? `Modifie ${prodPivotItem.name}, tout se recalcule`
-                  : `${title} — appuie sur ☆ en mode normal pour choisir un pivot`}
+            {/* Production mode toggle */}
+            {isEdit && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
+                <button type="button" className="btn" onClick={() => { setProdMode(m => !m); setProdQty(""); }}
+                  style={prodMode ? { background: "#4a6741", color: "white", borderColor: "#4a6741" } : undefined}>
+                  {prodMode ? "Mode normal" : "Mode production"}
+                </button>
+                {!prodMode && isEdit && userCanWrite && (
+                  <button type="button" className="btn" onClick={handleDelete} style={{ color: "#d93f3f", fontSize: 12 }}>Supprimer</button>
+                )}
               </div>
-            </div>
+            )}
 
-            {!pivotItemId || !prodPivotItem ? (
-              <div style={{
-                padding: "24px 16px", background: "rgba(0,0,0,0.03)", borderRadius: 12,
-                textAlign: "center", color: "#6f6a61", fontSize: 14, lineHeight: 1.7, marginBottom: 16,
-              }}>
-                Aucun ingrédient pivot défini.<br />
-                Appuyez sur ☆ en mode normal pour en choisir un.
-              </div>
-            ) : (
+            {prodMode ? (
               <>
+                {/* Banner */}
                 <div style={{
-                  background: "#FFFBEB", border: "2px solid #D97706",
-                  borderRadius: 12, padding: 16, marginBottom: 12,
+                  background: "#4a6741", color: "white", borderRadius: 12,
+                  padding: "12px 16px", marginBottom: 16,
                 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#D97706", marginBottom: 6 }}>★ Ingrédient pivot</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: "#2d2d2d", marginBottom: 12 }}>
-                    {prodPivotItem.name}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                    <StepperInput
-                      value={prodQty}
-                      onChange={setProdQty}
-                      step={1} min={0}
-                      placeholder={String(roundG(prodPivotItem.qty))}
-                    />
-                    <span style={{ fontSize: 16, color: "#6f6a61", fontWeight: 600 }}>{prodPivotItem.unit}</span>
-                  </div>
-                  <div style={{ fontSize: 12, color: "#9a8f84" }}>
-                    Recette de base : {roundG(prodPivotItem.qty)} {prodPivotItem.unit}
+                  <div style={{ fontSize: 15, fontWeight: 800 }}>Mode Production</div>
+                  <div style={{ fontSize: 13, opacity: 0.85 }}>
+                    {prodPivotItem
+                      ? `Modifie ${prodPivotItem.name}, tout se recalcule`
+                      : `${title} -- appuie sur une etoile en mode normal pour choisir un pivot`}
                   </div>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-                  {empItems.filter(i => i.id !== pivotItemId).map(item => {
-                    const newQty = prodFactor !== null ? Math.round(item.qty * prodFactor) : null;
-                    return (
-                      <div key={item.id} style={{
-                        display: "flex", justifyContent: "space-between", alignItems: "center",
-                        background: "white", border: "1px solid #EFEFEF", borderRadius: 10, padding: "10px 14px",
-                      }}>
-                        <span style={{ fontSize: 14, color: "#2d2d2d" }}>{item.name}</span>
-                        <span style={{ fontSize: 22, fontWeight: 800, color: "#4a6741" }}>
-                          {newQty !== null ? `${newQty.toLocaleString("fr-FR")} ${item.unit}` : fmtG(item.qty)}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {prodTotalW > 0 && (
+                {!pivotItemId || !prodPivotItem ? (
                   <div style={{
-                    background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10,
-                    padding: "12px 16px", color: "#4a6741", fontWeight: 700, fontSize: 15, marginBottom: 16,
+                    padding: "24px 16px", background: "rgba(0,0,0,0.03)", borderRadius: 12,
+                    textAlign: "center", color: "#6f6a61", fontSize: 14, lineHeight: 1.7, marginBottom: 16,
                   }}>
-                    Poids total estimé : {prodTotalW.toLocaleString("fr-FR")} g
+                    Aucun ingredient pivot defini.<br />
+                    Appuyez sur une etoile en mode normal pour en choisir un.
+                  </div>
+                ) : (
+                  <>
+                    <div style={{
+                      background: "#FFFBEB", border: "2px solid #D97706",
+                      borderRadius: 12, padding: 16, marginBottom: 12,
+                    }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#D97706", marginBottom: 6 }}>Ingredient pivot</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: "#2d2d2d", marginBottom: 12 }}>
+                        {prodPivotItem.name}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                        <StepperInput
+                          value={prodQty}
+                          onChange={setProdQty}
+                          step={1} min={0}
+                          placeholder={String(roundG(prodPivotItem.qty))}
+                        />
+                        <span style={{ fontSize: 16, color: "#6f6a61", fontWeight: 600 }}>{prodPivotItem.unit}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#9a8f84" }}>
+                        Recette de base : {roundG(prodPivotItem.qty)} {prodPivotItem.unit}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+                      {empItems.filter(i => i.id !== pivotItemId).map(item => {
+                        const newQty = prodFactor !== null ? Math.round(item.qty * prodFactor) : null;
+                        return (
+                          <div key={item.id} style={{
+                            display: "flex", justifyContent: "space-between", alignItems: "center",
+                            background: "white", border: "1px solid #EFEFEF", borderRadius: 10, padding: "10px 14px",
+                          }}>
+                            <span style={{ fontSize: 14, color: "#2d2d2d" }}>{item.name}</span>
+                            <span style={{ fontSize: 22, fontWeight: 800, color: "#4a6741" }}>
+                              {newQty !== null ? `${newQty.toLocaleString("fr-FR")} ${item.unit}` : fmtG(item.qty)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {prodTotalW > 0 && (
+                      <div style={{
+                        background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10,
+                        padding: "12px 16px", color: "#4a6741", fontWeight: 700, fontSize: 15, marginBottom: 16,
+                      }}>
+                        Poids total estime : {prodTotalW.toLocaleString("fr-FR")} g
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {steps.length > 0 && (
+                  <div className="card" style={{ marginBottom: 16 }}>
+                    <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
+                      Procedure / Etapes
+                    </h3>
+                    <ol style={{ margin: 0, paddingLeft: 20 }}>
+                      {steps.map((s, i) => (
+                        <li key={i} style={{ marginBottom: 6, fontSize: 14, color: "#2d2d2d", lineHeight: 1.5 }}>{s}</li>
+                      ))}
+                    </ol>
                   </div>
                 )}
               </>
-            )}
-
-            {steps.length > 0 && (
-              <div className="card" style={{ marginBottom: 16 }}>
-                <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
-                  Procédure / Étapes
-                </h3>
-                <ol style={{ margin: 0, paddingLeft: 20 }}>
-                  {steps.map((s, i) => (
-                    <li key={i} style={{ marginBottom: 6, fontSize: 14, color: "#2d2d2d", lineHeight: 1.5 }}>{s}</li>
-                  ))}
-                </ol>
-              </div>
-            )}
-          </>
-        ) : (
-          /* ── MODE NORMAL ── */
-          <>
-            <TopNav title={title} subtitle={`Empâtement${isEdit ? " · édition" : " · nouveau"}`} />
-            {saveError && <div className="errorBox" style={{ marginBottom: 12 }}>{saveError}</div>}
-
-            {/* Infos générales */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <div>
-                  <label className="label">Nom</label>
-                  <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Nom de l'empâtement…" />
-                </div>
-
-                <div>
-                  <label className="label">Type</label>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    {TYPE_OPTIONS.map(t => (
-                      <button
-                        key={t.id} type="button" onClick={() => setType(t.id)}
-                        style={{
-                          padding: "6px 16px", borderRadius: 8, fontSize: 13, fontWeight: 700,
-                          border: "1.5px solid",
-                          borderColor: type === t.id ? ACCENT : "rgba(217,199,182,0.9)",
-                          background: type === t.id ? "rgba(180,83,9,0.08)" : "rgba(255,255,255,0.7)",
-                          color: type === t.id ? ACCENT : "#6f6a61",
-                          cursor: "pointer",
-                        }}
-                      >{t.label}</button>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  <div>
-                    <label className="label">Nombre de pâtons</label>
-                    <StepperInput
-                      value={nbPatons}
-                      onChange={v => setNbPatons(v === "" ? 1 : v)}
-                      step={1} min={1}
-                    />
-                  </div>
-                  <div>
-                    <label className="label">Poids pâton (g)</label>
-                    <StepperInput
-                      value={poidsPaton}
-                      onChange={v => setPoidsPaton(v === "" ? 50 : v)}
-                      step={1} min={50}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Paramètres hydratation */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
-                Paramètres
-              </h3>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
-                {[
-                  { label: "Hydratation (%)", value: hydration, set: setHydration, min: 40, max: 100 },
-                  { label: "Sel (%)", value: salt, set: setSalt, min: 0, max: 5 },
-                  { label: "Huile (%)", value: oil, set: setOil, min: 0, max: 20 },
-                  { label: "Miel (%)", value: honey, set: setHoney, min: 0, max: 10 },
-                  ...(type !== "biga" ? [{ label: "Levure (%)", value: yeast, set: setYeast, min: 0, max: 5 }] : []),
-                  ...(type === "biga" ? [{ label: "Levure biga (%)", value: bigaYeast, set: setBigaYeast, min: 0, max: 5 }] : []),
-                ].map(p => (
-                  <div key={p.label}>
-                    <label className="label">{p.label}</label>
-                    <StepperInput
-                      value={p.value}
-                      onChange={v => p.set(v === "" ? p.min : v)}
-                      step={0.1} min={p.min} max={p.max}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Farines */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
-                Farines
-              </h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-                  <div style={{ flex: "1 1 120px" }}>
-                    <label className="label">Farine 1 — nom</label>
-                    <input className="input" value={flour1Name} onChange={e => setFlour1Name(e.target.value)} placeholder="ex: Tipo 00" />
-                  </div>
-                  {flourIngredients.length > 0 && (
-                    <div style={{ flex: "1 1 140px" }}>
-                      <label className="label">Lié à un ingrédient</label>
-                      <SmartSelect
-                        options={flourOptions}
-                        value={flour1Id ?? ""}
-                        onChange={id => {
-                          setFlour1Id(id || null);
-                          const ing = flourIngredients.find(i => i.id === id);
-                          if (ing) setFlour1Name(ing.name);
-                        }}
-                        placeholder="Ingrédient…"
-                      />
+            ) : (
+              /* ── MODE NORMAL ── */
+              <>
+                {/* Infos generales */}
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div>
+                      <label className="label">Nom</label>
+                      <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Nom de l'empatement..." />
                     </div>
-                  )}
-                  {useTwoFlours && (
-                    <div style={{ width: 140 }}>
-                      <label className="label">% farine 1</label>
-                      <StepperInput
-                        value={flour1Pct}
-                        onChange={v => setFlour1Pct(v === "" ? 0 : v)}
-                        step={5} min={0} max={100}
-                      />
-                    </div>
-                  )}
-                </div>
 
-                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
-                  <input type="checkbox" checked={useTwoFlours} onChange={e => setUseTwoFlours(e.target.checked)} />
-                  Utiliser 2 farines
-                </label>
-
-                {useTwoFlours && (
-                  <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-                    <div style={{ flex: "1 1 120px" }}>
-                      <label className="label">Farine 2 — nom</label>
-                      <input className="input" value={flour2Name} onChange={e => setFlour2Name(e.target.value)} placeholder="ex: Tipo 1" />
+                    <div>
+                      <label className="label">Type</label>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        {TYPE_OPTIONS.map(t => (
+                          <button
+                            key={t.id} type="button" onClick={() => setType(t.id)}
+                            style={{
+                              padding: "6px 16px", borderRadius: 8, fontSize: 13, fontWeight: 700,
+                              border: "1.5px solid",
+                              borderColor: type === t.id ? ACCENT : "rgba(217,199,182,0.9)",
+                              background: type === t.id ? "rgba(180,83,9,0.08)" : "rgba(255,255,255,0.7)",
+                              color: type === t.id ? ACCENT : "#6f6a61",
+                              cursor: "pointer",
+                            }}
+                          >{t.label}</button>
+                        ))}
+                      </div>
                     </div>
-                    {flourIngredients.length > 0 && (
-                      <div style={{ flex: "1 1 140px" }}>
-                        <label className="label">Lié à un ingrédient</label>
-                        <SmartSelect
-                          options={flourOptions}
-                          value={flour2Id ?? ""}
-                          onChange={id => {
-                            setFlour2Id(id || null);
-                            const ing = flourIngredients.find(i => i.id === id);
-                            if (ing) setFlour2Name(ing.name);
-                          }}
-                          placeholder="Ingrédient…"
+
+                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                      <div>
+                        <label className="label">Nombre de patons</label>
+                        <StepperInput
+                          value={nbPatons}
+                          onChange={v => setNbPatons(v === "" ? 1 : v)}
+                          step={1} min={1}
                         />
                       </div>
-                    )}
-                    <div style={{ width: 80 }}>
-                      <label className="label">% farine 2</label>
-                      <input type="text" readOnly value={100 - flour1Pct} className="input" style={{ opacity: 0.6 }} />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Résultats calculés — avec étoiles pivot */}
-            {result && (
-              <div className="card" style={{ marginBottom: 16, borderLeft: `4px solid ${ACCENT}` }}>
-                <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
-                  Quantités calculées — {nbPatons} pâton(s) de {poidsPaton} g
-                </h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-                  {empItems.map(item => (
-                    <div key={item.id} style={{
-                      display: "flex", alignItems: "center", gap: 10,
-                      padding: "8px 10px", borderRadius: 8,
-                      background: pivotItemId === item.id ? "rgba(217,119,6,0.08)" : "rgba(0,0,0,0.03)",
-                      border: pivotItemId === item.id ? "1.5px solid #D97706" : "1px solid rgba(217,199,182,0.5)",
-                    }}>
-                      <button
-                        type="button"
-                        onClick={() => setPivotItemId(pivotItemId === item.id ? null : item.id)}
-                        title="Définir comme pivot"
-                        style={{
-                          background: "none", border: "none", cursor: "pointer",
-                          fontSize: 16, padding: "0 2px", flexShrink: 0,
-                          color: pivotItemId === item.id ? "#D97706" : "#ccc",
-                        }}
-                      >
-                        {pivotItemId === item.id ? "★" : "☆"}
-                      </button>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "#9a8f84", textTransform: "uppercase" }}>{item.name}</div>
-                        <div style={{ fontSize: 16, fontWeight: 800, color: "#2f3a33" }}>{fmtG(item.qty)}</div>
+                      <div>
+                        <label className="label">Poids paton (g)</label>
+                        <StepperInput
+                          value={poidsPaton}
+                          onChange={v => setPoidsPaton(v === "" ? 50 : v)}
+                          step={1} min={50}
+                        />
                       </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
 
-                {useTwoFlours && result.flour_breakdown.length > 1 && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#6f6a61", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Détail farines</div>
-                    {result.flour_breakdown.map(f => (
-                      <div key={f.name} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
-                        <span style={{ color: "#2f3a33" }}>{f.name}</span>
-                        <span style={{ fontWeight: 700, color: ACCENT }}>{fmtG(f.grams)} ({f.percent} %)</span>
+                {/* Parametres hydratation */}
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                    Parametres
+                  </h3>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
+                    {[
+                      { label: "Hydratation (%)", value: hydration, set: setHydration, min: 40, max: 100 },
+                      { label: "Sel (%)", value: salt, set: setSalt, min: 0, max: 5 },
+                      { label: "Huile (%)", value: oil, set: setOil, min: 0, max: 20 },
+                      { label: "Miel (%)", value: honey, set: setHoney, min: 0, max: 10 },
+                      ...(type !== "biga" ? [{ label: "Levure (%)", value: yeast, set: setYeast, min: 0, max: 5 }] : []),
+                      ...(type === "biga" ? [{ label: "Levure biga (%)", value: bigaYeast, set: setBigaYeast, min: 0, max: 5 }] : []),
+                    ].map(p => (
+                      <div key={p.label}>
+                        <label className="label">{p.label}</label>
+                        <StepperInput
+                          value={p.value}
+                          onChange={v => p.set(v === "" ? p.min : v)}
+                          step={0.1} min={p.min} max={p.max}
+                        />
                       </div>
                     ))}
                   </div>
-                )}
+                </div>
 
-                {type === "biga" && result.phases.length > 1 && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#6f6a61", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Phases</div>
-                    {result.phases.map(ph => (
-                      <div key={ph.name} style={{ marginBottom: 8, padding: "8px 10px", borderRadius: 8, background: "rgba(180,83,9,0.04)", border: `1px solid rgba(180,83,9,0.15)` }}>
-                        <div style={{ fontWeight: 800, fontSize: 12, color: ACCENT, marginBottom: 4 }}>{ph.name}</div>
-                        <div style={{ fontSize: 12, color: "#6f6a61" }}>
-                          Farine: {fmtG(ph.flour_g)} · Eau: {fmtG(ph.water_g)} · Levure: {fmtG(ph.yeast_g)}
-                          {ph.salt_g > 0 ? ` · Sel: ${fmtG(ph.salt_g)}` : ""}
-                          {ph.oil_g > 0 ? ` · Huile: ${fmtG(ph.oil_g)}` : ""}
+                {/* Farines */}
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                    Farines
+                  </h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+                      <div style={{ flex: "1 1 120px" }}>
+                        <label className="label">Farine 1 -- nom</label>
+                        <input className="input" value={flour1Name} onChange={e => setFlour1Name(e.target.value)} placeholder="ex: Tipo 00" />
+                      </div>
+                      {flourIngredients.length > 0 && (
+                        <div style={{ flex: "1 1 140px" }}>
+                          <label className="label">Lie a un ingredient</label>
+                          <SmartSelect
+                            options={flourOptions}
+                            value={flour1Id ?? ""}
+                            onChange={id => {
+                              setFlour1Id(id || null);
+                              const ing = flourIngredients.find(i => i.id === id);
+                              if (ing) setFlour1Name(ing.name);
+                            }}
+                            placeholder="Ingredient..."
+                          />
+                        </div>
+                      )}
+                      {useTwoFlours && (
+                        <div style={{ width: 140 }}>
+                          <label className="label">% farine 1</label>
+                          <StepperInput
+                            value={flour1Pct}
+                            onChange={v => setFlour1Pct(v === "" ? 0 : v)}
+                            step={5} min={0} max={100}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
+                      <input type="checkbox" checked={useTwoFlours} onChange={e => setUseTwoFlours(e.target.checked)} />
+                      Utiliser 2 farines
+                    </label>
+
+                    {useTwoFlours && (
+                      <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+                        <div style={{ flex: "1 1 120px" }}>
+                          <label className="label">Farine 2 -- nom</label>
+                          <input className="input" value={flour2Name} onChange={e => setFlour2Name(e.target.value)} placeholder="ex: Tipo 1" />
+                        </div>
+                        {flourIngredients.length > 0 && (
+                          <div style={{ flex: "1 1 140px" }}>
+                            <label className="label">Lie a un ingredient</label>
+                            <SmartSelect
+                              options={flourOptions}
+                              value={flour2Id ?? ""}
+                              onChange={id => {
+                                setFlour2Id(id || null);
+                                const ing = flourIngredients.find(i => i.id === id);
+                                if (ing) setFlour2Name(ing.name);
+                              }}
+                              placeholder="Ingredient..."
+                            />
+                          </div>
+                        )}
+                        <div style={{ width: 80 }}>
+                          <label className="label">% farine 2</label>
+                          <input type="text" readOnly value={100 - flour1Pct} className="input" style={{ opacity: 0.6 }} />
                         </div>
                       </div>
-                    ))}
+                    )}
+                  </div>
+                </div>
+
+                {/* Resultats calcules -- avec etoiles pivot */}
+                {result && (
+                  <div className="card" style={{ marginBottom: 16, borderLeft: `4px solid ${ACCENT}` }}>
+                    <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                      Quantites calculees -- {nbPatons} paton(s) de {poidsPaton} g
+                    </h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+                      {empItems.map(item => (
+                        <div key={item.id} style={{
+                          display: "flex", alignItems: "center", gap: 10,
+                          padding: "8px 10px", borderRadius: 8,
+                          background: pivotItemId === item.id ? "rgba(217,119,6,0.08)" : "rgba(0,0,0,0.03)",
+                          border: pivotItemId === item.id ? "1.5px solid #D97706" : "1px solid rgba(217,199,182,0.5)",
+                        }}>
+                          <button
+                            type="button"
+                            onClick={() => setPivotItemId(pivotItemId === item.id ? null : item.id)}
+                            title="Definir comme pivot"
+                            style={{
+                              background: "none", border: "none", cursor: "pointer",
+                              fontSize: 16, padding: "0 2px", flexShrink: 0,
+                              color: pivotItemId === item.id ? "#D97706" : "#ccc",
+                            }}
+                          >
+                            {pivotItemId === item.id ? "\u2605" : "\u2606"}
+                          </button>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: "#9a8f84", textTransform: "uppercase" }}>{item.name}</div>
+                            <div style={{ fontSize: 16, fontWeight: 800, color: "#2f3a33" }}>{fmtG(item.qty)}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {useTwoFlours && result.flour_breakdown.length > 1 && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#6f6a61", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Detail farines</div>
+                        {result.flour_breakdown.map(f => (
+                          <div key={f.name} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
+                            <span style={{ color: "#2f3a33" }}>{f.name}</span>
+                            <span style={{ fontWeight: 700, color: ACCENT }}>{fmtG(f.grams)} ({f.percent} %)</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {type === "biga" && result.phases.length > 1 && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#6f6a61", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Phases</div>
+                        {result.phases.map(ph => (
+                          <div key={ph.name} style={{ marginBottom: 8, padding: "8px 10px", borderRadius: 8, background: "rgba(180,83,9,0.04)", border: "1px solid rgba(180,83,9,0.15)" }}>
+                            <div style={{ fontWeight: 800, fontSize: 12, color: ACCENT, marginBottom: 4 }}>{ph.name}</div>
+                            <div style={{ fontSize: 12, color: "#6f6a61" }}>
+                              Farine: {fmtG(ph.flour_g)} -- Eau: {fmtG(ph.water_g)} -- Levure: {fmtG(ph.yeast_g)}
+                              {ph.salt_g > 0 ? ` -- Sel: ${fmtG(ph.salt_g)}` : ""}
+                              {ph.oil_g > 0 ? ` -- Huile: ${fmtG(ph.oil_g)}` : ""}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {result.warnings.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        {result.warnings.map((w, i) => (
+                          <div key={i} style={{ fontSize: 12, color: "#D97706", fontWeight: 600 }}>! {w}</div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {result.warnings.length > 0 && (
-                  <div style={{ marginTop: 8 }}>
-                    {result.warnings.map((w, i) => (
-                      <div key={i} style={{ fontSize: 12, color: "#D97706", fontWeight: 600 }}>⚠ {w}</div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                {/* Etapes */}
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                    Procedure / Etapes
+                  </h3>
+                  <StepsList steps={steps} onChange={setSteps} />
+                </div>
+
+                {/* Prix & Marges */}
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                    Prix &amp; Marges
+                  </h3>
+                  <PricingBlock
+                    costPerKg={costPerKg}
+                    costPerPortion={costPerBall}
+                    portionLabel="paton"
+                    vatRate={vatRate}
+                    onVatChange={setVatRate}
+                    marginRate={marginRate}
+                    onMarginChange={setMarginRate}
+                    sellPrice={sellPrice}
+                    onSellPriceChange={setSellPrice}
+                    accentColor={ACCENT}
+                  />
+                </div>
+
+                {/* Bottom save */}
+                <div style={{ paddingBottom: 32 }}>
+                  {saveError && <div className="errorBox" style={{ marginBottom: 8 }}>{saveError}</div>}
+                  {userCanWrite && (
+                    <button onClick={handleSave} disabled={saving} className="btn btnPrimary w-full">
+                      {saving ? "Sauvegarde\u2026" : "Sauvegarder"}
+                    </button>
+                  )}
+                </div>
+              </>
             )}
-
-            {/* Étapes */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
-                Procédure / Étapes
-              </h3>
-              <StepsList steps={steps} onChange={setSteps} />
-            </div>
-
-            {/* Prix & Marges */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
-                Prix &amp; Marges
-              </h3>
-              <PricingBlock
-                costPerKg={costPerKg}
-                costPerPortion={costPerBall}
-                portionLabel="pâton"
-                vatRate={vatRate}
-                onVatChange={setVatRate}
-                marginRate={marginRate}
-                onMarginChange={setMarginRate}
-                sellPrice={sellPrice}
-                onSellPriceChange={setSellPrice}
-                accentColor={ACCENT}
-              />
-            </div>
-
-            {/* Bottom save */}
-            <div style={{ paddingBottom: 32 }}>
-              {saveError && <div className="errorBox" style={{ marginBottom: 8 }}>{saveError}</div>}
-              {userCanWrite && (
-                <button onClick={handleSave} disabled={saving} className="btn btnPrimary w-full">
-                  {saving ? "Sauvegarde…" : "Sauvegarder"}
-                </button>
-              )}
-            </div>
           </>
         )}
       </main>
     </>
+  );
+}
+
+// ── KPI Banner Item ──────────────────────────────────────────────
+function KpiBannerItem({ label, value, sub, color }: { label: string; value: string; sub?: string; color: string }) {
+  return (
+    <div style={{
+      flex: 1, padding: "12px 14px",
+      borderRight: "1px solid #f0ebe2",
+    }}>
+      <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 18, fontWeight: 700, color, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
+        {value}
+      </div>
+      {sub && (
+        <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>
+          {sub}
+        </div>
+      )}
+    </div>
   );
 }

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
-import { TopNav } from "@/components/TopNav";
 import { AllergenBadges } from "@/components/AllergenBadges";
 import { parseAllergens, mergeAllergens } from "@/lib/allergens";
 import { offerRowToCpu, enrichCpuWithConversions } from "@/lib/offerPricing";
@@ -16,7 +15,9 @@ import { StepsList } from "./StepsList";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { PricingBlock } from "./PricingBlock";
-import { GestionTab } from "./GestionTab";
+import { GestionFoodCost } from "./GestionFoodCost";
+import { GestionCommandes } from "./GestionCommandes";
+import { GestionPilotage } from "./GestionPilotage";
 import { StepperInput } from "@/components/StepperInput";
 import type { Ingredient } from "@/types/ingredients";
 import type { CpuByUnit } from "@/lib/offerPricing";
@@ -32,7 +33,7 @@ const COCKTAIL_TYPES = [
   { id: "signature",    label: "Signature" },
 ];
 
-const GLASS_OPTIONS = ["Tumbler", "Coupe", "Flûte", "Highball", "Martini", "Autre"];
+const GLASS_OPTIONS = ["Tumbler", "Coupe", "Fl\u00FBte", "Highball", "Martini", "Autre"];
 const METHOD_OPTIONS = ["Shaker", "Build", "Stirred", "Blender"];
 
 function tmpId() { return `tmp-${Math.random().toString(36).slice(2)}`; }
@@ -42,7 +43,7 @@ function fmtMoney(v: number) { return v.toLocaleString("fr-FR", { minimumFractio
 
 interface Props { cocktailId?: string; initialProdMode?: boolean; }
 
-function truncate(s: string, n: number) { return s.length > n ? s.slice(0, n) + "…" : s; }
+function truncate(s: string, n: number) { return s.length > n ? s.slice(0, n) + "\u2026" : s; }
 
 export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
   const router = useRouter();
@@ -70,6 +71,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, CpuByUnit>>({});
   const [priceLabelByIngredient, setPriceLabelByIngredient] = useState<Record<string, string>>({});
+  const [supplierByIngredient, setSupplierByIngredient] = useState<Record<string, string | null>>({});
   const [lines, setLines] = useState<IngredientLine[]>([]);
 
   // Steps (stored in `steps` column)
@@ -79,8 +81,9 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
   const [vatRate, setVatRate] = useState(0.2);
   const [marginRate, setMarginRate] = useState("75");
 
-  // Tabs
-  const [mainTab, setMainTab] = useState<"recette" | "gestion">("recette");
+  // Main tab
+  type MainTab = "fc" | "recette" | "cmd" | "pop";
+  const [mainTab, setMainTab] = useState<MainTab>(isEdit ? "fc" : "recette");
 
   // Production mode
   const [prodMode, setProdMode] = useState(initialProdMode ?? false);
@@ -94,7 +97,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  // Volume by ingredient (for cl→ml conversion)
+  // Volume by ingredient (for cl->ml conversion)
   const pieceVolById = useMemo(() => {
     const m = new Map<string, number | null>();
     for (const i of ingredients) m.set(i.id, i.piece_volume_ml ?? null);
@@ -149,8 +152,28 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
     return (unit === "cl" || unit === "ml") ? acc + (unit === "cl" ? qty * 10 : qty) : acc;
   }, 0);
 
+  // ── KPI computations ──────────────────────────────────────────
+  const sp = typeof sellPrice === "number" && sellPrice > 0 ? sellPrice : null;
+  const effectiveCostPerPortion = totalCostEur > 0 ? round2(totalCostEur) : null;
+  const foodCostPct = sp && effectiveCostPerPortion ? (effectiveCostPerPortion / sp) * 100 : null;
+  const margeBrute = sp && effectiveCostPerPortion ? sp - effectiveCostPerPortion : null;
+  const prixTTC = sp ? sp * (1 + vatRate) : null;
+
+  const typeLabel = COCKTAIL_TYPES.find(t => t.id === type)?.label ?? type;
+
+  // Tab definitions
+  const MAIN_TABS: { key: MainTab; label: string }[] = isEdit ? [
+    { key: "fc", label: "Food cost & Marges" },
+    { key: "recette", label: "Recette & Procede" },
+    { key: "cmd", label: "Commandes fournisseurs" },
+    { key: "pop", label: "Pilotage CA \u2014 Popina" },
+  ] : [
+    { key: "recette", label: "Recette" },
+  ];
+
   // Load
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) { setStatus("error"); setError({ message: "NOT_LOGGED" }); return; }
@@ -161,6 +184,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
         ingsQ.order("name"),
         supabase.from("v_latest_offers").select("*"),
       ]);
+      if (cancelled) return;
       if (iErr) { setStatus("error"); setError(iErr); return; }
 
       const ingList = (ingsData ?? []) as Ingredient[];
@@ -187,7 +211,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
         const sid = String(o.supplier_id ?? "");
         supplierByIng[iid] = sid ? (supplierNameById[sid] ?? null) : null;
       }
-      // Fallback 1 : purchase_price / purchase_unit depuis l'ingrédient
+      // Fallback 1 : purchase_price / purchase_unit depuis l'ingredient
       for (const i of ingList) {
         if (pm[i.id] && (pm[i.id].g || pm[i.id].ml || pm[i.id].pcs)) continue;
         const pp = i.purchase_price;
@@ -253,7 +277,10 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
         }
       }
 
+      if (cancelled) return;
+
       setPriceByIngredient(pm);
+      setSupplierByIngredient(supplierByIng);
 
       const labelMap: Record<string, string> = {};
       for (const i of ingList) {
@@ -266,6 +293,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
           supabase.from("cocktails").select("*").eq("id", cocktailId).single(),
           supabase.from("cocktail_ingredients").select("*").eq("cocktail_id", cocktailId).order("sort_order"),
         ]);
+        if (cancelled) return;
         if (coc) {
           const c = coc as Record<string, unknown>;
           setName(String(c.name ?? ""));
@@ -301,6 +329,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
       setStatus("ok");
     }
     load();
+    return () => { cancelled = true; };
   }, [cocktailId, etab]);
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -359,7 +388,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
         cid = data.id;
       }
 
-      // Save pivot (column added by migration — silent failure if not yet applied)
+      // Save pivot (column added by migration -- silent failure if not yet applied)
       await supabase.from("cocktails").update({ pivot_ingredient_id: pivotIngredientId }).eq("id", cid!);
 
       await supabase.from("cocktail_ingredients").delete().eq("cocktail_id", cid!);
@@ -399,7 +428,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
-      if (!token) { alert("Non authentifié"); return; }
+      if (!token) { alert("Non authentifi\u00E9"); return; }
       const res = await fetchApi("/api/cocktails/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
@@ -418,31 +447,9 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
   const title = name || (isEdit ? "Cocktail" : "Nouveau cocktail");
 
-  const actionButtons = (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-      <button type="button" className="btn" onClick={() => { setProdMode(m => !m); setProdQty(""); }}
-        style={prodMode ? { background: "#4a6741", color: "white", borderColor: "#4a6741" } : undefined}>
-        {prodMode ? "Mode normal" : "Mode production"}
-      </button>
-      {isEdit && (
-        <button type="button" className="btn" onClick={handleExportPdf} disabled={pdfLoading}>
-          {pdfLoading ? "Export\u2026" : "Exporter PDF"}
-        </button>
-      )}
-      {!prodMode && isEdit && userCanWrite && (
-        <button type="button" className="btn" onClick={handleDelete} style={{ color: "#d93f3f" }}>Supprimer</button>
-      )}
-      {!prodMode && userCanWrite && (
-        <button onClick={handleSave} disabled={saving} className="btn btnPrimary">
-          {saving ? "Sauvegarde\u2026" : "Sauvegarder"}
-        </button>
-      )}
-    </div>
-  );
-
   if (status === "loading") {
     return (
-      <main className="container"><div className="muted" style={{ marginTop: 40, textAlign: "center" }}>Chargement…</div></main>
+      <main className="container"><div className="muted" style={{ marginTop: 40, textAlign: "center" }}>Chargement\u2026</div></main>
     );
   }
   if (status === "error") {
@@ -454,280 +461,385 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
   return (
     <>
       <main className="container safe-bottom">
-        {/* ── Inline actions ── */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a" }}>{title}</h1>
-          {actionButtons}
+
+        {/* ── Header ── */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {photoPreview && (
+              <div style={{ width: 32, height: 32, borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>
+                <Image src={photoPreview} alt="" width={32} height={32} style={{ objectFit: "cover", width: 32, height: 32 }} />
+              </div>
+            )}
+            <div>
+              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a" }}>{title}</h1>
+              {isEdit && (
+                <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
+                  {etab && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 8px", borderRadius: 6, background: "#D4775A", color: "#fff" }}>{etab.nom ?? "Etablissement"}</span>}
+                  <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 8px", borderRadius: 6, background: "#f2ede4", color: "#666" }}>{typeLabel}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {isEdit && (
+              <button type="button" className="btn" onClick={handleExportPdf} disabled={pdfLoading}
+                style={{ fontSize: 12 }}>
+                {pdfLoading ? "Export\u2026" : "Apercu PDF"}
+              </button>
+            )}
+            {userCanWrite && (
+              <button onClick={handleSave} disabled={saving} className="btn btnPrimary">
+                {saving ? "Sauvegarde\u2026" : "Enregistrer"}
+              </button>
+            )}
+          </div>
         </div>
 
+        {/* ── KPI Banner ── */}
         {isEdit && (
-          <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
-            {(["recette", "gestion"] as const).map((t) => (
-              <button key={t} type="button" onClick={() => setMainTab(t)} style={{
-                padding: "8px 18px", borderRadius: 20, fontSize: 13, fontWeight: 700,
-                cursor: "pointer", transition: "all 0.15s",
-                border: mainTab === t ? "2px solid #D4775A" : "1.5px solid #ddd6c8",
-                background: mainTab === t ? "#D4775A" : "#fff",
-                color: mainTab === t ? "#fff" : "#666",
-              }}>
-                {t === "recette" ? "Recette" : "Gestion"}
-              </button>
-            ))}
+          <div style={{
+            display: "flex", gap: 0, marginBottom: 16, borderRadius: 10,
+            border: "1px solid #ddd6c8", overflow: "hidden", background: "#fff",
+          }}>
+            <KpiBannerItem label="COUT REVIENT" value={effectiveCostPerPortion ? `${fmtMoney(effectiveCostPerPortion)}\u00A0\u20AC` : "-"} sub="par cocktail" color="#D4775A" />
+            <KpiBannerItem
+              label="FOOD COST"
+              value={foodCostPct != null ? `${foodCostPct.toFixed(1)}%` : "-"}
+              sub="objectif \u2264 32%"
+              color={foodCostPct == null ? "#999" : foodCostPct <= 28 ? "#16a34a" : foodCostPct <= 32 ? "#D97706" : "#DC2626"}
+            />
+            <KpiBannerItem label="PRIX DE VENTE HT" value={sp ? `${fmtMoney(sp)}\u00A0\u20AC` : "-"} sub={prixTTC ? `${fmtMoney(prixTTC)}\u00A0\u20AC TTC` : ""} color="#1a1a1a" />
+            <KpiBannerItem label="MARGE BRUTE" value={margeBrute != null ? `${fmtMoney(margeBrute)}\u00A0\u20AC` : "-"} sub="par cocktail" color="#16a34a" />
           </div>
         )}
 
-        {mainTab === "gestion" && isEdit && cocktailId && (
-          <GestionTab
+        {/* ── Tab bar ── */}
+        <div style={{ display: "flex", gap: 0, borderBottom: "1.5px solid #ddd6c8", marginBottom: 16, overflowX: "auto" }}>
+          {MAIN_TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setMainTab(t.key)}
+              style={{
+                padding: "10px 16px", fontSize: 13, fontWeight: mainTab === t.key ? 700 : 500,
+                cursor: "pointer", border: "none", background: "transparent",
+                color: mainTab === t.key ? "#D4775A" : "#999",
+                borderBottom: mainTab === t.key ? "2.5px solid #D4775A" : "2.5px solid transparent",
+                transition: "all 0.15s", whiteSpace: "nowrap",
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {saveError && <div className="errorBox" style={{ marginBottom: 12 }}>{saveError}</div>}
+
+        {/* ── TAB: FOOD COST & MARGES ── */}
+        {mainTab === "fc" && isEdit && cocktailId && (
+          <GestionFoodCost
             recipeId={cocktailId}
             recipeType="cocktail"
             lines={lines}
             ingredients={ingredients}
             priceByIngredient={priceByIngredient}
+            supplierByIngredient={supplierByIngredient}
             totalCost={round2(totalCostEur)}
-            sellPrice={typeof sellPrice === "number" ? sellPrice : null}
+            sellPrice={sp}
             onSellPriceChange={(p) => setSellPrice(p)}
-            etablissementId={etab?.id}
-            recipeName={name}
           />
         )}
 
-        {/* ── MODE PRODUCTION ── */}
-        {mainTab !== "recette" ? null : prodMode ? (
+        {/* ── TAB: COMMANDES ── */}
+        {mainTab === "cmd" && isEdit && cocktailId && (
+          <GestionCommandes
+            recipeId={cocktailId}
+            recipeType="cocktail"
+            lines={lines}
+            ingredients={ingredients}
+            etablissementId={etab?.id}
+          />
+        )}
+
+        {/* ── TAB: PILOTAGE ── */}
+        {mainTab === "pop" && isEdit && (
+          <GestionPilotage recipeName={name} recipeType="cocktail" />
+        )}
+
+        {/* ── TAB: RECETTE & PROCEDE ── */}
+        {mainTab === "recette" && (
           <>
-            <div style={{
-              background: "#4a6741", color: "white", borderRadius: 12,
-              padding: "12px 16px", marginBottom: 16,
-            }}>
-              <div style={{ fontSize: 15, fontWeight: 800 }}>Mode Production</div>
-              <div style={{ fontSize: 13, opacity: 0.85 }}>
-                {prodPivotIng
-                  ? `Modifie ${prodPivotIng.name}, tout se recalcule`
-                  : `${title} — appuie sur ☆ en mode normal pour choisir un pivot`}
+            {/* Production mode toggle */}
+            {isEdit && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
+                <button type="button" className="btn" onClick={() => { setProdMode(m => !m); setProdQty(""); }}
+                  style={prodMode ? { background: "#4a6741", color: "white", borderColor: "#4a6741" } : undefined}>
+                  {prodMode ? "Mode normal" : "Mode production"}
+                </button>
+                {!prodMode && isEdit && userCanWrite && (
+                  <button type="button" className="btn" onClick={handleDelete} style={{ color: "#d93f3f", fontSize: 12 }}>Supprimer</button>
+                )}
               </div>
-            </div>
+            )}
 
-            {!pivotIngredientId || !prodPivotLine ? (
-              <div style={{
-                padding: "24px 16px", background: "rgba(0,0,0,0.03)", borderRadius: 12,
-                textAlign: "center", color: "#6f6a61", fontSize: 14, lineHeight: 1.7, marginBottom: 16,
-              }}>
-                Aucun ingrédient pivot défini.<br />
-                Appuyez sur ☆ en mode normal pour en choisir un.
-              </div>
-            ) : (
+            {prodMode ? (
               <>
+                {/* Banner */}
                 <div style={{
-                  background: "#FFFBEB", border: "2px solid #D97706",
-                  borderRadius: 12, padding: 16, marginBottom: 12,
+                  background: "#4a6741", color: "white", borderRadius: 12,
+                  padding: "12px 16px", marginBottom: 16,
                 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#D97706", marginBottom: 6 }}>★ Ingrédient pivot</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: "#2d2d2d", marginBottom: 12 }}>
-                    {prodPivotIng?.name ?? "—"}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                    <StepperInput
-                      value={prodQty}
-                      onChange={setProdQty}
-                      step={0.1} min={0}
-                      placeholder={String(prodPivotLine.qty)}
-                    />
-                    <span style={{ fontSize: 16, color: "#6f6a61", fontWeight: 600 }}>{prodPivotLine.unit}</span>
-                  </div>
-                  <div style={{ fontSize: 12, color: "#9a8f84" }}>
-                    Recette de base : {prodPivotLine.qty} {prodPivotLine.unit}
+                  <div style={{ fontSize: 15, fontWeight: 800 }}>Mode Production</div>
+                  <div style={{ fontSize: 13, opacity: 0.85 }}>
+                    {prodPivotIng
+                      ? `Modifie ${prodPivotIng.name}, tout se recalcule`
+                      : `${title} \u2014 appuie sur \u2606 en mode normal pour choisir un pivot`}
                   </div>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-                  {prodValidLines.filter(l => l.ingredient_id !== pivotIngredientId).map(l => {
-                    const ing = ingredients.find(i => i.id === l.ingredient_id);
-                    const newQty = prodFactor !== null ? Math.round(Number(l.qty) * prodFactor) : null;
-                    return (
-                      <div key={l.id} style={{
-                        display: "flex", justifyContent: "space-between", alignItems: "center",
-                        background: "white", border: "1px solid #EFEFEF", borderRadius: 10, padding: "10px 14px",
-                      }}>
-                        <span style={{ fontSize: 14, color: "#2d2d2d" }}>{truncate(ing?.name ?? "—", 35)}</span>
-                        <span style={{ fontSize: 22, fontWeight: 800, color: "#4a6741" }}>
-                          {newQty !== null ? `${newQty.toLocaleString("fr-FR")} ${l.unit}` : `${l.qty} ${l.unit}`}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {prodTotalW > 0 && (
+                {!pivotIngredientId || !prodPivotLine ? (
                   <div style={{
-                    background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10,
-                    padding: "12px 16px", color: "#4a6741", fontWeight: 700, fontSize: 15, marginBottom: 16,
+                    padding: "24px 16px", background: "rgba(0,0,0,0.03)", borderRadius: 12,
+                    textAlign: "center", color: "#6f6a61", fontSize: 14, lineHeight: 1.7, marginBottom: 16,
                   }}>
-                    Volume total estimé : {prodTotalW.toLocaleString("fr-FR")} ml
+                    Aucun ingr\u00E9dient pivot d\u00E9fini.<br />
+                    Appuyez sur \u2606 en mode normal pour en choisir un.
+                  </div>
+                ) : (
+                  <>
+                    <div style={{
+                      background: "#FFFBEB", border: "2px solid #D97706",
+                      borderRadius: 12, padding: 16, marginBottom: 12,
+                    }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#D97706", marginBottom: 6 }}>\u2605 Ingr\u00E9dient pivot</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: "#2d2d2d", marginBottom: 12 }}>
+                        {prodPivotIng?.name ?? "\u2014"}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                        <StepperInput
+                          value={prodQty}
+                          onChange={setProdQty}
+                          step={0.1} min={0}
+                          placeholder={String(prodPivotLine.qty)}
+                        />
+                        <span style={{ fontSize: 16, color: "#6f6a61", fontWeight: 600 }}>{prodPivotLine.unit}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#9a8f84" }}>
+                        Recette de base : {prodPivotLine.qty} {prodPivotLine.unit}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+                      {prodValidLines.filter(l => l.ingredient_id !== pivotIngredientId).map(l => {
+                        const ing = ingredients.find(i => i.id === l.ingredient_id);
+                        const newQty = prodFactor !== null ? Math.round(Number(l.qty) * prodFactor) : null;
+                        return (
+                          <div key={l.id} style={{
+                            display: "flex", justifyContent: "space-between", alignItems: "center",
+                            background: "white", border: "1px solid #EFEFEF", borderRadius: 10, padding: "10px 14px",
+                          }}>
+                            <span style={{ fontSize: 14, color: "#2d2d2d" }}>{truncate(ing?.name ?? "\u2014", 35)}</span>
+                            <span style={{ fontSize: 22, fontWeight: 800, color: "#4a6741" }}>
+                              {newQty !== null ? `${newQty.toLocaleString("fr-FR")} ${l.unit}` : `${l.qty} ${l.unit}`}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {prodTotalW > 0 && (
+                      <div style={{
+                        background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10,
+                        padding: "12px 16px", color: "#4a6741", fontWeight: 700, fontSize: 15, marginBottom: 16,
+                      }}>
+                        Volume total estim\u00E9 : {prodTotalW.toLocaleString("fr-FR")} ml
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {steps.length > 0 && (
+                  <div className="card" style={{ marginBottom: 16 }}>
+                    <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
+                      \u00C9tapes / Recette
+                    </h3>
+                    <ol style={{ margin: 0, paddingLeft: 20 }}>
+                      {steps.map((s, i) => (
+                        <li key={i} style={{ marginBottom: 6, fontSize: 14, color: "#2d2d2d", lineHeight: 1.5 }}>{s}</li>
+                      ))}
+                    </ol>
                   </div>
                 )}
               </>
+            ) : (
+              /* ── MODE NORMAL ── */
+              <>
+                {/* Infos generales */}
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div>
+                      <label className="label">Nom du cocktail</label>
+                      <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Nom\u2026" />
+                    </div>
+
+                    <div>
+                      <label className="label">Type</label>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {COCKTAIL_TYPES.map(t => (
+                          <button
+                            key={t.id} type="button" onClick={() => setType(t.id)}
+                            style={{
+                              padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                              border: "1.5px solid",
+                              borderColor: type === t.id ? ACCENT : "rgba(217,199,182,0.9)",
+                              background: type === t.id ? "rgba(14,116,144,0.08)" : "rgba(255,255,255,0.7)",
+                              color: type === t.id ? ACCENT : "#6f6a61",
+                              cursor: "pointer",
+                            }}
+                          >{t.label}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                      <div style={{ flex: "1 1 140px" }}>
+                        <label className="label">Verrerie</label>
+                        <select className="input" value={glass} onChange={e => setGlass(e.target.value)}>
+                          <option value="">\u2014 verre \u2014</option>
+                          {GLASS_OPTIONS.map(g => <option key={g} value={g.toLowerCase()}>{g}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ flex: "1 1 140px" }}>
+                        <label className="label">M\u00E9thode</label>
+                        <select className="input" value={method} onChange={e => setMethod(e.target.value)}>
+                          <option value="">\u2014 m\u00E9thode \u2014</option>
+                          {METHOD_OPTIONS.map(m => <option key={m} value={m.toLowerCase()}>{m}</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                      <div style={{ flex: "1 1 140px" }}>
+                        <label className="label">Base alcool</label>
+                        <input className="input" value={baseAlcool} onChange={e => setBaseAlcool(e.target.value)} placeholder="ex: Vodka" />
+                      </div>
+                      <div style={{ flex: "1 1 140px" }}>
+                        <label className="label">Garniture</label>
+                        <input className="input" value={garnish} onChange={e => setGarnish(e.target.value)} placeholder="ex: Tranche de citron" />
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* Ingredients */}
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                    Ingr\u00E9dients
+                  </h3>
+                  <IngredientListDnD
+                    items={lines}
+                    ingredients={ingredients}
+                    priceByIngredient={priceByIngredient}
+                    units={COCKTAIL_UNITS}
+                    onChange={setLines}
+                    priceLabelByIngredient={priceLabelByIngredient}
+                    pivotId={pivotIngredientId}
+                    onPivotChange={setPivotIngredientId}
+                  />
+                  {totalCostEur > 0 && (
+                    <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: "#2f3a33" }}>
+                      Co\u00FBt total : {fmtMoney(round2(totalCostEur))} \u20AC
+                    </div>
+                  )}
+                </div>
+
+                {/* Etapes */}
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                    \u00C9tapes / Recette
+                  </h3>
+                  <StepsList steps={steps} onChange={setSteps} />
+                </div>
+
+                {/* Allergenes */}
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
+                    Allerg\u00E8nes
+                  </h3>
+                  <AllergenBadges allergens={computedAllergens} />
+                </div>
+
+                {/* Prix & Marges */}
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                    Prix &amp; Marges
+                  </h3>
+                  <PricingBlock
+                    costPerPortion={totalCostEur > 0 ? round2(totalCostEur) : null}
+                    portionLabel="cocktail"
+                    vatRate={vatRate}
+                    onVatChange={setVatRate}
+                    marginRate={marginRate}
+                    onMarginChange={setMarginRate}
+                    sellPrice={sellPrice}
+                    onSellPriceChange={setSellPrice}
+                    accentColor={ACCENT}
+                  />
+                </div>
+
+                {/* Photo */}
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
+                    Photo
+                  </h3>
+                  {photoPreview && (
+                    <div style={{ marginBottom: 10 }}>
+                      <Image src={photoPreview} alt="Photo cocktail" width={200} height={150} style={{ borderRadius: 10, objectFit: "cover" }} />
+                    </div>
+                  )}
+                  <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoChange} />
+                  <button type="button" onClick={() => fileRef.current?.click()} disabled={photoUploading} className="btn">
+                    {photoUploading ? "Envoi\u2026" : photoPreview ? "Changer la photo" : "Ajouter une photo"}
+                  </button>
+                </div>
+
+                {/* Bottom save */}
+                <div style={{ paddingBottom: 32 }}>
+                  {saveError && <div className="errorBox" style={{ marginBottom: 8 }}>{saveError}</div>}
+                  {userCanWrite && (
+                    <button onClick={handleSave} disabled={saving} className="btn btnPrimary w-full">
+                      {saving ? "Sauvegarde\u2026" : "Sauvegarder"}
+                    </button>
+                  )}
+                </div>
+              </>
             )}
-
-            {steps.length > 0 && (
-              <div className="card" style={{ marginBottom: 16 }}>
-                <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
-                  Étapes / Recette
-                </h3>
-                <ol style={{ margin: 0, paddingLeft: 20 }}>
-                  {steps.map((s, i) => (
-                    <li key={i} style={{ marginBottom: 6, fontSize: 14, color: "#2d2d2d", lineHeight: 1.5 }}>{s}</li>
-                  ))}
-                </ol>
-              </div>
-            )}
-          </>
-        ) : (
-          /* ── MODE NORMAL ── */
-          <>
-            <TopNav title={title} subtitle={`Cocktail${isEdit ? " · édition" : " · nouveau"}`} />
-            {saveError && <div className="errorBox" style={{ marginBottom: 12 }}>{saveError}</div>}
-
-            {/* Infos générales */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <div>
-                  <label className="label">Nom du cocktail</label>
-                  <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Nom…" />
-                </div>
-
-                <div>
-                  <label className="label">Type</label>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {COCKTAIL_TYPES.map(t => (
-                      <button
-                        key={t.id} type="button" onClick={() => setType(t.id)}
-                        style={{
-                          padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                          border: "1.5px solid",
-                          borderColor: type === t.id ? ACCENT : "rgba(217,199,182,0.9)",
-                          background: type === t.id ? "rgba(14,116,144,0.08)" : "rgba(255,255,255,0.7)",
-                          color: type === t.id ? ACCENT : "#6f6a61",
-                          cursor: "pointer",
-                        }}
-                      >{t.label}</button>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  <div style={{ flex: "1 1 140px" }}>
-                    <label className="label">Verrerie</label>
-                    <select className="input" value={glass} onChange={e => setGlass(e.target.value)}>
-                      <option value="">— verre —</option>
-                      {GLASS_OPTIONS.map(g => <option key={g} value={g.toLowerCase()}>{g}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ flex: "1 1 140px" }}>
-                    <label className="label">Méthode</label>
-                    <select className="input" value={method} onChange={e => setMethod(e.target.value)}>
-                      <option value="">— méthode —</option>
-                      {METHOD_OPTIONS.map(m => <option key={m} value={m.toLowerCase()}>{m}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  <div style={{ flex: "1 1 140px" }}>
-                    <label className="label">Base alcool</label>
-                    <input className="input" value={baseAlcool} onChange={e => setBaseAlcool(e.target.value)} placeholder="ex: Vodka" />
-                  </div>
-                  <div style={{ flex: "1 1 140px" }}>
-                    <label className="label">Garniture</label>
-                    <input className="input" value={garnish} onChange={e => setGarnish(e.target.value)} placeholder="ex: Tranche de citron" />
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-            {/* Ingrédients */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
-                Ingrédients
-              </h3>
-              <IngredientListDnD
-                items={lines}
-                ingredients={ingredients}
-                priceByIngredient={priceByIngredient}
-                units={COCKTAIL_UNITS}
-                onChange={setLines}
-                priceLabelByIngredient={priceLabelByIngredient}
-                pivotId={pivotIngredientId}
-                onPivotChange={setPivotIngredientId}
-              />
-              {totalCostEur > 0 && (
-                <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: "#2f3a33" }}>
-                  Coût total : {fmtMoney(round2(totalCostEur))} €
-                </div>
-              )}
-            </div>
-
-            {/* Étapes */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
-                Étapes / Recette
-              </h3>
-              <StepsList steps={steps} onChange={setSteps} />
-            </div>
-
-            {/* Allergènes */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
-                Allergènes
-              </h3>
-              <AllergenBadges allergens={computedAllergens} />
-            </div>
-
-            {/* Prix & Marges */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
-                Prix &amp; Marges
-              </h3>
-              <PricingBlock
-                costPerPortion={totalCostEur > 0 ? round2(totalCostEur) : null}
-                portionLabel="cocktail"
-                vatRate={vatRate}
-                onVatChange={setVatRate}
-                marginRate={marginRate}
-                onMarginChange={setMarginRate}
-                sellPrice={sellPrice}
-                onSellPriceChange={setSellPrice}
-                accentColor={ACCENT}
-              />
-            </div>
-
-            {/* Photo */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
-                Photo
-              </h3>
-              {photoPreview && (
-                <div style={{ marginBottom: 10 }}>
-                  <Image src={photoPreview} alt="Photo cocktail" width={200} height={150} style={{ borderRadius: 10, objectFit: "cover" }} />
-                </div>
-              )}
-              <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoChange} />
-              <button type="button" onClick={() => fileRef.current?.click()} disabled={photoUploading} className="btn">
-                {photoUploading ? "Envoi…" : photoPreview ? "Changer la photo" : "Ajouter une photo"}
-              </button>
-            </div>
-
-            {/* Bottom save */}
-            <div style={{ paddingBottom: 32 }}>
-              {saveError && <div className="errorBox" style={{ marginBottom: 8 }}>{saveError}</div>}
-              {userCanWrite && (
-                <button onClick={handleSave} disabled={saving} className="btn btnPrimary w-full">
-                  {saving ? "Sauvegarde…" : "Sauvegarder"}
-                </button>
-              )}
-            </div>
           </>
         )}
       </main>
     </>
+  );
+}
+
+// ── KPI Banner Item ──────────────────────────────────────────────
+function KpiBannerItem({ label, value, sub, color }: { label: string; value: string; sub?: string; color: string }) {
+  return (
+    <div style={{
+      flex: 1, padding: "12px 14px",
+      borderRight: "1px solid #f0ebe2",
+    }}>
+      <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 18, fontWeight: 700, color, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
+        {value}
+      </div>
+      {sub && (
+        <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>
+          {sub}
+        </div>
+      )}
+    </div>
   );
 }
