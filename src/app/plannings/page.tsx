@@ -539,17 +539,18 @@ export default function PlanningPage() {
                 <div style={{ ...headerCell, fontSize: 10, color: "#999" }}>H.</div>
 
                 {/* ── Employee rows ── */}
-                {filteredEmployes.map((emp) => {
+                {filteredEmployes.map((emp, empIdx) => {
                   const bilan = bilans.get(emp.id);
                   const initials = emp.initiales || ((emp.prenom?.[0] ?? "") + (emp.nom?.[0] ?? "")).toUpperCase();
                   const contrat = emp.contrats?.find((c) => c.actif);
                   const isTNS = contrat?.type === "TNS";
                   const weekHours = bilan?.heures_travaillees ?? 0;
                   const hasAlerts = bilan && bilan.alertes.length > 0;
+                  const rowBg = empIdx % 2 === 0 ? "#fff" : "#f9f7f3";
 
                   return [
                     /* Employee name cell */
-                    <div key={`name-${emp.id}`} style={empCell}>
+                    <div key={`name-${emp.id}`} style={{ ...empCell, background: rowBg }}>
                       <div style={empAvatar}>{initials}</div>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -587,6 +588,7 @@ export default function PlanningPage() {
                               {...provided.droppableProps}
                               style={{
                                 ...dayCell,
+                                background: rowBg,
                                 ...(isToday(iso) ? todayCol : {}),
                                 ...(absType ? absenceCell : {}),
                                 ...(snapshot.isDraggingOver ? { background: "rgba(45,106,79,0.08)" } : {}),
@@ -640,7 +642,7 @@ export default function PlanningPage() {
                     }),
 
                     /* Hours total cell */
-                    <div key={`h-${emp.id}`} style={hoursCell}>
+                    <div key={`h-${emp.id}`} style={{ ...hoursCell, background: rowBg }}>
                       {isTNS ? (
                         <span style={{ fontSize: 10, color: "#A0845C", fontWeight: 700 }}>TNS</span>
                       ) : (
