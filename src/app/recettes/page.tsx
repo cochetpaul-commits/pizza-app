@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
 import { useProfile } from "@/lib/ProfileContext";
@@ -11,7 +12,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type PizzaRow = {
-  id: string; name: string | null;
+  id: string; name: string | null; photo_url: string | null;
   total_cost: number | null;
   margin_rate: number | null; vat_rate: number | null;
   sell_price: number | null;
@@ -19,7 +20,7 @@ type PizzaRow = {
   pivot_ingredient_id: string | null;
 };
 type KitchenRow = {
-  id: string; name: string | null; category: string | null;
+  id: string; name: string | null; category: string | null; photo_url: string | null;
   total_cost: number | null; cost_per_kg: number | null;
   cost_per_portion: number | null;
   margin_rate: number | null; vat_rate: number | null;
@@ -28,7 +29,7 @@ type KitchenRow = {
   pivot_ingredient_id: string | null;
 };
 type CocktailRow = {
-  id: string; name: string | null; type: string | null;
+  id: string; name: string | null; type: string | null; image_url: string | null;
   total_cost: number | null; sell_price: number | null;
   establishments: string[] | null;
   pivot_ingredient_id: string | null;
@@ -38,21 +39,23 @@ type EmpRow = {
   pivot_ingredient_id: string | null;
 };
 
+type MainTab = "tous" | "pizza" | "cuisine" | "cocktail" | "empatement";
+type SortKey = "name" | "cost" | "fc" | "price";
 type SortDir = "asc" | "desc";
 type CuisineCatFilter = "all" | "plat_cuisine" | "preparation" | "entree" | "sauce" | "dessert" | "autre";
 type FoodCostFilter = "all" | "bon" | "attention" | "alerte";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PIZZA_COLOR    = "#8B1A1A";  // bordeaux
-const CUISINE_COLOR  = "#4a6741";  // sauge
-const COCKTAIL_COLOR = "#D4775A";  // terre
-const EMP_COLOR      = "#c9b99a";  // terre-light
+const PIZZA_COLOR    = "#8B1A1A";
+const CUISINE_COLOR  = "#4a6741";
+const COCKTAIL_COLOR = "#D4775A";
+const EMP_COLOR      = "#8a7b6b";
 
 const CUISINE_CATS = [
-  { id: "preparation",    label: "Préparation" },
-  { id: "entree",         label: "Entrée" },
-  { id: "plat_cuisine",   label: "Plat cuisiné" },
+  { id: "preparation",    label: "Pr\u00e9paration" },
+  { id: "entree",         label: "Entr\u00e9e" },
+  { id: "plat_cuisine",   label: "Plat cuisin\u00e9" },
   { id: "accompagnement", label: "Accompagnement" },
   { id: "sauce",          label: "Sauce" },
   { id: "dessert",        label: "Dessert" },
@@ -63,7 +66,7 @@ const CUISINE_CAT_FILTERS: { id: CuisineCatFilter; label: string }[] = [
   { id: "all",           label: "Tous" },
   { id: "plat_cuisine",  label: "Plat" },
   { id: "preparation",   label: "Prep" },
-  { id: "entree",        label: "Entree" },
+  { id: "entree",        label: "Entr\u00e9e" },
   { id: "sauce",         label: "Sauce" },
   { id: "dessert",       label: "Dessert" },
   { id: "autre",         label: "Autre" },
@@ -71,10 +74,15 @@ const CUISINE_CAT_FILTERS: { id: CuisineCatFilter; label: string }[] = [
 
 const FOOD_COST_FILTERS: { id: FoodCostFilter; label: string }[] = [
   { id: "all",       label: "Tous" },
-  { id: "bon",       label: "Bon \u226428%" },
-  { id: "attention", label: "Attention \u226432%" },
-  { id: "alerte",    label: "Alerte >32%" },
+  { id: "bon",       label: "\u226428%" },
+  { id: "attention", label: "\u226432%" },
+  { id: "alerte",    label: ">32%" },
 ];
+
+const CAT_LABEL: Record<string, string> = {
+  preparation: "Pr\u00e9paration", entree: "Entr\u00e9e", plat_cuisine: "Plat",
+  accompagnement: "Accomp.", sauce: "Sauce", dessert: "Dessert", autre: "Autre",
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -87,11 +95,6 @@ function matchesSearch(name: string | null, q: string): boolean {
   return (name ?? "").toLowerCase().includes(q.toLowerCase());
 }
 
-/**
- * margin_rate stored as % (e.g. 75), vat_rate stored as % for pizza (e.g. 10)
- * or as decimal for kitchen (e.g. 0.1).
- * Normalization: if value >= 1 → treat as %, divide by 100.
- */
 function normRate(r: number | null): number {
   if (r == null) return 0;
   return r >= 1 ? r / 100 : r;
@@ -117,7 +120,6 @@ function pvTTCKitchen(r: KitchenRow): number | null {
   return cost / (1 - m) * (1 + v);
 }
 
-/** Compute food cost % for any recipe with cost and sell price */
 function computeFoodCost(cost: number | null, sellPrice: number | null, pvConseille?: number | null): number | null {
   const price = (sellPrice != null && sellPrice > 0) ? sellPrice : (pvConseille != null && pvConseille > 0 ? pvConseille : null);
   if (!cost || cost <= 0 || !price || price <= 0) return null;
@@ -131,9 +133,23 @@ function foodCostColor(fc: number): string {
 }
 
 function foodCostBg(fc: number): string {
-  if (fc <= 28) return "rgba(74,103,65,0.10)";
-  if (fc <= 32) return "rgba(217,119,6,0.10)";
-  return "rgba(139,26,26,0.10)";
+  if (fc <= 28) return "rgba(74,103,65,0.12)";
+  if (fc <= 32) return "rgba(217,119,6,0.12)";
+  return "rgba(139,26,26,0.12)";
+}
+
+function doSort<T>(arr: T[], sk: SortKey, sd: SortDir, getCost: (r: T) => number | null, getFc: (r: T) => number | null, getPrice: (r: T) => number | null, getName: (r: T) => string): T[] {
+  return [...arr].sort((a, b) => {
+    let va: number, vb: number;
+    if (sk === "name") {
+      const res = getName(a).localeCompare(getName(b), "fr");
+      return sd === "asc" ? res : -res;
+    }
+    if (sk === "cost") { va = getCost(a) ?? Infinity; vb = getCost(b) ?? Infinity; }
+    else if (sk === "fc") { va = getFc(a) ?? Infinity; vb = getFc(b) ?? Infinity; }
+    else { va = getPrice(a) ?? Infinity; vb = getPrice(b) ?? Infinity; }
+    return sd === "asc" ? va - vb : vb - va;
+  });
 }
 
 function matchesFoodCostFilter(fc: number | null, filter: FoodCostFilter): boolean {
@@ -141,26 +157,38 @@ function matchesFoodCostFilter(fc: number | null, filter: FoodCostFilter): boole
   if (fc == null) return false;
   if (filter === "bon") return fc <= 28;
   if (filter === "attention") return fc > 28 && fc <= 32;
-  return fc > 32; // alerte
+  return fc > 32;
 }
 
-// ─── Shared UI ────────────────────────────────────────────────────────────────
+// ─── UI Components ────────────────────────────────────────────────────────────
 
-const pillStyle = (active: boolean): React.CSSProperties => ({
-  padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-  border: "1.5px solid",
-  borderColor: active ? "#D4775A" : "rgba(217,199,182,0.9)",
-  background: active ? "rgba(122,74,42,0.08)" : "rgba(255,255,255,0.7)",
-  color: active ? "#D4775A" : "#6f6a61",
-  cursor: "pointer",
-});
+function Thumb({ src, name, color }: { src: string | null; name: string; color: string }) {
+  if (src) {
+    return (
+      <div style={{ width: 44, height: 44, borderRadius: 10, overflow: "hidden", flexShrink: 0, background: "#f2ede4" }}>
+        <Image src={src} alt={name} width={44} height={44} style={{ objectFit: "cover", width: 44, height: 44 }} />
+      </div>
+    );
+  }
+  const initials = (name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  return (
+    <div style={{
+      width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+      background: color + "18",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: 14, fontWeight: 800, color, letterSpacing: 1,
+    }}>
+      {initials}
+    </div>
+  );
+}
 
 function FoodCostBadge({ fc }: { fc: number }) {
   return (
     <span style={{
-      display: "inline-flex", alignItems: "center", gap: 3,
-      padding: "1px 7px", borderRadius: 6,
-      fontSize: 11, fontWeight: 700,
+      display: "inline-flex", alignItems: "center",
+      padding: "2px 8px", borderRadius: 6,
+      fontSize: 11, fontWeight: 800, letterSpacing: 0.3,
       color: foodCostColor(fc),
       background: foodCostBg(fc),
     }}>
@@ -170,17 +198,15 @@ function FoodCostBadge({ fc }: { fc: number }) {
 }
 
 function RecipeCard({
-  name, href, color, prodHref,
+  name, href, color, prodHref, photoUrl, subtitle,
   cost, costLabel, pv, pvConseille, pvLabel,
 }: {
   name: string; href: string; color: string;
-  prodHref?: string;
+  prodHref?: string; photoUrl?: string | null; subtitle?: string;
   cost?: number | null; costLabel?: string;
   pv?: number | null; pvConseille?: number | null; pvLabel?: string;
 }) {
   const router = useRouter();
-
-  // Effective price: manual sell_price > PV conseillé
   const effectivePrice = (pv != null && pv > 0) ? pv : (pvConseille != null && pvConseille > 0 ? pvConseille : null);
   const isConseille = (pv == null || pv <= 0) && effectivePrice != null;
   const fc = computeFoodCost(cost ?? null, pv ?? null, pvConseille);
@@ -192,141 +218,152 @@ function RecipeCard({
       onClick={() => router.push(href)}
       onKeyDown={ev => ev.key === "Enter" && router.push(href)}
       style={{
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "11px 14px", borderRadius: 12,
+        display: "flex", alignItems: "center", gap: 12,
+        padding: "10px 14px", borderRadius: 14,
         background: "#fff",
         border: "1px solid #ddd6c8",
-        cursor: "pointer", transition: "background 0.12s",
-        marginBottom: 6,
+        cursor: "pointer", transition: "all 0.15s",
       }}
-      onMouseEnter={e => (e.currentTarget.style.background = "#f2ede4")}
-      onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
+      onMouseEnter={e => { e.currentTarget.style.background = "#f8f5f0"; e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"; }}
+      onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "none"; }}
     >
-      <div style={{ flex: 1, minWidth: 0, paddingRight: 10 }}>
+      {/* Photo */}
+      <Thumb src={photoUrl ?? null} name={name} color={color} />
+
+      {/* Name + subtitle + cost */}
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{
-            fontWeight: 700, fontSize: 13,
-            textTransform: "uppercase", letterSpacing: "0.05em", color: "#2f3a33",
+            fontWeight: 700, fontSize: 14,
+            fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+            textTransform: "uppercase", letterSpacing: "0.04em", color: "#1a1a1a",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%",
           }}>
             {name}
           </span>
           {fc != null && <FoodCostBadge fc={fc} />}
         </div>
-        {cost != null && cost > 0 && (
-          <div style={{ fontSize: 11, color: "#999", marginTop: 3 }}>
-            {fmt(cost)} €{costLabel && <span style={{ marginLeft: 2 }}>{costLabel}</span>}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+          {subtitle && (
+            <span style={{ fontSize: 11, color: "#999", fontWeight: 500 }}>{subtitle}</span>
+          )}
+          {cost != null && cost > 0 && (
+            <span style={{ fontSize: 11, color: "#999" }}>
+              {subtitle ? "\u00b7 " : ""}{fmt(cost)} \u20ac{costLabel ?? ""}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Right: price + production */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+        {effectivePrice != null && (
+          <div style={{
+            fontSize: 16, fontWeight: isConseille ? 500 : 800,
+            fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+            fontStyle: isConseille ? "italic" : "normal",
+            color: isConseille ? "#b0a89e" : "#1a1a1a",
+            whiteSpace: "nowrap",
+          }}>
+            {fmt(effectivePrice)} \u20ac
+            {pvLabel && <span style={{ fontSize: 9, fontWeight: 500, color: "#999", marginLeft: 2 }}>{pvLabel}</span>}
+            {isConseille && <span style={{ fontSize: 9, fontWeight: 500, color: "#b0a89e", marginLeft: 2 }}>(c)</span>}
           </div>
         )}
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
         {prodHref && (
           <button
             type="button"
             onClick={ev => { ev.stopPropagation(); router.push(prodHref); }}
             style={{
-              padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+              padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700,
               border: "1.5px solid #4a6741",
               background: "rgba(74,103,65,0.08)", color: "#4a6741",
-              cursor: "pointer", whiteSpace: "nowrap",
+              cursor: "pointer", whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: 0.5,
             }}
           >
             Production
           </button>
         )}
-        {effectivePrice != null && (
-          <div style={{
-            fontSize: 15, fontWeight: isConseille ? 500 : 900,
-            fontStyle: isConseille ? "italic" : "normal",
-            color: isConseille ? "#9a8f84" : color,
-            whiteSpace: "nowrap",
-          }}>
-            {fmt(effectivePrice)} €{pvLabel && <span style={{ fontSize: 10, fontWeight: 500, marginLeft: 2 }}>{pvLabel}</span>}
-            {isConseille && <span style={{ fontSize: 9, fontWeight: 500, marginLeft: 3 }}>(c)</span>}
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
-// Fully controlled collapsible section
-function Section({
-  title, color, count, open, onToggle, newHref, children,
+function SectionHeader({
+  title, color, count, newHref,
 }: {
-  title: string; color: string; count: number;
-  open: boolean; onToggle: () => void;
-  newHref?: string;
-  children: React.ReactNode;
+  title: string; color: string; count: number; newHref?: string;
 }) {
   const router = useRouter();
   return (
-    <div style={{ marginBottom: 24 }}>
+    <div style={{
+      display: "flex", alignItems: "center", gap: 10,
+      padding: "14px 0 10px", marginBottom: 8,
+      borderBottom: `2px solid ${color}`,
+    }}>
       <div style={{
-        display: "flex", alignItems: "center", gap: 10,
-        padding: "6px 0 8px", borderBottom: "1.5px solid #1a1a1a", marginBottom: 12,
+        width: 4, height: 22, borderRadius: 2, background: color, flexShrink: 0,
+      }} />
+      <span style={{
+        fontSize: 15, fontWeight: 700, color,
+        textTransform: "uppercase", letterSpacing: 2,
+        fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+        flex: 1,
       }}>
-        {newHref && (
-          <button
-            type="button"
-            onClick={() => router.push(newHref)}
-            aria-label={`Nouvelle ${title.toLowerCase()}`}
-            style={{
-              width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              background: color, border: "none", cursor: "pointer",
-              color: "#fff", fontSize: 18, fontWeight: 700, lineHeight: 1,
-            }}
-          >+</button>
-        )}
+        {title}
+        <span style={{ fontWeight: 500, fontSize: 12, marginLeft: 8, color: "#999", letterSpacing: 0 }}>{count} fiche{count > 1 ? "s" : ""}</span>
+      </span>
+      {newHref && (
         <button
           type="button"
-          onClick={onToggle}
+          onClick={() => router.push(newHref)}
           style={{
-            flex: 1, display: "flex", justifyContent: "space-between", alignItems: "center",
-            background: "none", border: "none", cursor: "pointer", padding: 0,
+            padding: "5px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+            border: `1.5px solid ${color}`,
+            background: color + "10", color,
+            cursor: "pointer", whiteSpace: "nowrap",
           }}
         >
-          <span style={{ fontSize: 14, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-            {title}
-            <span style={{ fontWeight: 500, fontSize: 12, marginLeft: 6, color: "#6f6a61" }}>({count})</span>
-          </span>
-          <span style={{ fontSize: 12, color, fontWeight: 700 }}>{open ? "\u25B2" : "\u25BC"}</span>
+          + Nouvelle
         </button>
-      </div>
-      {open && children}
+      )}
     </div>
   );
 }
 
-// Fully controlled collapsible subsection
-function SubSection({
-  title, color, count, open, onToggle, children,
-}: {
-  title: string; color: string; count: number;
-  open: boolean; onToggle: () => void;
-  children: React.ReactNode;
-}) {
+function SubSectionHeader({ title, color, count }: { title: string; color: string; count: number }) {
   return (
-    <div style={{ marginBottom: 14 }}>
-      <button
-        type="button"
-        onClick={onToggle}
-        style={{
-          width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
-          background: "none", border: "none", cursor: "pointer",
-          padding: "8px 4px 9px", borderBottom: "1px solid rgba(74,103,65,0.2)", marginBottom: 8,
-        }}
-      >
-        <span style={{ fontSize: 14, fontWeight: 800, color, letterSpacing: 0.5 }}>
-          {title}
-          <span style={{ fontWeight: 500, marginLeft: 4 }}>({count})</span>
-        </span>
-        <span style={{ fontSize: 11, color }}>{open ? "\u25B2" : "\u25BC"}</span>
-      </button>
-      {open && children}
+    <div style={{
+      display: "flex", alignItems: "center", gap: 6,
+      padding: "10px 0 6px",
+    }}>
+      <span style={{ fontSize: 13, fontWeight: 700, color, letterSpacing: 0.3 }}>
+        {title}
+      </span>
+      <span style={{ fontSize: 11, color: "#999" }}>({count})</span>
     </div>
   );
 }
+
+// ─── Tab pill ─────────────────────────────────────────────────────────────────
+
+const tabStyle = (active: boolean, color?: string): React.CSSProperties => ({
+  padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+  border: active ? "none" : "1.5px solid #ddd6c8",
+  background: active ? (color ?? "#1a1a1a") : "transparent",
+  color: active ? "#fff" : "#6f6a61",
+  cursor: "pointer", whiteSpace: "nowrap",
+  transition: "all 0.15s",
+});
+
+const filterPill = (active: boolean, activeColor?: string): React.CSSProperties => ({
+  padding: "4px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+  border: "1.5px solid",
+  borderColor: active ? (activeColor ?? "#D4775A") : "#ddd6c8",
+  background: active ? (activeColor ?? "#D4775A") + "14" : "transparent",
+  color: active ? (activeColor ?? "#D4775A") : "#999",
+  cursor: "pointer",
+});
 
 // ─── Main inner component ─────────────────────────────────────────────────────
 
@@ -343,43 +380,29 @@ function RecettesInner() {
   const [loadErrors, setLoadErrors] = useState<string[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [q, setQ]         = useState("");
+  const [mainTab, setMainTab] = useState<MainTab>("tous");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [cuisineCatFilter, setCuisineCatFilter] = useState<CuisineCatFilter>("all");
   const [foodCostFilter, setFoodCostFilter] = useState<FoodCostFilter>("all");
-
-  // ── Sections open state (fully controlled for expand/collapse all) ──
-  const [allExpanded, setAllExpanded] = useState(false);
-  const [secOpen, setSecOpen] = useState({ pizza: false, cuisine: false, cocktail: false, empatement: false });
-  const [subOpen, setSubOpen] = useState<Record<string, boolean>>(
-    Object.fromEntries(CUISINE_CATS.map(c => [c.id, false]))
-  );
-
-  function handleExpandToggle(on: boolean) {
-    setAllExpanded(on);
-    setSecOpen({ pizza: on, cuisine: on, cocktail: on, empatement: on });
-    setSubOpen(Object.fromEntries(CUISINE_CATS.map(c => [c.id, on])));
-  }
-  function toggleSec(k: keyof typeof secOpen) {
-    setSecOpen(s => ({ ...s, [k]: !s[k] }));
-  }
-  function toggleSub(id: string) {
-    setSubOpen(s => ({ ...s, [id]: !s[id] }));
-  }
+  const [showFab, setShowFab] = useState(false);
 
   function refresh() { setLoading(true); setRefreshKey(k => k + 1); }
 
   useEffect(() => {
+    let cancelled = false;
     supabase.auth.getSession().then(({ data: sessionData }) => {
+      if (cancelled) return;
       if (!sessionData.session) { setAuthOk(false); setLoading(false); return; }
       setAuthOk(true);
       const pq = supabase.from("pizza_recipes")
-        .select("id,name,total_cost,margin_rate,vat_rate,sell_price,establishments,pivot_ingredient_id")
+        .select("id,name,photo_url,total_cost,margin_rate,vat_rate,sell_price,establishments,pivot_ingredient_id")
         .eq("is_draft", false);
       const kq = supabase.from("kitchen_recipes")
-        .select("id,name,category,total_cost,cost_per_kg,cost_per_portion,margin_rate,vat_rate,sell_price,establishments,pivot_ingredient_id")
+        .select("id,name,photo_url,category,total_cost,cost_per_kg,cost_per_portion,margin_rate,vat_rate,sell_price,establishments,pivot_ingredient_id")
         .eq("is_draft", false);
       const cq = supabase.from("cocktails")
-        .select("id,name,type,total_cost,sell_price,establishments,pivot_ingredient_id")
+        .select("id,name,image_url,type,total_cost,sell_price,establishments,pivot_ingredient_id")
         .eq("is_draft", false);
       const eq = supabase.from("recipes")
         .select("id,name,type,created_at,pivot_ingredient_id")
@@ -392,13 +415,13 @@ function RecettesInner() {
         eq.or(`etablissement_id.eq.${etabCtx.id},etablissement_id.is.null`);
       }
 
-      Promise.all([pq, kq, cq, eq
-      ]).then(([p, k, c, e]) => {
+      Promise.all([pq, kq, cq, eq]).then(([p, k, c, e]) => {
+        if (cancelled) return;
         const errs: string[] = [];
-        if (p.error) errs.push(`Pizza : ${p.error.message ?? JSON.stringify(p.error)}`);
-        if (k.error) errs.push(`Cuisine : ${k.error.message ?? JSON.stringify(k.error)}`);
-        if (c.error) errs.push(`Cocktail : ${c.error.message ?? JSON.stringify(c.error)}`);
-        if (e.error) errs.push(`Empatement : ${e.error.message ?? JSON.stringify(e.error)}`);
+        if (p.error) errs.push(`Pizza : ${p.error.message}`);
+        if (k.error) errs.push(`Cuisine : ${k.error.message}`);
+        if (c.error) errs.push(`Cocktail : ${c.error.message}`);
+        if (e.error) errs.push(`Empatement : ${e.error.message}`);
         setLoadErrors(errs);
         setPizzas((p.data ?? []) as PizzaRow[]);
         setKitchens((k.data ?? []) as KitchenRow[]);
@@ -407,68 +430,60 @@ function RecettesInner() {
         setLoading(false);
       });
     });
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey, etabCtx?.id]);
 
-  // ── Filtered + sorted data ──
-
-  // Helper to get food cost for a pizza
+  // ── Food cost helpers ──
   const pizzaFc = (r: PizzaRow) => computeFoodCost(r.total_cost, r.sell_price, pvTTCPizza(r));
-  // Helper to get food cost for kitchen
   const kitchenFc = (r: KitchenRow) => {
     const cost = r.cost_per_portion ?? r.cost_per_kg ?? null;
     return computeFoodCost(cost, r.sell_price, pvTTCKitchen(r));
   };
-  // Helper to get food cost for cocktail
   const cocktailFc = (r: CocktailRow) => computeFoodCost(r.total_cost, r.sell_price, null);
 
-  const filteredPizzas = useMemo(() =>
-    pizzas
+  // ── Filtered + sorted data ──
+  const filteredPizzas = useMemo(() => {
+    const base = pizzas
       .filter(r => matchesSearch(r.name, q))
-      .filter(r => matchesFoodCostFilter(pizzaFc(r), foodCostFilter))
-      .sort((a, b) => {
-        const ca = a.total_cost ?? Infinity, cb = b.total_cost ?? Infinity;
-        return sortDir === "asc" ? ca - cb : cb - ca;
-      }),
-  [pizzas, q, sortDir, foodCostFilter]);
+      .filter(r => matchesFoodCostFilter(pizzaFc(r), foodCostFilter));
+    return doSort(base, sortKey, sortDir, r => r.total_cost, pizzaFc,
+      r => r.sell_price ?? pvTTCPizza(r), r => r.name ?? "");
+  }, [pizzas, q, sortKey, sortDir, foodCostFilter]);
 
-  const filteredKitchens = useMemo(() =>
-    kitchens
+  const filteredKitchens = useMemo(() => {
+    const base = kitchens
       .filter(r => matchesSearch(r.name, q))
       .filter(r => {
         if (cuisineCatFilter !== "all") {
           const cat = r.category ?? "autre";
           if (cuisineCatFilter === "autre") {
-            // "Autre" filter: show accompagnement + autre + anything not in other filters
             const explicitCats = ["plat_cuisine", "preparation", "entree", "sauce", "dessert"];
             if (explicitCats.includes(cat)) return false;
-          } else {
-            if (cat !== cuisineCatFilter) return false;
-          }
+          } else if (cat !== cuisineCatFilter) return false;
         }
         return true;
       })
-      .filter(r => matchesFoodCostFilter(kitchenFc(r), foodCostFilter))
-      .sort((a, b) => {
-        const ca = a.cost_per_portion ?? a.cost_per_kg ?? Infinity;
-        const cb = b.cost_per_portion ?? b.cost_per_kg ?? Infinity;
-        return sortDir === "asc" ? ca - cb : cb - ca;
-      }),
-  [kitchens, q, sortDir, cuisineCatFilter, foodCostFilter]);
+      .filter(r => matchesFoodCostFilter(kitchenFc(r), foodCostFilter));
+    return doSort(base, sortKey, sortDir,
+      r => r.cost_per_portion ?? r.cost_per_kg ?? null,
+      kitchenFc,
+      r => r.sell_price ?? pvTTCKitchen(r),
+      r => r.name ?? "");
+  }, [kitchens, q, sortKey, sortDir, cuisineCatFilter, foodCostFilter]);
 
-  const filteredCocktails = useMemo(() =>
-    cocktails
+  const filteredCocktails = useMemo(() => {
+    const base = cocktails
       .filter(r => matchesSearch(r.name, q))
-      .filter(r => matchesFoodCostFilter(cocktailFc(r), foodCostFilter))
-      .sort((a, b) => {
-        const ca = a.total_cost ?? Infinity, cb = b.total_cost ?? Infinity;
-        return sortDir === "asc" ? ca - cb : cb - ca;
-      }),
-  [cocktails, q, sortDir, foodCostFilter]);
+      .filter(r => matchesFoodCostFilter(cocktailFc(r), foodCostFilter));
+    return doSort(base, sortKey, sortDir, r => r.total_cost, cocktailFc,
+      r => r.sell_price, r => r.name ?? "");
+  }, [cocktails, q, sortKey, sortDir, foodCostFilter]);
 
   const filteredEmps = useMemo(() =>
-    emps.filter(r => matchesSearch(r.name, q)),
-    [emps, q]);
+    emps.filter(r => matchesSearch(r.name, q))
+      .sort((a, b) => sortDir === "asc" ? a.name.localeCompare(b.name, "fr") : b.name.localeCompare(a.name, "fr")),
+    [emps, q, sortDir]);
 
   const kitchenByCat = useMemo(() => {
     const map: Record<string, KitchenRow[]> = {};
@@ -482,9 +497,33 @@ function RecettesInner() {
 
   const totalCount = filteredPizzas.length + filteredKitchens.length + filteredCocktails.length + filteredEmps.length;
 
+  // Food cost alert counts
+  const alertCount = useMemo(() => {
+    let count = 0;
+    for (const r of pizzas) { const fc = pizzaFc(r); if (fc != null && fc > 32) count++; }
+    for (const r of kitchens) { const fc = kitchenFc(r); if (fc != null && fc > 32) count++; }
+    for (const r of cocktails) { const fc = cocktailFc(r); if (fc != null && fc > 32) count++; }
+    return count;
+  }, [pizzas, kitchens, cocktails]);
+
+  // Tab counts
+  const tabCounts = useMemo(() => ({
+    tous: filteredPizzas.length + filteredKitchens.length + filteredCocktails.length + filteredEmps.length,
+    pizza: filteredPizzas.length,
+    cuisine: filteredKitchens.length,
+    cocktail: filteredCocktails.length,
+    empatement: filteredEmps.length,
+  }), [filteredPizzas, filteredKitchens, filteredCocktails, filteredEmps]);
+
   if (authOk === null || loading) {
     return (
-      <main className="container"><TopNav title="Recettes" subtitle="Chargement..." /></main>
+      <main className="container">
+        <TopNav title="Recettes" subtitle="Chargement..." />
+        <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
+          <div style={{ width: 24, height: 24, border: "3px solid #ddd6c8", borderTopColor: "#D4775A", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </main>
     );
   }
   if (!authOk) {
@@ -496,201 +535,284 @@ function RecettesInner() {
     );
   }
 
+  const showPizza = mainTab === "tous" || mainTab === "pizza";
+  const showCuisine = mainTab === "tous" || mainTab === "cuisine";
+  const showCocktail = mainTab === "tous" || mainTab === "cocktail";
+  const showEmp = mainTab === "tous" || mainTab === "empatement";
+
+  // Sort toggle
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("asc"); }
+  }
+
   return (
     <>
-      <main className="container" style={{ paddingBottom: 40 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-          <TopNav title="Recettes" subtitle={loading ? "Chargement..." : `${totalCount} fiche(s)`} />
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-            <button className="btn" onClick={refresh} disabled={loading} style={{ fontSize: 12 }}>
-              {loading ? "\u2026" : "\u21BB"}
-            </button>
-          </div>
+      <main className="container" style={{ paddingBottom: 80 }}>
+        {/* ── Header ── */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 4 }}>
+          <TopNav title="Recettes" subtitle={`${totalCount} fiche${totalCount > 1 ? "s" : ""}`} />
+          <button className="btn" onClick={refresh} disabled={loading}
+            style={{ fontSize: 18, width: 36, height: 36, borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #ddd6c8", background: "#fff" }}>
+            {loading ? "\u2026" : "\u21BB"}
+          </button>
         </div>
 
-        {/* ── Erreurs de chargement ── */}
+        {/* ── Erreurs ── */}
         {loadErrors.length > 0 && (
           <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, background: "#FEF2F2", border: "1px solid rgba(139,26,26,0.2)", fontSize: 13 }}>
-            <strong style={{ color: "#8B1A1A" }}>Erreurs de chargement :</strong>
+            <strong style={{ color: "#8B1A1A" }}>Erreurs :</strong>
             {loadErrors.map(e => <div key={e} style={{ color: "#8B1A1A", marginTop: 4 }}>{e}</div>)}
           </div>
         )}
 
-        {/* ── Filtres ── */}
-        <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+        {/* ── Search ── */}
+        <div style={{ position: "relative", marginBottom: 12 }}>
+          <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", fontSize: 16, color: "#999", pointerEvents: "none" }}>
+            &#x1F50D;
+          </span>
           <input
-            className="input"
             type="search"
             placeholder="Rechercher une recette..."
             value={q}
             onChange={e => setQ(e.target.value)}
+            style={{
+              width: "100%", padding: "12px 14px 12px 40px", borderRadius: 12,
+              border: "1.5px solid #ddd6c8", background: "#fff",
+              fontSize: 14, outline: "none", boxSizing: "border-box",
+            }}
           />
+        </div>
 
-          {/* Cuisine category filter */}
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#999", marginRight: 2 }}>Cuisine</span>
-            {CUISINE_CAT_FILTERS.map(f => (
-              <button
-                key={f.id} type="button"
-                onClick={() => setCuisineCatFilter(f.id)}
-                style={pillStyle(cuisineCatFilter === f.id)}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
+        {/* ── Main tabs ── */}
+        <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 8, marginBottom: 4 }}>
+          {([
+            { key: "tous" as MainTab, label: "Tous", color: "#1a1a1a" },
+            { key: "pizza" as MainTab, label: "Pizza", color: PIZZA_COLOR },
+            { key: "cuisine" as MainTab, label: "Cuisine", color: CUISINE_COLOR },
+            { key: "cocktail" as MainTab, label: "Cocktail", color: COCKTAIL_COLOR },
+            { key: "empatement" as MainTab, label: "Emp\u00e2t.", color: EMP_COLOR },
+          ]).map(t => (
+            <button key={t.key} type="button" onClick={() => setMainTab(t.key)} style={tabStyle(mainTab === t.key, t.color)}>
+              {t.label}
+              <span style={{ marginLeft: 4, fontSize: 11, opacity: 0.8 }}>({tabCounts[t.key]})</span>
+            </button>
+          ))}
+        </div>
 
-          {/* Food cost filter */}
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#999", marginRight: 2 }}>Food cost</span>
+        {/* ── Sub-filters ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+          {/* Cuisine sub-categories (only when cuisine tab or tous) */}
+          {(mainTab === "cuisine" || mainTab === "tous") && (
+            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
+              {CUISINE_CAT_FILTERS.map(f => (
+                <button key={f.id} type="button" onClick={() => setCuisineCatFilter(f.id)}
+                  style={filterPill(cuisineCatFilter === f.id, CUISINE_COLOR)}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Food cost + sort */}
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "#999" }}>FC</span>
             {FOOD_COST_FILTERS.map(f => (
-              <button
-                key={f.id} type="button"
-                onClick={() => setFoodCostFilter(f.id)}
-                style={pillStyle(foodCostFilter === f.id)}
-              >
+              <button key={f.id} type="button" onClick={() => setFoodCostFilter(f.id)}
+                style={filterPill(foodCostFilter === f.id, f.id === "bon" ? "#4a6741" : f.id === "attention" ? "#d97706" : f.id === "alerte" ? "#8B1A1A" : undefined)}>
                 {f.label}
               </button>
             ))}
-          </div>
-
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-            {/* Sort */}
-            <button
-              type="button" onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
-              style={pillStyle(false)}
-            >
-              Co\u00FBt {sortDir === "asc" ? "\u25B2" : "\u25BC"}
-            </button>
-
-            {/* Toggle tout déplier / replier */}
-            <button
-              type="button"
-              onClick={() => handleExpandToggle(!allExpanded)}
-              style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 7, background: "none", border: "none", cursor: "pointer", padding: 0 }}
-              aria-label={allExpanded ? "Tout replier" : "Tout déplier"}
-            >
-              <span style={{ fontSize: 11, fontWeight: 600, color: "#6f6a61" }}>
-                {allExpanded ? "Replier" : "Déplier"}
-              </span>
-              {/* Switch pill */}
+            {alertCount > 0 && foodCostFilter !== "alerte" && (
               <span style={{
-                display: "inline-flex", alignItems: "center",
-                width: 38, height: 22, borderRadius: 11,
-                background: allExpanded ? "#D4775A" : "rgba(217,199,182,0.9)",
-                transition: "background 0.2s", flexShrink: 0, padding: "0 3px",
-                justifyContent: allExpanded ? "flex-end" : "flex-start",
+                padding: "2px 7px", borderRadius: 6, fontSize: 10, fontWeight: 800,
+                background: "rgba(139,26,26,0.12)", color: "#8B1A1A",
               }}>
-                <span style={{
-                  width: 16, height: 16, borderRadius: "50%",
-                  background: "#fff",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
-                  transition: "all 0.2s",
-                  display: "block",
-                }} />
+                {alertCount} alerte{alertCount > 1 ? "s" : ""}
               </span>
-            </button>
+            )}
+
+            <span style={{ flex: 1 }} />
+
+            {/* Sort buttons */}
+            {(["name", "cost", "fc", "price"] as SortKey[]).map(k => {
+              const labels: Record<SortKey, string> = { name: "A-Z", cost: "Co\u00fbt", fc: "FC", price: "Prix" };
+              const active = sortKey === k;
+              return (
+                <button key={k} type="button" onClick={() => toggleSort(k)}
+                  style={{
+                    padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700,
+                    border: "1px solid", borderColor: active ? "#1a1a1a" : "#ddd6c8",
+                    background: active ? "#1a1a1a" : "transparent",
+                    color: active ? "#fff" : "#999",
+                    cursor: "pointer",
+                  }}>
+                  {labels[k]}{active ? (sortDir === "asc" ? " \u25B2" : " \u25BC") : ""}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {totalCount === 0 && !loading && (
-          <p className="muted">Aucune recette trouvée.</p>
+          <p style={{ textAlign: "center", color: "#999", padding: 40, fontSize: 14 }}>Aucune recette trouv\u00e9e.</p>
         )}
 
         {/* ── Pizza ── */}
-        <Section
-            title="Pizza" color={PIZZA_COLOR} count={filteredPizzas.length}
-            open={secOpen.pizza} onToggle={() => toggleSec("pizza")}
-            newHref={canWrite ? "/recettes/new/pizza" : undefined}
-          >
-            {filteredPizzas.map(r => (
+        {showPizza && filteredPizzas.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            <SectionHeader title="Pizza" color={PIZZA_COLOR} count={filteredPizzas.length}
+              newHref={canWrite ? "/recettes/new/pizza" : undefined} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 8 }}>
+              {filteredPizzas.map(r => (
                 <RecipeCard
                   key={r.id}
                   name={r.name ?? "Pizza"}
                   href={`/recettes/pizza/${r.id}`}
                   prodHref={r.pivot_ingredient_id ? `/recettes/pizza/${r.id}?mode=production` : undefined}
                   color={PIZZA_COLOR}
+                  photoUrl={r.photo_url}
+                  subtitle="Pizza"
                   cost={r.total_cost}
                   pv={r.sell_price}
                   pvConseille={pvTTCPizza(r)}
                   pvLabel="TTC"
                 />
-            ))}
-          </Section>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── Cuisine ── */}
-          <Section
-            title="Cuisine" color={CUISINE_COLOR} count={filteredKitchens.length}
-            open={secOpen.cuisine} onToggle={() => toggleSec("cuisine")}
-            newHref={canWrite ? "/recettes/new/cuisine" : undefined}
-          >
+        {showCuisine && filteredKitchens.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            <SectionHeader title="Cuisine" color={CUISINE_COLOR} count={filteredKitchens.length}
+              newHref={canWrite ? "/recettes/new/cuisine" : undefined} />
             {CUISINE_CATS.filter(cat => (kitchenByCat[cat.id]?.length ?? 0) > 0).map(cat => (
-              <SubSection
-                key={cat.id}
-                title={cat.label} color={CUISINE_COLOR}
-                count={kitchenByCat[cat.id].length}
-                open={subOpen[cat.id] ?? true}
-                onToggle={() => toggleSub(cat.id)}
-              >
-                {kitchenByCat[cat.id].map(r => {
-                  const hasPortion = r.cost_per_portion != null && r.cost_per_portion > 0;
-                  const hasKg = r.cost_per_kg != null && r.cost_per_kg > 0;
-                  return (
-                    <RecipeCard
-                      key={r.id}
-                      name={r.name ?? "Recette"}
-                      href={`/recettes/cuisine/${r.id}`}
-                      prodHref={r.pivot_ingredient_id ? `/recettes/cuisine/${r.id}?mode=production` : undefined}
-                      color={CUISINE_COLOR}
-                      cost={hasPortion ? r.cost_per_portion! : hasKg ? r.cost_per_kg! : null}
-                      costLabel={hasPortion ? "/portion" : hasKg ? "/kg" : undefined}
-                      pv={r.sell_price}
-                      pvConseille={pvTTCKitchen(r)}
-                      pvLabel={hasPortion ? "TTC/portion" : hasKg ? "TTC/kg" : undefined}
-                    />
-                  );
-                })}
-              </SubSection>
+              <div key={cat.id}>
+                <SubSectionHeader title={cat.label} color={CUISINE_COLOR} count={kitchenByCat[cat.id].length} />
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 8, marginBottom: 8 }}>
+                  {kitchenByCat[cat.id].map(r => {
+                    const hasPortion = r.cost_per_portion != null && r.cost_per_portion > 0;
+                    const hasKg = r.cost_per_kg != null && r.cost_per_kg > 0;
+                    return (
+                      <RecipeCard
+                        key={r.id}
+                        name={r.name ?? "Recette"}
+                        href={`/recettes/cuisine/${r.id}`}
+                        prodHref={r.pivot_ingredient_id ? `/recettes/cuisine/${r.id}?mode=production` : undefined}
+                        color={CUISINE_COLOR}
+                        photoUrl={r.photo_url}
+                        subtitle={CAT_LABEL[r.category ?? "autre"] ?? r.category ?? ""}
+                        cost={hasPortion ? r.cost_per_portion! : hasKg ? r.cost_per_kg! : null}
+                        costLabel={hasPortion ? "/portion" : hasKg ? "/kg" : undefined}
+                        pv={r.sell_price}
+                        pvConseille={pvTTCKitchen(r)}
+                        pvLabel={hasPortion ? "TTC" : hasKg ? "TTC/kg" : undefined}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
             ))}
-          </Section>
+          </div>
+        )}
 
         {/* ── Cocktail ── */}
-          <Section
-            title="Cocktail" color={COCKTAIL_COLOR} count={filteredCocktails.length}
-            open={secOpen.cocktail} onToggle={() => toggleSec("cocktail")}
-            newHref={canWrite ? "/recettes/new/cocktail" : undefined}
-          >
-            {filteredCocktails.map(r => (
-              <RecipeCard
-                key={r.id}
-                name={r.name ?? "Cocktail"}
-                href={`/recettes/cocktail/${r.id}`}
-                prodHref={r.pivot_ingredient_id ? `/recettes/cocktail/${r.id}?mode=production` : undefined}
-                color={COCKTAIL_COLOR}
-                cost={r.total_cost}
-                pv={r.sell_price}
-                pvLabel="TTC"
-              />
-            ))}
-          </Section>
+        {showCocktail && filteredCocktails.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            <SectionHeader title="Cocktail" color={COCKTAIL_COLOR} count={filteredCocktails.length}
+              newHref={canWrite ? "/recettes/new/cocktail" : undefined} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 8 }}>
+              {filteredCocktails.map(r => (
+                <RecipeCard
+                  key={r.id}
+                  name={r.name ?? "Cocktail"}
+                  href={`/recettes/cocktail/${r.id}`}
+                  prodHref={r.pivot_ingredient_id ? `/recettes/cocktail/${r.id}?mode=production` : undefined}
+                  color={COCKTAIL_COLOR}
+                  photoUrl={r.image_url}
+                  subtitle="Cocktail"
+                  cost={r.total_cost}
+                  pv={r.sell_price}
+                  pvLabel="TTC"
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── Empatement ── */}
-          <Section
-            title="Empatement" color={EMP_COLOR} count={filteredEmps.length}
-            open={secOpen.empatement} onToggle={() => toggleSec("empatement")}
-            newHref={canWrite ? "/recettes/new/empatement" : undefined}
-          >
-            {filteredEmps.map(r => (
-              <RecipeCard
-                key={r.id}
-                name={r.name}
-                href={`/recettes/empatement/${r.id}`}
-                prodHref={r.pivot_ingredient_id ? `/recettes/empatement/${r.id}?mode=production` : undefined}
-                color={EMP_COLOR}
-              />
-            ))}
-          </Section>
+        {showEmp && filteredEmps.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            <SectionHeader title="Emp\u00e2tement" color={EMP_COLOR} count={filteredEmps.length}
+              newHref={canWrite ? "/recettes/new/empatement" : undefined} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 8 }}>
+              {filteredEmps.map(r => (
+                <RecipeCard
+                  key={r.id}
+                  name={r.name}
+                  href={`/recettes/empatement/${r.id}`}
+                  prodHref={r.pivot_ingredient_id ? `/recettes/empatement/${r.id}?mode=production` : undefined}
+                  color={EMP_COLOR}
+                  subtitle="Emp\u00e2tement"
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </main>
+
+      {/* ── FAB mobile ── */}
+      {canWrite && (
+        <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 100 }}>
+          {showFab && (
+            <div style={{
+              position: "absolute", bottom: 60, right: 0,
+              background: "#fff", borderRadius: 14, padding: 8,
+              boxShadow: "0 4px 20px rgba(0,0,0,0.15)", border: "1px solid #ddd6c8",
+              display: "flex", flexDirection: "column", gap: 4, minWidth: 160,
+            }}>
+              {[
+                { label: "Pizza", href: "/recettes/new/pizza", color: PIZZA_COLOR },
+                { label: "Cuisine", href: "/recettes/new/cuisine", color: CUISINE_COLOR },
+                { label: "Cocktail", href: "/recettes/new/cocktail", color: COCKTAIL_COLOR },
+                { label: "Emp\u00e2tement", href: "/recettes/new/empatement", color: EMP_COLOR },
+              ].map(item => (
+                <Link key={item.href} href={item.href} style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "10px 14px", borderRadius: 10, textDecoration: "none",
+                  fontSize: 13, fontWeight: 700, color: item.color,
+                  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                  textTransform: "uppercase", letterSpacing: 1,
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "#f2ede4"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                >
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: item.color }} />
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowFab(f => !f)}
+            style={{
+              width: 52, height: 52, borderRadius: "50%",
+              background: "#D4775A", border: "none",
+              color: "#fff", fontSize: 26, fontWeight: 300,
+              cursor: "pointer",
+              boxShadow: "0 4px 14px rgba(212,119,90,0.4)",
+              transition: "transform 0.2s",
+              transform: showFab ? "rotate(45deg)" : "none",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            +
+          </button>
+        </div>
+      )}
     </>
   );
 }
