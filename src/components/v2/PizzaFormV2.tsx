@@ -198,11 +198,9 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) { setStatus("error"); setError({ message: "NOT_LOGGED" }); return; }
 
-      let ingsQ = supabase.from("ingredients").select("*").eq("is_active", true);
-      let doughQ = supabase.from("recipes").select("id,name,type,total_cost,yield_grams,ball_weight");
-      if (etab) { ingsQ = ingsQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`); doughQ = doughQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`); }
-      let offQ = supabase.from("v_latest_offers").select("*");
-      if (etab) offQ = offQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
+      const ingsQ = supabase.from("ingredients").select("*").eq("is_active", true);
+      const doughQ = supabase.from("recipes").select("id,name,type,total_cost,yield_grams,ball_weight");
+      const offQ = supabase.from("v_latest_offers").select("*");
       const [{ data: ingsData, error: iErr }, { data: offers }, { data: doughs }] = await Promise.all([
         ingsQ.order("name"),
         offQ,
@@ -271,9 +269,8 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
           if (nk) ingNameToId[nk] = i.id;
         }
         if (missingIds.size > 0) {
-          let krQ = supabase.from("kitchen_recipes").select("name,output_ingredient_id,total_cost,yield_grams,cost_per_kg");
-          let prQ = supabase.from("prep_recipes").select("name,output_ingredient_id,total_cost,yield_grams");
-          if (etab) { krQ = krQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`); prQ = prQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`); }
+          const krQ = supabase.from("kitchen_recipes").select("name,output_ingredient_id,total_cost,yield_grams,cost_per_kg");
+          const prQ = supabase.from("prep_recipes").select("name,output_ingredient_id,total_cost,yield_grams");
           const [{ data: krAll }, { data: prAll }] = await Promise.all([krQ, prQ]);
           if (cancelled) return;
           for (const kr of (krAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; total_cost: number | null; yield_grams: number | null; cost_per_kg: number | null }>) {

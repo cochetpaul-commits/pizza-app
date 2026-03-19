@@ -171,12 +171,11 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) { setStatus("error"); setError({ message: "NOT_LOGGED" }); return; }
 
-      let ingsQ = supabase
+      const ingsQ = supabase
         .from("ingredients")
         .select("*")
         .eq("is_active", true)
         .in("category", ["epicerie_salee", "autre"]);
-      if (etab) ingsQ = ingsQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
       const { data: ingsData } = await ingsQ.order("name");
       if (cancelled) return;
       setFlourIngredients((ingsData ?? []) as Ingredient[]);
