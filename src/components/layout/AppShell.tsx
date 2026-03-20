@@ -43,7 +43,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Mobile bottom tab bar */}
-      <BottomTabBar />
+      <BottomTabBar onMenuClick={openDrawer} />
     </>
   );
 }
