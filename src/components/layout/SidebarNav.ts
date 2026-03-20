@@ -1,24 +1,215 @@
 import type { Role } from "@/lib/rbac";
 
+/* ── Legacy types (kept for compatibility) ─────────────── */
+
 export type NavSection = {
   label: string;
-  /** Icon key for section header (from Icons.tsx) */
   icon?: string;
   items: NavItem[];
-  /** Only show this section for these roles. If omitted, shown to all. */
   roles?: Role[];
-  /** Only show this section when current establishment slug contains this string */
   slugFilter?: string;
 };
 
 export type NavItem = {
   label: string;
   href: string;
-  /** Icon key from Icons.tsx — only used for standalone items (no section label) */
   icon?: string;
-  /** Only show for these roles */
   roles?: Role[];
 };
+
+/* ── V2 types ──────────────────────────────────────────── */
+
+export type NavItemV2 = {
+  label: string;
+  href: string;
+  icon?: string;
+  roles?: Role[];
+};
+
+export type NavSubSection = {
+  label: string;
+  icon?: string;
+  items: NavItemV2[];
+  roles?: Role[];
+};
+
+export type NavEtabGroup = {
+  kind: "etab";
+  etabSlug: string;
+  label: string;
+  icon?: string;
+  color: string;
+  sections: NavSubSection[];
+  roles?: Role[];
+};
+
+export type NavSettingsGroup = {
+  kind: "settings";
+  label: string;
+  icon?: string;
+  sections: NavSubSection[];
+  roles?: Role[];
+};
+
+export type NavStandaloneItem = {
+  kind: "item";
+  label: string;
+  href: string;
+  icon?: string;
+  roles?: Role[];
+};
+
+export type NavDivider = {
+  kind: "divider";
+};
+
+export type SidebarEntry = NavEtabGroup | NavSettingsGroup | NavStandaloneItem | NavDivider;
+
+/* ── Admin / Direction nav ─────────────────────────────── */
+
+const PERSONNEL_ITEMS: NavItemV2[] = [
+  { label: "Employes", href: "/rh/equipe", icon: "users" },
+  { label: "Planning", href: "/plannings", icon: "calendar" },
+  { label: "Pointage", href: "/rh/pointage", icon: "clock" },
+  { label: "Conges", href: "/rh/conges", icon: "beach" },
+  { label: "Emargement", href: "/rh/emargement", icon: "clipboard" },
+  { label: "Simulation", href: "/rh/masse-salariale", icon: "calculator", roles: ["group_admin"] },
+];
+
+const FINANCE_ITEMS: NavItemV2[] = [
+  { label: "Base ingredients", href: "/ingredients", icon: "tag" },
+  { label: "Fiches techniques", href: "/recettes", icon: "book" },
+  { label: "Commandes", href: "/commandes", icon: "shoppingBag" },
+  { label: "Achats", href: "/achats", icon: "trendingUp" },
+  { label: "Variations & alertes", href: "/variations-prix", icon: "barChart" },
+  { label: "Pilotage", href: "/pilotage", icon: "barChart" },
+  { label: "Inventaire", href: "/inventaire", icon: "package" },
+  { label: "Articles en vente", href: "/epicerie", icon: "tag" },
+];
+
+const CLIENTS_ITEMS: NavItemV2[] = [
+  { label: "Particuliers", href: "/evenements/clients", icon: "users" },
+  { label: "Carnet clients", href: "/clients", icon: "book" },
+  { label: "Creer devis", href: "/devis/new", icon: "fileText" },
+  { label: "Factures", href: "/clients/factures", icon: "fileText" },
+  { label: "Evenements", href: "/evenements", icon: "calendarEvent" },
+  { label: "Import Kezia", href: "/kezia", icon: "fileText" },
+];
+
+export const SIDEBAR_NAV_V2: SidebarEntry[] = [
+  {
+    kind: "item",
+    label: "Accueil",
+    href: "/dashboard",
+    icon: "dashboard",
+  },
+
+  { kind: "divider" },
+
+  /* ── Bello Mio ── */
+  {
+    kind: "etab",
+    etabSlug: "bello-mio",
+    label: "Bello Mio",
+    color: "#e27f57",
+    roles: ["group_admin", "manager"],
+    sections: [
+      {
+        label: "Gestion du personnel",
+        icon: "users",
+        items: PERSONNEL_ITEMS,
+      },
+      {
+        label: "Gestion de la finance",
+        icon: "wallet",
+        roles: ["group_admin"],
+        items: FINANCE_ITEMS,
+      },
+    ],
+  },
+
+  /* ── Piccola Mia ── */
+  {
+    kind: "etab",
+    etabSlug: "piccola-mia",
+    label: "Piccola Mia",
+    color: "#efd199",
+    roles: ["group_admin", "manager"],
+    sections: [
+      {
+        label: "Gestion du personnel",
+        icon: "users",
+        items: PERSONNEL_ITEMS,
+      },
+      {
+        label: "Gestion de la finance",
+        icon: "wallet",
+        roles: ["group_admin"],
+        items: FINANCE_ITEMS,
+      },
+      {
+        label: "Gestion des clients",
+        icon: "calendarEvent",
+        roles: ["group_admin"],
+        items: CLIENTS_ITEMS,
+      },
+    ],
+  },
+
+  { kind: "divider" },
+
+  /* ── Parametres ── */
+  {
+    kind: "settings",
+    label: "Parametres",
+    icon: "settings",
+    roles: ["group_admin"],
+    sections: [
+      {
+        label: "Etablissement",
+        icon: "box",
+        items: [
+          { label: "Gestion de la finance", href: "/settings/finance", icon: "wallet" },
+          { label: "Gestion du planning", href: "/settings/planning", icon: "calendar" },
+          { label: "Pointeuse", href: "/settings/pointeuse", icon: "clock" },
+        ],
+      },
+      {
+        label: "Employes",
+        icon: "users",
+        items: [
+          { label: "Informations", href: "/admin/utilisateurs", icon: "users" },
+          { label: "Contrat", href: "/settings/employes/contrat", icon: "fileText" },
+          { label: "Acces application", href: "/settings/employes/acces", icon: "settings" },
+          { label: "Role et permissions", href: "/settings/employes/roles", icon: "clipboard" },
+        ],
+      },
+      {
+        label: "",
+        items: [
+          { label: "Mon compte", href: "/settings/account", icon: "settings" },
+        ],
+      },
+    ],
+  },
+];
+
+/* ── Simplified nav for employee roles ─────────────────── */
+
+export const SIDEBAR_NAV_SIMPLE: SidebarEntry[] = [
+  { kind: "item", label: "Accueil", href: "/dashboard", icon: "dashboard" },
+  { kind: "divider" },
+  { kind: "item", label: "Mon planning", href: "/mes-shifts", icon: "calendar" },
+  { kind: "item", label: "Recettes", href: "/recettes", icon: "book", roles: ["cuisine", "salle"] },
+  { kind: "item", label: "Ingredients", href: "/ingredients", icon: "tag", roles: ["cuisine", "salle"] },
+  { kind: "item", label: "Commandes", href: "/commandes", icon: "shoppingBag", roles: ["cuisine", "salle"] },
+  { kind: "item", label: "Fournisseurs", href: "/fournisseurs", icon: "truck", roles: ["cuisine", "salle"] },
+  { kind: "item", label: "Planning", href: "/plannings", icon: "calendar", roles: ["cuisine", "salle"] },
+  { kind: "divider" },
+  { kind: "item", label: "Mon compte", href: "/settings/account", icon: "settings" },
+];
+
+/* ── Legacy SIDEBAR_NAV (kept for TopBar compatibility) ── */
 
 export const SIDEBAR_NAV: NavSection[] = [
   {
@@ -94,7 +285,7 @@ export const SIDEBAR_NAV: NavSection[] = [
 
 /** Title map: pathname → page title for TopBar */
 export const PAGE_TITLES: Record<string, string> = {
-  "/dashboard": "Tableau de bord",
+  "/dashboard": "Accueil",
   "/rh/equipe": "Salaries",
   "/plannings": "Planning",
   "/rh/pointage": "Pointage",
@@ -102,7 +293,13 @@ export const PAGE_TITLES: Record<string, string> = {
   "/rh/emargement": "Emargement",
   "/rh/masse-salariale": "Simulation & Masse Salariale",
   "/rh/rapports": "Rapports RH",
-  "/settings/planning": "Parametres RH",
+  "/settings/planning": "Gestion du planning",
+  "/settings/finance": "Gestion de la finance",
+  "/settings/pointeuse": "Pointeuse",
+  "/settings/employes/contrat": "Contrat",
+  "/settings/employes/acces": "Acces application",
+  "/settings/employes/roles": "Role et permissions",
+  "/settings/account": "Mon compte",
   "/pilotage": "Pilotage",
   "/achats": "Achats",
   "/mercuriale": "Mercuriale",
@@ -121,7 +318,6 @@ export const PAGE_TITLES: Record<string, string> = {
   "/clients/factures": "Factures clients",
   "/devis/new": "Nouveau devis",
   "/admin/utilisateurs": "Utilisateurs",
-  "/settings/account": "Mon compte",
   "/messagerie": "Messagerie",
   "/mes-shifts": "Mon planning",
   "/notifications": "Notifications",
@@ -152,7 +348,13 @@ const PAGE_SECTIONS: Record<string, string> = {
   "/rh/emargement": "Gestion du personnel",
   "/rh/masse-salariale": "Gestion du personnel",
   "/rh/rapports": "Gestion du personnel",
-  "/settings/planning": "Gestion du personnel",
+  "/settings/planning": "Parametres",
+  "/settings/finance": "Parametres",
+  "/settings/pointeuse": "Parametres",
+  "/settings/employes/contrat": "Parametres",
+  "/settings/employes/acces": "Parametres",
+  "/settings/employes/roles": "Parametres",
+  "/settings/account": "Parametres",
   "/pilotage": "Gestion de la finance",
   "/mercuriale": "Gestion de la finance",
   "/stats-achats": "Gestion de la finance",

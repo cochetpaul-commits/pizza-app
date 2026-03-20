@@ -28,6 +28,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/devis":        ["group_admin"],
   "/session":      ["group_admin", "manager", "cuisine", "salle", "plonge"],
   "/settings":     ["group_admin"],
+  "/settings/account": ["group_admin", "manager", "cuisine", "salle", "plonge"],
   // Hub routes
   "/bello-mio":    ["group_admin", "manager", "cuisine", "salle", "plonge"],
   "/piccola-mia":  ["group_admin", "manager", "cuisine", "salle", "plonge"],

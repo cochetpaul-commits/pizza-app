@@ -8,6 +8,7 @@
   --terre-light: #c9b99a;
   --noir: #1a1a1a;
   --sidebar-width: 240px;
+  --sidebar-collapsed-width: 60px;
   --etab-color: #b45f57;
   --sauge: #4a6741;
   --sauge-light: #e8ede6;
@@ -64,6 +65,18 @@ html, body{
 
 .sidebar-desktop {
   display: block;
+  width: var(--sidebar-width);
+  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.sidebar-desktop.collapsed {
+  width: var(--sidebar-collapsed-width);
+}
+
+/* Expand on hover when collapsed */
+.sidebar-desktop.collapsed:hover {
+  width: var(--sidebar-width);
 }
 
 .topbar-mobile {
@@ -74,6 +87,11 @@ html, body{
   margin-left: var(--sidebar-width);
   min-height: 100dvh;
   background: var(--creme);
+  transition: margin-left 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-main.sidebar-collapsed {
+  margin-left: var(--sidebar-collapsed-width);
 }
 
 /* Mobile bottom tab bar — hidden on desktop */
