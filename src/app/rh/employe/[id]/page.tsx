@@ -7,6 +7,7 @@ import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
 import Image from "next/image";
+import { PERM_SECTIONS, DEFAULT_PERMS, ROLE_INFO, mapToPermRole, type PermRole } from "@/lib/permissions";
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
@@ -53,7 +54,7 @@ type Shift = {
   end_time: string;
 };
 
-type MainTab = "infos" | "dossier" | "acces";
+type MainTab = "infos" | "dossier" | "acces" | "roles";
 type DossierSubTab = "perso" | "contrats" | "temps" | "conges" | "notes" | "primes" | "dispo";
 
 /* ── Constants ─────────────────────────────────────────────────── */
@@ -552,6 +553,7 @@ export default function EmployeDetailPage() {
             ["infos", "Informations generales"],
             ["dossier", "Dossier RH"],
             ["acces", "Acces"],
+            ["roles", "Role et permissions"],
           ] as [MainTab, string][]).map(([key, label]) => (
             <button
               key={key}
@@ -967,6 +969,104 @@ export default function EmployeDetailPage() {
         )}
 
         {/* ═══ TAB: ACCES ═══ */}
+        {/* ═══ TAB: Role et Permissions ═══ */}
+        {mainTab === "roles" && (() => {
+          const empRole = mapToPermRole((emp as Record<string, unknown>)?.role as string ?? "employe");
+          const perms = DEFAULT_PERMS[empRole] ?? DEFAULT_PERMS.employe;
+
+          const changeRole = async (newRole: PermRole) => {
+            // Map PermRole back to DB role
+            const dbRole = newRole === "proprietaire" ? "group_admin"
+              : newRole === "admin" ? "admin"
+              : newRole === "directeur" ? "direction"
+              : newRole === "manager" ? "manager"
+              : "employe";
+            await supabase.from("employes").update({ role: dbRole }).eq("id", emp.id);
+            setEmp((prev: Record<string, unknown>) => ({ ...prev, role: dbRole }));
+          };
+
+          const CheckIcon = () => (
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" opacity="0.15" /><polyline points="9 12 11.5 14.5 15 9.5" />
+            </svg>
+          );
+          const XIcon = () => (
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.6">
+              <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+            </svg>
+          );
+          const ToggleIcon = ({ on }: { on: boolean }) => (
+            <div style={{ width: 36, height: 20, borderRadius: 10, background: on ? "#2D6A4F" : "#ddd6c8", position: "relative", display: "inline-block" }}>
+              <div style={{ position: "absolute", top: 2, left: on ? 18 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
+            </div>
+          );
+
+          return (
+            <div style={section}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
+                <span style={{ fontSize: 17, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Role et Permissions</span>
+              </div>
+
+              {/* Role selector cards */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 24 }}>
+                {(["employe", "manager", "directeur", "admin", "proprietaire"] as PermRole[]).map(r => {
+                  const info = ROLE_INFO[r];
+                  const active = empRole === r;
+                  return (
+                    <button key={r} type="button" onClick={() => changeRole(r)} style={{
+                      padding: "12px 8px", borderRadius: 10, cursor: "pointer", textAlign: "left",
+                      border: active ? "2px solid #2D6A4F" : "1px solid #ddd6c8",
+                      background: active ? "rgba(45,106,79,0.04)" : "#fff",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                        <div style={{ width: 14, height: 14, borderRadius: "50%", border: active ? "4px solid #2D6A4F" : "1.5px solid #ddd6c8" }} />
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{info.label}</span>
+                      </div>
+                      <p style={{ fontSize: 10, color: "#999", lineHeight: 1.3, margin: 0 }}>{info.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Permission matrix */}
+              {PERM_SECTIONS.map(sec => (
+                <div key={sec.label} style={{ marginBottom: 12 }}>
+                  <div style={{ padding: "8px 12px", background: "#faf7f2", borderRadius: 6, marginBottom: 2 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{sec.label}</span>
+                  </div>
+                  {sec.permissions.map(p => {
+                    const val = perms[p.key];
+                    return (
+                      <div key={p.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderBottom: "1px solid #f0ebe3" }}>
+                        <span style={{ fontSize: 13, color: "#1a1a1a" }}>{p.label}</span>
+                        <span style={{ flexShrink: 0, marginLeft: 12 }}>
+                          {val === true ? <CheckIcon /> : val === false ? <XIcon /> : <ToggleIcon on={false} />}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+
+              {/* Delete account */}
+              <div style={{ marginTop: 24, padding: "16px 12px", borderTop: "1px solid #f0ebe3", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>Supprimer le compte employe</div>
+                  <div style={{ fontSize: 11, color: "#999" }}>Effacer definitivement l&apos;employe de votre etablissement.</div>
+                </div>
+                <button type="button" onClick={async () => {
+                  if (!confirm("Supprimer definitivement cet employe ? Cette operation est irreversible.")) return;
+                  await supabase.from("employes").delete().eq("id", emp.id);
+                  window.location.href = "/settings/employes";
+                }} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid rgba(220,38,38,0.3)", background: "rgba(220,38,38,0.06)", color: "#DC2626", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                  Supprimer le compte
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
         {mainTab === "acces" && (
           <>
             <div style={section}>
@@ -985,7 +1085,16 @@ export default function EmployeDetailPage() {
                 Envoyer une invitation par email pour acceder a l&apos;application.
               </p>
               <div style={{ display: "flex", gap: 8 }}>
-                <button type="button" onClick={() => alert("Envoi d'invitation : fonctionnalite a venir")} style={addBtnStyle} disabled={!email}>
+                <button type="button" onClick={async () => {
+                  if (!email) return;
+                  const res = await fetch("/api/admin/invite", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, displayName: `${(emp as Record<string, unknown>).prenom} ${(emp as Record<string, unknown>).nom}`, role: (emp as Record<string, unknown>).role ?? "employe" }),
+                  });
+                  if (res.ok) alert("Invitation envoyee a " + email);
+                  else alert("Erreur: " + (await res.text()));
+                }} style={addBtnStyle} disabled={!email}>
                   Envoyer une invitation
                 </button>
               </div>

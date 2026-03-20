@@ -120,6 +120,12 @@ export default function SettingsEmployesPage() {
             Equipe
           </h1>
           <div style={{ display: "flex", gap: 10 }}>
+            <button type="button" onClick={() => router.push("/settings/employes/import")} style={{
+              display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", borderRadius: 8,
+              border: "1px solid #ddd6c8", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
+            }}>
+              Importer (CSV)
+            </button>
             <button type="button" style={{
               display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", borderRadius: 8,
               border: "1px solid #ddd6c8", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
