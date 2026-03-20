@@ -493,66 +493,98 @@ export default function EmployeDetailPage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={pageStyle}>
-        {/* ── Header card ── */}
-        <div style={headerCard}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1 }}>
-            {/* Photo or avatar */}
-            {photoUrl ? (
-              <Image src={photoUrl} alt={`${prenom} ${nom}`} width={56} height={56} style={{ ...avatarImg, objectFit: "cover" }} />
-            ) : (
-              <div style={{ ...avatarLarge, background: avatarColor }}>
-                {initDisplay}
-              </div>
-            )}
+        {/* ── Back link ── */}
+        <a href="/settings/employes" style={{ fontSize: 13, color: "#1a1a1a", textDecoration: "none", display: "flex", alignItems: "center", gap: 4, marginBottom: 12 }}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
+          Retour a la liste des employes
+        </a>
+
+        {/* ── Combo-style colored header ── */}
+        <div style={{
+          background: `linear-gradient(135deg, ${etab?.couleur ?? "#2D6A4F"} 0%, ${etab?.couleur ?? "#2D6A4F"}cc 100%)`,
+          borderRadius: "14px 14px 0 0", padding: "20px 24px 0", color: "#fff",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: "50%", background: "rgba(255,255,255,0.2)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 18, fontWeight: 700, flexShrink: 0, color: "#fff",
+            }}>
+              {initDisplay}
+            </div>
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <h1 style={nameStyle}>{prenom} {nom}</h1>
-                <span style={rolePill}>{roleLabel}</span>
-                <span style={statutPill(actif)}>{actif ? "Actif" : "Inactif"}</span>
-              </div>
-              {matricule && (
-                <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>
-                  Matricule : {matricule}
-                </div>
-              )}
-              <div style={{ display: "flex", gap: 16, marginTop: 6, fontSize: 13, color: "#6f6a61", flexWrap: "wrap" }}>
-                {email && <span>{email}</span>}
-                {telMobile && <span>{telMobile}</span>}
-              </div>
-
-              {/* Completion bar */}
-              <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={completionBarBg}>
-                  <div style={{ ...completionBarFill, width: `${completionPct}%` }} />
-                </div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: completionPct === 100 ? "#4a6741" : "#e27f57" }}>
-                  {completionPct}% {completionPct === 100 ? "Complet" : "Incomplet"}
+                <h1 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color: "#fff", margin: 0 }}>
+                  {prenom} {nom.toUpperCase()}
+                </h1>
+                <span style={{
+                  padding: "2px 10px", borderRadius: 4, fontSize: 11, fontWeight: 600,
+                  background: "rgba(255,255,255,0.2)", color: "#fff", border: "1px solid rgba(255,255,255,0.3)",
+                }}>
+                  {roleLabel}
                 </span>
               </div>
+              {activeContrat?.emploi && (
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", marginTop: 2 }}>{activeContrat.emploi}</div>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {canWrite && (
+                <button type="button" onClick={handleSave} disabled={saving} style={{
+                  ...saveBtnStyle, background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.3)",
+                }}>
+                  {saving ? "..." : saveOk ? "OK" : "Sauvegarder"}
+                </button>
+              )}
+              {canWrite && actif && (
+                <button type="button" onClick={handleArchive} style={{
+                  ...archiveBtnStyle, background: "transparent", border: "1px solid rgba(255,255,255,0.3)", color: "#fff",
+                }}>
+                  Archiver
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Actions */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-            {canWrite && (
-              <button type="button" onClick={handleSave} disabled={saving} style={saveBtnStyle}>
-                {saving ? "..." : saveOk ? "OK" : "Sauvegarder"}
-              </button>
-            )}
-            {canWrite && actif && (
-              <button type="button" onClick={handleArchive} style={archiveBtnStyle}>
-                Archiver
-              </button>
-            )}
+          {/* Contract info band */}
+          <div style={{
+            display: "flex", gap: 24, marginTop: 16, padding: "10px 0",
+            borderTop: "1px solid rgba(255,255,255,0.15)",
+            fontSize: 11, color: "rgba(255,255,255,0.7)",
+          }}>
+            <div>
+              <div style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Debut du contrat</div>
+              <div style={{ color: "#fff", fontSize: 12, marginTop: 2 }}>
+                {activeContrat?.date_debut ? new Date(activeContrat.date_debut).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "—"}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Fin du contrat</div>
+              <div style={{ color: "#fff", fontSize: 12, marginTop: 2 }}>
+                {activeContrat?.date_fin ? new Date(activeContrat.date_fin).toLocaleDateString("fr-FR") : "—"}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Type de contrat</div>
+              <div style={{ color: "#fff", fontSize: 12, marginTop: 2 }}>{activeContrat?.type ?? "—"}</div>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Etablissement</div>
+              <div style={{ color: "#fff", fontSize: 12, marginTop: 2 }}>{etab?.nom ?? "—"}</div>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Equipe</div>
+              <div style={{ color: "#fff", fontSize: 12, marginTop: 2 }}>{((emp as Record<string, unknown>).equipes_access as string[] ?? [])[0] ?? "—"}</div>
+            </div>
           </div>
         </div>
 
-        {/* ── Main Tabs (3) ── */}
-        <div style={tabsRow}>
+        {/* ── 6 Tabs ── */}
+        <div style={{ ...tabsRow, background: "#fff", borderRadius: "0 0 14px 14px", marginBottom: 16, borderTop: "none" }}>
           {([
-            ["infos", "Informations generales"],
-            ["dossier", "Dossier RH"],
-            ["acces", "Acces"],
+            ["infos", "Informations personnelles"],
+            ["dossier", "Contrats"],
+            ["acces", "Temps et planification"],
             ["roles", "Role et permissions"],
           ] as [MainTab, string][]).map(([key, label]) => (
             <button
