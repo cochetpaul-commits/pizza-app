@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -47,12 +47,32 @@ export function AddCollaborateurModal({ etablissementId, onClose, onCreated }: P
 
   // Step 3 — Contrat
   const [contratType, setContratType] = useState("CDI");
-  const [equipe, setEquipe] = useState("Cuisine");
+  const [equipe, setEquipe] = useState("");
+  const [dbEquipes, setDbEquipes] = useState<string[]>([]);
+  const [roleEmploye, setRoleEmploye] = useState("employe");
   const [emploi, setEmploi] = useState("");
   const [qualification, setQualification] = useState("");
   const [heures, setHeures] = useState(39);
   const [salaireBrut, setSalaireBrut] = useState(0);
   const [dateDebut, setDateDebut] = useState(new Date().toISOString().slice(0, 10));
+
+  // Load equipes from DB
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("equipes").select("nom").eq("etablissement_id", etablissementId).eq("actif", true).order("nom");
+      if (data && data.length > 0) {
+        const noms = data.map(e => e.nom);
+        setDbEquipes(noms);
+        if (!equipe) setEquipe(noms[0]);
+      } else {
+        // Fallback: derive from postes
+        const { data: postes } = await supabase.from("postes").select("equipe").eq("etablissement_id", etablissementId).eq("actif", true);
+        const noms = [...new Set((postes ?? []).map(p => p.equipe))].sort();
+        setDbEquipes(noms.length > 0 ? noms : ["Cuisine", "Salle"]);
+        if (!equipe && noms.length > 0) setEquipe(noms[0]);
+      }
+    })();
+  }, [etablissementId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const step1Valid = !!prenom.trim() && !!nom.trim();
 
@@ -100,7 +120,7 @@ export function AddCollaborateurModal({ etablissementId, onClose, onCreated }: P
         code_postal: codePostal.trim() || null,
         ville: ville.trim() || null,
         equipes_access: [equipe],
-        role: "employe",
+        role: roleEmploye,
         actif: true,
         date_anciennete: dateDebut || null,
       })
@@ -268,9 +288,7 @@ export function AddCollaborateurModal({ etablissementId, onClose, onCreated }: P
               <div style={{ ...S.field, flex: 1 }}>
                 <label style={S.label}>Equipe *</label>
                 <select style={S.input} value={equipe} onChange={(e) => setEquipe(e.target.value)}>
-                  <option value="Cuisine">Cuisine</option>
-                  <option value="Salle">Salle</option>
-                  <option value="Shop">Shop</option>
+                  {dbEquipes.map(eq => <option key={eq} value={eq}>{eq}</option>)}
                 </select>
               </div>
               <div style={{ ...S.field, flex: 1 }}>
@@ -286,6 +304,15 @@ export function AddCollaborateurModal({ etablissementId, onClose, onCreated }: P
                 <option value="Employe qualifie">Employe qualifie (Niveau II)</option>
                 <option value="Agent de maitrise">Agent de maitrise (Niveau III)</option>
                 <option value="Cadre">Cadre (Niveau IV-V)</option>
+              </select>
+            </div>
+            <div style={S.field}>
+              <label style={S.label}>Role</label>
+              <select style={S.input} value={roleEmploye} onChange={(e) => setRoleEmploye(e.target.value)}>
+                <option value="employe">Employe</option>
+                <option value="manager">Manager</option>
+                <option value="direction">Directeur</option>
+                <option value="admin">Administrateur</option>
               </select>
             </div>
             <div style={S.row}>
