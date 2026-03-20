@@ -126,6 +126,20 @@ export default function EtablissementDetailPage() {
   const [editPrimeId, setEditPrimeId] = useState<string | null>(null);
   const [allEtabs, setAllEtabs] = useState<{ id: string; nom: string }[]>([]);
 
+  // Modulation
+  type PeriodeMod = { id: string; mode: string; date_debut: string; date_fin: string; heures_annuelles: number; temps_plein_actif: boolean; plafond_hebdo_h: number; plancher_hebdo_h: number; temps_partiel_actif: boolean; actif: boolean; equipe_ids: string[] };
+  const [periodes, setPeriodes] = useState<PeriodeMod[]>([]);
+  const [showCreatePeriode, setShowCreatePeriode] = useState(false);
+  const [modMode, setModMode] = useState<"modulation" | "lissage">("modulation");
+  const [modDebut, setModDebut] = useState(() => { const y = new Date().getFullYear(); return `${y}-01-01`; });
+  const [modFin, setModFin] = useState(() => { const y = new Date().getFullYear(); return `${y}-12-31`; });
+  const [modHeures, setModHeures] = useState(1607);
+  const [modTpActif, setModTpActif] = useState(true);
+  const [modPlafond, setModPlafond] = useState(42);
+  const [modPlancher, setModPlancher] = useState(0);
+  const [modPartielActif, setModPartielActif] = useState(false);
+  const [modEquipeIds, setModEquipeIds] = useState<string[]>([]);
+
   // Planification modals
   const [showEquipesModal, setShowEquipesModal] = useState(false);
   const [editEquipes, setEditEquipes] = useState<string[]>([]);
@@ -147,12 +161,13 @@ export default function EtablissementDetailPage() {
     if (!id) return;
     let cancelled = false;
     (async () => {
-      const [etabRes, postesRes, primesRes, allEtabsRes, equipesRes] = await Promise.all([
+      const [etabRes, postesRes, primesRes, allEtabsRes, equipesRes, periodesRes] = await Promise.all([
         supabase.from("etablissements").select("*").eq("id", id).single(),
         supabase.from("postes").select("id, nom, equipe, couleur, emoji, actif").eq("etablissement_id", id).order("equipe").order("nom"),
         supabase.from("primes").select("id, libelle, code, type, montant, recurrence, actif").eq("etablissement_id", id).order("libelle"),
         supabase.from("etablissements").select("id, nom").eq("actif", true).order("nom"),
         supabase.from("equipes").select("id, nom, actif").eq("etablissement_id", id).eq("actif", true).order("nom"),
+        supabase.from("periodes_modulation").select("*").eq("etablissement_id", id).order("date_debut", { ascending: false }),
       ]);
       if (!cancelled) {
         if (etabRes.data) setSettings(etabRes.data as unknown as Settings);
@@ -163,6 +178,7 @@ export default function EtablissementDetailPage() {
         setEditEquipes(loadedEquipes.map(e => e.nom));
         setPrimes((primesRes.data ?? []) as Prime[]);
         setAllEtabs((allEtabsRes.data ?? []).filter(e => e.id !== id) as { id: string; nom: string }[]);
+        setPeriodes((periodesRes.data ?? []) as PeriodeMod[]);
         setLoading(false);
       }
     })();
@@ -690,29 +706,283 @@ export default function EtablissementDetailPage() {
   );
 
   /* ── Tab: Modulation ── */
-  const renderModulation = () => (
-    <div style={CARD}>
-      <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: "#1a1a1a" }}>Modulation du temps de travail</h2>
-      <p style={{ fontSize: 13, color: "#999", lineHeight: 1.5 }}>
-        La modulation permet d&apos;amenager le temps de travail sur une periode superieure a la semaine.
-        Les heures supplementaires sont alors calculees en fin de periode de reference.
-      </p>
-      <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <div>
-          <div style={LABEL}>Cotisations patronales (%)</div>
-          <input type="number" style={INPUT} value={settings.cotisations_patronales} onChange={e => updateField({ cotisations_patronales: Number(e.target.value) })} step={0.5} />
+  const createPeriode = async () => {
+    if (!id) return;
+    const payload = {
+      etablissement_id: id,
+      mode: modMode,
+      date_debut: modDebut,
+      date_fin: modFin,
+      heures_annuelles: modHeures,
+      temps_plein_actif: modTpActif,
+      plafond_hebdo_h: modPlafond,
+      plancher_hebdo_h: modPlancher,
+      temps_partiel_actif: modPartielActif,
+      equipe_ids: modEquipeIds,
+    };
+    const { data } = await supabase.from("periodes_modulation").insert(payload).select().single();
+    if (data) setPeriodes(prev => [data as PeriodeMod, ...prev]);
+    setShowCreatePeriode(false);
+  };
+
+  const deletePeriode = async (pId: string) => {
+    if (!confirm("Supprimer cette periode ?")) return;
+    await supabase.from("periodes_modulation").delete().eq("id", pId);
+    setPeriodes(prev => prev.filter(p => p.id !== pId));
+  };
+
+  const renderModulation = () => {
+    // List view (no create form)
+    if (!showCreatePeriode) {
+      return (
+        <>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+            <button type="button" onClick={() => setShowCreatePeriode(true)} style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "10px 18px", borderRadius: 8,
+              background: "#1a1a1a", color: "#fff", border: "none",
+              fontSize: 13, fontWeight: 600, cursor: "pointer",
+            }}>
+              + Creer une periode
+            </button>
+          </div>
+
+          {periodes.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "60px 20px" }}>
+              <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color: "#1a1a1a", marginBottom: 12 }}>
+                Aucune periode de modulation planifiee
+              </h2>
+              <p style={{ fontSize: 14, color: "#999", maxWidth: 500, margin: "0 auto", lineHeight: 1.5 }}>
+                Cet etablissement n&apos;a pas de periode de modulation planifiee. Vous pouvez creer une periode de modulation en cliquant sur le bouton ci-dessus.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: 12 }}>
+              {periodes.map(p => (
+                <div key={p.id} style={CARD}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <div>
+                      <span style={{
+                        padding: "3px 10px", borderRadius: 4, fontSize: 11, fontWeight: 700,
+                        background: p.mode === "modulation" ? "rgba(45,106,79,0.1)" : "rgba(37,99,235,0.1)",
+                        color: p.mode === "modulation" ? "#2D6A4F" : "#2563eb",
+                        textTransform: "uppercase",
+                      }}>
+                        {p.mode}
+                      </span>
+                    </div>
+                    <button type="button" onClick={() => deletePeriode(p.id)} style={{
+                      background: "none", border: "none", cursor: "pointer", color: "#DC2626", fontSize: 12, fontWeight: 600,
+                    }}>
+                      Supprimer
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>
+                    Du {new Date(p.date_debut).toLocaleDateString("fr-FR")} au {new Date(p.date_fin).toLocaleDateString("fr-FR")}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#999" }}>
+                    {p.heures_annuelles}h/an
+                    {p.temps_plein_actif && ` · Temps plein (plafond ${p.plafond_hebdo_h}h)`}
+                    {p.temps_partiel_actif && " · Temps partiel"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      );
+    }
+
+    // Create form
+    return (
+      <>
+        <button type="button" onClick={() => setShowCreatePeriode(false)} style={{
+          background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#1a1a1a",
+          display: "flex", alignItems: "center", gap: 4, marginBottom: 16, fontWeight: 600,
+        }}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
+          Retour a la configuration
+        </button>
+
+        <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color: "#1a1a1a", marginBottom: 20 }}>
+          Nouvelle periode d&apos;amenagement du temps de travail
+        </h2>
+
+        {/* Mode de comptage */}
+        <div style={CARD}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 12 }}>Mode de comptage des heures</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <label style={{
+              padding: 16, borderRadius: 10, cursor: "pointer",
+              border: modMode === "modulation" ? "2px solid #2D6A4F" : "1px solid #ddd6c8",
+              background: modMode === "modulation" ? "rgba(45,106,79,0.04)" : "#fff",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <input type="radio" name="modMode" checked={modMode === "modulation"} onChange={() => setModMode("modulation")} />
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Modulation</span>
+              </div>
+              <p style={{ fontSize: 12, color: "#666", lineHeight: 1.4, margin: 0 }}>
+                La modulation du temps de travail, tel que defini par un accord d&apos;entreprise ou votre convention collective, permet de definir un nombre d&apos;heures a effectuer sur l&apos;annee. Les horaires sont augmentes en periode de haute activite et reduits en periode de basse activite.
+              </p>
+            </label>
+            <label style={{
+              padding: 16, borderRadius: 10, cursor: "pointer",
+              border: modMode === "lissage" ? "2px solid #2563eb" : "1px solid #ddd6c8",
+              background: modMode === "lissage" ? "rgba(37,99,235,0.04)" : "#fff",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <input type="radio" name="modMode" checked={modMode === "lissage"} onChange={() => setModMode("lissage")} />
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Lissage</span>
+              </div>
+              <p style={{ fontSize: 12, color: "#666", lineHeight: 1.4, margin: 0 }}>
+                Dans le cadre du lissage, les variations par rapport a la duree contractuelle hebdomadaire sont compensees d&apos;une semaine a l&apos;autre, permettant de repartir uniformement les fluctuations sur l&apos;ensemble de la periode. A la fin, un compteur d&apos;heures vous indique le solde final.
+              </p>
+            </label>
+          </div>
         </div>
-        <div>
-          <div style={LABEL}>Taux accident du travail (%)</div>
-          <input type="number" style={INPUT} value={settings.taux_accident_travail} onChange={e => updateField({ taux_accident_travail: Number(e.target.value) })} step={0.1} />
+
+        {/* Periode de reference */}
+        <div style={CARD}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 12 }}>Periode de reference</h3>
+          <div style={{ ...LABEL, marginBottom: 6 }}>Dates <span style={{ color: "#DC2626" }}>*</span></div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <input type="date" style={{ ...INPUT, width: 180 }} value={modDebut} onChange={e => setModDebut(e.target.value)} />
+            <span style={{ color: "#999" }}>→</span>
+            <input type="date" style={{ ...INPUT, width: 180 }} value={modFin} onChange={e => setModFin(e.target.value)} />
+          </div>
         </div>
-        <div>
-          <div style={LABEL}>Taux horaire moyen (EUR/h)</div>
-          <input type="number" style={INPUT} value={settings.taux_horaire_moyen} onChange={e => updateField({ taux_horaire_moyen: Number(e.target.value) })} step={0.5} />
+
+        {/* Configuration contrat */}
+        <div style={CARD}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 12 }}>Configuration selon le contrat de travail</h3>
+
+          {modMode === "modulation" && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>
+                Heures a realiser sur l&apos;annee <span style={{ color: "#DC2626" }}>*</span>
+              </div>
+              <p style={{ fontSize: 12, color: "#999", marginBottom: 8 }}>
+                Les heures sont basees sur un total a realiser pour les temps pleins. Pour les temps partiels, celles-ci seront proratisees.
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <input type="number" style={{ ...INPUT, width: 120, textAlign: "right" }} value={modHeures} onChange={e => setModHeures(Number(e.target.value))} />
+                <span style={{ fontSize: 13, color: "#999" }}>h</span>
+              </div>
+            </div>
+          )}
+
+          {modMode === "lissage" && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>
+                Heures a travailler sur une semaine
+              </div>
+              <p style={{ fontSize: 12, color: "#999", marginBottom: 8 }}>
+                Cet objectif est base sur les termes du contrat de l&apos;employe, en tenant compte de conditions specifiques telles que la duree de la periode et les heures de travail.
+              </p>
+            </div>
+          )}
+
+          {/* Temps plein + Temps partiel toggles need at least one active */}
+          {!modTpActif && !modPartielActif && (
+            <div style={{
+              padding: 12, borderRadius: 8, marginBottom: 12,
+              background: "rgba(220,38,38,0.04)", border: "1px solid rgba(220,38,38,0.2)",
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#DC2626" }}>Erreur</div>
+              <div style={{ fontSize: 12, color: "#DC2626", marginTop: 2 }}>Vous devez activer au moins un type de contrat de travail</div>
+            </div>
+          )}
+
+          {/* Temps plein */}
+          <div style={{ ...CARD, border: modTpActif ? "1px solid #ddd6c8" : "1px solid #f0ebe3", padding: 16, marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: modTpActif ? 12 : 0 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Temps plein</span>
+              <Toggle value={modTpActif} onChange={setModTpActif} />
+            </div>
+            {modTpActif && modMode === "modulation" && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, paddingTop: 12, borderTop: "1px solid #f0ebe3" }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>Plafond hebdomadaire</div>
+                  <p style={{ fontSize: 11, color: "#999", marginBottom: 6 }}>Nombre maximum d&apos;heures prises en compte en modulation pour une semaine donnee.</p>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <input type="number" style={{ ...INPUT, width: 80, textAlign: "right" }} value={modPlafond} onChange={e => setModPlafond(Number(e.target.value))} />
+                    <span style={{ fontSize: 12, color: "#999" }}>h</span>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>Plancher hebdomadaire <span style={{ color: "#DC2626" }}>*</span></div>
+                  <p style={{ fontSize: 11, color: "#999", marginBottom: 6 }}>Nombre minimum d&apos;heures que doit travailler un employe au cours d&apos;une semaine.</p>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <input type="number" style={{ ...INPUT, width: 80, textAlign: "right" }} value={modPlancher} onChange={e => setModPlancher(Number(e.target.value))} />
+                    <span style={{ fontSize: 12, color: "#999" }}>h</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Temps partiel */}
+          <div style={{ ...CARD, border: modPartielActif ? "1px solid #ddd6c8" : "1px solid #f0ebe3", padding: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Temps partiel</span>
+              <Toggle value={modPartielActif} onChange={setModPartielActif} />
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  );
+
+        {/* Equipes et salaries */}
+        <div style={CARD}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 8 }}>Equipes et Salaries</h3>
+          <div style={{ marginBottom: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
+              Equipe(s) {modMode === "modulation" ? "modulee(s)" : "lissee(s)"} <span style={{ color: "#DC2626" }}>*</span>
+            </span>
+            <span style={{ fontSize: 12, color: "#D4775A", marginLeft: 6 }}>{modEquipeIds.length}/{dbEquipes.length}</span>
+          </div>
+          <p style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>
+            Vous pourrez desactiver ou configurer la modulation du temps de travail par employe dans l&apos;onglet &quot;contrat&quot; du profil de l&apos;employe.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {dbEquipes.map(eq => (
+              <label key={eq.id} style={{
+                display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
+                borderRadius: 8, border: "1px solid #ddd6c8", cursor: "pointer",
+                background: modEquipeIds.includes(eq.id) ? "rgba(45,106,79,0.04)" : "#fff",
+              }}>
+                <input
+                  type="checkbox"
+                  checked={modEquipeIds.includes(eq.id)}
+                  onChange={e => {
+                    if (e.target.checked) setModEquipeIds(prev => [...prev, eq.id]);
+                    else setModEquipeIds(prev => prev.filter(x => x !== eq.id));
+                  }}
+                />
+                <span style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a" }}>{eq.nom}</span>
+              </label>
+            ))}
+            {dbEquipes.length === 0 && <span style={{ fontSize: 12, color: "#999" }}>Aucune equipe configuree</span>}
+          </div>
+        </div>
+
+        {/* Create button */}
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+          <button
+            type="button"
+            onClick={createPeriode}
+            disabled={!modDebut || !modFin || (!modTpActif && !modPartielActif)}
+            style={{
+              padding: "10px 24px", borderRadius: 8, border: "none",
+              background: (!modTpActif && !modPartielActif) ? "#ddd6c8" : "#1a1a1a",
+              color: "#fff", fontSize: 14, fontWeight: 600,
+              cursor: (!modTpActif && !modPartielActif) ? "default" : "pointer",
+            }}
+          >
+            Creer
+          </button>
+        </div>
+      </>
+    );
+  };
 
   const tabStyle = (t: Tab): React.CSSProperties => ({
     padding: "6px 16px", borderRadius: 20, border: "none", cursor: "pointer",
