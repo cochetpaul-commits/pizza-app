@@ -58,7 +58,7 @@ type Shift = {
   end_time?: string;
 };
 
-type MainTab = "infos" | "dossier" | "acces" | "roles";
+type MainTab = "infos" | "dossier" | "acces" | "conges" | "documents" | "roles";
 type DossierSubTab = "perso" | "contrats" | "temps" | "conges" | "notes" | "primes" | "dispo";
 
 /* ── Constants ─────────────────────────────────────────────────── */
@@ -636,6 +636,8 @@ export default function EmployeDetailPage() {
             ["infos", "Informations personnelles"],
             ["dossier", "Contrats"],
             ["acces", "Temps et planification"],
+            ["conges", "Conges et Absences"],
+            ["documents", "Documents"],
             ["roles", "Role et permissions"],
           ] as [MainTab, string][]).map(([key, label]) => (
             <button
@@ -1242,6 +1244,194 @@ export default function EmployeDetailPage() {
             )}
           </>
         )}
+
+        {/* ═══ TAB: Conges et Absences ═══ */}
+        {mainTab === "conges" && (() => {
+          const ABSENCE_TYPES: Record<string, { label: string; color: string }> = {
+            conge_paye: { label: "Conge paye", color: "#2D6A4F" },
+            maladie: { label: "Maladie", color: "#DC2626" },
+            rtt: { label: "RTT", color: "#2563eb" },
+            absence_injustifiee: { label: "Absence injustifiee", color: "#DC2626" },
+            ferie: { label: "Jour ferie", color: "#7B1FA2" },
+            repos_compensateur: { label: "Repos compensateur", color: "#D4775A" },
+            formation: { label: "Formation", color: "#2563eb" },
+            evenement_familial: { label: "Evenement familial", color: "#A0845C" },
+            sans_solde: { label: "Sans solde", color: "#999" },
+            accident_travail: { label: "Accident du travail", color: "#DC2626" },
+            maternite: { label: "Maternite/Paternite", color: "#7B1FA2" },
+          };
+          const cpAcquis = absences.filter(a => a.type === "conge_paye").length;
+
+          return (
+            <>
+              {/* Compteurs CP */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
+                {[
+                  { label: "CP Acquis", value: `${(cpAcquis * 2.5).toFixed(1)} j`, color: "#2D6A4F" },
+                  { label: "CP Pris", value: `${cpAcquis} j`, color: "#D4775A" },
+                  { label: "Solde CP", value: `${((cpAcquis * 2.5) - cpAcquis).toFixed(1)} j`, color: "#2563eb" },
+                ].map(kpi => (
+                  <div key={kpi.label} style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 16, textAlign: "center" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", marginBottom: 4 }}>{kpi.label}</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: kpi.color }}>{kpi.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Liste des absences */}
+              <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(45,106,79,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                    </span>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Absences</span>
+                  </div>
+                </div>
+                {absences.length === 0 ? (
+                  <p style={{ fontSize: 13, color: "#999", textAlign: "center", padding: "20px 0" }}>Aucune absence enregistree</p>
+                ) : (
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead><tr style={{ borderBottom: "2px solid #ddd6c8" }}>
+                      <th style={{ textAlign: "left", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Type</th>
+                      <th style={{ textAlign: "left", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Debut</th>
+                      <th style={{ textAlign: "left", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Fin</th>
+                      <th style={{ textAlign: "left", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Statut</th>
+                    </tr></thead>
+                    <tbody>
+                      {absences.map(a => {
+                        const t = ABSENCE_TYPES[a.type] ?? { label: a.type, color: "#999" };
+                        return (
+                          <tr key={a.id} style={{ borderBottom: "1px solid #f0ebe3" }}>
+                            <td style={{ padding: "10px 0" }}>
+                              <span style={{ padding: "2px 8px", borderRadius: 4, background: `${t.color}15`, color: t.color, fontSize: 11, fontWeight: 600 }}>{t.label}</span>
+                            </td>
+                            <td style={{ padding: "10px 0" }}>{new Date(a.date_debut).toLocaleDateString("fr-FR")}</td>
+                            <td style={{ padding: "10px 0" }}>{new Date(a.date_fin).toLocaleDateString("fr-FR")}</td>
+                            <td style={{ padding: "10px 0" }}>
+                              <span style={{ fontSize: 11, fontWeight: 600, color: a.statut === "approuve" ? "#2D6A4F" : a.statut === "refuse" ? "#DC2626" : "#D4775A" }}>
+                                {a.statut === "approuve" ? "Approuve" : a.statut === "refuse" ? "Refuse" : "En attente"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </>
+          );
+        })()}
+
+        {/* ═══ TAB: Documents ═══ */}
+        {mainTab === "documents" && (() => {
+          const DOSSIERS = [
+            { key: "contrats", label: "Contrats de travail", icon: "fileText" },
+            { key: "fiches_paie", label: "Fiches de paie", icon: "wallet" },
+            { key: "documents_sociaux", label: "Documents sociaux", icon: "clipboard" },
+            { key: "arrets_maladie", label: "Arrets maladie", icon: "beach" },
+            { key: "formations", label: "Formations", icon: "book" },
+            { key: "autres", label: "Autres documents", icon: "package" },
+          ];
+
+          return (
+            <>
+              {/* Documents */}
+              <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(37,99,235,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                    </span>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Documents</span>
+                  </div>
+                  <button type="button" onClick={() => {
+                    const input = document.createElement("input");
+                    input.type = "file";
+                    input.accept = ".pdf,.jpg,.jpeg,.png,.doc,.docx";
+                    input.onchange = async (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0];
+                      if (!file) return;
+                      const path = `employes/${emp.id}/documents/${Date.now()}_${file.name}`;
+                      await supabase.storage.from("public").upload(path, file, { upsert: true });
+                      alert("Document uploade : " + file.name);
+                    };
+                    input.click();
+                  }} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                    + Ajouter un document
+                  </button>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+                  <span style={{ padding: "4px 10px", borderRadius: 20, border: "1px solid #ddd6c8", fontSize: 11, fontWeight: 600, color: "#1a1a1a" }}>
+                    Type de document 0/{DOSSIERS.length}
+                  </span>
+                  <input type="text" placeholder="Rechercher par nom de document" style={{ flex: 1, padding: "4px 10px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 12, minWidth: 200 }} />
+                </div>
+
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
+                    <th style={{ textAlign: "left", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Document</th>
+                    <th style={{ textAlign: "left", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Type</th>
+                    <th style={{ textAlign: "left", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Signature</th>
+                    <th style={{ textAlign: "left", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Date</th>
+                    <th style={{ textAlign: "left", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Actions</th>
+                  </tr></thead>
+                </table>
+                <div style={{ textAlign: "center", padding: "30px 0" }}>
+                  <svg width={40} height={40} viewBox="0 0 24 24" fill="none" stroke="#ddd6c8" strokeWidth="1.5"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                  <p style={{ fontSize: 13, color: "#999", marginTop: 8 }}>Pas de document a afficher</p>
+                  <p style={{ fontSize: 12, color: "#999" }}>Ajoutez votre premier document et faites-le signer simplement</p>
+                </div>
+              </div>
+
+              {/* Bulletins de paie */}
+              <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(212,119,90,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                  </span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Bulletins de paie</span>
+                </div>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginBottom: 8 }}>
+                  <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
+                    <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Document</th>
+                  </tr></thead>
+                </table>
+                <div style={{ textAlign: "center", padding: "30px 0" }}>
+                  <svg width={40} height={40} viewBox="0 0 24 24" fill="none" stroke="#ddd6c8" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
+                  <p style={{ fontSize: 13, color: "#1a1a1a", fontWeight: 600, marginTop: 8 }}>Aucun bulletin de paie importe</p>
+                  <p style={{ fontSize: 12, color: "#999" }}>Pour importer des bulletins de paie, vous pouvez vous rendre dans l&apos;espace &quot;distribution des bulletins de paie&quot;</p>
+                  <button type="button" style={{ marginTop: 8, padding: "8px 16px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    Distribution des bulletins de paie
+                  </button>
+                </div>
+              </div>
+
+              {/* Dossiers */}
+              <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                  <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(160,132,92,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>
+                  </span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Dossiers</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                  {DOSSIERS.map(d => (
+                    <div key={d.key} style={{ padding: 14, borderRadius: 10, border: "1px solid #f0ebe3", background: "#faf7f2", textAlign: "center", cursor: "pointer" }}>
+                      <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="1.5" style={{ marginBottom: 6 }}>
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                      </svg>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a" }}>{d.label}</div>
+                      <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>0 document</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          );
+        })()}
 
         {/* ═══ TAB: ACCES ═══ */}
         {/* ═══ TAB: Role et Permissions ═══ */}
