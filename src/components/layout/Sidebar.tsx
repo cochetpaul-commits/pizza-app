@@ -463,7 +463,8 @@ function ExpandedContent({ onNavigate, onCollapse, showBurger }: ExpandedContent
     if (!isRoleAllowed(entry.roles, role)) return null;
     const groupKey = entry.etabSlug;
     const isOpen = openGroups[groupKey] ?? false;
-    const active = isEtabActive(entry.etabSlug);
+    // Active = either open (clicked) or current context matches
+    const highlighted = isOpen || isEtabActive(entry.etabSlug);
 
     return (
       <div key={groupKey} style={{ marginBottom: 4 }}>
@@ -475,16 +476,16 @@ function ExpandedContent({ onNavigate, onCollapse, showBurger }: ExpandedContent
             width: "calc(100% - 16px)", padding: "10px 12px",
             margin: "2px 8px",
             borderRadius: 8,
-            background: active ? `${entry.color}22` : "transparent",
+            background: highlighted ? `${entry.color}22` : "transparent",
             border: "none", cursor: "pointer",
-            borderLeft: active ? `3px solid ${entry.color}` : "3px solid transparent",
-            color: active ? "#fff" : C.textNormal,
+            borderLeft: highlighted ? `3px solid ${entry.color}` : "3px solid transparent",
+            color: highlighted ? "#fff" : C.textNormal,
             fontSize: 14, fontWeight: 700,
             whiteSpace: "nowrap", overflow: "hidden",
             transition: "background 0.15s, color 0.15s",
           }}
         >
-          <IconStore size={18} color={active ? entry.color : C.textMuted} />
+          <IconStore size={18} color={highlighted ? entry.color : C.textMuted} />
           <span style={{ flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis" }}>
             {entry.label}
           </span>
@@ -493,7 +494,7 @@ function ExpandedContent({ onNavigate, onCollapse, showBurger }: ExpandedContent
             transition: "transform 0.15s ease",
             display: "flex", flexShrink: 0,
           }}>
-            <IconChevronDown size={12} color={active ? entry.color : C.textMuted} />
+            <IconChevronDown size={12} color={highlighted ? entry.color : C.textMuted} />
           </span>
         </button>
         {isOpen && entry.sections.map(sub => renderSubSection(sub, groupKey, entry.etabSlug))}
