@@ -70,7 +70,7 @@ const C = {
   divider: "rgba(255,255,255,0.06)",
   ifratelli: "#b45f57",
   belloMio: "#e27f57",
-  piccolaMia: "#F5DFB0",
+  piccolaMia: "#efd199",
 };
 
 /* ── Helpers ──────────────────────────────────────────── */
@@ -169,7 +169,7 @@ function CollapsedContent({ onExpand }: { onExpand: () => void }) {
     if (entry.kind === "etab") {
       if (!isRoleAllowed(entry.roles, role)) continue;
       const active = isEtabActive(entry.etabSlug);
-      // Restaurant icon with establishment color
+      // Restaurant icon — active gets colored square bg like screenshot
       elements.push(
         <button
           key={`etab-${entry.etabSlug}`}
@@ -177,14 +177,14 @@ function CollapsedContent({ onExpand }: { onExpand: () => void }) {
           onClick={onExpand}
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
-            width: 36, height: 36, borderRadius: 8,
-            background: active ? `${entry.color}20` : "transparent",
-            border: active ? `1px solid ${entry.color}40` : "1px solid transparent",
-            margin: "2px auto", cursor: "pointer",
-            transition: "background 0.12s",
+            width: 40, height: 40, borderRadius: 10,
+            background: active ? `${entry.color}28` : "transparent",
+            border: active ? `1.5px solid ${entry.color}50` : "1.5px solid transparent",
+            margin: "3px auto", cursor: "pointer",
+            transition: "background 0.15s, border-color 0.15s",
           }}
         >
-          <IconStore size={18} color={active ? entry.color : C.textMuted} />
+          <IconStore size={20} color={active ? entry.color : C.textMuted} />
         </button>
       );
       // Show sub-section icons
@@ -472,19 +472,19 @@ function ExpandedContent({ onNavigate, onCollapse, showBurger }: ExpandedContent
           onClick={() => toggleGroup(groupKey)}
           style={{
             display: "flex", alignItems: "center", gap: 10,
-            width: "calc(100% - 16px)", padding: "8px 12px",
-            margin: "1px 8px",
-            borderRadius: 6,
-            background: active ? `${entry.color}15` : "transparent",
+            width: "calc(100% - 16px)", padding: "10px 12px",
+            margin: "2px 8px",
+            borderRadius: 8,
+            background: active ? `${entry.color}22` : "transparent",
             border: "none", cursor: "pointer",
             borderLeft: active ? `3px solid ${entry.color}` : "3px solid transparent",
-            color: active ? C.textActive : C.textNormal,
-            fontSize: 13, fontWeight: 700,
+            color: active ? "#fff" : C.textNormal,
+            fontSize: 14, fontWeight: 700,
             whiteSpace: "nowrap", overflow: "hidden",
-            transition: "background 0.12s",
+            transition: "background 0.15s, color 0.15s",
           }}
         >
-          <IconStore size={16} color={active ? entry.color : C.textMuted} />
+          <IconStore size={18} color={active ? entry.color : C.textMuted} />
           <span style={{ flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis" }}>
             {entry.label}
           </span>
