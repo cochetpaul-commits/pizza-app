@@ -196,9 +196,6 @@ export default function EquipePage() {
           </div>
           {canWrite && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-              <button type="button" className="btn" onClick={() => router.push("/rh/rapports")}>Rapports</button>
-              <button type="button" className="btn" onClick={() => router.push("/rh/masse-salariale")}>Masse salariale</button>
-              <button type="button" className="btn" onClick={() => router.push("/settings/planning")}>Parametres</button>
               <button type="button" onClick={() => setShowModal(true)} style={primaryBtnStyle}>+ Employe</button>
             </div>
           )}
