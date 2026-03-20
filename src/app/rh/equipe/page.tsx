@@ -53,7 +53,7 @@ function getInitials(prenom: string, nom: string): string {
 }
 
 function getEtabColor(etabSlug?: string): string {
-  if (etabSlug === "piccola-mia" || etabSlug === "piccola_mia" || etabSlug === "piccola") return "#efd199";
+  if (etabSlug === "piccola-mia" || etabSlug === "piccola_mia" || etabSlug === "piccola") return "#5B8EAE";
   if (etabSlug === "bello-mio" || etabSlug === "bello_mia") return "#e27f57";
   return "#D4775A";
 }

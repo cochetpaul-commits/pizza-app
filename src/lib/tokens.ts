@@ -17,8 +17,7 @@ export const T = {
   sidebar: "#1a1512",
   ifratelli: "#b45f57",
   belloMio: "#e27f57",
-  piccolaMia: "#efd199",
-  piccolaMiaText: "#a8893a",
+  piccolaMia: "#5B8EAE",
 
   // Section accents
   sauge: "#4a6741",       // achats, approvisionnement
@@ -71,5 +70,5 @@ export function accentFor(resto: Restaurant): string {
 }
 
 export function accentDarkFor(resto: Restaurant): string {
-  return resto === "piccola-mia" ? T.piccolaMiaText : T.belloMio;
+  return resto === "piccola-mia" ? T.piccolaMia : T.belloMio;
 }

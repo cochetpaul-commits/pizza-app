@@ -8,8 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 const C = {
   ifratelli: "#b45f57",
   belloMio: "#e27f57",
-  piccolaMia: "#efd199",
-  piccolaMiaText: "#a8893a",
+  piccolaMia: "#5B8EAE",
 };
 
 function getColor(slug: string) {

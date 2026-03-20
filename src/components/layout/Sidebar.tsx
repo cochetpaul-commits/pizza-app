@@ -70,8 +70,7 @@ const C = {
   divider: "rgba(255,255,255,0.06)",
   ifratelli: "#b45f57",
   belloMio: "#e27f57",
-  piccolaMia: "#efd199",
-  piccolaMiaText: "#a8893a",
+  piccolaMia: "#5B8EAE",
 };
 
 /* ── Helpers ──────────────────────────────────────────── */
@@ -317,12 +316,27 @@ function ExpandedContent({ onNavigate, onCollapse, showBurger }: ExpandedContent
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [openSubSections, setOpenSubSections] = useState<Record<string, boolean>>({});
 
+  // Accordion: only one group open at a time
   const toggleGroup = useCallback((key: string) => {
-    setOpenGroups(p => ({ ...p, [key]: !p[key] }));
+    setOpenGroups(p => {
+      const wasOpen = p[key];
+      // Close all, then toggle this one
+      const next: Record<string, boolean> = {};
+      if (!wasOpen) next[key] = true;
+      return next;
+    });
+    // Also close sub-sections when switching groups
+    setOpenSubSections({});
   }, []);
 
+  // Accordion: only one sub-section open at a time within parent
   const toggleSubSection = useCallback((key: string) => {
-    setOpenSubSections(p => ({ ...p, [key]: !p[key] }));
+    setOpenSubSections(p => {
+      const wasOpen = p[key];
+      const next: Record<string, boolean> = {};
+      if (!wasOpen) next[key] = true;
+      return next;
+    });
   }, []);
 
   const isAdmin = role === "group_admin" || role === "manager";
@@ -353,7 +367,7 @@ function ExpandedContent({ onNavigate, onCollapse, showBurger }: ExpandedContent
     onCollapse?.();
   };
 
-  /* ── Render a single nav item ── */
+  /* ── Render a single nav item (level 3 — smallest, most subtle) ── */
   const renderItem = (item: NavItemV2, etabSlug?: string, indent = false) => {
     if (!isRoleAllowed(item.roles, role)) return null;
     const active = isActive(item.href) && (!etabSlug || isEtabActive(etabSlug));
@@ -368,20 +382,20 @@ function ExpandedContent({ onNavigate, onCollapse, showBurger }: ExpandedContent
         href={item.href}
         onClick={() => handleLinkClick(etabSlug)}
         style={{
-          display: "flex", alignItems: "center", gap: 10,
-          padding: indent ? "7px 16px 7px 28px" : "8px 16px",
+          display: "flex", alignItems: "center", gap: 8,
+          padding: indent ? "6px 16px 6px 34px" : "7px 16px",
           margin: "1px 8px",
           borderRadius: 6,
           textDecoration: "none",
-          fontSize: 13, fontWeight: active ? 600 : 500,
-          color: active ? C.textActive : C.textNormal,
-          background: active ? C.bgItemActive : "transparent",
-          borderLeft: active ? `3px solid ${accentColor}` : "3px solid transparent",
+          fontSize: 12, fontWeight: active ? 600 : 400,
+          color: active ? C.textActive : "rgba(255,255,255,0.55)",
+          background: active ? `${accentColor}12` : "transparent",
+          borderLeft: active ? `2px solid ${accentColor}60` : "2px solid transparent",
           transition: "background 0.12s, color 0.12s",
           whiteSpace: "nowrap", overflow: "hidden",
         }}
       >
-        {IconComp && <IconComp size={16} color={active ? accentColor : C.textMuted} />}
+        {IconComp && <IconComp size={14} color={active ? accentColor : "rgba(255,255,255,0.35)"} />}
         <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{item.label}</span>
       </Link>
     );
@@ -404,6 +418,9 @@ function ExpandedContent({ onNavigate, onCollapse, showBurger }: ExpandedContent
     const subKey = `${parentKey}:${sub.label}`;
     const isOpen = openSubSections[subKey] ?? false;
     const SectionIcon = sub.icon ? ICON_MAP[sub.icon] : null;
+    // Get parent color for subtle tinting
+    const parentEntry = entries.find((e): e is NavEtabGroup => e.kind === "etab" && e.etabSlug === parentKey);
+    const parentColor = parentEntry?.color ?? etabColor;
 
     return (
       <div key={subKey}>
@@ -412,14 +429,19 @@ function ExpandedContent({ onNavigate, onCollapse, showBurger }: ExpandedContent
           onClick={() => toggleSubSection(subKey)}
           style={{
             display: "flex", alignItems: "center", gap: 8,
-            width: "100%", padding: "8px 16px 4px 20px",
-            background: "none", border: "none", cursor: "pointer",
-            color: C.textMuted, fontSize: 11, fontWeight: 700,
-            letterSpacing: "0.06em",
+            width: "calc(100% - 16px)", padding: "7px 12px 7px 22px",
+            margin: "1px 8px",
+            borderRadius: 6,
+            background: isOpen ? `${parentColor}0A` : "transparent",
+            border: "none", cursor: "pointer",
+            color: isOpen ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.5)",
+            fontSize: 12, fontWeight: 600,
+            letterSpacing: "0.03em",
             whiteSpace: "nowrap", overflow: "hidden",
+            transition: "background 0.12s, color 0.12s",
           }}
         >
-          {SectionIcon && <SectionIcon size={13} color={C.textMuted} />}
+          {SectionIcon && <SectionIcon size={14} color={isOpen ? `${parentColor}BB` : "rgba(255,255,255,0.35)"} />}
           <span style={{ flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis" }}>
             {sub.label}
           </span>
@@ -428,7 +450,7 @@ function ExpandedContent({ onNavigate, onCollapse, showBurger }: ExpandedContent
             transition: "transform 0.15s ease",
             display: "flex", flexShrink: 0,
           }}>
-            <IconChevronDown size={10} color={C.textMuted} />
+            <IconChevronDown size={10} color="rgba(255,255,255,0.3)" />
           </span>
         </button>
         {isOpen && items.map(item => renderItem(item, etabSlug, true))}
@@ -629,7 +651,7 @@ function ExpandedContent({ onNavigate, onCollapse, showBurger }: ExpandedContent
         {role && (
           <div style={{
             background: etabColor,
-            color: etabColor === C.piccolaMia ? "#5a4a1a" : "#fff",
+            color: "#fff",
             borderRadius: 20, padding: "8px 16px",
             textAlign: "center", fontSize: 12, fontWeight: 700,
             letterSpacing: "0.04em", marginBottom: 10,
