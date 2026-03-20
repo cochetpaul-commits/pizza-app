@@ -159,6 +159,8 @@ export default function PlanningPage() {
   const [etabPauseDefaut, setEtabPauseDefaut] = useState(30);
   const [etabPauseAuto, setEtabPauseAuto] = useState(true);
   const [etabDureeMinPause, setEtabDureeMinPause] = useState(180); // minutes
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [etabReposCompActif, setEtabReposCompActif] = useState(false);
   const [mNote, setMNote] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -208,7 +210,7 @@ export default function PlanningPage() {
           .gte("date_fin", mondayISO),
         supabase
           .from("etablissements")
-          .select("pause_defaut_minutes, pause_auto_creation, duree_min_shift_pause")
+          .select("pause_defaut_minutes, pause_auto_creation, duree_min_shift_pause, repos_compensateurs_actif")
           .eq("id", etab.id)
           .single(),
       ]);
@@ -223,6 +225,7 @@ export default function PlanningPage() {
         const dur = String(es.duree_min_shift_pause ?? "03:00:00");
         const parts = dur.split(":");
         if (parts.length >= 2) setEtabDureeMinPause(Number(parts[0]) * 60 + Number(parts[1]));
+        setEtabReposCompActif(es.repos_compensateurs_actif ?? false);
       }
       setEmployes(empRes.data ?? []);
       setPostes(postesRes.data ?? []);
@@ -305,6 +308,7 @@ export default function PlanningPage() {
       map.set(emp.id, calculerBilanSemaine(empShifts, ci, emp.id));
     }
     return map;
+    // etabReposCompActif included for future repos compensateur integration in bilans
   }, [filteredEmployes, shifts, etab]);
 
   /* ── Week navigation ── */
@@ -731,7 +735,7 @@ export default function PlanningPage() {
                                       >
                                         {poste && (
                                           <div style={{ fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                            {poste.nom} {poste.emoji ?? ""}
+                                            {poste.nom}
                                           </div>
                                         )}
                                         <div style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 10, color: "rgba(0,0,0,0.6)" }}>
@@ -804,7 +808,6 @@ export default function PlanningPage() {
                       cursor: "pointer",
                     }}
                   >
-                    {p.emoji && <span style={{ marginRight: 4 }}>{p.emoji}</span>}
                     {p.nom}
                   </button>
                 ))}

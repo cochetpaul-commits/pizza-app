@@ -34,6 +34,7 @@ type Settings = {
   valeur_avantage_nature: number;
   cp_periode_jour: number;
   cp_periode_mois: number;
+  repos_compensateurs_actif: boolean;
   actif: boolean;
 };
 
@@ -635,7 +636,6 @@ export default function EtablissementDetailPage() {
                       opacity: p.actif ? 1 : 0.4,
                     }}
                   >
-                    {p.emoji && <span style={{ marginRight: 3 }}>{p.emoji}</span>}
                     {p.nom}
                   </span>
                 ))}
@@ -672,7 +672,7 @@ export default function EtablissementDetailPage() {
         </div>
         <div style={{ ...ROW, borderBottom: "none" }}>
           <span style={{ fontSize: 14, color: "#1a1a1a" }}>Activer les repos compensateurs pour les contrats eligibles &lt; 35h</span>
-          <Toggle value={settings.ajouter_cp_taux_horaire} onChange={v => updateField({ ajouter_cp_taux_horaire: v })} />
+          <Toggle value={settings.repos_compensateurs_actif} onChange={v => updateField({ repos_compensateurs_actif: v })} />
         </div>
       </div>
     </>
