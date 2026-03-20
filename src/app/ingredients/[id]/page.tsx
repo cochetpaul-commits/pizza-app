@@ -27,14 +27,6 @@ type Ingredient = {
   cost_per_unit?: number | null;
 };
 
-const DEFAULT_ZONES = [
-  { id: "frigo", label: "Frigo" },
-  { id: "cave", label: "Cave" },
-  { id: "sec", label: "Sec" },
-  { id: "congel", label: "Congelateur" },
-  { id: "bar", label: "Bar" },
-  { id: "reserve", label: "Reserve" },
-];
 
 type DerivedIngredient = {
   id: string;
@@ -397,27 +389,23 @@ function IngredientDetailInner() {
         {/* ── Lieu de stockage ── */}
         <div className="card" style={{ marginBottom: 12, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 12, fontWeight: 700, opacity: 0.65, whiteSpace: "nowrap" }}>Stockage</span>
-          <select
+          <input
+            type="text"
             value={storageZone}
-            onChange={async (e) => {
-              const val = e.target.value || null;
-              setStorageZone(e.target.value);
-              setStorageZoneSaved(false);
+            onChange={(e) => { setStorageZone(e.target.value); setStorageZoneSaved(false); }}
+            onBlur={async () => {
+              const val = storageZone.trim() || null;
               await supabase.from("ingredients").update({ storage_zone: val }).eq("id", id);
               setStorageZoneSaved(true);
               setTimeout(() => setStorageZoneSaved(false), 2000);
             }}
+            placeholder="ex: Chambre froide, Cave, Garage..."
             style={{
               flex: 1, height: 32, borderRadius: 8,
               border: "1.5px solid #e5ddd0", padding: "4px 10px",
               fontSize: 13, background: "#fff",
             }}
-          >
-            <option value="">Auto (par catégorie)</option>
-            {DEFAULT_ZONES.map((z) => (
-              <option key={z.id} value={z.id}>{z.label}</option>
-            ))}
-          </select>
+          />
           {storageZoneSaved && <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 600 }}>Enregistre</span>}
         </div>
 

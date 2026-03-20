@@ -18,16 +18,8 @@ type Inventaire = {
   notes: string | null;
 };
 
-type Zone = { id: string; nom: string };
-
-const DEFAULT_ZONES: Zone[] = [
-  { id: "frigo", nom: "Frigo" },
-  { id: "cave", nom: "Cave" },
-  { id: "sec", nom: "Sec" },
-  { id: "congel", nom: "Congelateur" },
-  { id: "bar", nom: "Bar" },
-  { id: "reserve", nom: "Reserve" },
-];
+/** Fallback zones used when no storage_zone is set on ingredients */
+const FALLBACK_ZONE_ORDER = ["frigo", "cave", "sec"];
 
 function categoryToZone(cat: string | null): string {
   if (!cat) return "sec";
@@ -262,11 +254,26 @@ export default function InventairePage() {
 
   // ── Computed ───────────────────────────────────────────────
 
-  // Build zones list: only show zones that have at least 1 ingredient
+  // Build zones dynamically from ingredients
   const activeZones = useMemo(() => {
-    const zoneSet = new Set<string>();
-    for (const ing of ingredients) zoneSet.add(resolveZone(ing));
-    return DEFAULT_ZONES.filter((z) => zoneSet.has(z.id));
+    const zoneMap = new Map<string, string>(); // id -> display name
+    for (const ing of ingredients) {
+      const z = resolveZone(ing);
+      if (!zoneMap.has(z)) {
+        // Capitalize first letter for display
+        zoneMap.set(z, z.charAt(0).toUpperCase() + z.slice(1));
+      }
+    }
+    // Sort: fallback zones first (frigo, cave, sec), then custom alphabetically
+    const sorted = [...zoneMap.entries()].sort(([a], [b]) => {
+      const ia = FALLBACK_ZONE_ORDER.indexOf(a);
+      const ib = FALLBACK_ZONE_ORDER.indexOf(b);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return a.localeCompare(b, "fr");
+    });
+    return sorted.map(([id, nom]) => ({ id, nom }));
   }, [ingredients]);
 
   const zoneIngredients = useMemo(() => {
@@ -310,7 +317,6 @@ export default function InventairePage() {
   // Zone counts for badges
   const zoneCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const z of DEFAULT_ZONES) counts[z.id] = 0;
     for (const ing of ingredients) {
       const qty = Number(quantities[ing.id] ?? 0);
       if (qty > 0) {

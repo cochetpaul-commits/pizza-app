@@ -402,22 +402,15 @@ export const IngredientRow = React.memo(function IngredientRow({
           {/* Lieu de stockage */}
           <div className="pt-1" style={{ marginBottom: 8 }}>
             <div className="text-[11px] font-extrabold opacity-60 mb-1 uppercase tracking-wide">Stockage</div>
-            <select
+            <input
               style={{
                 height: 32, borderRadius: 8, border: "1.5px solid #e5ddd0",
                 padding: "4px 10px", fontSize: 13, background: "#fff", width: 220,
               }}
               value={edit.storageZone}
               onChange={(e) => onEditChange({ ...edit, storageZone: e.target.value })}
-            >
-              <option value="">Auto (par catégorie)</option>
-              <option value="frigo">Frigo</option>
-              <option value="cave">Cave</option>
-              <option value="sec">Sec</option>
-              <option value="congel">Congelateur</option>
-              <option value="bar">Bar</option>
-              <option value="reserve">Reserve</option>
-            </select>
+              placeholder="ex: Chambre froide, Cave, Garage..."
+            />
           </div>
           {/* Allergènes */}
           <div className="pt-1">
