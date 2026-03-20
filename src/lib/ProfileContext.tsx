@@ -92,7 +92,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   const isGroupAdmin = role === "group_admin";
   const cw = role === "group_admin" || role === "manager";
-  const can = (permission: string) => hasPermission(role, permission);
+  const can = (permission: string) => role ? hasPermission(role, permission) : false;
 
   return (
     <ProfileContext.Provider value={{ role, displayName, loading, isGroupAdmin, canWrite: cw, can }}>
