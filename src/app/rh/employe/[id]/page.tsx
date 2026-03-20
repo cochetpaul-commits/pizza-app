@@ -601,62 +601,143 @@ export default function EmployeDetailPage() {
         {/* ═══ TAB: INFORMATIONS GENERALES ═══ */}
         {mainTab === "infos" && (
           <>
-            <div style={section}>
-              <p style={sectionTitle}>Identite</p>
-              <div style={grid2}>
-                <Field label="Prenom" value={prenom} onChange={setPrenom} disabled={!canWrite} />
-                <Field label="Nom" value={nom} onChange={setNom} disabled={!canWrite} />
-              </div>
-              <div style={grid2}>
-                <Field label="Email" type="email" value={email} onChange={setEmail} disabled={!canWrite} />
-                <Field label="Telephone" value={telMobile} onChange={setTelMobile} disabled={!canWrite} />
-              </div>
-              <Field label="Telephone fixe" value={telFixe} onChange={setTelFixe} disabled={!canWrite} />
-            </div>
+            <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700, color: "#1a1a1a", marginBottom: 16 }}>Informations personnelles</h2>
 
-            <div style={section}>
-              <p style={sectionTitle}>Poste</p>
-              <div style={grid2}>
-                <Field label="Matricule" value={matricule} onChange={setMatricule} disabled={!canWrite} />
-                <Field label="Date anciennete" type="date" value={dateAnciennete} onChange={setDateAnciennete} disabled={!canWrite} />
-              </div>
-              {activeContrat && (
-                <div style={grid3}>
-                  <div><span style={miniLabel}>Type contrat</span><br />{CONTRAT_LABELS[activeContrat.type] ?? activeContrat.type}</div>
-                  <div><span style={miniLabel}>Emploi</span><br />{activeContrat.emploi ?? "---"}</div>
-                  <div><span style={miniLabel}>Heures/sem</span><br />{activeContrat.heures_semaine}h</div>
+            {/* 2-column layout */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {/* Left: Etat civil */}
+              <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                  <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(45,106,79,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                  </span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Etat civil</span>
                 </div>
-              )}
+                <Field label="Genre" value={genre} onChange={setGenre} disabled={!canWrite} />
+                <Field label="Prenom" value={prenom} onChange={setPrenom} disabled={!canWrite} />
+                <Field label="Nom de naissance" value={nom} onChange={setNom} disabled={!canWrite} />
+                <Field label="Nationalite" value={nationalite} onChange={setNationalite} disabled={!canWrite} />
+                <Field label="Date de naissance" type="date" value={dateNaissance} onChange={setDateNaissance} disabled={!canWrite} />
+                <Field label="Lieu de naissance" value={lieuNaissance} onChange={setLieuNaissance} disabled={!canWrite} />
+                <Field label="Departement de naissance" value={deptNaissance} onChange={setDeptNaissance} disabled={!canWrite} />
+                <Field label="Situation familiale" value={situationFamiliale} onChange={setSituationFamiliale} disabled={!canWrite} />
+                <Field label="Nb personnes a charge" type="number" value={String(nbPersonnesCharge)} onChange={(v) => setNbPersonnesCharge(Number(v))} disabled={!canWrite} />
+              </div>
+
+              {/* Right: Coordonnees + Contact urgence */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                    <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(37,99,235,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7l-10 7L2 7" /></svg>
+                    </span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Coordonnees</span>
+                  </div>
+                  <Field label="Email" type="email" value={email} onChange={setEmail} disabled={!canWrite} />
+                  <Field label="Tel. mobile" value={telMobile} onChange={setTelMobile} disabled={!canWrite} />
+                  <Field label="Tel. fixe" value={telFixe} onChange={setTelFixe} disabled={!canWrite} />
+                  <Field label="Adresse" value={adresse} onChange={setAdresse} disabled={!canWrite} />
+                  <Field label="Code postal" value={codePostal} onChange={setCodePostal} disabled={!canWrite} />
+                  <Field label="Ville" value={ville} onChange={setVille} disabled={!canWrite} />
+                </div>
+
+                <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                    <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(220,38,38,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
+                    </span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Contact d&apos;urgence</span>
+                  </div>
+                  <Field label="Prenom" value={contactUrgPrenom} onChange={setContactUrgPrenom} disabled={!canWrite} />
+                  <Field label="Nom" value={contactUrgNom} onChange={setContactUrgNom} disabled={!canWrite} />
+                  <Field label="Lien" value={contactUrgLien} onChange={setContactUrgLien} disabled={!canWrite} />
+                  <Field label="Tel. mobile" value={contactUrgTel} onChange={setContactUrgTel} disabled={!canWrite} />
+                </div>
+              </div>
             </div>
 
-            <div style={section}>
-              <p style={sectionTitle}>Coordonnees bancaires</p>
+            {/* Infos professionnelles */}
+            <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginTop: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(160,132,92,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>
+                </span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Informations professionnelles</span>
+              </div>
+              <div style={grid2}>
+                <Field label="Date d'anciennete" type="date" value={dateAnciennete} onChange={setDateAnciennete} disabled={!canWrite} />
+                <Field label="Matricule" value={matricule} onChange={setMatricule} disabled={!canWrite} />
+              </div>
+            </div>
+
+            {/* Bancaire */}
+            <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginTop: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(160,132,92,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><rect x="1" y="5" width="22" height="16" rx="2" /><path d="M1 10h22" /></svg>
+                </span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Informations administratives et bancaires</span>
+              </div>
+              <div style={{ padding: 10, borderRadius: 8, background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.12)", marginBottom: 12, fontSize: 12, color: "#666" }}>
+                Depuis le 27 decembre 2022, le salaire doit imperativement etre verse sur un compte bancaire dont le collaborateur est titulaire ou co-titulaire.
+              </div>
+              <Field label="Nom du titulaire du compte" value={titulaireCompte} onChange={setTitulaireCompte} disabled={!canWrite} />
               <Field label="IBAN" value={iban} onChange={setIban} disabled={!canWrite} />
+              <Field label="BIC" value={bic} onChange={setBic} disabled={!canWrite} />
+            </div>
+
+            {/* Medical */}
+            <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginTop: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(37,99,235,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                </span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Informations medicales</span>
+              </div>
+              <div style={{ padding: 10, borderRadius: 8, background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.12)", marginBottom: 12, fontSize: 12, color: "#2563eb" }}>
+                Le numero doit comporter 15 chiffres et commencer par 1 ou 2. Si le numero commence par 7 ou 8, il s&apos;agit d&apos;un NIA (numero provisoire).
+              </div>
+              <Field label="Numero de Securite sociale" value={numeroSecu} onChange={setNumeroSecu} disabled={!canWrite} />
+              <Checkbox label="Personne en situation de handicap" checked={handicap} onChange={setHandicap} disabled={!canWrite} />
+              {handicap && <Field label="Type de handicap" value={typeHandicap} onChange={setTypeHandicap} disabled={!canWrite} />}
               <div style={grid2}>
-                <Field label="BIC" value={bic} onChange={setBic} disabled={!canWrite} />
-                <Field label="Titulaire du compte" value={titulaireCompte} onChange={setTitulaireCompte} disabled={!canWrite} />
+                <Field label="Date derniere visite medicale" type="date" value={dateVisiteMedicale} onChange={setDateVisiteMedicale} disabled={!canWrite} />
+                <Field label="Prochaine visite medicale" type="date" value={prochaineVisite} onChange={setProchaineVisite} disabled={!canWrite} />
+              </div>
+              <Checkbox label="Visite medicale renforcee" checked={visiteRenforcee} onChange={setVisiteRenforcee} disabled={!canWrite} />
+            </div>
+
+            {/* Autorisations de travail */}
+            <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginTop: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(123,31,162,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#7B1FA2" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
+                </span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Autorisations de travail</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 14, color: "#1a1a1a" }}>Travailleur etranger avec autorisation de travail</span>
+                <button type="button" onClick={() => setTravailleurEtranger(!travailleurEtranger)} disabled={!canWrite} style={{
+                  width: 40, height: 22, borderRadius: 11, border: "none", cursor: canWrite ? "pointer" : "default",
+                  background: travailleurEtranger ? "#2D6A4F" : "#ddd6c8", position: "relative",
+                }}>
+                  <span style={{
+                    position: "absolute", top: 2, left: travailleurEtranger ? 20 : 2,
+                    width: 18, height: 18, borderRadius: "50%", background: "#fff",
+                    transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+                  }} />
+                </button>
               </div>
             </div>
 
-            <div style={section}>
-              <p style={sectionTitle}>Sante</p>
-              <div style={grid2}>
-                <Field label="Date visite medicale" type="date" value={dateVisiteMedicale} onChange={setDateVisiteMedicale} disabled={!canWrite} />
-                <Field label="Prochaine visite" type="date" value={prochaineVisite} onChange={setProchaineVisite} disabled={!canWrite} />
-              </div>
-              <div style={{ display: "flex", gap: 20, marginTop: 8 }}>
-                <Checkbox label="Visite renforcee" checked={visiteRenforcee} onChange={setVisiteRenforcee} disabled={!canWrite} />
-                <Checkbox label="Handicap" checked={handicap} onChange={setHandicap} disabled={!canWrite} />
-                <Checkbox label="Travailleur etranger" checked={travailleurEtranger} onChange={setTravailleurEtranger} disabled={!canWrite} />
-              </div>
-              {handicap && (
-                <Field label="Type de handicap" value={typeHandicap} onChange={setTypeHandicap} disabled={!canWrite} />
-              )}
-            </div>
-
-            <div style={section}>
-              <p style={sectionTitle}>Statut</p>
-              <Checkbox label="Employe actif" checked={actif} onChange={setActif} disabled={!canWrite} />
+            {/* Save bar */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16, padding: "16px 0", borderTop: "1px solid #f0ebe3" }}>
+              <button type="button" onClick={() => window.location.reload()} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#1a1a1a" }}>
+                Annuler
+              </button>
+              <button type="button" onClick={handleSave} disabled={saving} style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: saving ? 0.5 : 1 }}>
+                {saving ? "..." : "Enregistrer les modifications"}
+              </button>
             </div>
           </>
         )}
