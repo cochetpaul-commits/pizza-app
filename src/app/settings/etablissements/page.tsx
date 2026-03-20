@@ -27,11 +27,6 @@ export default function EtablissementsListPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"actifs" | "inactifs" | "tous">("actifs");
-  const [showCreate, setShowCreate] = useState(false);
-  const [newNom, setNewNom] = useState("");
-  const [newAdresse, setNewAdresse] = useState("");
-  const [newConvention, setNewConvention] = useState("HCR_1979");
-  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,24 +61,6 @@ export default function EtablissementsListPage() {
     return Array.from(set).sort();
   };
 
-  const handleCreate = async () => {
-    if (!newNom.trim()) return;
-    setCreating(true);
-    const slug = newNom.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-    const { data, error } = await supabase.from("etablissements").insert({
-      nom: newNom.trim(),
-      slug,
-      adresse: newAdresse.trim() || null,
-      convention: newConvention,
-      actif: true,
-    }).select().single();
-    if (data && !error) {
-      router.push(`/settings/etablissements/${data.id}`);
-    } else {
-      alert(error?.message ?? "Erreur lors de la creation");
-      setCreating(false);
-    }
-  };
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
@@ -100,7 +77,7 @@ export default function EtablissementsListPage() {
           </div>
           <button
             type="button"
-            onClick={() => setShowCreate(true)}
+            onClick={() => router.push("/settings/etablissements/new")}
             style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "10px 18px", borderRadius: 8,
@@ -194,43 +171,6 @@ export default function EtablissementsListPage() {
         </div>
       </div>
 
-      {/* Modal: Creer un etablissement */}
-      {showCreate && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }}
-          onClick={() => setShowCreate(false)}
-        >
-          <div style={{ background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 480, boxShadow: "0 12px 40px rgba(0,0,0,0.15)" }}
-            onClick={e => e.stopPropagation()}
-          >
-            <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 16, color: "#1a1a1a" }}>
-              Nouvel etablissement
-            </h2>
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ ...LABEL, marginBottom: 4 }}>Nom</div>
-              <input style={{ ...INPUT, width: "100%" }} value={newNom} onChange={e => setNewNom(e.target.value)} placeholder="Ex: Trattoria Da Luigi" />
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ ...LABEL, marginBottom: 4 }}>Adresse</div>
-              <input style={{ ...INPUT, width: "100%" }} value={newAdresse} onChange={e => setNewAdresse(e.target.value)} placeholder="Adresse complete" />
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ ...LABEL, marginBottom: 4 }}>Convention collective</div>
-              <select style={{ ...INPUT, width: "100%" }} value={newConvention} onChange={e => setNewConvention(e.target.value)}>
-                <option value="HCR_1979">HCR - IDCC 1979</option>
-                <option value="RAPIDE_1501">Restauration rapide - IDCC 1501</option>
-              </select>
-            </div>
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button type="button" onClick={() => setShowCreate(false)} style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#1a1a1a" }}>
-                Annuler
-              </button>
-              <button type="button" onClick={handleCreate} disabled={creating || !newNom.trim()} style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", opacity: creating ? 0.5 : 1 }}>
-                {creating ? "Creation..." : "Creer"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </RequireRole>
   );
 }
