@@ -133,7 +133,7 @@ export const SIDEBAR_NAV_V2: SidebarEntry[] = [
     kind: "etab",
     etabSlug: "piccola-mia",
     label: "Piccola Mia",
-    color: "#5B8EAE",
+    color: "#F5DFB0",
     roles: ["group_admin", "manager"],
     sections: [
       {

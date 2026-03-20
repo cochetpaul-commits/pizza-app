@@ -17,7 +17,7 @@ export const T = {
   sidebar: "#1a1512",
   ifratelli: "#b45f57",
   belloMio: "#e27f57",
-  piccolaMia: "#5B8EAE",
+  piccolaMia: "#F5DFB0",
 
   // Section accents
   sauge: "#4a6741",       // achats, approvisionnement

@@ -70,7 +70,7 @@ const C = {
   divider: "rgba(255,255,255,0.06)",
   ifratelli: "#b45f57",
   belloMio: "#e27f57",
-  piccolaMia: "#5B8EAE",
+  piccolaMia: "#F5DFB0",
 };
 
 /* ── Helpers ──────────────────────────────────────────── */
@@ -651,7 +651,7 @@ function ExpandedContent({ onNavigate, onCollapse, showBurger }: ExpandedContent
         {role && (
           <div style={{
             background: etabColor,
-            color: "#fff",
+            color: etabColor === C.piccolaMia ? "#5a4a1a" : "#fff",
             borderRadius: 20, padding: "8px 16px",
             textAlign: "center", fontSize: 12, fontWeight: 700,
             letterSpacing: "0.04em", marginBottom: 10,
