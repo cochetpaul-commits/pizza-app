@@ -932,36 +932,57 @@ export default function EtablissementDetailPage() {
 
         {/* Equipes et salaries */}
         <div style={CARD}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 8 }}>Equipes et Salaries</h3>
-          <div style={{ marginBottom: 8 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 12 }}>Equipes et Salaries</h3>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
               Equipe(s) {modMode === "modulation" ? "modulee(s)" : "lissee(s)"} <span style={{ color: "#DC2626" }}>*</span>
             </span>
-            <span style={{ fontSize: 12, color: "#D4775A", marginLeft: 6 }}>{modEquipeIds.length}/{dbEquipes.length}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#D4775A" }}>{modEquipeIds.length}/{dbEquipes.length}</span>
           </div>
           <p style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>
             Vous pourrez desactiver ou configurer la modulation du temps de travail par employe dans l&apos;onglet &quot;contrat&quot; du profil de l&apos;employe.
           </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {dbEquipes.map(eq => (
-              <label key={eq.id} style={{
-                display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
-                borderRadius: 8, border: "1px solid #ddd6c8", cursor: "pointer",
-                background: modEquipeIds.includes(eq.id) ? "rgba(45,106,79,0.04)" : "#fff",
-              }}>
-                <input
-                  type="checkbox"
-                  checked={modEquipeIds.includes(eq.id)}
-                  onChange={e => {
-                    if (e.target.checked) setModEquipeIds(prev => [...prev, eq.id]);
-                    else setModEquipeIds(prev => prev.filter(x => x !== eq.id));
-                  }}
-                />
-                <span style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a" }}>{eq.nom}</span>
-              </label>
+
+          {/* Selected equipes tags */}
+          {modEquipeIds.length > 0 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+              {modEquipeIds.map(eqId => {
+                const eq = dbEquipes.find(e => e.id === eqId);
+                if (!eq) return null;
+                return (
+                  <span key={eqId} style={{
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    padding: "4px 10px", borderRadius: 20,
+                    background: "rgba(45,106,79,0.08)", color: "#2D6A4F",
+                    fontSize: 12, fontWeight: 600,
+                  }}>
+                    {eq.nom}
+                    <button type="button" onClick={() => setModEquipeIds(prev => prev.filter(x => x !== eqId))} style={{
+                      background: "none", border: "none", cursor: "pointer", padding: 0, color: "#2D6A4F", fontSize: 14, lineHeight: 1,
+                    }}>x</button>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Dropdown to add equipes */}
+          <select
+            style={{ ...INPUT, color: "#999" }}
+            value=""
+            onChange={e => {
+              const val = e.target.value;
+              if (val && !modEquipeIds.includes(val)) {
+                setModEquipeIds(prev => [...prev, val]);
+              }
+            }}
+          >
+            <option value="">Rechercher</option>
+            {dbEquipes.filter(eq => !modEquipeIds.includes(eq.id)).map(eq => (
+              <option key={eq.id} value={eq.id}>{eq.nom}</option>
             ))}
-            {dbEquipes.length === 0 && <span style={{ fontSize: 12, color: "#999" }}>Aucune equipe configuree</span>}
-          </div>
+          </select>
+          {dbEquipes.length === 0 && <p style={{ fontSize: 12, color: "#999", marginTop: 8 }}>Aucune equipe configuree. Ajoutez des equipes dans l&apos;onglet Planification.</p>}
         </div>
 
         {/* Create button */}
