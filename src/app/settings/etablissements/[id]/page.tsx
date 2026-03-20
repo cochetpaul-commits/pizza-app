@@ -18,6 +18,10 @@ type Settings = {
   siret: string;
   medecin_travail: string;
   pause_defaut_minutes: number;
+  duree_min_shift_pause: string;
+  employes_heures_reelles: boolean;
+  pause_auto_creation: boolean;
+  pause_unite: string;
   objectif_cout_ventes: number;
   objectif_productivite: number;
   cotisations_patronales: number;
@@ -114,6 +118,8 @@ export default function EtablissementDetailPage() {
 
   // Planification modals
   const [showEquipesModal, setShowEquipesModal] = useState(false);
+  const [editEquipes, setEditEquipes] = useState<string[]>([]);
+  const [newEquipeName, setNewEquipeName] = useState("");
   const [showImportModal, setShowImportModal] = useState(false);
   const [importEquipe, setImportEquipe] = useState("");
   const [importEtabId, setImportEtabId] = useState("");
@@ -491,7 +497,7 @@ export default function EtablissementDetailPage() {
       <div style={CARD}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>Organisation des plannings (equipes)</h2>
-          <button type="button" onClick={() => setShowEquipesModal(true)} style={{
+          <button type="button" onClick={() => { setEditEquipes([...equipes]); setNewEquipeName(""); setShowEquipesModal(true); }} style={{
             padding: "6px 14px", borderRadius: 6, border: "1px solid #ddd6c8",
             background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
           }}>
@@ -514,15 +520,15 @@ export default function EtablissementDetailPage() {
         <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, color: "#1a1a1a" }}>Preferences</h2>
         <div style={ROW}>
           <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Les employes peuvent saisir leurs heures reelles</span>
-          <Toggle value={true} onChange={() => {}} />
+          <Toggle value={settings.employes_heures_reelles} onChange={v => updateField({ employes_heures_reelles: v })} />
         </div>
         <div style={ROW}>
           <span style={{ fontSize: 14, color: "#1a1a1a" }}>Appliquer un temps de pause par defaut lors de la creation d&apos;un shift</span>
-          <Toggle value={true} onChange={() => {}} />
+          <Toggle value={settings.pause_auto_creation} onChange={v => updateField({ pause_auto_creation: v })} />
         </div>
         <div style={ROW}>
           <span style={{ fontSize: 14, color: "#1a1a1a" }}>Calculer la duree d&apos;une pause en</span>
-          <select style={{ ...INPUT, width: 150 }} defaultValue="minutes">
+          <select style={{ ...INPUT, width: 160 }} value={settings.pause_unite} onChange={e => updateField({ pause_unite: e.target.value })}>
             <option value="minutes">Minutes (min)</option>
             <option value="heures">Heures (h)</option>
           </select>
@@ -530,18 +536,39 @@ export default function EtablissementDetailPage() {
         <div style={ROW}>
           <span style={{ fontSize: 14, color: "#1a1a1a" }}>Ajouter un temps de pause par defaut de</span>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <input type="number" style={{ ...INPUT, width: 70, textAlign: "center" }} value={settings.pause_defaut_minutes} onChange={e => updateField({ pause_defaut_minutes: Number(e.target.value) })} min={0} max={120} />
+            <input type="number" style={{ ...INPUT, width: 80, textAlign: "right" }} value={settings.pause_defaut_minutes} onChange={e => updateField({ pause_defaut_minutes: Number(e.target.value) })} min={0} max={120} />
             <span style={{ fontSize: 12, color: "#999" }}>min</span>
           </div>
         </div>
         <div style={{ ...ROW, borderBottom: "none" }}>
-          <span style={{ fontSize: 14, color: "#1a1a1a" }}>Ajouter la pause par defaut aux shifts d&apos;une duree minimum de</span>
-          <input type="text" style={{ ...INPUT, width: 80, textAlign: "center" }} defaultValue="0:0" placeholder="HH:MM" />
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span style={{ fontSize: 14, color: "#1a1a1a" }}>Ajouter la pause par defaut aux shifts d&apos;une duree minimum de</span>
+            <span title="Si un shift depasse cette duree, la pause configuree ci-dessus sera automatiquement ajoutee" style={{ cursor: "help", display: "inline-flex" }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+            </span>
+          </div>
+          <input
+            type="text"
+            style={{ ...INPUT, width: 80, textAlign: "center" }}
+            value={(() => {
+              const d = settings.duree_min_shift_pause ?? "03:00:00";
+              const parts = String(d).split(":");
+              return `${parts[0] ?? "0"}:${parts[1] ?? "00"}`;
+            })()}
+            onChange={e => {
+              const val = e.target.value;
+              if (/^\d{0,2}:?\d{0,2}$/.test(val)) {
+                const clean = val.includes(":") ? val : val;
+                updateField({ duree_min_shift_pause: clean.includes(":") ? `${clean}:00` : `${clean}:00:00` });
+              }
+            }}
+            placeholder="HH:MM"
+          />
         </div>
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 14 }}>
           <button type="button" onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 2000); }} style={{
-            padding: "6px 16px", borderRadius: 6, border: "1px solid #ddd6c8",
-            background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#999",
+            padding: "8px 20px", borderRadius: 6, border: "1px solid #ddd6c8",
+            background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#999",
           }}>
             Enregistrer
           </button>
@@ -704,43 +731,115 @@ export default function EtablissementDetailPage() {
         {tab === "modulation" && renderModulation()}
       </div>
 
-      {/* Modal: Equipes */}
+      {/* Modal: Equipes (popup centered) */}
       {showEquipesModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "flex-start", justifyContent: "flex-end", zIndex: 200 }}
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }}
           onClick={() => setShowEquipesModal(false)}
         >
-          <div style={{ background: "#fff", width: 340, height: "100%", padding: 24, overflowY: "auto", boxShadow: "-4px 0 20px rgba(0,0,0,0.15)" }}
+          <div style={{ background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 420, boxShadow: "0 12px 40px rgba(0,0,0,0.15)" }}
             onClick={e => e.stopPropagation()}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
               <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>Plannings</h2>
               <button type="button" onClick={() => setShowEquipesModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#999" }}>x</button>
             </div>
-            <p style={{ fontSize: 12, color: "#999", lineHeight: 1.4, marginBottom: 16 }}>
+            <p style={{ fontSize: 12, color: "#999", lineHeight: 1.4, marginBottom: 12 }}>
               Vous pouvez avoir un ou plusieurs plannings par etablissement : cuisine, salle, etc. Les plannings etant independants ils sont publies separement.
             </p>
-            <p style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>
-              Cet etablissement a <strong style={{ color: "#1a1a1a" }}>{equipes.length} planning{equipes.length > 1 ? "s" : ""}</strong> :
+            <p style={{ fontSize: 12, color: "#1a1a1a", marginBottom: 16, fontWeight: 600 }}>
+              Cet etablissement a {editEquipes.length} planning{editEquipes.length > 1 ? "s" : ""} :
             </p>
-            {equipes.map(eq => (
-              <div key={eq} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                <input style={{ ...INPUT, flex: 1 }} value={eq} readOnly />
-                <span style={{ fontSize: 10, color: "#999", whiteSpace: "nowrap" }}>{eq.length}/40</span>
+
+            {/* Existing equipes — editable + deletable */}
+            {editEquipes.map((eq, idx) => (
+              <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <input
+                  style={{ ...INPUT, flex: 1 }}
+                  value={eq}
+                  onChange={e => {
+                    const next = [...editEquipes];
+                    next[idx] = e.target.value;
+                    setEditEquipes(next);
+                  }}
+                  maxLength={40}
+                />
+                <span style={{ fontSize: 10, color: "#999", whiteSpace: "nowrap", minWidth: 30, textAlign: "right" }}>{eq.length}/40</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (editEquipes.length <= 1) { alert("Il faut au moins un planning."); return; }
+                    if (!confirm(`Supprimer le planning "${eq}" ? Les postes associes seront aussi supprimes.`)) return;
+                    setEditEquipes(prev => prev.filter((_, i) => i !== idx));
+                  }}
+                  style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "#999", flexShrink: 0 }}
+                  title="Supprimer"
+                >
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
+                </button>
               </div>
             ))}
-            <button type="button" style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "8px 14px", borderRadius: 6, border: "1px solid #ddd6c8",
-              background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
-              marginTop: 8,
-            }}>
-              + Ajouter un planning
-            </button>
-            <div style={{ position: "absolute", bottom: 24, left: 24, right: 24 }}>
-              <button type="button" onClick={() => setShowEquipesModal(false)} style={{
-                width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #ddd6c8",
-                background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#999",
-              }}>
+
+            {/* Add new */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+              <input
+                style={{ ...INPUT, flex: 1 }}
+                value={newEquipeName}
+                onChange={e => setNewEquipeName(e.target.value)}
+                placeholder="Nom du planning"
+                maxLength={40}
+                onKeyDown={e => {
+                  if (e.key === "Enter" && newEquipeName.trim()) {
+                    setEditEquipes(prev => [...prev, newEquipeName.trim()]);
+                    setNewEquipeName("");
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (!newEquipeName.trim()) return;
+                  setEditEquipes(prev => [...prev, newEquipeName.trim()]);
+                  setNewEquipeName("");
+                }}
+                disabled={!newEquipeName.trim()}
+                style={{
+                  padding: "8px 14px", borderRadius: 6, border: "1px solid #ddd6c8",
+                  background: "#fff", fontSize: 13, fontWeight: 600, cursor: newEquipeName.trim() ? "pointer" : "default",
+                  color: newEquipeName.trim() ? "#1a1a1a" : "#ccc", whiteSpace: "nowrap",
+                }}
+              >
+                + Ajouter
+              </button>
+            </div>
+
+            {/* Save */}
+            <div style={{ marginTop: 20, borderTop: "1px solid #f0ebe3", paddingTop: 16 }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!id) return;
+                  // Rename postes whose equipe changed + delete postes for removed equipes
+                  const oldEquipes = [...new Set(postes.map(p => p.equipe))];
+                  const removed = oldEquipes.filter(eq => !editEquipes.includes(eq));
+                  // Delete postes for removed equipes
+                  for (const eq of removed) {
+                    await supabase.from("postes").delete().eq("etablissement_id", id).eq("equipe", eq);
+                  }
+                  // Refresh postes
+                  const { data: refreshed } = await supabase.from("postes").select("id, nom, equipe, couleur, emoji, actif").eq("etablissement_id", id).order("equipe").order("nom");
+                  if (refreshed) setPostes(refreshed as Poste[]);
+                  // For new equipes that don't have any postes yet, we don't need to create any — they'll show as empty sections
+                  setShowEquipesModal(false);
+                  setSaved(true);
+                  setTimeout(() => setSaved(false), 2000);
+                }}
+                style={{
+                  width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #ddd6c8",
+                  background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                }}
+              >
                 Enregistrer
               </button>
             </div>

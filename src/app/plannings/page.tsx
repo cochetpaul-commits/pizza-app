@@ -156,6 +156,9 @@ export default function PlanningPage() {
   const [mDebut, setMDebut] = useState("09:00");
   const [mFin, setMFin] = useState("15:00");
   const [mPause, setMPause] = useState(30);
+  const [etabPauseDefaut, setEtabPauseDefaut] = useState(30);
+  const [etabPauseAuto, setEtabPauseAuto] = useState(true);
+  const [etabDureeMinPause, setEtabDureeMinPause] = useState(180); // minutes
   const [mNote, setMNote] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -177,7 +180,7 @@ export default function PlanningPage() {
       const mondayISO = toISO(weekStart);
       const sundayISO = toISO(addDays(weekStart, 6));
 
-      const [empRes, postesRes, shiftsRes, absRes] = await Promise.all([
+      const [empRes, postesRes, shiftsRes, absRes, etabSettingsRes] = await Promise.all([
         supabase
           .from("employes")
           .select("id, prenom, nom, initiales, actif, equipes_access, contrats(type, heures_semaine, actif)")
@@ -203,9 +206,24 @@ export default function PlanningPage() {
           .eq("etablissement_id", etab.id)
           .lte("date_debut", sundayISO)
           .gte("date_fin", mondayISO),
+        supabase
+          .from("etablissements")
+          .select("pause_defaut_minutes, pause_auto_creation, duree_min_shift_pause")
+          .eq("id", etab.id)
+          .single(),
       ]);
 
       if (cancelled) return;
+      // Load etab preferences
+      if (etabSettingsRes.data) {
+        const es = etabSettingsRes.data;
+        setEtabPauseDefaut(es.pause_defaut_minutes ?? 30);
+        setEtabPauseAuto(es.pause_auto_creation ?? true);
+        // Parse interval "HH:MM:SS" or "X hours" to minutes
+        const dur = String(es.duree_min_shift_pause ?? "03:00:00");
+        const parts = dur.split(":");
+        if (parts.length >= 2) setEtabDureeMinPause(Number(parts[0]) * 60 + Number(parts[1]));
+      }
       setEmployes(empRes.data ?? []);
       setPostes(postesRes.data ?? []);
       setShifts(shiftsRes.data ?? []);
@@ -308,7 +326,10 @@ export default function PlanningPage() {
     setMPosteId(postes[0]?.id ?? "");
     setMDebut("09:00");
     setMFin("15:00");
-    setMPause(30);
+    // Use establishment pause settings: auto-add pause if shift duration >= min threshold
+    const shiftDur = (timeToMin("15:00") - timeToMin("09:00")); // 360 min = 6h
+    const shouldAddPause = etabPauseAuto && shiftDur >= etabDureeMinPause;
+    setMPause(shouldAddPause ? etabPauseDefaut : 0);
     setMNote("");
     setShowModal(true);
   };
