@@ -51,8 +51,11 @@ type Absence = {
 type Shift = {
   employe_id: string;
   date: string;
-  start_time: string;
-  end_time: string;
+  heure_debut: string;
+  heure_fin: string;
+  pause_minutes: number;
+  start_time?: string;
+  end_time?: string;
 };
 
 type MainTab = "infos" | "dossier" | "acces" | "roles";
@@ -154,6 +157,15 @@ export default function EmployeDetailPage() {
   const [elements, setElements] = useState<ContratElement[]>([]);
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
+
+  // ── Avenant modal ──
+  const [showAvenantModal, setShowAvenantModal] = useState(false);
+  const [avenantStep, setAvenantStep] = useState(1);
+  const [avenantType, setAvenantType] = useState<"permanent" | "ponctuel">("permanent");
+  const [avenantChanges, setAvenantChanges] = useState<string[]>([]);
+  const [avenantDate, setAvenantDate] = useState(new Date().toISOString().slice(0, 10));
+  const [avenantHeures, setAvenantHeures] = useState(0);
+  const [avenantSalaire, setAvenantSalaire] = useState(0);
 
   // ── Contrat modal ──
   const [showContratModal, setShowContratModal] = useState(false);
@@ -505,8 +517,13 @@ export default function EmployeDetailPage() {
 
         {/* ── Combo-style colored header ── */}
         <div style={{
-          background: `linear-gradient(135deg, ${etab?.couleur ?? "#2D6A4F"} 0%, ${etab?.couleur ?? "#2D6A4F"}cc 100%)`,
-          borderRadius: "14px 14px 0 0", padding: "20px 24px 0", color: "#fff",
+          background: (() => {
+            const r = (emp as Record<string, unknown>).role as string ?? "employe";
+            if (r === "group_admin" || r === "proprietaire" || r === "admin") return `linear-gradient(135deg, #2D4A3E 0%, #1a3a2e 100%)`; // iFratelli group dark green
+            if (r === "manager" || r === "direction") return `linear-gradient(135deg, #3D5A4E 0%, #2D4A3E 100%)`; // slightly lighter
+            return `linear-gradient(135deg, ${etab?.couleur ?? "#2D6A4F"} 0%, ${etab?.couleur ?? "#2D6A4F"}cc 100%)`;
+          })(),
+          borderRadius: 14, padding: "20px 24px 0", color: "#fff",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{
@@ -886,7 +903,15 @@ export default function EmployeDetailPage() {
                                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
                                 Afficher le detail
                               </button>
-                              <button type="button" onClick={() => { openEditContrat(c); document.getElementById("contract-actions")!.style.display = "none"; }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 16px", background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#1a1a1a", textAlign: "left" }}>
+                              <button type="button" onClick={() => {
+                                document.getElementById("contract-actions")!.style.display = "none";
+                                setAvenantStep(1);
+                                setAvenantChanges([]);
+                                setAvenantHeures(c.heures_semaine);
+                                setAvenantSalaire(c.remuneration);
+                                setAvenantDate(new Date().toISOString().slice(0, 10));
+                                setShowAvenantModal(true);
+                              }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 16px", background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#1a1a1a", textAlign: "left" }}>
                                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                                 Declarer un changement
                               </button>
@@ -1437,12 +1462,32 @@ export default function EmployeDetailPage() {
                     <tbody>
                       {(() => {
                         const now = new Date();
-                        return Array.from({ length: 4 }, (_, i) => {
+                        // Calculate hours per month from shifts
+                        const monthlyHours: Record<string, number> = {};
+                        for (const s of shifts) {
+                          const d = new Date(s.date);
+                          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+                          const start = s.heure_debut ?? s.start_time ?? "00:00";
+                          const end = s.heure_fin ?? s.end_time ?? "00:00";
+                          const [sh, sm] = start.split(":").map(Number);
+                          const [eh, em] = end.split(":").map(Number);
+                          let dur = (eh * 60 + em) - (sh * 60 + sm);
+                          if (dur < 0) dur += 1440;
+                          dur -= (s.pause_minutes ?? 0);
+                          monthlyHours[key] = (monthlyHours[key] ?? 0) + dur / 60;
+                        }
+                        return Array.from({ length: 6 }, (_, i) => {
                           const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+                          const h = monthlyHours[key] ?? 0;
+                          const hh = Math.floor(h);
+                          const mm = Math.round((h - hh) * 60);
                           return (
                             <tr key={i} style={{ borderBottom: "1px solid #f0ebe3" }}>
-                              <td style={{ padding: "8px 0" }}>{d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}</td>
-                              <td style={{ padding: "8px 0", textAlign: "right", color: "#999" }}>—</td>
+                              <td style={{ padding: "8px 0", textTransform: "capitalize" }}>{d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}</td>
+                              <td style={{ padding: "8px 0", textAlign: "right", fontWeight: h > 0 ? 600 : 400, color: h > 0 ? "#1a1a1a" : "#999" }}>
+                                {h > 0 ? `${hh}h${mm > 0 ? String(mm).padStart(2, "0") : "00"}` : "—"}
+                              </td>
                             </tr>
                           );
                         });
@@ -1620,6 +1665,150 @@ export default function EmployeDetailPage() {
           </div>
         </div>
       )}
+
+      {/* ═══ MODAL: Avenant ═══ */}
+      {showAvenantModal && (() => {
+        const ac = activeContrat;
+        if (!ac) return null;
+
+        const saveAvenant = async () => {
+          const updates: Record<string, unknown> = {};
+          if (avenantChanges.includes("heures")) updates.heures_semaine = avenantHeures;
+          if (avenantChanges.includes("salaire")) updates.remuneration = avenantSalaire;
+
+          if (Object.keys(updates).length > 0) {
+            await supabase.from("contrats").update(updates).eq("id", ac.id);
+            setContrats(prev => prev.map(c => c.id === ac.id ? { ...c, ...updates } as Contrat : c));
+          }
+          setShowAvenantModal(false);
+        };
+
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "flex-end", zIndex: 200 }} onClick={() => setShowAvenantModal(false)}>
+            <div style={{ background: "#fff", width: 420, height: "100%", padding: 24, overflowY: "auto", boxShadow: "-4px 0 20px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>
+                  {avenantStep === 1 ? "Declarer un changement" : `Creer un avenant au contrat de ${prenom}`}
+                </h2>
+                <button type="button" onClick={() => setShowAvenantModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#999" }}>x</button>
+              </div>
+
+              {avenantStep === 1 && (
+                <>
+                  <div style={{ padding: 12, borderRadius: 8, background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.12)", marginBottom: 16, fontSize: 12, color: "#666" }}>
+                    Le changement sur le contrat necessite-t-il un avenant ?
+                  </div>
+
+                  <label style={{ display: "block", padding: 14, borderRadius: 10, marginBottom: 8, cursor: "pointer", border: avenantType === "permanent" ? "2px solid #2D6A4F" : "1px solid #ddd6c8", background: avenantType === "permanent" ? "rgba(45,106,79,0.04)" : "#fff" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <input type="radio" name="avenantChoice" checked={avenantType === "permanent"} onChange={() => setAvenantType("permanent")} />
+                      <span style={{ fontSize: 14, fontWeight: 700 }}>Creer un avenant</span>
+                    </div>
+                    <p style={{ fontSize: 11, color: "#666", margin: "0 0 0 26px", lineHeight: 1.4 }}>
+                      L&apos;avenant est necessaire en cas de modification d&apos;une information essentielle telle que le type de contrat, le temps de travail, la qualification ou le poste.
+                    </p>
+                  </label>
+
+                  <label style={{ display: "block", padding: 14, borderRadius: 10, marginBottom: 16, cursor: "pointer", border: avenantType === "ponctuel" ? "2px solid #2D6A4F" : "1px solid #ddd6c8", background: avenantType === "ponctuel" ? "rgba(45,106,79,0.04)" : "#fff" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <input type="radio" name="avenantChoice" checked={avenantType === "ponctuel"} onChange={() => setAvenantType("ponctuel")} />
+                      <span style={{ fontSize: 14, fontWeight: 700 }}>Rectifier des informations du contrat</span>
+                    </div>
+                    <p style={{ fontSize: 11, color: "#666", margin: "0 0 0 26px", lineHeight: 1.4 }}>
+                      Les informations non essentielles peuvent etre modifiees sans avenant. Important : Toute modification s&apos;applique retroactivement.
+                    </p>
+                  </label>
+
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <button type="button" onClick={() => setAvenantStep(2)} style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                      Suivant
+                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg>
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {avenantStep === 2 && (
+                <>
+                  <div style={{ fontSize: 11, color: "#999", marginBottom: 12 }}>{avenantStep} sur 2 — {avenantType === "permanent" ? "Details de l'avenant" : "Rectification"}</div>
+
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 4 }}>Date d&apos;effet de l&apos;avenant <span style={{ color: "#DC2626" }}>*</span></label>
+                    <input type="date" value={avenantDate} onChange={e => setAvenantDate(e.target.value)} style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14, boxSizing: "border-box" as const }} />
+                  </div>
+
+                  {avenantType === "permanent" && (
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 8 }}>Que souhaitez-vous faire ? <span style={{ color: "#DC2626" }}>*</span></label>
+                      {[
+                        { key: "heures", label: "Changer le temps de travail hebdomadaire et/ou la remuneration" },
+                        { key: "jours", label: "Changer le nombre de jours travailles par semaine" },
+                        { key: "emploi", label: "Changer l'intitule de l'emploi" },
+                        { key: "qualification", label: "Changer la qualification" },
+                      ].map(opt => (
+                        <label key={opt.key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", cursor: "pointer" }}>
+                          <input type="checkbox" checked={avenantChanges.includes(opt.key)} onChange={e => {
+                            if (e.target.checked) setAvenantChanges(prev => [...prev, opt.key]);
+                            else setAvenantChanges(prev => prev.filter(k => k !== opt.key));
+                          }} />
+                          <span style={{ fontSize: 13 }}>{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  {avenantChanges.includes("heures") && (
+                    <div style={{ padding: 16, borderRadius: 10, border: "1px solid #ddd6c8", marginBottom: 16 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 12 }}>Temps de travail hebdomadaire</div>
+                      <div style={{ marginBottom: 8 }}>
+                        <label style={{ fontSize: 12, color: "#999" }}>Temps actuel</label>
+                        <div style={{ fontSize: 14, fontWeight: 600, padding: "6px 0" }}>{ac.heures_semaine} hrs</div>
+                      </div>
+                      <div style={{ marginBottom: 12 }}>
+                        <label style={{ fontSize: 12, color: "#1a1a1a", fontWeight: 600 }}>Nouveau temps de travail hebdomadaire <span style={{ color: "#DC2626" }}>*</span></label>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <input type="number" value={avenantHeures} onChange={e => setAvenantHeures(Number(e.target.value))} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14, boxSizing: "border-box" as const }} />
+                          <span style={{ fontSize: 12, color: "#999" }}>hrs</span>
+                        </div>
+                      </div>
+                      <div style={{ padding: 10, borderRadius: 8, background: "rgba(220,38,38,0.04)", border: "1px solid rgba(220,38,38,0.12)", fontSize: 11, color: "#DC2626", lineHeight: 1.4 }}>
+                        Pour le calcul des heures supplementaires, il ne peut y avoir qu&apos;un seul temps de travail hebdomadaire par semaine civile. Combo utilise le temps contractuel effectif en debut de semaine.
+                      </div>
+                    </div>
+                  )}
+
+                  {(avenantChanges.includes("heures") || avenantChanges.includes("salaire")) && (
+                    <div style={{ padding: 16, borderRadius: 10, border: "1px solid #ddd6c8", marginBottom: 16 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 12 }}>Salaire brut mensuel</div>
+                      <div style={{ marginBottom: 8 }}>
+                        <label style={{ fontSize: 12, color: "#999" }}>Salaire actuel</label>
+                        <div style={{ fontSize: 14, fontWeight: 600, padding: "6px 0" }}>{ac.remuneration.toLocaleString("fr-FR")} EUR</div>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 12, color: "#1a1a1a", fontWeight: 600 }}>Nouveau salaire brut mensuel <span style={{ color: "#DC2626" }}>*</span></label>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <input type="number" value={avenantSalaire} onChange={e => setAvenantSalaire(Number(e.target.value))} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14, boxSizing: "border-box" as const }} />
+                          <span style={{ fontSize: 12, color: "#999" }}>EUR</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
+                    <button type="button" onClick={() => setAvenantStep(1)} style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
+                      Retour
+                    </button>
+                    <button type="button" onClick={saveAvenant} disabled={avenantChanges.length === 0 && avenantType === "permanent"} style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                      Enregistrer l&apos;avenant
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </RequireRole>
   );
 }
