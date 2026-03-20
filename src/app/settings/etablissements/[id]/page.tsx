@@ -63,7 +63,7 @@ type Prime = {
   actif: boolean;
 };
 
-type Tab = "social" | "planification" | "modulation";
+type Tab = "social" | "planification" | "modulation" | "pointeuse";
 
 /* ── Constants ───────────────────────────────────────── */
 
@@ -1182,12 +1182,72 @@ export default function EtablissementDetailPage() {
           <button type="button" style={tabStyle("social")} onClick={() => setTab("social")}>Regles sociales</button>
           <button type="button" style={tabStyle("planification")} onClick={() => setTab("planification")}>Planification</button>
           <button type="button" style={tabStyle("modulation")} onClick={() => setTab("modulation")}>Modulation</button>
+          <button type="button" style={tabStyle("pointeuse")} onClick={() => setTab("pointeuse")}>Pointeuse</button>
         </div>
 
         {/* Content */}
         {tab === "social" && renderSocial()}
         {tab === "planification" && renderPlanification()}
         {tab === "modulation" && renderModulation()}
+        {tab === "pointeuse" && (
+          <>
+            <div style={CARD}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, color: "#1a1a1a" }}>Configuration de la pointeuse</h2>
+              <div style={ROW}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Activer la pointeuse</div>
+                  <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>Les employes peuvent pointer leurs heures d&apos;arrivee et de depart</div>
+                </div>
+                <Toggle value={(settings as Record<string, unknown>).pointeuse_enabled as boolean ?? false} onChange={v => updateField({ pointeuse_enabled: v } as Partial<Settings>)} />
+              </div>
+              <div style={ROW}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Pause automatique</div>
+                  <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>Deduire automatiquement la pause configuree du temps pointe</div>
+                </div>
+                <Toggle value={(settings as Record<string, unknown>).pointeuse_auto_pause as boolean ?? true} onChange={v => updateField({ pointeuse_auto_pause: v } as Partial<Settings>)} />
+              </div>
+              <div style={ROW}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Geolocalisation</div>
+                  <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>Verifier la position de l&apos;employe lors du pointage</div>
+                </div>
+                <Toggle value={(settings as Record<string, unknown>).pointeuse_geoloc as boolean ?? false} onChange={v => updateField({ pointeuse_geoloc: v } as Partial<Settings>)} />
+              </div>
+              <div style={{ ...ROW, borderBottom: "none" }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Tolerance (minutes)</div>
+                  <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>Ecart accepte avant/apres l&apos;heure prevue du shift</div>
+                </div>
+                <input
+                  type="number"
+                  style={{ ...INPUT, width: 80, textAlign: "center" }}
+                  value={(settings as Record<string, unknown>).pointeuse_tolerance_minutes as number ?? 5}
+                  onChange={e => updateField({ pointeuse_tolerance_minutes: Number(e.target.value) } as Partial<Settings>)}
+                  min={0} max={60}
+                />
+              </div>
+            </div>
+
+            <div style={CARD}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: "#1a1a1a" }}>Methode de pointage</h2>
+              <div style={ROW}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Code PIN</div>
+                  <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>L&apos;employe saisit son code PIN a 4 chiffres pour pointer</div>
+                </div>
+                <Toggle value={true} onChange={() => {}} />
+              </div>
+              <div style={{ ...ROW, borderBottom: "none" }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Application mobile</div>
+                  <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>L&apos;employe pointe depuis l&apos;application mobile Combo</div>
+                </div>
+                <Toggle value={true} onChange={() => {}} />
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Modal: Equipes (popup centered) */}

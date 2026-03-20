@@ -166,17 +166,9 @@ export function buildDynamicNav(
     roles: ["group_admin"],
     sections: [
       {
-        label: "Etablissement",
-        icon: "box",
-        items: [
-          { label: "Configuration", href: "/settings/etablissements", icon: "building" },
-          { label: "Planning", href: "/settings/planning", icon: "calendar" },
-          { label: "Pointeuse", href: "/settings/pointeuse", icon: "clock" },
-        ],
-      },
-      {
         label: "",
         items: [
+          { label: "Etablissement", href: "/settings/etablissements", icon: "building" },
           { label: "Employes", href: "/settings/employes", icon: "users" },
           { label: "Fournisseurs", href: "/fournisseurs", icon: "truck" },
         ],
