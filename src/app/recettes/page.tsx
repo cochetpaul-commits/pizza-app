@@ -62,14 +62,14 @@ const CUISINE_CATS = [
   { id: "autre",          label: "Autre" },
 ];
 
-const CUISINE_CAT_FILTERS: { id: CuisineCatFilter; label: string }[] = [
-  { id: "all",           label: "Tous" },
-  { id: "plat_cuisine",  label: "Plat" },
-  { id: "preparation",   label: "Prep" },
-  { id: "entree",        label: "Entr\u00e9e" },
-  { id: "sauce",         label: "Sauce" },
-  { id: "dessert",       label: "Dessert" },
-  { id: "autre",         label: "Autre" },
+const CUISINE_CAT_FILTERS: { id: CuisineCatFilter; label: string; color: string }[] = [
+  { id: "all",           label: "Tous",            color: CUISINE_COLOR },
+  { id: "plat_cuisine",  label: "Plat",            color: "#B45309" },
+  { id: "preparation",   label: "Prep",            color: "#7C3AED" },
+  { id: "entree",        label: "Entr\u00e9e",     color: "#0284C7" },
+  { id: "sauce",         label: "Sauce",           color: "#DC2626" },
+  { id: "dessert",       label: "Dessert",         color: "#D4775A" },
+  { id: "autre",         label: "Autre",           color: "#6B7280" },
 ];
 
 const FOOD_COST_FILTERS: { id: FoodCostFilter; label: string }[] = [
@@ -678,33 +678,49 @@ function RecettesInner() {
                 <span style={{ marginLeft: 4, fontSize: 11, opacity: 0.7 }}>({tabCounts[t.key]})</span>
                 {t.key === "cuisine" && <span style={{ marginLeft: 2, fontSize: 9, opacity: 0.6 }}>{"\u25BC"}</span>}
               </button>
-              {/* Cuisine sub-category popup */}
+              {/* Cuisine sub-category modal */}
               {t.key === "cuisine" && showCuisinePop && (
-                <>
-                  <div onClick={() => setShowCuisinePop(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
-                  <div style={{
-                    position: "absolute", top: 40, left: 0, zIndex: 200,
-                    background: "#fff", borderRadius: 12, padding: 6,
-                    boxShadow: "0 4px 20px rgba(0,0,0,0.12)", border: `1.5px solid ${CUISINE_COLOR}30`,
-                    minWidth: 160,
+                <div onClick={() => setShowCuisinePop(false)} style={{
+                  position: "fixed", inset: 0, zIndex: 300,
+                  background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <div onClick={e => e.stopPropagation()} style={{
+                    background: "#fff", borderRadius: 20, padding: "24px 20px 20px",
+                    width: "90%", maxWidth: 360,
+                    boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
                   }}>
-                    {CUISINE_CAT_FILTERS.map(f => {
-                      const active = cuisineCatFilter === f.id;
-                      return (
-                        <button key={f.id} type="button"
-                          onClick={() => { setCuisineCatFilter(f.id); setShowCuisinePop(false); }}
-                          style={{
-                            width: "100%", padding: "8px 12px", borderRadius: 8,
-                            border: "none", background: active ? `${CUISINE_COLOR}14` : "transparent",
-                            color: active ? CUISINE_COLOR : "#1a1a1a", fontSize: 13,
-                            fontWeight: active ? 700 : 500, cursor: "pointer", textAlign: "left",
-                          }}>
-                          {f.label}
-                        </button>
-                      );
-                    })}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                      <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: CUISINE_COLOR, textTransform: "uppercase", letterSpacing: 1 }}>
+                        Cuisine
+                      </h3>
+                      <button type="button" onClick={() => setShowCuisinePop(false)}
+                        style={{ background: "none", border: "none", fontSize: 20, color: "#999", cursor: "pointer", padding: 4 }}>
+                        {"\u2715"}
+                      </button>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      {CUISINE_CAT_FILTERS.map(f => {
+                        const active = cuisineCatFilter === f.id;
+                        const c = f.color;
+                        return (
+                          <button key={f.id} type="button"
+                            onClick={() => { setCuisineCatFilter(f.id); setShowCuisinePop(false); }}
+                            style={{
+                              padding: "14px 12px", borderRadius: 12,
+                              border: active ? `2px solid ${c}` : `1.5px solid ${c}40`,
+                              background: active ? `${c}20` : `${c}0A`,
+                              color: c,
+                              fontSize: 14, fontWeight: active ? 700 : 600,
+                              cursor: "pointer", textAlign: "center",
+                              gridColumn: f.id === "all" ? "1 / -1" : undefined,
+                            }}>
+                            {f.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </>
+                </div>
               )}
             </div>
           ))}
