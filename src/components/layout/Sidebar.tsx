@@ -8,6 +8,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import {
   buildDynamicNav,
+  SIDEBAR_NAV_V2,
   SIDEBAR_NAV_SIMPLE,
   type SidebarEntry,
   type NavEtabGroup,
@@ -113,7 +114,9 @@ function CollapsedContent({ onExpand }: { onExpand: () => void }) {
 
   const isAdmin = role === "group_admin" || role === "manager";
   const entries: SidebarEntry[] = isAdmin
-    ? buildDynamicNav(etablissements.map(e => ({ slug: e.slug, nom: e.nom, couleur: e.couleur })))
+    ? (etablissements.length > 0
+        ? buildDynamicNav(etablissements.map(e => ({ slug: e.slug, nom: e.nom, couleur: e.couleur })))
+        : SIDEBAR_NAV_V2)
     : SIDEBAR_NAV_SIMPLE;
 
   const etabColor = isGroupView
@@ -360,7 +363,9 @@ function ExpandedContent({ onNavigate, onCollapse, showBurger }: ExpandedContent
 
   const isAdmin = role === "group_admin" || role === "manager";
   const entries: SidebarEntry[] = isAdmin
-    ? buildDynamicNav(etablissements.map(e => ({ slug: e.slug, nom: e.nom, couleur: e.couleur })))
+    ? (etablissements.length > 0
+        ? buildDynamicNav(etablissements.map(e => ({ slug: e.slug, nom: e.nom, couleur: e.couleur })))
+        : SIDEBAR_NAV_V2)
     : SIDEBAR_NAV_SIMPLE;
 
   const etabColor = isGroupView
