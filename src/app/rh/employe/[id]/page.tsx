@@ -158,6 +158,31 @@ export default function EmployeDetailPage() {
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
 
+  // ── Absence modal ──
+  const [showAbsenceModal, setShowAbsenceModal] = useState(false);
+  const [absType, setAbsType] = useState("conge_paye");
+  const [absDebut, setAbsDebut] = useState(new Date().toISOString().slice(0, 10));
+  const [absFin, setAbsFin] = useState(new Date().toISOString().slice(0, 10));
+  const [absDebutPeriode, setAbsDebutPeriode] = useState<"matin" | "apres_midi">("matin");
+  const [absFinPeriode, setAbsFinPeriode] = useState<"matin" | "apres_midi">("apres_midi");
+  const [absNote, setAbsNote] = useState("");
+
+  // ── Prime modal ──
+  const [showPrimeModal, setShowPrimeModal] = useState(false);
+  const [primeType, setPrimeType] = useState("");
+  const [primeMontant, setPrimeMontant] = useState(0);
+  const [primeDate, setPrimeDate] = useState(new Date().toISOString().slice(0, 10));
+
+  // ── Transport modal ──
+  const [showTransportModal, setShowTransportModal] = useState(false);
+  const [transportDispositif, setTransportDispositif] = useState("");
+
+  // ── Disponibilites modal ──
+  const [showDispoModal, setShowDispoModal] = useState(false);
+
+  // ── Planification modal ──
+  const [showPlanifModal, setShowPlanifModal] = useState(false);
+
   // ── Avenant modal ──
   const [showAvenantModal, setShowAvenantModal] = useState(false);
   const [avenantStep, setAvenantStep] = useState(1);
@@ -180,8 +205,7 @@ export default function EmployeDetailPage() {
   const [cJours, setCJours] = useState(5);
   const [cActif, setCActif] = useState(true);
 
-  // ── Absence modal ──
-  const [showAbsenceModal, setShowAbsenceModal] = useState(false);
+  // ── Old absence modal (legacy) ──
   const [aType, setAType] = useState("CP");
   const [aDebut, setADebut] = useState("");
   const [aFin, setAFin] = useState("");
@@ -989,7 +1013,7 @@ export default function EmployeDetailPage() {
                       </span>
                       <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Indemnites de transport mensuelles</span>
                     </div>
-                    <button type="button" style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>+ Ajouter</button>
+                    <button type="button" onClick={() => setShowTransportModal(true)} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>+ Ajouter</button>
                   </div>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, marginBottom: 8 }}>
                     <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
@@ -1011,7 +1035,7 @@ export default function EmployeDetailPage() {
                       </span>
                       <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Primes, acomptes et indemnites</span>
                     </div>
-                    <button type="button" onClick={openNewContrat} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>+ Ajouter</button>
+                    <button type="button" onClick={() => setShowPrimeModal(true)} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>+ Ajouter</button>
                   </div>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, marginBottom: 8 }}>
                     <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
@@ -1261,6 +1285,9 @@ export default function EmployeDetailPage() {
                     </span>
                     <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Absences</span>
                   </div>
+                  <button type="button" onClick={() => setShowAbsenceModal(true)} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    + Demande d&apos;absence
+                  </button>
                 </div>
                 {absences.length === 0 ? (
                   <p style={{ fontSize: 13, color: "#999", textAlign: "center", padding: "20px 0" }}>Aucune absence enregistree</p>
@@ -1591,6 +1618,13 @@ export default function EmployeDetailPage() {
                     </p>
                   </div>
 
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                    <button type="button" onClick={() => setShowPlanifModal(true)} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                      Modifier
+                    </button>
+                  </div>
+
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
                       <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Etablissement</th>
@@ -1666,7 +1700,7 @@ export default function EmployeDetailPage() {
                   </table>
                 </div>
 
-                {/* Disponibilites — editable */}
+                {/* Disponibilites */}
                 <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1675,10 +1709,11 @@ export default function EmployeDetailPage() {
                       </span>
                       <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Disponibilites</span>
                     </div>
+                    <button type="button" onClick={() => setShowDispoModal(true)} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                      Modifier
+                    </button>
                   </div>
-                  <p style={{ fontSize: 11, color: "#999", marginBottom: 12 }}>
-                    Cochez les jours ou le salarie est disponible. Les horaires sont repercutes sur le planning.
-                  </p>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
                       <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", width: 90 }}>Jour</th>
@@ -1850,6 +1885,203 @@ export default function EmployeDetailPage() {
               <button type="button" onClick={() => setShowAbsenceModal(false)} style={cancelBtn}>Annuler</button>
               <button type="button" onClick={handleSaveAbsence} disabled={saving || !aDebut} style={{ ...saveBtnStyle, opacity: saving || !aDebut ? 0.5 : 1 }}>
                 {saving ? "..." : "Enregistrer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL: Demande d'absence ═══ */}
+      {showAbsenceModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }} onClick={() => setShowAbsenceModal(false)}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 460, boxShadow: "0 12px 40px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>Demande d&apos;absence</h2>
+              <button type="button" onClick={() => setShowAbsenceModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#999" }}>x</button>
+            </div>
+            <p style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>Les demandes d&apos;absences sont envoyees a votre responsable qui pourra valider ou refuser votre demande.</p>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 4 }}>Type d&apos;absence</label>
+              <select value={absType} onChange={e => setAbsType(e.target.value)} style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14, boxSizing: "border-box" as const }}>
+                <option value="conge_paye">Conge paye</option>
+                <option value="sans_solde">Conge sans solde</option>
+                <option value="evenement_familial">Evenement familial</option>
+                <option value="maladie">Maladie</option>
+                <option value="rtt">RTT</option>
+                <option value="repos_compensateur">Repos compensateur</option>
+                <option value="formation">Formation</option>
+              </select>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 4 }}>Date de debut</label>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input type="date" value={absDebut} onChange={e => setAbsDebut(e.target.value)} style={{ flex: 1, padding: "10px 14px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14 }} />
+                <div style={{ display: "flex", borderRadius: 8, border: "1px solid #ddd6c8", overflow: "hidden" }}>
+                  <button type="button" onClick={() => setAbsDebutPeriode("matin")} style={{ padding: "8px 12px", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, background: absDebutPeriode === "matin" ? "#f0ebe3" : "#fff", color: "#1a1a1a" }}>Matin</button>
+                  <button type="button" onClick={() => setAbsDebutPeriode("apres_midi")} style={{ padding: "8px 12px", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, background: absDebutPeriode === "apres_midi" ? "#f0ebe3" : "#fff", color: "#1a1a1a", borderLeft: "1px solid #ddd6c8" }}>Apres-midi</button>
+                </div>
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 4 }}>Date de fin</label>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input type="date" value={absFin} onChange={e => setAbsFin(e.target.value)} style={{ flex: 1, padding: "10px 14px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14 }} />
+                <div style={{ display: "flex", borderRadius: 8, border: "1px solid #ddd6c8", overflow: "hidden" }}>
+                  <button type="button" onClick={() => setAbsFinPeriode("matin")} style={{ padding: "8px 12px", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, background: absFinPeriode === "matin" ? "#f0ebe3" : "#fff", color: "#1a1a1a" }}>Matin</button>
+                  <button type="button" onClick={() => setAbsFinPeriode("apres_midi")} style={{ padding: "8px 12px", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, background: absFinPeriode === "apres_midi" ? "#f0ebe3" : "#fff", color: "#1a1a1a", borderLeft: "1px solid #ddd6c8" }}>Apres-midi</button>
+                </div>
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 4 }}>Commentaire (facultatif)</label>
+              <textarea value={absNote} onChange={e => setAbsNote(e.target.value)} rows={3} style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14, boxSizing: "border-box" as const, resize: "vertical" }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button type="button" onClick={async () => {
+                await supabase.from("absences").insert({ employe_id: emp.id, etablissement_id: etab?.id, type: absType, date_debut: absDebut, date_fin: absFin, note: absNote || null, statut: "demande" });
+                setAbsences(prev => [...prev, { id: crypto.randomUUID(), type: absType, date_debut: absDebut, date_fin: absFin, statut: "demande" } as Absence]);
+                setShowAbsenceModal(false);
+                setAbsNote("");
+              }} style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL: Ajouter prime ═══ */}
+      {showPrimeModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }} onClick={() => setShowPrimeModal(false)}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 420, boxShadow: "0 12px 40px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>Ajouter une prime, un acompte ou autre indemnite</h2>
+              <button type="button" onClick={() => setShowPrimeModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#999" }}>x</button>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 4 }}>Choix du contrat <span style={{ color: "#DC2626" }}>*</span></label>
+              <select style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14 }}>
+                {contrats.filter(c => c.actif).map(c => <option key={c.id} value={c.id}>{CONTRAT_LABELS[c.type] ?? c.type} du {fmtDate(c.date_debut)}</option>)}
+              </select>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 4 }}>Type <span style={{ color: "#DC2626" }}>*</span></label>
+              <select value={primeType} onChange={e => setPrimeType(e.target.value)} style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14 }}>
+                <option value="">Selectionnez un type de prime...</option>
+                <option value="prime">Prime</option>
+                <option value="acompte">Acompte</option>
+                <option value="transport">Indemnite de transport</option>
+                <option value="mutuelle_dispense">Dispense de mutuelle</option>
+              </select>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 4 }}>Montant <span style={{ color: "#DC2626" }}>*</span></label>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <input type="number" value={primeMontant} onChange={e => setPrimeMontant(Number(e.target.value))} style={{ flex: 1, padding: "10px 14px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14 }} />
+                <span style={{ fontSize: 13, color: "#999" }}>EUR</span>
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 4 }}>Date <span style={{ color: "#DC2626" }}>*</span></label>
+              <input type="date" value={primeDate} onChange={e => setPrimeDate(e.target.value)} style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14 }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button type="button" onClick={async () => {
+                const ac = contrats.find(c => c.actif);
+                if (!ac) return;
+                await supabase.from("contrat_elements").insert({ contrat_id: ac.id, type: primeType || "prime", libelle: primeType || "Prime", montant: primeMontant, date_debut: primeDate });
+                setElements(prev => [...prev, { id: crypto.randomUUID(), contrat_id: ac.id, type: primeType || "prime", libelle: primeType || "Prime", montant: primeMontant, code_silae: null, date_debut: primeDate, date_fin: null }]);
+                setShowPrimeModal(false);
+              }} style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                Creer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL: Transport ═══ */}
+      {showTransportModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }} onClick={() => setShowTransportModal(false)}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 420, boxShadow: "0 12px 40px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>Ajouter une indemnite de transport mensuelle</h2>
+              <button type="button" onClick={() => setShowTransportModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#999" }}>x</button>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 4 }}>Dispositif <span style={{ color: "#DC2626" }}>*</span></label>
+              <select value={transportDispositif} onChange={e => setTransportDispositif(e.target.value)} style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14 }}>
+                <option value="">Selectionnez un dispositif</option>
+                <option value="abonnement_collectif">Abonnement transport collectif</option>
+                <option value="forfait_mobilite">Forfait mobilite durable</option>
+                <option value="indemnite_soumise">Autre indemnite de transport (soumise a cotisation)</option>
+                <option value="indemnite_non_soumise">Autre indemnite de transport (non soumise a cotisation)</option>
+              </select>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button type="button" onClick={() => { alert("Indemnite ajoutee"); setShowTransportModal(false); }} disabled={!transportDispositif} style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: transportDispositif ? "#1a1a1a" : "#ddd6c8", color: "#fff", fontSize: 13, fontWeight: 600, cursor: transportDispositif ? "pointer" : "default" }}>
+                Ajouter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL: Disponibilites ═══ */}
+      {showDispoModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "flex-end", zIndex: 200 }} onClick={() => setShowDispoModal(false)}>
+          <div style={{ background: "#fff", width: 380, height: "100%", padding: 24, overflowY: "auto", boxShadow: "-4px 0 20px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>Disponibilites</h2>
+              <button type="button" onClick={() => setShowDispoModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#999" }}>x</button>
+            </div>
+            {["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"].map(j => (
+              <div key={j} style={{ marginBottom: 14 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 4 }}>{j}</label>
+                <select defaultValue="disponible" style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14 }}>
+                  <option value="disponible">Disponible</option>
+                  <option value="partiel">Disponible partiellement</option>
+                  <option value="indisponible">Indisponible</option>
+                </select>
+              </div>
+            ))}
+            <div style={{ position: "sticky", bottom: 0, paddingTop: 16 }}>
+              <button type="button" onClick={() => { alert("Disponibilites enregistrees"); setShowDispoModal(false); }} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL: Planification ═══ */}
+      {showPlanifModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "flex-end", zIndex: 200 }} onClick={() => setShowPlanifModal(false)}>
+          <div style={{ background: "#fff", width: 400, height: "100%", padding: 24, overflowY: "auto", boxShadow: "-4px 0 20px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>Planification</h2>
+              <button type="button" onClick={() => setShowPlanifModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#999" }}>x</button>
+            </div>
+            <div style={{ padding: 12, borderRadius: 8, background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.12)", marginBottom: 16, fontSize: 12, color: "#2563eb", lineHeight: 1.4 }}>
+              <strong>L&apos;employe est toujours planifiable sur son equipe de rattachement au contrat</strong><br />
+              L&apos;etablissement et l&apos;equipe par defaut dependent du contrat de travail en cours.
+            </div>
+            <p style={{ fontSize: 13, color: "#666", marginBottom: 16 }}>Selectionnez les equipes sur lesquelles {prenom} peut etre planifie(e) :</p>
+            {/* TODO: Load all etabs + equipes dynamically */}
+            <div style={{ border: "1px solid #ddd6c8", borderRadius: 10, padding: 14, marginBottom: 10 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 8 }}>{etab?.nom ?? "—"} (par defaut)</div>
+              {((emp as Record<string, unknown>).equipes_access as string[] ?? []).map(eq => (
+                <div key={eq} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0" }}>
+                  <span style={{ fontSize: 13, color: "#666" }}>{eq}</span>
+                  <button type="button" style={{ width: 36, height: 20, borderRadius: 10, background: "#2D6A4F", border: "none", position: "relative", cursor: "pointer" }}>
+                    <span style={{ position: "absolute", top: 2, left: 18, width: 16, height: 16, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div style={{ position: "sticky", bottom: 0, paddingTop: 16 }}>
+              <button type="button" onClick={() => { alert("Planification enregistree"); setShowPlanifModal(false); }} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                Enregistrer
               </button>
             </div>
           </div>
