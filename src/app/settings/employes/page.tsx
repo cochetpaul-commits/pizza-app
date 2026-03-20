@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
+import { useEtablissement } from "@/lib/EtablissementContext";
+import { AddCollaborateurModal } from "@/components/rh/AddCollaborateurModal";
 
 type Employe = {
   id: string;
@@ -39,6 +41,8 @@ const INPUT: React.CSSProperties = { padding: "8px 14px", borderRadius: 8, borde
 
 export default function SettingsEmployesPage() {
   const router = useRouter();
+  const { current: currentEtab } = useEtablissement();
+  const [showAddModal, setShowAddModal] = useState(false);
   const [employes, setEmployes] = useState<Employe[]>([]);
   const [etabs, setEtabs] = useState<Etab[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,7 +139,7 @@ export default function SettingsEmployesPage() {
             }}>
               Registre Unique du Personnel
             </button>
-            <button type="button" onClick={() => router.push("/rh/equipe")} style={{
+            <button type="button" onClick={() => setShowAddModal(true)} style={{
               display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", borderRadius: 8,
               background: "#1a1a1a", color: "#fff", border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer",
             }}>
@@ -230,6 +234,14 @@ export default function SettingsEmployesPage() {
           )}
         </div>
       </div>
+
+      {showAddModal && currentEtab && (
+        <AddCollaborateurModal
+          etablissementId={currentEtab.id}
+          onClose={() => setShowAddModal(false)}
+          onCreated={() => window.location.reload()}
+        />
+      )}
     </RequireRole>
   );
 }
