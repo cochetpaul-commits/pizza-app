@@ -147,6 +147,7 @@ export default function CongesPage() {
       supabase
         .from("absences")
         .select("id, employe_id, type, date_debut, date_fin, statut, note, created_at")
+        .eq("etablissement_id", etab.id)
         .order("date_debut", { ascending: false })
         .limit(200),
     ]);
@@ -182,6 +183,7 @@ export default function CongesPage() {
         supabase
           .from("absences")
           .select("id, employe_id, type, date_debut, date_fin, statut, note, created_at")
+          .eq("etablissement_id", etab.id)
           .order("date_debut", { ascending: false })
           .limit(200),
       ]);

@@ -62,7 +62,7 @@ type Absence = {
   date_fin: string;
 };
 
-type EquipeFilter = "tous" | "Cuisine" | "Salle" | "Shop";
+type EquipeFilter = string;
 
 /* ── Helpers ───────────────────────────────────────────────────── */
 
@@ -143,6 +143,7 @@ export default function PlanningPage() {
 
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
   const [equipeFilter, setEquipeFilter] = useState<EquipeFilter>("tous");
+  const [equipeNames, setEquipeNames] = useState<string[]>([]);
 
   // Track mousedown on shift to prevent cell click from opening create modal
   const shiftMouseDown = useRef(false);
@@ -182,7 +183,7 @@ export default function PlanningPage() {
       const mondayISO = toISO(weekStart);
       const sundayISO = toISO(addDays(weekStart, 6));
 
-      const [empRes, postesRes, shiftsRes, absRes, etabSettingsRes] = await Promise.all([
+      const [empRes, postesRes, shiftsRes, absRes, etabSettingsRes, equipesRes] = await Promise.all([
         supabase
           .from("employes")
           .select("id, prenom, nom, initiales, actif, equipes_access, contrats(type, heures_semaine, actif)")
@@ -213,6 +214,12 @@ export default function PlanningPage() {
           .select("pause_defaut_minutes, pause_auto_creation, duree_min_shift_pause, repos_compensateurs_actif")
           .eq("id", etab.id)
           .single(),
+        supabase
+          .from("equipes")
+          .select("nom")
+          .eq("etablissement_id", etab.id)
+          .eq("actif", true)
+          .order("nom"),
       ]);
 
       if (cancelled) return;
@@ -231,6 +238,9 @@ export default function PlanningPage() {
       setPostes(postesRes.data ?? []);
       setShifts(shiftsRes.data ?? []);
       setAbsences((absRes.data ?? []) as Absence[]);
+      // Load equipe names for filters
+      const eqNames = (equipesRes.data ?? []).map((e: { nom: string }) => e.nom);
+      setEquipeNames(eqNames.length > 0 ? eqNames : [...new Set((postesRes.data ?? []).map((p: { equipe: string }) => p.equipe))].sort());
       setLoading(false);
     })();
 
@@ -533,6 +543,15 @@ export default function PlanningPage() {
   return (
     <RequireRole allowedRoles={["group_admin", "cuisine", "salle"]}>
       <div style={pageStyle}>
+        {/* ── Establishment badge ── */}
+        {etab && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: etab.couleur ?? "#D4775A" }} />
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a" }}>{etab.nom}</span>
+            <span style={{ fontSize: 11, color: "#999" }}>— Planning</span>
+          </div>
+        )}
+
         {/* ── Week navigation ── */}
         <div style={weekNav}>
           <button type="button" onClick={() => goWeek(-1)} style={navArrow}>←</button>
@@ -544,7 +563,7 @@ export default function PlanningPage() {
         {/* ── Filters ── */}
         <div style={filtersRow}>
           <div style={{ display: "flex", gap: 4 }}>
-            {(["tous", "Cuisine", "Salle", "Shop"] as EquipeFilter[]).map((f) => (
+            {["tous", ...equipeNames].map((f) => (
               <button key={f} type="button" onClick={() => setEquipeFilter(f)} style={pillBtn(equipeFilter === f)}>
                 {f === "tous" ? "Tous" : f}
               </button>
