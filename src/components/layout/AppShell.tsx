@@ -17,61 +17,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { role, loading } = useProfile();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("sidebar_collapsed") === "true";
-    }
-    return false;
-  });
-
-  const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed(prev => {
-      const next = !prev;
-      localStorage.setItem("sidebar_collapsed", String(next));
-      return next;
-    });
-  }, []);
-
-  const collapseSidebar = useCallback(() => {
-    setSidebarCollapsed(true);
-    localStorage.setItem("sidebar_collapsed", "true");
-  }, []);
-
-  const expandSidebar = useCallback(() => {
-    setSidebarCollapsed(false);
-    localStorage.setItem("sidebar_collapsed", "false");
-  }, []);
 
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
-  // No shell for auth pages or unauthenticated users
   if (isExcluded(pathname) || loading || !role) {
     return <>{children}</>;
   }
 
   return (
     <>
-      {/* Desktop sidebar */}
-      <Sidebar
-        collapsed={sidebarCollapsed}
-        onToggle={toggleSidebar}
-        onExpand={expandSidebar}
-        onCollapse={collapseSidebar}
-      />
-
-      {/* Mobile drawer (accessible via TopBar menu button) */}
+      <Sidebar />
       <SidebarDrawer open={drawerOpen} onClose={closeDrawer} />
 
-      {/* Main content area */}
-      <div className={`app-main${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
+      <div className="app-main">
         <TopBar onMenuClick={openDrawer} />
-        <main>
-          {children}
-        </main>
+        <main>{children}</main>
       </div>
 
-      {/* Mobile bottom tab bar */}
       <BottomTabBar onMenuClick={openDrawer} />
     </>
   );
