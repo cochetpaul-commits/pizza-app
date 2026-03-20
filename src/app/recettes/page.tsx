@@ -349,9 +349,9 @@ function SubSectionHeader({ title, color, count }: { title: string; color: strin
 
 const tabStyle = (active: boolean, color?: string): React.CSSProperties => ({
   padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-  border: active ? "none" : "1.5px solid #ddd6c8",
-  background: active ? (color ?? "#1a1a1a") : "transparent",
-  color: active ? "#fff" : "#6f6a61",
+  border: active ? "none" : `1.5px solid ${color ?? "#1a1a1a"}40`,
+  background: active ? (color ?? "#1a1a1a") : `${color ?? "#1a1a1a"}14`,
+  color: active ? "#fff" : (color ?? "#1a1a1a"),
   cursor: "pointer", whiteSpace: "nowrap",
   transition: "all 0.15s",
 });
@@ -387,6 +387,8 @@ function RecettesInner() {
   const [foodCostFilter, setFoodCostFilter] = useState<FoodCostFilter>("all");
   const [showFab, setShowFab] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [showSort, setShowSort] = useState(false);
+  const [showCuisinePop, setShowCuisinePop] = useState(false);
 
   function refresh() { setLoading(true); setRefreshKey(k => k + 1); }
 
@@ -601,27 +603,55 @@ function RecettesInner() {
             }}>
             {hasActiveFilter ? "\u2731" : "\u2630"}
           </button>
-          {/* Sort dropdown */}
-          <select
-            value={`${sortKey}-${sortDir}`}
-            onChange={e => {
-              const [k, d] = e.target.value.split("-") as [SortKey, SortDir];
-              setSortKey(k); setSortDir(d);
-            }}
-            style={{
-              padding: "0 10px", borderRadius: 12, height: 42,
-              border: "1.5px solid #ddd6c8", background: "#fff",
-              fontSize: 12, fontWeight: 600, color: "#1a1a1a", cursor: "pointer",
-            }}>
-            <option value="name-asc">A-Z</option>
-            <option value="name-desc">Z-A</option>
-            <option value="cost-asc">{"Co\u00fbt \u2191"}</option>
-            <option value="cost-desc">{"Co\u00fbt \u2193"}</option>
-            <option value="fc-asc">{"FC \u2191"}</option>
-            <option value="fc-desc">{"FC \u2193"}</option>
-            <option value="price-asc">{"Prix \u2191"}</option>
-            <option value="price-desc">{"Prix \u2193"}</option>
-          </select>
+          {/* Sort dropdown custom */}
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <button type="button" onClick={() => setShowSort(s => !s)}
+              style={{
+                height: 42, padding: "0 12px", borderRadius: 12,
+                border: "1.5px solid #ddd6c8", background: "#fff",
+                fontSize: 12, fontWeight: 700, color: "#1a1a1a", cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 4,
+              }}>
+              {sortKey === "name" ? (sortDir === "asc" ? "A-Z" : "Z-A") : sortKey === "cost" ? "Co\u00fbt" : sortKey === "fc" ? "FC" : "Prix"}
+              <span style={{ fontSize: 9, opacity: 0.5 }}>{"\u25BC"}</span>
+            </button>
+            {showSort && (
+              <>
+                <div onClick={() => setShowSort(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
+                <div style={{
+                  position: "absolute", top: 46, right: 0, zIndex: 200,
+                  background: "#fff", borderRadius: 12, padding: 6,
+                  boxShadow: "0 4px 20px rgba(0,0,0,0.12)", border: "1px solid #ddd6c8",
+                  minWidth: 130,
+                }}>
+                  {([
+                    { k: "name" as SortKey, d: "asc" as SortDir, label: "A \u2192 Z" },
+                    { k: "name" as SortKey, d: "desc" as SortDir, label: "Z \u2192 A" },
+                    { k: "cost" as SortKey, d: "asc" as SortDir, label: "Co\u00fbt \u2191" },
+                    { k: "cost" as SortKey, d: "desc" as SortDir, label: "Co\u00fbt \u2193" },
+                    { k: "fc" as SortKey, d: "asc" as SortDir, label: "FC \u2191" },
+                    { k: "fc" as SortKey, d: "desc" as SortDir, label: "FC \u2193" },
+                    { k: "price" as SortKey, d: "asc" as SortDir, label: "Prix \u2191" },
+                    { k: "price" as SortKey, d: "desc" as SortDir, label: "Prix \u2193" },
+                  ]).map(opt => {
+                    const active = sortKey === opt.k && sortDir === opt.d;
+                    return (
+                      <button key={`${opt.k}-${opt.d}`} type="button"
+                        onClick={() => { setSortKey(opt.k); setSortDir(opt.d); setShowSort(false); }}
+                        style={{
+                          width: "100%", padding: "8px 12px", borderRadius: 8,
+                          border: "none", background: active ? "#D4775A14" : "transparent",
+                          color: active ? "#D4775A" : "#1a1a1a", fontSize: 13, fontWeight: active ? 700 : 500,
+                          cursor: "pointer", textAlign: "left",
+                        }}>
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* ── Main tabs ── */}
@@ -633,10 +663,50 @@ function RecettesInner() {
             { key: "cocktail" as MainTab, label: "Cocktail", color: COCKTAIL_COLOR },
             { key: "empatement" as MainTab, label: "Emp\u00e2t.", color: EMP_COLOR },
           ]).map(t => (
-            <button key={t.key} type="button" onClick={() => setMainTab(t.key)} style={tabStyle(mainTab === t.key, t.color)}>
-              {t.label}
-              <span style={{ marginLeft: 4, fontSize: 11, opacity: 0.7 }}>({tabCounts[t.key]})</span>
-            </button>
+            <div key={t.key} style={{ position: "relative", flexShrink: 0 }}>
+              <button type="button"
+                onClick={() => {
+                  if (t.key === "cuisine") {
+                    if (mainTab === "cuisine") { setShowCuisinePop(p => !p); }
+                    else { setMainTab("cuisine"); setShowCuisinePop(true); }
+                  } else {
+                    setMainTab(t.key); setShowCuisinePop(false);
+                  }
+                }}
+                style={tabStyle(mainTab === t.key, t.color)}>
+                {t.label}
+                <span style={{ marginLeft: 4, fontSize: 11, opacity: 0.7 }}>({tabCounts[t.key]})</span>
+                {t.key === "cuisine" && <span style={{ marginLeft: 2, fontSize: 9, opacity: 0.6 }}>{"\u25BC"}</span>}
+              </button>
+              {/* Cuisine sub-category popup */}
+              {t.key === "cuisine" && showCuisinePop && (
+                <>
+                  <div onClick={() => setShowCuisinePop(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
+                  <div style={{
+                    position: "absolute", top: 40, left: 0, zIndex: 200,
+                    background: "#fff", borderRadius: 12, padding: 6,
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.12)", border: `1.5px solid ${CUISINE_COLOR}30`,
+                    minWidth: 160,
+                  }}>
+                    {CUISINE_CAT_FILTERS.map(f => {
+                      const active = cuisineCatFilter === f.id;
+                      return (
+                        <button key={f.id} type="button"
+                          onClick={() => { setCuisineCatFilter(f.id); setShowCuisinePop(false); }}
+                          style={{
+                            width: "100%", padding: "8px 12px", borderRadius: 8,
+                            border: "none", background: active ? `${CUISINE_COLOR}14` : "transparent",
+                            color: active ? CUISINE_COLOR : "#1a1a1a", fontSize: 13,
+                            fontWeight: active ? 700 : 500, cursor: "pointer", textAlign: "left",
+                          }}>
+                          {f.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
           ))}
         </div>
 
@@ -647,20 +717,6 @@ function RecettesInner() {
             background: "#fff", border: "1.5px solid #ddd6c8",
             display: "flex", flexDirection: "column", gap: 10,
           }}>
-            {/* Cuisine sub-categories */}
-            {(mainTab === "cuisine" || mainTab === "tous") && (
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#999", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Cuisine</div>
-                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                  {CUISINE_CAT_FILTERS.map(f => (
-                    <button key={f.id} type="button" onClick={() => setCuisineCatFilter(f.id)}
-                      style={filterPill(cuisineCatFilter === f.id, CUISINE_COLOR)}>
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
             {/* Food cost */}
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#999", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Food cost</div>
