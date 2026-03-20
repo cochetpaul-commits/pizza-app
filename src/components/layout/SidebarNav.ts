@@ -177,20 +177,10 @@ export function buildDynamicNav(
         ],
       },
       {
-        label: "Employes",
-        icon: "users",
+        label: "",
         items: [
-          { label: "Informations", href: "/admin/utilisateurs", icon: "users" },
-          { label: "Contrat", href: "/settings/employes/contrat", icon: "fileText" },
-          { label: "Acces application", href: "/settings/employes/acces", icon: "settings" },
-          { label: "Role et permissions", href: "/settings/employes/roles", icon: "clipboard" },
-        ],
-      },
-      {
-        label: "Fournisseurs",
-        icon: "truck",
-        items: [
-          { label: "Liste fournisseurs", href: "/fournisseurs", icon: "truck" },
+          { label: "Employes", href: "/settings/employes", icon: "users" },
+          { label: "Fournisseurs", href: "/fournisseurs", icon: "truck" },
         ],
       },
       {
