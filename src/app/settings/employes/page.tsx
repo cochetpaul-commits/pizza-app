@@ -126,7 +126,10 @@ export default function SettingsEmployesPage() {
             }}>
               Importer (CSV)
             </button>
-            <button type="button" style={{
+            <button type="button" onClick={() => {
+              const url = etabFilter !== "all" ? `/api/rh/rup?etab=${etabFilter}` : "/api/rh/rup";
+              window.open(url, "_blank");
+            }} style={{
               display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", borderRadius: 8,
               border: "1px solid #ddd6c8", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
             }}>
