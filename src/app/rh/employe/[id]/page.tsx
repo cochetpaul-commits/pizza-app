@@ -181,7 +181,6 @@ export default function EmployeDetailPage() {
   const [showSalary, setShowSalary] = useState(false);
 
   /* ── Completion % ── */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const completionPct = useMemo(() => {
     const values: Record<string, unknown> = {
       prenom, nom, email, tel_mobile: telMobile, date_naissance: dateNaissance,
