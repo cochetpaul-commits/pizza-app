@@ -225,7 +225,11 @@ export default function SettingsEmployesPage() {
                     <td style={{ padding: "12px 8px", fontSize: 12, color: "#1a1a1a" }}>{emp.tel_mobile ?? "Non renseigne"}</td>
                     <td style={{ padding: "12px 8px", fontSize: 12, color: "#666" }}>{getRattachement(emp)}</td>
                     <td style={{ padding: "12px 8px" }}>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: "#2D6A4F" }}>Acceptee</span>
+                      {emp.email ? (
+                        <span style={{ fontSize: 11, fontWeight: 600, color: "#2D6A4F" }}>Acceptee</span>
+                      ) : (
+                        <span style={{ fontSize: 11, fontWeight: 600, color: "#999" }}>Non invitee</span>
+                      )}
                     </td>
                   </tr>
                 ))}

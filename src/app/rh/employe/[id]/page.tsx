@@ -532,6 +532,16 @@ export default function EmployeDetailPage() {
               {activeContrat?.emploi && (
                 <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", marginTop: 2 }}>{activeContrat.emploi}</div>
               )}
+              {/* Supervise X personnes */}
+              <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ padding: "2px 10px", borderRadius: 12, background: "rgba(255,255,255,0.15)", fontSize: 11, color: "rgba(255,255,255,0.9)", display: "flex", alignItems: "center", gap: 4 }}>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                  Supervise {((emp as Record<string, unknown>).equipes_access as string[] ?? []).length > 0 ? "son equipe" : "—"}
+                </span>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.6)" }}>
+                  {completionPct}% {completionPct === 100 ? "complet" : "incomplet"}
+                </span>
+              </div>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               {canWrite && (
@@ -579,13 +589,27 @@ export default function EmployeDetailPage() {
             </div>
             <div>
               <div style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Equipe</div>
-              <div style={{ color: "#fff", fontSize: 12, marginTop: 2 }}>{((emp as Record<string, unknown>).equipes_access as string[] ?? [])[0] ?? "—"}</div>
+              <div style={{ color: "#fff", fontSize: 12, marginTop: 2 }}>{((emp as Record<string, unknown>).equipes_access as string[] ?? []).join(", ") || "—"}</div>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Responsable hierarchique</div>
+              <div style={{ color: "#fff", fontSize: 12, marginTop: 2 }}>—</div>
             </div>
           </div>
         </div>
 
-        {/* ── 6 Tabs ── */}
-        <div style={{ ...tabsRow, background: "#fff", borderRadius: "0 0 14px 14px", marginBottom: 16, borderTop: "none" }}>
+        {/* Completion bar */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "12px 0" }}>
+          <div style={completionBarBg}>
+            <div style={{ ...completionBarFill, width: `${completionPct}%` }} />
+          </div>
+          <span style={{ fontSize: 11, fontWeight: 700, color: completionPct === 100 ? "#4a6741" : "#e27f57" }}>
+            {completionPct}% {completionPct === 100 ? "Complet" : "Incomplet"}
+          </span>
+        </div>
+
+        {/* ── Tabs — separated from header ── */}
+        <div style={{ ...tabsRow, marginBottom: 16 }}>
           {([
             ["infos", "Informations personnelles"],
             ["dossier", "Contrats"],
