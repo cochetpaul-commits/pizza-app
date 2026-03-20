@@ -103,9 +103,13 @@ export function AddCollaborateurModal({ etablissementId, onClose, onCreated }: P
 
     // Send invite if requested
     if (invite && email.trim()) {
+      const { data: { session } } = await supabase.auth.getSession();
       await fetch("/api/admin/invite", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ email: email.trim(), displayName: `${prenom.trim()} ${nom.trim()}`, role: dbRole }),
       });
     }

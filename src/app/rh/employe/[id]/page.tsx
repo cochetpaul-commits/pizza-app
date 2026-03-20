@@ -1102,9 +1102,13 @@ export default function EmployeDetailPage() {
               <div style={{ display: "flex", gap: 8 }}>
                 <button type="button" onClick={async () => {
                   if (!email) return;
+                  const { data: { session } } = await supabase.auth.getSession();
                   const res = await fetch("/api/admin/invite", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                      "Content-Type": "application/json",
+                      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+                    },
                     body: JSON.stringify({ email, displayName: `${(emp as Record<string, unknown>).prenom} ${(emp as Record<string, unknown>).nom}`, role: (emp as Record<string, unknown>).role ?? "employe" }),
                   });
                   if (res.ok) alert("Invitation envoyee a " + email);
