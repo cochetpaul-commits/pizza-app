@@ -169,7 +169,7 @@ export const SIDEBAR_NAV_V2: SidebarEntry[] = [
         label: "Etablissement",
         icon: "box",
         items: [
-          { label: "Gestion de la finance", href: "/settings/finance", icon: "wallet" },
+          { label: "Liste & configuration", href: "/settings/etablissements", icon: "building" },
           { label: "Gestion du planning", href: "/settings/planning", icon: "calendar" },
           { label: "Pointeuse", href: "/settings/pointeuse", icon: "clock" },
         ],
@@ -294,6 +294,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/rh/masse-salariale": "Simulation & Masse Salariale",
   "/rh/rapports": "Rapports RH",
   "/settings/planning": "Gestion du planning",
+  "/settings/etablissements": "Etablissements",
   "/settings/finance": "Gestion de la finance",
   "/settings/pointeuse": "Pointeuse",
   "/settings/employes/contrat": "Contrat",
