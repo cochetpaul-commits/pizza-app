@@ -480,6 +480,7 @@ function IngredientsPageInner() {
       packPieceWeightG: off?.piece_weight_g != null ? String(off.piece_weight_g) : "",
       allergens: parseAllergens(x.allergens),
       orderUnitLabel: x.order_unit_label || guessOrderUnit(off),
+      storageZone: x.storage_zone ?? "",
     });
   }, [offersByIngredientId, guessOrderUnit]);
 
@@ -548,7 +549,8 @@ function IngredientsPageInner() {
       piece_volume_ml: parseNum(edit.pieceVolumeMl) ?? null,
       allergens: edit.allergens.length ? edit.allergens : null,
       order_unit_label: edit.orderUnitLabel.trim() || null,
-    };
+      storage_zone: edit.storageZone || null,
+    } as Record<string, unknown>;
     const u1 = await supabase.from("ingredients").update(up).eq("id", editingId);
     if (u1.error) {
       if (u1.error.message.includes("ingredients_etab_name")) {
