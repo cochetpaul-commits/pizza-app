@@ -21,7 +21,7 @@ import {
   IconShoppingBag, IconTruck, IconFileText, IconPackage,
   IconBarChart, IconTrendingUp, IconBook, IconTag,
   IconCalendarEvent, IconChevronDown, IconBox, IconChefHat,
-  IconSwitch, IconChevronLeft, IconBuilding,
+  IconSwitch, IconChevronLeft, IconBuilding, IconStore,
 } from "./Icons";
 import type { Role } from "@/lib/rbac";
 
@@ -47,6 +47,7 @@ const ICON_MAP: Record<string, React.FC<{ size?: number; color?: string }>> = {
   box: IconBox,
   chefHat: IconChefHat,
   building: IconBuilding,
+  store: IconStore,
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -94,16 +95,9 @@ function BurgerIcon({ size = 32 }: { size?: number }) {
       alignItems: "center", justifyContent: "center",
       gap: 3,
     }}>
-      {/* Three horizontal lines */}
       <span style={{ width: 14, height: 2, borderRadius: 1, background: "rgba(255,255,255,0.7)" }} />
       <span style={{ width: 14, height: 2, borderRadius: 1, background: "rgba(255,255,255,0.7)" }} />
       <span style={{ width: 14, height: 2, borderRadius: 1, background: "rgba(255,255,255,0.7)" }} />
-      {/* Red notification dot */}
-      <span style={{
-        position: "absolute", top: 2, right: 2,
-        width: 7, height: 7, borderRadius: "50%",
-        background: "#e05252",
-      }} />
     </div>
   );
 }
@@ -176,7 +170,7 @@ function CollapsedContent({ onExpand }: { onExpand: () => void }) {
     if (entry.kind === "etab") {
       if (!isRoleAllowed(entry.roles, role)) continue;
       const active = isEtabActive(entry.etabSlug);
-      // Colored dot for establishment
+      // Restaurant icon with establishment color
       elements.push(
         <button
           key={`etab-${entry.etabSlug}`}
@@ -185,16 +179,13 @@ function CollapsedContent({ onExpand }: { onExpand: () => void }) {
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
             width: 36, height: 36, borderRadius: 8,
-            background: active ? C.bgItemActive : "transparent",
+            background: active ? `${entry.color}20` : "transparent",
+            border: active ? `1px solid ${entry.color}40` : "1px solid transparent",
             margin: "2px auto", cursor: "pointer",
-            border: "none",
+            transition: "background 0.12s",
           }}
         >
-          <span style={{
-            width: 10, height: 10, borderRadius: "50%",
-            background: entry.color,
-            border: active ? "2px solid rgba(255,255,255,0.5)" : "2px solid transparent",
-          }} />
+          <IconStore size={18} color={active ? entry.color : C.textMuted} />
         </button>
       );
       // Show sub-section icons
@@ -453,23 +444,25 @@ function ExpandedContent({ onNavigate, onCollapse, showBurger }: ExpandedContent
     const active = isEtabActive(entry.etabSlug);
 
     return (
-      <div key={groupKey} style={{ marginBottom: 2 }}>
+      <div key={groupKey} style={{ marginBottom: 4 }}>
         <button
           type="button"
           onClick={() => toggleGroup(groupKey)}
           style={{
-            display: "flex", alignItems: "center", gap: 8,
-            width: "100%", padding: "10px 16px 8px",
-            background: "none", border: "none", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 10,
+            width: "calc(100% - 16px)", padding: "8px 12px",
+            margin: "1px 8px",
+            borderRadius: 6,
+            background: active ? `${entry.color}15` : "transparent",
+            border: "none", cursor: "pointer",
+            borderLeft: active ? `3px solid ${entry.color}` : "3px solid transparent",
             color: active ? C.textActive : C.textNormal,
             fontSize: 13, fontWeight: 700,
             whiteSpace: "nowrap", overflow: "hidden",
+            transition: "background 0.12s",
           }}
         >
-          <span style={{
-            width: 8, height: 8, borderRadius: "50%",
-            background: entry.color, flexShrink: 0,
-          }} />
+          <IconStore size={16} color={active ? entry.color : C.textMuted} />
           <span style={{ flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis" }}>
             {entry.label}
           </span>
@@ -478,7 +471,7 @@ function ExpandedContent({ onNavigate, onCollapse, showBurger }: ExpandedContent
             transition: "transform 0.15s ease",
             display: "flex", flexShrink: 0,
           }}>
-            <IconChevronDown size={12} color={C.textMuted} />
+            <IconChevronDown size={12} color={active ? entry.color : C.textMuted} />
           </span>
         </button>
         {isOpen && entry.sections.map(sub => renderSubSection(sub, groupKey, entry.etabSlug))}

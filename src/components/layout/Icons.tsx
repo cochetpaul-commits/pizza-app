@@ -267,6 +267,20 @@ export function IconBuilding({ size = 20, color = "currentColor" }: IconProps) {
   );
 }
 
+export function IconStore({ size = 20, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l1-4h16l1 4" />
+      <path d="M3 9v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9" />
+      <path d="M9 21V13h6v8" />
+      <path d="M3 9h18" />
+      <path d="M7 5v4" />
+      <path d="M12 5v4" />
+      <path d="M17 5v4" />
+    </svg>
+  );
+}
+
 export function IconMoreHorizontal({ size = 20, color = "currentColor" }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
