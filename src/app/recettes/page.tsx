@@ -62,14 +62,20 @@ const CUISINE_CATS = [
   { id: "autre",          label: "Autre" },
 ];
 
+const CUISINE_CAT_COLORS: Record<string, string> = {
+  all: CUISINE_COLOR, plat_cuisine: "#B45309", preparation: "#7C3AED",
+  entree: "#0284C7", sauce: "#DC2626", dessert: "#D4775A",
+  accompagnement: "#16A34A", autre: "#6B7280",
+};
+
 const CUISINE_CAT_FILTERS: { id: CuisineCatFilter; label: string; color: string }[] = [
-  { id: "all",           label: "Tous",            color: CUISINE_COLOR },
-  { id: "plat_cuisine",  label: "Plat",            color: "#B45309" },
-  { id: "preparation",   label: "Prep",            color: "#7C3AED" },
-  { id: "entree",        label: "Entr\u00e9e",     color: "#0284C7" },
-  { id: "sauce",         label: "Sauce",           color: "#DC2626" },
-  { id: "dessert",       label: "Dessert",         color: "#D4775A" },
-  { id: "autre",         label: "Autre",           color: "#6B7280" },
+  { id: "all",           label: "Tous",            color: CUISINE_CAT_COLORS.all },
+  { id: "plat_cuisine",  label: "Plat",            color: CUISINE_CAT_COLORS.plat_cuisine },
+  { id: "preparation",   label: "Prep",            color: CUISINE_CAT_COLORS.preparation },
+  { id: "entree",        label: "Entr\u00e9e",     color: CUISINE_CAT_COLORS.entree },
+  { id: "sauce",         label: "Sauce",           color: CUISINE_CAT_COLORS.sauce },
+  { id: "dessert",       label: "Dessert",         color: CUISINE_CAT_COLORS.dessert },
+  { id: "autre",         label: "Autre",           color: CUISINE_CAT_COLORS.autre },
 ];
 
 const FOOD_COST_FILTERS: { id: FoodCostFilter; label: string }[] = [
@@ -198,11 +204,11 @@ function FoodCostBadge({ fc }: { fc: number }) {
 }
 
 function RecipeCard({
-  name, href, color, prodHref, photoUrl, subtitle,
+  name, href, color, prodHref, photoUrl, subtitle, subtitleColor,
   cost, costLabel, pv, pvConseille, pvLabel,
 }: {
   name: string; href: string; color: string;
-  prodHref?: string; photoUrl?: string | null; subtitle?: string;
+  prodHref?: string; photoUrl?: string | null; subtitle?: string; subtitleColor?: string;
   cost?: number | null; costLabel?: string;
   pv?: number | null; pvConseille?: number | null; pvLabel?: string;
 }) {
@@ -245,7 +251,7 @@ function RecipeCard({
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
           {subtitle && (
-            <span style={{ fontSize: 11, color: "#999", fontWeight: 500 }}>{subtitle}</span>
+            <span style={{ fontSize: 11, color: subtitleColor ?? "#999", fontWeight: 600 }}>{subtitle}</span>
           )}
           {cost != null && cost > 0 && (
             <span style={{ fontSize: 11, color: "#999" }}>
@@ -676,7 +682,6 @@ function RecettesInner() {
                 style={tabStyle(mainTab === t.key, t.color)}>
                 {t.label}
                 <span style={{ marginLeft: 4, fontSize: 11, opacity: 0.7 }}>({tabCounts[t.key]})</span>
-                {t.key === "cuisine" && <span style={{ marginLeft: 2, fontSize: 9, opacity: 0.6 }}>{"\u25BC"}</span>}
               </button>
               {/* Cuisine sub-category modal */}
               {t.key === "cuisine" && showCuisinePop && (
@@ -773,6 +778,7 @@ function RecettesInner() {
                   color={PIZZA_COLOR}
                   photoUrl={r.photo_url}
                   subtitle="Pizza"
+                  subtitleColor={PIZZA_COLOR}
                   cost={r.total_cost}
                   pv={r.sell_price}
                   pvConseille={pvTTCPizza(r)}
@@ -790,7 +796,7 @@ function RecettesInner() {
               newHref={canWrite ? "/recettes/new/cuisine" : undefined} />
             {CUISINE_CATS.filter(cat => (kitchenByCat[cat.id]?.length ?? 0) > 0).map(cat => (
               <div key={cat.id}>
-                <SubSectionHeader title={cat.label} color={CUISINE_COLOR} count={kitchenByCat[cat.id].length} />
+                <SubSectionHeader title={cat.label} color={CUISINE_CAT_COLORS[cat.id] ?? CUISINE_COLOR} count={kitchenByCat[cat.id].length} />
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 8, marginBottom: 8 }}>
                   {kitchenByCat[cat.id].map(r => {
                     const hasPortion = r.cost_per_portion != null && r.cost_per_portion > 0;
@@ -804,6 +810,7 @@ function RecettesInner() {
                         color={CUISINE_COLOR}
                         photoUrl={r.photo_url}
                         subtitle={CAT_LABEL[r.category ?? "autre"] ?? r.category ?? ""}
+                        subtitleColor={CUISINE_CAT_COLORS[r.category ?? "autre"] ?? CUISINE_COLOR}
                         cost={hasPortion ? r.cost_per_portion! : hasKg ? r.cost_per_kg! : null}
                         costLabel={hasPortion ? "/portion" : hasKg ? "/kg" : undefined}
                         pv={r.sell_price}
@@ -833,6 +840,7 @@ function RecettesInner() {
                   color={COCKTAIL_COLOR}
                   photoUrl={r.image_url}
                   subtitle="Cocktail"
+                  subtitleColor={COCKTAIL_COLOR}
                   cost={r.total_cost}
                   pv={r.sell_price}
                   pvLabel="TTC"
@@ -856,6 +864,7 @@ function RecettesInner() {
                   prodHref={r.pivot_ingredient_id ? `/recettes/empatement/${r.id}?mode=production` : undefined}
                   color={EMP_COLOR}
                   subtitle="Emp\u00e2tement"
+                  subtitleColor={EMP_COLOR}
                 />
               ))}
             </div>
