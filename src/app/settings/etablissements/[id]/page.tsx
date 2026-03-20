@@ -215,7 +215,13 @@ export default function EtablissementDetailPage() {
         setPostes(loadedPostes);
         const loadedEquipes = (equipesRes.data ?? []) as Equipe[];
         setDbEquipes(loadedEquipes);
-        setEditEquipes(loadedEquipes.map(e => e.nom));
+        // If equipes table is empty/missing, derive from postes
+        if (loadedEquipes.length > 0) {
+          setEditEquipes(loadedEquipes.map(e => e.nom));
+        } else {
+          const fromPostes = [...new Set(loadedPostes.map(p => p.equipe))].sort();
+          setEditEquipes(fromPostes);
+        }
         setPrimes((primesRes.data ?? []) as Prime[]);
         setAllEtabs((allEtabsRes.data ?? []).filter(e => e.id !== id) as { id: string; nom: string }[]);
         setPeriodes((periodesRes.data ?? []) as PeriodeMod[]);
@@ -1276,32 +1282,50 @@ export default function EtablissementDetailPage() {
                   const oldNames = dbEquipes.map(e => e.nom);
                   const newNames = editEquipes.filter(n => n.trim());
 
-                  // Delete removed equipes from DB + their postes
-                  const removed = oldNames.filter(n => !newNames.includes(n));
-                  for (const eqName of removed) {
-                    await supabase.from("equipes").delete().eq("etablissement_id", id).eq("nom", eqName);
-                    await supabase.from("postes").delete().eq("etablissement_id", id).eq("equipe", eqName);
-                  }
+                  try {
+                    // 1. Delete removed equipes from DB + their postes
+                    const removed = oldNames.filter(n => !newNames.includes(n));
+                    for (const eqName of removed) {
+                      await supabase.from("equipes").delete().eq("etablissement_id", id).eq("nom", eqName);
+                      await supabase.from("postes").delete().eq("etablissement_id", id).eq("equipe", eqName);
+                    }
 
-                  // Add new equipes to DB
-                  const added = newNames.filter(n => !oldNames.includes(n));
-                  if (added.length > 0) {
-                    await supabase.from("equipes").insert(added.map(nom => ({ etablissement_id: id, nom })));
-                  }
+                    // 2. Add new equipes to DB
+                    const added = newNames.filter(n => !oldNames.includes(n));
+                    for (const nom of added) {
+                      const { error } = await supabase.from("equipes").insert({ etablissement_id: id, nom, actif: true });
+                      if (error) {
+                        console.error("Erreur creation equipe:", nom, error.message);
+                        // Try upsert if unique conflict
+                        if (error.code === "23505") continue;
+                        alert(`Erreur lors de la creation de l'equipe "${nom}": ${error.message}`);
+                      }
+                    }
 
-                  // Rename: update postes equipe for renamed equipes
-                  // (matching by index for equipes that changed name but kept position)
+                    // 3. Handle renames: match old→new by position for items that changed
+                    for (let i = 0; i < Math.min(oldNames.length, newNames.length); i++) {
+                      if (oldNames[i] !== newNames[i] && !removed.includes(oldNames[i]) && !added.includes(newNames[i])) {
+                        // Rename equipe in DB
+                        await supabase.from("equipes").update({ nom: newNames[i] }).eq("etablissement_id", id).eq("nom", oldNames[i]);
+                        // Rename postes equipe field
+                        await supabase.from("postes").update({ equipe: newNames[i] }).eq("etablissement_id", id).eq("equipe", oldNames[i]);
+                      }
+                    }
 
-                  // Refresh equipes + postes
-                  const [eqRefresh, postesRefresh] = await Promise.all([
-                    supabase.from("equipes").select("id, nom, actif").eq("etablissement_id", id).eq("actif", true).order("nom"),
-                    supabase.from("postes").select("id, nom, equipe, couleur, emoji, actif").eq("etablissement_id", id).order("equipe").order("nom"),
-                  ]);
-                  if (eqRefresh.data) {
-                    setDbEquipes(eqRefresh.data as Equipe[]);
-                    setEditEquipes((eqRefresh.data as Equipe[]).map(e => e.nom));
+                    // 4. Refresh equipes + postes from DB
+                    const [eqRefresh, postesRefresh] = await Promise.all([
+                      supabase.from("equipes").select("id, nom, actif").eq("etablissement_id", id).eq("actif", true).order("nom"),
+                      supabase.from("postes").select("id, nom, equipe, couleur, emoji, actif").eq("etablissement_id", id).order("equipe").order("nom"),
+                    ]);
+                    if (eqRefresh.data) {
+                      setDbEquipes(eqRefresh.data as Equipe[]);
+                      setEditEquipes((eqRefresh.data as Equipe[]).map(e => e.nom));
+                    }
+                    if (postesRefresh.data) setPostes(postesRefresh.data as Poste[]);
+                  } catch (err) {
+                    console.error("Erreur sauvegarde equipes:", err);
+                    alert("Erreur lors de la sauvegarde. Verifiez que la table equipes existe en base.");
                   }
-                  if (postesRefresh.data) setPostes(postesRefresh.data as Poste[]);
 
                   setShowEquipesModal(false);
                   setSaved(true);
