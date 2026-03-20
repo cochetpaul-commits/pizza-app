@@ -107,21 +107,26 @@ export const PERSONNEL_ITEMS = PLANNING_ITEMS;
 export const FINANCE_ITEMS = ACHATS_ITEMS;
 export const CLIENTS_ITEMS = EVENEMENTIEL_ITEMS;
 
-/** Base sections for every establishment */
-const BASE_ETAB_SECTIONS: NavSubSection[] = [
+/** Common sections for every establishment */
+const COMMON_SECTIONS: NavSubSection[] = [
   { label: "Planning", icon: "calendar", items: PLANNING_ITEMS },
-  { label: "Finance", icon: "wallet", roles: ["group_admin"], items: [] }, // placeholder — Popina later
   { label: "Achats", icon: "shoppingBag", roles: ["group_admin"], items: ACHATS_ITEMS },
   { label: "Performances", icon: "barChart", roles: ["group_admin"], items: PERFORMANCES_ITEMS },
   { label: "Operations", icon: "package", roles: ["group_admin"], items: OPERATIONS_ITEMS },
 ];
 
-/** Extra section for establishments with events (piccola-mia etc.) */
+/** Finance placeholder per source */
+const FINANCE_POPINA: NavSubSection = { label: "Finance", icon: "wallet", roles: ["group_admin"], items: [] }; // Popina — a venir
+const FINANCE_KEZIA: NavSubSection = { label: "Finance", icon: "wallet", roles: ["group_admin"], items: [
+  { label: "Import Kezia", href: "/kezia", icon: "fileText" },
+] };
+
+/** Evenementiel section */
 const EVENEMENTIEL_SECTION: NavSubSection = {
   label: "Evenementiel", icon: "calendarEvent", roles: ["group_admin"], items: EVENEMENTIEL_ITEMS,
 };
 
-/** Fournisseurs standalone item for each etab */
+/** Fournisseurs standalone item */
 const FOURNISSEURS_ITEM: NavItemV2 = { label: "Fournisseurs", href: "/fournisseurs", icon: "truck" };
 
 /** Build dynamic nav entries from a list of establishments */
@@ -136,9 +141,10 @@ export function buildDynamicNav(
   for (const etab of etabs) {
     const isPiccola = etab.slug?.includes("piccola");
     const sections: NavSubSection[] = [
-      ...BASE_ETAB_SECTIONS,
+      COMMON_SECTIONS[0], // Planning
+      isPiccola ? FINANCE_KEZIA : FINANCE_POPINA,
+      ...COMMON_SECTIONS.slice(1), // Achats, Performances, Operations
       ...(isPiccola ? [EVENEMENTIEL_SECTION] : []),
-      // Fournisseurs as a flat section
       { label: "", items: [FOURNISSEURS_ITEM] },
     ];
 
