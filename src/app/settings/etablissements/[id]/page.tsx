@@ -44,6 +44,10 @@ type Prime = {
   id: string;
   libelle: string;
   code: string;
+  type: string;
+  montant: number | null;
+  recurrence: string;
+  actif: boolean;
 };
 
 type Tab = "social" | "planification" | "modulation";
@@ -99,6 +103,16 @@ export default function EtablissementDetailPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  // Prime modal (multi-step)
+  const [showPrimeModal, setShowPrimeModal] = useState(false);
+  const [primeStep, setPrimeStep] = useState<"choice" | "duplicate" | "create">("choice");
+  const [primeChoice, setPrimeChoice] = useState<"duplicate" | "create">("create");
+  const [primeDupEtabId, setPrimeDupEtabId] = useState("");
+  const [primeLibelle, setPrimeLibelle] = useState("");
+  const [primeCode, setPrimeCode] = useState("");
+  const [editPrimeId, setEditPrimeId] = useState<string | null>(null);
+  const [allEtabs, setAllEtabs] = useState<{ id: string; nom: string }[]>([]);
+
   // Poste modal
   const [showPosteModal, setShowPosteModal] = useState(false);
   const [editPosteId, setEditPosteId] = useState<string | null>(null);
@@ -112,15 +126,17 @@ export default function EtablissementDetailPage() {
     if (!id) return;
     let cancelled = false;
     (async () => {
-      const [etabRes, postesRes, primesRes] = await Promise.all([
+      const [etabRes, postesRes, primesRes, allEtabsRes] = await Promise.all([
         supabase.from("etablissements").select("*").eq("id", id).single(),
         supabase.from("postes").select("id, nom, equipe, couleur, emoji, actif").eq("etablissement_id", id).order("equipe").order("nom"),
-        supabase.from("primes").select("id, libelle, code").eq("etablissement_id", id).order("libelle"),
+        supabase.from("primes").select("id, libelle, code, type, montant, recurrence, actif").eq("etablissement_id", id).order("libelle"),
+        supabase.from("etablissements").select("id, nom").eq("actif", true).order("nom"),
       ]);
       if (!cancelled) {
         if (etabRes.data) setSettings(etabRes.data as unknown as Settings);
         setPostes((postesRes.data ?? []) as Poste[]);
         setPrimes((primesRes.data ?? []) as Prime[]);
+        setAllEtabs((allEtabsRes.data ?? []).filter(e => e.id !== id) as { id: string; nom: string }[]);
         setLoading(false);
       }
     })();
@@ -174,6 +190,53 @@ export default function EtablissementDetailPage() {
   const togglePoste = async (posteId: string, actif: boolean) => {
     setPostes(prev => prev.map(p => p.id === posteId ? { ...p, actif } : p));
     await supabase.from("postes").update({ actif }).eq("id", posteId);
+  };
+
+  /* ── Prime CRUD ── */
+  const openAddPrime = () => {
+    setEditPrimeId(null);
+    setPrimeLibelle("");
+    setPrimeCode("");
+    setPrimeChoice("create");
+    setPrimeStep("choice");
+    setPrimeDupEtabId("");
+    setShowPrimeModal(true);
+  };
+
+  const openEditPrime = (p: Prime) => {
+    setEditPrimeId(p.id);
+    setPrimeLibelle(p.libelle);
+    setPrimeCode(p.code);
+    setPrimeStep("create");
+    setShowPrimeModal(true);
+  };
+
+  const savePrime = async () => {
+    if (!id || !primeLibelle.trim()) return;
+    if (editPrimeId) {
+      const { data } = await supabase.from("primes").update({ libelle: primeLibelle.trim(), code: primeCode.trim() }).eq("id", editPrimeId).select().single();
+      if (data) setPrimes(prev => prev.map(p => p.id === editPrimeId ? { ...p, ...data } as Prime : p));
+    } else {
+      const { data } = await supabase.from("primes").insert({ etablissement_id: id, libelle: primeLibelle.trim(), code: primeCode.trim() }).select().single();
+      if (data) setPrimes(prev => [...prev, data as Prime]);
+    }
+    setShowPrimeModal(false);
+  };
+
+  const duplicatePrimes = async () => {
+    if (!id || !primeDupEtabId) return;
+    const { data: srcPrimes } = await supabase.from("primes").select("libelle, code, type, montant, recurrence").eq("etablissement_id", primeDupEtabId).eq("actif", true);
+    if (!srcPrimes || srcPrimes.length === 0) { alert("Aucune prime a dupliquer."); return; }
+    const toInsert = srcPrimes.map(p => ({ ...p, etablissement_id: id }));
+    const { data } = await supabase.from("primes").insert(toInsert).select();
+    if (data) setPrimes(prev => [...prev, ...(data as Prime[])]);
+    setShowPrimeModal(false);
+  };
+
+  const deletePrime = async (primeId: string) => {
+    if (!confirm("Supprimer cette prime ?")) return;
+    await supabase.from("primes").delete().eq("id", primeId);
+    setPrimes(prev => prev.filter(p => p.id !== primeId));
   };
 
   if (loading || !settings) {
@@ -242,22 +305,39 @@ export default function EtablissementDetailPage() {
       <div style={CARD}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>Modeles de primes, d&apos;acomptes et d&apos;indemnites</h2>
+          <button type="button" onClick={openAddPrime} style={{
+            padding: "6px 14px", borderRadius: 6, border: "1px solid #ddd6c8",
+            background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
+          }}>
+            Ajouter
+          </button>
         </div>
         {primes.length === 0 ? (
-          <p style={{ color: "#999", fontSize: 13 }}>Aucune prime configuree.</p>
+          <p style={{ color: "#999", fontSize: 13, textAlign: "center", padding: "20px 0" }}>
+            Vous n&apos;avez pas cree de prime pour le moment.
+          </p>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #ddd6c8" }}>
                 <th style={{ ...LABEL, textAlign: "left", padding: "8px 0" }}>Libelle</th>
                 <th style={{ ...LABEL, textAlign: "left", padding: "8px 0" }}>Code associe</th>
+                <th style={{ ...LABEL, textAlign: "right", padding: "8px 0", width: 80 }}></th>
               </tr>
             </thead>
             <tbody>
               {primes.map(p => (
                 <tr key={p.id} style={{ borderBottom: "1px solid #f0ebe3" }}>
-                  <td style={{ padding: "10px 0" }}>{p.libelle}</td>
-                  <td style={{ padding: "10px 0" }}>{p.code}</td>
+                  <td style={{ padding: "10px 0", fontWeight: 500 }}>{p.libelle}</td>
+                  <td style={{ padding: "10px 0", color: "#999" }}>{p.code}</td>
+                  <td style={{ padding: "10px 0", textAlign: "right" }}>
+                    <button type="button" onClick={() => openEditPrime(p)} style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 6px", fontSize: 14, color: "#999" }} title="Modifier">
+                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                    </button>
+                    <button type="button" onClick={() => deletePrime(p.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 6px", fontSize: 14, color: "#DC2626" }} title="Supprimer">
+                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -557,6 +637,142 @@ export default function EtablissementDetailPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Prime (multi-step) */}
+      {showPrimeModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }}
+          onClick={() => setShowPrimeModal(false)}
+        >
+          <div style={{ background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 500, boxShadow: "0 12px 40px rgba(0,0,0,0.15)" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700, color: "#1a1a1a" }}>
+                {editPrimeId ? "Modifier la prime" : "Ajouter un modele de prime ou d'indemnite"}
+              </h2>
+              <button type="button" onClick={() => setShowPrimeModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#999", padding: 4 }}>
+                x
+              </button>
+            </div>
+
+            {/* Step: Choice (only for new) */}
+            {primeStep === "choice" && !editPrimeId && (
+              <>
+                <label style={{
+                  display: "block", padding: 16, borderRadius: 10, marginBottom: 8, cursor: "pointer",
+                  border: primeChoice === "duplicate" ? "2px solid #2D6A4F" : "1px solid #ddd6c8",
+                  background: primeChoice === "duplicate" ? "rgba(45,106,79,0.04)" : "#fff",
+                }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <input type="radio" name="primeChoice" checked={primeChoice === "duplicate"} onChange={() => setPrimeChoice("duplicate")} style={{ marginTop: 3 }} />
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Dupliquer les modeles d&apos;un autre etablissement</div>
+                      <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>Choisissez parmi des modeles deja cree pour un autre etablissement.</div>
+                    </div>
+                  </div>
+                </label>
+                <label style={{
+                  display: "block", padding: 16, borderRadius: 10, marginBottom: 16, cursor: "pointer",
+                  border: primeChoice === "create" ? "2px solid #2D6A4F" : "1px solid #ddd6c8",
+                  background: primeChoice === "create" ? "rgba(45,106,79,0.04)" : "#fff",
+                }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <input type="radio" name="primeChoice" checked={primeChoice === "create"} onChange={() => setPrimeChoice("create")} style={{ marginTop: 3 }} />
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Creer votre modele de prime ou d&apos;indemnite</div>
+                      <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>Vous ne trouvez pas votre modele ? Vous pouvez creer votre propre modele.</div>
+                    </div>
+                  </div>
+                </label>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button type="button" onClick={() => setPrimeStep(primeChoice)} style={{
+                    padding: "10px 20px", borderRadius: 8, border: "none",
+                    background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 6,
+                  }}>
+                    Suivant
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg>
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Step: Duplicate */}
+            {primeStep === "duplicate" && (
+              <>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ ...LABEL, marginBottom: 6 }}>Selectionner les modeles d&apos;un autre etablissement <span style={{ color: "#DC2626" }}>*</span></div>
+                  <select style={INPUT} value={primeDupEtabId} onChange={e => setPrimeDupEtabId(e.target.value)}>
+                    <option value="">Rechercher</option>
+                    {allEtabs.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+                  <button type="button" onClick={() => setPrimeStep("choice")} style={{
+                    background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#1a1a1a",
+                    display: "flex", alignItems: "center", gap: 4,
+                  }}>
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
+                    Retour
+                  </button>
+                  <button type="button" onClick={duplicatePrimes} disabled={!primeDupEtabId} style={{
+                    padding: "10px 20px", borderRadius: 8, border: "none",
+                    background: primeDupEtabId ? "#1a1a1a" : "#ddd6c8", color: "#fff",
+                    fontSize: 13, fontWeight: 600, cursor: primeDupEtabId ? "pointer" : "default",
+                  }}>
+                    Ajouter
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Step: Create / Edit */}
+            {primeStep === "create" && (
+              <>
+                {!editPrimeId && (
+                  <div style={{
+                    padding: 12, borderRadius: 8, background: "rgba(37,99,235,0.04)",
+                    border: "1px solid rgba(37,99,235,0.15)", marginBottom: 16,
+                    display: "flex", gap: 10, alignItems: "flex-start",
+                  }}>
+                    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" style={{ flexShrink: 0, marginTop: 2 }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+                    <span style={{ fontSize: 12, color: "#666", lineHeight: 1.4 }}>
+                      Referez-vous a la configuration de votre logiciel de paie ou rapprochez-vous de votre gestionnaire de paie.
+                    </span>
+                  </div>
+                )}
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ ...LABEL, marginBottom: 4 }}>Libelle <span style={{ color: "#DC2626" }}>*</span></div>
+                  <input style={INPUT} value={primeLibelle} onChange={e => setPrimeLibelle(e.target.value)} placeholder="Ex: Prime Noel" />
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ ...LABEL, marginBottom: 4 }}>Code associe <span style={{ color: "#DC2626" }}>*</span></div>
+                  <input style={INPUT} value={primeCode} onChange={e => setPrimeCode(e.target.value)} placeholder="Ex: 6413" />
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+                  {!editPrimeId && (
+                    <button type="button" onClick={() => setPrimeStep("choice")} style={{
+                      background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#1a1a1a",
+                      display: "flex", alignItems: "center", gap: 4,
+                    }}>
+                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
+                      Retour
+                    </button>
+                  )}
+                  <button type="button" onClick={savePrime} disabled={!primeLibelle.trim() || !primeCode.trim()} style={{
+                    padding: "10px 20px", borderRadius: 8, border: "none",
+                    background: primeLibelle.trim() && primeCode.trim() ? "#1a1a1a" : "#ddd6c8",
+                    color: "#fff", fontSize: 13, fontWeight: 600,
+                    cursor: primeLibelle.trim() && primeCode.trim() ? "pointer" : "default",
+                  }}>
+                    {editPrimeId ? "Enregistrer" : "Ajouter"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
