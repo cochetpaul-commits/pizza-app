@@ -126,9 +126,6 @@ const EVENEMENTIEL_SECTION: NavSubSection = {
   label: "Evenementiel", icon: "calendarEvent", roles: ["group_admin"], items: EVENEMENTIEL_ITEMS,
 };
 
-/** Fournisseurs standalone item */
-const FOURNISSEURS_ITEM: NavItemV2 = { label: "Fournisseurs", href: "/fournisseurs", icon: "truck" };
-
 /** Build dynamic nav entries from a list of establishments */
 export function buildDynamicNav(
   etabs: { slug: string; nom: string; couleur: string | null }[],
@@ -145,7 +142,6 @@ export function buildDynamicNav(
       isPiccola ? FINANCE_KEZIA : FINANCE_POPINA,
       ...COMMON_SECTIONS.slice(1), // Achats, Performances, Operations
       ...(isPiccola ? [EVENEMENTIEL_SECTION] : []),
-      { label: "", items: [FOURNISSEURS_ITEM] },
     ];
 
     entries.push({
