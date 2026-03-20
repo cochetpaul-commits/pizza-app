@@ -67,7 +67,6 @@ const REPAS_TYPES = [
 ];
 
 const COLORS = ["#E07070", "#D4775A", "#E0A060", "#E0D060", "#7CCF7C", "#5AAFAF", "#5A8AD4", "#7A6AD4", "#B070D0", "#D070A0", "#A0845C", "#4a6741"];
-const EMOJIS = [null, "🔥", "🍕", "🍝", "🥗", "🧊", "🍰", "🍹", "🧽", "🍽️", "📋", "🧪", "🛒", "💼", "🎪", "🧑‍🍳", "🍷", "☕"];
 
 const CARD: React.CSSProperties = { background: "#fff", borderRadius: 14, padding: 20, border: "1px solid #ddd6c8", marginBottom: 16 };
 const LABEL: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 };
@@ -112,6 +111,12 @@ export default function EtablissementDetailPage() {
   const [primeCode, setPrimeCode] = useState("");
   const [editPrimeId, setEditPrimeId] = useState<string | null>(null);
   const [allEtabs, setAllEtabs] = useState<{ id: string; nom: string }[]>([]);
+
+  // Planification modals
+  const [showEquipesModal, setShowEquipesModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importEquipe, setImportEquipe] = useState("");
+  const [importEtabId, setImportEtabId] = useState("");
 
   // Poste modal
   const [showPosteModal, setShowPosteModal] = useState(false);
@@ -187,10 +192,6 @@ export default function EtablissementDetailPage() {
     setShowPosteModal(false);
   };
 
-  const togglePoste = async (posteId: string, actif: boolean) => {
-    setPostes(prev => prev.map(p => p.id === posteId ? { ...p, actif } : p));
-    await supabase.from("postes").update({ actif }).eq("id", posteId);
-  };
 
   /* ── Prime CRUD ── */
   const openAddPrime = () => {
@@ -447,16 +448,41 @@ export default function EtablissementDetailPage() {
   );
 
   /* ── Tab: Planification ── */
+
+  const importEtiquettes = async () => {
+    if (!id || !importEtabId || !importEquipe) return;
+    const { data: src } = await supabase.from("postes").select("nom, equipe, couleur, emoji").eq("etablissement_id", importEtabId).eq("equipe", importEquipe).eq("actif", true);
+    if (!src || src.length === 0) { alert("Aucune etiquette a importer."); return; }
+    const toInsert = src.map(p => ({ ...p, etablissement_id: id, actif: true }));
+    const { data } = await supabase.from("postes").insert(toInsert).select();
+    if (data) setPostes(prev => [...prev, ...(data as Poste[])]);
+    setShowImportModal(false);
+  };
+
+  const deletePoste = async (posteId: string) => {
+    if (!confirm("Supprimer cette etiquette ?")) return;
+    await supabase.from("postes").delete().eq("id", posteId);
+    setPostes(prev => prev.filter(p => p.id !== posteId));
+    setShowPosteModal(false);
+  };
+
   const renderPlanification = () => (
     <>
       {/* Equipes */}
       <div style={CARD}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>Organisation des plannings (equipes)</h2>
+          <button type="button" onClick={() => setShowEquipesModal(true)} style={{
+            padding: "6px 14px", borderRadius: 6, border: "1px solid #ddd6c8",
+            background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
+          }}>
+            Modifier
+          </button>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {equipes.map(eq => (
-            <span key={eq} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #ddd6c8", fontSize: 13, fontWeight: 600 }}>
+            <span key={eq} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #ddd6c8", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
               {eq}
             </span>
           ))}
@@ -468,11 +494,38 @@ export default function EtablissementDetailPage() {
       <div style={CARD}>
         <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, color: "#1a1a1a" }}>Preferences</h2>
         <div style={ROW}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Les employes peuvent saisir leurs heures reelles</span>
+          <Toggle value={true} onChange={() => {}} />
+        </div>
+        <div style={ROW}>
+          <span style={{ fontSize: 14, color: "#1a1a1a" }}>Appliquer un temps de pause par defaut lors de la creation d&apos;un shift</span>
+          <Toggle value={true} onChange={() => {}} />
+        </div>
+        <div style={ROW}>
+          <span style={{ fontSize: 14, color: "#1a1a1a" }}>Calculer la duree d&apos;une pause en</span>
+          <select style={{ ...INPUT, width: 150 }} defaultValue="minutes">
+            <option value="minutes">Minutes (min)</option>
+            <option value="heures">Heures (h)</option>
+          </select>
+        </div>
+        <div style={ROW}>
           <span style={{ fontSize: 14, color: "#1a1a1a" }}>Ajouter un temps de pause par defaut de</span>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <input type="number" style={{ ...INPUT, width: 70, textAlign: "center" }} value={settings.pause_defaut_minutes} onChange={e => updateField({ pause_defaut_minutes: Number(e.target.value) })} min={0} max={120} />
             <span style={{ fontSize: 12, color: "#999" }}>min</span>
           </div>
+        </div>
+        <div style={{ ...ROW, borderBottom: "none" }}>
+          <span style={{ fontSize: 14, color: "#1a1a1a" }}>Ajouter la pause par defaut aux shifts d&apos;une duree minimum de</span>
+          <input type="text" style={{ ...INPUT, width: 80, textAlign: "center" }} defaultValue="0:0" placeholder="HH:MM" />
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <button type="button" onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 2000); }} style={{
+            padding: "6px 16px", borderRadius: 6, border: "1px solid #ddd6c8",
+            background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#999",
+          }}>
+            Enregistrer
+          </button>
         </div>
       </div>
 
@@ -482,16 +535,24 @@ export default function EtablissementDetailPage() {
         <div style={ROW}>
           <span style={{ fontSize: 14, color: "#1a1a1a" }}>Cout des shifts / ventes</span>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <input type="number" style={{ ...INPUT, width: 70, textAlign: "center" }} value={settings.objectif_cout_ventes} onChange={e => updateField({ objectif_cout_ventes: Number(e.target.value) })} min={0} max={100} />
+            <input type="number" style={{ ...INPUT, width: 80, textAlign: "right" }} value={settings.objectif_cout_ventes} onChange={e => updateField({ objectif_cout_ventes: Number(e.target.value) })} min={0} max={100} />
             <span style={{ fontSize: 12, color: "#999" }}>%</span>
           </div>
         </div>
         <div style={{ ...ROW, borderBottom: "none" }}>
           <span style={{ fontSize: 14, color: "#1a1a1a" }}>Productivite</span>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <input type="number" style={{ ...INPUT, width: 70, textAlign: "center" }} value={settings.objectif_productivite} onChange={e => updateField({ objectif_productivite: Number(e.target.value) })} min={0} />
+            <input type="number" style={{ ...INPUT, width: 80, textAlign: "right" }} value={settings.objectif_productivite} onChange={e => updateField({ objectif_productivite: Number(e.target.value) })} min={0} />
             <span style={{ fontSize: 12, color: "#999" }}>EUR/H</span>
           </div>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <button type="button" onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 2000); }} style={{
+            padding: "6px 16px", borderRadius: 6, border: "1px solid #ddd6c8",
+            background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#999",
+          }}>
+            Enregistrer
+          </button>
         </div>
       </div>
 
@@ -521,12 +582,20 @@ export default function EtablissementDetailPage() {
                   </span>
                 ))}
               </div>
-              <button type="button" onClick={() => openCreatePoste(eq)} style={{
-                padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff",
-                fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
-              }}>
-                Nouvelle etiquette
-              </button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="button" onClick={() => openCreatePoste(eq)} style={{
+                  padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff",
+                  fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
+                }}>
+                  Nouvelle etiquette
+                </button>
+                <button type="button" onClick={() => { setImportEquipe(eq); setImportEtabId(""); setShowImportModal(true); }} style={{
+                  padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff",
+                  fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
+                }}>
+                  Importer
+                </button>
+              </div>
             </div>
           );
         })}
@@ -535,6 +604,14 @@ export default function EtablissementDetailPage() {
       {/* Compteurs */}
       <div style={CARD}>
         <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: "#1a1a1a" }}>Compteurs</h2>
+        <div style={{
+          padding: 12, borderRadius: 8, marginBottom: 12,
+          background: "rgba(220,38,38,0.04)", border: "1px solid rgba(220,38,38,0.15)",
+        }}>
+          <span style={{ fontSize: 12, color: "#DC2626", lineHeight: 1.4 }}>
+            Attention, les changements de configuration peuvent impacter les donnees. Veuillez verifier le solde de Repos Compensateurs de chaque collaborateur avant toute modification.
+          </span>
+        </div>
         <div style={{ ...ROW, borderBottom: "none" }}>
           <span style={{ fontSize: 14, color: "#1a1a1a" }}>Activer les repos compensateurs pour les contrats eligibles &lt; 35h</span>
           <Toggle value={settings.ajouter_cp_taux_horaire} onChange={v => updateField({ ajouter_cp_taux_horaire: v })} />
@@ -608,86 +685,140 @@ export default function EtablissementDetailPage() {
         {tab === "modulation" && renderModulation()}
       </div>
 
-      {/* Modal: Poste */}
+      {/* Modal: Equipes */}
+      {showEquipesModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "flex-start", justifyContent: "flex-end", zIndex: 200 }}
+          onClick={() => setShowEquipesModal(false)}
+        >
+          <div style={{ background: "#fff", width: 340, height: "100%", padding: 24, overflowY: "auto", boxShadow: "-4px 0 20px rgba(0,0,0,0.15)" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>Plannings</h2>
+              <button type="button" onClick={() => setShowEquipesModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#999" }}>x</button>
+            </div>
+            <p style={{ fontSize: 12, color: "#999", lineHeight: 1.4, marginBottom: 16 }}>
+              Vous pouvez avoir un ou plusieurs plannings par etablissement : cuisine, salle, etc. Les plannings etant independants ils sont publies separement.
+            </p>
+            <p style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>
+              Cet etablissement a <strong style={{ color: "#1a1a1a" }}>{equipes.length} planning{equipes.length > 1 ? "s" : ""}</strong> :
+            </p>
+            {equipes.map(eq => (
+              <div key={eq} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <input style={{ ...INPUT, flex: 1 }} value={eq} readOnly />
+                <span style={{ fontSize: 10, color: "#999", whiteSpace: "nowrap" }}>{eq.length}/40</span>
+              </div>
+            ))}
+            <button type="button" style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "8px 14px", borderRadius: 6, border: "1px solid #ddd6c8",
+              background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
+              marginTop: 8,
+            }}>
+              + Ajouter un planning
+            </button>
+            <div style={{ position: "absolute", bottom: 24, left: 24, right: 24 }}>
+              <button type="button" onClick={() => setShowEquipesModal(false)} style={{
+                width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #ddd6c8",
+                background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#999",
+              }}>
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Import etiquettes */}
+      {showImportModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }}
+          onClick={() => setShowImportModal(false)}
+        >
+          <div style={{ background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 500, boxShadow: "0 12px 40px rgba(0,0,0,0.15)" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div>
+                <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>Importer des etiquettes</h2>
+                <p style={{ fontSize: 12, color: "#999", marginTop: 4 }}>Pour gagner du temps !</p>
+              </div>
+              <button type="button" onClick={() => setShowImportModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#999" }}>x</button>
+            </div>
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 6 }}>Selectionnez un etablissement :</div>
+              <select style={INPUT} value={importEtabId} onChange={e => setImportEtabId(e.target.value)}>
+                <option value="">Rechercher</option>
+                {allEtabs.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
+              </select>
+            </div>
+            {importEtabId && (
+              <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
+                <button type="button" onClick={importEtiquettes} style={{
+                  padding: "10px 20px", borderRadius: 8, border: "none",
+                  background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                }}>
+                  Importer
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Etiquette (Poste) — simplified Komia style */}
       {showPosteModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }}
           onClick={() => setShowPosteModal(false)}
         >
-          <div style={{ background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 400, boxShadow: "0 12px 40px rgba(0,0,0,0.15)" }}
+          <div style={{ background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 500, boxShadow: "0 12px 40px rgba(0,0,0,0.15)" }}
             onClick={e => e.stopPropagation()}
           >
-            <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
-              {editPosteId ? "Modifier le poste" : "Nouveau poste"}
-            </h2>
-            <div style={{ marginBottom: 12 }}>
-              <div style={LABEL}>Nom</div>
-              <input style={INPUT} value={pNom} onChange={e => setPNom(e.target.value)} placeholder="Ex: Pizza" />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>
+                {editPosteId ? "Modifier une etiquette" : "Ajouter une etiquette"}
+              </h2>
+              <button type="button" onClick={() => setShowPosteModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#999" }}>x</button>
             </div>
-            <div style={{ marginBottom: 12 }}>
-              <div style={LABEL}>Equipe</div>
-              <div style={{ display: "flex", gap: 6 }}>
-                {["Cuisine", "Salle", "Shop"].map(eq => (
-                  <button key={eq} type="button" onClick={() => setPEquipe(eq)} style={{
-                    padding: "5px 14px", borderRadius: 20,
-                    border: pEquipe === eq ? "2px solid #2D6A4F" : "1px solid #ddd6c8",
-                    background: pEquipe === eq ? "rgba(45,106,79,0.08)" : "#fff",
-                    fontSize: 12, fontWeight: 600, cursor: "pointer",
-                  }}>
-                    {eq}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <div style={LABEL}>Couleur</div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {COLORS.map(c => (
-                  <button key={c} type="button" onClick={() => setPCouleur(c)} style={{
-                    width: 28, height: 28, borderRadius: 6, border: pCouleur === c ? "2px solid #1a1a1a" : "2px solid transparent",
-                    background: c, cursor: "pointer",
-                  }} />
-                ))}
-              </div>
-            </div>
+            <p style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>Pour avoir des plannings super puissants !</p>
+
             <div style={{ marginBottom: 16 }}>
-              <div style={LABEL}>Emoji</div>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                {EMOJIS.map((em, i) => (
-                  <button key={i} type="button" onClick={() => setPEmoji(em)} style={{
-                    width: 32, height: 32, borderRadius: 6,
-                    border: pEmoji === em ? "2px solid #1a1a1a" : "1px solid #ddd6c8",
-                    background: "#fff", cursor: "pointer", fontSize: 14,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>
-                    {em ?? "—"}
-                  </button>
-                ))}
-              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 6 }}>Intitule de l&apos;etiquette</div>
+              <input style={INPUT} value={pNom} onChange={e => setPNom(e.target.value)} placeholder="" />
             </div>
-            {/* Preview */}
-            <div style={{ marginBottom: 16, padding: 10, background: "#faf7f2", borderRadius: 8, textAlign: "center" }}>
-              <span style={{ padding: "4px 12px", borderRadius: 4, background: pCouleur, color: "#fff", fontSize: 13, fontWeight: 600 }}>
-                {pEmoji && <span style={{ marginRight: 4 }}>{pEmoji}</span>}
-                {pNom || "Apercu"}
-              </span>
+
+            {/* Extended color palette */}
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 20 }}>
+              {[
+                "#E8E8E8", "#F2B8D0", "#D4698A", "#8B2252", "#E8A0C8", "#C87AB0", "#9B59B6", "#7D5BA6", "#6A4C93", "#5B4A8A",
+                "#89CFF0", "#6CB4EE", "#4A90D9", "#3B5FA0", "#2C6F8F", "#2E8B8B", "#3AA08C", "#2D8B57", "#1B5E20", "#4A7B3F",
+                "#8DB600", "#A4C639", "#B5B35C", "#8B7D3C", "#C9A96E", "#E8C49A", "#D4A06A", "#C08040", "#E8D4B0", "#F0E4C8",
+                "#E8A040", "#C0392B", "#F4A7B9",
+              ].map(c => (
+                <button key={c} type="button" onClick={() => setPCouleur(c)} style={{
+                  width: 32, height: 32, borderRadius: 6,
+                  border: pCouleur === c ? "2px solid #1a1a1a" : "1px solid #e0e0e0",
+                  background: c, cursor: "pointer",
+                }} />
+              ))}
             </div>
-            <div style={{ display: "flex", gap: 10, justifyContent: "space-between" }}>
-              <div>
-                {editPosteId && (
-                  <button type="button" onClick={() => { togglePoste(editPosteId, !postes.find(p => p.id === editPosteId)?.actif); setShowPosteModal(false); }}
-                    style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#999" }}>
-                    {postes.find(p => p.id === editPosteId)?.actif ? "Desactiver" : "Activer"}
-                  </button>
-                )}
-              </div>
-              <div style={{ display: "flex", gap: 10 }}>
-                <button type="button" onClick={() => setShowPosteModal(false)} style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                  Annuler
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              {editPosteId && (
+                <button type="button" onClick={() => deletePoste(editPosteId)} style={{
+                  padding: "10px 20px", borderRadius: 8, border: "none",
+                  background: "#DC2626", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                  marginRight: "auto",
+                }}>
+                  Supprimer
                 </button>
-                <button type="button" onClick={savePoste} disabled={!pNom.trim()} style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "#2D6A4F", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                  {editPosteId ? "Enregistrer" : "Creer"}
-                </button>
-              </div>
+              )}
+              <button type="button" onClick={savePoste} disabled={!pNom.trim()} style={{
+                padding: "10px 20px", borderRadius: 8, border: "none",
+                background: pNom.trim() ? "#1a1a1a" : "#ddd6c8", color: "#fff",
+                fontSize: 13, fontWeight: 600, cursor: pNom.trim() ? "pointer" : "default",
+              }}>
+                Enregistrer
+              </button>
             </div>
           </div>
         </div>
