@@ -169,7 +169,7 @@ function CollapsedContent({ onExpand }: { onExpand: () => void }) {
     if (entry.kind === "etab") {
       if (!isRoleAllowed(entry.roles, role)) continue;
       const active = isEtabActive(entry.etabSlug);
-      // Restaurant icon — active gets colored square bg like screenshot
+      // Restaurant icon — active gets same tinted bg as Accueil
       elements.push(
         <button
           key={`etab-${entry.etabSlug}`}
@@ -177,14 +177,14 @@ function CollapsedContent({ onExpand }: { onExpand: () => void }) {
           onClick={onExpand}
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
-            width: 40, height: 40, borderRadius: 10,
-            background: active ? `${entry.color}28` : "transparent",
-            border: active ? `1.5px solid ${entry.color}50` : "1.5px solid transparent",
-            margin: "3px auto", cursor: "pointer",
+            width: 38, height: 38, borderRadius: 8,
+            background: active ? C.bgItemActive : "transparent",
+            border: active ? `1.5px solid ${entry.color}40` : "1.5px solid transparent",
+            margin: "2px auto", cursor: "pointer",
             transition: "background 0.15s, border-color 0.15s",
           }}
         >
-          <IconStore size={20} color={active ? entry.color : C.textMuted} />
+          <IconStore size={18} color={active ? entry.color : C.textMuted} />
         </button>
       );
       // Show sub-section icons
@@ -467,25 +467,26 @@ function ExpandedContent({ onNavigate, onCollapse, showBurger }: ExpandedContent
     const highlighted = isOpen || isEtabActive(entry.etabSlug);
 
     return (
-      <div key={groupKey} style={{ marginBottom: 4 }}>
+      <div key={groupKey} style={{ marginBottom: 2 }}>
         <button
           type="button"
           onClick={() => toggleGroup(groupKey)}
           style={{
             display: "flex", alignItems: "center", gap: 10,
-            width: "calc(100% - 16px)", padding: "10px 12px",
-            margin: "2px 8px",
-            borderRadius: 8,
-            background: highlighted ? `${entry.color}22` : "transparent",
+            padding: "8px 16px",
+            margin: "1px 8px",
+            width: "calc(100% - 16px)",
+            borderRadius: 6,
+            background: highlighted ? C.bgItemActive : "transparent",
             border: "none", cursor: "pointer",
             borderLeft: highlighted ? `3px solid ${entry.color}` : "3px solid transparent",
-            color: highlighted ? "#fff" : C.textNormal,
-            fontSize: 14, fontWeight: 700,
+            color: highlighted ? C.textActive : C.textNormal,
+            fontSize: 13, fontWeight: highlighted ? 600 : 500,
             whiteSpace: "nowrap", overflow: "hidden",
-            transition: "background 0.15s, color 0.15s",
+            transition: "background 0.12s, color 0.12s",
           }}
         >
-          <IconStore size={18} color={highlighted ? entry.color : C.textMuted} />
+          <IconStore size={16} color={highlighted ? entry.color : C.textMuted} />
           <span style={{ flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis" }}>
             {entry.label}
           </span>
