@@ -347,19 +347,71 @@ export default function EtablissementDetailPage() {
 
       {/* Conges payes */}
       <div style={CARD}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, color: "#1a1a1a" }}>Conges payes</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>Conges payes</h2>
+          <a href="/rh/conges" style={{ fontSize: 12, color: "#2563eb", textDecoration: "none", fontWeight: 600 }}>
+            Voir les compteurs de conges payes
+          </a>
+        </div>
+
+        {/* Base de calcul */}
+        <div style={ROW}>
           <div>
-            <div style={LABEL}>Base de calcul</div>
-            <select style={INPUT} value={settings.base_calcul_cp} onChange={e => updateField({ base_calcul_cp: Number(e.target.value) })}>
-              <option value={6}>Sur 6 jours - FR - ouvrable</option>
-              <option value={5}>Sur 5 jours - FR - ouvre</option>
+            <span style={{ fontSize: 14, color: "#1a1a1a" }}>Base de calcul du decompte des conges payes</span>
+            <span style={{ color: "#DC2626", marginLeft: 2 }}>*</span>
+          </div>
+          <select style={{ ...INPUT, width: 240 }} value={settings.base_calcul_cp} onChange={e => updateField({ base_calcul_cp: Number(e.target.value) })}>
+            <option value={6}>Sur 6 jours - FR - ouvrable</option>
+            <option value={5}>Sur 5 jours - FR - ouvre</option>
+          </select>
+        </div>
+
+        {/* Acquisition mensuelle */}
+        <div style={ROW}>
+          <div>
+            <div style={{ fontSize: 14, color: "#1a1a1a" }}>
+              Acquisition mensuelle <span style={{ color: "#DC2626" }}>*</span>
+            </div>
+            <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>Appliquee automatiquement dans la nuit du dernier jour du mois.</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <input type="number" style={{ ...INPUT, width: 80, textAlign: "center" }} value={settings.acquisition_mensuelle_cp} onChange={e => updateField({ acquisition_mensuelle_cp: Number(e.target.value) })} step={0.5} min={0} max={5} />
+            <span style={{ fontSize: 12, color: "#999" }}>j</span>
+          </div>
+        </div>
+
+        {/* Periode d'acquisition */}
+        <div style={{ ...ROW, borderBottom: "none" }}>
+          <div>
+            <div style={{ fontSize: 14, color: "#1a1a1a" }}>
+              Periode d&apos;acquisition <span style={{ color: "#DC2626" }}>*</span>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+            <span style={{ color: "#999" }}>Du</span>
+            <select style={{ ...INPUT, width: 60, padding: "6px 4px", textAlign: "center" }} defaultValue="1">
+              {Array.from({ length: 28 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
             </select>
+            <select style={{ ...INPUT, width: 100, padding: "6px 8px" }} defaultValue="6">
+              {["janvier", "fevrier", "mars", "avril", "mai", "juin", "juillet", "aout", "septembre", "octobre", "novembre", "decembre"].map((m, i) => (
+                <option key={i} value={i + 1}>{m}</option>
+              ))}
+            </select>
+            <span style={{ color: "#999" }}>au 31 mai N+1</span>
           </div>
-          <div>
-            <div style={LABEL}>Acquisition mensuelle</div>
-            <input type="number" style={INPUT} value={settings.acquisition_mensuelle_cp} onChange={e => updateField({ acquisition_mensuelle_cp: Number(e.target.value) })} step={0.5} min={0} max={5} />
-          </div>
+        </div>
+
+        {/* Save + last update */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12, paddingTop: 12, borderTop: "1px solid #f0ebe3" }}>
+          <button type="button" onClick={() => { /* already auto-saved */ setSaved(true); setTimeout(() => setSaved(false), 2000); }} style={{
+            padding: "6px 16px", borderRadius: 6, border: "1px solid #ddd6c8",
+            background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
+          }}>
+            Enregistrer
+          </button>
+          <span style={{ fontSize: 11, color: "#999" }}>
+            {saved ? "Enregistre" : ""}
+          </span>
         </div>
       </div>
 
