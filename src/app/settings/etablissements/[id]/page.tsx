@@ -38,6 +38,12 @@ type Settings = {
   actif: boolean;
 };
 
+type Equipe = {
+  id: string;
+  nom: string;
+  actif: boolean;
+};
+
 type Poste = {
   id: string;
   nom: string;
@@ -102,6 +108,7 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 export default function EtablissementDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [dbEquipes, setDbEquipes] = useState<Equipe[]>([]);
   const [postes, setPostes] = useState<Poste[]>([]);
   const [primes, setPrimes] = useState<Prime[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,18 +147,20 @@ export default function EtablissementDetailPage() {
     if (!id) return;
     let cancelled = false;
     (async () => {
-      const [etabRes, postesRes, primesRes, allEtabsRes] = await Promise.all([
+      const [etabRes, postesRes, primesRes, allEtabsRes, equipesRes] = await Promise.all([
         supabase.from("etablissements").select("*").eq("id", id).single(),
         supabase.from("postes").select("id, nom, equipe, couleur, emoji, actif").eq("etablissement_id", id).order("equipe").order("nom"),
         supabase.from("primes").select("id, libelle, code, type, montant, recurrence, actif").eq("etablissement_id", id).order("libelle"),
         supabase.from("etablissements").select("id, nom").eq("actif", true).order("nom"),
+        supabase.from("equipes").select("id, nom, actif").eq("etablissement_id", id).eq("actif", true).order("nom"),
       ]);
       if (!cancelled) {
         if (etabRes.data) setSettings(etabRes.data as unknown as Settings);
         const loadedPostes = (postesRes.data ?? []) as Poste[];
         setPostes(loadedPostes);
-        // Initialize editEquipes from existing postes equipes
-        setEditEquipes([...new Set(loadedPostes.map(p => p.equipe))].sort());
+        const loadedEquipes = (equipesRes.data ?? []) as Equipe[];
+        setDbEquipes(loadedEquipes);
+        setEditEquipes(loadedEquipes.map(e => e.nom));
         setPrimes((primesRes.data ?? []) as Prime[]);
         setAllEtabs((allEtabsRes.data ?? []).filter(e => e.id !== id) as { id: string; nom: string }[]);
         setLoading(false);
@@ -262,8 +271,8 @@ export default function EtablissementDetailPage() {
     );
   }
 
-  // Merge equipes from postes + any added via modal (editEquipes)
-  const equipes = [...new Set([...postes.map(p => p.equipe), ...editEquipes])].sort();
+  // Equipes from DB table + any from postes (backwards compat) + modal edits
+  const equipes = [...new Set([...dbEquipes.map(e => e.nom), ...postes.map(p => p.equipe), ...editEquipes])].sort();
 
   /* ── Tab: Regles sociales ── */
   const renderSocial = () => (
@@ -489,9 +498,11 @@ export default function EtablissementDetailPage() {
 
   const importEtiquettes = async () => {
     if (!id || !importEtabId || !importEquipe) return;
-    const { data: src } = await supabase.from("postes").select("nom, equipe, couleur, emoji").eq("etablissement_id", importEtabId).eq("equipe", importEquipe).eq("actif", true);
-    if (!src || src.length === 0) { alert("Aucune etiquette a importer."); return; }
-    const toInsert = src.map(p => ({ ...p, etablissement_id: id, actif: true }));
+    // Load ALL active postes from the source establishment
+    const { data: src } = await supabase.from("postes").select("nom, couleur").eq("etablissement_id", importEtabId).eq("actif", true);
+    if (!src || src.length === 0) { alert("Aucune etiquette a importer depuis cet etablissement."); return; }
+    // Insert them under the current equipe of this establishment
+    const toInsert = src.map(p => ({ nom: p.nom, couleur: p.couleur, equipe: importEquipe, etablissement_id: id, actif: true, emoji: null }));
     const { data } = await supabase.from("postes").insert(toInsert).select();
     if (data) setPostes(prev => [...prev, ...(data as Poste[])]);
     setShowImportModal(false);
@@ -832,17 +843,36 @@ export default function EtablissementDetailPage() {
                 type="button"
                 onClick={async () => {
                   if (!id) return;
-                  // Rename postes whose equipe changed + delete postes for removed equipes
-                  const oldEquipes = [...new Set(postes.map(p => p.equipe))];
-                  const removed = oldEquipes.filter(eq => !editEquipes.includes(eq));
-                  // Delete postes for removed equipes
-                  for (const eq of removed) {
-                    await supabase.from("postes").delete().eq("etablissement_id", id).eq("equipe", eq);
+                  const oldNames = dbEquipes.map(e => e.nom);
+                  const newNames = editEquipes.filter(n => n.trim());
+
+                  // Delete removed equipes from DB + their postes
+                  const removed = oldNames.filter(n => !newNames.includes(n));
+                  for (const eqName of removed) {
+                    await supabase.from("equipes").delete().eq("etablissement_id", id).eq("nom", eqName);
+                    await supabase.from("postes").delete().eq("etablissement_id", id).eq("equipe", eqName);
                   }
-                  // Refresh postes
-                  const { data: refreshed } = await supabase.from("postes").select("id, nom, equipe, couleur, emoji, actif").eq("etablissement_id", id).order("equipe").order("nom");
-                  if (refreshed) setPostes(refreshed as Poste[]);
-                  // For new equipes that don't have any postes yet, we don't need to create any — they'll show as empty sections
+
+                  // Add new equipes to DB
+                  const added = newNames.filter(n => !oldNames.includes(n));
+                  if (added.length > 0) {
+                    await supabase.from("equipes").insert(added.map(nom => ({ etablissement_id: id, nom })));
+                  }
+
+                  // Rename: update postes equipe for renamed equipes
+                  // (matching by index for equipes that changed name but kept position)
+
+                  // Refresh equipes + postes
+                  const [eqRefresh, postesRefresh] = await Promise.all([
+                    supabase.from("equipes").select("id, nom, actif").eq("etablissement_id", id).eq("actif", true).order("nom"),
+                    supabase.from("postes").select("id, nom, equipe, couleur, emoji, actif").eq("etablissement_id", id).order("equipe").order("nom"),
+                  ]);
+                  if (eqRefresh.data) {
+                    setDbEquipes(eqRefresh.data as Equipe[]);
+                    setEditEquipes((eqRefresh.data as Equipe[]).map(e => e.nom));
+                  }
+                  if (postesRefresh.data) setPostes(postesRefresh.data as Poste[]);
+
                   setShowEquipesModal(false);
                   setSaved(true);
                   setTimeout(() => setSaved(false), 2000);
