@@ -21,7 +21,8 @@ import {
   IconShoppingBag, IconTruck, IconFileText, IconPackage,
   IconBarChart, IconTrendingUp, IconBook, IconTag,
   IconCalendarEvent, IconChevronDown, IconBox, IconChefHat,
-  IconSwitch, IconMenu, IconChevronLeft, IconBuilding,
+  IconSwitch, IconChevronLeft, IconBuilding,
+  IconChevronRight,
 } from "./Icons";
 import type { Role } from "@/lib/rbac";
 
@@ -81,20 +82,237 @@ function isRoleAllowed(roles: Role[] | undefined, role: Role | null): boolean {
   return roles.includes(role);
 }
 
-/* ── Sidebar Content ─────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════
+   COLLAPSED VIEW — icons only (60px wide)
+   ═══════════════════════════════════════════════════════ */
 
-type SidebarContentProps = {
-  onNavigate?: () => void;
-  collapsed?: boolean;
-  onToggle?: () => void;
-};
-
-function SidebarContent({ onNavigate, collapsed, onToggle }: SidebarContentProps) {
+function CollapsedContent({ onToggle }: { onToggle?: () => void }) {
   const pathname = usePathname();
   const { role } = useProfile();
   const { current, setCurrent, etablissements, isGroupView, setGroupView } = useEtablissement();
 
-  // Collapsed state for etab groups and settings sub-sections
+  const isAdmin = role === "group_admin" || role === "manager";
+  const entries: SidebarEntry[] = isAdmin ? SIDEBAR_NAV_V2 : SIDEBAR_NAV_SIMPLE;
+
+  const etabColor = isGroupView
+    ? C.ifratelli
+    : (current?.couleur ?? C.ifratelli);
+
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(href + "/");
+
+  const isEtabActive = (slug: string) =>
+    !isGroupView && (current?.slug === slug || current?.slug?.replace("_", "-") === slug);
+
+  const switchEtab = (slug: string) => {
+    const target = etablissements.find(e => e.slug === slug || e.slug?.replace("_", "-") === slug);
+    if (target && current?.slug !== slug && current?.slug?.replace("_", "-") !== slug) {
+      setGroupView(false);
+      setCurrent(target);
+    }
+  };
+
+  /* Icon-only item */
+  const iconItem = (href: string, icon: string | undefined, active: boolean, color: string, key: string, etabSlug?: string) => {
+    const IconComp = icon ? ICON_MAP[icon] : null;
+    if (!IconComp) return null;
+    return (
+      <Link
+        key={key}
+        href={href}
+        onClick={() => { if (etabSlug) switchEtab(etabSlug); }}
+        title=""
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          width: 36, height: 36, borderRadius: 8,
+          background: active ? C.bgItemActive : "transparent",
+          margin: "2px auto",
+          transition: "background 0.12s",
+        }}
+      >
+        <IconComp size={18} color={active ? color : C.textMuted} />
+      </Link>
+    );
+  };
+
+  /* Collect all visible icons to render */
+  const elements: React.ReactNode[] = [];
+
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+
+    if (entry.kind === "divider") {
+      elements.push(
+        <div key={`d-${i}`} style={{ height: 1, background: C.divider, margin: "6px 12px" }} />
+      );
+      continue;
+    }
+
+    if (entry.kind === "item") {
+      if (!isRoleAllowed(entry.roles, role)) continue;
+      const active = isActive(entry.href);
+      elements.push(iconItem(entry.href, entry.icon, active, etabColor, `i-${entry.href}`));
+      continue;
+    }
+
+    if (entry.kind === "etab") {
+      if (!isRoleAllowed(entry.roles, role)) continue;
+      const active = isEtabActive(entry.etabSlug);
+      // Colored dot for establishment
+      elements.push(
+        <div
+          key={`etab-${entry.etabSlug}`}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 36, height: 36, borderRadius: 8,
+            background: active ? C.bgItemActive : "transparent",
+            margin: "2px auto", cursor: "default",
+          }}
+        >
+          <span style={{
+            width: 10, height: 10, borderRadius: "50%",
+            background: entry.color,
+            border: active ? "2px solid rgba(255,255,255,0.5)" : "2px solid transparent",
+          }} />
+        </div>
+      );
+      // Show sub-section icons
+      for (const sub of entry.sections) {
+        if (!isRoleAllowed(sub.roles, role)) continue;
+        if (sub.icon) {
+          const SubIcon = ICON_MAP[sub.icon];
+          if (SubIcon) {
+            // Check if any item in this sub-section is active
+            const subActive = sub.items.some(it => isRoleAllowed(it.roles, role) && isActive(it.href) && isEtabActive(entry.etabSlug));
+            const firstHref = sub.items.find(it => isRoleAllowed(it.roles, role))?.href;
+            if (firstHref) {
+              elements.push(
+                <Link
+                  key={`${entry.etabSlug}-${sub.label}`}
+                  href={firstHref}
+                  onClick={() => switchEtab(entry.etabSlug)}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    width: 36, height: 36, borderRadius: 8,
+                    background: subActive ? C.bgItemActive : "transparent",
+                    margin: "2px auto",
+                    transition: "background 0.12s",
+                  }}
+                >
+                  <SubIcon size={16} color={subActive ? entry.color : C.textMuted} />
+                </Link>
+              );
+            }
+          }
+        }
+      }
+      continue;
+    }
+
+    if (entry.kind === "settings") {
+      if (!isRoleAllowed(entry.roles, role)) continue;
+      const SettingsIcon = entry.icon ? ICON_MAP[entry.icon] : null;
+      const anyActive = entry.sections.some(sub =>
+        sub.items.some(it => isRoleAllowed(it.roles, role) && isActive(it.href))
+      );
+      if (SettingsIcon) {
+        const firstHref = entry.sections[0]?.items[0]?.href ?? "/settings/account";
+        elements.push(
+          <Link
+            key="settings-icon"
+            href={firstHref}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 36, height: 36, borderRadius: 8,
+              background: anyActive ? C.bgItemActive : "transparent",
+              margin: "2px auto",
+              transition: "background 0.12s",
+            }}
+          >
+            <SettingsIcon size={18} color={anyActive ? etabColor : C.textMuted} />
+          </Link>
+        );
+      }
+    }
+  }
+
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", height: "100%",
+      background: C.bg, color: C.textNormal,
+      fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+      width: 60,
+    }}>
+      {/* Logo only */}
+      <div style={{
+        padding: "16px 0 12px",
+        borderBottom: `1px solid ${C.divider}`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <Image
+          src="/logo-ifratelli.png"
+          alt="iFratelli"
+          width={28}
+          height={28}
+          style={{ width: 28, height: 28, objectFit: "contain", borderRadius: 6 }}
+        />
+      </div>
+
+      {/* Icon nav */}
+      <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "8px 0" }}>
+        {elements}
+      </nav>
+
+      {/* Footer: expand button */}
+      <div style={{
+        padding: "12px 0 16px",
+        borderTop: `1px solid ${C.divider}`,
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+      }}>
+        <Link
+          href="/session"
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 36, height: 36, borderRadius: 8,
+            textDecoration: "none",
+          }}
+        >
+          <IconSwitch size={16} color={C.textMuted} />
+        </Link>
+        {onToggle && (
+          <button
+            type="button"
+            onClick={onToggle}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 36, height: 36, borderRadius: 8,
+              background: C.bgItem, border: `1px solid ${C.divider}`,
+              cursor: "pointer",
+            }}
+            title="Ouvrir le menu"
+          >
+            <IconChevronRight size={16} color={C.textMuted} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════
+   EXPANDED VIEW — full sidebar (240px)
+   ═══════════════════════════════════════════════════════ */
+
+type ExpandedContentProps = {
+  onNavigate?: () => void;
+  onToggle?: () => void;
+};
+
+function ExpandedContent({ onNavigate, onToggle }: ExpandedContentProps) {
+  const pathname = usePathname();
+  const { role } = useProfile();
+  const { current, setCurrent, etablissements, isGroupView, setGroupView } = useEtablissement();
+
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [openSubSections, setOpenSubSections] = useState<Record<string, boolean>>({});
 
@@ -106,16 +324,13 @@ function SidebarContent({ onNavigate, collapsed, onToggle }: SidebarContentProps
     setOpenSubSections(p => ({ ...p, [key]: !p[key] }));
   }, []);
 
-  // Pick the right nav based on role
   const isAdmin = role === "group_admin" || role === "manager";
   const entries: SidebarEntry[] = isAdmin ? SIDEBAR_NAV_V2 : SIDEBAR_NAV_SIMPLE;
 
-  // Determine the active establishment color
   const etabColor = isGroupView
     ? C.ifratelli
     : (current?.couleur ?? C.ifratelli);
 
-  // Auto-switch establishment context
   const switchEtab = useCallback((slug: string) => {
     const target = etablissements.find(e => e.slug === slug || e.slug?.replace("_", "-") === slug);
     if (target && current?.slug !== slug && current?.slug?.replace("_", "-") !== slug) {
@@ -124,11 +339,9 @@ function SidebarContent({ onNavigate, collapsed, onToggle }: SidebarContentProps
     }
   }, [etablissements, current, setCurrent, setGroupView]);
 
-  // Check if a nav item is active
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
 
-  // Check if an etab group is the currently active one (for highlight)
   const isEtabActive = (slug: string) =>
     !isGroupView && (current?.slug === slug || current?.slug?.replace("_", "-") === slug);
 
@@ -146,9 +359,7 @@ function SidebarContent({ onNavigate, collapsed, onToggle }: SidebarContentProps
         key={`${etabSlug ?? "g"}-${item.href}`}
         href={item.href}
         onClick={() => {
-          if (etabSlug) {
-            switchEtab(etabSlug);
-          }
+          if (etabSlug) switchEtab(etabSlug);
           onNavigate?.();
         }}
         style={{
@@ -171,13 +382,12 @@ function SidebarContent({ onNavigate, collapsed, onToggle }: SidebarContentProps
     );
   };
 
-  /* ── Render a sub-section (inside etab or settings group) ── */
+  /* ── Render a sub-section ── */
   const renderSubSection = (sub: NavSubSection, parentKey: string, etabSlug?: string) => {
     if (!isRoleAllowed(sub.roles, role)) return null;
     const items = sub.items.filter(i => isRoleAllowed(i.roles, role));
     if (items.length === 0) return null;
 
-    // No label = standalone items (like "Mon compte" in Parametres)
     if (!sub.label) {
       return (
         <div key={`${parentKey}-nolabel`}>
@@ -221,7 +431,7 @@ function SidebarContent({ onNavigate, collapsed, onToggle }: SidebarContentProps
     );
   };
 
-  /* ── Render an etab group ── */
+  /* ── Render etab group ── */
   const renderEtabGroup = (entry: NavEtabGroup) => {
     if (!isRoleAllowed(entry.roles, role)) return null;
     const groupKey = entry.etabSlug;
@@ -262,7 +472,7 @@ function SidebarContent({ onNavigate, collapsed, onToggle }: SidebarContentProps
     );
   };
 
-  /* ── Render a settings group ── */
+  /* ── Render settings group ── */
   const renderSettingsGroup = (entry: NavSettingsGroup) => {
     if (!isRoleAllowed(entry.roles, role)) return null;
     const groupKey = "settings";
@@ -299,7 +509,7 @@ function SidebarContent({ onNavigate, collapsed, onToggle }: SidebarContentProps
     );
   };
 
-  /* ── Render a standalone item ── */
+  /* ── Render standalone item ── */
   const renderStandaloneItem = (entry: SidebarEntry & { kind: "item" }) => {
     if (!isRoleAllowed(entry.roles, role)) return null;
     const active = isActive(entry.href);
@@ -330,20 +540,18 @@ function SidebarContent({ onNavigate, collapsed, onToggle }: SidebarContentProps
     );
   };
 
-  /* ── Main render ── */
   return (
     <div style={{
       display: "flex", flexDirection: "column", height: "100%",
       background: C.bg, color: C.textNormal,
       fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-      minWidth: collapsed ? 60 : 240,
+      width: 240,
     }}>
-      {/* ── Header: Logo + toggle ── */}
+      {/* Header */}
       <div style={{
-        padding: collapsed ? "16px 8px 12px" : "20px 16px 12px",
+        padding: "20px 16px 12px",
         borderBottom: `1px solid ${C.divider}`,
-        display: "flex", alignItems: "center",
-        gap: 8,
+        display: "flex", alignItems: "center", gap: 8,
       }}>
         <Image
           src="/logo-ifratelli.png"
@@ -352,25 +560,23 @@ function SidebarContent({ onNavigate, collapsed, onToggle }: SidebarContentProps
           height={32}
           style={{ width: 32, height: 32, objectFit: "contain", borderRadius: 6, flexShrink: 0 }}
         />
-        {!collapsed && (
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <span style={{
-              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-              fontSize: 15, fontWeight: 700, color: "#fff",
-              letterSpacing: 0.5, lineHeight: 1,
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{
+            fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+            fontSize: 15, fontWeight: 700, color: "#fff",
+            letterSpacing: 0.5, lineHeight: 1,
+          }}>
+            iFratelli
+          </span>
+          {role && (
+            <div style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: "0.15em",
+              color: etabColor, textTransform: "uppercase", marginTop: 2,
             }}>
-              iFratelli
-            </span>
-            {role && (
-              <div style={{
-                fontSize: 10, fontWeight: 700, letterSpacing: "0.15em",
-                color: etabColor, textTransform: "uppercase", marginTop: 2,
-              }}>
-                {ROLE_LABELS[role] ?? role.toUpperCase()}
-              </div>
-            )}
-          </div>
-        )}
+              {ROLE_LABELS[role] ?? role.toUpperCase()}
+            </div>
+          )}
+        </div>
         {onToggle && (
           <button
             type="button"
@@ -380,43 +586,29 @@ function SidebarContent({ onNavigate, collapsed, onToggle }: SidebarContentProps
               padding: 4, display: "flex", alignItems: "center", justifyContent: "center",
               color: C.textMuted, flexShrink: 0,
             }}
-            title={collapsed ? "Ouvrir le menu" : "Reduire le menu"}
+            title="Reduire le menu"
           >
-            {collapsed ? <IconMenu size={18} color={C.textMuted} /> : <IconChevronLeft size={18} color={C.textMuted} />}
+            <IconChevronLeft size={18} color={C.textMuted} />
           </button>
         )}
       </div>
 
-      {/* ── Navigation ── */}
+      {/* Navigation */}
       <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "8px 0" }}>
         {entries.map((entry, i) => {
           if (entry.kind === "divider") {
-            return (
-              <div key={`div-${i}`} style={{
-                height: 1, background: C.divider,
-                margin: "8px 16px",
-              }} />
-            );
+            return <div key={`div-${i}`} style={{ height: 1, background: C.divider, margin: "8px 16px" }} />;
           }
-          if (entry.kind === "item") {
-            return renderStandaloneItem(entry);
-          }
-          if (entry.kind === "etab") {
-            return renderEtabGroup(entry);
-          }
-          if (entry.kind === "settings") {
-            return renderSettingsGroup(entry);
-          }
+          if (entry.kind === "item") return renderStandaloneItem(entry);
+          if (entry.kind === "etab") return renderEtabGroup(entry);
+          if (entry.kind === "settings") return renderSettingsGroup(entry);
           return null;
         })}
       </nav>
 
-      {/* ── Footer: Session + changer ── */}
-      <div style={{
-        padding: collapsed ? "12px 8px 16px" : "12px 16px 16px",
-        borderTop: `1px solid ${C.divider}`,
-      }}>
-        {role && !collapsed && (
+      {/* Footer */}
+      <div style={{ padding: "12px 16px 16px", borderTop: `1px solid ${C.divider}` }}>
+        {role && (
           <div style={{
             background: etabColor,
             color: etabColor === C.piccolaMia ? "#5a4a1a" : "#fff",
@@ -438,15 +630,18 @@ function SidebarContent({ onNavigate, collapsed, onToggle }: SidebarContentProps
           }}
         >
           <IconSwitch size={14} color={C.textMuted} />
-          {!collapsed && <span>Changer de session</span>}
+          <span>Changer de session</span>
         </Link>
       </div>
     </div>
   );
 }
 
-/* ── Desktop persistent sidebar ── */
+/* ═══════════════════════════════════════════════════════
+   EXPORTS
+   ═══════════════════════════════════════════════════════ */
 
+/** Desktop persistent sidebar */
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   return (
     <aside
@@ -458,13 +653,15 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
         overflowX: "hidden",
       }}
     >
-      <SidebarContent collapsed={collapsed} onToggle={onToggle} />
+      {collapsed
+        ? <CollapsedContent onToggle={onToggle} />
+        : <ExpandedContent onToggle={onToggle} />
+      }
     </aside>
   );
 }
 
-/* ── Mobile drawer sidebar ── */
-
+/** Mobile drawer sidebar — always expanded */
 export function SidebarDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   if (!open) return null;
 
@@ -484,7 +681,7 @@ export function SidebarDrawer({ open, onClose }: { open: boolean; onClose: () =>
         }}
         onClick={e => e.stopPropagation()}
       >
-        <SidebarContent onNavigate={onClose} />
+        <ExpandedContent onNavigate={onClose} />
       </div>
     </div>
   );
