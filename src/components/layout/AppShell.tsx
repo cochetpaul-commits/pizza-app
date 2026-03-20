@@ -32,6 +32,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const collapseSidebar = useCallback(() => {
+    setSidebarCollapsed(true);
+    localStorage.setItem("sidebar_collapsed", "true");
+  }, []);
+
+  const expandSidebar = useCallback(() => {
+    setSidebarCollapsed(false);
+    localStorage.setItem("sidebar_collapsed", "false");
+  }, []);
+
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
@@ -43,7 +53,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       {/* Desktop sidebar */}
-      <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+      <Sidebar
+        collapsed={sidebarCollapsed}
+        onToggle={toggleSidebar}
+        onExpand={expandSidebar}
+        onCollapse={collapseSidebar}
+      />
 
       {/* Mobile drawer (accessible via TopBar menu button) */}
       <SidebarDrawer open={drawerOpen} onClose={closeDrawer} />

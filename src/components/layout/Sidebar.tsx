@@ -22,7 +22,6 @@ import {
   IconBarChart, IconTrendingUp, IconBook, IconTag,
   IconCalendarEvent, IconChevronDown, IconBox, IconChefHat,
   IconSwitch, IconChevronLeft, IconBuilding,
-  IconChevronRight,
 } from "./Icons";
 import type { Role } from "@/lib/rbac";
 
@@ -82,14 +81,41 @@ function isRoleAllowed(roles: Role[] | undefined, role: Role | null): boolean {
   return roles.includes(role);
 }
 
+/* ── Burger Icon (matches Komia style) ────────────────── */
+
+function BurgerIcon({ size = 32 }: { size?: number }) {
+  return (
+    <div style={{
+      position: "relative",
+      width: size, height: size,
+      background: "rgba(255,255,255,0.08)",
+      borderRadius: 8,
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      gap: 3,
+    }}>
+      {/* Three horizontal lines */}
+      <span style={{ width: 14, height: 2, borderRadius: 1, background: "rgba(255,255,255,0.7)" }} />
+      <span style={{ width: 14, height: 2, borderRadius: 1, background: "rgba(255,255,255,0.7)" }} />
+      <span style={{ width: 14, height: 2, borderRadius: 1, background: "rgba(255,255,255,0.7)" }} />
+      {/* Red notification dot */}
+      <span style={{
+        position: "absolute", top: 2, right: 2,
+        width: 7, height: 7, borderRadius: "50%",
+        background: "#e05252",
+      }} />
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════
    COLLAPSED VIEW — icons only (60px wide)
    ═══════════════════════════════════════════════════════ */
 
-function CollapsedContent({ onToggle }: { onToggle?: () => void }) {
+function CollapsedContent({ onExpand }: { onExpand: () => void }) {
   const pathname = usePathname();
   const { role } = useProfile();
-  const { current, setCurrent, etablissements, isGroupView, setGroupView } = useEtablissement();
+  const { current, isGroupView } = useEtablissement();
 
   const isAdmin = role === "group_admin" || role === "manager";
   const entries: SidebarEntry[] = isAdmin ? SIDEBAR_NAV_V2 : SIDEBAR_NAV_SIMPLE;
@@ -104,34 +130,26 @@ function CollapsedContent({ onToggle }: { onToggle?: () => void }) {
   const isEtabActive = (slug: string) =>
     !isGroupView && (current?.slug === slug || current?.slug?.replace("_", "-") === slug);
 
-  const switchEtab = (slug: string) => {
-    const target = etablissements.find(e => e.slug === slug || e.slug?.replace("_", "-") === slug);
-    if (target && current?.slug !== slug && current?.slug?.replace("_", "-") !== slug) {
-      setGroupView(false);
-      setCurrent(target);
-    }
-  };
-
-  /* Icon-only item */
-  const iconItem = (href: string, icon: string | undefined, active: boolean, color: string, key: string, etabSlug?: string) => {
+  /* Icon-only item — clicking expands the sidebar */
+  const iconItem = (href: string, icon: string | undefined, active: boolean, color: string, key: string) => {
     const IconComp = icon ? ICON_MAP[icon] : null;
     if (!IconComp) return null;
     return (
-      <Link
+      <button
         key={key}
-        href={href}
-        onClick={() => { if (etabSlug) switchEtab(etabSlug); }}
-        title=""
+        type="button"
+        onClick={onExpand}
         style={{
           display: "flex", alignItems: "center", justifyContent: "center",
           width: 36, height: 36, borderRadius: 8,
           background: active ? C.bgItemActive : "transparent",
           margin: "2px auto",
           transition: "background 0.12s",
+          border: "none", cursor: "pointer",
         }}
       >
         <IconComp size={18} color={active ? color : C.textMuted} />
-      </Link>
+      </button>
     );
   };
 
@@ -160,13 +178,16 @@ function CollapsedContent({ onToggle }: { onToggle?: () => void }) {
       const active = isEtabActive(entry.etabSlug);
       // Colored dot for establishment
       elements.push(
-        <div
+        <button
           key={`etab-${entry.etabSlug}`}
+          type="button"
+          onClick={onExpand}
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
             width: 36, height: 36, borderRadius: 8,
             background: active ? C.bgItemActive : "transparent",
-            margin: "2px auto", cursor: "default",
+            margin: "2px auto", cursor: "pointer",
+            border: "none",
           }}
         >
           <span style={{
@@ -174,7 +195,7 @@ function CollapsedContent({ onToggle }: { onToggle?: () => void }) {
             background: entry.color,
             border: active ? "2px solid rgba(255,255,255,0.5)" : "2px solid transparent",
           }} />
-        </div>
+        </button>
       );
       // Show sub-section icons
       for (const sub of entry.sections) {
@@ -182,27 +203,24 @@ function CollapsedContent({ onToggle }: { onToggle?: () => void }) {
         if (sub.icon) {
           const SubIcon = ICON_MAP[sub.icon];
           if (SubIcon) {
-            // Check if any item in this sub-section is active
             const subActive = sub.items.some(it => isRoleAllowed(it.roles, role) && isActive(it.href) && isEtabActive(entry.etabSlug));
-            const firstHref = sub.items.find(it => isRoleAllowed(it.roles, role))?.href;
-            if (firstHref) {
-              elements.push(
-                <Link
-                  key={`${entry.etabSlug}-${sub.label}`}
-                  href={firstHref}
-                  onClick={() => switchEtab(entry.etabSlug)}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    width: 36, height: 36, borderRadius: 8,
-                    background: subActive ? C.bgItemActive : "transparent",
-                    margin: "2px auto",
-                    transition: "background 0.12s",
-                  }}
-                >
-                  <SubIcon size={16} color={subActive ? entry.color : C.textMuted} />
-                </Link>
-              );
-            }
+            elements.push(
+              <button
+                key={`${entry.etabSlug}-${sub.label}`}
+                type="button"
+                onClick={onExpand}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 36, height: 36, borderRadius: 8,
+                  background: subActive ? C.bgItemActive : "transparent",
+                  margin: "2px auto",
+                  transition: "background 0.12s",
+                  border: "none", cursor: "pointer",
+                }}
+              >
+                <SubIcon size={16} color={subActive ? entry.color : C.textMuted} />
+              </button>
+            );
           }
         }
       }
@@ -216,21 +234,22 @@ function CollapsedContent({ onToggle }: { onToggle?: () => void }) {
         sub.items.some(it => isRoleAllowed(it.roles, role) && isActive(it.href))
       );
       if (SettingsIcon) {
-        const firstHref = entry.sections[0]?.items[0]?.href ?? "/settings/account";
         elements.push(
-          <Link
+          <button
             key="settings-icon"
-            href={firstHref}
+            type="button"
+            onClick={onExpand}
             style={{
               display: "flex", alignItems: "center", justifyContent: "center",
               width: 36, height: 36, borderRadius: 8,
               background: anyActive ? C.bgItemActive : "transparent",
               margin: "2px auto",
               transition: "background 0.12s",
+              border: "none", cursor: "pointer",
             }}
           >
             <SettingsIcon size={18} color={anyActive ? etabColor : C.textMuted} />
-          </Link>
+          </button>
         );
       }
     }
@@ -243,19 +262,22 @@ function CollapsedContent({ onToggle }: { onToggle?: () => void }) {
       fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
       width: 60,
     }}>
-      {/* Logo only */}
+      {/* Burger at top */}
       <div style={{
-        padding: "16px 0 12px",
+        padding: "14px 0 10px",
         borderBottom: `1px solid ${C.divider}`,
         display: "flex", alignItems: "center", justifyContent: "center",
       }}>
-        <Image
-          src="/logo-ifratelli.png"
-          alt="iFratelli"
-          width={28}
-          height={28}
-          style={{ width: 28, height: 28, objectFit: "contain", borderRadius: 6 }}
-        />
+        <button
+          type="button"
+          onClick={onExpand}
+          style={{
+            background: "none", border: "none", cursor: "pointer", padding: 0,
+          }}
+          title="Ouvrir le menu"
+        >
+          <BurgerIcon size={36} />
+        </button>
       </div>
 
       {/* Icon nav */}
@@ -263,37 +285,23 @@ function CollapsedContent({ onToggle }: { onToggle?: () => void }) {
         {elements}
       </nav>
 
-      {/* Footer: expand button */}
+      {/* Footer */}
       <div style={{
         padding: "12px 0 16px",
         borderTop: `1px solid ${C.divider}`,
         display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
       }}>
-        <Link
-          href="/session"
+        <button
+          type="button"
+          onClick={onExpand}
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
             width: 36, height: 36, borderRadius: 8,
-            textDecoration: "none",
+            background: "none", border: "none", cursor: "pointer",
           }}
         >
           <IconSwitch size={16} color={C.textMuted} />
-        </Link>
-        {onToggle && (
-          <button
-            type="button"
-            onClick={onToggle}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: 36, height: 36, borderRadius: 8,
-              background: C.bgItem, border: `1px solid ${C.divider}`,
-              cursor: "pointer",
-            }}
-            title="Ouvrir le menu"
-          >
-            <IconChevronRight size={16} color={C.textMuted} />
-          </button>
-        )}
+        </button>
       </div>
     </div>
   );
@@ -301,14 +309,16 @@ function CollapsedContent({ onToggle }: { onToggle?: () => void }) {
 
 /* ═══════════════════════════════════════════════════════
    EXPANDED VIEW — full sidebar (240px)
+   Clicking a link auto-collapses back
    ═══════════════════════════════════════════════════════ */
 
 type ExpandedContentProps = {
   onNavigate?: () => void;
-  onToggle?: () => void;
+  onCollapse?: () => void;
+  showBurger?: boolean;
 };
 
-function ExpandedContent({ onNavigate, onToggle }: ExpandedContentProps) {
+function ExpandedContent({ onNavigate, onCollapse, showBurger }: ExpandedContentProps) {
   const pathname = usePathname();
   const { role } = useProfile();
   const { current, setCurrent, etablissements, isGroupView, setGroupView } = useEtablissement();
@@ -345,6 +355,13 @@ function ExpandedContent({ onNavigate, onToggle }: ExpandedContentProps) {
   const isEtabActive = (slug: string) =>
     !isGroupView && (current?.slug === slug || current?.slug?.replace("_", "-") === slug);
 
+  // When user clicks a link, collapse sidebar + trigger onNavigate (for mobile drawer)
+  const handleLinkClick = (etabSlug?: string) => {
+    if (etabSlug) switchEtab(etabSlug);
+    onNavigate?.();
+    onCollapse?.();
+  };
+
   /* ── Render a single nav item ── */
   const renderItem = (item: NavItemV2, etabSlug?: string, indent = false) => {
     if (!isRoleAllowed(item.roles, role)) return null;
@@ -358,10 +375,7 @@ function ExpandedContent({ onNavigate, onToggle }: ExpandedContentProps) {
       <Link
         key={`${etabSlug ?? "g"}-${item.href}`}
         href={item.href}
-        onClick={() => {
-          if (etabSlug) switchEtab(etabSlug);
-          onNavigate?.();
-        }}
+        onClick={() => handleLinkClick(etabSlug)}
         style={{
           display: "flex", alignItems: "center", gap: 10,
           padding: indent ? "7px 16px 7px 28px" : "8px 16px",
@@ -519,7 +533,7 @@ function ExpandedContent({ onNavigate, onToggle }: ExpandedContentProps) {
       <Link
         key={entry.href}
         href={entry.href}
-        onClick={onNavigate}
+        onClick={() => handleLinkClick()}
         style={{
           display: "flex", alignItems: "center", gap: 10,
           padding: "8px 16px",
@@ -553,13 +567,24 @@ function ExpandedContent({ onNavigate, onToggle }: ExpandedContentProps) {
         borderBottom: `1px solid ${C.divider}`,
         display: "flex", alignItems: "center", gap: 8,
       }}>
-        <Image
-          src="/logo-ifratelli.png"
-          alt="iFratelli"
-          width={32}
-          height={32}
-          style={{ width: 32, height: 32, objectFit: "contain", borderRadius: 6, flexShrink: 0 }}
-        />
+        {showBurger ? (
+          <button
+            type="button"
+            onClick={onCollapse}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}
+            title="Reduire le menu"
+          >
+            <BurgerIcon size={36} />
+          </button>
+        ) : (
+          <Image
+            src="/logo-ifratelli.png"
+            alt="iFratelli"
+            width={32}
+            height={32}
+            style={{ width: 32, height: 32, objectFit: "contain", borderRadius: 6, flexShrink: 0 }}
+          />
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <span style={{
             fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
@@ -577,10 +602,10 @@ function ExpandedContent({ onNavigate, onToggle }: ExpandedContentProps) {
             </div>
           )}
         </div>
-        {onToggle && (
+        {!showBurger && onCollapse && (
           <button
             type="button"
-            onClick={onToggle}
+            onClick={onCollapse}
             style={{
               background: "none", border: "none", cursor: "pointer",
               padding: 4, display: "flex", alignItems: "center", justifyContent: "center",
@@ -622,7 +647,7 @@ function ExpandedContent({ onNavigate, onToggle }: ExpandedContentProps) {
         )}
         <Link
           href="/session"
-          onClick={onNavigate}
+          onClick={() => handleLinkClick()}
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
             gap: 6, textDecoration: "none",
@@ -641,8 +666,15 @@ function ExpandedContent({ onNavigate, onToggle }: ExpandedContentProps) {
    EXPORTS
    ═══════════════════════════════════════════════════════ */
 
+type SidebarProps = {
+  collapsed: boolean;
+  onToggle: () => void;
+  onExpand: () => void;
+  onCollapse: () => void;
+};
+
 /** Desktop persistent sidebar */
-export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+export function Sidebar({ collapsed, onExpand, onCollapse }: SidebarProps) {
   return (
     <aside
       className={`sidebar-desktop${collapsed ? " collapsed" : ""}`}
@@ -654,14 +686,14 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
       }}
     >
       {collapsed
-        ? <CollapsedContent onToggle={onToggle} />
-        : <ExpandedContent onToggle={onToggle} />
+        ? <CollapsedContent onExpand={onExpand} />
+        : <ExpandedContent onCollapse={onCollapse} showBurger />
       }
     </aside>
   );
 }
 
-/** Mobile drawer sidebar — always expanded */
+/** Mobile drawer sidebar — always expanded, no burger, closes on nav */
 export function SidebarDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   if (!open) return null;
 
