@@ -29,6 +29,8 @@ export type NavItemV2 = {
 export type NavSubSection = {
   label: string;
   icon?: string;
+  /** Optional: navigate to this href when clicking the section header */
+  href?: string;
   items: NavItemV2[];
   roles?: Role[];
 };
@@ -109,7 +111,7 @@ export const CLIENTS_ITEMS = EVENEMENTIEL_ITEMS;
 
 /** Common sections for every establishment */
 const COMMON_SECTIONS: NavSubSection[] = [
-  { label: "Planning", icon: "calendar", items: PLANNING_ITEMS },
+  { label: "Planning", icon: "calendar", href: "/plannings", items: PLANNING_ITEMS },
   { label: "Achats", icon: "shoppingBag", roles: ["group_admin"], items: ACHATS_ITEMS },
   { label: "Performances", icon: "barChart", roles: ["group_admin"], items: PERFORMANCES_ITEMS },
   { label: "Operations", icon: "package", roles: ["group_admin"], items: OPERATIONS_ITEMS },

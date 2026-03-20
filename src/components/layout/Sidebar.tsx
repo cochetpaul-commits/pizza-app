@@ -3,7 +3,7 @@
 import React, { useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import {
@@ -65,6 +65,7 @@ function isRoleAllowed(roles: Role[] | undefined, role: Role | null): boolean {
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { role } = useProfile();
   const { current, setCurrent, etablissements, isGroupView, setGroupView } = useEtablissement();
 
@@ -180,7 +181,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <div key={hubKey}>
         <button
           type="button"
-          onClick={() => items.length > 0 ? toggleHub(hubKey) : undefined}
+          onClick={() => {
+            if (items.length > 0) toggleHub(hubKey);
+            if (sub.href) { router.push(sub.href); onNavigate?.(); }
+          }}
           style={{
             display: "flex", alignItems: "center", gap: 8,
             width: "calc(100% - 16px)", padding: "7px 12px 7px 28px",
