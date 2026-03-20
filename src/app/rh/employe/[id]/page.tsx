@@ -519,9 +519,15 @@ export default function EmployeDetailPage() {
         <div style={{
           background: (() => {
             const r = (emp as Record<string, unknown>).role as string ?? "employe";
-            if (r === "group_admin" || r === "proprietaire" || r === "admin") return `linear-gradient(135deg, #2D4A3E 0%, #1a3a2e 100%)`; // iFratelli group dark green
-            if (r === "manager" || r === "direction") return `linear-gradient(135deg, #3D5A4E 0%, #2D4A3E 100%)`; // slightly lighter
-            return `linear-gradient(135deg, ${etab?.couleur ?? "#2D6A4F"} 0%, ${etab?.couleur ?? "#2D6A4F"}cc 100%)`;
+            // Admin/Proprietaire = couleur groupe iFratelli #b45f57
+            if (r === "group_admin" || r === "proprietaire" || r === "admin") return `linear-gradient(135deg, #b45f57 0%, #8a4842 100%)`;
+            // Manager = couleur etab avec ton plus soutenu
+            if (r === "manager" || r === "direction") {
+              const c = etab?.couleur ?? "#b45f57";
+              return `linear-gradient(135deg, ${c} 0%, ${c}bb 100%)`;
+            }
+            // Employe = couleur etab
+            return `linear-gradient(135deg, ${etab?.couleur ?? "#e27f57"} 0%, ${etab?.couleur ?? "#e27f57"}cc 100%)`;
           })(),
           borderRadius: 14, padding: "20px 24px 0", color: "#fff",
         }}>

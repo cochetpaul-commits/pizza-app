@@ -243,22 +243,33 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     );
   };
 
-  /* ── Render settings group ── */
+  /* ── Render settings group — collapsible ── */
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   const renderSettingsGroup = (entry: NavSettingsGroup) => {
     if (!isRoleAllowed(entry.roles, role)) return null;
     const SettingsIcon = entry.icon ? ICON_MAP[entry.icon] : null;
 
     return (
       <div key="settings" style={{ marginBottom: 2 }}>
-        <div style={{
-          display: "flex", alignItems: "center", gap: 10,
-          padding: "8px 16px", margin: "1px 8px",
-          fontSize: 13, fontWeight: 600, color: C.textNormal,
-        }}>
+        <button
+          type="button"
+          onClick={() => setSettingsOpen(prev => !prev)}
+          style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "8px 16px", margin: "1px 8px", width: "calc(100% - 16px)",
+            borderRadius: 6, border: "none", cursor: "pointer",
+            fontSize: 13, fontWeight: 600, color: C.textNormal,
+            background: settingsOpen ? C.bgItemActive : "transparent",
+          }}
+        >
           {SettingsIcon && <SettingsIcon size={15} color={C.textMuted} />}
-          <span>{entry.label}</span>
-        </div>
-        {entry.sections.map(sub => {
+          <span style={{ flex: 1, textAlign: "left" }}>{entry.label}</span>
+          <span style={{ transform: settingsOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s ease", display: "flex" }}>
+            <IconChevronDown size={12} color={C.textMuted} />
+          </span>
+        </button>
+        {settingsOpen && entry.sections.map(sub => {
           if (!isRoleAllowed(sub.roles, role)) return null;
           const items = sub.items.filter(i => isRoleAllowed(i.roles, role));
           if (items.length === 0) return null;
