@@ -65,43 +65,64 @@ export type NavDivider = {
 
 export type SidebarEntry = NavEtabGroup | NavSettingsGroup | NavStandaloneItem | NavDivider;
 
-/* ── Admin / Direction nav ─────────────────────────────── */
+/* ── Section item templates ─────────────────────────────── */
 
-export const PERSONNEL_ITEMS: NavItemV2[] = [
+export const PLANNING_ITEMS: NavItemV2[] = [
   { label: "Employes", href: "/rh/equipe", icon: "users" },
-  { label: "Planning", href: "/plannings", icon: "calendar" },
   { label: "Pointage", href: "/rh/pointage", icon: "clock" },
   { label: "Conges", href: "/rh/conges", icon: "beach" },
   { label: "Emargement", href: "/rh/emargement", icon: "clipboard" },
+  { label: "Rapport de paie", href: "/rh/rapports", icon: "fileText" },
   { label: "Simulation", href: "/rh/masse-salariale", icon: "calculator", roles: ["group_admin"] },
 ];
 
-export const FINANCE_ITEMS: NavItemV2[] = [
-  { label: "Base ingredients", href: "/ingredients", icon: "tag" },
-  { label: "Fiches techniques", href: "/recettes", icon: "book" },
-  { label: "Commandes", href: "/commandes", icon: "shoppingBag" },
-  { label: "Achats", href: "/achats", icon: "trendingUp" },
-  { label: "Variations & alertes", href: "/variations-prix", icon: "barChart" },
-  { label: "Pilotage", href: "/pilotage", icon: "barChart" },
-  { label: "Inventaire", href: "/inventaire", icon: "package" },
-  { label: "Articles en vente", href: "/epicerie", icon: "tag" },
+export const ACHATS_ITEMS: NavItemV2[] = [
+  { label: "Stats d'achats", href: "/stats-achats", icon: "barChart" },
+  { label: "Factures", href: "/achats", icon: "fileText" },
+  { label: "Base produits", href: "/ingredients", icon: "tag" },
 ];
 
-export const CLIENTS_ITEMS: NavItemV2[] = [
+export const PERFORMANCES_ITEMS: NavItemV2[] = [
+  { label: "Indicateurs cles", href: "/pilotage", icon: "barChart" },
+  { label: "Variations & alertes", href: "/variations-prix", icon: "trendingUp" },
+];
+
+export const OPERATIONS_ITEMS: NavItemV2[] = [
+  { label: "Catalogue recettes", href: "/recettes", icon: "book" },
+  { label: "Fiches techniques", href: "/recettes", icon: "book" },
+  { label: "Commandes", href: "/commandes", icon: "shoppingBag" },
+  { label: "Inventaire", href: "/inventaire", icon: "package" },
+];
+
+export const EVENEMENTIEL_ITEMS: NavItemV2[] = [
   { label: "Particuliers", href: "/evenements/clients", icon: "users" },
-  { label: "Carnet clients", href: "/clients", icon: "book" },
+  { label: "Entreprise", href: "/evenements", icon: "calendarEvent" },
   { label: "Creer devis", href: "/devis/new", icon: "fileText" },
   { label: "Factures", href: "/clients/factures", icon: "fileText" },
-  { label: "Evenements", href: "/evenements", icon: "calendarEvent" },
   { label: "Import Kezia", href: "/kezia", icon: "fileText" },
 ];
 
-/** Template sections for each establishment */
-export const ETAB_SECTION_TEMPLATES: NavSubSection[] = [
-  { label: "Gestion du personnel", icon: "users", items: PERSONNEL_ITEMS },
-  { label: "Gestion de la finance", icon: "wallet", roles: ["group_admin"], items: FINANCE_ITEMS },
-  { label: "Gestion des clients", icon: "calendarEvent", roles: ["group_admin"], items: CLIENTS_ITEMS },
+// Keep legacy exports for compatibility
+export const PERSONNEL_ITEMS = PLANNING_ITEMS;
+export const FINANCE_ITEMS = ACHATS_ITEMS;
+export const CLIENTS_ITEMS = EVENEMENTIEL_ITEMS;
+
+/** Base sections for every establishment */
+const BASE_ETAB_SECTIONS: NavSubSection[] = [
+  { label: "Planning", icon: "calendar", items: PLANNING_ITEMS },
+  { label: "Finance", icon: "wallet", roles: ["group_admin"], items: [] }, // placeholder — Popina later
+  { label: "Achats", icon: "shoppingBag", roles: ["group_admin"], items: ACHATS_ITEMS },
+  { label: "Performances", icon: "barChart", roles: ["group_admin"], items: PERFORMANCES_ITEMS },
+  { label: "Operations", icon: "package", roles: ["group_admin"], items: OPERATIONS_ITEMS },
 ];
+
+/** Extra section for establishments with events (piccola-mia etc.) */
+const EVENEMENTIEL_SECTION: NavSubSection = {
+  label: "Evenementiel", icon: "calendarEvent", roles: ["group_admin"], items: EVENEMENTIEL_ITEMS,
+};
+
+/** Fournisseurs standalone item for each etab */
+const FOURNISSEURS_ITEM: NavItemV2 = { label: "Fournisseurs", href: "/fournisseurs", icon: "truck" };
 
 /** Build dynamic nav entries from a list of establishments */
 export function buildDynamicNav(
@@ -113,13 +134,21 @@ export function buildDynamicNav(
   ];
 
   for (const etab of etabs) {
+    const isPiccola = etab.slug?.includes("piccola");
+    const sections: NavSubSection[] = [
+      ...BASE_ETAB_SECTIONS,
+      ...(isPiccola ? [EVENEMENTIEL_SECTION] : []),
+      // Fournisseurs as a flat section
+      { label: "", items: [FOURNISSEURS_ITEM] },
+    ];
+
     entries.push({
       kind: "etab",
       etabSlug: etab.slug,
       label: etab.nom,
       color: etab.couleur ?? "#D4775A",
       roles: ["group_admin", "manager"],
-      sections: ETAB_SECTION_TEMPLATES,
+      sections,
     });
   }
 
@@ -136,8 +165,8 @@ export function buildDynamicNav(
         label: "Etablissement",
         icon: "box",
         items: [
-          { label: "Liste & configuration", href: "/settings/etablissements", icon: "building" },
-          { label: "Gestion du planning", href: "/settings/planning", icon: "calendar" },
+          { label: "Configuration", href: "/settings/etablissements", icon: "building" },
+          { label: "Planning", href: "/settings/planning", icon: "calendar" },
           { label: "Pointeuse", href: "/settings/pointeuse", icon: "clock" },
         ],
       },
@@ -149,6 +178,13 @@ export function buildDynamicNav(
           { label: "Contrat", href: "/settings/employes/contrat", icon: "fileText" },
           { label: "Acces application", href: "/settings/employes/acces", icon: "settings" },
           { label: "Role et permissions", href: "/settings/employes/roles", icon: "clipboard" },
+        ],
+      },
+      {
+        label: "Fournisseurs",
+        icon: "truck",
+        items: [
+          { label: "Liste fournisseurs", href: "/fournisseurs", icon: "truck" },
         ],
       },
       {
@@ -163,103 +199,11 @@ export function buildDynamicNav(
   return entries;
 }
 
-export const SIDEBAR_NAV_V2: SidebarEntry[] = [
-  {
-    kind: "item",
-    label: "Accueil",
-    href: "/dashboard",
-    icon: "dashboard",
-  },
-
-  { kind: "divider" },
-
-  /* ── Bello Mio ── */
-  {
-    kind: "etab",
-    etabSlug: "bello-mio",
-    label: "Bello Mio",
-    color: "#e27f57",
-    roles: ["group_admin", "manager"],
-    sections: [
-      {
-        label: "Gestion du personnel",
-        icon: "users",
-        items: PERSONNEL_ITEMS,
-      },
-      {
-        label: "Gestion de la finance",
-        icon: "wallet",
-        roles: ["group_admin"],
-        items: FINANCE_ITEMS,
-      },
-    ],
-  },
-
-  /* ── Piccola Mia ── */
-  {
-    kind: "etab",
-    etabSlug: "piccola-mia",
-    label: "Piccola Mia",
-    color: "#efd199",
-    roles: ["group_admin", "manager"],
-    sections: [
-      {
-        label: "Gestion du personnel",
-        icon: "users",
-        items: PERSONNEL_ITEMS,
-      },
-      {
-        label: "Gestion de la finance",
-        icon: "wallet",
-        roles: ["group_admin"],
-        items: FINANCE_ITEMS,
-      },
-      {
-        label: "Gestion des clients",
-        icon: "calendarEvent",
-        roles: ["group_admin"],
-        items: CLIENTS_ITEMS,
-      },
-    ],
-  },
-
-  { kind: "divider" },
-
-  /* ── Parametres ── */
-  {
-    kind: "settings",
-    label: "Parametres",
-    icon: "settings",
-    roles: ["group_admin"],
-    sections: [
-      {
-        label: "Etablissement",
-        icon: "box",
-        items: [
-          { label: "Liste & configuration", href: "/settings/etablissements", icon: "building" },
-          { label: "Gestion du planning", href: "/settings/planning", icon: "calendar" },
-          { label: "Pointeuse", href: "/settings/pointeuse", icon: "clock" },
-        ],
-      },
-      {
-        label: "Employes",
-        icon: "users",
-        items: [
-          { label: "Informations", href: "/admin/utilisateurs", icon: "users" },
-          { label: "Contrat", href: "/settings/employes/contrat", icon: "fileText" },
-          { label: "Acces application", href: "/settings/employes/acces", icon: "settings" },
-          { label: "Role et permissions", href: "/settings/employes/roles", icon: "clipboard" },
-        ],
-      },
-      {
-        label: "",
-        items: [
-          { label: "Mon compte", href: "/settings/account", icon: "settings" },
-        ],
-      },
-    ],
-  },
-];
+/** Hardcoded fallback while context loads */
+export const SIDEBAR_NAV_V2: SidebarEntry[] = buildDynamicNav([
+  { slug: "bello-mio", nom: "Bello Mio", couleur: "#e27f57" },
+  { slug: "piccola-mia", nom: "Piccola Mia", couleur: "#efd199" },
+]);
 
 /* ── Simplified nav for employee roles ─────────────────── */
 
