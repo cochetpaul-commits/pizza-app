@@ -145,7 +145,10 @@ export default function EtablissementDetailPage() {
       ]);
       if (!cancelled) {
         if (etabRes.data) setSettings(etabRes.data as unknown as Settings);
-        setPostes((postesRes.data ?? []) as Poste[]);
+        const loadedPostes = (postesRes.data ?? []) as Poste[];
+        setPostes(loadedPostes);
+        // Initialize editEquipes from existing postes equipes
+        setEditEquipes([...new Set(loadedPostes.map(p => p.equipe))].sort());
         setPrimes((primesRes.data ?? []) as Prime[]);
         setAllEtabs((allEtabsRes.data ?? []).filter(e => e.id !== id) as { id: string; nom: string }[]);
         setLoading(false);
@@ -256,7 +259,8 @@ export default function EtablissementDetailPage() {
     );
   }
 
-  const equipes = [...new Set(postes.map(p => p.equipe))].sort();
+  // Merge equipes from postes + any added via modal (editEquipes)
+  const equipes = [...new Set([...postes.map(p => p.equipe), ...editEquipes])].sort();
 
   /* ── Tab: Regles sociales ── */
   const renderSocial = () => (
@@ -607,7 +611,7 @@ export default function EtablissementDetailPage() {
         <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4, color: "#1a1a1a" }}>Etiquettes de couleur</h2>
         <p style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>Utilisez les etiquettes pour identifier certaines categories de shifts avec un code couleur.</p>
 
-        {(equipes.length > 0 ? equipes : ["Cuisine", "Salle", "Shop"]).map(eq => {
+        {equipes.map(eq => {
           const eqPostes = postes.filter(p => p.equipe === eq);
           return (
             <div key={eq} style={{ marginBottom: 16 }}>
