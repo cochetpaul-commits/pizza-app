@@ -613,7 +613,7 @@ export default function EmployeDetailPage() {
           {([
             ["infos", "Informations personnelles"],
             ["dossier", "Contrats"],
-            ["acces", "Acces"],
+            ["acces", "Temps et planification"],
             ["roles", "Role et permissions"],
           ] as [MainTab, string][]).map(([key, label]) => (
             <button
@@ -1327,45 +1327,192 @@ export default function EmployeDetailPage() {
           );
         })()}
 
-        {mainTab === "acces" && (
-          <>
-            <div style={section}>
-              <p style={sectionTitle}>Code PIN</p>
-              <p style={{ fontSize: 13, color: "#6f6a61", margin: "0 0 12px" }}>
-                Le code PIN est utilise pour pointer sur le terminal.
-              </p>
-              <div style={{ maxWidth: 200 }}>
-                <Field label="Code PIN" value={(emp as Record<string, unknown>)?.pin_code as string ?? ""} onChange={() => {}} disabled placeholder="----" />
-              </div>
-            </div>
+        {mainTab === "acces" && (() => {
+          const empEquipes = ((emp as Record<string, unknown>).equipes_access as string[] ?? []);
+          const affichagePlanning = (emp as Record<string, unknown>).affichage_planning !== false;
+          const JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 
-            <div style={section}>
-              <p style={sectionTitle}>Invitation</p>
-              <p style={{ fontSize: 13, color: "#6f6a61", margin: "0 0 12px" }}>
-                Envoyer une invitation par email pour acceder a l&apos;application.
-              </p>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button type="button" onClick={async () => {
-                  if (!email) return;
-                  const { data: { session } } = await supabase.auth.getSession();
-                  const res = await fetch("/api/admin/invite", {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-                    },
-                    body: JSON.stringify({ email, displayName: `${(emp as Record<string, unknown>).prenom} ${(emp as Record<string, unknown>).nom}`, role: (emp as Record<string, unknown>).role ?? "employe" }),
-                  });
-                  if (res.ok) alert("Invitation envoyee a " + email);
-                  else alert("Erreur: " + (await res.text()));
-                }} style={addBtnStyle} disabled={!email}>
-                  Envoyer une invitation
-                </button>
+          return (
+            <>
+              {/* Planification et acces */}
+              <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                  <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(45,106,79,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                  </span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Planification et acces</span>
+                </div>
+
+                {/* Acces aux equipes */}
+                <div style={{ border: "1px solid #f0ebe3", borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>Acces aux equipes</span>
+                  </div>
+                  <p style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>Donne de la visibilite au salarie sur plus d&apos;equipes (exemple : plannings). Necessaire pour etre planifie.</p>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
+                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Etablissement</th>
+                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Equipes</th>
+                    </tr></thead>
+                    <tbody>
+                      <tr style={{ borderBottom: "1px solid #f0ebe3" }}>
+                        <td style={{ padding: "10px 0" }}>{etab?.nom ?? "—"}</td>
+                        <td style={{ padding: "10px 0" }}>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {empEquipes.length > 0 ? empEquipes.map(eq => (
+                              <span key={eq} style={{ padding: "2px 8px", borderRadius: 4, background: "#f0ebe3", fontSize: 12, fontWeight: 500 }}>{eq}</span>
+                            )) : <span style={{ color: "#999" }}>—</span>}
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Affichage sur le planning */}
+                <div style={{ border: "1px solid #f0ebe3", borderRadius: 10, padding: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>Affichage sur le planning</span>
+                  </div>
+                  <p style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>Permet au salarie d&apos;etre planifie sur plus d&apos;equipes. Necessite d&apos;avoir acces aux equipes ci-dessus.</p>
+
+                  <div style={{ padding: 12, borderRadius: 8, background: "#faf7f2", marginBottom: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>Afficher le salarie sur le planning</span>
+                      <button type="button" onClick={async () => {
+                        const next = !affichagePlanning;
+                        await supabase.from("employes").update({ affichage_planning: next }).eq("id", emp.id);
+                        setEmp((prev: Record<string, unknown>) => ({ ...prev, affichage_planning: next }));
+                      }} style={{
+                        width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer",
+                        background: affichagePlanning ? "#2D6A4F" : "#ddd6c8", position: "relative",
+                      }}>
+                        <span style={{ position: "absolute", top: 2, left: affichagePlanning ? 20 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
+                      </button>
+                    </div>
+                    <p style={{ fontSize: 11, color: "#999", margin: 0, lineHeight: 1.4 }}>
+                      Permet de faire apparaitre le salarie sur le planning aux dates de son contrat. En le desactivant, tout l&apos;historique de planification sera cache.
+                    </p>
+                  </div>
+
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
+                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Etablissement</th>
+                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Equipes</th>
+                    </tr></thead>
+                    <tbody>
+                      <tr>
+                        <td style={{ padding: "10px 0" }}>{etab?.nom ?? "—"}</td>
+                        <td style={{ padding: "10px 0" }}>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            {empEquipes.map(eq => (
+                              <span key={eq} style={{ padding: "2px 8px", borderRadius: 4, background: "#f0ebe3", fontSize: 12 }}>{eq}</span>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              {!email && <p style={{ fontSize: 12, color: "#e27f57", marginTop: 6 }}>Ajoutez un email pour pouvoir envoyer une invitation.</p>}
-            </div>
-          </>
-        )}
+
+              {/* Temps de travail + Disponibilites — 2 columns */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                {/* Temps de travail */}
+                <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(212,119,90,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                      </span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Temps de travail</span>
+                    </div>
+                  </div>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
+                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Periode</th>
+                      <th style={{ textAlign: "right", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Heures travaillees</th>
+                    </tr></thead>
+                    <tbody>
+                      {(() => {
+                        const now = new Date();
+                        return Array.from({ length: 4 }, (_, i) => {
+                          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                          return (
+                            <tr key={i} style={{ borderBottom: "1px solid #f0ebe3" }}>
+                              <td style={{ padding: "8px 0" }}>{d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}</td>
+                              <td style={{ padding: "8px 0", textAlign: "right", color: "#999" }}>—</td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Disponibilites */}
+                <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(212,119,90,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                      </span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Disponibilites</span>
+                    </div>
+                    <button type="button" style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                      Modifier
+                    </button>
+                  </div>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <tbody>
+                      {JOURS.map(j => (
+                        <tr key={j} style={{ borderBottom: "1px solid #f0ebe3" }}>
+                          <td style={{ padding: "8px 0", fontWeight: 500 }}>{j}</td>
+                          <td style={{ padding: "8px 0", textAlign: "right" }}>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "#2D6A4F", fontWeight: 600 }}>
+                              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                              Disponible
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Invitation */}
+              <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginTop: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(37,99,235,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7l-10 7L2 7" /></svg>
+                  </span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Invitation</span>
+                </div>
+                <p style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>Envoyer une invitation par email pour acceder a l&apos;application.</p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button type="button" onClick={async () => {
+                    if (!email) return;
+                    const { data: { session } } = await supabase.auth.getSession();
+                    const res = await fetch("/api/admin/invite", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+                      body: JSON.stringify({ email, displayName: `${prenom} ${nom}`, role: (emp as Record<string, unknown>).role ?? "employe" }),
+                    });
+                    if (res.ok) alert("Invitation envoyee a " + email);
+                    else alert("Erreur: " + (await res.text()));
+                  }} style={addBtnStyle} disabled={!email}>
+                    Envoyer une invitation
+                  </button>
+                </div>
+                {!email && <p style={{ fontSize: 12, color: "#e27f57", marginTop: 6 }}>Ajoutez un email pour pouvoir envoyer une invitation.</p>}
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* ═══ MODAL: Contrat ═══ */}
