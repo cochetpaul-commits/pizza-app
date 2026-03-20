@@ -973,16 +973,18 @@ export default function EmployeDetailPage() {
         {mainTab === "roles" && (() => {
           const empRole = mapToPermRole((emp as Record<string, unknown>)?.role as string ?? "employe");
           const perms = DEFAULT_PERMS[empRole] ?? DEFAULT_PERMS.employe;
+          const customPerms: Record<string, boolean> = ((emp as Record<string, unknown>)?.custom_permissions as Record<string, boolean>) ?? {};
 
           const changeRole = async (newRole: PermRole) => {
-            // Map PermRole back to DB role
-            const dbRole = newRole === "proprietaire" ? "group_admin"
-              : newRole === "admin" ? "admin"
-              : newRole === "directeur" ? "direction"
-              : newRole === "manager" ? "manager"
-              : "employe";
-            await supabase.from("employes").update({ role: dbRole }).eq("id", emp.id);
-            setEmp((prev: Record<string, unknown>) => ({ ...prev, role: dbRole }));
+            const dbRole = newRole === "admin" ? "group_admin" : newRole === "manager" ? "manager" : "employe";
+            await supabase.from("employes").update({ role: dbRole, custom_permissions: {} }).eq("id", emp.id);
+            setEmp((prev: Record<string, unknown>) => ({ ...prev, role: dbRole, custom_permissions: {} }));
+          };
+
+          const togglePerm = async (key: string, currentOn: boolean) => {
+            const next = { ...customPerms, [key]: !currentOn };
+            await supabase.from("employes").update({ custom_permissions: next }).eq("id", emp.id);
+            setEmp((prev: Record<string, unknown>) => ({ ...prev, custom_permissions: next }));
           };
 
           const CheckIcon = () => (
@@ -995,11 +997,6 @@ export default function EmployeDetailPage() {
               <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
             </svg>
           );
-          const ToggleIcon = ({ on }: { on: boolean }) => (
-            <div style={{ width: 36, height: 20, borderRadius: 10, background: on ? "#2D6A4F" : "#ddd6c8", position: "relative", display: "inline-block" }}>
-              <div style={{ position: "absolute", top: 2, left: on ? 18 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
-            </div>
-          );
 
           return (
             <div style={section}>
@@ -1008,40 +1005,58 @@ export default function EmployeDetailPage() {
                 <span style={{ fontSize: 17, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Role et Permissions</span>
               </div>
 
-              {/* Role selector cards */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 24 }}>
-                {(["employe", "manager", "directeur", "admin", "proprietaire"] as PermRole[]).map(r => {
+              {/* 3 Role cards */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 24 }}>
+                {(["employe", "manager", "admin"] as PermRole[]).map(r => {
                   const info = ROLE_INFO[r];
                   const active = empRole === r;
                   return (
                     <button key={r} type="button" onClick={() => changeRole(r)} style={{
-                      padding: "12px 8px", borderRadius: 10, cursor: "pointer", textAlign: "left",
-                      border: active ? "2px solid #2D6A4F" : "1px solid #ddd6c8",
-                      background: active ? "rgba(45,106,79,0.04)" : "#fff",
+                      padding: 16, borderRadius: 12, cursor: "pointer", textAlign: "left",
+                      border: active ? `2px solid ${info.color}` : "1px solid #ddd6c8",
+                      background: active ? info.bg : "#fff",
                     }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                        <div style={{ width: 14, height: 14, borderRadius: "50%", border: active ? "4px solid #2D6A4F" : "1.5px solid #ddd6c8" }} />
-                        <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{info.label}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <div style={{
+                          width: 18, height: 18, borderRadius: "50%",
+                          border: active ? `5px solid ${info.color}` : "2px solid #ddd6c8",
+                          background: active ? info.color : "#fff",
+                        }} />
+                        <span style={{ fontSize: 14, fontWeight: 700, color: active ? info.color : "#1a1a1a" }}>{info.label}</span>
                       </div>
-                      <p style={{ fontSize: 10, color: "#999", lineHeight: 1.3, margin: 0 }}>{info.description}</p>
+                      <p style={{ fontSize: 11, color: "#666", lineHeight: 1.4, margin: 0 }}>{info.description}</p>
                     </button>
                   );
                 })}
               </div>
 
-              {/* Permission matrix */}
+              {/* Permission matrix with functional toggles */}
               {PERM_SECTIONS.map(sec => (
                 <div key={sec.label} style={{ marginBottom: 12 }}>
                   <div style={{ padding: "8px 12px", background: "#faf7f2", borderRadius: 6, marginBottom: 2 }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{sec.label}</span>
                   </div>
                   {sec.permissions.map(p => {
-                    const val = perms[p.key];
+                    const defaultVal = perms[p.key];
+                    const isToggle = defaultVal === "toggle";
+                    const isOn = isToggle ? (customPerms[p.key] ?? false) : defaultVal === true;
+
                     return (
                       <div key={p.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderBottom: "1px solid #f0ebe3" }}>
                         <span style={{ fontSize: 13, color: "#1a1a1a" }}>{p.label}</span>
                         <span style={{ flexShrink: 0, marginLeft: 12 }}>
-                          {val === true ? <CheckIcon /> : val === false ? <XIcon /> : <ToggleIcon on={false} />}
+                          {isToggle ? (
+                            <button type="button" onClick={() => togglePerm(p.key, isOn)} style={{
+                              width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer",
+                              background: isOn ? "#2D6A4F" : "#ddd6c8", position: "relative",
+                            }}>
+                              <span style={{
+                                position: "absolute", top: 2, left: isOn ? 20 : 2,
+                                width: 18, height: 18, borderRadius: "50%", background: "#fff",
+                                transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+                              }} />
+                            </button>
+                          ) : defaultVal === true ? <CheckIcon /> : <XIcon />}
                         </span>
                       </div>
                     );

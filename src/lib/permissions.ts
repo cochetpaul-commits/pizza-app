@@ -1,22 +1,34 @@
 /**
- * Permission system for iFratelli — inspired by Combo + GestionPlus
+ * Permission system for iFratelli
  *
- * 5 roles (ascending access):
- *   employe → manager → directeur → admin → proprietaire
+ * 3 roles (ascending access):
+ *   employe → manager → admin
  *
- * Each permission can be: true (granted), false (denied), or "toggle" (configurable per user)
+ * Each permission: true (granted), false (denied), "toggle" (configurable per user)
  */
 
 export type AppRole = "group_admin" | "manager" | "cuisine" | "salle" | "plonge";
 
-export type PermRole = "employe" | "manager" | "directeur" | "admin" | "proprietaire";
+export type PermRole = "employe" | "manager" | "admin";
 
-export const ROLE_INFO: Record<PermRole, { label: string; description: string }> = {
-  employe: { label: "Employe", description: "Role par defaut qui permet d'acceder a la plateforme en tant qu'employe." },
-  manager: { label: "Manager", description: "Supervise une equipe par la creation de planning ou la gestion des absences." },
-  directeur: { label: "Directeur", description: "Gere un etablissement de la configuration a la pre-paie." },
-  admin: { label: "Administrateur", description: "Peut acceder a l'ensemble de l'application." },
-  proprietaire: { label: "Proprietaire", description: "Titulaire du compte, il peut modifier les droits d'un admin." },
+export const PERM_ROLES: PermRole[] = ["employe", "manager", "admin"];
+
+export const ROLE_INFO: Record<PermRole, { label: string; description: string; color: string; bg: string }> = {
+  employe: {
+    label: "Employe",
+    description: "L'utilisateur avec un acces employe ne peut pas acceder au backoffice. Il peut badger a la pointeuse, consulter le planning, faire une demande de conge et recevoir un document.",
+    color: "#2D6A4F", bg: "rgba(45,106,79,0.08)",
+  },
+  manager: {
+    label: "Manager",
+    description: "L'utilisateur avec un acces manager peut gerer les modules que l'administrateur lui a attribue (Planning, pointeuse, employe, rapport) sur le backoffice ou l'application mobile.",
+    color: "#7B1FA2", bg: "rgba(123,31,162,0.06)",
+  },
+  admin: {
+    label: "Administrateur",
+    description: "L'utilisateur avec un acces administrateur peut tout faire !",
+    color: "#DC2626", bg: "rgba(220,38,38,0.05)",
+  },
 };
 
 export type PermValue = boolean | "toggle";
@@ -128,40 +140,14 @@ export const DEFAULT_PERMS: Record<PermRole, Record<string, PermValue>> = {
     "heures.register_own": true, "heures.edit_team": true, "heures.validate_own": "toggle",
     "heures.edit_all": false, "heures.unvalidate": "toggle", "heures.revalorize_absences": "toggle",
     "profil.view_own": true, "profil.edit_own": true, "profil.view_feuilles": true,
-    "profil.view_team": "toggle", "profil.view_managers": false, "profil.view_all": false, "profil.delete": false,
+    "profil.view_team": true, "profil.view_managers": false, "profil.view_all": false, "profil.delete": false,
     "absences.edit_cp": "toggle", "paie.manage": false,
-    "achats.view": false, "achats.edit": false, "achats.inventaire": false,
-    "operations.recettes": true, "operations.edit_recettes": false, "operations.commandes": true,
-    "performances.view": false, "performances.pilotage": false,
-    "settings.etablissements": false, "settings.employes": false, "settings.roles": false,
-  },
-  directeur: {
-    "planning.view_own": true, "planning.view_draft": true, "planning.view_other": false,
-    "planning.view_alerts": true, "planning.edit": true, "planning.validate_shifts": "toggle", "planning.view_ratios": true,
-    "heures.register_own": true, "heures.edit_team": true, "heures.validate_own": true,
-    "heures.edit_all": false, "heures.unvalidate": "toggle", "heures.revalorize_absences": "toggle",
-    "profil.view_own": true, "profil.edit_own": true, "profil.view_feuilles": true,
-    "profil.view_team": true, "profil.view_managers": true, "profil.view_all": false, "profil.delete": "toggle",
-    "absences.edit_cp": "toggle", "paie.manage": false,
-    "achats.view": true, "achats.edit": true, "achats.inventaire": true,
-    "operations.recettes": true, "operations.edit_recettes": true, "operations.commandes": true,
-    "performances.view": true, "performances.pilotage": true,
+    "achats.view": "toggle", "achats.edit": false, "achats.inventaire": "toggle",
+    "operations.recettes": true, "operations.edit_recettes": "toggle", "operations.commandes": true,
+    "performances.view": "toggle", "performances.pilotage": false,
     "settings.etablissements": false, "settings.employes": false, "settings.roles": false,
   },
   admin: {
-    "planning.view_own": true, "planning.view_draft": true, "planning.view_other": true,
-    "planning.view_alerts": true, "planning.edit": true, "planning.validate_shifts": true, "planning.view_ratios": true,
-    "heures.register_own": true, "heures.edit_team": true, "heures.validate_own": true,
-    "heures.edit_all": true, "heures.unvalidate": true, "heures.revalorize_absences": true,
-    "profil.view_own": true, "profil.edit_own": true, "profil.view_feuilles": true,
-    "profil.view_team": true, "profil.view_managers": true, "profil.view_all": true, "profil.delete": true,
-    "absences.edit_cp": true, "paie.manage": true,
-    "achats.view": true, "achats.edit": true, "achats.inventaire": true,
-    "operations.recettes": true, "operations.edit_recettes": true, "operations.commandes": true,
-    "performances.view": true, "performances.pilotage": true,
-    "settings.etablissements": true, "settings.employes": true, "settings.roles": false,
-  },
-  proprietaire: {
     "planning.view_own": true, "planning.view_draft": true, "planning.view_other": true,
     "planning.view_alerts": true, "planning.edit": true, "planning.validate_shifts": true, "planning.view_ratios": true,
     "heures.register_own": true, "heures.edit_team": true, "heures.validate_own": true,
@@ -178,7 +164,7 @@ export const DEFAULT_PERMS: Record<PermRole, Record<string, PermValue>> = {
 
 /** Legacy compat */
 export const PERMISSIONS: Record<AppRole, string[]> = {
-  group_admin: Object.keys(DEFAULT_PERMS.proprietaire).filter(k => DEFAULT_PERMS.proprietaire[k] === true),
+  group_admin: Object.keys(DEFAULT_PERMS.admin).filter(k => DEFAULT_PERMS.admin[k] === true),
   manager: Object.keys(DEFAULT_PERMS.manager).filter(k => DEFAULT_PERMS.manager[k] === true),
   cuisine: Object.keys(DEFAULT_PERMS.employe).filter(k => DEFAULT_PERMS.employe[k] === true),
   salle: Object.keys(DEFAULT_PERMS.employe).filter(k => DEFAULT_PERMS.employe[k] === true),
@@ -187,9 +173,7 @@ export const PERMISSIONS: Record<AppRole, string[]> = {
 
 /** Map app roles to perm roles */
 export function mapToPermRole(role: string): PermRole {
-  if (role === "group_admin" || role === "proprietaire") return "proprietaire";
-  if (role === "admin") return "admin";
-  if (role === "direction" || role === "directeur") return "directeur";
+  if (role === "group_admin" || role === "admin" || role === "proprietaire" || role === "direction" || role === "directeur") return "admin";
   if (role === "manager") return "manager";
   return "employe";
 }
