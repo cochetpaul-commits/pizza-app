@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { Sidebar, SidebarDrawer } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { BottomTabBar } from "./BottomTabBar";
 
 const EXCLUDED_PATHS = ["/login", "/auth"];
 
@@ -30,7 +31,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Desktop sidebar */}
       <Sidebar />
 
-      {/* Mobile drawer */}
+      {/* Mobile drawer (accessible via TopBar menu button) */}
       <SidebarDrawer open={drawerOpen} onClose={closeDrawer} />
 
       {/* Main content area */}
@@ -40,6 +41,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+
+      {/* Mobile bottom tab bar */}
+      <BottomTabBar />
     </>
   );
 }

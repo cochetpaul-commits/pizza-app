@@ -76,6 +76,11 @@ html, body{
   background: var(--creme);
 }
 
+/* Mobile bottom tab bar — hidden on desktop */
+.bottom-tab-bar {
+  display: none !important;
+}
+
 @media (max-width: 767px) {
   .sidebar-desktop {
     display: none;
@@ -85,6 +90,11 @@ html, body{
   }
   .app-main {
     margin-left: 0;
+    /* Extra bottom padding for bottom tab bar */
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
+  .bottom-tab-bar {
+    display: block !important;
   }
 }
 
