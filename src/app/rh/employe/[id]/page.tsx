@@ -584,7 +584,7 @@ export default function EmployeDetailPage() {
           {([
             ["infos", "Informations personnelles"],
             ["dossier", "Contrats"],
-            ["acces", "Temps et planification"],
+            ["acces", "Acces"],
             ["roles", "Role et permissions"],
           ] as [MainTab, string][]).map(([key, label]) => (
             <button
@@ -747,72 +747,174 @@ export default function EmployeDetailPage() {
             {/* ─── SUB: Contrats ─── */}
             {dossierSub === "contrats" && (
               <>
-                {canWrite && (
-                  <div style={{ marginBottom: 12, display: "flex", gap: 8 }}>
-                    <button type="button" onClick={openNewContrat} style={addBtnStyle}>+ Nouveau contrat</button>
-                    <button type="button" onClick={() => alert("Generation de contrat : fonctionnalite a venir")} style={{ ...addBtnStyle, borderColor: "#999", color: "#999", background: "transparent" }}>
-                      Generer contrat
-                    </button>
+                <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700, color: "#1a1a1a", marginBottom: 16 }}>Contrats</h2>
+
+                {/* Contrat en cours */}
+                {activeContrat && (() => {
+                  const c = activeContrat;
+                  const cElems = elements.filter((e) => e.contrat_id === c.id);
+                  return (
+                    <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginBottom: 16 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(212,119,90,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                          </span>
+                          <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Contrat en cours</span>
+                        </div>
+                        {canWrite && (
+                          <div style={{ position: "relative" }}>
+                            <button type="button" onClick={() => {
+                              const el = document.getElementById("contract-actions");
+                              if (el) el.style.display = el.style.display === "block" ? "none" : "block";
+                            }} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#1a1a1a", display: "flex", alignItems: "center", gap: 4 }}>
+                              ... Actions
+                              <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
+                            </button>
+                            <div id="contract-actions" style={{ display: "none", position: "absolute", right: 0, top: "calc(100% + 4px)", background: "#fff", border: "1px solid #ddd6c8", borderRadius: 8, padding: "4px 0", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.1)", minWidth: 200 }}>
+                              <button type="button" onClick={() => { openEditContrat(c); document.getElementById("contract-actions")!.style.display = "none"; }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 16px", background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#1a1a1a", textAlign: "left" }}>
+                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                                Afficher le detail
+                              </button>
+                              <button type="button" onClick={() => { openEditContrat(c); document.getElementById("contract-actions")!.style.display = "none"; }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 16px", background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#1a1a1a", textAlign: "left" }}>
+                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                                Declarer un changement
+                              </button>
+                              <button type="button" onClick={() => { handleTerminateContrat(c.id); document.getElementById("contract-actions")!.style.display = "none"; }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 16px", background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#DC2626", textAlign: "left" }}>
+                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="8 12 12 16 16 12" /></svg>
+                                Terminer le contrat
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                        <tbody>
+                          {[
+                            ["Type", CONTRAT_LABELS[c.type] ?? c.type],
+                            ["Debut du contrat", fmtDate(c.date_debut)],
+                            ["Remuneration", `${c.remuneration.toLocaleString("fr-FR")} EUR`],
+                            ["Emploi", c.emploi ?? "—"],
+                            ["Duree de travail hebdomadaire", `${c.heures_semaine} heures`],
+                            ["Nb. de jours travailles par semaine", `${c.jours_semaine} jours`],
+                            ["Qualification", c.qualification ?? "—"],
+                          ].map(([label, value]) => (
+                            <tr key={label} style={{ borderBottom: "1px solid #f0ebe3" }}>
+                              <td style={{ padding: "10px 0", color: "#1a1a1a", fontWeight: 500 }}>{label}</td>
+                              <td style={{ padding: "10px 0", color: "#1a1a1a", textAlign: "right" }}>{value}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
+
+                {/* Historique contrats */}
+                {contrats.length > 0 && (
+                  <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginBottom: 16 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                      <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(160,132,92,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+                      </span>
+                      <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Tous les contrats et avenants</span>
+                    </div>
+                    {contrats.map(c => (
+                      <div key={c.id} style={{ marginBottom: 16 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                          <span style={{ fontSize: 12, color: "#999" }}>{fmtDate(c.date_debut)}</span>
+                          <span style={{ fontSize: 12, color: "#1a1a1a", fontWeight: 600 }}>{c.actif ? "Contrat actif" : "Nouveau contrat"}</span>
+                        </div>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, background: "#faf7f2", borderRadius: 8, overflow: "hidden" }}>
+                          <tbody>
+                            {[
+                              ["Type", CONTRAT_LABELS[c.type] ?? c.type],
+                              ["Debut du contrat", fmtDate(c.date_debut)],
+                              ["Remuneration", `${c.remuneration.toLocaleString("fr-FR")} EUR`],
+                              ["Emploi", c.emploi ?? "—"],
+                              ["Duree de travail hebdomadaire", `${c.heures_semaine} heures`],
+                              ["Nb. de jours travailles par semaine", `${c.jours_semaine} jours`],
+                              ["Qualification", c.qualification ?? "—"],
+                            ].map(([label, value]) => (
+                              <tr key={label} style={{ borderBottom: "1px solid #f0ebe3" }}>
+                                <td style={{ padding: "8px 12px", color: "#666" }}>{label}</td>
+                                <td style={{ padding: "8px 12px", color: "#1a1a1a" }}>{value}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ))}
                   </div>
                 )}
 
-                {contrats.length === 0 ? (
-                  <div style={{ ...section, textAlign: "center", color: "#999" }}>Aucun contrat</div>
-                ) : contrats.map((c) => {
-                  const cElems = elements.filter((e) => e.contrat_id === c.id);
-                  return (
-                    <div key={c.id} style={{ ...section, borderLeft: c.actif ? "3px solid #e27f57" : "3px solid #ddd6c8" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                          <span style={contratPill(c.type)}>{CONTRAT_LABELS[c.type] ?? c.type}</span>
-                          {c.actif && <span style={{ fontSize: 11, fontWeight: 700, color: "#4a6741" }}>ACTIF</span>}
-                          {!c.actif && <span style={{ fontSize: 11, color: "#bbb" }}>Termine</span>}
-                        </div>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          {canWrite && c.actif && (
-                            <button type="button" onClick={() => handleTerminateContrat(c.id)} style={{ ...editBtnSmall, color: "#DC2626", borderColor: "rgba(220,38,38,0.3)" }}>
-                              Terminer
-                            </button>
-                          )}
-                          {canWrite && (
-                            <button type="button" onClick={() => openEditContrat(c)} style={editBtnSmall}>Modifier</button>
-                          )}
-                        </div>
-                      </div>
+                {/* Mutuelle */}
+                <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginBottom: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                    <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(212,119,90,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                    </span>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Mutuelle</span>
+                  </div>
+                  <p style={{ fontSize: 13, color: "#999", textAlign: "center" }}>
+                    Aucune dispense de mutuelle n&apos;a ete enregistree pour ce collaborateur. Il est donc automatiquement considere comme couvert par une mutuelle.
+                  </p>
+                </div>
 
-                      <div style={grid3}>
-                        <div><span style={miniLabel}>Debut</span><br />{fmtDate(c.date_debut)}</div>
-                        <div><span style={miniLabel}>Fin</span><br />{c.date_fin ? fmtDate(c.date_fin) : "---"}</div>
-                        <div>
-                          <span style={miniLabel}>
-                            Remuneration brute
-                            <button type="button" onClick={() => setShowSalary(!showSalary)} style={eyeBtn}>
-                              {showSalary ? "masquer" : "voir"}
-                            </button>
-                          </span>
-                          <br />{showSalary ? `${c.remuneration.toLocaleString("fr-FR")} EUR` : "****"}
-                        </div>
-                      </div>
-                      <div style={{ ...grid3, marginTop: 8 }}>
-                        <div><span style={miniLabel}>Emploi</span><br />{c.emploi ?? "---"}</div>
-                        <div><span style={miniLabel}>Qualification</span><br />{c.qualification ?? "---"}</div>
-                        <div><span style={miniLabel}>Heures/sem</span><br />{c.heures_semaine}h / {c.jours_semaine}j</div>
-                      </div>
-
-                      {cElems.length > 0 && (
-                        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid #f0ebe3" }}>
-                          <span style={{ ...miniLabel, marginBottom: 6, display: "block" }}>Elements</span>
-                          {cElems.map((el) => (
-                            <div key={el.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13 }}>
-                              <span>{ELEMENT_LABELS[el.type] ?? el.type} --- {el.libelle}</span>
-                              <span style={{ fontWeight: 700 }}>{el.montant != null ? `${el.montant.toLocaleString("fr-FR")} EUR` : "---"}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                {/* Indemnites transport */}
+                <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginBottom: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(45,106,79,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                      </span>
+                      <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Indemnites de transport mensuelles</span>
                     </div>
-                  );
-                })}
+                    <button type="button" style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>+ Ajouter</button>
+                  </div>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, marginBottom: 8 }}>
+                    <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
+                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Nom du dispositif</th>
+                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Montant mensuel</th>
+                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Periode</th>
+                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Etat</th>
+                    </tr></thead>
+                  </table>
+                  <p style={{ fontSize: 13, color: "#999", textAlign: "center" }}>Aucune indemnite de transport</p>
+                </div>
+
+                {/* Primes et acomptes */}
+                <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(160,132,92,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
+                      </span>
+                      <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Primes, acomptes et indemnites</span>
+                    </div>
+                    <button type="button" onClick={openNewContrat} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>+ Ajouter</button>
+                  </div>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, marginBottom: 8 }}>
+                    <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
+                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Date</th>
+                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Type</th>
+                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Montant</th>
+                    </tr></thead>
+                    <tbody>
+                      {elements.length === 0 ? (
+                        <tr><td colSpan={3} style={{ padding: "16px 0", textAlign: "center", color: "#999" }}>Pas de prime ou d&apos;acompte</td></tr>
+                      ) : elements.map(el => (
+                        <tr key={el.id} style={{ borderBottom: "1px solid #f0ebe3" }}>
+                          <td style={{ padding: "8px 0" }}>{el.date_debut ? fmtDate(el.date_debut) : "—"}</td>
+                          <td style={{ padding: "8px 0" }}>{ELEMENT_LABELS[el.type] ?? el.type} — {el.libelle}</td>
+                          <td style={{ padding: "8px 0" }}>{el.montant ? `${el.montant} EUR` : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </>
             )}
 
