@@ -86,6 +86,44 @@ const LABEL: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "#999
 const INPUT: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14, boxSizing: "border-box" };
 const ROW: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #f0ebe3" };
 
+/* ── HelpTip — black tooltip on click ─────────────────── */
+
+function HelpTip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        style={{
+          background: "none", border: "none", cursor: "pointer", padding: 0,
+          display: "inline-flex", alignItems: "center",
+        }}
+      >
+        <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
+        </svg>
+      </button>
+      {open && (
+        <div style={{
+          position: "absolute", bottom: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)",
+          background: "#1a1a1a", color: "#fff", padding: "10px 14px", borderRadius: 8,
+          fontSize: 12, lineHeight: 1.5, width: 260, zIndex: 50,
+          boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+        }}>
+          {text}
+          <div style={{
+            position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)",
+            width: 0, height: 0, borderLeft: "6px solid transparent", borderRight: "6px solid transparent",
+            borderTop: "6px solid #1a1a1a",
+          }} />
+        </div>
+      )}
+    </span>
+  );
+}
+
 /* ── Toggle ──────────────────────────────────────────── */
 
 function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
@@ -413,9 +451,7 @@ export default function EtablissementDetailPage() {
           <div>
             <div style={{ fontSize: 14, color: "#1a1a1a", display: "flex", alignItems: "center", gap: 4 }}>
               Acquisition mensuelle <span style={{ color: "#DC2626" }}>*</span>
-              <span title="Nombre de jours de conges acquis chaque mois" style={{ cursor: "help", display: "inline-flex" }}>
-                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
-              </span>
+              <HelpTip text="2.5 est le minimum requis pour la base de calcul du decompte des conges payes choisie." />
             </div>
             <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>Appliquee automatiquement dans la nuit du dernier jour du mois.</div>
           </div>
@@ -430,9 +466,7 @@ export default function EtablissementDetailPage() {
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <span style={{ fontSize: 14, color: "#1a1a1a" }}>Periode d&apos;acquisition</span>
             <span style={{ color: "#DC2626" }}>*</span>
-            <span title="Periode de reference pour le calcul des conges payes" style={{ cursor: "help", display: "inline-flex", alignItems: "center" }}>
-              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
-            </span>
+            <HelpTip text="Vous ne pouvez pas selectionner le '29 Fevrier' pour le debut de votre periode d'acquisition. Nous ne gerons pas cette date de debut car elle implique une gestion particuliere en cas d'annee bissextile." />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
             <span style={{ color: "#666" }}>Du</span>
@@ -586,9 +620,7 @@ export default function EtablissementDetailPage() {
         <div style={{ ...ROW, borderBottom: "none" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <span style={{ fontSize: 14, color: "#1a1a1a" }}>Ajouter la pause par defaut aux shifts d&apos;une duree minimum de</span>
-            <span title="Si un shift depasse cette duree, la pause configuree ci-dessus sera automatiquement ajoutee" style={{ cursor: "help", display: "inline-flex" }}>
-              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
-            </span>
+            <HelpTip text="Si un shift depasse cette duree, la pause configuree ci-dessus sera automatiquement ajoutee lors de la creation du shift." />
           </div>
           <input
             type="text"
@@ -1020,10 +1052,30 @@ export default function EtablissementDetailPage() {
                         <th style={{ ...LABEL, textAlign: "left", padding: "8px 6px", minWidth: 130 }}>Salarie</th>
                         <th style={{ ...LABEL, textAlign: "left", padding: "8px 6px", minWidth: 70 }}>Equipe</th>
                         <th style={{ ...LABEL, textAlign: "center", padding: "8px 6px", minWidth: 70 }}>Module</th>
-                        <th style={{ ...LABEL, textAlign: "center", padding: "8px 6px", minWidth: 90 }}>Solde initial</th>
-                        <th style={{ ...LABEL, textAlign: "center", padding: "8px 6px", minWidth: 100 }}>Heures a realiser</th>
-                        <th style={{ ...LABEL, textAlign: "center", padding: "8px 6px", minWidth: 130 }}>Debut personnalise</th>
-                        <th style={{ ...LABEL, textAlign: "center", padding: "8px 6px", minWidth: 130 }}>Fin personnalisee</th>
+                        <th style={{ ...LABEL, textAlign: "center", padding: "8px 6px", minWidth: 90 }}>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            Solde initial
+                            <HelpTip text="Le solde initial correspond au nombre d'heures a prendre en compte au debut de votre periode pour un salarie. Il peut etre positif ou negatif." />
+                          </span>
+                        </th>
+                        <th style={{ ...LABEL, textAlign: "center", padding: "8px 6px", minWidth: 100 }}>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            Heures a realiser
+                            <HelpTip text="Ce sont les heures a realiser par l'employe sur la periode de modulation rattachee a son contrat. Si vide, la valeur par defaut sera automatiquement calculee sur la base des informations renseignees (temps contrat, periode de modulation, etc.)" />
+                          </span>
+                        </th>
+                        <th style={{ ...LABEL, textAlign: "center", padding: "8px 6px", minWidth: 130 }}>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            Debut personnalise
+                            <HelpTip text="Renseignez cette date si vous souhaitez que la modulation demarre apres le debut de votre periode pour cet employe." />
+                          </span>
+                        </th>
+                        <th style={{ ...LABEL, textAlign: "center", padding: "8px 6px", minWidth: 130 }}>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            Fin personnalisee
+                            <HelpTip text="Renseignez cette date si vous souhaitez que la modulation se termine avant la fin de votre periode pour cet employe." />
+                          </span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
