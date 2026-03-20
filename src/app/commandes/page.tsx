@@ -773,17 +773,20 @@ function CommandesPage() {
               return (
                 <div key={cat} style={{ marginBottom: 8 }}>
                   <div style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    padding: "8px 14px", background: "#f5f0e8",
-                    borderRadius: "8px 8px 0 0", borderBottom: `2px solid ${color}`,
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "10px 16px", background: `${color}14`, border: `1px solid ${color}30`,
+                    borderRadius: "12px 12px 0 0",
                   }}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
-                    <span style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#1a1a1a" }}>
+                    <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                    <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color }}>
                       {catLabel(cat)}
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${color}30`, color }}>
+                      {items.length}
                     </span>
                   </div>
                   {items.map((item, i) => (
-                    <div key={i} style={{ ...tile, borderRadius: i === items.length - 1 ? "0 0 8px 8px" : 0 }}>
+                    <div key={i} style={{ ...tile, borderRadius: i === items.length - 1 ? "0 0 12px 12px" : 0 }}>
                       <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", flex: 1 }}>{item.name}</span>
                       <span style={{ fontSize: 14, fontWeight: 700, color: "#D4775A", flexShrink: 0 }}>× {item.qty}</span>
                       {item.unit && (
@@ -839,39 +842,37 @@ function CommandesPage() {
           const color = CAT_COLORS[cat] ?? "#6B7280";
 
           return (
-            <div key={cat} style={{ marginBottom: 4 }}>
+            <div key={cat} style={{ marginBottom: 6 }}>
               <button type="button"
                 onClick={() => setOpenCats((prev) => ({ ...prev, [cat]: !isOpen }))}
                 style={{
                   width: "100%", display: "flex", alignItems: "center",
-                  justifyContent: "space-between", padding: "11px 14px",
-                  background: "#fff", border: "1px solid #e5ddd0",
-                  borderLeft: `4px solid ${color}`,
-                  borderRadius: isOpen ? "10px 10px 0 0" : 10,
-                  cursor: "pointer", fontFamily: "inherit",
+                  gap: 10, padding: "10px 16px",
+                  background: `${color}14`, border: `1px solid ${color}30`,
+                  borderRadius: isOpen ? "12px 12px 0 0" : 12,
+                  cursor: "pointer", fontFamily: "inherit", textAlign: "left",
                   transition: "border-radius 0.2s",
                 }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 11, transition: "transform 0.2s", transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", display: "inline-block" }}>▾</span>
-                  <span style={{ fontWeight: 700, fontSize: 12, textTransform: "uppercase", letterSpacing: 1, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                    {catLabel(cat)}
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color }}>
+                  {catLabel(cat)}
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${color}30`, color }}>
+                  {allItems.length}
+                </span>
+                {selectedCount > 0 && (
+                  <span style={{ background: color, color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, minWidth: 20, textAlign: "center" }}>
+                    {selectedCount}
                   </span>
-                </span>
-                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 10, color: "#999" }}>{allItems.length} article{allItems.length > 1 ? "s" : ""}</span>
-                  {selectedCount > 0 && (
-                    <span style={{ background: color, color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, minWidth: 20, textAlign: "center" }}>
-                      {selectedCount}
-                    </span>
-                  )}
-                </span>
+                )}
+                <span style={{ marginLeft: "auto", fontSize: 10, color: "#b0a894", transition: "transform 0.2s", transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}>{"▼"}</span>
               </button>
 
               <div style={{
                 maxHeight: isOpen ? 5000 : 0, overflow: "hidden",
                 transition: "max-height 0.3s ease",
-                border: isOpen ? "1px solid #e5ddd0" : "none",
-                borderTop: "none", borderRadius: "0 0 10px 10px",
+                border: isOpen ? `1px solid ${color}30` : "none",
+                borderTop: "none", borderRadius: "0 0 12px 12px",
               }}>
                 {favoris.length > 0 && (
                   <div style={{ background: "#FFFBF0", borderLeft: "3px solid #F59E0B", padding: "6px 0 2px 0" }}>
