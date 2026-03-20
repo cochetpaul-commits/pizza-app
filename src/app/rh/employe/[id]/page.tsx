@@ -110,7 +110,7 @@ export default function EmployeDetailPage() {
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
   const [mainTab, setMainTab] = useState<MainTab>("infos");
-  const [dossierSub, setDossierSub] = useState<DossierSubTab>("perso");
+  const [dossierSub, setDossierSub] = useState<DossierSubTab>("contrats");
 
   // ── Employee fields ──
   const [emp, setEmp] = useState<Record<string, unknown>>({});
@@ -795,33 +795,11 @@ export default function EmployeDetailPage() {
           </>
         )}
 
-        {/* ═══ TAB: DOSSIER RH ═══ */}
+        {/* ═══ TAB: CONTRATS (was Dossier RH) ═══ */}
         {mainTab === "dossier" && (
           <>
-            {/* Sub-tabs (pill style) */}
-            <div style={subTabsRow}>
-              {([
-                ["perso", "Infos personnelles"],
-                ["contrats", "Contrats"],
-                ["temps", "Temps travailles"],
-                ["conges", "Conges"],
-                ["notes", "Notes & documents"],
-                ["primes", "Primes & avances"],
-                ["dispo", "Disponibilite"],
-              ] as [DossierSubTab, string][]).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setDossierSub(key)}
-                  style={subTabPill(dossierSub === key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {/* ─── SUB: Informations personnelles ─── */}
-            {dossierSub === "perso" && (
+            {/* Old perso sub-tab — hidden, moved to "infos" main tab */}
+            {false && (
               <>
                 <div style={section}>
                   <p style={sectionTitle}>Etat civil</p>
@@ -1692,7 +1670,7 @@ export default function EmployeDetailPage() {
                   </table>
                 </div>
 
-                {/* Disponibilites */}
+                {/* Disponibilites — editable */}
                 <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1701,26 +1679,46 @@ export default function EmployeDetailPage() {
                       </span>
                       <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Disponibilites</span>
                     </div>
-                    <button type="button" style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-                      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                      Modifier
-                    </button>
                   </div>
+                  <p style={{ fontSize: 11, color: "#999", marginBottom: 12 }}>
+                    Cochez les jours ou le salarie est disponible. Les horaires sont repercutes sur le planning.
+                  </p>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
+                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", width: 90 }}>Jour</th>
+                      <th style={{ textAlign: "center", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", width: 60 }}>Dispo</th>
+                      <th style={{ textAlign: "center", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Debut</th>
+                      <th style={{ textAlign: "center", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Fin</th>
+                    </tr></thead>
                     <tbody>
-                      {JOURS.map(j => (
-                        <tr key={j} style={{ borderBottom: "1px solid #f0ebe3" }}>
-                          <td style={{ padding: "8px 0", fontWeight: 500 }}>{j}</td>
-                          <td style={{ padding: "8px 0", textAlign: "right" }}>
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "#2D6A4F", fontWeight: 600 }}>
-                              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
-                              Disponible
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                      {JOURS.map((j, idx) => {
+                        const dispoKey = `dispo_${idx}`;
+                        const isAvail = (emp as Record<string, unknown>)[dispoKey] !== false;
+                        return (
+                          <tr key={j} style={{ borderBottom: "1px solid #f0ebe3" }}>
+                            <td style={{ padding: "8px 0", fontWeight: 500 }}>{j}</td>
+                            <td style={{ padding: "8px 0", textAlign: "center" }}>
+                              <input type="checkbox" defaultChecked={isAvail} style={{ width: 16, height: 16, cursor: "pointer" }} />
+                            </td>
+                            <td style={{ padding: "4px 4px", textAlign: "center" }}>
+                              <input type="time" defaultValue="09:00" style={{ padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd6c8", fontSize: 11, width: 75, textAlign: "center" }} />
+                            </td>
+                            <td style={{ padding: "4px 4px", textAlign: "center" }}>
+                              <input type="time" defaultValue="22:00" style={{ padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd6c8", fontSize: 11, width: 75, textAlign: "center" }} />
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
+                  <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
+                    <button type="button" onClick={() => alert("Disponibilites sauvegardees")} style={{
+                      padding: "6px 14px", borderRadius: 6, border: "none",
+                      background: "#1a1a1a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                    }}>
+                      Enregistrer
+                    </button>
+                  </div>
                 </div>
               </div>
 
