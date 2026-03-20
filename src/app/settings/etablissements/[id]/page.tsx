@@ -111,6 +111,7 @@ export default function EtablissementDetailPage() {
   const [dbEquipes, setDbEquipes] = useState<Equipe[]>([]);
   const [postes, setPostes] = useState<Poste[]>([]);
   const [primes, setPrimes] = useState<Prime[]>([]);
+  const [employes, setEmployes] = useState<{ id: string; prenom: string; nom: string; equipes_access: string[] }[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("social");
   const [saving, setSaving] = useState(false);
@@ -161,13 +162,14 @@ export default function EtablissementDetailPage() {
     if (!id) return;
     let cancelled = false;
     (async () => {
-      const [etabRes, postesRes, primesRes, allEtabsRes, equipesRes, periodesRes] = await Promise.all([
+      const [etabRes, postesRes, primesRes, allEtabsRes, equipesRes, periodesRes, empRes] = await Promise.all([
         supabase.from("etablissements").select("*").eq("id", id).single(),
         supabase.from("postes").select("id, nom, equipe, couleur, emoji, actif").eq("etablissement_id", id).order("equipe").order("nom"),
         supabase.from("primes").select("id, libelle, code, type, montant, recurrence, actif").eq("etablissement_id", id).order("libelle"),
         supabase.from("etablissements").select("id, nom").eq("actif", true).order("nom"),
         supabase.from("equipes").select("id, nom, actif").eq("etablissement_id", id).eq("actif", true).order("nom"),
         supabase.from("periodes_modulation").select("*").eq("etablissement_id", id).order("date_debut", { ascending: false }),
+        supabase.from("employes").select("id, prenom, nom, equipes_access").eq("etablissement_id", id).eq("actif", true).order("nom"),
       ]);
       if (!cancelled) {
         if (etabRes.data) setSettings(etabRes.data as unknown as Settings);
@@ -179,6 +181,7 @@ export default function EtablissementDetailPage() {
         setPrimes((primesRes.data ?? []) as Prime[]);
         setAllEtabs((allEtabsRes.data ?? []).filter(e => e.id !== id) as { id: string; nom: string }[]);
         setPeriodes((periodesRes.data ?? []) as PeriodeMod[]);
+        setEmployes((empRes.data ?? []) as { id: string; prenom: string; nom: string; equipes_access: string[] }[]);
         setLoading(false);
       }
     })();
@@ -984,6 +987,90 @@ export default function EtablissementDetailPage() {
           </select>
           {dbEquipes.length === 0 && <p style={{ fontSize: 12, color: "#999", marginTop: 8 }}>Aucune equipe configuree. Ajoutez des equipes dans l&apos;onglet Planification.</p>}
         </div>
+
+        {/* Personnaliser la modulation par salarie */}
+        {modEquipeIds.length > 0 && (() => {
+          // Get equipe names for selected ids
+          const selectedEquipeNames = modEquipeIds.map(eId => dbEquipes.find(e => e.id === eId)?.nom).filter(Boolean) as string[];
+          // Filter employees who belong to selected equipes
+          const filteredEmps = employes.filter(emp => {
+            const access = emp.equipes_access ?? [];
+            if (access.length === 0) return selectedEquipeNames.length > 0; // no restriction = all equipes
+            return access.some(a => selectedEquipeNames.includes(a));
+          });
+          // Match employee to equipe name
+          const empEquipe = (emp: typeof employes[0]) => {
+            const access = emp.equipes_access ?? [];
+            if (access.length === 0) return selectedEquipeNames[0] ?? "—";
+            return access.find(a => selectedEquipeNames.includes(a)) ?? access[0] ?? "—";
+          };
+
+          return (
+            <div style={CARD}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>Personnaliser la modulation par salarie</h3>
+              <p style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>Vous pouvez decider de changer certains parametres employe par employe.</p>
+
+              {filteredEmps.length === 0 ? (
+                <p style={{ fontSize: 13, color: "#999" }}>Aucun salarie dans les equipes selectionnees.</p>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ borderBottom: "2px solid #ddd6c8" }}>
+                        <th style={{ ...LABEL, textAlign: "left", padding: "8px 6px", minWidth: 130 }}>Salarie</th>
+                        <th style={{ ...LABEL, textAlign: "left", padding: "8px 6px", minWidth: 70 }}>Equipe</th>
+                        <th style={{ ...LABEL, textAlign: "center", padding: "8px 6px", minWidth: 70 }}>Module</th>
+                        <th style={{ ...LABEL, textAlign: "center", padding: "8px 6px", minWidth: 90 }}>Solde initial</th>
+                        <th style={{ ...LABEL, textAlign: "center", padding: "8px 6px", minWidth: 100 }}>Heures a realiser</th>
+                        <th style={{ ...LABEL, textAlign: "center", padding: "8px 6px", minWidth: 130 }}>Debut personnalise</th>
+                        <th style={{ ...LABEL, textAlign: "center", padding: "8px 6px", minWidth: 130 }}>Fin personnalisee</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredEmps.map(emp => (
+                        <tr key={emp.id} style={{ borderBottom: "1px solid #f0ebe3" }}>
+                          <td style={{ padding: "10px 6px" }}>
+                            <a href={`/rh/employe/${emp.id}`} style={{ color: "#2563eb", textDecoration: "none", fontWeight: 500 }}>
+                              {emp.prenom} {emp.nom.toUpperCase()}
+                            </a>
+                          </td>
+                          <td style={{ padding: "10px 6px", color: "#666" }}>{empEquipe(emp)}</td>
+                          <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                            <Toggle value={true} onChange={() => {}} />
+                          </td>
+                          <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                              <input type="number" defaultValue={0} style={{ ...INPUT, width: 50, textAlign: "center", padding: "4px 6px", fontSize: 12 }} />
+                              <span style={{ fontSize: 11, color: "#999" }}>h</span>
+                            </div>
+                          </td>
+                          <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                              <input type="number" style={{ ...INPUT, width: 50, textAlign: "center", padding: "4px 6px", fontSize: 12 }} placeholder="" />
+                              <span style={{ fontSize: 11, color: "#999" }}>h</span>
+                            </div>
+                          </td>
+                          <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                              <input type="date" defaultValue={modDebut} style={{ ...INPUT, width: 120, padding: "4px 6px", fontSize: 11 }} />
+                              <button type="button" style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 14 }}>x</button>
+                            </div>
+                          </td>
+                          <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                              <input type="date" defaultValue={modFin} style={{ ...INPUT, width: 120, padding: "4px 6px", fontSize: 11 }} />
+                              <button type="button" style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 14 }}>x</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Create button */}
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
