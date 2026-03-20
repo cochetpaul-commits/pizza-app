@@ -370,8 +370,11 @@ export default function EtablissementDetailPage() {
         {/* Acquisition mensuelle */}
         <div style={ROW}>
           <div>
-            <div style={{ fontSize: 14, color: "#1a1a1a" }}>
+            <div style={{ fontSize: 14, color: "#1a1a1a", display: "flex", alignItems: "center", gap: 4 }}>
               Acquisition mensuelle <span style={{ color: "#DC2626" }}>*</span>
+              <span title="Nombre de jours de conges acquis chaque mois" style={{ cursor: "help", display: "inline-flex" }}>
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+              </span>
             </div>
             <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>Appliquee automatiquement dans la nuit du dernier jour du mois.</div>
           </div>
@@ -383,35 +386,51 @@ export default function EtablissementDetailPage() {
 
         {/* Periode d'acquisition */}
         <div style={{ ...ROW, borderBottom: "none" }}>
-          <div>
-            <div style={{ fontSize: 14, color: "#1a1a1a" }}>
-              Periode d&apos;acquisition <span style={{ color: "#DC2626" }}>*</span>
-            </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span style={{ fontSize: 14, color: "#1a1a1a" }}>Periode d&apos;acquisition</span>
+            <span style={{ color: "#DC2626" }}>*</span>
+            <span title="Periode de reference pour le calcul des conges payes" style={{ cursor: "help", display: "inline-flex", alignItems: "center" }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+            </span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-            <span style={{ color: "#999" }}>Du</span>
-            <select style={{ ...INPUT, width: 60, padding: "6px 4px", textAlign: "center" }} defaultValue="1">
-              {Array.from({ length: 28 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+            <span style={{ color: "#666" }}>Du</span>
+            <select style={{
+              padding: "6px 10px", borderRadius: 20, border: "1px solid #ddd6c8",
+              fontSize: 13, background: "#fff", color: "#1a1a1a", cursor: "pointer",
+              appearance: "none" as const, WebkitAppearance: "none" as const,
+              backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
+              backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center",
+              paddingRight: 24, minWidth: 52,
+            }} defaultValue="1">
+              {Array.from({ length: 31 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
             </select>
-            <select style={{ ...INPUT, width: 100, padding: "6px 8px" }} defaultValue="6">
+            <select style={{
+              padding: "6px 12px", borderRadius: 20, border: "1px solid #ddd6c8",
+              fontSize: 13, background: "#fff", color: "#1a1a1a", cursor: "pointer",
+              appearance: "none" as const, WebkitAppearance: "none" as const,
+              backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
+              backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center",
+              paddingRight: 28, minWidth: 90,
+            }} defaultValue="6">
               {["janvier", "fevrier", "mars", "avril", "mai", "juin", "juillet", "aout", "septembre", "octobre", "novembre", "decembre"].map((m, i) => (
                 <option key={i} value={i + 1}>{m}</option>
               ))}
             </select>
-            <span style={{ color: "#999" }}>au 31 mai N+1</span>
+            <span style={{ color: "#666" }}>au 31 mai N+1</span>
           </div>
         </div>
 
         {/* Save + last update */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12, paddingTop: 12, borderTop: "1px solid #f0ebe3" }}>
-          <button type="button" onClick={() => { /* already auto-saved */ setSaved(true); setTimeout(() => setSaved(false), 2000); }} style={{
-            padding: "6px 16px", borderRadius: 6, border: "1px solid #ddd6c8",
-            background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16, paddingTop: 14, borderTop: "1px solid #f0ebe3" }}>
+          <button type="button" onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 2000); }} style={{
+            padding: "8px 20px", borderRadius: 6, border: "1px solid #ddd6c8",
+            background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#999",
           }}>
             Enregistrer
           </button>
           <span style={{ fontSize: 11, color: "#999" }}>
-            {saved ? "Enregistre" : ""}
+            Mise a jour le {new Date().toLocaleDateString("fr-FR")}.
           </span>
         </div>
       </div>
