@@ -67,7 +67,7 @@ export type SidebarEntry = NavEtabGroup | NavSettingsGroup | NavStandaloneItem |
 
 /* ── Admin / Direction nav ─────────────────────────────── */
 
-const PERSONNEL_ITEMS: NavItemV2[] = [
+export const PERSONNEL_ITEMS: NavItemV2[] = [
   { label: "Employes", href: "/rh/equipe", icon: "users" },
   { label: "Planning", href: "/plannings", icon: "calendar" },
   { label: "Pointage", href: "/rh/pointage", icon: "clock" },
@@ -76,7 +76,7 @@ const PERSONNEL_ITEMS: NavItemV2[] = [
   { label: "Simulation", href: "/rh/masse-salariale", icon: "calculator", roles: ["group_admin"] },
 ];
 
-const FINANCE_ITEMS: NavItemV2[] = [
+export const FINANCE_ITEMS: NavItemV2[] = [
   { label: "Base ingredients", href: "/ingredients", icon: "tag" },
   { label: "Fiches techniques", href: "/recettes", icon: "book" },
   { label: "Commandes", href: "/commandes", icon: "shoppingBag" },
@@ -87,7 +87,7 @@ const FINANCE_ITEMS: NavItemV2[] = [
   { label: "Articles en vente", href: "/epicerie", icon: "tag" },
 ];
 
-const CLIENTS_ITEMS: NavItemV2[] = [
+export const CLIENTS_ITEMS: NavItemV2[] = [
   { label: "Particuliers", href: "/evenements/clients", icon: "users" },
   { label: "Carnet clients", href: "/clients", icon: "book" },
   { label: "Creer devis", href: "/devis/new", icon: "fileText" },
@@ -95,6 +95,73 @@ const CLIENTS_ITEMS: NavItemV2[] = [
   { label: "Evenements", href: "/evenements", icon: "calendarEvent" },
   { label: "Import Kezia", href: "/kezia", icon: "fileText" },
 ];
+
+/** Template sections for each establishment */
+export const ETAB_SECTION_TEMPLATES: NavSubSection[] = [
+  { label: "Gestion du personnel", icon: "users", items: PERSONNEL_ITEMS },
+  { label: "Gestion de la finance", icon: "wallet", roles: ["group_admin"], items: FINANCE_ITEMS },
+  { label: "Gestion des clients", icon: "calendarEvent", roles: ["group_admin"], items: CLIENTS_ITEMS },
+];
+
+/** Build dynamic nav entries from a list of establishments */
+export function buildDynamicNav(
+  etabs: { slug: string; nom: string; couleur: string | null }[],
+): SidebarEntry[] {
+  const entries: SidebarEntry[] = [
+    { kind: "item", label: "Accueil", href: "/dashboard", icon: "dashboard" },
+    { kind: "divider" },
+  ];
+
+  for (const etab of etabs) {
+    entries.push({
+      kind: "etab",
+      etabSlug: etab.slug,
+      label: etab.nom,
+      color: etab.couleur ?? "#D4775A",
+      roles: ["group_admin", "manager"],
+      sections: ETAB_SECTION_TEMPLATES,
+    });
+  }
+
+  entries.push({ kind: "divider" });
+
+  // Parametres
+  entries.push({
+    kind: "settings",
+    label: "Parametres",
+    icon: "settings",
+    roles: ["group_admin"],
+    sections: [
+      {
+        label: "Etablissement",
+        icon: "box",
+        items: [
+          { label: "Liste & configuration", href: "/settings/etablissements", icon: "building" },
+          { label: "Gestion du planning", href: "/settings/planning", icon: "calendar" },
+          { label: "Pointeuse", href: "/settings/pointeuse", icon: "clock" },
+        ],
+      },
+      {
+        label: "Employes",
+        icon: "users",
+        items: [
+          { label: "Informations", href: "/admin/utilisateurs", icon: "users" },
+          { label: "Contrat", href: "/settings/employes/contrat", icon: "fileText" },
+          { label: "Acces application", href: "/settings/employes/acces", icon: "settings" },
+          { label: "Role et permissions", href: "/settings/employes/roles", icon: "clipboard" },
+        ],
+      },
+      {
+        label: "",
+        items: [
+          { label: "Mon compte", href: "/settings/account", icon: "settings" },
+        ],
+      },
+    ],
+  });
+
+  return entries;
+}
 
 export const SIDEBAR_NAV_V2: SidebarEntry[] = [
   {

@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import {
-  SIDEBAR_NAV_V2,
+  buildDynamicNav,
   SIDEBAR_NAV_SIMPLE,
   type SidebarEntry,
   type NavEtabGroup,
@@ -108,10 +108,13 @@ function BurgerIcon({ size = 32 }: { size?: number }) {
 function CollapsedContent({ onExpand }: { onExpand: () => void }) {
   const pathname = usePathname();
   const { role } = useProfile();
-  const { current, isGroupView } = useEtablissement();
+  const { current, etablissements, isGroupView, setCurrent, setGroupView } = useEtablissement();
+  const [expandedEtab, setExpandedEtab] = useState<string | null>(null);
 
   const isAdmin = role === "group_admin" || role === "manager";
-  const entries: SidebarEntry[] = isAdmin ? SIDEBAR_NAV_V2 : SIDEBAR_NAV_SIMPLE;
+  const entries: SidebarEntry[] = isAdmin
+    ? buildDynamicNav(etablissements.map(e => ({ slug: e.slug, nom: e.nom, couleur: e.couleur })))
+    : SIDEBAR_NAV_SIMPLE;
 
   const etabColor = isGroupView
     ? C.ifratelli
@@ -119,6 +122,11 @@ function CollapsedContent({ onExpand }: { onExpand: () => void }) {
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
+
+  const switchEtab = (slug: string) => {
+    const target = etablissements.find(e => e.slug === slug || e.slug?.replace("_", "-") === slug);
+    if (target) { setGroupView(false); setCurrent(target); }
+  };
 
   const isEtabActive = (slug: string) =>
     !isGroupView && (current?.slug === slug || current?.slug?.replace("_", "-") === slug);
@@ -168,49 +176,60 @@ function CollapsedContent({ onExpand }: { onExpand: () => void }) {
 
     if (entry.kind === "etab") {
       if (!isRoleAllowed(entry.roles, role)) continue;
-      const active = isEtabActive(entry.etabSlug);
-      // Restaurant icon — active gets same tinted bg as Accueil
+      const slug = entry.etabSlug;
+      const active = isEtabActive(slug);
+      const isExpanded = expandedEtab === slug;
+      const highlighted = active || isExpanded;
+
+      // Store icon — click toggles accordion
       elements.push(
         <button
-          key={`etab-${entry.etabSlug}`}
+          key={`etab-${slug}`}
           type="button"
-          onClick={onExpand}
+          onClick={() => {
+            switchEtab(slug);
+            setExpandedEtab(prev => prev === slug ? null : slug);
+          }}
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
-            width: 38, height: 38, borderRadius: 8,
-            background: active ? C.bgItemActive : "transparent",
-            border: active ? `1.5px solid ${entry.color}40` : "1.5px solid transparent",
-            margin: "2px auto", cursor: "pointer",
+            width: 40, height: 40, borderRadius: 8,
+            background: highlighted ? `${entry.color}22` : "transparent",
+            border: highlighted ? `1.5px solid ${entry.color}40` : "1.5px solid transparent",
+            margin: "3px auto", cursor: "pointer",
             transition: "background 0.15s, border-color 0.15s",
           }}
         >
-          <IconStore size={18} color={active ? entry.color : C.textMuted} />
+          <IconStore size={18} color={highlighted ? entry.color : C.textMuted} />
         </button>
       );
-      // Show sub-section icons
-      for (const sub of entry.sections) {
-        if (!isRoleAllowed(sub.roles, role)) continue;
-        if (sub.icon) {
-          const SubIcon = ICON_MAP[sub.icon];
-          if (SubIcon) {
-            const subActive = sub.items.some(it => isRoleAllowed(it.roles, role) && isActive(it.href) && isEtabActive(entry.etabSlug));
-            elements.push(
-              <button
-                key={`${entry.etabSlug}-${sub.label}`}
-                type="button"
-                onClick={onExpand}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  width: 36, height: 36, borderRadius: 8,
-                  background: subActive ? C.bgItemActive : "transparent",
-                  margin: "2px auto",
-                  transition: "background 0.12s",
-                  border: "none", cursor: "pointer",
-                }}
-              >
-                <SubIcon size={16} color={subActive ? entry.color : C.textMuted} />
-              </button>
-            );
+
+      // Accordion: show sub-section icons when expanded
+      if (isExpanded) {
+        for (const sub of entry.sections) {
+          if (!isRoleAllowed(sub.roles, role)) continue;
+          if (sub.icon) {
+            const SubIcon = ICON_MAP[sub.icon];
+            if (SubIcon) {
+              const firstHref = sub.items.find(it => isRoleAllowed(it.roles, role))?.href;
+              const subActive = sub.items.some(it => isRoleAllowed(it.roles, role) && isActive(it.href) && isEtabActive(slug));
+              elements.push(
+                <a
+                  key={`${slug}-${sub.label}`}
+                  href={firstHref ?? "#"}
+                  onClick={() => { switchEtab(slug); }}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    width: 36, height: 36, borderRadius: 8,
+                    background: subActive ? C.bgItemActive : "transparent",
+                    margin: "1px auto",
+                    transition: "background 0.12s",
+                    textDecoration: "none",
+                  }}
+                >
+                  <SubIcon size={16} color={subActive ? entry.color : C.textMuted} />
+                </a>
+              );
+            }
           }
         }
       }
@@ -340,7 +359,9 @@ function ExpandedContent({ onNavigate, onCollapse, showBurger }: ExpandedContent
   }, []);
 
   const isAdmin = role === "group_admin" || role === "manager";
-  const entries: SidebarEntry[] = isAdmin ? SIDEBAR_NAV_V2 : SIDEBAR_NAV_SIMPLE;
+  const entries: SidebarEntry[] = isAdmin
+    ? buildDynamicNav(etablissements.map(e => ({ slug: e.slug, nom: e.nom, couleur: e.couleur })))
+    : SIDEBAR_NAV_SIMPLE;
 
   const etabColor = isGroupView
     ? C.ifratelli

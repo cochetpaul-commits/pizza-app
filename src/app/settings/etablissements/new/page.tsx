@@ -26,6 +26,7 @@ export default function NewEtablissementPage() {
   const [ville, setVille] = useState("");
   const [pays, setPays] = useState("France");
 
+  const [couleur, setCouleur] = useState("#D4775A");
   const [isFranchise, setIsFranchise] = useState(false);
 
   const [convention, setConvention] = useState("HCR_1979");
@@ -57,6 +58,7 @@ export default function NewEtablissementPage() {
       siret: siret || null,
       code_ape: codeApe || null,
       convention,
+      couleur,
       medecin_travail: codeSst || null,
       actif: true,
     }).select().single();
@@ -147,6 +149,35 @@ export default function NewEtablissementPage() {
                 </>
               )}
             </button>
+          </div>
+        </div>
+
+        {/* Couleur */}
+        <div style={CARD}>
+          <div style={LABEL}>Couleur de l&apos;etablissement</div>
+          <div style={SUBLABEL}>Cette couleur sera utilisee dans la sidebar et les rapports.</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
+            <input
+              type="color"
+              value={couleur}
+              onChange={e => setCouleur(e.target.value)}
+              style={{
+                width: 44, height: 44, borderRadius: 8,
+                border: "2px solid #ddd6c8", cursor: "pointer",
+                padding: 0, background: "none",
+              }}
+            />
+            <input
+              type="text"
+              value={couleur}
+              onChange={e => setCouleur(e.target.value)}
+              style={{ ...INPUT, width: 120, textTransform: "uppercase", fontFamily: "monospace" }}
+              maxLength={7}
+            />
+            <div style={{
+              width: 32, height: 32, borderRadius: "50%",
+              background: couleur, border: "1px solid #ddd6c8",
+            }} />
           </div>
         </div>
 
