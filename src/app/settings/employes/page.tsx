@@ -235,9 +235,9 @@ export default function SettingsEmployesPage() {
         </div>
       </div>
 
-      {showAddModal && currentEtab && (
+      {showAddModal && (
         <AddCollaborateurModal
-          etablissementId={currentEtab.id}
+          etablissementId={currentEtab?.id ?? etabs[0]?.id ?? ""}
           onClose={() => setShowAddModal(false)}
           onCreated={() => window.location.reload()}
         />
