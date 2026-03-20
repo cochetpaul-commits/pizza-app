@@ -32,6 +32,8 @@ type Settings = {
   acquisition_mensuelle_cp: number;
   type_indemnisation_repas: string;
   valeur_avantage_nature: number;
+  cp_periode_jour: number;
+  cp_periode_mois: number;
   actif: boolean;
 };
 
@@ -412,7 +414,7 @@ export default function EtablissementDetailPage() {
               backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
               backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center",
               paddingRight: 24, minWidth: 52,
-            }} defaultValue="1">
+            }} value={settings.cp_periode_jour ?? 1} onChange={e => updateField({ cp_periode_jour: Number(e.target.value) })}>
               {Array.from({ length: 31 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
             </select>
             <select style={{
@@ -422,7 +424,7 @@ export default function EtablissementDetailPage() {
               backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
               backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center",
               paddingRight: 28, minWidth: 90,
-            }} defaultValue="6">
+            }} value={settings.cp_periode_mois ?? 6} onChange={e => updateField({ cp_periode_mois: Number(e.target.value) })}>
               {["janvier", "fevrier", "mars", "avril", "mai", "juin", "juillet", "aout", "septembre", "octobre", "novembre", "decembre"].map((m, i) => (
                 <option key={i} value={i + 1}>{m}</option>
               ))}
@@ -433,14 +435,20 @@ export default function EtablissementDetailPage() {
 
         {/* Save + last update */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16, paddingTop: 14, borderTop: "1px solid #f0ebe3" }}>
-          <button type="button" onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 2000); }} style={{
+          <button type="button" onClick={() => updateField({
+            base_calcul_cp: settings.base_calcul_cp,
+            acquisition_mensuelle_cp: settings.acquisition_mensuelle_cp,
+            cp_periode_jour: settings.cp_periode_jour,
+            cp_periode_mois: settings.cp_periode_mois,
+          })} style={{
             padding: "8px 20px", borderRadius: 6, border: "1px solid #ddd6c8",
-            background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#999",
+            background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
+            color: saving ? "#D4775A" : "#999",
           }}>
-            Enregistrer
+            {saving ? "Enregistrement..." : "Enregistrer"}
           </button>
-          <span style={{ fontSize: 11, color: "#999" }}>
-            Mise a jour le {new Date().toLocaleDateString("fr-FR")}.
+          <span style={{ fontSize: 11, color: saved ? "#22c55e" : "#999" }}>
+            {saved ? "Enregistre" : `Mise a jour le ${new Date().toLocaleDateString("fr-FR")}.`}
           </span>
         </div>
       </div>
