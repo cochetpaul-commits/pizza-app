@@ -90,8 +90,8 @@ export const PERFORMANCES_ITEMS: NavItemV2[] = [
 ];
 
 export const OPERATIONS_ITEMS: NavItemV2[] = [
-  { label: "Catalogue recettes", href: "/recettes", icon: "book" },
-  { label: "Fiches techniques", href: "/recettes", icon: "book" },
+  { label: "Catalogue", href: "/catalogue", icon: "book" },
+  { label: "Fiches techniques", href: "/recettes", icon: "fileText" },
   { label: "Commandes", href: "/commandes", icon: "shoppingBag" },
   { label: "Inventaire", href: "/inventaire", icon: "package" },
 ];
@@ -317,6 +317,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/commandes": "Commandes",
   "/inventaire": "Inventaire",
   "/recettes": "Recettes",
+  "/catalogue": "Catalogue",
   "/epicerie": "Articles en vente",
   "/finances": "Finances",
   "/evenements": "Evenements",

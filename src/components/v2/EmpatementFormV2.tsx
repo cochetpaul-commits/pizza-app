@@ -15,6 +15,7 @@ import { GestionCommandes } from "./GestionCommandes";
 import { GestionPilotage } from "./GestionPilotage";
 import type { Ingredient } from "@/types/ingredients";
 import { fetchApi } from "@/lib/fetchApi";
+import { PublishCatalogueButton } from "./PublishCatalogueButton";
 
 const TYPE_OPTIONS: { id: EmpatementType; label: string }[] = [
   { id: "direct",   label: "Direct" },
@@ -357,10 +358,13 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {isEdit && (
+              <>
               <button type="button" className="btn" onClick={handleExportPdf} disabled={pdfLoading}
                 style={{ fontSize: 12 }}>
                 {pdfLoading ? "Export\u2026" : "Apercu PDF"}
               </button>
+              <PublishCatalogueButton recipeType="empatement" recipeId={recipeId!} />
+              </>
             )}
             {userCanWrite && (
               <button onClick={handleSave} disabled={saving} className="btn btnPrimary">

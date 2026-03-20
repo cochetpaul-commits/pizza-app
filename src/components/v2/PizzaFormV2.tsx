@@ -18,6 +18,7 @@ import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./Ingredi
 import { StepsList } from "./StepsList";
 import { PricingBlock } from "./PricingBlock";
 import { GestionFoodCost } from "./GestionFoodCost";
+import { PublishCatalogueButton } from "./PublishCatalogueButton";
 import { GestionCommandes } from "./GestionCommandes";
 import { GestionPilotage } from "./GestionPilotage";
 import { StepperInput } from "@/components/StepperInput";
@@ -525,10 +526,13 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
               </button>
             )}
             {isEdit && (
-              <button type="button" className="btn" onClick={handleExportPdf} disabled={pdfLoading}
-                style={{ fontSize: 12 }}>
-                {pdfLoading ? "Export\u2026" : "Apercu PDF"}
-              </button>
+              <>
+                <button type="button" className="btn" onClick={handleExportPdf} disabled={pdfLoading}
+                  style={{ fontSize: 12 }}>
+                  {pdfLoading ? "Export\u2026" : "Apercu PDF"}
+                </button>
+                <PublishCatalogueButton recipeType="pizza" recipeId={pizzaId!} />
+              </>
             )}
             {userCanWrite && (
               <button onClick={handleSave} disabled={saving} className="btn btnPrimary">

@@ -21,6 +21,7 @@ import { GestionPilotage } from "./GestionPilotage";
 import { StepperInput } from "@/components/StepperInput";
 import type { Ingredient } from "@/types/ingredients";
 import type { CpuByUnit } from "@/lib/offerPricing";
+import { PublishCatalogueButton } from "./PublishCatalogueButton";
 
 const COCKTAIL_UNITS = ["g", "cL", "pcs"];
 const ACCENT = "#0E7490";
@@ -493,10 +494,13 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
               </button>
             )}
             {isEdit && (
-              <button type="button" className="btn" onClick={handleExportPdf} disabled={pdfLoading}
-                style={{ fontSize: 12 }}>
-                {pdfLoading ? "Export\u2026" : "Apercu PDF"}
-              </button>
+              <>
+                <button type="button" className="btn" onClick={handleExportPdf} disabled={pdfLoading}
+                  style={{ fontSize: 12 }}>
+                  {pdfLoading ? "Export\u2026" : "Apercu PDF"}
+                </button>
+                <PublishCatalogueButton recipeType="cocktail" recipeId={cocktailId!} />
+              </>
             )}
             {userCanWrite && (
               <button onClick={handleSave} disabled={saving} className="btn btnPrimary">
