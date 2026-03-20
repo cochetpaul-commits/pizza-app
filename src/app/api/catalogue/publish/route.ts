@@ -5,6 +5,18 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function extractAllergens(rows: any[] | null): string[] {
+  if (!rows) return [];
+  const set = new Set<string>();
+  for (const r of rows) {
+    const a = r?.ingredient?.allergens;
+    if (Array.isArray(a)) a.forEach((x: string) => { if (x) set.add(x); });
+  }
+  return [...set].sort();
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 /**
  * POST /api/catalogue/publish
  * Body: { recipeType: "pizza"|"cuisine"|"cocktail"|"empatement", recipeId: string }
@@ -62,19 +74,48 @@ export async function POST(req: NextRequest) {
   let name = "Recette";
   let category: string | null = null;
   let photoUrl: string | null = null;
+  let ingredientCount = 0;
+  let stepCount = 0;
+  let allergens: string[] = [];
 
   if (recipeType === "pizza") {
-    const { data } = await supabaseAdmin.from("pizza_recipes").select("name, photo_url").eq("id", recipeId).single();
-    if (data) { name = data.name; photoUrl = data.photo_url; }
+    const { data } = await supabaseAdmin.from("pizza_recipes").select("name, photo_url, notes").eq("id", recipeId).single();
+    if (data) {
+      name = data.name; photoUrl = data.photo_url;
+      try { stepCount = Array.isArray(JSON.parse(data.notes || "[]")) ? JSON.parse(data.notes || "[]").length : 0; } catch { stepCount = 0; }
+    }
+    const { count } = await supabaseAdmin.from("pizza_ingredients").select("id", { count: "exact", head: true }).eq("pizza_id", recipeId);
+    ingredientCount = count ?? 0;
+    const { data: ings } = await supabaseAdmin.from("pizza_ingredients").select("ingredient:ingredients(allergens)").eq("pizza_id", recipeId);
+    allergens = extractAllergens(ings);
   } else if (recipeType === "cuisine") {
-    const { data } = await supabaseAdmin.from("kitchen_recipes").select("name, category, photo_url").eq("id", recipeId).single();
-    if (data) { name = data.name; category = data.category; photoUrl = data.photo_url; }
+    const { data } = await supabaseAdmin.from("kitchen_recipes").select("name, category, photo_url, procedure").eq("id", recipeId).single();
+    if (data) {
+      name = data.name; category = data.category; photoUrl = data.photo_url;
+      try { stepCount = Array.isArray(JSON.parse(data.procedure || "[]")) ? JSON.parse(data.procedure || "[]").length : 0; } catch { stepCount = 0; }
+    }
+    const { count } = await supabaseAdmin.from("kitchen_recipe_lines").select("id", { count: "exact", head: true }).eq("recipe_id", recipeId);
+    ingredientCount = count ?? 0;
+    const { data: ings } = await supabaseAdmin.from("kitchen_recipe_lines").select("ingredient:ingredients(allergens)").eq("recipe_id", recipeId);
+    allergens = extractAllergens(ings);
   } else if (recipeType === "cocktail") {
-    const { data } = await supabaseAdmin.from("cocktails").select("name, image_url").eq("id", recipeId).single();
-    if (data) { name = data.name; photoUrl = data.image_url; }
+    const { data } = await supabaseAdmin.from("cocktails").select("name, image_url, steps").eq("id", recipeId).single();
+    if (data) {
+      name = data.name; photoUrl = data.image_url;
+      try { stepCount = Array.isArray(JSON.parse(data.steps || "[]")) ? JSON.parse(data.steps || "[]").length : 0; } catch { stepCount = 0; }
+    }
+    const { count } = await supabaseAdmin.from("cocktail_ingredients").select("id", { count: "exact", head: true }).eq("cocktail_id", recipeId);
+    ingredientCount = count ?? 0;
+    const { data: ings } = await supabaseAdmin.from("cocktail_ingredients").select("ingredient:ingredients(allergens)").eq("cocktail_id", recipeId);
+    allergens = extractAllergens(ings);
   } else if (recipeType === "empatement") {
     const { data } = await supabaseAdmin.from("recipes").select("name").eq("id", recipeId).single();
     if (data) { name = data.name; }
+    const { count } = await supabaseAdmin.from("recipe_ingredients").select("id", { count: "exact", head: true }).eq("recipe_id", recipeId);
+    ingredientCount = (count ?? 0);
+    // Also count flours
+    const { count: flourCount } = await supabaseAdmin.from("recipe_flours").select("id", { count: "exact", head: true }).eq("recipe_id", recipeId);
+    ingredientCount += (flourCount ?? 0);
   }
 
   // Upload PDF to Storage
@@ -106,6 +147,9 @@ export async function POST(req: NextRequest) {
         category,
         photo_url: photoUrl,
         pdf_url: pdfUrl,
+        ingredient_count: ingredientCount,
+        step_count: stepCount,
+        allergens,
         exported_at: new Date().toISOString(),
         exported_by: etab.userId,
       },
@@ -126,7 +170,7 @@ export async function POST(req: NextRequest) {
 export async function GET() {
   const { data, error } = await supabaseAdmin
     .from("catalogue_fiches")
-    .select("id, recipe_type, recipe_id, name, category, photo_url, pdf_url, exported_at")
+    .select("id, recipe_type, recipe_id, name, category, photo_url, pdf_url, ingredient_count, step_count, allergens, exported_at")
     .order("recipe_type")
     .order("name");
 
