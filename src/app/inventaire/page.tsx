@@ -20,11 +20,13 @@ type Inventaire = {
 
 type Zone = { id: string; nom: string };
 
-const ZONES: Zone[] = [
+const DEFAULT_ZONES: Zone[] = [
   { id: "frigo", nom: "Frigo" },
   { id: "cave", nom: "Cave" },
   { id: "sec", nom: "Sec" },
   { id: "congel", nom: "Congelateur" },
+  { id: "bar", nom: "Bar" },
+  { id: "reserve", nom: "Reserve" },
 ];
 
 function categoryToZone(cat: string | null): string {
@@ -44,6 +46,11 @@ function categoryToZone(cat: string | null): string {
     default:
       return "sec";
   }
+}
+
+/** Resolve zone: explicit storage_zone on ingredient, or auto from category */
+function resolveZone(ing: Ingredient): string {
+  return ing.storage_zone || categoryToZone(ing.category);
 }
 
 function fmtDate(iso: string) {
@@ -255,8 +262,15 @@ export default function InventairePage() {
 
   // ── Computed ───────────────────────────────────────────────
 
+  // Build zones list: only show zones that have at least 1 ingredient
+  const activeZones = useMemo(() => {
+    const zoneSet = new Set<string>();
+    for (const ing of ingredients) zoneSet.add(resolveZone(ing));
+    return DEFAULT_ZONES.filter((z) => zoneSet.has(z.id));
+  }, [ingredients]);
+
   const zoneIngredients = useMemo(() => {
-    return ingredients.filter((ing) => categoryToZone(ing.category) === activeZone);
+    return ingredients.filter((ing) => resolveZone(ing) === activeZone);
   }, [ingredients, activeZone]);
 
   const isActive = !!session && !viewingId;
@@ -296,11 +310,11 @@ export default function InventairePage() {
   // Zone counts for badges
   const zoneCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const z of ZONES) counts[z.id] = 0;
+    for (const z of DEFAULT_ZONES) counts[z.id] = 0;
     for (const ing of ingredients) {
       const qty = Number(quantities[ing.id] ?? 0);
       if (qty > 0) {
-        const zone = categoryToZone(ing.category);
+        const zone = resolveZone(ing);
         counts[zone] = (counts[zone] ?? 0) + 1;
       }
     }
@@ -462,7 +476,7 @@ export default function InventairePage() {
 
         {/* Zone tabs */}
         <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
-          {ZONES.map((z) => {
+          {activeZones.map((z) => {
             const isActiveZone = activeZone === z.id;
             const count = zoneCounts[z.id] ?? 0;
             return (

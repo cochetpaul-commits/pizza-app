@@ -102,6 +102,9 @@ export type Ingredient = {
 
   order_unit_label?: string | null;
 
+  // Lieu de stockage (inventaire)
+  storage_zone?: string | null;
+
   // Ingrédients dérivés (rendement)
   parent_ingredient_id?: string | null;
   rendement?: number | null;

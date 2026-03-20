@@ -20,11 +20,21 @@ type Ingredient = {
   supplier_id: string | null; establishments: string[] | null;
   unit?: string | null;
   order_unit_label?: string | null;
+  storage_zone?: string | null;
   parent_ingredient_id?: string | null;
   rendement?: number | null;
   is_derived?: boolean;
   cost_per_unit?: number | null;
 };
+
+const DEFAULT_ZONES = [
+  { id: "frigo", label: "Frigo" },
+  { id: "cave", label: "Cave" },
+  { id: "sec", label: "Sec" },
+  { id: "congel", label: "Congelateur" },
+  { id: "bar", label: "Bar" },
+  { id: "reserve", label: "Reserve" },
+];
 
 type DerivedIngredient = {
   id: string;
@@ -110,6 +120,9 @@ function IngredientDetailInner() {
   // Order unit editing
   const [orderUnit, setOrderUnit] = useState("");
   const [orderUnitSaved, setOrderUnitSaved] = useState(false);
+  // Storage zone
+  const [storageZone, setStorageZone] = useState<string>("");
+  const [storageZoneSaved, setStorageZoneSaved] = useState(false);
 
   const [derivedList, setDerivedList] = useState<DerivedIngredient[]>([]);
   const [parentInfo, setParentInfo] = useState<ParentInfo | null>(null);
@@ -149,6 +162,7 @@ function IngredientDetailInner() {
         const ingTyped = ing as Ingredient;
         setIngredient(ingTyped);
         setOrderUnit(ingTyped.order_unit_label ?? "");
+        setStorageZone(ingTyped.storage_zone ?? "");
 
         // Fetch supplier names
         const supplierIds = [...new Set((offerData ?? []).map((o: { supplier_id: string }) => o.supplier_id))];
@@ -378,6 +392,33 @@ function IngredientDetailInner() {
             }}
           />
           {orderUnitSaved && <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 600 }}>Enregistre</span>}
+        </div>
+
+        {/* ── Lieu de stockage ── */}
+        <div className="card" style={{ marginBottom: 12, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, opacity: 0.65, whiteSpace: "nowrap" }}>Stockage</span>
+          <select
+            value={storageZone}
+            onChange={async (e) => {
+              const val = e.target.value || null;
+              setStorageZone(e.target.value);
+              setStorageZoneSaved(false);
+              await supabase.from("ingredients").update({ storage_zone: val }).eq("id", id);
+              setStorageZoneSaved(true);
+              setTimeout(() => setStorageZoneSaved(false), 2000);
+            }}
+            style={{
+              flex: 1, height: 32, borderRadius: 8,
+              border: "1.5px solid #e5ddd0", padding: "4px 10px",
+              fontSize: 13, background: "#fff",
+            }}
+          >
+            <option value="">Auto (par catégorie)</option>
+            {DEFAULT_ZONES.map((z) => (
+              <option key={z.id} value={z.id}>{z.label}</option>
+            ))}
+          </select>
+          {storageZoneSaved && <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 600 }}>Enregistre</span>}
         </div>
 
         {/* ── Meilleur prix ── */}
