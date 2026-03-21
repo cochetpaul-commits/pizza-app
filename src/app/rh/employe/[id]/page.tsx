@@ -553,9 +553,11 @@ export default function EmployeDetailPage() {
             const r = (emp as Record<string, unknown>).role as string ?? "employe";
             // Administrateur = couleur iFratelli group #b45f57
             if (r === "group_admin" || r === "proprietaire" || r === "admin") return `linear-gradient(135deg, #b45f57 0%, #8a4842 100%)`;
-            // Employe + Manager = couleur du restaurant de l'employe
+            // Employé + Manager = couleur du restaurant de l'employé
             const c = empEtab?.couleur ?? etab?.couleur ?? "#e27f57";
-            return `linear-gradient(135deg, ${c} 0%, ${c}cc 100%)`;
+            // Fallback si couleur est le défaut Supabase #D4775A
+            const finalColor = (c === "#D4775A" && empEtab?.nom?.toLowerCase().includes("piccola")) ? "#efd199" : c;
+            return `linear-gradient(135deg, ${finalColor} 0%, ${finalColor}cc 100%)`;
           })(),
           borderRadius: 14, padding: "20px 24px 0", color: "#fff",
         }}>
@@ -694,8 +696,9 @@ export default function EmployeDetailPage() {
                   </span>
                   <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Etat civil</span>
                 </div>
-                <Field label="Genre" value={genre} onChange={setGenre} disabled={!canWrite} />
-                <Field label="Prenom" value={prenom} onChange={setPrenom} disabled={!canWrite} />
+                <FieldSelect label="Genre" value={genre} onChange={setGenre} disabled={!canWrite}
+                  options={[["", "— Sélectionner —"], ["M", "Homme"], ["F", "Femme"]]} />
+                <Field label="Prénom" value={prenom} onChange={setPrenom} disabled={!canWrite} />
                 <Field label="Nom de naissance" value={nom} onChange={setNom} disabled={!canWrite} />
                 <Field label="Nationalite" value={nationalite} onChange={setNationalite} disabled={!canWrite} />
                 <Field label="Date de naissance" type="date" value={dateNaissance} onChange={setDateNaissance} disabled={!canWrite} />
@@ -1747,26 +1750,23 @@ export default function EmployeDetailPage() {
                   </div>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
-                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", width: 90 }}>Jour</th>
-                      <th style={{ textAlign: "center", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", width: 60 }}>Dispo</th>
-                      <th style={{ textAlign: "center", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Debut</th>
-                      <th style={{ textAlign: "center", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Fin</th>
+                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", width: 100 }}>Jour</th>
+                      <th style={{ textAlign: "center", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Disponibilité</th>
                     </tr></thead>
                     <tbody>
                       {JOURS.map((j, idx) => {
-                        const dispoKey = `dispo_${idx}`;
-                        const isAvail = (emp as Record<string, unknown>)[dispoKey] !== false;
+                        const dispos = ((emp as Record<string, unknown>).disponibilites as Record<string, unknown>) ?? {};
+                        const val = String(dispos[String(idx)] ?? "journee");
                         return (
                           <tr key={j} style={{ borderBottom: "1px solid #f0ebe3" }}>
                             <td style={{ padding: "8px 0", fontWeight: 500 }}>{j}</td>
-                            <td style={{ padding: "8px 0", textAlign: "center" }}>
-                              <input type="checkbox" defaultChecked={isAvail} style={{ width: 16, height: 16, cursor: "pointer" }} />
-                            </td>
-                            <td style={{ padding: "4px 4px", textAlign: "center" }}>
-                              <input type="time" defaultValue="09:00" style={{ padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd6c8", fontSize: 11, width: 75, textAlign: "center" }} />
-                            </td>
-                            <td style={{ padding: "4px 4px", textAlign: "center" }}>
-                              <input type="time" defaultValue="22:00" style={{ padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd6c8", fontSize: 11, width: 75, textAlign: "center" }} />
+                            <td style={{ padding: "4px 0", textAlign: "center" }}>
+                              <select defaultValue={val === "false" || val === "indisponible" ? "indisponible" : val === "matin" ? "matin" : val === "soir" ? "soir" : "journee"} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd6c8", fontSize: 12, cursor: "pointer" }}>
+                                <option value="journee">Journée</option>
+                                <option value="matin">Matin</option>
+                                <option value="soir">Soir</option>
+                                <option value="indisponible">Indisponible</option>
+                              </select>
                             </td>
                           </tr>
                         );
@@ -1774,7 +1774,13 @@ export default function EmployeDetailPage() {
                     </tbody>
                   </table>
                   <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
-                    <button type="button" onClick={() => alert("Disponibilites sauvegardees")} style={{
+                    <button type="button" onClick={async () => {
+                      const selects = document.querySelectorAll("table select");
+                      const dispos: Record<string, string> = {};
+                      selects.forEach((sel, idx) => { dispos[String(idx)] = (sel as HTMLSelectElement).value; });
+                      await supabase.from("employes").update({ disponibilites: dispos }).eq("id", emp.id);
+                      alert("Disponibilités enregistrées");
+                    }} style={{
                       padding: "6px 14px", borderRadius: 6, border: "none",
                       background: "#1a1a1a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer",
                     }}>
@@ -2066,18 +2072,32 @@ export default function EmployeDetailPage() {
               <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>Disponibilites</h2>
               <button type="button" onClick={() => setShowDispoModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#999" }}>x</button>
             </div>
-            {["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"].map(j => (
-              <div key={j} style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 4 }}>{j}</label>
-                <select defaultValue="disponible" style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14 }}>
-                  <option value="disponible">Disponible</option>
-                  <option value="partiel">Disponible partiellement</option>
-                  <option value="indisponible">Indisponible</option>
-                </select>
-              </div>
-            ))}
+            {["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"].map((j, idx) => {
+              const dispos = ((emp as Record<string, unknown>).disponibilites as Record<string, unknown>) ?? {};
+              const val = String(dispos[String(idx)] ?? "journee");
+              return (
+                <div key={j} style={{ marginBottom: 14 }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 4 }}>{j}</label>
+                  <select id={`dispo-modal-${idx}`} defaultValue={val === "false" || val === "indisponible" ? "indisponible" : val === "matin" ? "matin" : val === "soir" ? "soir" : "journee"} style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14 }}>
+                    <option value="journee">Journée</option>
+                    <option value="matin">Matin</option>
+                    <option value="soir">Soir</option>
+                    <option value="indisponible">Indisponible</option>
+                  </select>
+                </div>
+              );
+            })}
             <div style={{ position: "sticky", bottom: 0, paddingTop: 16 }}>
-              <button type="button" onClick={() => { alert("Disponibilites enregistrees"); setShowDispoModal(false); }} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+              <button type="button" onClick={async () => {
+                const dispos: Record<string, string> = {};
+                for (let i = 0; i < 7; i++) {
+                  const sel = document.getElementById(`dispo-modal-${i}`) as HTMLSelectElement;
+                  if (sel) dispos[String(i)] = sel.value;
+                }
+                await supabase.from("employes").update({ disponibilites: dispos }).eq("id", emp.id);
+                setEmp((prev: Record<string, unknown>) => ({ ...prev, disponibilites: dispos }));
+                setShowDispoModal(false);
+              }} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
                 Enregistrer
               </button>
             </div>
