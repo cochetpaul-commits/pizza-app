@@ -86,6 +86,8 @@ export default function StatsAchatsPage() {
   const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([]);
   const [monthBars, setMonthBars] = useState<MonthBar[]>([]);
 
+  const etabId = etab.current?.id ?? null;
+
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -93,12 +95,15 @@ export default function StatsAchatsPage() {
       const months = parseInt(period);
       const startDate = getStartDate(months);
 
-      // Current period
-      const { data } = await supabase
+      // Current period — filter by etablissement
+      let q = supabase
         .from("supplier_invoices")
         .select("invoice_date, total_ht, supplier_id, suppliers(name)")
         .gte("invoice_date", startDate)
         .order("invoice_date", { ascending: true });
+      if (etabId) q = q.eq("etablissement_id", etabId);
+
+      const { data } = await q;
 
       const rows = (data ?? []) as unknown as {
         invoice_date: string | null;
@@ -109,11 +114,14 @@ export default function StatsAchatsPage() {
 
       // Previous period (for trend)
       const prevStart = getStartDate(months * 2);
-      const { data: prevData } = await supabase
+      let prevQ = supabase
         .from("supplier_invoices")
         .select("total_ht")
         .gte("invoice_date", prevStart)
         .lt("invoice_date", startDate);
+      if (etabId) prevQ = prevQ.eq("etablissement_id", etabId);
+
+      const { data: prevData } = await prevQ;
 
       const prevTotal = (prevData ?? []).reduce((s, r: { total_ht: number | null }) => s + (r.total_ht ?? 0), 0);
 
@@ -149,11 +157,13 @@ export default function StatsAchatsPage() {
       const byCat: Record<string, number> = {};
       if (supplierIdsArr.length > 0) {
         // Get ingredients per supplier with their categories
-        const { data: ingData } = await supabase
+        let ingQ = supabase
           .from("ingredients")
           .select("supplier_id, category")
           .in("supplier_id", supplierIdsArr)
           .not("category", "is", null);
+        if (etabId) ingQ = ingQ.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
+        const { data: ingData } = await ingQ;
 
         // Count ingredients per supplier per category
         const supplierCatCounts: Record<string, Record<string, number>> = {};
@@ -267,7 +277,7 @@ export default function StatsAchatsPage() {
 
       setLoading(false);
     })();
-  }, [period, etab]);
+  }, [period, etabId]);
 
   // Max for horizontal bars
   const maxSupplier = topSuppliers.length > 0 ? topSuppliers[0].totalHT : 1;
