@@ -325,6 +325,29 @@ export default function PlanningPage() {
   const goWeek = (delta: number) => setWeekStart((w) => addDays(w, delta * 7));
   const goToday = () => setWeekStart(getMonday(new Date()));
 
+  /* ── Duplicate previous week ── */
+  const duplicateWeek = async () => {
+    if (!etab || !confirm("Dupliquer les shifts de la semaine précédente ?")) return;
+    setSaving(true);
+    const prevMonday = toISO(addDays(weekStart, -7));
+    const prevSunday = toISO(addDays(weekStart, -1));
+    const { data: prevShifts } = await supabase
+      .from("shifts")
+      .select("employe_id, poste_id, date, heure_debut, heure_fin, pause_minutes, note")
+      .eq("etablissement_id", etab.id)
+      .gte("date", prevMonday)
+      .lte("date", prevSunday);
+    if (!prevShifts || prevShifts.length === 0) { setSaving(false); return; }
+    const newShifts = prevShifts.map((s) => {
+      const oldDate = new Date(s.date + "T00:00:00");
+      const dayOffset = Math.round((oldDate.getTime() - new Date(prevMonday + "T00:00:00").getTime()) / 86400000);
+      return { ...s, etablissement_id: etab.id, date: toISO(addDays(weekStart, dayOffset)), statut: "brouillon" };
+    });
+    const { data: inserted } = await supabase.from("shifts").insert(newShifts).select();
+    if (inserted) setShifts((prev) => [...prev, ...inserted]);
+    setSaving(false);
+  };
+
   const weekLabel = useMemo(() => {
     const s = weekDates[0];
     const e = weekDates[6];
@@ -543,14 +566,42 @@ export default function PlanningPage() {
   return (
     <RequireRole allowedRoles={["group_admin", "cuisine", "salle"]}>
       <div style={pageStyle}>
-        {/* ── Establishment badge ── */}
-        {etab && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: etab.couleur ?? "#D4775A" }} />
-            <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a" }}>{etab.nom}</span>
-            <span style={{ fontSize: 11, color: "#999" }}>— Planning</span>
+        {/* ── Header with establishment + actions ── */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {etab && (
+              <>
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: etab.couleur ?? "#D4775A" }} />
+                <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700, color: "#1a1a1a" }}>{etab.nom}</span>
+              </>
+            )}
           </div>
-        )}
+          <div style={{ display: "flex", gap: 8 }}>
+            {canWrite && (
+              <>
+                <button type="button" onClick={duplicateWeek} disabled={saving} style={{
+                  padding: "6px 14px", borderRadius: 8, border: "1px solid #ddd6c8",
+                  background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
+                }}>
+                  Dupliquer S-1
+                </button>
+                <button type="button" onClick={async () => {
+                  if (!etab) return;
+                  // Mark all shifts this week as published
+                  const weekShiftIds = shifts.map(s => s.id);
+                  if (weekShiftIds.length === 0) { return; }
+                  await supabase.from("shifts").update({ statut: "publie" }).in("id", weekShiftIds);
+                  setShifts(prev => prev.map(s => ({ ...s, statut: "publie" })));
+                }} style={{
+                  padding: "6px 14px", borderRadius: 8, border: "none",
+                  background: "#2D6A4F", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                }}>
+                  Publier le planning
+                </button>
+              </>
+            )}
+          </div>
+        </div>
 
         {/* ── Week navigation ── */}
         <div style={weekNav}>
@@ -664,18 +715,22 @@ export default function PlanningPage() {
                             <span style={{ ...statItem, fontWeight: 700 }}>{fmtHM(weekHours)}</span>
                             <span style={statSep}>|</span>
                             <span style={statItem}>{fmtHM(hsTotal)}</span>
-                            {delta !== 0 && (
+                            {(() => {
+                              const color = delta === 0 ? "#2D6A4F" : delta > 0 ? "#DC2626" : "#c47a20";
+                              const bg = delta === 0 ? "rgba(45,106,79,0.1)" : delta > 0 ? "rgba(220,38,38,0.1)" : "rgba(234,160,60,0.15)";
+                              return (
                               <>
                                 <span style={statSep}>|</span>
                                 <span style={{
                                   ...deltaBadge,
-                                  background: delta > 0 ? "rgba(220,38,38,0.1)" : "rgba(234,160,60,0.15)",
-                                  color: delta > 0 ? "#DC2626" : "#c47a20",
+                                  background: bg,
+                                  color,
                                 }}>
-                                  {delta > 0 ? "+" : ""}{fmtHM(delta)}
+                                  {delta === 0 ? "OK" : (delta > 0 ? "+" : "") + fmtHM(delta)}
                                 </span>
                               </>
-                            )}
+                              );
+                            })()}
                             {rcH > 0 && (
                               <>
                                 <span style={statSep}>|</span>
