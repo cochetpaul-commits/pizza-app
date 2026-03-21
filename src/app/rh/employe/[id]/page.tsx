@@ -1834,85 +1834,158 @@ export default function EmployeDetailPage() {
               </div>
             )}
 
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8, marginTop: 16 }}>CONTRAT</div>
-
-            <div style={fieldRow}>
-              <label style={labelSt}>Type de contrat *</label>
-              <select style={inputSt} value={cType} onChange={(e) => setCType(e.target.value)}>
-                {Object.entries(CONTRAT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
+            {/* ── Onglets Contrat / Paie ── */}
+            <div style={{ display: "flex", borderRadius: 20, border: "1px solid #ddd6c8", overflow: "hidden", marginBottom: 16 }}>
+              <button type="button" id="contrat-tab-contrat" onClick={() => { document.getElementById("contrat-section-paie")!.style.display = "none"; document.getElementById("contrat-section-contrat")!.style.display = "block"; document.getElementById("contrat-tab-contrat")!.style.background = "#f0ebe3"; document.getElementById("contrat-tab-paie")!.style.background = "#fff"; }} style={{ flex: 1, padding: "8px 0", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, background: "#f0ebe3" }}>Contrat</button>
+              <button type="button" id="contrat-tab-paie" onClick={() => { document.getElementById("contrat-section-contrat")!.style.display = "none"; document.getElementById("contrat-section-paie")!.style.display = "block"; document.getElementById("contrat-tab-paie")!.style.background = "#f0ebe3"; document.getElementById("contrat-tab-contrat")!.style.background = "#fff"; }} style={{ flex: 1, padding: "8px 0", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, background: "#fff" }}>Paie</button>
             </div>
 
-            <div style={fieldRow}>
-              <label style={labelSt}>Temps de travail hebdomadaire</label>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <input type="number" style={inputSt} value={cHeures} onChange={(e) => setCHeures(Number(e.target.value))} />
-                <span style={{ fontSize: 12, color: "#999" }}>h</span>
-              </div>
-            </div>
+            {/* ── Section Contrat ── */}
+            <div id="contrat-section-contrat">
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>CONTRAT</div>
 
-            <div style={grid2}>
               <div style={fieldRow}>
-                <label style={labelSt}>Date de début de contrat *</label>
-                <input type="date" style={inputSt} value={cDebut} onChange={(e) => setCDebut(e.target.value)} />
+                <label style={labelSt}>Type de contrat *</label>
+                <select style={inputSt} value={cType} onChange={(e) => setCType(e.target.value)}>
+                  {Object.entries(CONTRAT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
               </div>
+
+              <Checkbox label="Ce contrat est en forfait jour" checked={false} onChange={() => {}} />
+
               <div style={fieldRow}>
-                <label style={labelSt}>Date de fin de contrat</label>
-                <input type="date" style={inputSt} value={cFin} onChange={(e) => setCFin(e.target.value)} />
+                <label style={labelSt}>Temps de travail hebdomadaire</label>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <input type="number" style={inputSt} value={cHeures} onChange={(e) => setCHeures(Number(e.target.value))} />
+                  <span style={{ fontSize: 12, color: "#999" }}>h</span>
+                </div>
               </div>
-            </div>
 
-            <div style={fieldRow}>
-              <label style={labelSt}>Jours travaillés par semaine *</label>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <input type="number" style={inputSt} value={cJours} onChange={(e) => setCJours(Number(e.target.value))} min={1} max={7} />
-                <span style={{ fontSize: 12, color: "#999" }}>j</span>
+              <div style={grid2}>
+                <div style={fieldRow}>
+                  <label style={labelSt}>Date de début de contrat *</label>
+                  <input type="date" style={inputSt} value={cDebut} onChange={(e) => setCDebut(e.target.value)} />
+                </div>
+                <div style={fieldRow}>
+                  <label style={labelSt}>Heure de début de contrat</label>
+                  <input type="time" style={inputSt} defaultValue="08:00" />
+                </div>
               </div>
-            </div>
 
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8, marginTop: 16 }}>EMPLOI ET QUALIFICATION</div>
+              {(cType === "CDD" || cType === "extra" || cType === "interim") && (
+                <div style={grid2}>
+                  <div style={fieldRow}>
+                    <label style={labelSt}>Date de fin de contrat *</label>
+                    <input type="date" style={inputSt} value={cFin} onChange={(e) => setCFin(e.target.value)} />
+                  </div>
+                  <div style={fieldRow}>
+                    <label style={labelSt}>Motif du CDD</label>
+                    <select style={inputSt} defaultValue="">
+                      <option value="">Sélectionnez...</option>
+                      <option value="remplacement">Remplacement d&apos;un salarié absent</option>
+                      <option value="accroissement">Accroissement temporaire d&apos;activité</option>
+                      <option value="saisonnier">Emploi saisonnier</option>
+                      <option value="usage">Contrat d&apos;usage</option>
+                    </select>
+                  </div>
+                </div>
+              )}
 
-            <div style={fieldRow}>
-              <label style={labelSt}>Intitulé de l&apos;emploi</label>
-              <input style={inputSt} value={cEmploi} onChange={(e) => setCEmploi(e.target.value)} placeholder="Pizzaiolo, Serveur..." />
-            </div>
-
-            <div style={fieldRow}>
-              <label style={labelSt}>Qualification</label>
-              <select style={inputSt} value={cQualification} onChange={(e) => setCQualification(e.target.value)}>
-                <option value="">Sélectionnez une valeur...</option>
-                <option value="Employe">Employé (Niveau I)</option>
-                <option value="Employe qualifie">Employé qualifié (Niveau II)</option>
-                <option value="Agent de maitrise">Agent de maîtrise (Niveau III)</option>
-                <option value="Cadre">Cadre (Niveau IV-V)</option>
-                <option value="Gerant">Gérant</option>
-              </select>
-            </div>
-
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8, marginTop: 16 }}>RÉMUNÉRATION</div>
-
-            <div style={fieldRow}>
-              <label style={labelSt}>Salaire brut mensuel</label>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <input type="number" style={inputSt} value={cRemuneration} onChange={(e) => setCRemuneration(Number(e.target.value))} />
-                <span style={{ fontSize: 12, color: "#999" }}>€</span>
+              <div style={fieldRow}>
+                <label style={labelSt}>Date de fin de période d&apos;essai</label>
+                <input type="date" style={inputSt} defaultValue="" />
               </div>
+
+              <div style={fieldRow}>
+                <label style={labelSt}>Jours travaillés par semaine *</label>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <input type="number" style={inputSt} value={cJours} onChange={(e) => setCJours(Number(e.target.value))} min={1} max={7} />
+                  <span style={{ fontSize: 12, color: "#999" }}>j</span>
+                </div>
+              </div>
+
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8, marginTop: 16 }}>EMPLOI ET QUALIFICATION</div>
+
+              <div style={fieldRow}>
+                <label style={labelSt}>Intitulé de l&apos;emploi <span style={{ fontSize: 9, color: "#999", fontWeight: 400 }}>RUP</span></label>
+                <input style={inputSt} value={cEmploi} onChange={(e) => setCEmploi(e.target.value)} placeholder="Pizzaiolo, Serveur..." />
+              </div>
+
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4, marginTop: 8 }}>QUALIFICATION</div>
+
+              <div style={fieldRow}>
+                <label style={labelSt}>Catégorie *</label>
+                <select style={inputSt} value={cQualification} onChange={(e) => setCQualification(e.target.value)}>
+                  <option value="">Sélectionnez une valeur...</option>
+                  <option value="Employe N1">Employé - Niveau I (Échelon 1-3)</option>
+                  <option value="Employe N2">Employé qualifié - Niveau II (Échelon 1-3)</option>
+                  <option value="Employe N3">Employé qualifié - Niveau III (Échelon 1-2)</option>
+                  <option value="Agent maitrise N4">Agent de maîtrise - Niveau IV (Échelon 1-2)</option>
+                  <option value="Cadre N5">Cadre - Niveau V (Échelon 1-3)</option>
+                  <option value="Gerant">Gérant / TNS</option>
+                </select>
+              </div>
+
+              <div style={fieldRow}>
+                <label style={labelSt}>Autre qualification</label>
+                <input style={inputSt} value={cQualification} onChange={(e) => setCQualification(e.target.value)} />
+                <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Si vous n&apos;indiquez pas de qualification, la mention &quot;Autre qualification&quot; sera indiquée par défaut dans le Registre Unique du Personnel.</div>
+              </div>
+
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8, marginTop: 16 }}>RATTACHEMENT</div>
+
+              <div style={fieldRow}>
+                <label style={labelSt}>Établissement par défaut *</label>
+                <select style={inputSt} defaultValue={(emp as Record<string, unknown>).etablissement_id as string ?? ""}>
+                  {etablissements.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
+                </select>
+              </div>
+
+              <div style={fieldRow}>
+                <label style={labelSt}>Équipe par défaut *</label>
+                <select style={inputSt} defaultValue={((emp as Record<string, unknown>).equipes_access as string[] ?? [])[0] ?? ""}>
+                  {((emp as Record<string, unknown>).equipes_access as string[] ?? []).map(eq => <option key={eq} value={eq}>{eq}</option>)}
+                </select>
+              </div>
+
+              <div style={fieldRow}>
+                <label style={labelSt}>Responsable hiérarchique</label>
+                <select style={inputSt} defaultValue="">
+                  <option value="">Sélectionnez...</option>
+                </select>
+              </div>
+
+              <Checkbox label="Ne pas afficher dans le registre du personnel" checked={false} onChange={() => {}} />
             </div>
 
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8, marginTop: 16 }}>RATTACHEMENT</div>
+            {/* ── Section Paie ── */}
+            <div id="contrat-section-paie" style={{ display: "none" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>SALAIRE</div>
 
-            <div style={fieldRow}>
-              <label style={labelSt}>Établissement par défaut *</label>
-              <select style={inputSt} value={(emp as Record<string, unknown>).etablissement_id as string ?? ""} disabled>
-                {etablissements.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
-              </select>
-            </div>
+              <Checkbox label="Salarié au SMIC" checked={false} onChange={() => {}} />
+              <div style={{ padding: 8, borderRadius: 8, background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.12)", marginBottom: 12, fontSize: 11, color: "#2563eb" }}>
+                Pour appliquer le SMIC à un salarié vous devez renseigner au préalable le temps de travail hebdomadaire prévu au contrat de travail.
+              </div>
 
-            <div style={fieldRow}>
-              <label style={labelSt}>Équipe par défaut *</label>
-              <select style={inputSt} value={((emp as Record<string, unknown>).equipes_access as string[] ?? [])[0] ?? ""} disabled>
-                {((emp as Record<string, unknown>).equipes_access as string[] ?? []).map(eq => <option key={eq} value={eq}>{eq}</option>)}
-              </select>
+              <div style={fieldRow}>
+                <label style={labelSt}>Salaire brut mensuel</label>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <input type="number" style={inputSt} value={cRemuneration} onChange={(e) => setCRemuneration(Number(e.target.value))} />
+                  <span style={{ fontSize: 12, color: "#999" }}>€</span>
+                </div>
+              </div>
+
+              <div style={fieldRow}>
+                <label style={labelSt}>Taux horaire brut</label>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <input type="number" style={inputSt} value={cHeures > 0 ? Math.round(cRemuneration / (cHeures * 52 / 12) * 100) / 100 : 0} disabled />
+                  <span style={{ fontSize: 12, color: "#999" }}>€</span>
+                </div>
+              </div>
+
+              <div style={{ padding: 10, borderRadius: 8, background: "rgba(220,38,38,0.04)", border: "1px solid rgba(220,38,38,0.12)", marginBottom: 12, fontSize: 11, color: "#DC2626", lineHeight: 1.4 }}>
+                Pour le calcul des heures supplémentaires, il ne peut y avoir qu&apos;un seul temps de travail hebdomadaire par semaine civile (du lundi au dimanche). Combo utilise le temps de travail contractuel effectif en début de semaine pour calculer les heures supplémentaires.
+              </div>
             </div>
 
             <Checkbox label="Contrat actif" checked={cActif} onChange={setCActif} />
