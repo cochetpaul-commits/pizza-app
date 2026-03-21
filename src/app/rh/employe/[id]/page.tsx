@@ -103,7 +103,7 @@ const COMPLETION_FIELDS = [
 
 export default function EmployeDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { current: etab, etablissements } = useEtablissement();
+  const { current: etab } = useEtablissement();
   const [empEtab, setEmpEtab] = useState<{ id: string; nom: string; couleur: string } | null>(null);
   const { canWrite } = useProfile();
 
@@ -111,6 +111,7 @@ export default function EmployeDetailPage() {
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
   const [mainTab, setMainTab] = useState<MainTab>("infos");
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [dossierSub, setDossierSub] = useState<DossierSubTab>("contrats");
 
   // ── Employee fields ──
