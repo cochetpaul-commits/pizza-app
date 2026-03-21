@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
   const rows = (lignes ?? []) as unknown as LigneRow[];
 
   // Group by category
-  const byCat: Record<string, { name: string; qty: number; unit: string; prixUnitaire: number | null; totalLigne: number | null }[]> = {};
+  const byCat: Record<string, { name: string; qty: number; unit: string }[]> = {};
   for (const l of rows) {
     const ing = getIng(l);
     const cat = ing?.category ?? "autre";
@@ -121,8 +121,6 @@ export async function GET(req: NextRequest) {
       name: ing?.name ?? "?",
       qty: l.quantite,
       unit: l.unite ?? ing?.default_unit ?? "",
-      prixUnitaire: l.prix_unitaire_ht,
-      totalLigne: l.total_ligne_ht,
     });
   }
 
@@ -137,8 +135,6 @@ export async function GET(req: NextRequest) {
 
   const supplierObj = session.suppliers as { name: string } | null;
 
-  const totalHt = rows.reduce((sum, l) => sum + (l.total_ligne_ht ?? 0), 0);
-
   const data: CommandePdfData = {
     supplierName: supplierObj?.name ?? "—",
     sessionDate: new Date(session.created_at).toLocaleDateString("fr-FR", {
@@ -146,7 +142,6 @@ export async function GET(req: NextRequest) {
     }),
     categories,
     totalArticles: rows.length,
-    totalHt: totalHt > 0 ? totalHt : null,
     notes: session.notes,
     logoBase64: readLogoBase64(),
     exportedAt: new Date().toLocaleDateString("fr-FR", {

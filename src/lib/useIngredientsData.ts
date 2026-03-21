@@ -5,6 +5,13 @@ import type { Ingredient, LatestOffer, Supplier } from "@/types/ingredients";
 
 const PAGE_SIZE = 100;
 
+/** Map establishment slugs (DB) → offer establishment keys */
+function slugToOfferEstab(slug: string): string | null {
+  if (slug.includes("bello")) return "bellomio";
+  if (slug.includes("piccola")) return "piccola";
+  return null;
+}
+
 const INGREDIENT_COLS =
   "id,name,import_name,category,allergens,is_active,default_unit,purchase_price,purchase_unit,purchase_unit_label,purchase_unit_name,density_g_per_ml,piece_weight_g,piece_volume_ml,supplier_id,source_prep_recipe_name,source,recipe_id,status,status_note,validated_at,validated_by,cost_per_unit,cost_per_kg,etablissement_id,order_unit_label,order_quantity,storage_zone,parent_ingredient_id,rendement,is_derived";
 
@@ -42,7 +49,7 @@ async function fetchOffersForIds(ids: string[]): Promise<LatestOffer[]> {
   })) as LatestOffer[];
 }
 
-async function fetchPage(page: number, etabId?: string | null): Promise<{ items: Ingredient[]; offers: LatestOffer[]; hasMore: boolean }> {
+async function fetchPage(page: number, etabId?: string | null, etabSlug?: string | null): Promise<{ items: Ingredient[]; offers: LatestOffer[]; hasMore: boolean }> {
   const from = page * PAGE_SIZE;
   let query = supabase
     .from("ingredients")
@@ -57,12 +64,29 @@ async function fetchPage(page: number, etabId?: string | null): Promise<{ items:
   const { data, error } = await query;
 
   if (error) throw new Error(error.message);
-  const items = (data ?? []) as Ingredient[];
+  let items = (data ?? []) as Ingredient[];
   const offers = await fetchOffersForIds(items.map((i) => i.id));
+
+  // Filter out ingredients whose offer is exclusive to another establishment
+  if (etabSlug) {
+    const myEstab = slugToOfferEstab(etabSlug);
+    if (myEstab) {
+      const offerMap = new Map<string, string>();
+      for (const o of offers) offerMap.set(o.ingredient_id, o.establishment ?? "both");
+      items = items.filter((i) => {
+        const e = offerMap.get(i.id);
+        // No offer → keep (ingredient has no offer, not filtered)
+        if (!e) return true;
+        // "both" or matches current → keep
+        return e === "both" || e === myEstab;
+      });
+    }
+  }
+
   return { items, offers, hasMore: items.length === PAGE_SIZE };
 }
 
-async function searchIngredients(q: string, etabId?: string | null): Promise<{ items: Ingredient[]; offers: LatestOffer[] }> {
+async function searchIngredients(q: string, etabId?: string | null, etabSlug?: string | null): Promise<{ items: Ingredient[]; offers: LatestOffer[] }> {
   let query = supabase
     .from("ingredients")
     .select(INGREDIENT_COLS)
@@ -76,12 +100,27 @@ async function searchIngredients(q: string, etabId?: string | null): Promise<{ i
   const { data, error } = await query;
 
   if (error) throw new Error(error.message);
-  const items = (data ?? []) as Ingredient[];
+  let items = (data ?? []) as Ingredient[];
   const offers = await fetchOffersForIds(items.map((i) => i.id));
+
+  // Filter out ingredients whose offer is exclusive to another establishment
+  if (etabSlug) {
+    const myEstab = slugToOfferEstab(etabSlug);
+    if (myEstab) {
+      const offerMap = new Map<string, string>();
+      for (const o of offers) offerMap.set(o.ingredient_id, o.establishment ?? "both");
+      items = items.filter((i) => {
+        const e = offerMap.get(i.id);
+        if (!e) return true;
+        return e === "both" || e === myEstab;
+      });
+    }
+  }
+
   return { items, offers };
 }
 
-export function useIngredientsData(searchQuery: string, etablissementId?: string | null) {
+export function useIngredientsData(searchQuery: string, etablissementId?: string | null, etablissementSlug?: string | null) {
   const [items, setItems] = useState<Ingredient[]>([]);
   const [offers, setOffers] = useState<LatestOffer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -96,6 +135,8 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
   const fetchIdRef = useRef(0);
   const etabRef = useRef(etablissementId);
   etabRef.current = etablissementId;
+  const etabSlugRef = useRef(etablissementSlug);
+  etabSlugRef.current = etablissementSlug;
 
   // Suppliers + alerts: load once (independent of pagination)
   useEffect(() => {
@@ -145,13 +186,13 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
 
     try {
       if (q) {
-        const bundle = await searchIngredients(q, etabRef.current);
+        const bundle = await searchIngredients(q, etabRef.current, etabSlugRef.current);
         if (fetchIdRef.current !== fetchId) return;
         setItems(bundle.items);
         setOffers(bundle.offers);
         setHasMore(false);
       } else {
-        const bundle = await fetchPage(0, etabRef.current);
+        const bundle = await fetchPage(0, etabRef.current, etabSlugRef.current);
         if (fetchIdRef.current !== fetchId) return;
         setItems(bundle.items);
         setOffers(bundle.offers);
@@ -175,7 +216,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
-      const bundle = await fetchPage(pageRef.current, etabRef.current);
+      const bundle = await fetchPage(pageRef.current, etabRef.current, etabSlugRef.current);
       setItems((prev) => {
         const seen = new Set(prev.map((i) => i.id));
         return [...prev, ...bundle.items.filter((i) => !seen.has(i.id))];

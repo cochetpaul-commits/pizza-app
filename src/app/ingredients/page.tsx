@@ -94,7 +94,7 @@ function IngredientsPageInner() {
 
   const [q, setQ] = useState("");
   const debouncedQ = useDebounce(q, 300);
-  const { items, suppliers, supplierAliases, offers, alertMap, loading, loadingMore, hasMore, loadMore, error: dataError, mutate } = useIngredientsData(debouncedQ, etab?.id);
+  const { items, suppliers, supplierAliases, offers, alertMap, loading, loadingMore, hasMore, loadMore, error: dataError, mutate } = useIngredientsData(debouncedQ, etab?.id, etab?.slug);
 
   const [session, setSession] = useState<Session | null>(null);
 

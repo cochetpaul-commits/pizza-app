@@ -355,12 +355,13 @@ function CommandesPage() {
     }
 
     // Load catalog: ingredients linked to this supplier (via offers or supplier_id)
+    const etabKey = etab?.slug?.includes("bello") ? "bellomio" : etab?.slug?.includes("piccola") ? "piccola" : null;
     let offerQ = supabase
       .from("supplier_offers")
-      .select("ingredient_id, price_kind, unit, unit_price, pack_price, pack_unit, pack_count, pack_each_qty, pack_each_unit, pack_total_qty")
+      .select("ingredient_id, price_kind, unit, unit_price, pack_price, pack_unit, pack_count, pack_each_qty, pack_each_unit, pack_total_qty, establishment")
       .eq("supplier_id", supplierId)
       .eq("is_active", true);
-    if (etab) offerQ = offerQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
+    if (etabKey) offerQ = offerQ.or(`establishment.eq.${etabKey},establishment.eq.both,establishment.is.null`);
     const { data: offerData } = await offerQ;
 
     const offerMap = new Map<string, typeof offerData extends (infer T)[] | null ? T : never>();
