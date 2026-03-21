@@ -6,7 +6,7 @@ import type { Ingredient, LatestOffer, Supplier } from "@/types/ingredients";
 const PAGE_SIZE = 100;
 
 const INGREDIENT_COLS =
-  "id,name,import_name,category,allergens,is_active,default_unit,purchase_price,purchase_unit,purchase_unit_label,purchase_unit_name,density_g_per_ml,piece_weight_g,piece_volume_ml,supplier_id,source_prep_recipe_name,source,recipe_id,status,status_note,validated_at,validated_by,cost_per_unit,cost_per_kg,etablissement_id,order_unit_label,storage_zone,parent_ingredient_id,rendement,is_derived";
+  "id,name,import_name,category,allergens,is_active,default_unit,purchase_price,purchase_unit,purchase_unit_label,purchase_unit_name,density_g_per_ml,piece_weight_g,piece_volume_ml,supplier_id,source_prep_recipe_name,source,recipe_id,status,status_note,validated_at,validated_by,cost_per_unit,cost_per_kg,etablissement_id,order_unit_label,order_quantity,storage_zone,parent_ingredient_id,rendement,is_derived";
 
 const VIEW_COLS =
   "ingredient_id,supplier_id,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g";

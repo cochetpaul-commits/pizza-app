@@ -92,12 +92,12 @@ export type EditState = {
   packUnit: "kg" | "l"; packCount: string; packEachQty: string; packEachUnit: "kg" | "l" | "pc";
   packPieceWeightG: string; pieceVolumeMl: string; allergens: string[];
   orderUnitLabel: string;
+  orderQuantity: string;
   storageZone: string;
 };
 
 // ─── IngredientRow ──────────────────────────────────────────────────────────
 export type StorageZoneOption = { id: string; name: string };
-export type OrderUnitOption = { id: string; name: string };
 
 export type IngredientRowProps = {
   item: Ingredient;
@@ -110,7 +110,6 @@ export type IngredientRowProps = {
   edit: EditState | null;
   suppliers: Supplier[];
   storageZones: StorageZoneOption[];
-  orderUnits: OrderUnitOption[];
   previewEditPack: string;
   onStartEdit: (x: Ingredient) => void;
   onSaveEdit: () => void;
@@ -123,7 +122,7 @@ export type IngredientRowProps = {
 
 export const IngredientRow = React.memo(function IngredientRow({
   item: x, offer, supplierName, supplierIdForDisplay, alert, isEditing, compactMode, edit,
-  suppliers, storageZones, orderUnits, previewEditPack,
+  suppliers, storageZones, previewEditPack,
   onStartEdit, onSaveEdit, onDelete, onSetStatus, onEditChange, onEditImportName, onCreateDerived,
 }: IngredientRowProps) {
   const price = formatIngredientPrice(x, offer ?? null);
@@ -394,20 +393,31 @@ export const IngredientRow = React.memo(function IngredientRow({
           {/* Unité de commande */}
           <div className="pt-1" style={{ marginBottom: 8 }}>
             <div className="text-[11px] font-extrabold opacity-60 mb-1 uppercase tracking-wide">Unité de commande</div>
-            <select
-              style={{
-                height: 32, borderRadius: 8, border: "1.5px solid #e5ddd0",
-                padding: "4px 10px", fontSize: 13, background: "#fff", width: 220,
-                cursor: "pointer",
-              }}
-              value={edit.orderUnitLabel}
-              onChange={(e) => onEditChange({ ...edit, orderUnitLabel: e.target.value })}
-            >
-              <option value="">— Aucune —</option>
-              {orderUnits.map(u => (
-                <option key={u.id} value={u.name}>{u.name}</option>
-              ))}
-            </select>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                style={{
+                  height: 32, borderRadius: 8, border: "1.5px solid #e5ddd0",
+                  padding: "4px 10px", fontSize: 13, background: "#fff", width: 160,
+                }}
+                value={edit.orderUnitLabel}
+                onChange={(e) => onEditChange({ ...edit, orderUnitLabel: e.target.value })}
+                placeholder="ex: bac 2.5kg, cagette 3kg"
+              />
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                style={{
+                  height: 32, borderRadius: 8, border: "1.5px solid #e5ddd0",
+                  padding: "4px 10px", fontSize: 13, background: "#fff", width: 70,
+                  textAlign: "right",
+                }}
+                value={edit.orderQuantity}
+                onChange={(e) => onEditChange({ ...edit, orderQuantity: e.target.value })}
+                placeholder="qté"
+              />
+              <span style={{ fontSize: 11, color: "#999" }}>contenu</span>
+            </div>
           </div>
           {/* Lieu de stockage */}
           <div className="pt-1" style={{ marginBottom: 8 }}>

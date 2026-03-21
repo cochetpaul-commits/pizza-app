@@ -101,6 +101,7 @@ export type Ingredient = {
   cost_per_kg?: number | null;
 
   order_unit_label?: string | null;
+  order_quantity?: number | null;
 
   // Lieu de stockage (inventaire)
   storage_zone?: string | null;
