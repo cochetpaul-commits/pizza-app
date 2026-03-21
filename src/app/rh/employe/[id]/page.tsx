@@ -103,7 +103,7 @@ const COMPLETION_FIELDS = [
 
 export default function EmployeDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { current: etab } = useEtablissement();
+  const { current: etab, etablissements } = useEtablissement();
   const [empEtab, setEmpEtab] = useState<{ id: string; nom: string; couleur: string } | null>(null);
   const { canWrite } = useProfile();
 
@@ -1975,7 +1975,22 @@ export default function EmployeDetailPage() {
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button type="button" onClick={async () => {
-                await supabase.from("absences").insert({ employe_id: emp.id, etablissement_id: empEtab?.id ?? etab?.id, type: absType, date_debut: absDebut, date_fin: absFin, note: absNote || null, statut: "demande" });
+                // Calculer nb_jours
+                const d1 = new Date(absDebut); const d2 = new Date(absFin);
+                let nbJours = Math.max(1, Math.ceil((d2.getTime() - d1.getTime()) / 86400000) + 1);
+                if (absDebutPeriode === "apres_midi") nbJours -= 0.5;
+                if (absFinPeriode === "matin") nbJours -= 0.5;
+
+                await supabase.from("absences").insert({
+                  employe_id: emp.id,
+                  etablissement_id: empEtab?.id ?? etab?.id,
+                  type: absType,
+                  date_debut: absDebut,
+                  date_fin: absFin,
+                  nb_jours: nbJours,
+                  note: absNote || null,
+                  statut: "demande",
+                });
                 setAbsences(prev => [...prev, { id: crypto.randomUUID(), type: absType, date_debut: absDebut, date_fin: absFin, statut: "demande" } as Absence]);
                 setShowAbsenceModal(false);
                 setAbsNote("");
@@ -2056,7 +2071,13 @@ export default function EmployeDetailPage() {
               </select>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button type="button" onClick={() => { alert("Indemnite ajoutee"); setShowTransportModal(false); }} disabled={!transportDispositif} style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: transportDispositif ? "#1a1a1a" : "#ddd6c8", color: "#fff", fontSize: 13, fontWeight: 600, cursor: transportDispositif ? "pointer" : "default" }}>
+              <button type="button" onClick={async () => {
+                const ac = contrats.find(c => c.actif);
+                if (!ac) return;
+                await supabase.from("contrat_elements").insert({ contrat_id: ac.id, type: "transport", libelle: transportDispositif, montant: 0 });
+                setElements(prev => [...prev, { id: crypto.randomUUID(), contrat_id: ac.id, type: "transport", libelle: transportDispositif, montant: 0, code_silae: null, date_debut: null, date_fin: null }]);
+                setShowTransportModal(false);
+              }} disabled={!transportDispositif} style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: transportDispositif ? "#1a1a1a" : "#ddd6c8", color: "#fff", fontSize: 13, fontWeight: 600, cursor: transportDispositif ? "pointer" : "default" }}>
                 Ajouter
               </button>
             </div>
@@ -2106,38 +2127,45 @@ export default function EmployeDetailPage() {
       )}
 
       {/* ═══ MODAL: Planification ═══ */}
-      {showPlanifModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "flex-end", zIndex: 200 }} onClick={() => setShowPlanifModal(false)}>
-          <div style={{ background: "#fff", width: 400, height: "100%", padding: 24, overflowY: "auto", boxShadow: "-4px 0 20px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>Planification</h2>
-              <button type="button" onClick={() => setShowPlanifModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#999" }}>x</button>
-            </div>
-            <div style={{ padding: 12, borderRadius: 8, background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.12)", marginBottom: 16, fontSize: 12, color: "#2563eb", lineHeight: 1.4 }}>
-              <strong>L&apos;employe est toujours planifiable sur son equipe de rattachement au contrat</strong><br />
-              L&apos;etablissement et l&apos;equipe par defaut dependent du contrat de travail en cours.
-            </div>
-            <p style={{ fontSize: 13, color: "#666", marginBottom: 16 }}>Selectionnez les equipes sur lesquelles {prenom} peut etre planifie(e) :</p>
-            {/* TODO: Load all etabs + equipes dynamically */}
-            <div style={{ border: "1px solid #ddd6c8", borderRadius: 10, padding: 14, marginBottom: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 8 }}>{etab?.nom ?? "—"} (par defaut)</div>
-              {((emp as Record<string, unknown>).equipes_access as string[] ?? []).map(eq => (
-                <div key={eq} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0" }}>
-                  <span style={{ fontSize: 13, color: "#666" }}>{eq}</span>
-                  <button type="button" style={{ width: 36, height: 20, borderRadius: 10, background: "#2D6A4F", border: "none", position: "relative", cursor: "pointer" }}>
-                    <span style={{ position: "absolute", top: 2, left: 18, width: 16, height: 16, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div style={{ position: "sticky", bottom: 0, paddingTop: 16 }}>
-              <button type="button" onClick={() => { alert("Planification enregistree"); setShowPlanifModal(false); }} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
-                Enregistrer
-              </button>
+      {showPlanifModal && (() => {
+        const currentAccess = ((emp as Record<string, unknown>).equipes_access as string[]) ?? [];
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "flex-end", zIndex: 200 }} onClick={() => setShowPlanifModal(false)}>
+            <div style={{ background: "#fff", width: 400, height: "100%", padding: 24, overflowY: "auto", boxShadow: "-4px 0 20px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>Planification</h2>
+                <button type="button" onClick={() => setShowPlanifModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#999" }}>x</button>
+              </div>
+              <div style={{ padding: 12, borderRadius: 8, background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.12)", marginBottom: 16, fontSize: 12, color: "#2563eb", lineHeight: 1.4 }}>
+                <strong>L&apos;employé est toujours planifiable sur son équipe de rattachement au contrat</strong><br />
+                L&apos;établissement et l&apos;équipe par défaut dépendent du contrat de travail en cours.
+              </div>
+              <p style={{ fontSize: 13, color: "#666", marginBottom: 16 }}>Sélectionnez les équipes sur lesquelles {prenom} peut être planifié(e) :</p>
+
+              {etablissements.map(et => {
+                const isDefault = et.id === (emp as Record<string, unknown>).etablissement_id;
+                return (
+                  <div key={et.id} style={{ border: "1px solid #ddd6c8", borderRadius: 10, padding: 14, marginBottom: 10 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 8 }}>
+                      {et.nom} {isDefault ? "(par défaut)" : ""}
+                    </div>
+                    {/* Load equipes for this etab inline */}
+                    <PlanifEquipes etabId={et.id} currentAccess={currentAccess} empId={emp.id as string} onUpdate={(newAccess) => {
+                      setEmp((prev: Record<string, unknown>) => ({ ...prev, equipes_access: newAccess }));
+                    }} />
+                  </div>
+                );
+              })}
+
+              <div style={{ position: "sticky", bottom: 0, paddingTop: 16 }}>
+                <button type="button" onClick={() => setShowPlanifModal(false)} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                  Enregistrer
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ═══ MODAL: Avenant ═══ */}
       {showAvenantModal && (() => {
@@ -2346,6 +2374,49 @@ function fmtDate(d: string) {
 }
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
+/* ── PlanifEquipes sub-component ── */
+function PlanifEquipes({ etabId, currentAccess, empId, onUpdate }: {
+  etabId: string; currentAccess: string[]; empId: string;
+  onUpdate: (newAccess: string[]) => void;
+}) {
+  const [equipes, setEquipes] = useState<string[]>([]);
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("equipes").select("nom").eq("etablissement_id", etabId).eq("actif", true).order("nom");
+      if (data) setEquipes(data.map((e: { nom: string }) => e.nom));
+    })();
+  }, [etabId]);
+
+  const toggle = async (eq: string) => {
+    const newAccess = currentAccess.includes(eq)
+      ? currentAccess.filter(e => e !== eq)
+      : [...currentAccess, eq];
+    await supabase.from("employes").update({ equipes_access: newAccess }).eq("id", empId);
+    onUpdate(newAccess);
+  };
+
+  return (
+    <div>
+      {equipes.length === 0 ? (
+        <span style={{ fontSize: 12, color: "#999" }}>Aucune équipe configurée</span>
+      ) : equipes.map(eq => {
+        const isOn = currentAccess.includes(eq);
+        return (
+          <div key={eq} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0" }}>
+            <span style={{ fontSize: 13, color: isOn ? "#1a1a1a" : "#999" }}>{eq} {currentAccess[0] === eq ? "(par défaut)" : ""}</span>
+            <button type="button" onClick={() => toggle(eq)} style={{
+              width: 36, height: 20, borderRadius: 10, border: "none", cursor: "pointer",
+              background: isOn ? "#2D6A4F" : "#ddd6c8", position: "relative",
+            }}>
+              <span style={{ position: "absolute", top: 2, left: isOn ? 18 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ── Styles ────────────────────────────────────────────────────── */
 
 const pageStyle: React.CSSProperties = {
