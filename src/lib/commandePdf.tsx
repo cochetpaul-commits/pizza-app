@@ -5,6 +5,8 @@ export type CommandePdfLine = {
   name: string;
   qty: number;
   unit: string;
+  prixUnitaire: number | null;
+  totalLigne: number | null;
 };
 
 export type CommandePdfCategory = {
@@ -18,6 +20,7 @@ export type CommandePdfData = {
   sessionDate: string;
   categories: CommandePdfCategory[];
   totalArticles: number;
+  totalHt: number | null;
   notes: string | null;
   logoBase64: string | null;
   exportedAt: string;
@@ -75,8 +78,10 @@ const s = StyleSheet.create({
     borderBottomColor: "#E5DDD0",
   },
   rowName: { flex: 1, fontSize: 11 },
-  rowQty: { width: 50, textAlign: "right" as const, fontSize: 11, fontWeight: "bold" },
-  rowUnit: { width: 40, textAlign: "left" as const, fontSize: 10, color: MUTED, paddingLeft: 4 },
+  rowQty: { width: 35, textAlign: "right" as const, fontSize: 11, fontWeight: "bold" },
+  rowUnit: { width: 30, textAlign: "left" as const, fontSize: 10, color: MUTED, paddingLeft: 4 },
+  rowPu: { width: 55, textAlign: "right" as const, fontSize: 10, color: MUTED },
+  rowTotal: { width: 60, textAlign: "right" as const, fontSize: 11, fontWeight: "bold" },
 
   footer: {
     position: "absolute",
@@ -144,6 +149,8 @@ export function CommandePdfDocument({ data }: { data: CommandePdfData }) {
                 <Text style={s.rowName}>{item.name}</Text>
                 <Text style={s.rowQty}>{item.qty}</Text>
                 <Text style={s.rowUnit}>{item.unit}</Text>
+                <Text style={s.rowPu}>{item.prixUnitaire != null ? `${item.prixUnitaire.toFixed(2)} €` : ""}</Text>
+                <Text style={s.rowTotal}>{item.totalLigne != null ? `${item.totalLigne.toFixed(2)} €` : ""}</Text>
               </View>
             ))}
           </View>
@@ -152,6 +159,9 @@ export function CommandePdfDocument({ data }: { data: CommandePdfData }) {
         {/* Total */}
         <View style={s.totalBar}>
           <Text style={s.totalText}>{data.totalArticles} article{data.totalArticles > 1 ? "s" : ""}</Text>
+          {data.totalHt != null && (
+            <Text style={s.totalText}>Total : {data.totalHt.toFixed(2)} € HT</Text>
+          )}
         </View>
 
         {/* Notes */}

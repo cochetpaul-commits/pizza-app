@@ -26,6 +26,7 @@ type Ligne = {
   ingredients?: { name: string; category: string | null; default_unit: string | null } | null;
 };
 
+
 type Session = {
   id: string;
   supplier_id: string;
@@ -445,7 +446,7 @@ function CommandesPage() {
 
   // ── Save ligne ────────────────────────────────────────────────────────
 
-  async function saveLigne(sessionId: string, ingredientId: string, qty: number | "", unite: string | null) {
+  async function saveLigne(sessionId: string, ingredientId: string, qty: number | "", unite: string | null, prixUnitaire: number | null) {
     await fetchApi("/api/commandes/ligne", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -454,6 +455,7 @@ function CommandesPage() {
         ingredient_id: ingredientId,
         quantite: qty === "" ? 0 : Math.floor(qty as number),
         unite: unite ?? undefined,
+        prix_unitaire_ht: prixUnitaire ?? undefined,
       }),
     });
   }
@@ -463,7 +465,7 @@ function CommandesPage() {
     setQuantities((prev) => ({ ...prev, [ingredientId]: qty }));
     if (session) {
       const item = catalog.find((c) => c.id === ingredientId);
-      saveLigne(session.id, ingredientId, qty, item?.order_unit ?? item?.default_unit ?? null);
+      saveLigne(session.id, ingredientId, qty, item?.order_unit ?? item?.default_unit ?? null, item?.prix_commande ?? null);
     }
   }
 
@@ -695,7 +697,7 @@ function CommandesPage() {
   function renderSummary() {
     if (!session) return null;
 
-    type SummaryItem = { name: string; qty: number; unit: string; category: string };
+    type SummaryItem = { name: string; qty: number; unit: string; category: string; prixUnitaire: number | null };
     const selected: SummaryItem[] = [];
 
     for (const item of catalog) {
@@ -706,6 +708,7 @@ function CommandesPage() {
           qty: q,
           unit: item.order_unit ?? item.default_unit ?? "",
           category: item.category ?? "autre",
+          prixUnitaire: item.prix_commande ?? null,
         });
       }
     }
@@ -721,6 +724,7 @@ function CommandesPage() {
             qty: l.quantite,
             unit: l.unite ?? l.ingredients?.default_unit ?? "",
             category: l.ingredients?.category ?? "autre",
+            prixUnitaire: l.prix_unitaire_ht ?? null,
           });
         }
       }
@@ -799,21 +803,39 @@ function CommandesPage() {
                       {items.length}
                     </span>
                   </div>
-                  {items.map((item, i) => (
-                    <div key={i} style={{ ...tile, borderRadius: i === items.length - 1 ? "0 0 12px 12px" : 0 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", flex: 1 }}>{item.name}</span>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: "#D4775A", flexShrink: 0 }}>× {item.qty}</span>
-                      {item.unit && (
-                        <span style={{ fontSize: 11, color: "#999", flexShrink: 0 }}>{item.unit}</span>
-                      )}
-                    </div>
-                  ))}
+                  {items.map((item, i) => {
+                    const lineTotal = item.prixUnitaire != null ? item.prixUnitaire * item.qty : null;
+                    return (
+                      <div key={i} style={{ ...tile, borderRadius: i === items.length - 1 ? "0 0 12px 12px" : 0 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", flex: 1 }}>{item.name}</span>
+                        {item.prixUnitaire != null && (
+                          <span style={{ fontSize: 11, color: "#999", flexShrink: 0 }}>{item.prixUnitaire.toFixed(2)}€</span>
+                        )}
+                        <span style={{ fontSize: 14, fontWeight: 700, color: "#D4775A", flexShrink: 0 }}>× {item.qty}</span>
+                        {item.unit && (
+                          <span style={{ fontSize: 11, color: "#999", flexShrink: 0 }}>{item.unit}</span>
+                        )}
+                        {lineTotal != null && (
+                          <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", flexShrink: 0, minWidth: 55, textAlign: "right" }}>{lineTotal.toFixed(2)}€</span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
-            <div style={{ textAlign: "center", fontSize: 13, fontWeight: 700, color: "#D4775A", marginTop: 12 }}>
-              {selected.length} article{selected.length > 1 ? "s" : ""} commandé{selected.length > 1 ? "s" : ""}
-            </div>
+            {(() => {
+              const total = selected.reduce((sum, item) => {
+                if (item.prixUnitaire == null) return sum;
+                return sum + item.prixUnitaire * item.qty;
+              }, 0);
+              return (
+                <div style={{ textAlign: "center", fontSize: 13, fontWeight: 700, color: "#D4775A", marginTop: 12 }}>
+                  {selected.length} article{selected.length > 1 ? "s" : ""} commandé{selected.length > 1 ? "s" : ""}
+                  {total > 0 && <span style={{ marginLeft: 12, color: "#1a1a1a" }}>Total : {total.toFixed(2)} € HT</span>}
+                </div>
+              );
+            })()}
           </>
         )}
       </div>

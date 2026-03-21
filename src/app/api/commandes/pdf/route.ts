@@ -64,6 +64,8 @@ function readLogoBase64(): string | null {
 type LigneRow = {
   quantite: number;
   unite: string | null;
+  prix_unitaire_ht: number | null;
+  total_ligne_ht: number | null;
   ingredients: { name: string; category: string | null; default_unit: string | null } | null;
 };
 
@@ -103,14 +105,14 @@ export async function GET(req: NextRequest) {
   // Fetch lines with qty > 0
   const { data: lignes } = await supabaseAdmin
     .from("commande_lignes")
-    .select("quantite, unite, ingredients(name, category, default_unit)")
+    .select("quantite, unite, prix_unitaire_ht, total_ligne_ht, ingredients(name, category, default_unit)")
     .eq("session_id", sessionId)
     .gt("quantite", 0);
 
   const rows = (lignes ?? []) as unknown as LigneRow[];
 
   // Group by category
-  const byCat: Record<string, { name: string; qty: number; unit: string }[]> = {};
+  const byCat: Record<string, { name: string; qty: number; unit: string; prixUnitaire: number | null; totalLigne: number | null }[]> = {};
   for (const l of rows) {
     const ing = getIng(l);
     const cat = ing?.category ?? "autre";
@@ -119,6 +121,8 @@ export async function GET(req: NextRequest) {
       name: ing?.name ?? "?",
       qty: l.quantite,
       unit: l.unite ?? ing?.default_unit ?? "",
+      prixUnitaire: l.prix_unitaire_ht,
+      totalLigne: l.total_ligne_ht,
     });
   }
 
@@ -133,6 +137,8 @@ export async function GET(req: NextRequest) {
 
   const supplierObj = session.suppliers as { name: string } | null;
 
+  const totalHt = rows.reduce((sum, l) => sum + (l.total_ligne_ht ?? 0), 0);
+
   const data: CommandePdfData = {
     supplierName: supplierObj?.name ?? "—",
     sessionDate: new Date(session.created_at).toLocaleDateString("fr-FR", {
@@ -140,6 +146,7 @@ export async function GET(req: NextRequest) {
     }),
     categories,
     totalArticles: rows.length,
+    totalHt: totalHt > 0 ? totalHt : null,
     notes: session.notes,
     logoBase64: readLogoBase64(),
     exportedAt: new Date().toLocaleDateString("fr-FR", {
