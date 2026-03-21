@@ -343,7 +343,7 @@ export function AddCollaborateurModal({ etablissementId, onClose, onCreated }: P
                 Ajouter
               </button>
               <button type="button" onClick={() => handleCreate(true)} disabled={saving || !email.trim()} style={{
-                ...S.btn, border: "none", background: "#5B8EAE", color: "#fff", opacity: saving || !email.trim() ? 0.5 : 1,
+                ...S.btn, border: "none", background: "#b45f57", color: "#fff", opacity: saving || !email.trim() ? 0.5 : 1,
               }}>
                 Ajouter et inviter
               </button>

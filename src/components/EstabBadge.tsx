@@ -12,8 +12,8 @@ const BASE: CSSProperties = {
 };
 
 export const ESTAB_CONFIG = {
-  bellomio: { bg: "#FEF2F2", color: "#8B1A1A", label: "Bello Mio",   short: "BM"    },
-  piccola:  { bg: "#F5F3FF", color: "#6B21A8", label: "Piccola Mia", short: "PM"    },
+  bellomio: { bg: "rgba(226,127,87,0.1)", color: "#e27f57", label: "Bello Mio",   short: "BM"    },
+  piccola:  { bg: "rgba(239,209,153,0.2)", color: "#a8893a", label: "Piccola Mia", short: "PM"    },
   both:     { bg: "#F3F4F6", color: "#6B7280", label: "Les deux",    short: "BM·PM" },
 } as const;
 

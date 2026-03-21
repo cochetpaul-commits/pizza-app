@@ -70,9 +70,11 @@ export async function POST(req: NextRequest) {
   // Normalize role for Supabase profile
   const profileRole = role ?? "employe";
 
-  // Invite user — use VERCEL_URL or request origin
+  // Invite user — use production URL, never localhost
+  const reqOrigin = new URL(req.url).origin;
   const origin = process.env.NEXT_PUBLIC_SITE_URL
-    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : new URL(req.url).origin);
+    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
+    || (reqOrigin.includes("localhost") ? "https://pizza-app.vercel.app" : reqOrigin);
   const { data: inviteData, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
     data: { display_name: displayName || email, role: profileRole },
     redirectTo: `${origin}/auth/setup-password`,

@@ -886,7 +886,14 @@ export default function EmployeDetailPage() {
             {/* ─── SUB: Contrats ─── */}
             {dossierSub === "contrats" && (
               <>
-                <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700, color: "#1a1a1a", marginBottom: 16 }}>Contrats</h2>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700, color: "#1a1a1a", margin: 0 }}>Contrats</h2>
+                  {canWrite && (
+                    <button type="button" onClick={openNewContrat} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      + Nouveau contrat
+                    </button>
+                  )}
+                </div>
 
                 {/* Contrat en cours */}
                 {activeContrat && (() => {
@@ -1427,12 +1434,28 @@ export default function EmployeDetailPage() {
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
                   {DOSSIERS.map(d => (
-                    <div key={d.key} style={{ padding: 14, borderRadius: 10, border: "1px solid #f0ebe3", background: "#faf7f2", textAlign: "center", cursor: "pointer" }}>
+                    <div key={d.key} onClick={() => {
+                      const input = document.createElement("input");
+                      input.type = "file";
+                      input.accept = ".pdf,.jpg,.jpeg,.png,.doc,.docx";
+                      input.onchange = async (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0];
+                        if (!file) return;
+                        const path = `employes/${emp.id}/${d.key}/${Date.now()}_${file.name}`;
+                        const { error: uploadErr } = await supabase.storage.from("public").upload(path, file, { upsert: true });
+                        if (uploadErr) alert("Erreur : " + uploadErr.message);
+                        else alert(`Document "${file.name}" depose dans ${d.label}`);
+                      };
+                      input.click();
+                    }} style={{ padding: 14, borderRadius: 10, border: "1px solid #f0ebe3", background: "#faf7f2", textAlign: "center", cursor: "pointer", transition: "background 0.12s" }}
+                      onMouseOver={e => (e.currentTarget.style.background = "#f0ebe3")}
+                      onMouseOut={e => (e.currentTarget.style.background = "#faf7f2")}
+                    >
                       <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="1.5" style={{ marginBottom: 6 }}>
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                       </svg>
                       <div style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a" }}>{d.label}</div>
-                      <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>0 document</div>
+                      <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Cliquez pour deposer</div>
                     </div>
                   ))}
                 </div>
@@ -1945,7 +1968,7 @@ export default function EmployeDetailPage() {
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button type="button" onClick={async () => {
-                await supabase.from("absences").insert({ employe_id: emp.id, etablissement_id: etab?.id, type: absType, date_debut: absDebut, date_fin: absFin, note: absNote || null, statut: "demande" });
+                await supabase.from("absences").insert({ employe_id: emp.id, etablissement_id: empEtab?.id ?? etab?.id, type: absType, date_debut: absDebut, date_fin: absFin, note: absNote || null, statut: "demande" });
                 setAbsences(prev => [...prev, { id: crypto.randomUUID(), type: absType, date_debut: absDebut, date_fin: absFin, statut: "demande" } as Absence]);
                 setShowAbsenceModal(false);
                 setAbsNote("");
