@@ -96,6 +96,8 @@ export type EditState = {
 };
 
 // ─── IngredientRow ──────────────────────────────────────────────────────────
+export type StorageZoneOption = { id: string; name: string };
+
 export type IngredientRowProps = {
   item: Ingredient;
   offer: LatestOffer | undefined;
@@ -106,6 +108,7 @@ export type IngredientRowProps = {
   compactMode: boolean;
   edit: EditState | null;
   suppliers: Supplier[];
+  storageZones: StorageZoneOption[];
   previewEditPack: string;
   onStartEdit: (x: Ingredient) => void;
   onSaveEdit: () => void;
@@ -118,7 +121,7 @@ export type IngredientRowProps = {
 
 export const IngredientRow = React.memo(function IngredientRow({
   item: x, offer, supplierName, supplierIdForDisplay, alert, isEditing, compactMode, edit,
-  suppliers, previewEditPack,
+  suppliers, storageZones, previewEditPack,
   onStartEdit, onSaveEdit, onDelete, onSetStatus, onEditChange, onEditImportName, onCreateDerived,
 }: IngredientRowProps) {
   const price = formatIngredientPrice(x, offer ?? null);
@@ -402,15 +405,20 @@ export const IngredientRow = React.memo(function IngredientRow({
           {/* Lieu de stockage */}
           <div className="pt-1" style={{ marginBottom: 8 }}>
             <div className="text-[11px] font-extrabold opacity-60 mb-1 uppercase tracking-wide">Stockage</div>
-            <input
+            <select
               style={{
                 height: 32, borderRadius: 8, border: "1.5px solid #e5ddd0",
                 padding: "4px 10px", fontSize: 13, background: "#fff", width: 220,
+                appearance: "none" as const, cursor: "pointer",
               }}
               value={edit.storageZone}
               onChange={(e) => onEditChange({ ...edit, storageZone: e.target.value })}
-              placeholder="ex: Chambre froide, Cave, Garage..."
-            />
+            >
+              <option value="">— Aucun —</option>
+              {storageZones.map(z => (
+                <option key={z.id} value={z.name}>{z.name}</option>
+              ))}
+            </select>
           </div>
           {/* Allergènes */}
           <div className="pt-1">

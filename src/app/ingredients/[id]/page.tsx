@@ -115,6 +115,7 @@ function IngredientDetailInner() {
   // Storage zone
   const [storageZone, setStorageZone] = useState<string>("");
   const [storageZoneSaved, setStorageZoneSaved] = useState(false);
+  const [storageZoneOptions, setStorageZoneOptions] = useState<{ id: string; name: string }[]>([]);
 
   const [derivedList, setDerivedList] = useState<DerivedIngredient[]>([]);
   const [parentInfo, setParentInfo] = useState<ParentInfo | null>(null);
@@ -178,6 +179,14 @@ function IngredientDetailInner() {
     run();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, etab?.id]);
+
+  // Load storage zones
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("storage_zones").select("id, name").order("display_order").order("name");
+      setStorageZoneOptions((data ?? []) as { id: string; name: string }[]);
+    })();
+  }, []);
 
   // Load derived ingredients + parent info
   useEffect(() => {
@@ -389,23 +398,26 @@ function IngredientDetailInner() {
         {/* ── Lieu de stockage ── */}
         <div className="card" style={{ marginBottom: 12, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 12, fontWeight: 700, opacity: 0.65, whiteSpace: "nowrap" }}>Stockage</span>
-          <input
-            type="text"
+          <select
             value={storageZone}
-            onChange={(e) => { setStorageZone(e.target.value); setStorageZoneSaved(false); }}
-            onBlur={async () => {
-              const val = storageZone.trim() || null;
+            onChange={async (e) => {
+              const val = e.target.value || null;
+              setStorageZone(e.target.value);
               await supabase.from("ingredients").update({ storage_zone: val }).eq("id", id);
               setStorageZoneSaved(true);
               setTimeout(() => setStorageZoneSaved(false), 2000);
             }}
-            placeholder="ex: Chambre froide, Cave, Garage..."
             style={{
               flex: 1, height: 32, borderRadius: 8,
               border: "1.5px solid #e5ddd0", padding: "4px 10px",
-              fontSize: 13, background: "#fff",
+              fontSize: 13, background: "#fff", cursor: "pointer",
             }}
-          />
+          >
+            <option value="">— Aucun —</option>
+            {storageZoneOptions.map(z => (
+              <option key={z.id} value={z.name}>{z.name}</option>
+            ))}
+          </select>
           {storageZoneSaved && <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 600 }}>Enregistre</span>}
         </div>
 

@@ -36,7 +36,7 @@ import { detectAllergensFromName } from "@/lib/invoices/allergenDetector";
 import { detectCategoryFromName } from "@/lib/invoices/categoryDetector";
 import { PriceAlertsPanel } from "@/components/PriceAlertsPanel";
 import { parseAllergens } from "@/lib/allergens";
-import { CategoryHeader, IngredientRow, type EditState } from "@/components/IngredientRow";
+import { CategoryHeader, IngredientRow, type EditState, type StorageZoneOption } from "@/components/IngredientRow";
 import { useProfile } from "@/lib/ProfileContext";
 import { updateDerivedIngredients, computeDerivedPrice, computeRendement } from "@/lib/rendement";
 import DuplicatePanel from "@/components/DuplicatePanel";
@@ -122,6 +122,16 @@ function IngredientsPageInner() {
   const [filterCategory, setFilterCategory] = useState<"all" | Category>("all");
   const [filterSupplier, setFilterSupplier] = useState<"all" | string>(supplierParam ?? "all");
   const [includeNoOffer, setIncludeNoOffer] = useState(true);
+  const [storageZones, setStorageZones] = useState<StorageZoneOption[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      let q = supabase.from("storage_zones").select("id, name").order("display_order").order("name");
+      if (etab?.id) q = q.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
+      const { data } = await q;
+      setStorageZones((data ?? []) as StorageZoneOption[]);
+    })();
+  }, [etab?.id]);
 
   const suppliersMap = useMemo(() => {
     const m = new Map<string, Supplier>();
@@ -944,6 +954,7 @@ function IngredientsPageInner() {
                             compactMode={compactMode}
                             edit={editingId === x.id ? edit : null}
                             suppliers={suppliers}
+                            storageZones={storageZones}
                             previewEditPack={editingId === x.id ? previewEditPack : ""}
                             onStartEdit={userCanWrite ? startEdit : () => {}}
                             onSaveEdit={userCanWrite ? saveEdit : () => {}}

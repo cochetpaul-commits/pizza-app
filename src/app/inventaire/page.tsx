@@ -18,8 +18,13 @@ type Inventaire = {
   notes: string | null;
 };
 
-/** Fallback zones used when no storage_zone is set on ingredients */
-const FALLBACK_ZONE_ORDER = ["frigo", "cave", "sec"];
+type StorageZone = {
+  id: string;
+  name: string;
+  display_order: number;
+};
+
+const SANS_ZONE = "__sans_zone__";
 
 function categoryToZone(cat: string | null): string {
   if (!cat) return "sec";
@@ -40,9 +45,13 @@ function categoryToZone(cat: string | null): string {
   }
 }
 
-/** Resolve zone: explicit storage_zone on ingredient, or auto from category */
-function resolveZone(ing: Ingredient): string {
-  return ing.storage_zone || categoryToZone(ing.category);
+/** Resolve zone: explicit storage_zone on ingredient, or fallback */
+function resolveZone(ing: Ingredient, zones: StorageZone[]): string {
+  if (ing.storage_zone) {
+    // Check if zone still exists in DB
+    if (zones.some(z => z.name === ing.storage_zone)) return ing.storage_zone;
+  }
+  return SANS_ZONE;
 }
 
 function fmtDate(iso: string) {
@@ -74,7 +83,12 @@ export default function InventairePage() {
 
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number | "">>({});
-  const [activeZone, setActiveZone] = useState("frigo");
+  const [zones, setZones] = useState<StorageZone[]>([]);
+  const [activeZone, setActiveZone] = useState<string>(SANS_ZONE);
+  const [showAddZone, setShowAddZone] = useState(false);
+  const [newZoneName, setNewZoneName] = useState("");
+  const [addingZone, setAddingZone] = useState(false);
+  const [showManageZones, setShowManageZones] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -83,7 +97,18 @@ export default function InventairePage() {
 
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  // ── Load ingredients ──────────────────────────────────────
+  // ── Load ingredients + zones ─────────────────────────────
+
+  const loadZones = useCallback(async () => {
+    let q = supabase.from("storage_zones").select("*").order("display_order").order("name");
+    if (etab?.id) {
+      q = q.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
+    }
+    const { data } = await q;
+    const zList = (data ?? []) as StorageZone[];
+    setZones(zList);
+    return zList;
+  }, [etab?.id]);
 
   useEffect(() => {
     (async () => {
@@ -95,11 +120,13 @@ export default function InventairePage() {
       if (etab?.id) {
         q = q.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
       }
-      const { data, error } = await q;
+      const [{ data, error }, zList] = await Promise.all([q, loadZones()]);
       if (error) { console.error("ingredients query:", error); }
       setIngredients((data ?? []) as Ingredient[]);
+      // Default to first zone or "sans zone"
+      if (zList.length > 0) setActiveZone(zList[0].name);
     })();
-  }, [etab?.id]);
+  }, [etab?.id, loadZones]);
 
   // ── Load inventaires ──────────────────────────────────────
 
@@ -252,33 +279,75 @@ export default function InventairePage() {
     }
   }
 
+  // ── Add / delete zone ────────────────────────────────────
+
+  async function addZone() {
+    const name = newZoneName.trim();
+    if (!name) return;
+    setAddingZone(true);
+    const { error } = await supabase.from("storage_zones").insert({
+      name,
+      etablissement_id: etab?.id ?? null,
+      display_order: zones.length,
+    });
+    if (error) {
+      if (error.message.includes("unique") || error.message.includes("duplicate")) {
+        alert("Cette zone existe déjà.");
+      } else {
+        alert(error.message);
+      }
+      setAddingZone(false);
+      return;
+    }
+    await loadZones();
+    setNewZoneName("");
+    setShowAddZone(false);
+    setAddingZone(false);
+    setActiveZone(name);
+  }
+
+  async function deleteZone(zone: StorageZone) {
+    // Check if any ingredients use this zone
+    const count = ingredients.filter(i => i.storage_zone === zone.name).length;
+    const msg = count > 0
+      ? `"${zone.name}" est utilisée par ${count} ingrédient(s). Les ingrédients seront déplacés dans "Sans zone". Supprimer ?`
+      : `Supprimer la zone "${zone.name}" ?`;
+    if (!confirm(msg)) return;
+
+    // Clear storage_zone on ingredients that use this zone
+    if (count > 0) {
+      await supabase.from("ingredients").update({ storage_zone: null }).eq("storage_zone", zone.name);
+    }
+    await supabase.from("storage_zones").delete().eq("id", zone.id);
+    const zList = await loadZones();
+    // Reload ingredients to reflect cleared zones
+    if (count > 0) {
+      let q = supabase.from("ingredients").select("*").eq("is_active", true).order("name");
+      if (etab?.id) q = q.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
+      const { data } = await q;
+      setIngredients((data ?? []) as Ingredient[]);
+    }
+    if (activeZone === zone.name) {
+      setActiveZone(zList.length > 0 ? zList[0].name : SANS_ZONE);
+    }
+  }
+
   // ── Computed ───────────────────────────────────────────────
 
-  // Build zones dynamically from ingredients
-  const activeZones = useMemo(() => {
-    const zoneMap = new Map<string, string>(); // id -> display name
-    for (const ing of ingredients) {
-      const z = resolveZone(ing);
-      if (!zoneMap.has(z)) {
-        // Capitalize first letter for display
-        zoneMap.set(z, z.charAt(0).toUpperCase() + z.slice(1));
-      }
+  // Tabs: DB zones + "Sans zone" if any unassigned ingredients
+  const displayZones = useMemo(() => {
+    const tabs: { id: string; nom: string }[] = zones.map(z => ({ id: z.name, nom: z.name }));
+    // Check if any ingredients have no zone
+    const hasUnassigned = ingredients.some(i => resolveZone(i, zones) === SANS_ZONE);
+    if (hasUnassigned) {
+      tabs.push({ id: SANS_ZONE, nom: "Sans zone" });
     }
-    // Sort: fallback zones first (frigo, cave, sec), then custom alphabetically
-    const sorted = [...zoneMap.entries()].sort(([a], [b]) => {
-      const ia = FALLBACK_ZONE_ORDER.indexOf(a);
-      const ib = FALLBACK_ZONE_ORDER.indexOf(b);
-      if (ia !== -1 && ib !== -1) return ia - ib;
-      if (ia !== -1) return -1;
-      if (ib !== -1) return 1;
-      return a.localeCompare(b, "fr");
-    });
-    return sorted.map(([id, nom]) => ({ id, nom }));
-  }, [ingredients]);
+    return tabs;
+  }, [zones, ingredients]);
 
   const zoneIngredients = useMemo(() => {
-    return ingredients.filter((ing) => resolveZone(ing) === activeZone);
-  }, [ingredients, activeZone]);
+    return ingredients.filter((ing) => resolveZone(ing, zones) === activeZone);
+  }, [ingredients, activeZone, zones]);
 
   const isActive = !!session && !viewingId;
   const isViewing = !!viewingId;
@@ -320,12 +389,12 @@ export default function InventairePage() {
     for (const ing of ingredients) {
       const qty = Number(quantities[ing.id] ?? 0);
       if (qty > 0) {
-        const zone = resolveZone(ing);
+        const zone = resolveZone(ing, zones);
         counts[zone] = (counts[zone] ?? 0) + 1;
       }
     }
     return counts;
-  }, [ingredients, quantities]);
+  }, [ingredients, quantities, zones]);
 
   // ── Render: empty state (no active session) ───────────────
 
@@ -481,8 +550,8 @@ export default function InventairePage() {
         </div>
 
         {/* Zone tabs */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
-          {activeZones.map((z) => {
+        <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
+          {displayZones.map((z) => {
             const isActiveZone = activeZone === z.id;
             const count = zoneCounts[z.id] ?? 0;
             return (
@@ -512,7 +581,111 @@ export default function InventairePage() {
               </button>
             );
           })}
+          {/* Add zone button */}
+          <button
+            type="button"
+            onClick={() => setShowAddZone(true)}
+            style={{
+              width: 32, height: 32, borderRadius: 20, fontSize: 16, fontWeight: 700,
+              cursor: "pointer", border: "1.5px dashed #ddd6c8", background: "#fff",
+              color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+            title="Ajouter une zone"
+          >+</button>
+          {/* Manage zones button */}
+          {zones.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowManageZones(!showManageZones)}
+              style={{
+                fontSize: 11, color: "#999", background: "none", border: "none",
+                cursor: "pointer", textDecoration: "underline", padding: "4px 0",
+              }}
+            >
+              {showManageZones ? "Fermer" : "Gérer"}
+            </button>
+          )}
         </div>
+
+        {/* Add zone inline */}
+        {showAddZone && (
+          <div style={{
+            display: "flex", gap: 8, marginBottom: 12, alignItems: "center",
+            padding: "10px 14px", background: "#fff", borderRadius: 10,
+            border: "1.5px solid #ddd6c8",
+          }}>
+            <input
+              autoFocus
+              type="text"
+              value={newZoneName}
+              onChange={(e) => setNewZoneName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") addZone(); if (e.key === "Escape") setShowAddZone(false); }}
+              placeholder="Nom de la zone (ex: Chambre froide)"
+              style={{
+                flex: 1, height: 34, borderRadius: 8, border: "1.5px solid #e5ddd0",
+                padding: "4px 12px", fontSize: 13, background: "#fff",
+              }}
+            />
+            <button
+              type="button"
+              onClick={addZone}
+              disabled={addingZone || !newZoneName.trim()}
+              style={{
+                padding: "8px 16px", borderRadius: 8, border: "none",
+                background: "#D4775A", color: "#fff", fontSize: 12, fontWeight: 700,
+                cursor: "pointer", opacity: addingZone || !newZoneName.trim() ? 0.5 : 1,
+              }}
+            >
+              {addingZone ? "..." : "Ajouter"}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowAddZone(false); setNewZoneName(""); }}
+              style={{
+                padding: "8px 12px", borderRadius: 8, border: "1px solid #ddd6c8",
+                background: "#fff", fontSize: 12, cursor: "pointer", color: "#999",
+              }}
+            >Annuler</button>
+          </div>
+        )}
+
+        {/* Manage zones panel */}
+        {showManageZones && (
+          <div style={{
+            marginBottom: 12, padding: "12px 14px", background: "#fff",
+            borderRadius: 10, border: "1.5px solid #ddd6c8",
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: "#1a1a1a" }}>
+              Zones de stockage
+            </div>
+            {zones.map((z) => {
+              const count = ingredients.filter(i => i.storage_zone === z.name).length;
+              return (
+                <div key={z.id} style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "6px 0", borderBottom: "1px solid #f0ebe2",
+                }}>
+                  <div>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{z.name}</span>
+                    <span style={{ fontSize: 11, color: "#999", marginLeft: 8 }}>
+                      {count} ingrédient{count !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => deleteZone(z)}
+                    style={{
+                      fontSize: 11, color: "#DC2626", background: "none", border: "none",
+                      cursor: "pointer", padding: "4px 8px",
+                    }}
+                  >
+                    Supprimer
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Zone summary line */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, padding: "0 4px" }}>
