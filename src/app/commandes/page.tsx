@@ -229,8 +229,11 @@ function computeOrderUnitPrice(offer: OfferRow | null, orderQty: number | null):
     return null;
   }
 
-  // Unit pricing (kg, L, pc): unit_price is the price per unit ordered
-  return offer.unit_price ?? null;
+  // Unit pricing: only return unit_price if unit is "pc" (pièce = on commande à l'unité)
+  // For kg/L, unit_price is a rate (€/kg, €/L) — sans order_quantity on ne peut pas
+  // calculer le prix réel de la commande
+  if (offer.unit === "pc") return offer.unit_price ?? null;
+  return null;
 }
 
 // ── Status config ────────────────────────────────────────────────────────────
