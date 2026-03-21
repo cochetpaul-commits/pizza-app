@@ -75,7 +75,8 @@ const s = StyleSheet.create({
     borderBottomColor: "#E5DDD0",
   },
   rowName: { flex: 1, fontSize: 11 },
-  rowRight: { width: 120, textAlign: "right" as const, fontSize: 11 },
+  rowQty: { width: 30, textAlign: "right" as const, fontSize: 11, fontWeight: "bold" },
+  rowUnit: { width: 80, textAlign: "left" as const, fontSize: 10, color: MUTED, paddingLeft: 6 },
 
   footer: {
     position: "absolute",
@@ -141,7 +142,8 @@ export function CommandePdfDocument({ data }: { data: CommandePdfData }) {
             {cat.items.map((item, i) => (
               <View key={i} style={s.row}>
                 <Text style={s.rowName}>{item.name}</Text>
-                <Text style={s.rowRight}>{item.qty}  {item.unit}</Text>
+                <Text style={s.rowQty}>{item.qty}</Text>
+                <Text style={s.rowUnit}>{item.unit}</Text>
               </View>
             ))}
           </View>
