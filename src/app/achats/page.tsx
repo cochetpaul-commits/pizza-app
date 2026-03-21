@@ -29,13 +29,7 @@ type InvoiceLine = {
   total_price: number | null;
 };
 
-type Tab = "factures" | "stats" | "fournisseurs";
-type PeriodKey = "1" | "3" | "6" | "12";
-
-type SupplierStat = { name: string; totalHT: number; nbFactures: number; pct: number; color: string };
-
-type MonthSegment = { name: string; amount: number; color: string; pct: number };
-type MonthBar = { label: string; total: number; pct: number; nbFactures: number; segments: MonthSegment[] };
+type Tab = "factures" | "fournisseurs";
 
 type SupplierRow = {
   id: string; name: string; is_active: boolean;
@@ -48,27 +42,8 @@ type SupplierInfo = { refCount: number; lastImport: string | null; lastImportNum
 const fmt = (n: number | null) =>
   n == null ? "—" : n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 
-const fmtCompact = (n: number) =>
-  n >= 1000
-    ? n.toLocaleString("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 0, maximumFractionDigits: 0 })
-    : fmt(n);
-
 const fmtDate = (d: string | null) =>
   d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
-
-function getStartDate(months: number): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() - months + 1);
-  d.setDate(1);
-  return d.toISOString().slice(0, 10);
-}
-
-const PERIODS: { key: PeriodKey; label: string }[] = [
-  { key: "1", label: "Ce mois" },
-  { key: "3", label: "3 mois" },
-  { key: "6", label: "6 mois" },
-  { key: "12", label: "12 mois" },
-];
 
 const SUPPLIER_COLORS = [
   "#8B1A1A", "#C0392B", "#D4775A", "#E67E22", "#D4AC0D",
@@ -93,15 +68,6 @@ export default function AchatsPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<string | null>(null);
   const [lines, setLines] = useState<InvoiceLine[]>([]);
   const [linesLoading, setLinesLoading] = useState(false);
-
-  // ── Stats state ──
-  const [period, setPeriod] = useState<PeriodKey>("3");
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [statsData, setStatsData] = useState<{
-    totalHT: number; avgMonthly: number; nbSuppliers: number; nbFactures: number;
-    trend: number | null;
-    topSuppliers: SupplierStat[]; monthBars: MonthBar[];
-  }>({ totalHT: 0, avgMonthly: 0, nbSuppliers: 0, nbFactures: 0, trend: null, topSuppliers: [], monthBars: [] });
 
   // ── Fournisseurs state ──
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
@@ -151,125 +117,6 @@ export default function AchatsPage() {
       setLoading(false);
     })();
   }, [etabId]);
-
-  // ── Load stats ──
-  useEffect(() => {
-    if (tab !== "stats") return;
-    (async () => {
-      setStatsLoading(true);
-      const months = parseInt(period);
-      const startDate = getStartDate(months);
-
-      let statsQ = supabase
-        .from("supplier_invoices")
-        .select("invoice_date, total_ht, supplier_id, suppliers(name)")
-        .gte("invoice_date", startDate)
-        .order("invoice_date", { ascending: true });
-      if (etabId) statsQ = statsQ.eq("etablissement_id", etabId);
-      const { data } = await statsQ;
-
-      const rows = (data ?? []) as unknown as {
-        invoice_date: string | null; total_ht: number | null;
-        supplier_id: string | null; suppliers: { name: string } | null;
-      }[];
-
-      // Previous period (for trend)
-      const prevStart = getStartDate(months * 2);
-      let prevQ = supabase
-        .from("supplier_invoices")
-        .select("total_ht")
-        .gte("invoice_date", prevStart)
-        .lt("invoice_date", startDate);
-      if (etabId) prevQ = prevQ.eq("etablissement_id", etabId);
-      const { data: prevData } = await prevQ;
-      const prevTotal = (prevData ?? []).reduce((s, r: { total_ht: number | null }) => s + (r.total_ht ?? 0), 0);
-
-      const total = rows.reduce((s, r) => s + (r.total_ht ?? 0), 0);
-      const supplierIds = new Set<string>();
-      const bySupplier: Record<string, { name: string; totalHT: number; nbFactures: number }> = {};
-      for (const r of rows) {
-        const sid = r.supplier_id ?? "?";
-        supplierIds.add(sid);
-        const name = r.suppliers?.name ?? "Inconnu";
-        if (!bySupplier[sid]) bySupplier[sid] = { name, totalHT: 0, nbFactures: 0 };
-        bySupplier[sid].totalHT += r.total_ht ?? 0;
-        bySupplier[sid].nbFactures += 1;
-      }
-
-      const topSuppliers = Object.values(bySupplier)
-        .sort((a, b) => b.totalHT - a.totalHT)
-        .map((s, i) => ({
-          ...s,
-          pct: total > 0 ? (s.totalHT / total) * 100 : 0,
-          color: SUPPLIER_COLORS[i % SUPPLIER_COLORS.length],
-        }));
-
-      // Build supplier name→color map
-      const supplierColorMap: Record<string, { name: string; color: string }> = {};
-      for (const s of topSuppliers) {
-        const skey = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-        supplierColorMap[skey] = { name: s.name, color: s.color };
-      }
-
-      const byMonth: Record<string, number> = {};
-      const byMonthSupplier: Record<string, Record<string, number>> = {};
-      const byMonthCount: Record<string, number> = {};
-      for (const r of rows) {
-        if (!r.invoice_date) continue;
-        const key = r.invoice_date.slice(0, 7);
-        byMonth[key] = (byMonth[key] ?? 0) + (r.total_ht ?? 0);
-        byMonthCount[key] = (byMonthCount[key] ?? 0) + 1;
-        const name = r.suppliers?.name ?? "Inconnu";
-        const skey = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-        if (!byMonthSupplier[key]) byMonthSupplier[key] = {};
-        byMonthSupplier[key][skey] = (byMonthSupplier[key][skey] ?? 0) + (r.total_ht ?? 0);
-      }
-
-      const allMonths: string[] = [];
-      const d = new Date();
-      for (let i = months - 1; i >= 0; i--) {
-        const md = new Date(d.getFullYear(), d.getMonth() - i, 1);
-        const key = md.toISOString().slice(0, 7);
-        allMonths.push(key);
-        if (!byMonth[key]) byMonth[key] = 0;
-      }
-
-      const monthsWithData = allMonths.filter((k) => byMonth[k] > 0);
-      const maxMonth = Math.max(...monthsWithData.map((k) => byMonth[k]), 1);
-      const monthNames = ["Jan", "Fev", "Mar", "Avr", "Mai", "Jun", "Jul", "Aou", "Sep", "Oct", "Nov", "Dec"];
-      const monthBars: MonthBar[] = monthsWithData.map((k) => {
-        const [y, m] = k.split("-");
-        const monthTotal = byMonth[k];
-        const supplierBreakdown = byMonthSupplier[k] ?? {};
-        const segments: MonthSegment[] = Object.entries(supplierBreakdown)
-          .sort(([, a], [, b]) => b - a)
-          .map(([skey, amount]) => ({
-            name: supplierColorMap[skey]?.name ?? skey,
-            amount,
-            color: supplierColorMap[skey]?.color ?? "#999",
-            pct: monthTotal > 0 ? (amount / monthTotal) * 100 : 0,
-          }));
-        return {
-          label: `${monthNames[parseInt(m) - 1]} ${y.slice(2)}`,
-          total: monthTotal,
-          pct: (monthTotal / maxMonth) * 100,
-          nbFactures: byMonthCount[k] ?? 0,
-          segments,
-        };
-      });
-
-      const rawTrend = prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : null;
-      const trend = rawTrend != null ? Math.max(-999, Math.min(999, rawTrend)) : null;
-
-      setStatsData({
-        totalHT: total, avgMonthly: months > 0 ? total / months : 0,
-        nbSuppliers: supplierIds.size, nbFactures: rows.length,
-        trend,
-        topSuppliers, monthBars,
-      });
-      setStatsLoading(false);
-    })();
-  }, [tab, period, etabId]);
 
   // ── Load fournisseurs ──
   useEffect(() => {
@@ -361,8 +208,6 @@ export default function AchatsPage() {
   const tdStyle: React.CSSProperties = { padding: "8px 10px", fontSize: 13 };
   const tdR: React.CSSProperties = { ...tdStyle, textAlign: "right" };
 
-  const maxSupplier = statsData.topSuppliers.length > 0 ? statsData.topSuppliers[0].totalHT : 1;
-
   const tabBtn = (key: Tab, label: string) => (
     <button
       key={key}
@@ -393,7 +238,6 @@ export default function AchatsPage() {
         {/* Tabs */}
         <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
           {tabBtn("factures", "Factures")}
-          {tabBtn("stats", "Statistiques")}
           {tabBtn("fournisseurs", "Fournisseurs")}
         </div>
 
@@ -546,196 +390,6 @@ export default function AchatsPage() {
               )}
             </>
           )
-        )}
-
-        {/* ═══ TAB: STATISTIQUES ═══ */}
-        {tab === "stats" && (
-          <>
-            <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
-              {PERIODS.map((p) => (
-                <button
-                  key={p.key}
-                  onClick={() => setPeriod(p.key)}
-                  style={{
-                    fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600,
-                    padding: "7px 16px", borderRadius: 20, cursor: "pointer",
-                    border: period === p.key ? "2px solid #D4775A" : "1px solid #ddd6c8",
-                    background: period === p.key ? "#D4775A" : "#fff",
-                    color: period === p.key ? "#fff" : "#1a1a1a",
-                    transition: "all 0.15s",
-                  }}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-
-            {statsLoading ? (
-              <p style={{ color: "#999", fontSize: 14, textAlign: "center", marginTop: 40 }}>Chargement...</p>
-            ) : (
-              <>
-                {/* KPI cards */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 28 }}>
-                  {[
-                    { label: "Total achats HT", value: fmt(statsData.totalHT), trend: statsData.trend },
-                    { label: "Moyenne mensuelle", value: fmt(statsData.avgMonthly) },
-                    { label: "Fournisseurs actifs", value: String(statsData.nbSuppliers) },
-                    { label: "Factures traitees", value: String(statsData.nbFactures) },
-                  ].map((k) => (
-                    <div key={k.label} style={{
-                      background: "#fff", borderRadius: 12, padding: "18px 20px",
-                      border: "1px solid #e5ddd0", boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                    }}>
-                      <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginBottom: 8 }}>{k.label}</div>
-                      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                        <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 22, color: "#1a1a1a" }}>
-                          {k.value}
-                        </span>
-                        {k.trend != null && (
-                          <span style={{
-                            fontSize: 12, fontWeight: 600,
-                            color: k.trend >= 0 ? "#DC2626" : "#16a34a",
-                            display: "flex", alignItems: "center", gap: 2,
-                          }}>
-                            {k.trend >= 0 ? "\u2191" : "\u2193"} {Math.abs(k.trend).toFixed(1)}%
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Top fournisseurs — horizontal bars */}
-                <h2 style={{
-                  fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 16,
-                  color: "#1a1a1a", margin: "0 0 12px", letterSpacing: "0.04em", textTransform: "uppercase",
-                }}>
-                  Top fournisseurs
-                </h2>
-
-                {statsData.topSuppliers.length === 0 ? (
-                  <p style={{ color: "#999", fontSize: 14, marginBottom: 28 }}>Aucune donnee sur la periode.</p>
-                ) : (
-                  <div style={{ marginBottom: 28 }}>
-                    {statsData.topSuppliers.map((s) => (
-                      <div
-                        key={s.name}
-                        style={{
-                          display: "flex", alignItems: "center", gap: 12,
-                          padding: "10px 0", borderBottom: "1px solid #f0ebe2",
-                        }}
-                      >
-                        <span style={{ width: 12, height: 12, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
-                        <span style={{
-                          fontFamily: "DM Sans, sans-serif", fontSize: 14, fontWeight: 500, color: "#1a1a1a",
-                          width: 160, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                        }}>
-                          {s.name}
-                        </span>
-                        <div style={{ flex: 1, height: 24, background: "#f0ebe2", borderRadius: 6, overflow: "hidden" }}>
-                          <div style={{
-                            width: `${Math.max((s.totalHT / maxSupplier) * 100, 2)}%`,
-                            height: "100%", background: s.color, borderRadius: 6,
-                            display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 8,
-                            transition: "width 0.3s ease",
-                          }}>
-                            {(s.totalHT / maxSupplier) * 100 > 25 && (
-                              <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", whiteSpace: "nowrap" }}>
-                                {fmtCompact(s.totalHT)}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        {(s.totalHT / maxSupplier) * 100 <= 25 && (
-                          <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", flexShrink: 0, whiteSpace: "nowrap" }}>
-                            {fmtCompact(s.totalHT)}
-                          </span>
-                        )}
-                        <span style={{ fontSize: 12, color: "#999", flexShrink: 0, width: 45, textAlign: "right" }}>
-                          {s.pct.toFixed(1)}%
-                        </span>
-                      </div>
-                    ))}
-
-                    {/* Total row */}
-                    <div style={{
-                      display: "flex", alignItems: "center", gap: 12,
-                      padding: "14px 0 10px", borderTop: "2px solid #ddd6c8", marginTop: 4,
-                    }}>
-                      <span style={{ width: 12, flexShrink: 0 }} />
-                      <span style={{
-                        fontFamily: "var(--font-oswald), Oswald, sans-serif",
-                        fontSize: 14, fontWeight: 700, color: "#D4775A", width: 160, flexShrink: 0,
-                      }}>
-                        Achat cumule
-                      </span>
-                      <span style={{
-                        fontFamily: "var(--font-oswald), Oswald, sans-serif",
-                        fontSize: 18, fontWeight: 700, color: "#1a1a1a", flex: 1,
-                      }}>
-                        {fmt(statsData.topSuppliers.reduce((s, x) => s + x.totalHT, 0))}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Evolution mensuelle — segmented bars */}
-                <h2 style={{
-                  fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 16,
-                  color: "#1a1a1a", margin: "0 0 12px", letterSpacing: "0.04em", textTransform: "uppercase",
-                }}>
-                  Evolution mensuelle
-                </h2>
-
-                {statsData.monthBars.length === 0 ? (
-                  <p style={{ color: "#999", fontSize: 14 }}>Aucune donnee.</p>
-                ) : (
-                  <>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {statsData.monthBars.map((b) => (
-                        <div key={b.label} style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: "DM Sans, sans-serif", fontSize: 13 }}>
-                          <span style={{ width: 56, flexShrink: 0, color: "#999", textAlign: "right", fontSize: 12 }}>{b.label}</span>
-                          <div style={{ flex: 1, background: "#f0ebe2", borderRadius: 6, height: 28, overflow: "hidden", display: "flex" }}>
-                            {b.segments.map((seg, i) => (
-                              <div
-                                key={seg.name}
-                                title={`${seg.name}: ${fmtCompact(seg.amount)}`}
-                                style={{
-                                  width: `${(seg.pct / 100) * Math.max(b.pct, 3)}%`,
-                                  height: "100%", background: seg.color,
-                                  borderTopLeftRadius: i === 0 ? 6 : 0,
-                                  borderBottomLeftRadius: i === 0 ? 6 : 0,
-                                  borderTopRightRadius: i === b.segments.length - 1 ? 6 : 0,
-                                  borderBottomRightRadius: i === b.segments.length - 1 ? 6 : 0,
-                                  transition: "width 0.3s ease",
-                                }}
-                              />
-                            ))}
-                          </div>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", whiteSpace: "nowrap", flexShrink: 0 }}>
-                            {fmtCompact(b.total)}
-                          </span>
-                          <span style={{ fontSize: 10, color: "#999", flexShrink: 0, whiteSpace: "nowrap" }}>
-                            {b.nbFactures} fact.
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Legend */}
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", marginTop: 14 }}>
-                      {statsData.topSuppliers.filter((s) => s.totalHT > 0).map((s) => (
-                        <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
-                          <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, color: "#777" }}>{s.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-          </>
         )}
 
         {/* ═══ TAB: FOURNISSEURS ═══ */}
