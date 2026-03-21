@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, type CSSProperties } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -107,37 +107,46 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   };
 
   /* ── Render nav item (level 3 — sub-menu items) ── */
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+
   const renderItem = (item: NavItemV2, etabSlug?: string) => {
     if (!isRoleAllowed(item.roles, role)) return null;
     const active = isActive(item.href);
+    const itemKey = `${etabSlug ?? "g"}-${item.href}`;
+    const hovered = hoveredItem === itemKey;
     const accentColor = etabSlug
       ? entries.find((e): e is NavEtabGroup => e.kind === "etab" && e.etabSlug === etabSlug)?.color ?? etabColor
       : etabColor;
 
     return (
       <Link
-        key={`${etabSlug ?? "g"}-${item.href}`}
+        key={itemKey}
         href={item.href}
         onClick={() => handleNav(etabSlug)}
+        onMouseEnter={() => setHoveredItem(itemKey)}
+        onMouseLeave={() => setHoveredItem(null)}
         style={{
-          display: "flex", alignItems: "center", gap: 8,
-          padding: "6px 16px 6px 40px",
+          display: "flex", alignItems: "center", gap: 6,
+          padding: "5px 16px 5px 44px",
           margin: "1px 8px", borderRadius: 6,
           textDecoration: "none",
           fontSize: 12, fontWeight: active ? 600 : 400,
-          color: active ? C.textActive : "rgba(255,255,255,0.55)",
-          background: active ? `${accentColor}12` : "transparent",
+          color: active ? C.textActive : hovered ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.5)",
+          background: active ? `${accentColor}12` : hovered ? "rgba(255,255,255,0.04)" : "transparent",
           borderLeft: active ? `2px solid ${accentColor}60` : "2px solid transparent",
-          transition: "background 0.12s",
+          transition: "background 0.12s, color 0.12s",
           whiteSpace: "nowrap", overflow: "hidden",
         }}
       >
+        <span style={{ color: active ? accentColor : "rgba(255,255,255,0.3)", fontSize: 8, flexShrink: 0 }}>●</span>
         <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{item.label}</span>
       </Link>
     );
   };
 
   /* ── Render a hub (level 2 — always visible, sub-items toggle) ── */
+  const [hoveredHub, setHoveredHub] = useState<string | null>(null);
+
   const renderHub = (sub: NavSubSection, etabSlug: string, parentColor: string) => {
     if (!isRoleAllowed(sub.roles, role)) return null;
     const items = sub.items.filter(i => isRoleAllowed(i.roles, role));
@@ -147,25 +156,29 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       return items.map(item => {
         if (!isRoleAllowed(item.roles, role)) return null;
         const active = isActive(item.href);
+        const soloKey = `${etabSlug}-${item.href}`;
+        const hovered = hoveredHub === soloKey;
         const IconComp = item.icon ? ICON_MAP[item.icon] : null;
         return (
           <Link
-            key={`${etabSlug}-${item.href}`}
+            key={soloKey}
             href={item.href}
             onClick={() => handleNav(etabSlug)}
+            onMouseEnter={() => setHoveredHub(soloKey)}
+            onMouseLeave={() => setHoveredHub(null)}
             style={{
               display: "flex", alignItems: "center", gap: 8,
               padding: "7px 16px 7px 28px",
               margin: "1px 8px", borderRadius: 6,
               textDecoration: "none",
               fontSize: 12, fontWeight: active ? 600 : 500,
-              color: active ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.5)",
-              background: active ? C.bgItemActive : "transparent",
-              transition: "background 0.12s",
+              color: active ? "rgba(255,255,255,0.85)" : hovered ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.5)",
+              background: active ? C.bgItemActive : hovered ? "rgba(255,255,255,0.04)" : "transparent",
+              transition: "background 0.12s, color 0.12s",
               whiteSpace: "nowrap", overflow: "hidden",
             }}
           >
-            {IconComp && <IconComp size={14} color={active ? parentColor : "rgba(255,255,255,0.35)"} />}
+            {IconComp && <IconComp size={14} color={active ? parentColor : hovered ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.35)"} />}
             <span>{item.label}</span>
           </Link>
         );
@@ -174,8 +187,21 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
     const hubKey = `${etabSlug}:${sub.label}`;
     const isOpen = openHub === hubKey;
+    const hovered = hoveredHub === hubKey;
     const SectionIcon = sub.icon ? ICON_MAP[sub.icon] : null;
     const hasActiveChild = items.some(it => isActive(it.href));
+
+    const hubBtnStyle: CSSProperties = {
+      display: "flex", alignItems: "center", gap: 8,
+      width: "calc(100% - 16px)", padding: "7px 12px 7px 28px",
+      margin: "1px 8px", borderRadius: 6,
+      background: isOpen ? `${parentColor}14` : hovered ? "rgba(255,255,255,0.06)" : "transparent",
+      border: "none", cursor: items.length > 0 ? "pointer" : "default",
+      color: (isOpen || hasActiveChild) ? "rgba(255,255,255,0.85)" : hovered ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.5)",
+      fontSize: 13, fontWeight: 700,
+      whiteSpace: "nowrap", overflow: "hidden",
+      transition: "background 0.15s, color 0.15s",
+    };
 
     return (
       <div key={hubKey}>
@@ -185,19 +211,11 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             if (items.length > 0) toggleHub(hubKey);
             if (sub.href) { router.push(sub.href); onNavigate?.(); }
           }}
-          style={{
-            display: "flex", alignItems: "center", gap: 8,
-            width: "calc(100% - 16px)", padding: "7px 12px 7px 28px",
-            margin: "1px 8px", borderRadius: 6,
-            background: isOpen ? `${parentColor}0A` : "transparent",
-            border: "none", cursor: items.length > 0 ? "pointer" : "default",
-            color: (isOpen || hasActiveChild) ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.5)",
-            fontSize: 12, fontWeight: 600,
-            whiteSpace: "nowrap", overflow: "hidden",
-            transition: "background 0.12s, color 0.12s",
-          }}
+          onMouseEnter={() => setHoveredHub(hubKey)}
+          onMouseLeave={() => setHoveredHub(null)}
+          style={hubBtnStyle}
         >
-          {SectionIcon && <SectionIcon size={14} color={(isOpen || hasActiveChild) ? `${parentColor}CC` : "rgba(255,255,255,0.35)"} />}
+          {SectionIcon && <SectionIcon size={14} color={(isOpen || hasActiveChild) ? `${parentColor}CC` : hovered ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.35)"} />}
           <span style={{ flex: 1, textAlign: "left" }}>{sub.label}</span>
           {items.length > 0 && (
             <span style={{
