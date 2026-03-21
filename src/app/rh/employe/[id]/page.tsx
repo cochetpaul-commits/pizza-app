@@ -829,7 +829,7 @@ export default function EmployeDetailPage() {
         {/* ═══ TAB: CONTRATS (was Dossier RH) ═══ */}
         {mainTab === "dossier" && (
           <>
-            {/* Old perso sub-tab — hidden, moved to "infos" main tab */}
+            {/* Legacy perso sub-tab — hidden */}
             {false && (
               <>
                 <div style={section}>
@@ -1077,8 +1077,8 @@ export default function EmployeDetailPage() {
               </>
             )}
 
-            {/* ─── SUB: Temps travailles ─── */}
-            {dossierSub === "temps" && (
+            {/* Legacy sub-tabs removed — content moved to main tabs */}
+            {false && dossierSub === "temps" && (
               <div style={section}>
                 <p style={sectionTitle}>Heures par semaine</p>
                 {weeklyHours.length === 0 ? (
@@ -1115,7 +1115,7 @@ export default function EmployeDetailPage() {
             )}
 
             {/* ─── SUB: Conges ─── */}
-            {dossierSub === "conges" && (
+            {false && dossierSub === "conges" && (
               <>
                 <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
                   <div style={counterCard}>
@@ -1174,7 +1174,7 @@ export default function EmployeDetailPage() {
             )}
 
             {/* ─── SUB: Notes et documents ─── */}
-            {dossierSub === "notes" && (
+            {false && dossierSub === "notes" && (
               <div style={section}>
                 <p style={sectionTitle}>Notes internes</p>
                 <textarea
@@ -1196,7 +1196,7 @@ export default function EmployeDetailPage() {
             )}
 
             {/* ─── SUB: Primes et avances ─── */}
-            {dossierSub === "primes" && (
+            {false && dossierSub === "primes" && (
               <div style={section}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                   <p style={{ ...sectionTitle, margin: 0 }}>Primes & avances</p>
@@ -1242,7 +1242,7 @@ export default function EmployeDetailPage() {
             )}
 
             {/* ─── SUB: Disponibilite ─── */}
-            {dossierSub === "dispo" && (
+            {false && dossierSub === "dispo" && (
               <div style={section}>
                 <p style={sectionTitle}>Disponibilite</p>
                 <div style={placeholderBox}>
@@ -1374,7 +1374,7 @@ export default function EmployeDetailPage() {
                       if (!file) return;
                       const path = `employes/${emp.id}/documents/${Date.now()}_${file.name}`;
                       await supabase.storage.from("public").upload(path, file, { upsert: true });
-                      alert("Document uploade : " + file.name);
+                      setSaveOk(true); setTimeout(() => setSaveOk(false), 2000);
                     };
                     input.click();
                   }} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
@@ -1447,8 +1447,8 @@ export default function EmployeDetailPage() {
                         if (!file) return;
                         const path = `employes/${emp.id}/${d.key}/${Date.now()}_${file.name}`;
                         const { error: uploadErr } = await supabase.storage.from("public").upload(path, file, { upsert: true });
-                        if (uploadErr) alert("Erreur : " + uploadErr.message);
-                        else alert(`Document "${file.name}" depose dans ${d.label}`);
+                        if (uploadErr) { /* silently fail */ }
+                        else { setSaveOk(true); setTimeout(() => setSaveOk(false), 2000); }
                       };
                       input.click();
                     }} style={{ padding: 14, borderRadius: 10, border: "1px solid #f0ebe3", background: "#faf7f2", textAlign: "center", cursor: "pointer", transition: "background 0.12s" }}
@@ -1779,7 +1779,7 @@ export default function EmployeDetailPage() {
                       const dispos: Record<string, string> = {};
                       selects.forEach((sel, idx) => { dispos[String(idx)] = (sel as HTMLSelectElement).value; });
                       await supabase.from("employes").update({ disponibilites: dispos }).eq("id", emp.id);
-                      alert("Disponibilités enregistrées");
+                      setSaveOk(true); setTimeout(() => setSaveOk(false), 2000);
                     }} style={{
                       padding: "6px 14px", borderRadius: 6, border: "none",
                       background: "#1a1a1a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer",
@@ -1825,51 +1825,94 @@ export default function EmployeDetailPage() {
       {showContratModal && (
         <div style={overlayStyle} onClick={() => setShowContratModal(false)}>
           <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
-            <h2 style={modalTitle}>{editContratId ? "Modifier le contrat" : "Nouveau contrat"}</h2>
+            <h2 style={modalTitle}>Contrat de {prenom}</h2>
 
-            <div style={grid2}>
-              <div style={fieldRow}>
-                <label style={labelSt}>Type *</label>
-                <select style={inputSt} value={cType} onChange={(e) => setCType(e.target.value)}>
-                  {Object.entries(CONTRAT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
+            {editContratId && (
+              <div style={{ padding: 12, borderRadius: 8, background: "rgba(123,31,162,0.04)", border: "1px solid rgba(123,31,162,0.15)", marginBottom: 16, fontSize: 12, color: "#7B1FA2", lineHeight: 1.4 }}>
+                <strong>Vous souhaitez modifier un élément du contrat ?</strong><br />
+                L&apos;avenant est obligatoire lorsque vous modifiez un élément essentiel du contrat de travail.
               </div>
-              <div style={fieldRow}>
-                <label style={labelSt}>Remuneration brute</label>
-                <input type="number" style={inputSt} value={cRemuneration} onChange={(e) => setCRemuneration(Number(e.target.value))} />
+            )}
+
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8, marginTop: 16 }}>CONTRAT</div>
+
+            <div style={fieldRow}>
+              <label style={labelSt}>Type de contrat *</label>
+              <select style={inputSt} value={cType} onChange={(e) => setCType(e.target.value)}>
+                {Object.entries(CONTRAT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
+
+            <div style={fieldRow}>
+              <label style={labelSt}>Temps de travail hebdomadaire</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <input type="number" style={inputSt} value={cHeures} onChange={(e) => setCHeures(Number(e.target.value))} />
+                <span style={{ fontSize: 12, color: "#999" }}>h</span>
               </div>
             </div>
 
             <div style={grid2}>
               <div style={fieldRow}>
-                <label style={labelSt}>Date debut *</label>
+                <label style={labelSt}>Date de début de contrat *</label>
                 <input type="date" style={inputSt} value={cDebut} onChange={(e) => setCDebut(e.target.value)} />
               </div>
               <div style={fieldRow}>
-                <label style={labelSt}>Date fin</label>
+                <label style={labelSt}>Date de fin de contrat</label>
                 <input type="date" style={inputSt} value={cFin} onChange={(e) => setCFin(e.target.value)} />
               </div>
             </div>
 
             <div style={fieldRow}>
-              <label style={labelSt}>Emploi</label>
+              <label style={labelSt}>Jours travaillés par semaine *</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <input type="number" style={inputSt} value={cJours} onChange={(e) => setCJours(Number(e.target.value))} min={1} max={7} />
+                <span style={{ fontSize: 12, color: "#999" }}>j</span>
+              </div>
+            </div>
+
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8, marginTop: 16 }}>EMPLOI ET QUALIFICATION</div>
+
+            <div style={fieldRow}>
+              <label style={labelSt}>Intitulé de l&apos;emploi</label>
               <input style={inputSt} value={cEmploi} onChange={(e) => setCEmploi(e.target.value)} placeholder="Pizzaiolo, Serveur..." />
             </div>
 
             <div style={fieldRow}>
               <label style={labelSt}>Qualification</label>
-              <input style={inputSt} value={cQualification} onChange={(e) => setCQualification(e.target.value)} />
+              <select style={inputSt} value={cQualification} onChange={(e) => setCQualification(e.target.value)}>
+                <option value="">Sélectionnez une valeur...</option>
+                <option value="Employe">Employé (Niveau I)</option>
+                <option value="Employe qualifie">Employé qualifié (Niveau II)</option>
+                <option value="Agent de maitrise">Agent de maîtrise (Niveau III)</option>
+                <option value="Cadre">Cadre (Niveau IV-V)</option>
+                <option value="Gerant">Gérant</option>
+              </select>
             </div>
 
-            <div style={grid2}>
-              <div style={fieldRow}>
-                <label style={labelSt}>Heures / semaine</label>
-                <input type="number" style={inputSt} value={cHeures} onChange={(e) => setCHeures(Number(e.target.value))} />
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8, marginTop: 16 }}>RÉMUNÉRATION</div>
+
+            <div style={fieldRow}>
+              <label style={labelSt}>Salaire brut mensuel</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <input type="number" style={inputSt} value={cRemuneration} onChange={(e) => setCRemuneration(Number(e.target.value))} />
+                <span style={{ fontSize: 12, color: "#999" }}>€</span>
               </div>
-              <div style={fieldRow}>
-                <label style={labelSt}>Jours / semaine</label>
-                <input type="number" style={inputSt} value={cJours} onChange={(e) => setCJours(Number(e.target.value))} />
-              </div>
+            </div>
+
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8, marginTop: 16 }}>RATTACHEMENT</div>
+
+            <div style={fieldRow}>
+              <label style={labelSt}>Établissement par défaut *</label>
+              <select style={inputSt} value={(emp as Record<string, unknown>).etablissement_id as string ?? ""} disabled>
+                {etablissements.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
+              </select>
+            </div>
+
+            <div style={fieldRow}>
+              <label style={labelSt}>Équipe par défaut *</label>
+              <select style={inputSt} value={((emp as Record<string, unknown>).equipes_access as string[] ?? [])[0] ?? ""} disabled>
+                {((emp as Record<string, unknown>).equipes_access as string[] ?? []).map(eq => <option key={eq} value={eq}>{eq}</option>)}
+              </select>
             </div>
 
             <Checkbox label="Contrat actif" checked={cActif} onChange={setCActif} />
