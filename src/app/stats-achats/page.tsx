@@ -6,6 +6,7 @@ import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { CAT_LABELS, CAT_COLORS, type Category } from "@/types/ingredients";
+import { getSupplierColor } from "@/lib/supplierColors";
 
 type PeriodKey = "1" | "3" | "6" | "12";
 type ViewTab = "fournisseur" | "categorie";
@@ -60,13 +61,6 @@ const PERIODS: { key: PeriodKey; label: string }[] = [
   { key: "3", label: "3 mois" },
   { key: "6", label: "6 mois" },
   { key: "12", label: "12 mois" },
-];
-
-// Distinct color palette for suppliers (warm gradient)
-const SUPPLIER_COLORS = [
-  "#8B1A1A", "#C0392B", "#D4775A", "#E67E22", "#D4AC0D",
-  "#C8CC78", "#7CB342", "#26A69A", "#4EAAB0", "#2E86C1",
-  "#5B6AAF", "#7D3C98", "#95A5A6",
 ];
 
 function getStartDate(months: number): string {
@@ -145,10 +139,10 @@ export default function StatsAchatsPage() {
 
       const supplierList = Object.values(bySupplier)
         .sort((a, b) => b.totalHT - a.totalHT)
-        .map((s, i) => ({
+        .map((s) => ({
           ...s,
           pct: total > 0 ? (s.totalHT / total) * 100 : 0,
-          color: SUPPLIER_COLORS[i % SUPPLIER_COLORS.length],
+          color: getSupplierColor(s.name),
         }));
       setTopSuppliers(supplierList);
 

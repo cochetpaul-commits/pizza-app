@@ -7,6 +7,7 @@ import Link from "next/link";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
+import { getSupplierColor } from "@/lib/supplierColors";
 
 /* ── Types ── */
 
@@ -44,12 +45,6 @@ const fmt = (n: number | null) =>
 
 const fmtDate = (d: string | null) =>
   d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
-
-const SUPPLIER_COLORS = [
-  "#8B1A1A", "#C0392B", "#D4775A", "#E67E22", "#D4AC0D",
-  "#C8CC78", "#7CB342", "#26A69A", "#4EAAB0", "#2E86C1",
-  "#5B6AAF", "#7D3C98", "#95A5A6",
-];
 
 /* ── Component ── */
 
@@ -187,7 +182,7 @@ export default function AchatsPage() {
   // Assign consistent colors to folders (by rank)
   const folderColorMap = useMemo(() => {
     const m = new Map<string, string>();
-    folders.forEach(([key], i) => { m.set(key, SUPPLIER_COLORS[i % SUPPLIER_COLORS.length]); });
+    folders.forEach(([key]) => { m.set(key, getSupplierColor(key)); });
     return m;
   }, [folders]);
 
@@ -400,16 +395,18 @@ export default function AchatsPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {suppliers.filter((s) => s.is_active).map((s) => {
                 const st = supplierStats.get(s.id);
+                const sColor = getSupplierColor(s.name);
                 return (
                   <div key={s.id} style={{
                     border: "1px solid #ddd6c8", borderRadius: 12, padding: "14px 16px",
                     background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                    borderLeft: `4px solid ${sColor}`,
                   }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <Link
                           href={`/fournisseurs/${s.id}`}
-                          style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 700, fontSize: 15, color: "#D4775A", textDecoration: "none" }}
+                          style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 700, fontSize: 15, color: sColor, textDecoration: "none" }}
                         >
                           {s.name}
                         </Link>
