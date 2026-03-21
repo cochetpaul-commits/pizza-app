@@ -35,14 +35,34 @@ const TYPE_LABELS: Record<string, string> = {
   empatement: "Emp\u00e2tement",
 };
 
+const CUISINE_CAT_ORDER = [
+  "preparation",
+  "sauce",
+  "entree",
+  "plat_cuisine",
+  "accompagnement",
+  "dessert",
+  "autre",
+];
+
 const CAT_LABELS: Record<string, string> = {
   preparation: "Pr\u00e9paration",
+  sauce: "Sauce",
   entree: "Entr\u00e9e",
   plat_cuisine: "Plat cuisin\u00e9",
   accompagnement: "Accompagnement",
-  sauce: "Sauce",
   dessert: "Dessert",
   autre: "Autre",
+};
+
+const CAT_COLORS: Record<string, string> = {
+  preparation: "#6b8e5e",
+  sauce: "#c2703e",
+  entree: "#4a7a8c",
+  plat_cuisine: "#8B1A1A",
+  accompagnement: "#7a6b4e",
+  dessert: "#9b5a8a",
+  autre: "#666",
 };
 
 const ALLERGEN_LABELS: Record<string, string> = {
@@ -129,6 +149,12 @@ export default function CataloguePage() {
       const ia = order.indexOf(a.split(":")[0]);
       const ib = order.indexOf(b.split(":")[0]);
       if (ia !== ib) return ia - ib;
+      // Sort cuisine categories by CUISINE_CAT_ORDER
+      const catA = a.includes(":") ? a.split(":")[1] : "";
+      const catB = b.includes(":") ? b.split(":")[1] : "";
+      const ca = CUISINE_CAT_ORDER.indexOf(catA);
+      const cb = CUISINE_CAT_ORDER.indexOf(catB);
+      if (ca !== -1 && cb !== -1) return ca - cb;
       return a.localeCompare(b, "fr");
     });
   }, [filtered]);
@@ -262,43 +288,104 @@ export default function CataloguePage() {
       )}
 
       {/* Groups */}
-      {groups.map(([key, items]) => {
-        const color = groupColor(key);
-        return (
-          <div key={key} style={{ marginBottom: 28 }}>
-            {/* Section title */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <div style={{ width: 4, height: 20, borderRadius: 2, background: color }} />
-              <span
-                style={{
-                  fontSize: 14,
-                  fontWeight: 700,
-                  color,
-                  textTransform: "uppercase",
-                  letterSpacing: 1.5,
-                  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                }}
-              >
-                {groupLabel(key)}
-              </span>
-              <span style={{ fontSize: 11, color: "#999" }}>{items.length}</span>
-            </div>
+      {(() => {
+        const cuisineGroups = groups.filter(([k]) => k.startsWith("cuisine:"));
+        const otherGroups = groups.filter(([k]) => !k.startsWith("cuisine:"));
 
-            {/* Grid */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
-                gap: 16,
-              }}
-            >
-              {items.map((f) => (
-                <FicheCard key={f.id} fiche={f} onOpen={setViewerFiche} />
-              ))}
-            </div>
-          </div>
+        return (
+          <>
+            {/* Non-cuisine groups: standard grid */}
+            {otherGroups.map(([key, items]) => {
+              const color = groupColor(key);
+              return (
+                <div key={key} style={{ marginBottom: 28 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                    <div style={{ width: 4, height: 20, borderRadius: 2, background: color }} />
+                    <span style={{ fontSize: 14, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
+                      {groupLabel(key)}
+                    </span>
+                    <span style={{ fontSize: 11, color: "#999" }}>{items.length}</span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 16 }}>
+                    {items.map((f) => (
+                      <FicheCard key={f.id} fiche={f} onOpen={setViewerFiche} />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Cuisine groups: solitaire horizontal columns */}
+            {cuisineGroups.length > 0 && (
+              <div style={{ marginBottom: 28 }}>
+                {/* Section header */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                  <div style={{ width: 4, height: 20, borderRadius: 2, background: TYPE_COLORS.cuisine }} />
+                  <span style={{ fontSize: 14, fontWeight: 700, color: TYPE_COLORS.cuisine, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
+                    Cuisine
+                  </span>
+                  <span style={{ fontSize: 11, color: "#999" }}>
+                    {cuisineGroups.reduce((s, [, items]) => s + items.length, 0)}
+                  </span>
+                </div>
+
+                {/* Horizontal solitaire columns */}
+                <div className="catalogue-solitaire" style={{
+                  display: "flex",
+                  gap: 12,
+                  overflowX: "auto",
+                  paddingBottom: 12,
+                  alignItems: "flex-start",
+                }}>
+                  {cuisineGroups.map(([key, items]) => {
+                    const cat = key.split(":")[1];
+                    const catColor = CAT_COLORS[cat] ?? TYPE_COLORS.cuisine;
+                    return (
+                      <div key={key} style={{ minWidth: 130, maxWidth: 150, flex: "0 0 auto" }}>
+                        {/* Category header */}
+                        <div style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: catColor,
+                          textTransform: "uppercase",
+                          letterSpacing: 1,
+                          fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                          marginBottom: 8,
+                          paddingBottom: 4,
+                          borderBottom: `2px solid ${catColor}`,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}>
+                          {CAT_LABELS[cat] ?? cat}
+                          <span style={{ fontSize: 10, fontWeight: 500, color: "#999", marginLeft: 6 }}>{items.length}</span>
+                        </div>
+                        {/* Stacked cards */}
+                        <div style={{ position: "relative" }}>
+                          {items.map((f, i) => (
+                            <div
+                              key={f.id}
+                              style={{
+                                marginBottom: i < items.length - 1 ? -32 : 0,
+                                position: "relative",
+                                zIndex: i,
+                                transition: "transform 0.15s ease, z-index 0s",
+                              }}
+                              className="solitaire-card"
+                            >
+                              <SolitaireCard fiche={f} catColor={catColor} onOpen={setViewerFiche} />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
         );
-      })}
+      })()}
 
       {/* PDF Viewer Modal */}
       {viewerFiche && (
@@ -318,6 +405,20 @@ export default function CataloguePage() {
         @keyframes modalIn {
           from { opacity: 0; transform: scale(0.95); }
           to { opacity: 1; transform: scale(1); }
+        }
+        .solitaire-card:hover {
+          z-index: 50 !important;
+          transform: translateY(-8px);
+        }
+        .solitaire-card:hover > div {
+          box-shadow: 0 6px 20px rgba(0,0,0,0.15) !important;
+        }
+        .catalogue-solitaire::-webkit-scrollbar {
+          height: 4px;
+        }
+        .catalogue-solitaire::-webkit-scrollbar-thumb {
+          background: #ddd6c8;
+          border-radius: 2px;
         }
       `}</style>
     </main>
@@ -561,6 +662,81 @@ function FicheCard({ fiche, onOpen }: { fiche: Fiche; onOpen: (f: Fiche) => void
               Consulter la fiche
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Solitaire Card (compact, for stacked layout) ─────────────────────────────
+
+function SolitaireCard({
+  fiche,
+  catColor,
+  onOpen,
+}: {
+  fiche: Fiche;
+  catColor: string;
+  onOpen: (f: Fiche) => void;
+}) {
+  const hasPhoto = !!fiche.photo_url;
+
+  return (
+    <div
+      onClick={() => onOpen(fiche)}
+      style={{
+        borderRadius: 10,
+        overflow: "hidden",
+        background: "#fff",
+        border: `1.5px solid ${catColor}30`,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+        cursor: "pointer",
+        transition: "box-shadow 0.15s, transform 0.15s",
+      }}
+    >
+      {/* Cover */}
+      <div
+        style={{
+          height: 80,
+          background: hasPhoto
+            ? `url(${fiche.photo_url}) center/cover`
+            : `linear-gradient(135deg, ${catColor}20 0%, ${catColor}08 100%)`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {!hasPhoto && (
+          <span
+            style={{
+              fontSize: 24,
+              fontWeight: 700,
+              color: `${catColor}40`,
+              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+            }}
+          >
+            {initials(fiche.name)}
+          </span>
+        )}
+      </div>
+
+      {/* Title */}
+      <div style={{
+        padding: "6px 8px",
+        borderTop: `2px solid ${catColor}`,
+      }}>
+        <div style={{
+          fontSize: 10,
+          fontWeight: 700,
+          color: "#1a1a1a",
+          fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+          textTransform: "uppercase",
+          letterSpacing: "0.03em",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}>
+          {fiche.name}
         </div>
       </div>
     </div>
