@@ -54,10 +54,10 @@ const EMP_COLOR      = "#8a7b6b";
 
 const CUISINE_CATS = [
   { id: "preparation",    label: "Pr\u00e9paration" },
+  { id: "sauce",          label: "Sauce" },
   { id: "entree",         label: "Entr\u00e9e" },
   { id: "plat_cuisine",   label: "Plat cuisin\u00e9" },
   { id: "accompagnement", label: "Accompagnement" },
-  { id: "sauce",          label: "Sauce" },
   { id: "dessert",        label: "Dessert" },
   { id: "autre",          label: "Autre" },
 ];
@@ -84,11 +84,6 @@ const FOOD_COST_FILTERS: { id: FoodCostFilter; label: string }[] = [
   { id: "attention", label: "\u226432%" },
   { id: "alerte",    label: ">32%" },
 ];
-
-const CAT_LABEL: Record<string, string> = {
-  preparation: "Pr\u00e9paration", entree: "Entr\u00e9e", plat_cuisine: "Plat",
-  accompagnement: "Accomp.", sauce: "Sauce", dessert: "Dessert", autre: "Autre",
-};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -337,20 +332,6 @@ function SectionHeader({
   );
 }
 
-function SubSectionHeader({ title, color, count }: { title: string; color: string; count: number }) {
-  return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 6,
-      padding: "10px 0 6px",
-    }}>
-      <span style={{ fontSize: 13, fontWeight: 700, color, letterSpacing: 0.3 }}>
-        {title}
-      </span>
-      <span style={{ fontSize: 11, color: "#999" }}>({count})</span>
-    </div>
-  );
-}
-
 // ─── Tab pill ─────────────────────────────────────────────────────────────────
 
 const tabStyle = (active: boolean, color?: string): React.CSSProperties => ({
@@ -374,6 +355,7 @@ const filterPill = (active: boolean, activeColor?: string): React.CSSProperties 
 // ─── Main inner component ─────────────────────────────────────────────────────
 
 function RecettesInner() {
+  const router = useRouter();
   const { can } = useProfile();
   const canWrite = can("recettes.edit");
   const { current: etabCtx } = useEtablissement();
@@ -789,39 +771,110 @@ function RecettesInner() {
           </div>
         )}
 
-        {/* ── Cuisine ── */}
+        {/* ── Cuisine — solitaire columns ── */}
         {showCuisine && filteredKitchens.length > 0 && (
           <div style={{ marginBottom: 24 }}>
             <SectionHeader title="Cuisine" color={CUISINE_COLOR} count={filteredKitchens.length}
               newHref={canWrite ? "/recettes/new/cuisine" : undefined} />
-            {CUISINE_CATS.filter(cat => (kitchenByCat[cat.id]?.length ?? 0) > 0).map(cat => (
-              <div key={cat.id}>
-                <SubSectionHeader title={cat.label} color={CUISINE_CAT_COLORS[cat.id] ?? CUISINE_COLOR} count={kitchenByCat[cat.id].length} />
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 8, marginBottom: 8 }}>
-                  {kitchenByCat[cat.id].map(r => {
-                    const hasPortion = r.cost_per_portion != null && r.cost_per_portion > 0;
-                    const hasKg = r.cost_per_kg != null && r.cost_per_kg > 0;
-                    return (
-                      <RecipeCard
-                        key={r.id}
-                        name={r.name ?? "Recette"}
-                        href={`/recettes/cuisine/${r.id}`}
-                        prodHref={r.pivot_ingredient_id ? `/recettes/cuisine/${r.id}?mode=production` : undefined}
-                        color={CUISINE_COLOR}
-                        photoUrl={r.photo_url}
-                        subtitle={CAT_LABEL[r.category ?? "autre"] ?? r.category ?? ""}
-                        subtitleColor={CUISINE_CAT_COLORS[r.category ?? "autre"] ?? CUISINE_COLOR}
-                        cost={hasPortion ? r.cost_per_portion! : hasKg ? r.cost_per_kg! : null}
-                        costLabel={hasPortion ? "/portion" : hasKg ? "/kg" : undefined}
-                        pv={r.sell_price}
-                        pvConseille={pvTTCKitchen(r)}
-                        pvLabel={hasPortion ? "TTC" : hasKg ? "TTC/kg" : undefined}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+            <div style={{
+              display: "flex", gap: 14, overflowX: "auto",
+              paddingBottom: 12, WebkitOverflowScrolling: "touch",
+            }}>
+              {CUISINE_CATS.filter(cat => (kitchenByCat[cat.id]?.length ?? 0) > 0).map(cat => {
+                const color = CUISINE_CAT_COLORS[cat.id] ?? CUISINE_COLOR;
+                const items = kitchenByCat[cat.id];
+                return (
+                  <div key={cat.id} style={{ minWidth: 200, maxWidth: 240, flex: "0 0 auto" }}>
+                    {/* Category header pill */}
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      padding: "8px 12px", marginBottom: 6,
+                      borderRadius: 10, background: `${color}14`,
+                      borderLeft: `4px solid ${color}`,
+                    }}>
+                      <span style={{
+                        fontSize: 12, fontWeight: 700, textTransform: "uppercase",
+                        letterSpacing: 1, color,
+                        fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                      }}>
+                        {cat.label}
+                      </span>
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: "1px 6px",
+                        borderRadius: 6, background: `${color}25`, color,
+                      }}>
+                        {items.length}
+                      </span>
+                    </div>
+                    {/* Stacked cards — solitaire style */}
+                    <div style={{ position: "relative" }}>
+                      {items.map((r, idx) => {
+                        const hasPortion = r.cost_per_portion != null && r.cost_per_portion > 0;
+                        const hasKg = r.cost_per_kg != null && r.cost_per_kg > 0;
+                        const fc = kitchenFc(r);
+                        const isLast = idx === items.length - 1;
+                        return (
+                          <div
+                            key={r.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => router.push(`/recettes/cuisine/${r.id}`)}
+                            onKeyDown={ev => ev.key === "Enter" && router.push(`/recettes/cuisine/${r.id}`)}
+                            style={{
+                              position: "relative",
+                              marginBottom: isLast ? 0 : -32,
+                              zIndex: idx,
+                              background: "#fff",
+                              borderRadius: 12,
+                              border: `1.5px solid ${color}30`,
+                              borderLeft: `4px solid ${color}`,
+                              padding: "10px 12px",
+                              cursor: "pointer",
+                              transition: "transform 0.15s, box-shadow 0.15s, z-index 0s",
+                              boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                            }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.transform = "translateY(-4px)";
+                              e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.12)";
+                              e.currentTarget.style.zIndex = "50";
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.transform = "none";
+                              e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.06)";
+                              e.currentTarget.style.zIndex = String(idx);
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <Thumb src={r.photo_url ?? null} name={r.name ?? "?"} color={color} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  <span style={{
+                                    fontWeight: 700, fontSize: 12,
+                                    fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                                    textTransform: "uppercase", letterSpacing: "0.03em",
+                                    color: "#1a1a1a",
+                                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                  }}>
+                                    {r.name ?? "Recette"}
+                                  </span>
+                                  {fc != null && <FoodCostBadge fc={fc} />}
+                                </div>
+                                <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>
+                                  {hasPortion ? `${fmt(r.cost_per_portion!)}/portion` : hasKg ? `${fmt(r.cost_per_kg!)}/kg` : ""}
+                                  {r.sell_price != null && r.sell_price > 0 && (
+                                    <span style={{ marginLeft: 6, fontWeight: 700, color: "#1a1a1a" }}>{fmt(r.sell_price)}{"\u00a0\u20ac"}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
