@@ -24,6 +24,7 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
   const { id } = use(params);
   const router = useRouter();
   const { current: etab } = useEtablissement();
+  const etabId = etab?.id ?? null;
 
   const [supplier, setSupplier] = useState<SupplierFull | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -36,13 +37,16 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
   useEffect(() => {
     (async () => {
       setLoading(true);
+
+      let invQuery = supabase.from("supplier_invoices")
+        .select("id,invoice_number,invoice_date,total_ht,created_at")
+        .eq("supplier_id", id);
+      if (etabId) invQuery = invQuery.eq("etablissement_id", etabId);
+      invQuery = invQuery.order("created_at", { ascending: false }).limit(5);
+
       const [supRes, invRes] = await Promise.all([
         supabase.from("suppliers").select("*").eq("id", id).single(),
-        supabase.from("supplier_invoices")
-          .select("id,invoice_number,invoice_date,total_ht,created_at")
-          .eq("supplier_id", id)
-          .order("created_at", { ascending: false })
-          .limit(5),
+        invQuery,
       ]);
 
       if (supRes.data) {
@@ -57,7 +61,7 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
       setInvoices((invRes.data ?? []) as Invoice[]);
       setLoading(false);
     })();
-  }, [id, etab?.id]);
+  }, [id, etabId]);
 
   async function save() {
     if (!supplier) return;

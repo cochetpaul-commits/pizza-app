@@ -139,19 +139,21 @@ export default function EventsPage() {
     return map;
   }, [events]);
 
+  const etabKey = etab?.slug?.includes("bello") ? "bellomio" : etab?.slug?.includes("piccola") ? "piccola" : null;
+
   useEffect(() => {
     (async () => {
       const q = supabase
         .from("events")
         .select("id,name,type,date,time,location,covers,establishment,status,contact_name,sell_price")
         .order("date", { ascending: true, nullsFirst: false });
-      if (etab) q.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
+      if (etabKey) q.or(`establishment.eq.${etabKey},establishment.eq.both,establishment.is.null`);
       const { data } = await q;
       setEvents(data ?? []);
       setLoading(false);
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [etab?.id]);
+  }, [etabKey]);
 
   const today = new Date().toISOString().slice(0, 10);
   const filtered = events.filter((e) => {

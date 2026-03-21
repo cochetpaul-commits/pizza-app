@@ -290,7 +290,7 @@ type SortKey = "ca" | "foodCostPct" | "margin" | "quantity";
 // ── Component ─────────────────────────────────────────────────────────────
 
 export default function FinancesPage() {
-  const { current: _etab } = useEtablissement(); // eslint-disable-line @typescript-eslint/no-unused-vars
+  const etab = useEtablissement();
   const currentWeek = useMemo(() => getCurrentWeek(), []);
   const currentMonth = useMemo(() => getCurrentMonth(), []);
 
@@ -313,7 +313,7 @@ export default function FinancesPage() {
       if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [mode, weekStr, monthStr]);
+  }, [mode, weekStr, monthStr, etab.current?.id]);
 
   function goPrev() {
     if (mode === "week") setWeekStr((w) => shiftWeek(w, -1));

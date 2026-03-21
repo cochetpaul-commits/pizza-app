@@ -406,7 +406,7 @@ const deltaStyle: React.CSSProperties = {
 // ── Component ─────────────────────────────────────────────────────────────
 
 export default function PilotagePage() {
-  useEtablissement();
+  const etab = useEtablissement();
   const currentWeek = useMemo(() => getCurrentWeek(), []);
   const [weekStr, setWeekStr] = useState(currentWeek);
   const [stats, setStats] = useState<StatsData | null>(null);
@@ -460,7 +460,7 @@ export default function PilotagePage() {
     }, 60_000);
 
     return () => clearInterval(tick);
-  }, [weekStr, currentWeek, loadStats]);
+  }, [weekStr, currentWeek, loadStats, etab.current?.id]);
 
   function goPrevWeek() {
     setWeekStr((w) => shiftWeek(w, -1));

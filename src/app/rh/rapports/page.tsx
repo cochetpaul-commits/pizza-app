@@ -113,17 +113,13 @@ export default function RapportsPage() {
       const prevYear = month === 0 ? year - 1 : year;
       const prevPeriode = `${prevYear}-${String(prevMonth + 1).padStart(2, "0")}`;
 
-      const [empRes, contratRes, shiftsRes, absRes, compteursRes] = await Promise.all([
+      const [empRes, shiftsRes, absRes, compteursRes] = await Promise.all([
         supabase
           .from("employes")
           .select("*")
           .eq("etablissement_id", etab.id)
           .eq("actif", true)
           .order("nom"),
-        supabase
-          .from("contrats")
-          .select("*")
-          .eq("actif", true),
         supabase
           .from("shifts")
           .select("employe_id, date, heure_debut, heure_fin, pause_minutes")
@@ -142,6 +138,17 @@ export default function RapportsPage() {
           .eq("etablissement_id", etab.id)
           .eq("periode", prevPeriode),
       ]);
+
+      if (cancelled) return;
+
+      const empIds = (empRes.data ?? []).map((e: Record<string, unknown>) => e.id as string);
+      const contratRes = empIds.length > 0
+        ? await supabase
+            .from("contrats")
+            .select("*")
+            .eq("actif", true)
+            .in("employe_id", empIds)
+        : { data: [] };
 
       if (cancelled) return;
 

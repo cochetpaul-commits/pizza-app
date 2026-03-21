@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchPriceAlerts, PriceAlert, ALERT_THRESHOLD } from "@/lib/priceAlerts";
+import { useEtablissement } from "@/lib/EtablissementContext";
 import Link from "next/link";
 
 const SNOOZE_KEY = "alertes-prix:snoozed"; // localStorage key: JSON { [ingredient_id+supplier_id]: snooze_until_iso }
@@ -33,6 +34,7 @@ function fmtDate(iso: string) {
 }
 
 export default function AleretesPrixPage() {
+  const { current: etab } = useEtablissement();
   const [alerts, setAlerts] = useState<PriceAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +49,8 @@ export default function AleretesPrixPage() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Non connecté");
-        const all = await fetchPriceAlerts(supabase, user.id, ALERT_THRESHOLD);
+        const eid = etab?.id;
+        const all = await fetchPriceAlerts(supabase, user.id, ALERT_THRESHOLD, undefined, eid);
         setAlerts(all);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : String(e));
@@ -56,7 +59,7 @@ export default function AleretesPrixPage() {
       }
     };
     run();
-  }, []);
+  }, [etab]);
 
   function snooze(a: PriceAlert) {
     const until = new Date();

@@ -125,20 +125,27 @@ export default function EquipePage() {
     (async () => {
       if (!etab) return;
       setLoading(true);
-      const [empRes, contratRes] = await Promise.all([
-        supabase
-          .from("employes")
-          .select("*")
-          .eq("etablissement_id", etab.id)
-          .order("nom", { ascending: true }),
-        supabase
+      const empRes = await supabase
+        .from("employes")
+        .select("*")
+        .eq("etablissement_id", etab.id)
+        .order("nom", { ascending: true });
+      if (cancelled) return;
+      const emps = empRes.data ?? [];
+      setEmployes(emps);
+
+      const empIds = emps.map((e: Employe) => e.id);
+      if (empIds.length > 0) {
+        const contratRes = await supabase
           .from("contrats")
           .select("id, employe_id, type, heures_semaine, emploi, actif")
-          .eq("actif", true),
-      ]);
-      if (cancelled) return;
-      setEmployes(empRes.data ?? []);
-      setContrats(contratRes.data ?? []);
+          .eq("actif", true)
+          .in("employe_id", empIds);
+        if (cancelled) return;
+        setContrats(contratRes.data ?? []);
+      } else {
+        setContrats([]);
+      }
       setLoading(false);
     })();
     return () => { cancelled = true; };

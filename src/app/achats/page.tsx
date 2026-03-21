@@ -68,6 +68,7 @@ const PERIODS: { key: PeriodKey; label: string }[] = [
 export default function AchatsPage() {
   const router = useRouter();
   const etab = useEtablissement();
+  const etabId = etab.current?.id ?? null;
 
   const [tab, setTab] = useState<Tab>("factures");
 
@@ -102,19 +103,23 @@ export default function AchatsPage() {
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
       const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
 
-      const { data: recent } = await supabase
+      let recentQ = supabase
         .from("supplier_invoices")
         .select("id, invoice_number, invoice_date, total_ht, total_ttc, supplier_id, suppliers(name)")
         .order("invoice_date", { ascending: false })
         .limit(200);
+      if (etabId) recentQ = recentQ.eq("etablissement_id", etabId);
+      const { data: recent } = await recentQ;
 
       setInvoices((recent ?? []) as unknown as InvoiceRow[]);
 
-      const { data: monthInvoices } = await supabase
+      let monthQ = supabase
         .from("supplier_invoices")
         .select("total_ht, supplier_id, suppliers(name)")
         .gte("invoice_date", monthStart)
         .lte("invoice_date", monthEnd);
+      if (etabId) monthQ = monthQ.eq("etablissement_id", etabId);
+      const { data: monthInvoices } = await monthQ;
 
       const mi = (monthInvoices ?? []) as unknown as { total_ht: number | null; supplier_id: string | null; suppliers: { name: string } | null }[];
       const totalHT = mi.reduce((s, r) => s + (r.total_ht ?? 0), 0);
@@ -131,7 +136,7 @@ export default function AchatsPage() {
       setKPIs({ totalHT, nbFactures: mi.length, topSupplier: sorted[0]?.name ?? "—" });
       setLoading(false);
     })();
-  }, [etab]);
+  }, [etabId]);
 
   // ── Load stats ──
   useEffect(() => {
@@ -141,11 +146,13 @@ export default function AchatsPage() {
       const months = parseInt(period);
       const startDate = getStartDate(months);
 
-      const { data } = await supabase
+      let statsQ = supabase
         .from("supplier_invoices")
         .select("invoice_date, total_ht, supplier_id, suppliers(name)")
         .gte("invoice_date", startDate)
         .order("invoice_date", { ascending: true });
+      if (etabId) statsQ = statsQ.eq("etablissement_id", etabId);
+      const { data } = await statsQ;
 
       const rows = (data ?? []) as unknown as {
         invoice_date: string | null; total_ht: number | null;
@@ -198,17 +205,21 @@ export default function AchatsPage() {
       });
       setStatsLoading(false);
     })();
-  }, [tab, period, etab]);
+  }, [tab, period, etabId]);
 
   // ── Load fournisseurs ──
   useEffect(() => {
     if (tab !== "fournisseurs") return;
     (async () => {
       setSuppliersLoading(true);
+      let supQ = supabase.from("suppliers").select("id,name,is_active,email,phone,contact_name").order("name");
+      if (etabId) supQ = supQ.eq("etablissement_id", etabId);
+      let invQ = supabase.from("supplier_invoices").select("supplier_id,created_at,invoice_number").order("created_at", { ascending: false });
+      if (etabId) invQ = invQ.eq("etablissement_id", etabId);
       const [supRes, offRes, invRes] = await Promise.all([
-        supabase.from("suppliers").select("id,name,is_active,email,phone,contact_name").order("name"),
+        supQ,
         supabase.from("v_latest_offers").select("supplier_id"),
-        supabase.from("supplier_invoices").select("supplier_id,created_at,invoice_number").order("created_at", { ascending: false }),
+        invQ,
       ]);
 
       const rawRows = (supRes.data ?? []) as SupplierRow[];
@@ -243,7 +254,7 @@ export default function AchatsPage() {
       setSupplierStats(m);
       setSuppliersLoading(false);
     })();
-  }, [tab, etab]);
+  }, [tab, etabId]);
 
   // ── Folders ──
   const folders = useMemo(() => {

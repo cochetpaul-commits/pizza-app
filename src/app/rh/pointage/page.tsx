@@ -257,18 +257,21 @@ export default function PointagePage() {
     setLoading(true);
     setTableError(false);
 
-    const [empRes, contratRes] = await Promise.all([
-      supabase
-        .from("employes")
-        .select("*")
-        .eq("etablissement_id", etab.id)
-        .eq("actif", true)
-        .order("nom"),
-      supabase
-        .from("contrats")
-        .select("id, employe_id, emploi, actif")
-        .eq("actif", true),
-    ]);
+    const empRes = await supabase
+      .from("employes")
+      .select("*")
+      .eq("etablissement_id", etab.id)
+      .eq("actif", true)
+      .order("nom");
+
+    const empIds = (empRes.data ?? []).map((e: Record<string, unknown>) => e.id as string);
+    const contratRes = empIds.length > 0
+      ? await supabase
+          .from("contrats")
+          .select("id, employe_id, emploi, actif")
+          .eq("actif", true)
+          .in("employe_id", empIds)
+      : { data: [] };
 
     const contratsData = (contratRes.data ?? []) as ContratPointage[];
     const employes: Employe[] = (empRes.data ?? []).map((e: Record<string, unknown>) => ({

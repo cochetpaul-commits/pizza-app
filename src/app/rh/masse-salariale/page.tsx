@@ -140,18 +140,23 @@ export default function MasseSalarialePage() {
 
     (async () => {
       setLoading(true);
-      const [empRes, contratRes] = await Promise.all([
-        supabase
-          .from("employes")
-          .select("*")
-          .eq("etablissement_id", etab.id)
-          .eq("actif", true)
-          .order("nom"),
-        supabase
-          .from("contrats")
-          .select("*")
-          .eq("actif", true),
-      ]);
+      const empRes = await supabase
+        .from("employes")
+        .select("*")
+        .eq("etablissement_id", etab.id)
+        .eq("actif", true)
+        .order("nom");
+
+      if (cancelled) return;
+
+      const empIds = (empRes.data ?? []).map((e: Record<string, unknown>) => e.id as string);
+      const contratRes = empIds.length > 0
+        ? await supabase
+            .from("contrats")
+            .select("*")
+            .eq("actif", true)
+            .in("employe_id", empIds)
+        : { data: [] };
 
       if (cancelled) return;
       const contrats = (contratRes.data ?? []) as Contrat[];
