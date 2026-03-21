@@ -112,16 +112,18 @@ export default function StatsAchatsPage() {
       const total = rows.reduce((s, r) => s + (r.total_ht ?? 0), 0);
       const nbFactures = rows.length;
 
-      // Suppliers stats
-      const bySupplier: Record<string, { name: string; totalHT: number; nbFactures: number }> = {};
-      const supplierIds = new Set<string>();
+      // Suppliers stats — group by name (normalized) to merge duplicate supplier entries
+      const bySupplier: Record<string, { name: string; totalHT: number; nbFactures: number; supplierIds: string[] }> = {};
+      const allSupplierIds = new Set<string>();
       for (const r of rows) {
         const sid = r.supplier_id ?? "?";
-        supplierIds.add(sid);
+        allSupplierIds.add(sid);
         const name = r.suppliers?.name ?? "Inconnu";
-        if (!bySupplier[sid]) bySupplier[sid] = { name, totalHT: 0, nbFactures: 0 };
-        bySupplier[sid].totalHT += r.total_ht ?? 0;
-        bySupplier[sid].nbFactures += 1;
+        const key = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+        if (!bySupplier[key]) bySupplier[key] = { name, totalHT: 0, nbFactures: 0, supplierIds: [] };
+        if (!bySupplier[key].supplierIds.includes(sid)) bySupplier[key].supplierIds.push(sid);
+        bySupplier[key].totalHT += r.total_ht ?? 0;
+        bySupplier[key].nbFactures += 1;
       }
 
       const supplierList = Object.values(bySupplier)
@@ -133,16 +135,43 @@ export default function StatsAchatsPage() {
         }));
       setTopSuppliers(supplierList);
 
-      // Category stats from invoice lines
-      const { data: lineData } = await supabase
-        .from("supplier_invoice_lines")
-        .select("total_ht, ingredient_id, ingredients(category), supplier_invoices!inner(invoice_date)")
-        .gte("supplier_invoices.invoice_date", startDate);
-
+      // Category stats: map supplier → ingredient categories, then distribute invoice totals
+      const supplierIdsArr = Array.from(allSupplierIds);
       const byCat: Record<string, number> = {};
-      for (const line of (lineData ?? []) as unknown as { total_ht: number | null; ingredients: { category: string | null } | null }[]) {
-        const cat = line.ingredients?.category ?? "autre";
-        byCat[cat] = (byCat[cat] ?? 0) + (line.total_ht ?? 0);
+      if (supplierIdsArr.length > 0) {
+        // Get ingredients per supplier with their categories
+        const { data: ingData } = await supabase
+          .from("ingredients")
+          .select("supplier_id, category")
+          .in("supplier_id", supplierIdsArr)
+          .not("category", "is", null);
+
+        // Count ingredients per supplier per category
+        const supplierCatCounts: Record<string, Record<string, number>> = {};
+        for (const ing of (ingData ?? []) as { supplier_id: string; category: string | null }[]) {
+          const sid = ing.supplier_id;
+          const cat = ing.category ?? "autre";
+          if (!supplierCatCounts[sid]) supplierCatCounts[sid] = {};
+          supplierCatCounts[sid][cat] = (supplierCatCounts[sid][cat] ?? 0) + 1;
+        }
+
+        // Distribute each supplier group's total_ht proportionally across categories
+        for (const group of Object.values(bySupplier)) {
+          // Merge category counts across all supplier IDs in this group
+          const mergedCats: Record<string, number> = {};
+          for (const sid of group.supplierIds) {
+            const cats = supplierCatCounts[sid];
+            if (!cats) continue;
+            for (const [cat, count] of Object.entries(cats)) {
+              mergedCats[cat] = (mergedCats[cat] ?? 0) + count;
+            }
+          }
+          const totalIngs = Object.values(mergedCats).reduce((s, c) => s + c, 0);
+          if (totalIngs === 0) continue;
+          for (const [cat, count] of Object.entries(mergedCats)) {
+            byCat[cat] = (byCat[cat] ?? 0) + (group.totalHT * count) / totalIngs;
+          }
+        }
       }
 
       const catTotal = Object.values(byCat).reduce((s, v) => s + v, 0);
@@ -159,12 +188,14 @@ export default function StatsAchatsPage() {
 
       // KPIs with trend
       const avgMonthly = months > 0 ? total / months : 0;
-      const trend = prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : null;
+      // Cap trend at ±999% to avoid absurd numbers when previous period is near zero
+      const rawTrend = prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : null;
+      const trend = rawTrend != null ? Math.max(-999, Math.min(999, rawTrend)) : null;
 
       setKpis([
         { label: "Total achats HT", value: fmt(total), trend },
         { label: "Moyenne mensuelle", value: fmt(avgMonthly) },
-        { label: "Fournisseurs actifs", value: String(supplierIds.size) },
+        { label: "Fournisseurs actifs", value: String(Object.keys(bySupplier).length) },
         { label: "Factures traitees", value: String(nbFactures) },
       ]);
 
@@ -185,9 +216,11 @@ export default function StatsAchatsPage() {
         if (!byMonth[key]) byMonth[key] = 0;
       }
 
-      const maxMonth = Math.max(...allMonths.map((k) => byMonth[k]), 1);
+      // Only show months that have data
+      const monthsWithData = allMonths.filter((k) => byMonth[k] > 0);
+      const maxMonth = Math.max(...monthsWithData.map((k) => byMonth[k]), 1);
       const monthNames = ["Jan", "Fev", "Mar", "Avr", "Mai", "Jun", "Jul", "Aou", "Sep", "Oct", "Nov", "Dec"];
-      const bars: MonthBar[] = allMonths.map((k) => {
+      const bars: MonthBar[] = monthsWithData.map((k) => {
         const [y, m] = k.split("-");
         return { label: `${monthNames[parseInt(m) - 1]} ${y.slice(2)}`, total: byMonth[k], pct: (byMonth[k] / maxMonth) * 100 };
       });
