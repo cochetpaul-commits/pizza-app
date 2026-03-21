@@ -329,8 +329,20 @@ export default function AchatsPage() {
       if (!grouped[key]) grouped[key] = { name: rawName, invoices: [] };
       grouped[key].invoices.push(inv);
     }
-    return Object.entries(grouped).sort((a, b) => a[1].name.localeCompare(b[1].name, "fr"));
+    // Sort by total descending to assign colors by importance
+    return Object.entries(grouped).sort((a, b) => {
+      const totalA = a[1].invoices.reduce((s, i) => s + (i.total_ht ?? 0), 0);
+      const totalB = b[1].invoices.reduce((s, i) => s + (i.total_ht ?? 0), 0);
+      return totalB - totalA;
+    });
   }, [invoices]);
+
+  // Assign consistent colors to folders (by rank)
+  const folderColorMap = useMemo(() => {
+    const m = new Map<string, string>();
+    folders.forEach(([key], i) => { m.set(key, SUPPLIER_COLORS[i % SUPPLIER_COLORS.length]); });
+    return m;
+  }, [folders]);
 
   const loadLines = async (invoiceId: string) => {
     if (selectedInvoice === invoiceId) { setSelectedInvoice(null); setLines([]); return; }
@@ -434,8 +446,9 @@ export default function AchatsPage() {
                   {folders.map(([key, folder]) => {
                     const isOpen = openFolder === key;
                     const folderTotal = folder.invoices.reduce((s, i) => s + (i.total_ht ?? 0), 0);
+                    const color = folderColorMap.get(key) ?? "#999";
                     return (
-                      <div key={key} style={{ border: "1px solid #ddd6c8", borderRadius: 10, overflow: "hidden" }}>
+                      <div key={key} style={{ border: "1px solid #ddd6c8", borderLeft: `3px solid ${color}`, borderRadius: 10, overflow: "hidden" }}>
                         <div
                           onClick={() => setOpenFolder(isOpen ? null : key)}
                           style={{
@@ -447,13 +460,14 @@ export default function AchatsPage() {
                           onMouseLeave={(e) => { if (!isOpen) e.currentTarget.style.background = "#fff"; }}
                         >
                           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0 }} />
                             <span style={{ fontSize: 12, color: "#999", transition: "transform 0.2s", transform: isOpen ? "rotate(90deg)" : "rotate(0deg)" }}>&#9654;</span>
                             <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 600, fontSize: 14, color: "#1a1a1a" }}>{folder.name}</span>
                             <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, color: "#999", background: "#f2ede4", borderRadius: 8, padding: "2px 8px" }}>
                               {folder.invoices.length} facture{folder.invoices.length > 1 ? "s" : ""}
                             </span>
                           </div>
-                          <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, color: "#666" }}>{fmt(folderTotal)} HT</span>
+                          <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>{fmt(folderTotal)} HT</span>
                         </div>
                         {isOpen && (
                           <div style={{ borderTop: "1px solid #ddd6c8" }}>
