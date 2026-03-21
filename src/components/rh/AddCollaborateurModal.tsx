@@ -63,11 +63,20 @@ export function AddCollaborateurModal({ etablissementId, onClose, onCreated }: P
     if (!prenom.trim() || !nom.trim()) return;
     setSaving(true);
 
-    // Determine main etab + equipes
-    const mainEtabId = Object.entries(selectedEtabs).find(([, v]) => v.active)?.[0] ?? etablissementId;
-    const equipesAccess = Object.entries(selectedEtabs)
-      .filter(([, v]) => v.active && v.equipe)
+    // Determine main etab — prioritize selected active, fallback to prop
+    const activeEntries = Object.entries(selectedEtabs).filter(([, v]) => v.active);
+    const mainEtabId = activeEntries.length > 0 ? activeEntries[0][0] : etablissementId;
+
+    // Collect all equipes from active etabs
+    const equipesAccess = activeEntries
+      .filter(([, v]) => v.equipe)
       .map(([, v]) => v.equipe);
+
+    // If no equipe selected, try to get the first available
+    if (equipesAccess.length === 0) {
+      const eqs = allEquipes[mainEtabId] ?? [];
+      if (eqs.length > 0) equipesAccess.push(eqs[0]);
+    }
 
     // Map role
     const dbRole = selectedRole === "admin" ? "group_admin" : selectedRole === "manager" ? "manager" : "employe";

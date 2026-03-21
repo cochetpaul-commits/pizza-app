@@ -103,7 +103,8 @@ const COMPLETION_FIELDS = [
 
 export default function EmployeDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { current: etab } = useEtablissement();
+  const { current: etab, etablissements } = useEtablissement();
+  const [empEtab, setEmpEtab] = useState<{ id: string; nom: string; couleur: string } | null>(null);
   const { canWrite } = useProfile();
 
   const [loading, setLoading] = useState(true);
@@ -244,6 +245,12 @@ export default function EmployeDetailPage() {
 
       if (cancelled || !empData) { setLoading(false); return; }
       setEmp(empData);
+
+      // Load employee's establishment for correct color
+      if (empData.etablissement_id) {
+        const { data: etabData } = await supabase.from("etablissements").select("id, nom, couleur").eq("id", empData.etablissement_id).single();
+        if (etabData && !cancelled) setEmpEtab(etabData as { id: string; nom: string; couleur: string });
+      }
 
       setPrenom(empData.prenom ?? "");
       setNom(empData.nom ?? "");
@@ -545,8 +552,8 @@ export default function EmployeDetailPage() {
             const r = (emp as Record<string, unknown>).role as string ?? "employe";
             // Administrateur = couleur iFratelli group #b45f57
             if (r === "group_admin" || r === "proprietaire" || r === "admin") return `linear-gradient(135deg, #b45f57 0%, #8a4842 100%)`;
-            // Employe + Manager = couleur du restaurant
-            const c = etab?.couleur ?? "#e27f57";
+            // Employe + Manager = couleur du restaurant de l'employe
+            const c = empEtab?.couleur ?? etab?.couleur ?? "#e27f57";
             return `linear-gradient(135deg, ${c} 0%, ${c}cc 100%)`;
           })(),
           borderRadius: 14, padding: "20px 24px 0", color: "#fff",
@@ -627,7 +634,7 @@ export default function EmployeDetailPage() {
             </div>
             <div>
               <div style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Etablissement</div>
-              <div style={{ color: "#fff", fontSize: 12, marginTop: 2 }}>{etab?.nom ?? "—"}</div>
+              <div style={{ color: "#fff", fontSize: 12, marginTop: 2 }}>{empEtab?.nom ?? etab?.nom ?? "—"}</div>
             </div>
             <div>
               <div style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Equipe</div>

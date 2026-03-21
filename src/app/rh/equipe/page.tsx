@@ -349,9 +349,9 @@ export default function EquipePage() {
       </div>
 
       {/* ── Add Employee Modal ── */}
-      {showModal && etab && (
+      {showModal && (
         <AddCollaborateurModal
-          etablissementId={etab.id}
+          etablissementId={etab?.id ?? ""}
           onClose={() => setShowModal(false)}
           onCreated={loadData}
         />
