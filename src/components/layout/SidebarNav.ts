@@ -70,10 +70,10 @@ export type SidebarEntry = NavEtabGroup | NavSettingsGroup | NavStandaloneItem |
 /* ── Section item templates ─────────────────────────────── */
 
 export const PLANNING_ITEMS: NavItemV2[] = [
-  { label: "Employes", href: "/rh/equipe", icon: "users" },
+  { label: "Employés", href: "/rh/equipe", icon: "users" },
   { label: "Pointage", href: "/rh/pointage", icon: "clock" },
-  { label: "Conges", href: "/rh/conges", icon: "beach" },
-  { label: "Emargement", href: "/rh/emargement", icon: "clipboard" },
+  { label: "Congés", href: "/rh/conges", icon: "beach" },
+  { label: "Émargement", href: "/rh/emargement", icon: "clipboard" },
   { label: "Rapport de paie", href: "/rh/rapports", icon: "fileText" },
   { label: "Simulation", href: "/rh/masse-salariale", icon: "calculator", roles: ["group_admin"] },
 ];
@@ -85,7 +85,7 @@ export const ACHATS_ITEMS: NavItemV2[] = [
 ];
 
 export const PERFORMANCES_ITEMS: NavItemV2[] = [
-  { label: "Indicateurs cles", href: "/pilotage", icon: "barChart" },
+  { label: "Indicateurs clés", href: "/pilotage", icon: "barChart" },
   { label: "Variations & alertes", href: "/variations-prix", icon: "trendingUp" },
 ];
 
@@ -99,7 +99,7 @@ export const OPERATIONS_ITEMS: NavItemV2[] = [
 export const EVENEMENTIEL_ITEMS: NavItemV2[] = [
   { label: "Particuliers", href: "/evenements/clients", icon: "users" },
   { label: "Entreprise", href: "/evenements", icon: "calendarEvent" },
-  { label: "Creer devis", href: "/devis/new", icon: "fileText" },
+  { label: "Créer devis", href: "/devis/new", icon: "fileText" },
   { label: "Factures", href: "/clients/factures", icon: "fileText" },
   { label: "Import Kezia", href: "/kezia", icon: "fileText" },
 ];
@@ -114,18 +114,18 @@ const COMMON_SECTIONS: NavSubSection[] = [
   { label: "Planning", icon: "calendar", href: "/plannings", items: PLANNING_ITEMS },
   { label: "Achats", icon: "shoppingBag", roles: ["group_admin"], items: ACHATS_ITEMS },
   { label: "Performances", icon: "barChart", roles: ["group_admin"], items: PERFORMANCES_ITEMS },
-  { label: "Operations", icon: "package", roles: ["group_admin"], items: OPERATIONS_ITEMS },
+  { label: "Opérations", icon: "package", roles: ["group_admin"], items: OPERATIONS_ITEMS },
 ];
 
 /** Finance placeholder per source */
-const FINANCE_POPINA: NavSubSection = { label: "Finance", icon: "wallet", roles: ["group_admin"], items: [] }; // Popina — a venir
+const FINANCE_POPINA: NavSubSection = { label: "Finance", icon: "wallet", roles: ["group_admin"], items: [] }; // Popina — à venir
 const FINANCE_KEZIA: NavSubSection = { label: "Finance", icon: "wallet", roles: ["group_admin"], items: [
   { label: "Import Kezia", href: "/kezia", icon: "fileText" },
 ] };
 
 /** Evenementiel section */
 const EVENEMENTIEL_SECTION: NavSubSection = {
-  label: "Evenementiel", icon: "calendarEvent", roles: ["group_admin"], items: EVENEMENTIEL_ITEMS,
+  label: "Événementiel", icon: "calendarEvent", roles: ["group_admin"], items: EVENEMENTIEL_ITEMS,
 };
 
 /** Build dynamic nav entries from a list of establishments */
@@ -161,15 +161,15 @@ export function buildDynamicNav(
   // Parametres
   entries.push({
     kind: "settings",
-    label: "Parametres",
+    label: "Paramètres",
     icon: "settings",
     roles: ["group_admin"],
     sections: [
       {
         label: "",
         items: [
-          { label: "Etablissement", href: "/settings/etablissements", icon: "building" },
-          { label: "Employes", href: "/settings/employes", icon: "users" },
+          { label: "Établissement", href: "/settings/etablissements", icon: "building" },
+          { label: "Employés", href: "/settings/employes", icon: "users" },
           { label: "Fournisseurs", href: "/fournisseurs", icon: "truck" },
         ],
       },
@@ -198,7 +198,7 @@ export const SIDEBAR_NAV_SIMPLE: SidebarEntry[] = [
   { kind: "divider" },
   { kind: "item", label: "Mon planning", href: "/mes-shifts", icon: "calendar" },
   { kind: "item", label: "Recettes", href: "/recettes", icon: "book", roles: ["cuisine", "salle"] },
-  { kind: "item", label: "Ingredients", href: "/ingredients", icon: "tag", roles: ["cuisine", "salle"] },
+  { kind: "item", label: "Ingrédients", href: "/ingredients", icon: "tag", roles: ["cuisine", "salle"] },
   { kind: "item", label: "Commandes", href: "/commandes", icon: "shoppingBag", roles: ["cuisine", "salle"] },
   { kind: "item", label: "Fournisseurs", href: "/fournisseurs", icon: "truck", roles: ["cuisine", "salle"] },
   { kind: "item", label: "Planning", href: "/plannings", icon: "calendar", roles: ["cuisine", "salle"] },
@@ -220,11 +220,11 @@ export const SIDEBAR_NAV: NavSection[] = [
     icon: "users",
     roles: ["group_admin", "manager"],
     items: [
-      { label: "Employes", href: "/rh/equipe" },
+      { label: "Employés", href: "/rh/equipe" },
       { label: "Planning", href: "/plannings" },
       { label: "Pointage", href: "/rh/pointage" },
-      { label: "Conges", href: "/rh/conges" },
-      { label: "Feuille d'emargement", href: "/rh/emargement" },
+      { label: "Congés", href: "/rh/conges" },
+      { label: "Feuille d'émargement", href: "/rh/emargement" },
       { label: "Simulation", href: "/rh/masse-salariale", roles: ["group_admin"] },
     ],
   },
@@ -233,7 +233,7 @@ export const SIDEBAR_NAV: NavSection[] = [
     icon: "wallet",
     roles: ["group_admin"],
     items: [
-      { label: "Base ingredients", href: "/ingredients" },
+      { label: "Base ingrédients", href: "/ingredients" },
       { label: "Recettes", href: "/recettes" },
       { label: "Commandes", href: "/commandes" },
       { label: "Achats", href: "/achats" },
@@ -270,7 +270,7 @@ export const SIDEBAR_NAV: NavSection[] = [
     ],
   },
   {
-    label: "Parametres",
+    label: "Paramètres",
     icon: "settings",
     roles: ["group_admin"],
     items: [
@@ -283,20 +283,20 @@ export const SIDEBAR_NAV: NavSection[] = [
 /** Title map: pathname → page title for TopBar */
 export const PAGE_TITLES: Record<string, string> = {
   "/dashboard": "Accueil",
-  "/rh/equipe": "Salaries",
+  "/rh/equipe": "Salariés",
   "/plannings": "Planning",
   "/rh/pointage": "Pointage",
-  "/rh/conges": "Conges",
-  "/rh/emargement": "Emargement",
-  "/rh/masse-salariale": "Simulation & Masse Salariale",
+  "/rh/conges": "Congés",
+  "/rh/emargement": "Émargement",
+  "/rh/masse-salariale": "Simulation & Masse salariale",
   "/rh/rapports": "Rapports RH",
   "/settings/planning": "Gestion du planning",
-  "/settings/etablissements": "Etablissements",
+  "/settings/etablissements": "Établissements",
   "/settings/finance": "Gestion de la finance",
   "/settings/pointeuse": "Pointeuse",
   "/settings/employes/contrat": "Contrat",
-  "/settings/employes/acces": "Acces application",
-  "/settings/employes/roles": "Role et permissions",
+  "/settings/employes/acces": "Accès application",
+  "/settings/employes/roles": "Rôle et permissions",
   "/settings/account": "Mon compte",
   "/pilotage": "Pilotage",
   "/achats": "Achats",
@@ -304,7 +304,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/stats-achats": "Stats d'achats",
   "/variations-prix": "Variations & alertes",
   "/fournisseurs": "Fournisseurs",
-  "/ingredients": "Base ingredients",
+  "/ingredients": "Base ingrédients",
   "/invoices": "Factures",
   "/commandes": "Commandes",
   "/inventaire": "Inventaire",
@@ -312,7 +312,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/catalogue": "Catalogue",
   "/epicerie": "Articles en vente",
   "/finances": "Finances",
-  "/evenements": "Evenements",
+  "/evenements": "Événements",
   "/clients": "Carnet clients",
   "/clients/factures": "Factures clients",
   "/devis/new": "Nouveau devis",
@@ -325,17 +325,17 @@ export const PAGE_TITLES: Record<string, string> = {
   "/recettes/new/pizza": "Nouvelle pizza",
   "/recettes/new/cuisine": "Nouvelle recette cuisine",
   "/recettes/new/cocktail": "Nouveau cocktail",
-  "/recettes/new/empatement": "Nouvel empatement",
+  "/recettes/new/empatement": "Nouvel empâtement",
   "/recettes/pizza": "Recette pizza",
   "/recettes/cuisine": "Recette cuisine",
   "/recettes/cocktail": "Recette cocktail",
-  "/recettes/empatement": "Recette empatement",
-  "/rh/employe": "Fiche employe",
+  "/recettes/empatement": "Recette empâtement",
+  "/rh/employe": "Fiche employé",
   "/bello-mio": "Bello Mio",
   "/bello-mio/planning": "Planning Bello Mio",
   "/piccola-mia": "Piccola Mia",
   "/piccola-mia/planning": "Planning Piccola Mia",
-  "/piccola-mia/evenements": "Evenements Piccola Mia",
+  "/piccola-mia/evenements": "Événements Piccola Mia",
 };
 
 /** Section name map: pathname → parent section label for TopBar subtitle */
@@ -347,13 +347,13 @@ const PAGE_SECTIONS: Record<string, string> = {
   "/rh/emargement": "Gestion du personnel",
   "/rh/masse-salariale": "Gestion du personnel",
   "/rh/rapports": "Gestion du personnel",
-  "/settings/planning": "Parametres",
-  "/settings/finance": "Parametres",
-  "/settings/pointeuse": "Parametres",
-  "/settings/employes/contrat": "Parametres",
-  "/settings/employes/acces": "Parametres",
-  "/settings/employes/roles": "Parametres",
-  "/settings/account": "Parametres",
+  "/settings/planning": "Paramètres",
+  "/settings/finance": "Paramètres",
+  "/settings/pointeuse": "Paramètres",
+  "/settings/employes/contrat": "Paramètres",
+  "/settings/employes/acces": "Paramètres",
+  "/settings/employes/roles": "Paramètres",
+  "/settings/account": "Paramètres",
   "/pilotage": "Gestion de la finance",
   "/mercuriale": "Gestion de la finance",
   "/stats-achats": "Gestion de la finance",
