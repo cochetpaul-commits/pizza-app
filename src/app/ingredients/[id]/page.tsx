@@ -112,6 +112,7 @@ function IngredientDetailInner() {
   // Order unit editing
   const [orderUnit, setOrderUnit] = useState("");
   const [orderUnitSaved, setOrderUnitSaved] = useState(false);
+  const [orderUnitOptions, setOrderUnitOptions] = useState<{ id: string; name: string }[]>([]);
   // Storage zone
   const [storageZone, setStorageZone] = useState<string>("");
   const [storageZoneSaved, setStorageZoneSaved] = useState(false);
@@ -180,11 +181,15 @@ function IngredientDetailInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, etab?.id]);
 
-  // Load storage zones
+  // Load storage zones + order units
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("storage_zones").select("id, name").order("display_order").order("name");
-      setStorageZoneOptions((data ?? []) as { id: string; name: string }[]);
+      const [{ data: zData }, { data: uData }] = await Promise.all([
+        supabase.from("storage_zones").select("id, name").order("display_order").order("name"),
+        supabase.from("order_units").select("id, name").order("display_order").order("name"),
+      ]);
+      setStorageZoneOptions((zData ?? []) as { id: string; name: string }[]);
+      setOrderUnitOptions((uData ?? []) as { id: string; name: string }[]);
     })();
   }, []);
 
@@ -375,23 +380,26 @@ function IngredientDetailInner() {
         {/* ── Unité de commande ── */}
         <div className="card" style={{ marginBottom: 12, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 12, fontWeight: 700, opacity: 0.65, whiteSpace: "nowrap" }}>Unité de commande</span>
-          <input
-            type="text"
+          <select
             value={orderUnit}
-            onChange={(e) => { setOrderUnit(e.target.value); setOrderUnitSaved(false); }}
-            onBlur={async () => {
-              const val = orderUnit.trim() || null;
+            onChange={async (e) => {
+              const val = e.target.value || null;
+              setOrderUnit(e.target.value);
               await supabase.from("ingredients").update({ order_unit_label: val }).eq("id", id);
               setOrderUnitSaved(true);
               setTimeout(() => setOrderUnitSaved(false), 2000);
             }}
-            placeholder="ex: pcs, carton de 6, seau 5kg…"
             style={{
               flex: 1, height: 32, borderRadius: 8,
               border: "1.5px solid #e5ddd0", padding: "4px 10px",
-              fontSize: 13, background: "#fff",
+              fontSize: 13, background: "#fff", cursor: "pointer",
             }}
-          />
+          >
+            <option value="">— Aucune —</option>
+            {orderUnitOptions.map(u => (
+              <option key={u.id} value={u.name}>{u.name}</option>
+            ))}
+          </select>
           {orderUnitSaved && <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 600 }}>Enregistre</span>}
         </div>
 

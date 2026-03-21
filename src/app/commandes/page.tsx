@@ -290,6 +290,13 @@ function CommandesPage() {
   const [loadingSupplier, setLoadingSupplier] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Order units management
+  type OrderUnit = { id: string; name: string; display_order: number };
+  const [orderUnits, setOrderUnits] = useState<OrderUnit[]>([]);
+  const [showManageUnits, setShowManageUnits] = useState(false);
+  const [newUnitName, setNewUnitName] = useState("");
+  const [addingUnit, setAddingUnit] = useState(false);
+
   // ── Load all suppliers ──────────────────────────────────────────────────
 
   useEffect(() => {
@@ -320,6 +327,48 @@ function CommandesPage() {
     }
     init();
   }, [etab?.id, searchParams]);
+
+  // ── Load order units ──────────────────────────────────────────────────
+
+  async function loadOrderUnits() {
+    let q = supabase.from("order_units").select("*").order("display_order").order("name");
+    if (etab?.id) q = q.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
+    const { data } = await q;
+    setOrderUnits((data ?? []) as OrderUnit[]);
+  }
+
+  useEffect(() => { loadOrderUnits(); }, [etab?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function addOrderUnit() {
+    const name = newUnitName.trim();
+    if (!name) return;
+    setAddingUnit(true);
+    const { error } = await supabase.from("order_units").insert({
+      name,
+      etablissement_id: etab?.id ?? null,
+      display_order: orderUnits.length,
+    });
+    if (error) {
+      if (error.message.includes("unique") || error.message.includes("duplicate")) {
+        alert("Cette unité existe déjà.");
+      } else {
+        alert(error.message);
+      }
+      setAddingUnit(false);
+      return;
+    }
+    await loadOrderUnits();
+    setNewUnitName("");
+    setAddingUnit(false);
+  }
+
+  async function deleteOrderUnit(unit: OrderUnit) {
+    if (!confirm(`Supprimer l'unité "${unit.name}" ?`)) return;
+    // Clear order_unit_label on ingredients that use this unit
+    await supabase.from("ingredients").update({ order_unit_label: null }).eq("order_unit_label", unit.name);
+    await supabase.from("order_units").delete().eq("id", unit.id);
+    await loadOrderUnits();
+  }
 
   // ── Load session + catalog when supplier changes ──────────────────────
 
@@ -644,18 +693,25 @@ function CommandesPage() {
 
     if (isEditing) {
       return (
-        <input
+        <select
           autoFocus
           value={editUnitValue}
-          onChange={(e) => setEditUnitValue(e.target.value)}
-          onBlur={() => { saveOrderUnit(item.id, editUnitValue); setEditingUnit(null); }}
-          onKeyDown={(e) => { if (e.key === "Enter") { saveOrderUnit(item.id, editUnitValue); setEditingUnit(null); } }}
+          onChange={(e) => {
+            setEditUnitValue(e.target.value);
+            saveOrderUnit(item.id, e.target.value);
+            setEditingUnit(null);
+          }}
+          onBlur={() => setEditingUnit(null)}
           style={{
             fontSize: 10, color: "#666", background: "#fff", border: "1.5px solid #D4775A",
-            padding: "2px 6px", borderRadius: 4, width: 80, outline: "none",
+            padding: "2px 4px", borderRadius: 4, width: 100, outline: "none", cursor: "pointer",
           }}
-          placeholder="ex: pcs, carton..."
-        />
+        >
+          <option value="">— Aucune —</option>
+          {orderUnits.map(ou => (
+            <option key={ou.id} value={ou.name}>{ou.name}</option>
+          ))}
+        </select>
       );
     }
 
@@ -961,6 +1017,76 @@ function CommandesPage() {
                 </button>
               );
             })}
+          </div>
+        )}
+
+        {/* Manage order units */}
+        {!loading && (
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+            <button
+              type="button"
+              onClick={() => setShowManageUnits(!showManageUnits)}
+              style={{
+                fontSize: 11, color: "#999", background: "none", border: "none",
+                cursor: "pointer", textDecoration: "underline",
+              }}
+            >
+              {showManageUnits ? "Fermer" : "Unités de commande"}
+            </button>
+          </div>
+        )}
+
+        {showManageUnits && (
+          <div style={{
+            marginTop: 4, marginBottom: 12, padding: "12px 14px", background: "#fff",
+            borderRadius: 10, border: "1.5px solid #ddd6c8",
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: "#1a1a1a" }}>
+              Unités de commande
+            </div>
+            {orderUnits.map((u) => (
+              <div key={u.id} style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "5px 0", borderBottom: "1px solid #f0ebe2",
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{u.name}</span>
+                <button
+                  type="button"
+                  onClick={() => deleteOrderUnit(u)}
+                  style={{
+                    fontSize: 11, color: "#DC2626", background: "none", border: "none",
+                    cursor: "pointer", padding: "4px 8px",
+                  }}
+                >
+                  Supprimer
+                </button>
+              </div>
+            ))}
+            <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
+              <input
+                type="text"
+                value={newUnitName}
+                onChange={(e) => setNewUnitName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") addOrderUnit(); }}
+                placeholder="Nouvelle unité (ex: carton de 6)"
+                style={{
+                  flex: 1, height: 32, borderRadius: 8, border: "1.5px solid #e5ddd0",
+                  padding: "4px 10px", fontSize: 13, background: "#fff",
+                }}
+              />
+              <button
+                type="button"
+                onClick={addOrderUnit}
+                disabled={addingUnit || !newUnitName.trim()}
+                style={{
+                  padding: "6px 14px", borderRadius: 8, border: "none",
+                  background: "#D4775A", color: "#fff", fontSize: 12, fontWeight: 700,
+                  cursor: "pointer", opacity: addingUnit || !newUnitName.trim() ? 0.5 : 1,
+                }}
+              >
+                {addingUnit ? "..." : "Ajouter"}
+              </button>
+            </div>
           </div>
         )}
 
