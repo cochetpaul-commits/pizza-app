@@ -21,7 +21,7 @@ import {
   IconClipboard, IconCalculator, IconSettings, IconWallet,
   IconShoppingBag, IconTruck, IconFileText, IconPackage,
   IconBarChart, IconTrendingUp, IconBook, IconTag,
-  IconCalendarEvent, IconChevronDown, IconBox, IconChefHat,
+  IconCalendarEvent, IconBox, IconChefHat,
   IconSwitch, IconBuilding, IconStore,
 } from "./Icons";
 import type { Role } from "@/lib/rbac";
@@ -130,7 +130,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           padding: "5px 16px 5px 44px",
           margin: "1px 8px", borderRadius: 6,
           textDecoration: "none",
-          fontSize: 12, fontWeight: active ? 600 : 400,
+          fontSize: 13, fontWeight: active ? 600 : 400,
           color: active ? C.textActive : hovered ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.5)",
           background: active ? `${accentColor}12` : hovered ? "rgba(255,255,255,0.04)" : "transparent",
           borderLeft: active ? `2px solid ${accentColor}60` : "2px solid transparent",
@@ -193,18 +193,19 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
     const hubBtnStyle: CSSProperties = {
       display: "flex", alignItems: "center", gap: 8,
-      width: "calc(100% - 16px)", padding: "7px 12px 7px 28px",
+      width: "calc(100% - 16px)", padding: "8px 12px 8px 28px",
       margin: "1px 8px", borderRadius: 6,
       background: isOpen ? `${parentColor}14` : hovered ? "rgba(255,255,255,0.06)" : "transparent",
       border: "none", cursor: items.length > 0 ? "pointer" : "default",
-      color: (isOpen || hasActiveChild) ? "rgba(255,255,255,0.85)" : hovered ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.5)",
-      fontSize: 13, fontWeight: 700,
+      borderLeft: isOpen ? `2px solid ${parentColor}80` : "2px solid transparent",
+      color: (isOpen || hasActiveChild) ? "rgba(255,255,255,0.9)" : hovered ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.5)",
+      fontSize: 14, fontWeight: 700,
       whiteSpace: "nowrap", overflow: "hidden",
-      transition: "background 0.15s, color 0.15s",
+      transition: "background 0.15s, color 0.15s, border-color 0.15s",
     };
 
     return (
-      <div key={hubKey}>
+      <div key={hubKey} style={{ marginBottom: isOpen ? 4 : 2 }}>
         <button
           type="button"
           onClick={() => {
@@ -215,19 +216,14 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           onMouseLeave={() => setHoveredHub(null)}
           style={hubBtnStyle}
         >
-          {SectionIcon && <SectionIcon size={14} color={(isOpen || hasActiveChild) ? `${parentColor}CC` : hovered ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.35)"} />}
+          {SectionIcon && <SectionIcon size={15} color={(isOpen || hasActiveChild) ? `${parentColor}CC` : hovered ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.35)"} />}
           <span style={{ flex: 1, textAlign: "left" }}>{sub.label}</span>
-          {items.length > 0 && (
-            <span style={{
-              transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)",
-              transition: "transform 0.15s ease",
-              display: "flex", flexShrink: 0,
-            }}>
-              <IconChevronDown size={10} color="rgba(255,255,255,0.3)" />
-            </span>
-          )}
         </button>
-        {isOpen && items.map(item => renderItem(item, etabSlug))}
+        {isOpen && (
+          <div style={{ marginBottom: 6 }}>
+            {items.map(item => renderItem(item, etabSlug))}
+          </div>
+        )}
       </div>
     );
   };
@@ -277,15 +273,14 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             display: "flex", alignItems: "center", gap: 10,
             padding: "8px 16px", margin: "1px 8px", width: "calc(100% - 16px)",
             borderRadius: 6, border: "none", cursor: "pointer",
-            fontSize: 13, fontWeight: 600, color: C.textNormal,
+            borderLeft: settingsOpen ? `2px solid ${etabColor}80` : "2px solid transparent",
+            fontSize: 14, fontWeight: 700, color: settingsOpen ? "rgba(255,255,255,0.9)" : C.textNormal,
             background: settingsOpen ? C.bgItemActive : "transparent",
+            transition: "background 0.15s, color 0.15s",
           }}
         >
-          {SettingsIcon && <SettingsIcon size={15} color={C.textMuted} />}
+          {SettingsIcon && <SettingsIcon size={15} color={settingsOpen ? etabColor : C.textMuted} />}
           <span style={{ flex: 1, textAlign: "left" }}>{entry.label}</span>
-          <span style={{ transform: settingsOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s ease", display: "flex" }}>
-            <IconChevronDown size={12} color={C.textMuted} />
-          </span>
         </button>
         {settingsOpen && entry.sections.map(sub => {
           if (!isRoleAllowed(sub.roles, role)) return null;
@@ -320,17 +315,17 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             <div key={subKey}>
               <button type="button" onClick={() => toggleSettingsSub(subKey)} style={{
                 display: "flex", alignItems: "center", gap: 8,
-                width: "calc(100% - 16px)", padding: "7px 12px 7px 28px",
+                width: "calc(100% - 16px)", padding: "8px 12px 8px 28px",
                 margin: "1px 8px", borderRadius: 6,
-                background: "transparent", border: "none", cursor: "pointer",
+                background: isOpen ? "rgba(255,255,255,0.04)" : "transparent",
+                border: "none", cursor: "pointer",
+                borderLeft: isOpen ? `2px solid ${etabColor}60` : "2px solid transparent",
                 color: isOpen ? C.textActive : "rgba(255,255,255,0.5)",
-                fontSize: 12, fontWeight: 600, whiteSpace: "nowrap",
+                fontSize: 14, fontWeight: 700, whiteSpace: "nowrap",
+                transition: "background 0.15s, color 0.15s",
               }}>
-                {SubIcon && <SubIcon size={14} color={isOpen ? etabColor : "rgba(255,255,255,0.35)"} />}
+                {SubIcon && <SubIcon size={15} color={isOpen ? etabColor : "rgba(255,255,255,0.35)"} />}
                 <span style={{ flex: 1, textAlign: "left" }}>{sub.label}</span>
-                <span style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s ease", display: "flex" }}>
-                  <IconChevronDown size={10} color="rgba(255,255,255,0.3)" />
-                </span>
               </button>
               {isOpen && items.map(item => {
                 const active = isActive(item.href);
@@ -338,8 +333,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                   <Link key={item.href} href={item.href} onClick={() => handleNav()}
                     style={{
                       display: "flex", alignItems: "center", gap: 8,
-                      padding: "6px 16px 6px 44px", margin: "1px 8px", borderRadius: 6,
-                      textDecoration: "none", fontSize: 12, fontWeight: active ? 600 : 400,
+                      padding: "5px 16px 5px 44px", margin: "1px 8px", borderRadius: 6,
+                      textDecoration: "none", fontSize: 13, fontWeight: active ? 600 : 400,
                       color: active ? C.textActive : "rgba(255,255,255,0.55)",
                       background: active ? C.bgItemActive : "transparent",
                     }}>
