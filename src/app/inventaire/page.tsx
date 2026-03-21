@@ -26,25 +26,6 @@ type StorageZone = {
 
 const SANS_ZONE = "__sans_zone__";
 
-function categoryToZone(cat: string | null): string {
-  if (!cat) return "sec";
-  switch (cat) {
-    case "cremerie_fromage":
-    case "charcuterie_viande":
-    case "maree":
-    case "legumes_herbes":
-    case "fruit":
-    case "sauce":
-    case "antipasti":
-      return "frigo";
-    case "alcool_spiritueux":
-    case "boisson":
-      return "cave";
-    default:
-      return "sec";
-  }
-}
-
 /** Resolve zone: explicit storage_zone on ingredient, or fallback */
 function resolveZone(ing: Ingredient, zones: StorageZone[]): string {
   if (ing.storage_zone) {
@@ -99,16 +80,18 @@ export default function InventairePage() {
 
   // ── Load ingredients + zones ─────────────────────────────
 
-  const loadZones = useCallback(async () => {
+  const etabId = etab?.id ?? null;
+
+  async function fetchZones() {
     let q = supabase.from("storage_zones").select("*").order("display_order").order("name");
-    if (etab?.id) {
-      q = q.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
-    }
+    if (etabId) q = q.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
     const { data } = await q;
     const zList = (data ?? []) as StorageZone[];
     setZones(zList);
     return zList;
-  }, [etab?.id]);
+  }
+
+  const loadZones = fetchZones;
 
   useEffect(() => {
     (async () => {
@@ -117,16 +100,19 @@ export default function InventairePage() {
         .select("*")
         .eq("is_active", true)
         .order("name");
-      if (etab?.id) {
-        q = q.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
+      if (etabId) {
+        q = q.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
       }
-      const [{ data, error }, zList] = await Promise.all([q, loadZones()]);
+      let zq = supabase.from("storage_zones").select("*").order("display_order").order("name");
+      if (etabId) zq = zq.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
+      const [{ data, error }, { data: zData }] = await Promise.all([q, zq]);
       if (error) { console.error("ingredients query:", error); }
       setIngredients((data ?? []) as Ingredient[]);
-      // Default to first zone or "sans zone"
+      const zList = (zData ?? []) as StorageZone[];
+      setZones(zList);
       if (zList.length > 0) setActiveZone(zList[0].name);
     })();
-  }, [etab?.id, loadZones]);
+  }, [etabId]);
 
   // ── Load inventaires ──────────────────────────────────────
 
