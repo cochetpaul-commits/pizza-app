@@ -26,10 +26,19 @@ type CategoryStat = {
   color: string;
 };
 
+type MonthSegment = {
+  name: string;
+  amount: number;
+  color: string;
+  pct: number; // % of this month's total width
+};
+
 type MonthBar = {
   label: string;
   total: number;
   pct: number;
+  nbFactures: number;
+  segments: MonthSegment[];
 };
 
 type KpiCard = {
@@ -199,12 +208,26 @@ export default function StatsAchatsPage() {
         { label: "Factures traitees", value: String(nbFactures) },
       ]);
 
-      // Monthly bars
+      // Monthly bars with supplier breakdown
       const byMonth: Record<string, number> = {};
+      const byMonthSupplier: Record<string, Record<string, number>> = {}; // month → supplierKey → amount
+      const byMonthCount: Record<string, number> = {};
       for (const r of rows) {
         if (!r.invoice_date) continue;
         const key = r.invoice_date.slice(0, 7);
         byMonth[key] = (byMonth[key] ?? 0) + (r.total_ht ?? 0);
+        byMonthCount[key] = (byMonthCount[key] ?? 0) + 1;
+        const name = r.suppliers?.name ?? "Inconnu";
+        const skey = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+        if (!byMonthSupplier[key]) byMonthSupplier[key] = {};
+        byMonthSupplier[key][skey] = (byMonthSupplier[key][skey] ?? 0) + (r.total_ht ?? 0);
+      }
+
+      // Build supplier name→color map from supplierList
+      const supplierColorMap: Record<string, { name: string; color: string }> = {};
+      for (const s of supplierList) {
+        const skey = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+        supplierColorMap[skey] = { name: s.name, color: s.color };
       }
 
       const allMonths: string[] = [];
@@ -222,7 +245,23 @@ export default function StatsAchatsPage() {
       const monthNames = ["Jan", "Fev", "Mar", "Avr", "Mai", "Jun", "Jul", "Aou", "Sep", "Oct", "Nov", "Dec"];
       const bars: MonthBar[] = monthsWithData.map((k) => {
         const [y, m] = k.split("-");
-        return { label: `${monthNames[parseInt(m) - 1]} ${y.slice(2)}`, total: byMonth[k], pct: (byMonth[k] / maxMonth) * 100 };
+        const monthTotal = byMonth[k];
+        const supplierBreakdown = byMonthSupplier[k] ?? {};
+        const segments: MonthSegment[] = Object.entries(supplierBreakdown)
+          .sort(([, a], [, b]) => b - a)
+          .map(([skey, amount]) => ({
+            name: supplierColorMap[skey]?.name ?? skey,
+            amount,
+            color: supplierColorMap[skey]?.color ?? "#999",
+            pct: monthTotal > 0 ? (amount / monthTotal) * 100 : 0,
+          }));
+        return {
+          label: `${monthNames[parseInt(m) - 1]} ${y.slice(2)}`,
+          total: monthTotal,
+          pct: (monthTotal / maxMonth) * 100,
+          nbFactures: byMonthCount[k] ?? 0,
+          segments,
+        };
       });
       setMonthBars(bars);
 
@@ -505,37 +544,49 @@ export default function StatsAchatsPage() {
             {monthBars.length === 0 ? (
               <p style={{ color: "#999", fontSize: 14 }}>Aucune donnee.</p>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {monthBars.map((b) => (
-                  <div key={b.label} style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: "DM Sans, sans-serif", fontSize: 13 }}>
-                    <span style={{ width: 56, flexShrink: 0, color: "#999", textAlign: "right", fontSize: 12 }}>{b.label}</span>
-                    <div style={{ flex: 1, background: "#f0ebe2", borderRadius: 6, height: 24, overflow: "hidden" }}>
-                      <div
-                        style={{
-                          width: `${Math.max(b.pct, 1)}%`,
-                          height: "100%",
-                          background: "linear-gradient(90deg, #D4775A, #e27f57)",
-                          borderRadius: 6,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "flex-end",
-                          paddingRight: 8,
-                          transition: "width 0.3s ease",
-                        }}
-                      >
-                        {b.pct > 25 && (
-                          <span style={{ color: "#fff", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
-                            {fmtCompact(b.total)}
-                          </span>
-                        )}
+              <>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {monthBars.map((b) => (
+                    <div key={b.label} style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: "DM Sans, sans-serif", fontSize: 13 }}>
+                      <span style={{ width: 56, flexShrink: 0, color: "#999", textAlign: "right", fontSize: 12 }}>{b.label}</span>
+                      <div style={{ flex: 1, background: "#f0ebe2", borderRadius: 6, height: 28, overflow: "hidden", display: "flex" }}>
+                        {b.segments.map((seg, i) => (
+                          <div
+                            key={seg.name}
+                            title={`${seg.name}: ${fmtCompact(seg.amount)}`}
+                            style={{
+                              width: `${(seg.pct / 100) * Math.max(b.pct, 3)}%`,
+                              height: "100%",
+                              background: seg.color,
+                              borderTopLeftRadius: i === 0 ? 6 : 0,
+                              borderBottomLeftRadius: i === 0 ? 6 : 0,
+                              borderTopRightRadius: i === b.segments.length - 1 ? 6 : 0,
+                              borderBottomRightRadius: i === b.segments.length - 1 ? 6 : 0,
+                              transition: "width 0.3s ease",
+                            }}
+                          />
+                        ))}
                       </div>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", whiteSpace: "nowrap", flexShrink: 0 }}>
+                        {fmtCompact(b.total)}
+                      </span>
+                      <span style={{ fontSize: 10, color: "#999", flexShrink: 0, whiteSpace: "nowrap" }}>
+                        {b.nbFactures} fact.
+                      </span>
                     </div>
-                    {b.pct <= 25 && (
-                      <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", whiteSpace: "nowrap" }}>{fmtCompact(b.total)}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+
+                {/* Legend */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", marginTop: 14 }}>
+                  {topSuppliers.filter((s) => s.totalHT > 0).map((s) => (
+                    <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
+                      <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, color: "#777" }}>{s.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </>
         )}
