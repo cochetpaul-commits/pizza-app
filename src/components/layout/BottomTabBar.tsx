@@ -271,8 +271,8 @@ const SECTION_EVENTS: TabSection = {
   match: ["/evenements", "/clients", "/devis"],
   icon: (a) => <IconHeart active={a} />,
   tabs: [
-    { label: "Entreprise", href: "/evenements", match: ["/evenements"], icon: (a) => <IconShoppingBag active={a} /> },
-    { label: "Particuliers", href: "/evenements/clients", match: ["/evenements/clients"], icon: (a) => <IconUsers active={a} /> },
+    { label: "Evenements", href: "/evenements", match: ["/evenements"], icon: (a) => <IconCalendar active={a} /> },
+    { label: "Clients", href: "/clients", match: ["/clients"], icon: (a) => <IconUsers active={a} /> },
     { label: "Devis", href: "/devis", match: ["/devis"], icon: (a) => <IconFileText active={a} /> },
     { label: "Factures", href: "/clients/factures", match: ["/clients/factures"], icon: (a) => <IconWallet active={a} /> },
   ],

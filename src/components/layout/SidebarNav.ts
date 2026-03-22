@@ -97,11 +97,10 @@ export const OPERATIONS_ITEMS: NavItemV2[] = [
 ];
 
 export const EVENEMENTIEL_ITEMS: NavItemV2[] = [
-  { label: "Particuliers", href: "/evenements/clients", icon: "users" },
-  { label: "Entreprise", href: "/evenements", icon: "calendarEvent" },
+  { label: "Evenements", href: "/evenements", icon: "calendarEvent" },
+  { label: "Carnet clients", href: "/clients", icon: "users" },
   { label: "Devis", href: "/devis", icon: "fileText" },
   { label: "Factures", href: "/clients/factures", icon: "fileText" },
-  { label: "Carnet clients", href: "/clients", icon: "users" },
   { label: "Import Kezia", href: "/kezia", icon: "fileText" },
 ];
 
@@ -262,11 +261,10 @@ export const SIDEBAR_NAV: NavSection[] = [
     roles: ["group_admin"],
     slugFilter: "piccola",
     items: [
-      { label: "Particuliers", href: "/evenements/clients" },
+      { label: "Evenements", href: "/evenements" },
       { label: "Carnet clients", href: "/clients" },
       { label: "Devis", href: "/devis" },
       { label: "Factures", href: "/clients/factures" },
-      { label: "Evenements", href: "/evenements" },
       { label: "Import Kezia", href: "/kezia" },
     ],
   },
@@ -373,7 +371,6 @@ const PAGE_SECTIONS: Record<string, string> = {
   "/clients/factures": "Gestion des clients",
   "/devis": "Gestion des clients",
   "/evenements": "Gestion des clients",
-  "/evenements/clients": "Gestion des clients",
   "/recettes/new/pizza": "Gestion de la finance",
   "/recettes/new/cuisine": "Gestion de la finance",
   "/recettes/new/cocktail": "Gestion de la finance",
