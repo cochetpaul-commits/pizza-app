@@ -556,7 +556,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
 
           {/* Prix de vente */}
           <div style={{ marginTop: 10 }}>
-            <label style={labelStyle}>Prix de vente événement (€ HT)</label>
+            <label style={labelStyle}>Prix de vente événement (€ TTC)</label>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <input
                 style={{ ...inputStyle, fontWeight: 700, fontSize: 15, flex: 1 }}
