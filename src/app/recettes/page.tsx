@@ -372,6 +372,7 @@ function RecettesInner() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [cuisineCatFilter, setCuisineCatFilter] = useState<CuisineCatFilter>("all");
   const [foodCostFilter, setFoodCostFilter] = useState<FoodCostFilter>("all");
+  const [prodFilter, setProdFilter] = useState(false);
   const [showFab, setShowFab] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showSort, setShowSort] = useState(false);
@@ -436,10 +437,11 @@ function RecettesInner() {
   const filteredPizzas = useMemo(() => {
     const base = pizzas
       .filter(r => matchesSearch(r.name, q))
-      .filter(r => matchesFoodCostFilter(pizzaFc(r), foodCostFilter));
+      .filter(r => matchesFoodCostFilter(pizzaFc(r), foodCostFilter))
+      .filter(r => !prodFilter || r.pivot_ingredient_id != null);
     return doSort(base, sortKey, sortDir, r => r.total_cost, pizzaFc,
       r => r.sell_price ?? pvTTCPizza(r), r => r.name ?? "");
-  }, [pizzas, q, sortKey, sortDir, foodCostFilter]);
+  }, [pizzas, q, sortKey, sortDir, foodCostFilter, prodFilter]);
 
   const filteredKitchens = useMemo(() => {
     const base = kitchens
@@ -454,26 +456,29 @@ function RecettesInner() {
         }
         return true;
       })
-      .filter(r => matchesFoodCostFilter(kitchenFc(r), foodCostFilter));
+      .filter(r => matchesFoodCostFilter(kitchenFc(r), foodCostFilter))
+      .filter(r => !prodFilter || r.pivot_ingredient_id != null);
     return doSort(base, sortKey, sortDir,
       r => r.cost_per_portion ?? r.cost_per_kg ?? null,
       kitchenFc,
       r => r.sell_price ?? pvTTCKitchen(r),
       r => r.name ?? "");
-  }, [kitchens, q, sortKey, sortDir, cuisineCatFilter, foodCostFilter]);
+  }, [kitchens, q, sortKey, sortDir, cuisineCatFilter, foodCostFilter, prodFilter]);
 
   const filteredCocktails = useMemo(() => {
     const base = cocktails
       .filter(r => matchesSearch(r.name, q))
-      .filter(r => matchesFoodCostFilter(cocktailFc(r), foodCostFilter));
+      .filter(r => matchesFoodCostFilter(cocktailFc(r), foodCostFilter))
+      .filter(r => !prodFilter || r.pivot_ingredient_id != null);
     return doSort(base, sortKey, sortDir, r => r.total_cost, cocktailFc,
       r => r.sell_price, r => r.name ?? "");
-  }, [cocktails, q, sortKey, sortDir, foodCostFilter]);
+  }, [cocktails, q, sortKey, sortDir, foodCostFilter, prodFilter]);
 
   const filteredEmps = useMemo(() =>
     emps.filter(r => matchesSearch(r.name, q))
+      .filter(r => !prodFilter || r.pivot_ingredient_id != null)
       .sort((a, b) => sortDir === "asc" ? a.name.localeCompare(b.name, "fr") : b.name.localeCompare(a.name, "fr")),
-    [emps, q, sortDir]);
+    [emps, q, sortDir, prodFilter]);
 
   const kitchenByCat = useMemo(() => {
     const map: Record<string, KitchenRow[]> = {};
@@ -495,6 +500,13 @@ function RecettesInner() {
     for (const r of cocktails) { const fc = cocktailFc(r); if (fc != null && fc > 32) count++; }
     return count;
   }, [pizzas, kitchens, cocktails]);
+
+  const prodCount = useMemo(() => {
+    return pizzas.filter(r => r.pivot_ingredient_id).length
+      + kitchens.filter(r => r.pivot_ingredient_id).length
+      + cocktails.filter(r => r.pivot_ingredient_id).length
+      + emps.filter(r => r.pivot_ingredient_id).length;
+  }, [pizzas, kitchens, cocktails, emps]);
 
   // Tab counts
   const tabCounts = useMemo(() => ({
@@ -530,7 +542,7 @@ function RecettesInner() {
   const showCocktail = mainTab === "tous" || mainTab === "cocktail";
   const showEmp = mainTab === "tous" || mainTab === "empatement";
 
-  const hasActiveFilter = foodCostFilter !== "all" || cuisineCatFilter !== "all";
+  const hasActiveFilter = foodCostFilter !== "all" || cuisineCatFilter !== "all" || prodFilter;
 
   return (
     <>
@@ -731,8 +743,16 @@ function RecettesInner() {
                 ))}
               </div>
             </div>
+            {/* Production */}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#999", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Mode</div>
+              <button type="button" onClick={() => setProdFilter(p => !p)}
+                style={filterPill(prodFilter, "#4a6741")}>
+                Production ({prodCount})
+              </button>
+            </div>
             {hasActiveFilter && (
-              <button type="button" onClick={() => { setFoodCostFilter("all"); setCuisineCatFilter("all"); }}
+              <button type="button" onClick={() => { setFoodCostFilter("all"); setCuisineCatFilter("all"); setProdFilter(false); }}
                 style={{ fontSize: 12, fontWeight: 600, color: "#D4775A", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
                 Effacer les filtres
               </button>
