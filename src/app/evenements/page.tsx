@@ -412,51 +412,53 @@ export default function EventsPage() {
             <div style={{
               marginBottom: 20, background: "#fff", borderRadius: 14,
               border: "1px solid #e8e2d8",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.03)",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
               overflow: "hidden",
             }}>
               {/* Month nav */}
               <div style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "12px 16px", background: "#faf8f5",
+                padding: "10px 14px",
                 borderBottom: "1px solid #f0ebe3",
               }}>
                 <button onClick={prevMonth} style={calNavBtn}>
-                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#6f6a61" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#6f6a61" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
                 </button>
                 <span style={{
-                  fontSize: 14, fontWeight: 800, color: "#1a1a1a",
+                  fontSize: 13, fontWeight: 800, color: "#1a1a1a",
                   fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
                   textTransform: "uppercase", letterSpacing: 1,
                 }}>
                   {MONTH_NAMES[calMonth]} {calYear}
                 </span>
                 <button onClick={nextMonth} style={calNavBtn}>
-                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#6f6a61" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#6f6a61" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
                 </button>
               </div>
 
               {/* Day headers */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "8px 4px 4px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "6px 6px 2px" }}>
                 {DAY_HEADERS.map((d, i) => (
                   <div key={`${d}-${i}`} style={{
                     textAlign: "center",
-                    fontSize: 10, fontWeight: 700, color: "#b0a894",
+                    fontSize: 9, fontWeight: 700, color: "#b0a894",
                     textTransform: "uppercase", letterSpacing: 0.5,
+                    padding: "2px 0",
                   }}>{d}</div>
                 ))}
               </div>
 
-              {/* Day cells */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "0 4px 8px", gap: 2 }}>
+              {/* Day cells — compact grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "2px 6px 6px", gap: 1 }}>
                 {cells.map((day, i) => {
-                  if (day == null) return <div key={`empty-${i}`} style={{ height: 36 }} />;
+                  if (day == null) return <div key={`empty-${i}`} style={{ aspectRatio: "1", minHeight: 0 }} />;
 
                   const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                   const dayEvents = eventsByDate.get(dateStr) ?? [];
                   const hasEvents = dayEvents.length > 0;
                   const isToday = dateStr === todayStr;
                   const isSelected = dateStr === selectedDate;
+                  const isPast = dateStr < todayStr;
 
                   return (
                     <button
@@ -467,33 +469,38 @@ export default function EventsPage() {
                         else if (hasEvents) setSelectedDate(dateStr);
                       }}
                       style={{
-                        height: 36,
+                        aspectRatio: "1",
+                        minHeight: 0,
                         display: "flex", flexDirection: "column",
                         alignItems: "center", justifyContent: "center",
-                        gap: 1, border: "none",
+                        gap: 2, border: "none",
                         cursor: hasEvents ? "pointer" : "default",
                         background: isSelected
                           ? "#D4775A"
                           : isToday
-                            ? "rgba(212,119,90,0.08)"
-                            : "transparent",
-                        borderRadius: 8,
+                            ? "rgba(212,119,90,0.10)"
+                            : hasEvents
+                              ? "#faf7f2"
+                              : "transparent",
+                        borderRadius: isToday || isSelected ? "50%" : 6,
                         position: "relative",
+                        padding: 0,
                       }}
                     >
                       <span style={{
                         fontSize: 12,
-                        fontWeight: isToday || isSelected ? 800 : 400,
-                        color: isSelected ? "#fff" : isToday ? "#D4775A" : "#2f3a33",
+                        fontWeight: isToday || isSelected || hasEvents ? 700 : 400,
+                        color: isSelected ? "#fff" : isToday ? "#D4775A" : isPast ? "#ccc" : hasEvents ? "#1a1a1a" : "#6f6a61",
+                        lineHeight: 1,
                       }}>
                         {day}
                       </span>
                       {hasEvents && (
-                        <div style={{ display: "flex", gap: 2 }}>
+                        <div style={{ display: "flex", gap: 2, position: "absolute", bottom: 3 }}>
                           {dayEvents.slice(0, 3).map((ev) => (
                             <span key={ev.id} style={{
                               width: 4, height: 4, borderRadius: "50%",
-                              background: isSelected ? "rgba(255,255,255,0.8)" : (TYPE_COLORS[ev.type] ?? "#999"),
+                              background: isSelected ? "rgba(255,255,255,0.85)" : (TYPE_COLORS[ev.type] ?? "#999"),
                               display: "inline-block",
                             }} />
                           ))}
@@ -506,14 +513,13 @@ export default function EventsPage() {
 
               {/* Legend */}
               <div style={{
-                display: "flex", gap: 14, flexWrap: "wrap",
-                padding: "8px 16px", borderTop: "1px solid #f0ebe3",
-                background: "#faf8f5",
-                fontSize: 10, color: "#9a8f84",
+                display: "flex", gap: 12, flexWrap: "wrap",
+                padding: "6px 14px", borderTop: "1px solid #f0ebe3",
+                fontSize: 9, color: "#9a8f84",
               }}>
                 {Object.entries(TYPE_COLORS).slice(0, 4).map(([type, color]) => (
-                  <span key={type} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, display: "inline-block" }} />
+                  <span key={type} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: color, display: "inline-block" }} />
                     {TYPE_LABELS[type] ?? type}
                   </span>
                 ))}
