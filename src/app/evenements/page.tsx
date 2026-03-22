@@ -253,6 +253,11 @@ export default function EventsPage() {
   // Next event for hero
   const nextEvent = upcoming[0] ?? null;
 
+  // Accent color from establishment (Piccola = #efd199, Bello = #e27f57, fallback = terracotta)
+  const accent = etab?.couleur ?? "#D4775A";
+  // Darker version for text on light accent backgrounds
+  const accentDark = etab?.slug?.includes("piccola") ? "#8B6914" : "#b5573d";
+
   return (
     <RequireRole allowedRoles={["group_admin"]}>
     <>
@@ -284,10 +289,10 @@ export default function EventsPage() {
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                 <div style={{
                   width: 32, height: 32, borderRadius: 8,
-                  background: "rgba(212,119,90,0.10)",
+                  background: `${accent}20`,
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
-                  <CalendarIcon size={16} color="#D4775A" />
+                  <CalendarIcon size={16} color={accentDark} />
                 </div>
               </div>
               <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a", lineHeight: 1 }}>
@@ -340,7 +345,7 @@ export default function EventsPage() {
                 CA prévisionnel
               </div>
               {kpiRevenue === 0 && kpiCount > 0 && (
-                <div style={{ fontSize: 9, color: "#D4775A", marginTop: 2, fontStyle: "italic" }}>
+                <div style={{ fontSize: 9, color: accentDark, marginTop: 2, fontStyle: "italic" }}>
                   Renseignez le prix sur vos events
                 </div>
               )}
@@ -386,7 +391,7 @@ export default function EventsPage() {
                 {jours !== null && jours >= 0 && (
                   <div style={{
                     textAlign: "center", flexShrink: 0,
-                    background: jours <= 3 ? "#D4775A" : tc,
+                    background: jours <= 3 ? accentDark : tc,
                     color: "#fff",
                     borderRadius: 10, padding: "6px 12px",
                     minWidth: 44,
@@ -413,16 +418,16 @@ export default function EventsPage() {
           return (
             <div style={{
               marginBottom: 20, borderRadius: 14,
-              background: "linear-gradient(180deg, #D4775A 0%, #c66a4f 100%)",
-              boxShadow: "0 4px 16px rgba(212,119,90,0.25)",
+              background: `linear-gradient(180deg, ${accent} 0%, ${accentDark} 100%)`,
+              boxShadow: `0 4px 16px ${accent}40`,
               overflow: "hidden",
             }}>
-              {/* Month nav — dark header */}
+              {/* Month nav — colored header */}
               <div style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 padding: "12px 16px",
               }}>
-                <button onClick={prevMonth} style={{ ...calNavBtn, background: "rgba(255,255,255,0.15)", border: "none" }}>
+                <button onClick={prevMonth} style={{ ...calNavBtn, background: "rgba(255,255,255,0.2)", border: "none" }}>
                   <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
                 </button>
                 <div style={{ textAlign: "center" }}>
@@ -430,16 +435,17 @@ export default function EventsPage() {
                     fontSize: 14, fontWeight: 800, color: "#fff",
                     fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
                     textTransform: "uppercase", letterSpacing: 1.5,
+                    textShadow: "0 1px 2px rgba(0,0,0,0.15)",
                   }}>
                     {MONTH_NAMES[calMonth]} {calYear}
                   </div>
                   {monthEvents.length > 0 && (
-                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", marginTop: 1 }}>
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.8)", marginTop: 1 }}>
                       {monthEvents.length} événement{monthEvents.length > 1 ? "s" : ""}
                     </div>
                   )}
                 </div>
-                <button onClick={nextMonth} style={{ ...calNavBtn, background: "rgba(255,255,255,0.15)", border: "none" }}>
+                <button onClick={nextMonth} style={{ ...calNavBtn, background: "rgba(255,255,255,0.2)", border: "none" }}>
                   <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
                 </button>
               </div>
@@ -451,7 +457,7 @@ export default function EventsPage() {
                   {DAY_HEADERS.map((d, i) => (
                     <div key={`${d}-${i}`} style={{
                       textAlign: "center",
-                      fontSize: 10, fontWeight: 700, color: "#D4775A",
+                      fontSize: 10, fontWeight: 700, color: accentDark,
                       textTransform: "uppercase", letterSpacing: 0.5,
                       padding: "4px 0",
                     }}>{d}</div>
@@ -469,6 +475,8 @@ export default function EventsPage() {
                     const isToday = dateStr === todayStr;
                     const isSelected = dateStr === selectedDate;
                     const isPast = dateStr < todayStr;
+                    // Color the cell background with the first event's type color
+                    const eventTypeColor = hasEvents ? (TYPE_COLORS[dayEvents[0].type] ?? "#6B7280") : "";
 
                     return (
                       <button
@@ -482,16 +490,19 @@ export default function EventsPage() {
                           height: 36,
                           display: "flex", flexDirection: "column",
                           alignItems: "center", justifyContent: "center",
-                          gap: 2, border: "none",
+                          gap: 2,
+                          border: isToday ? `2px solid ${accentDark}` : "2px solid transparent",
                           cursor: hasEvents ? "pointer" : "default",
                           background: isSelected
-                            ? "#D4775A"
-                            : isToday
-                              ? "rgba(212,119,90,0.12)"
-                              : hasEvents
-                                ? "#faf7f2"
-                                : "transparent",
-                          borderRadius: isToday || isSelected ? "50%" : 6,
+                            ? accentDark
+                            : isToday && hasEvents
+                              ? `${eventTypeColor}25`
+                              : isToday
+                                ? `${accent}25`
+                                : hasEvents
+                                  ? `${eventTypeColor}18`
+                                  : "transparent",
+                          borderRadius: 6,
                           position: "relative",
                           padding: 0,
                         }}
@@ -499,7 +510,7 @@ export default function EventsPage() {
                         <span style={{
                           fontSize: 13,
                           fontWeight: isToday || isSelected || hasEvents ? 700 : 400,
-                          color: isSelected ? "#fff" : isToday ? "#D4775A" : isPast && !hasEvents ? "#ccc" : hasEvents ? "#1a1a1a" : "#6f6a61",
+                          color: isSelected ? "#fff" : isToday ? accentDark : isPast && !hasEvents ? "#ccc" : hasEvents ? "#1a1a1a" : "#6f6a61",
                           lineHeight: 1,
                         }}>
                           {day}
@@ -544,8 +555,8 @@ export default function EventsPage() {
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
             marginBottom: 14, padding: "8px 14px",
-            background: "rgba(212,119,90,0.06)", borderRadius: 10,
-            border: "1px solid rgba(212,119,90,0.15)",
+            background: `${accent}12`, borderRadius: 10,
+            border: `1px solid ${accent}30`,
           }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
               {new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
@@ -555,7 +566,7 @@ export default function EventsPage() {
               onClick={() => setSelectedDate(null)}
               style={{
                 background: "none", border: "none",
-                color: "#D4775A", fontSize: 12, fontWeight: 700,
+                color: accentDark, fontSize: 12, fontWeight: 700,
                 cursor: "pointer",
               }}
             >
@@ -576,8 +587,8 @@ export default function EventsPage() {
                   style={{
                     padding: "6px 16px",
                     borderRadius: 20,
-                    border: active ? "1.5px solid #D4775A" : "1px solid #ddd6c8",
-                    background: active ? "#D4775A" : "#fff",
+                    border: active ? `1.5px solid ${accentDark}` : "1px solid #ddd6c8",
+                    background: active ? accentDark : "#fff",
                     color: active ? "#fff" : "#6f6a61",
                     fontWeight: 700,
                     fontSize: 12,
@@ -611,7 +622,7 @@ export default function EventsPage() {
               <Link href="/evenements/new" style={{
                 display: "inline-block",
                 padding: "10px 24px", borderRadius: 20,
-                background: "#D4775A", color: "#fff",
+                background: accentDark, color: "#fff",
                 fontWeight: 700, fontSize: 13,
                 textDecoration: "none",
               }}>
@@ -702,7 +713,7 @@ export default function EventsPage() {
                             {isUpcoming && jours !== null && (
                               <span style={{
                                 fontSize: 10, fontWeight: 800,
-                                color: jours <= 7 ? "#D4775A" : "#9a8f84",
+                                color: jours <= 7 ? accentDark : "#9a8f84",
                               }}>
                                 {jours === 0 ? "Aujourd\u2019hui" : jours === 1 ? "Demain" : `J-${jours}`}
                               </span>
@@ -756,12 +767,12 @@ export default function EventsPage() {
           width: 54,
           height: 54,
           borderRadius: "50%",
-          background: "linear-gradient(135deg, #D4775A 0%, #c66a4f 100%)",
+          background: `linear-gradient(135deg, ${accent} 0%, ${accentDark} 100%)`,
           color: "#fff",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          boxShadow: "0 4px 20px rgba(212,119,90,0.45), 0 2px 8px rgba(0,0,0,0.1)",
+          boxShadow: `0 4px 20px ${accent}70, 0 2px 8px rgba(0,0,0,0.1)`,
           textDecoration: "none",
           fontSize: 28,
           fontWeight: 300,
