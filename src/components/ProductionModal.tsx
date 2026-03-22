@@ -135,65 +135,10 @@ export default function ProductionModal({ recipeType, recipeId, recipeName, pivo
     });
   }, []);
 
-  // Print
+  // Print — uses @media print CSS to hide everything except modal content (iOS-safe)
   const handlePrint = useCallback(() => {
-    const displayQty = prodQty === "" ? baseQty : Number(prodQty);
-    const f = baseQty > 0 && displayQty > 0 ? displayQty / baseQty : 1;
-    const printLines = lines
-      .filter(l => l.ingredient_id !== pivotIngredientId)
-      .map(l => ({ name: l.name, qty: Math.round(l.qty * f), unit: l.unit }));
-    const tw = printLines.filter(l => l.unit === "g").reduce((a, l) => a + l.qty, 0);
-
-    const date = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
-
-    const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Production — ${recipeName}</title>
-<style>
-  @page { size: A4; margin: 20mm; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, "Segoe UI", sans-serif; color: #1a1a1a; }
-  .header { background: #4a6741; color: white; padding: 20px 24px; border-radius: 12px; margin-bottom: 20px; }
-  .header h1 { font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
-  .header .sub { font-size: 13px; opacity: 0.8; margin-top: 4px; }
-  .pivot { background: #FFFBEB; border: 2px solid #D97706; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; }
-  .pivot .label { font-size: 11px; font-weight: 700; color: #D97706; text-transform: uppercase; letter-spacing: 1px; }
-  .pivot .value { font-size: 20px; font-weight: 800; margin-top: 6px; }
-  table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; font-size: 11px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 1px; padding: 8px 12px; border-bottom: 2px solid #ddd6c8; }
-  td { padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 14px; }
-  td.qty { text-align: right; font-size: 18px; font-weight: 700; white-space: nowrap; }
-  td.unit { color: #999; font-size: 13px; width: 40px; }
-  td.check { width: 28px; }
-  .check-box { width: 18px; height: 18px; border: 2px solid #ccc; border-radius: 4px; }
-  tr:nth-child(even) { background: #faf8f4; }
-  .footer { margin-top: 20px; background: #4a6741; color: white; padding: 14px 20px; border-radius: 12px; display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; }
-  .footer .val { font-size: 20px; font-weight: 700; }
-  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-</style></head><body>
-<div class="header">
-  <div class="sub">Fiche de production — ${date}</div>
-  <h1>${recipeName}</h1>
-</div>
-<div class="pivot">
-  <div class="label">Ingredient pivot</div>
-  <div class="value">${pivotName} — ${displayQty} ${pivotLine?.unit ?? "g"}</div>
-</div>
-<table>
-  <thead><tr><th class="check"></th><th>Ingredient</th><th style="text-align:right">Quantite</th><th>Unite</th></tr></thead>
-  <tbody>${printLines.map(l => `
-    <tr><td class="check"><div class="check-box"></div></td><td>${l.name}</td><td class="qty">${l.qty}</td><td class="unit">${l.unit}</td></tr>`).join("")}
-  </tbody>
-</table>
-${tw > 0 ? `<div class="footer"><span>Poids total estime</span><span class="val">${tw} g</span></div>` : ""}
-</body></html>`;
-
-    const w = window.open("", "_blank");
-    if (w) {
-      w.document.write(html);
-      w.document.close();
-      setTimeout(() => w.print(), 300);
-    }
-  }, [lines, prodQty, baseQty, pivotIngredientId, recipeName, pivotName, pivotLine]);
+    window.print();
+  }, []);
 
   // Close on Escape
   useEffect(() => {
@@ -206,6 +151,7 @@ ${tw > 0 ? `<div class="footer"><span>Poids total estime</span><span class="val"
 
   return (
     <div
+      data-production-print
       onClick={onClose}
       style={{
         position: "fixed", inset: 0, zIndex: 9999,
@@ -246,7 +192,7 @@ ${tw > 0 ? `<div class="footer"><span>Poids total estime</span><span class="val"
               {recipeName}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+          <div data-print-hide style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
             {!loading && pivotLine && (
               <button
                 type="button"
@@ -306,8 +252,15 @@ ${tw > 0 ? `<div class="footer"><span>Poids total estime</span><span class="val"
                   {pivotName}
                 </div>
 
+                {/* Print: show pivot qty as plain text */}
+                <div className="print-pivot-qty" style={{ display: "none" }}>
+                  <span style={{ fontSize: 20, fontWeight: 800, color: "#1a1a1a" }}>
+                    {prodQty === "" ? baseQty : Number(prodQty)} {pivotLine.unit}
+                  </span>
+                </div>
+
                 {/* Stepper */}
-                <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+                <div data-print-hide style={{ display: "flex", alignItems: "center", gap: 0 }}>
                   <button
                     type="button"
                     onClick={() => handleStep(-1)}
@@ -357,7 +310,7 @@ ${tw > 0 ? `<div class="footer"><span>Poids total estime</span><span class="val"
                 </div>
 
                 {/* Multipliers */}
-                <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+                <div data-print-hide style={{ display: "flex", gap: 6, marginTop: 12 }}>
                   {MULTIPLIERS.map(m => {
                     const isActive = prodQty === baseQty * m;
                     return (
@@ -380,14 +333,14 @@ ${tw > 0 ? `<div class="footer"><span>Poids total estime</span><span class="val"
                   })}
                 </div>
 
-                <div style={{ fontSize: 12, color: "#999", marginTop: 10 }}>
+                <div data-print-hide style={{ fontSize: 12, color: "#999", marginTop: 10 }}>
                   Recette de base : {baseQty} {pivotLine.unit}
                 </div>
               </div>
 
               {/* Progress */}
               {nonPivotLines.length > 0 && (
-                <div style={{
+                <div data-print-hide style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between",
                   marginBottom: 10, padding: "0 4px",
                 }}>

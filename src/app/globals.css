@@ -640,3 +640,25 @@ input[type='number'] {
 .dash-card:hover .dash-pill {
   background: var(--pill-hover, rgba(212,119,90,0.18));
 }
+
+/* ── Print: production modal ── */
+@media print {
+  /* Hide all interactive controls */
+  [data-print-hide] { display: none !important; }
+  /* Show print-only pivot qty */
+  .print-pivot-qty { display: block !important; }
+  /* The production overlay becomes static white page */
+  [data-production-print] {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+  [data-production-print] > * {
+    max-width: 100% !important;
+    height: auto !important;
+    background: white !important;
+    overflow: visible !important;
+  }
+  @page { size: A4; margin: 16mm; }
+}
