@@ -297,10 +297,16 @@ export function BottomTabBar({ onMenuClick }: Props) {
         maxWidth: 500,
         margin: "0 auto",
       }}>
-        {/* Menu button — always first */}
+        {/* Menu button — goes back to level 1 (hubs) when in sub-tabs, opens sidebar otherwise */}
         <button
           type="button"
-          onClick={onMenuClick}
+          onClick={() => {
+            if (showSubTabs) {
+              router.push("/dashboard");
+            } else {
+              onMenuClick();
+            }
+          }}
           style={{
             display: "flex",
             flexDirection: "column",
