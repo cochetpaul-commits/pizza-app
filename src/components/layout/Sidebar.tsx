@@ -240,20 +240,28 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
     return (
       <div key={entry.etabSlug} style={{ marginBottom: 2 }}>
-        {/* Etab header — always illuminated */}
-        <div style={{
-          display: "flex", alignItems: "center", gap: 10,
-          padding: "8px 16px", margin: "1px 8px",
-          borderRadius: 6,
-          background: C.bgItemActive,
-          borderLeft: `3px solid ${entry.color}`,
-          whiteSpace: "nowrap", overflow: "hidden",
-        }}>
+        {/* Etab header — clickable, navigates to establishment dashboard */}
+        <button
+          type="button"
+          onClick={() => {
+            router.push(`/${entry.etabSlug}`);
+            onNavigate?.();
+          }}
+          style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "8px 16px", margin: "1px 8px",
+            width: "calc(100% - 16px)",
+            borderRadius: 6, border: "none", cursor: "pointer",
+            background: C.bgItemActive,
+            borderLeft: `3px solid ${entry.color}`,
+            whiteSpace: "nowrap", overflow: "hidden",
+          }}
+        >
           <IconStore size={16} color={entry.color} />
           <span style={{ fontSize: 13, fontWeight: 600, color: C.textActive, overflow: "hidden", textOverflow: "ellipsis" }}>
             {entry.label}
           </span>
-        </div>
+        </button>
 
         {/* Hubs — always visible */}
         <div style={{ marginTop: 2 }}>
