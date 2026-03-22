@@ -355,6 +355,34 @@ export default function EventForm({ eventId }: { eventId?: string }) {
         updated_at: new Date().toISOString(),
       };
 
+      // ── Auto-create or update client ───────────────────────────────
+      let resolvedClientId = clientId;
+      if (contactName.trim()) {
+        const nameParts = contactName.trim().split(/\s+/);
+        const nom = nameParts[0] ?? "";
+        const prenom = nameParts.slice(1).join(" ") || null;
+        const clientData = {
+          nom,
+          prenom,
+          email: contactEmail.trim() || null,
+          telephone: contactPhone.trim() || null,
+          notes: contactNotes.trim() || null,
+          etablissement_id: etab?.id ?? null,
+          type: (type === "seminaire" || type === "repas_staff") ? "entreprise" : "particulier",
+        };
+        if (resolvedClientId) {
+          await supabase.from("clients").update(clientData).eq("id", resolvedClientId);
+        } else {
+          const { data: newClient } = await supabase.from("clients").insert(clientData).select("id").single();
+          if (newClient) {
+            resolvedClientId = newClient.id;
+            setClientId(newClient.id);
+            setClientsList(prev => [...prev, { id: newClient.id, nom, prenom, email: clientData.email, telephone: clientData.telephone, notes: clientData.notes }]);
+          }
+        }
+      }
+      row.client_id = resolvedClientId || null;
+
       let eid = eventId;
 
       if (isNew) {
