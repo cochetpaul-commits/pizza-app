@@ -502,63 +502,75 @@ export default function DashboardPage() {
         {/* ── 2 Establishment Cards ── */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
           {/* Bello Mio */}
-          <div style={{ background: T.white, borderRadius: 14, border: `1.5px solid ${T.border}`, padding: "18px 20px", display: "flex", flexDirection: "column" }}>
+          <div style={{
+            background: `linear-gradient(135deg, ${T.belloMio}12 0%, ${T.white} 60%)`,
+            borderRadius: 16, border: `2px solid ${T.belloMio}30`,
+            padding: "18px 20px", display: "flex", flexDirection: "column",
+            boxShadow: `0 4px 16px ${T.belloMio}10`,
+          }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: T.belloMio }} />
-              <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 16, color: T.dark }}>Bello Mio</span>
+              <span style={{ width: 12, height: 12, borderRadius: "50%", background: T.belloMio, boxShadow: `0 0 8px ${T.belloMio}60` }} />
+              <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 17, color: T.dark, textTransform: "uppercase", letterSpacing: 0.5 }}>Bello Mio</span>
             </div>
             <EtabStatRow label="CA du jour" value={`${fmtEur(ca?.totalSales ?? 0)}\u00A0\u20AC`} delta={fmtDelta(deltaCaBM, "%")} deltaColor={deltaColor(deltaCaBM)} />
             <EtabStatRow label="Couverts" value={String(ca?.guestsNumber ?? 0)} delta={fmtDelta(deltaCouvBM)} deltaColor={deltaColor(deltaCouvBM)} />
             <EtabStatRow label="Soir" value={`${fmtEur(ca?.soir.ca ?? 0)}\u00A0\u20AC`} />
-            <div style={{ display: "flex", gap: 14, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
+            <div style={{ display: "flex", gap: 14, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.belloMio}20` }}>
               <MiniStat label="planifiees" value={heuresBM != null ? `${heuresBM} h` : "\u2014"} />
               <MiniStat label="ratio MS" value={ratioMSBM != null ? `${ratioMSBM}%` : "\u2014"} valueColor={ratioMSBM != null && ratioMSBM > objMS ? "#DC2626" : T.sauge} />
               <MiniStat label="masse sal." value={masseSalBM != null ? `${fmtEur(masseSalBM)}\u00A0\u20AC` : "\u2014"} />
             </div>
-            <button
+            <Link
+              href="/bello-mio"
               onClick={() => {
                 const bm = etablissements.find(e => e.slug?.includes("bello"));
                 if (bm) { setCurrent(bm); setGroupView(false); }
               }}
               style={{
                 marginTop: 16, width: "100%", padding: "10px 0", borderRadius: 10,
-                border: `1.5px solid ${T.border}`, background: "transparent",
+                border: `1.5px solid ${T.belloMio}40`, background: T.belloMio,
                 fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600,
-                color: T.belloMio, cursor: "pointer",
+                color: "#fff", cursor: "pointer", textAlign: "center", textDecoration: "none",
               }}
             >
               Entrer dans Bello Mio &rarr;
-            </button>
+            </Link>
           </div>
 
           {/* Piccola Mia */}
-          <div style={{ background: T.white, borderRadius: 14, border: `1.5px solid ${T.border}`, padding: "18px 20px", display: "flex", flexDirection: "column" }}>
+          <div style={{
+            background: `linear-gradient(135deg, ${T.piccolaMia}25 0%, ${T.white} 60%)`,
+            borderRadius: 16, border: `2px solid ${T.piccolaMia}60`,
+            padding: "18px 20px", display: "flex", flexDirection: "column",
+            boxShadow: `0 4px 16px ${T.piccolaMia}15`,
+          }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: T.bleu }} />
-              <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 16, color: T.dark }}>Piccola Mia</span>
+              <span style={{ width: 12, height: 12, borderRadius: "50%", background: T.piccolaMia, boxShadow: `0 0 8px ${T.piccolaMia}80` }} />
+              <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 17, color: T.dark, textTransform: "uppercase", letterSpacing: 0.5 }}>Piccola Mia</span>
             </div>
             <EtabStatRow label="CA du jour" value={`${fmtEur(caPM?.ca ?? 0)}\u00A0\u20AC`} delta={fmtDelta(deltaCaPM, "%")} deltaColor={deltaColor(deltaCaPM)} />
             <EtabStatRow label="Couverts" value={String(caPM?.couverts ?? 0)} delta={fmtDelta(deltaCouvPM)} deltaColor={deltaColor(deltaCouvPM)} />
             <EtabStatRow label="Soir" value={"\u2014"} />
-            <div style={{ display: "flex", gap: 14, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
+            <div style={{ display: "flex", gap: 14, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.piccolaMia}40` }}>
               <MiniStat label="planifiees" value={heuresPM != null ? `${heuresPM} h` : "\u2014"} />
               <MiniStat label="ratio MS" value={ratioMSPM != null ? `${ratioMSPM}%` : "\u2014"} valueColor={ratioMSPM != null && ratioMSPM > objMS ? "#DC2626" : T.sauge} />
               <MiniStat label="masse sal." value={masseSalPM != null ? `${fmtEur(masseSalPM)}\u00A0\u20AC` : "\u2014"} />
             </div>
-            <button
+            <Link
+              href="/piccola-mia"
               onClick={() => {
                 const pm = etablissements.find(e => !e.slug?.includes("bello"));
                 if (pm) { setCurrent(pm); setGroupView(false); }
               }}
               style={{
                 marginTop: 16, width: "100%", padding: "10px 0", borderRadius: 10,
-                border: `1.5px solid ${T.border}`, background: "transparent",
+                border: `1.5px solid ${T.piccolaMia}60`, background: "#8B6914",
                 fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600,
-                color: T.bleu, cursor: "pointer",
+                color: "#fff", cursor: "pointer", textAlign: "center", textDecoration: "none",
               }}
             >
               Entrer dans Piccola Mia &rarr;
-            </button>
+            </Link>
           </div>
         </div>
 

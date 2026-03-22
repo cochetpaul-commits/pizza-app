@@ -1,10 +1,244 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
+import { useProfile } from "@/lib/ProfileContext";
+import { useEtablissement } from "@/lib/EtablissementContext";
+import { supabase } from "@/lib/supabaseClient";
+import { T } from "@/lib/tokens";
+import { fetchPriceAlerts } from "@/lib/priceAlerts";
 
-export default function PiccolaMiaPage() {
-  const router = useRouter();
-  useEffect(() => { router.replace("/dashboard"); }, [router]);
-  return null;
+const COLOR = "#8B6914";
+const COLOR_LIGHT = "#efd199";
+
+function fmtEur(n: number) {
+  return n.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+export default function PiccolaMiaDashboard() {
+  const { isGroupAdmin } = useProfile();
+  const { etablissements, setCurrent, setGroupView } = useEtablissement();
+
+  const [caToday, setCaToday] = useState(0);
+  const [couverts, setCouverts] = useState(0);
+  const [panierMoyen, setPanierMoyen] = useState(0);
+  const [caYesterday, setCaYesterday] = useState<number | null>(null);
+  const [shiftsToday, setShiftsToday] = useState(0);
+  const [alertCount, setAlertCount] = useState(0);
+  const [pendingCommandes, setPendingCommandes] = useState(0);
+  const [upcomingEvents, setUpcomingEvents] = useState<{ id: string; name: string; date: string | null; covers: number }[]>([]);
+
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const yesterday = useMemo(() => {
+    const d = new Date(); d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
+  const etab = useMemo(() => etablissements.find(e => e.slug?.includes("piccola")), [etablissements]);
+
+  // Set context to Piccola Mia
+  useEffect(() => {
+    if (etab) { setCurrent(etab); setGroupView(false); }
+  }, [etab, setCurrent, setGroupView]);
+
+  // Fetch CA from daily_sales (Kezia)
+  useEffect(() => {
+    if (!isGroupAdmin) return;
+    (async () => {
+      const { data } = await supabase.from("daily_sales").select("ca_ttc, couverts, panier_moyen")
+        .eq("date", today).eq("source", "kezia_pdf").limit(1).maybeSingle();
+      if (data) {
+        setCaToday(data.ca_ttc ?? 0);
+        setCouverts(data.couverts ?? 0);
+        setPanierMoyen(data.panier_moyen ?? 0);
+      }
+    })();
+  }, [isGroupAdmin, today]);
+
+  // CA yesterday
+  useEffect(() => {
+    if (!etab) return;
+    (async () => {
+      const { data } = await supabase.from("daily_sales").select("ca_ttc").eq("date", yesterday).eq("etablissement_id", etab.id).maybeSingle();
+      setCaYesterday(data?.ca_ttc ?? null);
+    })();
+  }, [etab, yesterday]);
+
+  // Shifts today
+  useEffect(() => {
+    if (!etab) return;
+    (async () => {
+      const { data } = await supabase.from("shifts").select("id").eq("date", today).eq("etablissement_id", etab.id);
+      setShiftsToday(data?.length ?? 0);
+    })();
+  }, [etab, today]);
+
+  // Pending commandes
+  useEffect(() => {
+    if (!etab) return;
+    (async () => {
+      const { data } = await supabase.from("commande_sessions").select("id").in("status", ["brouillon", "en_attente"]).eq("etablissement_id", etab.id);
+      setPendingCommandes(data?.length ?? 0);
+    })();
+  }, [etab]);
+
+  // Upcoming events
+  useEffect(() => {
+    if (!etab) return;
+    (async () => {
+      const { data } = await supabase.from("events").select("id, name, date, covers")
+        .gte("date", today).in("status", ["confirme", "en_cours"])
+        .order("date").limit(3);
+      setUpcomingEvents(data ?? []);
+    })();
+  }, [etab, today]);
+
+  // Price alerts
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) { const a = await fetchPriceAlerts(supabase, user.id); setAlertCount(a.length); }
+      } catch { /* */ }
+    })();
+  }, []);
+
+  const deltaCa = caYesterday && caYesterday > 0 ? Math.round(((caToday - caYesterday) / caYesterday) * 100) : null;
+
+  return (
+    <div style={{ maxWidth: 600, margin: "0 auto", padding: "16px 16px 40px" }}>
+
+      {/* Header */}
+      <div style={{
+        background: `linear-gradient(135deg, ${COLOR} 0%, ${COLOR_LIGHT} 100%)`,
+        borderRadius: 16, padding: "24px 20px 20px", marginBottom: 20,
+        color: "#fff",
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1.5, opacity: 0.8, marginBottom: 4 }}>
+          Tableau de bord
+        </div>
+        <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 28, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+          Piccola Mia
+        </div>
+        <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
+          {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+        <KpiCard label="CA du jour" value={`${fmtEur(caToday)} \u20AC`} accent={COLOR}
+          sub={deltaCa != null ? `${deltaCa > 0 ? "+" : ""}${deltaCa}% vs hier` : undefined}
+          subColor={deltaCa != null ? (deltaCa > 0 ? T.sauge : "#DC2626") : undefined} />
+        <KpiCard label="Couverts" value={String(couverts)} accent={T.dark} />
+        <KpiCard label="Panier moyen" value={`${panierMoyen.toFixed(1).replace(".", ",")} \u20AC`} accent={T.dark} />
+        <KpiCard label="En service" value={String(shiftsToday)} accent={T.bleu} />
+      </div>
+
+      {/* Quick stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+        <QuickStat label="Commandes" value={String(pendingCommandes)} color={pendingCommandes > 0 ? COLOR : T.sauge} href="/commandes" />
+        <QuickStat label="Alertes prix" value={String(alertCount)} color={alertCount > 0 ? COLOR : T.sauge} href="/variations-prix" />
+      </div>
+
+      {/* Events */}
+      {upcomingEvents.length > 0 && (
+        <>
+          <div style={{
+            fontSize: 9, fontWeight: 700, letterSpacing: "0.14em",
+            textTransform: "uppercase", color: T.muted, marginBottom: 10,
+          }}>
+            Evenements a venir
+          </div>
+          <div style={{ display: "grid", gap: 6, marginBottom: 20 }}>
+            {upcomingEvents.map(ev => (
+              <Link key={ev.id} href={`/evenements/${ev.id}`} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "12px 14px", background: T.white, borderRadius: 12,
+                border: `1.5px solid ${T.border}`, textDecoration: "none",
+              }}>
+                <span style={{ fontWeight: 700, fontSize: 13, color: T.dark }}>{ev.name}</span>
+                <span style={{ fontSize: 11, color: T.muted }}>
+                  {ev.date ? new Date(ev.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : "\u2014"}
+                  {ev.covers > 0 ? ` \u00B7 ${ev.covers} couv.` : ""}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Navigation rapide */}
+      <div style={{
+        fontSize: 9, fontWeight: 700, letterSpacing: "0.14em",
+        textTransform: "uppercase", color: T.muted, marginBottom: 10,
+      }}>
+        Acces rapide
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 20 }}>
+        <NavCard href="/plannings" label="Planning" color={COLOR} />
+        <NavCard href="/recettes" label="Fiches techniques" color={COLOR} />
+        <NavCard href="/commandes" label="Commandes" color={COLOR} />
+        <NavCard href="/evenements" label="Evenements" color={COLOR} />
+      </div>
+
+      {/* Retour groupe */}
+      <Link
+        href="/dashboard"
+        style={{
+          display: "block", textAlign: "center", padding: "12px 0", borderRadius: 10,
+          border: `1.5px solid ${T.border}`, background: "transparent",
+          fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600,
+          color: T.muted, cursor: "pointer", textDecoration: "none",
+        }}
+      >
+        &larr; Retour vue groupe
+      </Link>
+    </div>
+  );
+}
+
+/* ── Sub-components ── */
+
+function KpiCard({ label, value, accent, sub, subColor }: {
+  label: string; value: string; accent?: string; sub?: string; subColor?: string;
+}) {
+  return (
+    <div style={{
+      background: T.white, borderRadius: 14, padding: "14px 14px",
+      border: `1.5px solid ${T.border}`, display: "flex", flexDirection: "column", gap: 2,
+    }}>
+      <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: T.muted }}>{label}</span>
+      <span style={{ fontSize: 24, fontWeight: 700, color: accent ?? T.dark, fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1.15, marginTop: 4 }}>{value}</span>
+      {sub && <span style={{ fontSize: 10, color: subColor ?? T.muted, marginTop: 2 }}>{sub}</span>}
+    </div>
+  );
+}
+
+function QuickStat({ label, value, color, href }: { label: string; value: string; color: string; href?: string }) {
+  const inner = (
+    <div style={{
+      background: `${color}10`, borderRadius: 12, padding: "12px 14px",
+      border: `1.5px solid ${color}20`, textAlign: "center",
+      cursor: href ? "pointer" : "default",
+    }}>
+      <div style={{ fontSize: 22, fontWeight: 700, color, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{value}</div>
+      <div style={{ fontSize: 10, color: T.muted, fontWeight: 600, marginTop: 2 }}>{label}</div>
+    </div>
+  );
+  if (href) return <Link href={href} style={{ textDecoration: "none" }}>{inner}</Link>;
+  return inner;
+}
+
+function NavCard({ href, label, color }: { href: string; label: string; color: string }) {
+  return (
+    <Link href={href} style={{
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: "14px 12px", borderRadius: 12,
+      background: T.white, border: `1.5px solid ${T.border}`,
+      textDecoration: "none", fontWeight: 600, fontSize: 13, color: T.dark,
+    }}>
+      <span style={{ borderBottom: `2px solid ${color}40` }}>{label}</span>
+    </Link>
+  );
 }
