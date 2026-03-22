@@ -67,51 +67,196 @@ function IconPackage({ active }: { active: boolean }) {
   );
 }
 
-/* ── Fixed 5 tabs matching sidebar hubs ──────────── */
+function IconUsers({ active }: { active: boolean }) {
+  return (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function IconClock({ active }: { active: boolean }) {
+  return (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
+function IconBeach({ active }: { active: boolean }) {
+  return (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="5" />
+      <path d="M12 13v8" />
+      <path d="M8 21h8" />
+    </svg>
+  );
+}
+
+function IconFileText({ active }: { active: boolean }) {
+  return (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+    </svg>
+  );
+}
+
+function IconTrendingUp({ active }: { active: boolean }) {
+  return (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+      <polyline points="17 6 23 6 23 12" />
+    </svg>
+  );
+}
+
+function IconBook({ active }: { active: boolean }) {
+  return (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    </svg>
+  );
+}
+
+function IconTruck({ active }: { active: boolean }) {
+  return (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="3" width="15" height="13" rx="1" />
+      <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+      <circle cx="5.5" cy="18.5" r="2.5" />
+      <circle cx="18.5" cy="18.5" r="2.5" />
+    </svg>
+  );
+}
+
+function IconBox({ active }: { active: boolean }) {
+  return (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+    </svg>
+  );
+}
+
+function IconTag({ active }: { active: boolean }) {
+  return (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <line x1="7" y1="7" x2="7.01" y2="7" />
+    </svg>
+  );
+}
+
+function IconGrid({ active }: { active: boolean }) {
+  return (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" />
+      <rect x="14" y="3" width="7" height="7" />
+      <rect x="14" y="14" width="7" height="7" />
+      <rect x="3" y="14" width="7" height="7" />
+    </svg>
+  );
+}
+
+/* ── Tab types ────────────────────────────────────── */
 
 type Tab = {
   label: string;
   href: string;
-  /** Pathname prefixes that make this tab "active" */
   match: string[];
   icon: (active: boolean) => React.ReactNode;
 };
 
-const TABS: Tab[] = [
+type TabSection = {
+  label: string;
+  /** First item href — where hub click navigates */
+  href: string;
+  /** Pathnames that belong to this section */
+  match: string[];
+  icon: (active: boolean) => React.ReactNode;
+  /** Sub-tabs shown when inside this section */
+  tabs: Tab[];
+};
+
+/* ── Sections with sub-tabs ──────────────────────── */
+
+const SECTIONS: TabSection[] = [
   {
     label: "Planning",
     href: "/rh/equipe",
     match: ["/plannings", "/rh/", "/mes-shifts"],
     icon: (a) => <IconCalendar active={a} />,
+    tabs: [
+      { label: "Employes", href: "/rh/equipe", match: ["/rh/equipe", "/rh/employe"], icon: (a) => <IconUsers active={a} /> },
+      { label: "Pointage", href: "/rh/pointage", match: ["/rh/pointage"], icon: (a) => <IconClock active={a} /> },
+      { label: "Conges", href: "/rh/conges", match: ["/rh/conges"], icon: (a) => <IconBeach active={a} /> },
+      { label: "Rapports", href: "/rh/rapports", match: ["/rh/rapports"], icon: (a) => <IconFileText active={a} /> },
+    ],
   },
   {
     label: "Finance",
     href: "/finances",
     match: ["/finances", "/kezia"],
     icon: (a) => <IconWallet active={a} />,
+    tabs: [],
   },
   {
     label: "Achats",
     href: "/stats-achats",
     match: ["/stats-achats", "/achats", "/ingredients", "/invoices", "/fournisseurs", "/base-produits"],
     icon: (a) => <IconShoppingBag active={a} />,
+    tabs: [
+      { label: "Stats", href: "/stats-achats", match: ["/stats-achats"], icon: (a) => <IconBarChart active={a} /> },
+      { label: "Factures", href: "/achats", match: ["/achats", "/invoices"], icon: (a) => <IconFileText active={a} /> },
+      { label: "Produits", href: "/ingredients", match: ["/ingredients"], icon: (a) => <IconTag active={a} /> },
+    ],
   },
   {
     label: "Perf.",
     href: "/pilotage",
     match: ["/pilotage", "/variations-prix", "/alertes-prix"],
     icon: (a) => <IconBarChart active={a} />,
+    tabs: [
+      { label: "Indicateurs", href: "/pilotage", match: ["/pilotage"], icon: (a) => <IconBarChart active={a} /> },
+      { label: "Alertes", href: "/variations-prix", match: ["/variations-prix", "/alertes-prix"], icon: (a) => <IconTrendingUp active={a} /> },
+    ],
   },
   {
     label: "Ops",
     href: "/recettes",
     match: ["/catalogue", "/recettes", "/commandes", "/inventaire", "/epicerie", "/prep"],
     icon: (a) => <IconPackage active={a} />,
+    tabs: [
+      { label: "Catalogue", href: "/catalogue", match: ["/catalogue"], icon: (a) => <IconGrid active={a} /> },
+      { label: "Fiches", href: "/recettes", match: ["/recettes", "/prep"], icon: (a) => <IconBook active={a} /> },
+      { label: "Commandes", href: "/commandes", match: ["/commandes"], icon: (a) => <IconTruck active={a} /> },
+      { label: "Inventaire", href: "/inventaire", match: ["/inventaire"], icon: (a) => <IconBox active={a} /> },
+    ],
   },
 ];
 
 const ACTIVE_COLOR = "#2D6A4F";
 const INACTIVE_COLOR = "#999";
+
+/* ── Helpers ──────────────────────────────────────── */
+
+function pathMatches(pathname: string, patterns: string[]): boolean {
+  return patterns.some(m => pathname === m || pathname.startsWith(m + "/") || (m.endsWith("/") && pathname.startsWith(m)));
+}
+
+function getActiveSection(pathname: string): TabSection | null {
+  for (const section of SECTIONS) {
+    if (pathMatches(pathname, section.match)) return section;
+  }
+  return null;
+}
 
 /* ── Component ────────────────────────────────────── */
 
@@ -125,6 +270,12 @@ export function BottomTabBar({ onMenuClick }: Props) {
   const { role } = useProfile();
 
   if (!role) return null;
+
+  const activeSection = getActiveSection(pathname);
+
+  // If inside a section with sub-tabs → show sub-tabs
+  // Otherwise → show the 5 hub tabs (level 1)
+  const showSubTabs = activeSection && activeSection.tabs.length > 0;
 
   return (
     <nav className="bottom-tab-bar" style={{
@@ -170,44 +321,79 @@ export function BottomTabBar({ onMenuClick }: Props) {
           </span>
         </button>
 
-        {/* 5 fixed tabs */}
-        {TABS.map((tab) => {
-          const isActive = tab.match.some(m =>
-            pathname === m || pathname.startsWith(m) || pathname.startsWith(m + "/")
-          );
-
-          return (
-            <button
-              key={tab.label}
-              type="button"
-              onClick={() => router.push(tab.href)}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 2,
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                padding: "4px 0",
-                minWidth: 48,
-                color: isActive ? ACTIVE_COLOR : INACTIVE_COLOR,
-                transition: "color 150ms ease",
-              }}
-            >
-              {tab.icon(isActive)}
-              <span style={{
-                fontSize: 10,
-                fontWeight: isActive ? 700 : 500,
-                lineHeight: 1.2,
-                letterSpacing: 0.2,
-              }}>
-                {tab.label}
-              </span>
-            </button>
-          );
-        })}
+        {showSubTabs ? (
+          /* ── Level 2: sub-tabs of active section ── */
+          activeSection.tabs.map((tab) => {
+            const isActive = pathMatches(pathname, tab.match);
+            return (
+              <button
+                key={tab.href}
+                type="button"
+                onClick={() => router.push(tab.href)}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 2,
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "4px 0",
+                  minWidth: 48,
+                  color: isActive ? ACTIVE_COLOR : INACTIVE_COLOR,
+                  transition: "color 150ms ease",
+                }}
+              >
+                {tab.icon(isActive)}
+                <span style={{
+                  fontSize: 10,
+                  fontWeight: isActive ? 700 : 500,
+                  lineHeight: 1.2,
+                  letterSpacing: 0.2,
+                }}>
+                  {tab.label}
+                </span>
+              </button>
+            );
+          })
+        ) : (
+          /* ── Level 1: 5 hub tabs ── */
+          SECTIONS.map((section) => {
+            const isActive = activeSection === section;
+            return (
+              <button
+                key={section.label}
+                type="button"
+                onClick={() => router.push(section.href)}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 2,
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "4px 0",
+                  minWidth: 48,
+                  color: isActive ? ACTIVE_COLOR : INACTIVE_COLOR,
+                  transition: "color 150ms ease",
+                }}
+              >
+                {section.icon(isActive)}
+                <span style={{
+                  fontSize: 10,
+                  fontWeight: isActive ? 700 : 500,
+                  lineHeight: 1.2,
+                  letterSpacing: 0.2,
+                }}>
+                  {section.label}
+                </span>
+              </button>
+            );
+          })
+        )}
       </div>
     </nav>
   );
