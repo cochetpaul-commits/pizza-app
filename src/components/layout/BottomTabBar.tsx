@@ -190,7 +190,7 @@ type TabSection = {
 const SECTIONS: TabSection[] = [
   {
     label: "Planning",
-    href: "/rh/equipe",
+    href: "/plannings",
     match: ["/plannings", "/rh/", "/mes-shifts"],
     icon: (a) => <IconCalendar active={a} />,
     tabs: [
