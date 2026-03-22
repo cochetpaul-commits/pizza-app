@@ -408,121 +408,132 @@ export default function EventsPage() {
         {!loading && (() => {
           const cells = getCalendarDays(calYear, calMonth);
           const todayStr = new Date().toISOString().slice(0, 10);
+          // Count events this month for header
+          const monthEvents = events.filter((e) => e.date && e.date.startsWith(`${calYear}-${String(calMonth + 1).padStart(2, "0")}`));
           return (
             <div style={{
-              marginBottom: 20, background: "#fff", borderRadius: 14,
-              border: "1px solid #e8e2d8",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+              marginBottom: 20, borderRadius: 14,
+              background: "linear-gradient(180deg, #D4775A 0%, #c66a4f 100%)",
+              boxShadow: "0 4px 16px rgba(212,119,90,0.25)",
               overflow: "hidden",
             }}>
-              {/* Month nav */}
+              {/* Month nav — dark header */}
               <div style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "10px 14px",
-                borderBottom: "1px solid #f0ebe3",
+                padding: "12px 16px",
               }}>
-                <button onClick={prevMonth} style={calNavBtn}>
-                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#6f6a61" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                <button onClick={prevMonth} style={{ ...calNavBtn, background: "rgba(255,255,255,0.15)", border: "none" }}>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
                 </button>
-                <span style={{
-                  fontSize: 13, fontWeight: 800, color: "#1a1a1a",
-                  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                  textTransform: "uppercase", letterSpacing: 1,
+                <div style={{ textAlign: "center" }}>
+                  <div style={{
+                    fontSize: 14, fontWeight: 800, color: "#fff",
+                    fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                    textTransform: "uppercase", letterSpacing: 1.5,
+                  }}>
+                    {MONTH_NAMES[calMonth]} {calYear}
+                  </div>
+                  {monthEvents.length > 0 && (
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", marginTop: 1 }}>
+                      {monthEvents.length} événement{monthEvents.length > 1 ? "s" : ""}
+                    </div>
+                  )}
+                </div>
+                <button onClick={nextMonth} style={{ ...calNavBtn, background: "rgba(255,255,255,0.15)", border: "none" }}>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                </button>
+              </div>
+
+              {/* Calendar body — white */}
+              <div style={{ background: "#fff", borderRadius: "12px 12px 14px 14px", padding: "8px 8px 4px" }}>
+                {/* Day headers */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: 4 }}>
+                  {DAY_HEADERS.map((d, i) => (
+                    <div key={`${d}-${i}`} style={{
+                      textAlign: "center",
+                      fontSize: 10, fontWeight: 700, color: "#D4775A",
+                      textTransform: "uppercase", letterSpacing: 0.5,
+                      padding: "4px 0",
+                    }}>{d}</div>
+                  ))}
+                </div>
+
+                {/* Day cells */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
+                  {cells.map((day, i) => {
+                    if (day == null) return <div key={`empty-${i}`} style={{ height: 36 }} />;
+
+                    const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                    const dayEvents = eventsByDate.get(dateStr) ?? [];
+                    const hasEvents = dayEvents.length > 0;
+                    const isToday = dateStr === todayStr;
+                    const isSelected = dateStr === selectedDate;
+                    const isPast = dateStr < todayStr;
+
+                    return (
+                      <button
+                        key={dateStr}
+                        type="button"
+                        onClick={() => {
+                          if (selectedDate === dateStr) setSelectedDate(null);
+                          else if (hasEvents) setSelectedDate(dateStr);
+                        }}
+                        style={{
+                          height: 36,
+                          display: "flex", flexDirection: "column",
+                          alignItems: "center", justifyContent: "center",
+                          gap: 2, border: "none",
+                          cursor: hasEvents ? "pointer" : "default",
+                          background: isSelected
+                            ? "#D4775A"
+                            : isToday
+                              ? "rgba(212,119,90,0.12)"
+                              : hasEvents
+                                ? "#faf7f2"
+                                : "transparent",
+                          borderRadius: isToday || isSelected ? "50%" : 6,
+                          position: "relative",
+                          padding: 0,
+                        }}
+                      >
+                        <span style={{
+                          fontSize: 13,
+                          fontWeight: isToday || isSelected || hasEvents ? 700 : 400,
+                          color: isSelected ? "#fff" : isToday ? "#D4775A" : isPast && !hasEvents ? "#ccc" : hasEvents ? "#1a1a1a" : "#6f6a61",
+                          lineHeight: 1,
+                        }}>
+                          {day}
+                        </span>
+                        {hasEvents && (
+                          <div style={{ display: "flex", gap: 2, position: "absolute", bottom: 2 }}>
+                            {dayEvents.slice(0, 3).map((ev) => (
+                              <span key={ev.id} style={{
+                                width: 4, height: 4, borderRadius: "50%",
+                                background: isSelected ? "rgba(255,255,255,0.85)" : (TYPE_COLORS[ev.type] ?? "#999"),
+                                display: "inline-block",
+                              }} />
+                            ))}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Legend */}
+                <div style={{
+                  display: "flex", gap: 12, flexWrap: "wrap",
+                  padding: "6px 8px", marginTop: 2,
+                  borderTop: "1px solid #f0ebe3",
+                  fontSize: 9, color: "#9a8f84",
                 }}>
-                  {MONTH_NAMES[calMonth]} {calYear}
-                </span>
-                <button onClick={nextMonth} style={calNavBtn}>
-                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#6f6a61" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
-                </button>
-              </div>
-
-              {/* Day headers */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "6px 6px 2px" }}>
-                {DAY_HEADERS.map((d, i) => (
-                  <div key={`${d}-${i}`} style={{
-                    textAlign: "center",
-                    fontSize: 9, fontWeight: 700, color: "#b0a894",
-                    textTransform: "uppercase", letterSpacing: 0.5,
-                    padding: "2px 0",
-                  }}>{d}</div>
-                ))}
-              </div>
-
-              {/* Day cells — compact grid */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "2px 6px 6px", gap: 1 }}>
-                {cells.map((day, i) => {
-                  if (day == null) return <div key={`empty-${i}`} style={{ aspectRatio: "1", minHeight: 0 }} />;
-
-                  const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                  const dayEvents = eventsByDate.get(dateStr) ?? [];
-                  const hasEvents = dayEvents.length > 0;
-                  const isToday = dateStr === todayStr;
-                  const isSelected = dateStr === selectedDate;
-                  const isPast = dateStr < todayStr;
-
-                  return (
-                    <button
-                      key={dateStr}
-                      type="button"
-                      onClick={() => {
-                        if (selectedDate === dateStr) setSelectedDate(null);
-                        else if (hasEvents) setSelectedDate(dateStr);
-                      }}
-                      style={{
-                        aspectRatio: "1",
-                        minHeight: 0,
-                        display: "flex", flexDirection: "column",
-                        alignItems: "center", justifyContent: "center",
-                        gap: 2, border: "none",
-                        cursor: hasEvents ? "pointer" : "default",
-                        background: isSelected
-                          ? "#D4775A"
-                          : isToday
-                            ? "rgba(212,119,90,0.10)"
-                            : hasEvents
-                              ? "#faf7f2"
-                              : "transparent",
-                        borderRadius: isToday || isSelected ? "50%" : 6,
-                        position: "relative",
-                        padding: 0,
-                      }}
-                    >
-                      <span style={{
-                        fontSize: 12,
-                        fontWeight: isToday || isSelected || hasEvents ? 700 : 400,
-                        color: isSelected ? "#fff" : isToday ? "#D4775A" : isPast ? "#ccc" : hasEvents ? "#1a1a1a" : "#6f6a61",
-                        lineHeight: 1,
-                      }}>
-                        {day}
-                      </span>
-                      {hasEvents && (
-                        <div style={{ display: "flex", gap: 2, position: "absolute", bottom: 3 }}>
-                          {dayEvents.slice(0, 3).map((ev) => (
-                            <span key={ev.id} style={{
-                              width: 4, height: 4, borderRadius: "50%",
-                              background: isSelected ? "rgba(255,255,255,0.85)" : (TYPE_COLORS[ev.type] ?? "#999"),
-                              display: "inline-block",
-                            }} />
-                          ))}
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Legend */}
-              <div style={{
-                display: "flex", gap: 12, flexWrap: "wrap",
-                padding: "6px 14px", borderTop: "1px solid #f0ebe3",
-                fontSize: 9, color: "#9a8f84",
-              }}>
-                {Object.entries(TYPE_COLORS).slice(0, 4).map(([type, color]) => (
-                  <span key={type} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: color, display: "inline-block" }} />
-                    {TYPE_LABELS[type] ?? type}
-                  </span>
-                ))}
+                  {Object.entries(TYPE_COLORS).slice(0, 4).map(([type, color]) => (
+                    <span key={type} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                      <span style={{ width: 5, height: 5, borderRadius: "50%", background: color, display: "inline-block" }} />
+                      {TYPE_LABELS[type] ?? type}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
           );
