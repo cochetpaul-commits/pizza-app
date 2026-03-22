@@ -139,6 +139,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
   // UI
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [loading, setLoading] = useState(!!eventId);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -384,7 +385,9 @@ export default function EventForm({ eventId }: { eventId?: string }) {
       if (isNew) {
         router.push(`/evenements/${eid}`);
       } else {
+        setSaveSuccess(true);
         setSaving(false);
+        setTimeout(() => setSaveSuccess(false), 2000);
       }
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Erreur");
@@ -437,6 +440,11 @@ export default function EventForm({ eventId }: { eventId?: string }) {
         {saveError && (
           <div style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.25)", borderRadius: 10, padding: "10px 14px", marginBottom: 14, color: "#DC2626", fontSize: 13, fontWeight: 600 }}>
             {saveError}
+          </div>
+        )}
+        {saveSuccess && (
+          <div style={{ background: "rgba(74,103,65,0.08)", border: "1px solid rgba(74,103,65,0.25)", borderRadius: 10, padding: "10px 14px", marginBottom: 14, color: "#4a6741", fontSize: 13, fontWeight: 600 }}>
+            Enregistré avec succès
           </div>
         )}
 
