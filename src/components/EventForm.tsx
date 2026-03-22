@@ -361,8 +361,9 @@ export default function EventForm({ eventId }: { eventId?: string }) {
         if (error) throw new Error(error.message);
         eid = data.id;
       } else {
-        const { error } = await supabase.from("events").update(row).eq("id", eventId);
+        const { error, count } = await supabase.from("events").update(row).eq("id", eventId);
         if (error) throw new Error(error.message);
+        console.log("EventForm update — sell_price:", sellPrice, "rows affected:", count);
       }
 
       // Save recipes: delete all then re-insert
