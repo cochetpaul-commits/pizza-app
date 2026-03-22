@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { TopNav } from "@/components/TopNav";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import ProductionModal from "@/components/ProductionModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -199,11 +200,11 @@ function FoodCostBadge({ fc }: { fc: number }) {
 }
 
 function RecipeCard({
-  name, href, color, prodHref, photoUrl, subtitle, subtitleColor,
+  name, href, color, onProd, photoUrl, subtitle, subtitleColor,
   cost, costLabel, pv, pvConseille, pvLabel,
 }: {
   name: string; href: string; color: string;
-  prodHref?: string; photoUrl?: string | null; subtitle?: string; subtitleColor?: string;
+  onProd?: () => void; photoUrl?: string | null; subtitle?: string; subtitleColor?: string;
   cost?: number | null; costLabel?: string;
   pv?: number | null; pvConseille?: number | null; pvLabel?: string;
 }) {
@@ -271,20 +272,19 @@ function RecipeCard({
             {isConseille && <span style={{ fontSize: 9, fontWeight: 500, color: "#b0a89e", marginLeft: 2 }}>(c)</span>}
           </div>
         )}
-        {prodHref && (
-          <Link
-            href={prodHref}
-            onClick={ev => { ev.stopPropagation(); }}
+        {onProd && (
+          <button
+            type="button"
+            onClick={ev => { ev.stopPropagation(); onProd(); }}
             style={{
               padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700,
               border: "1.5px solid #4a6741",
               background: "rgba(74,103,65,0.08)", color: "#4a6741",
               cursor: "pointer", whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: 0.5,
-              textDecoration: "none",
             }}
           >
             Production
-          </Link>
+          </button>
         )}
       </div>
     </div>
@@ -374,6 +374,7 @@ function RecettesInner() {
   const [cuisineCatFilter, setCuisineCatFilter] = useState<CuisineCatFilter>("all");
   const [foodCostFilter, setFoodCostFilter] = useState<FoodCostFilter>("all");
   const [prodFilter, setProdFilter] = useState(false);
+  const [prodModal, setProdModal] = useState<{ type: "pizza" | "cuisine" | "cocktail" | "empatement"; id: string; name: string; pivotId: string } | null>(null);
   const [showFab, setShowFab] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showSort, setShowSort] = useState(false);
@@ -776,7 +777,7 @@ function RecettesInner() {
                   key={r.id}
                   name={r.name ?? "Pizza"}
                   href={`/recettes/pizza/${r.id}`}
-                  prodHref={r.pivot_ingredient_id ? `/recettes/pizza/${r.id}?mode=production` : undefined}
+                  onProd={r.pivot_ingredient_id ? () => setProdModal({ type: "pizza", id: r.id, name: r.name ?? "Pizza", pivotId: r.pivot_ingredient_id! }) : undefined}
                   color={PIZZA_COLOR}
                   photoUrl={r.photo_url}
                   subtitle="Pizza"
@@ -813,7 +814,7 @@ function RecettesInner() {
                           key={r.id}
                           name={r.name ?? "Recette"}
                           href={`/recettes/cuisine/${r.id}`}
-                          prodHref={r.pivot_ingredient_id ? `/recettes/cuisine/${r.id}?mode=production` : undefined}
+                          onProd={r.pivot_ingredient_id ? () => setProdModal({ type: "cuisine", id: r.id, name: r.name ?? "Cuisine", pivotId: r.pivot_ingredient_id! }) : undefined}
                           color={catColor}
                           photoUrl={r.photo_url}
                           subtitle={cat.label}
@@ -844,7 +845,7 @@ function RecettesInner() {
                   key={r.id}
                   name={r.name ?? "Cocktail"}
                   href={`/recettes/cocktail/${r.id}`}
-                  prodHref={r.pivot_ingredient_id ? `/recettes/cocktail/${r.id}?mode=production` : undefined}
+                  onProd={r.pivot_ingredient_id ? () => setProdModal({ type: "cocktail", id: r.id, name: r.name ?? "Cocktail", pivotId: r.pivot_ingredient_id! }) : undefined}
                   color={COCKTAIL_COLOR}
                   photoUrl={r.image_url}
                   subtitle="Cocktail"
@@ -869,7 +870,7 @@ function RecettesInner() {
                   key={r.id}
                   name={r.name}
                   href={`/recettes/empatement/${r.id}`}
-                  prodHref={r.pivot_ingredient_id ? `/recettes/empatement/${r.id}?mode=production` : undefined}
+                  onProd={r.pivot_ingredient_id ? () => setProdModal({ type: "empatement", id: r.id, name: r.name ?? "Empatement", pivotId: r.pivot_ingredient_id! }) : undefined}
                   color={EMP_COLOR}
                   subtitle="Emp\u00e2tement"
                   subtitleColor={EMP_COLOR}
@@ -929,6 +930,15 @@ function RecettesInner() {
             +
           </button>
         </div>
+      )}
+      {prodModal && (
+        <ProductionModal
+          recipeType={prodModal.type}
+          recipeId={prodModal.id}
+          recipeName={prodModal.name}
+          pivotIngredientId={prodModal.pivotId}
+          onClose={() => setProdModal(null)}
+        />
       )}
     </>
   );

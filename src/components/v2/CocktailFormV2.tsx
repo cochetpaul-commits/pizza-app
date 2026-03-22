@@ -22,6 +22,7 @@ import { StepperInput } from "@/components/StepperInput";
 import type { Ingredient } from "@/types/ingredients";
 import type { CpuByUnit } from "@/lib/offerPricing";
 import { PublishCatalogueButton } from "./PublishCatalogueButton";
+import ProductionModal from "@/components/ProductionModal";
 
 const COCKTAIL_UNITS = ["g", "cL", "pcs"];
 const ACCENT = "#0E7490";
@@ -88,6 +89,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
   // Production mode
   const [prodMode, setProdMode] = useState(initialProdMode ?? false);
+  const [showProdModal, setShowProdModal] = useState(initialProdMode ?? false);
   const [pivotIngredientId, setPivotIngredientId] = useState<string | null>(null);
   const [prodQty, setProdQty] = useState<number | "">("");
 
@@ -488,7 +490,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {isEdit && pivotIngredientId && (
-              <button type="button" className="btn" onClick={() => { setMainTab("recette"); setProdMode(true); }}
+              <button type="button" className="btn" onClick={() => setShowProdModal(true)}
                 style={{ fontSize: 12, background: "#4a6741", borderColor: "#4a6741", color: "#fff" }}>
                 Production
               </button>
@@ -833,6 +835,16 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
           </>
         )}
       </main>
+
+      {showProdModal && pivotIngredientId && cocktailId && (
+        <ProductionModal
+          recipeType="cocktail"
+          recipeId={cocktailId}
+          recipeName={title}
+          pivotIngredientId={pivotIngredientId}
+          onClose={() => setShowProdModal(false)}
+        />
+      )}
     </>
   );
 }

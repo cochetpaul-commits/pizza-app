@@ -23,6 +23,7 @@ import { GestionPilotage } from "./GestionPilotage";
 import { StepperInput } from "@/components/StepperInput";
 import type { Ingredient, Category } from "@/types/ingredients";
 import type { CpuByUnit } from "@/lib/offerPricing";
+import ProductionModal from "@/components/ProductionModal";
 
 const CUISINE_UNITS = ["g", "cL", "pcs"];
 
@@ -82,6 +83,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
 
   // Production mode
   const [prodMode, setProdMode] = useState(initialProdMode ?? false);
+  const [showProdModal, setShowProdModal] = useState(initialProdMode ?? false);
   const [pivotIngredientId, setPivotIngredientId] = useState<string | null>(null);
   const [prodQty, setProdQty] = useState<number | "">("");
 
@@ -613,7 +615,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {isEdit && pivotIngredientId && (
-              <button type="button" className="btn" onClick={() => { setMainTab("recette"); setProdMode(true); }}
+              <button type="button" className="btn" onClick={() => setShowProdModal(true)}
                 style={{ fontSize: 12, background: "#4a6741", borderColor: "#4a6741", color: "#fff" }}>
                 Production
               </button>
@@ -1019,6 +1021,16 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
           </>
         )}
       </main>
+
+      {showProdModal && pivotIngredientId && recipeId && (
+        <ProductionModal
+          recipeType="cuisine"
+          recipeId={recipeId}
+          recipeName={title}
+          pivotIngredientId={pivotIngredientId}
+          onClose={() => setShowProdModal(false)}
+        />
+      )}
     </>
   );
 }
