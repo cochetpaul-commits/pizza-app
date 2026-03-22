@@ -272,18 +272,19 @@ function RecipeCard({
           </div>
         )}
         {prodHref && (
-          <button
-            type="button"
-            onClick={ev => { ev.stopPropagation(); router.push(prodHref); }}
+          <Link
+            href={prodHref}
+            onClick={ev => { ev.stopPropagation(); }}
             style={{
               padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700,
               border: "1.5px solid #4a6741",
               background: "rgba(74,103,65,0.08)", color: "#4a6741",
               cursor: "pointer", whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: 0.5,
+              textDecoration: "none",
             }}
           >
             Production
-          </button>
+          </Link>
         )}
       </div>
     </div>
@@ -722,6 +723,14 @@ function RecettesInner() {
               )}
             </div>
           ))}
+          {prodCount > 0 && (
+            <button type="button"
+              onClick={() => { setProdFilter(p => !p); }}
+              style={tabStyle(prodFilter, "#4a6741")}>
+              Prod.
+              <span style={{ marginLeft: 4, fontSize: 11, opacity: 0.7 }}>({prodCount})</span>
+            </button>
+          )}
         </div>
 
         {/* ── Filter panel (collapsible) ── */}
@@ -742,14 +751,6 @@ function RecettesInner() {
                   </button>
                 ))}
               </div>
-            </div>
-            {/* Production */}
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#999", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Mode</div>
-              <button type="button" onClick={() => setProdFilter(p => !p)}
-                style={filterPill(prodFilter, "#4a6741")}>
-                Production ({prodCount})
-              </button>
             </div>
             {hasActiveFilter && (
               <button type="button" onClick={() => { setFoodCostFilter("all"); setCuisineCatFilter("all"); setProdFilter(false); }}
