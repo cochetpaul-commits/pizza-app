@@ -556,18 +556,29 @@ export default function EventForm({ eventId }: { eventId?: string }) {
           {/* Prix de vente */}
           <div style={{ marginTop: 10 }}>
             <label style={labelStyle}>Prix de vente événement (€ HT)</label>
-            <input
-              style={{ ...inputStyle, fontWeight: 700, fontSize: 15 }}
-              type="number"
-              step="0.01"
-              min={0}
-              value={sellPrice ?? ""}
-              onChange={(e) => {
-                const v = e.target.value;
-                setSellPrice(v ? parseFloat(v) : null);
-              }}
-              placeholder="Ex: 3500"
-            />
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                style={{ ...inputStyle, fontWeight: 700, fontSize: 15, flex: 1 }}
+                inputMode="decimal"
+                value={sellPrice != null ? String(sellPrice) : ""}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".");
+                  if (raw === "") {
+                    setSellPrice(null);
+                  } else {
+                    const n = parseFloat(raw);
+                    if (!isNaN(n)) setSellPrice(n);
+                  }
+                }}
+                placeholder="3500"
+              />
+              <span style={{ fontSize: 14, color: "#6f6a61", fontWeight: 700 }}>€</span>
+            </div>
+            {sellPrice != null && sellPrice > 0 && (
+              <p style={{ margin: "4px 0 0", fontSize: 11, color: "#4a6741", fontWeight: 600 }}>
+                {sellPrice.toLocaleString("fr-FR")} € enregistré au prochain clic sur Enregistrer
+              </p>
+            )}
           </div>
         </div>
 
