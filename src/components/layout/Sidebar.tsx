@@ -244,8 +244,11 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <button
           type="button"
           onClick={() => {
-            const routeSlug = entry.etabSlug.replace(/_/g, "-");
-            router.push(`/${routeSlug}`);
+            // Map DB slugs to route paths (DB may have bello_mio, piccola, piccola_mia, etc.)
+            const route = entry.etabSlug.includes("bello") ? "/bello-mio"
+              : entry.etabSlug.includes("piccola") ? "/piccola-mia"
+              : `/${entry.etabSlug.replace(/_/g, "-")}`;
+            router.push(route);
             onNavigate?.();
           }}
           style={{
