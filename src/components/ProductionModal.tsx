@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 /* ── Types ── */
@@ -38,13 +38,16 @@ const LINE_FK: Record<RecipeType, string> = {
   empatement: "recipe_id",
 };
 
+const MULTIPLIERS = [1, 2, 3, 5, 10];
+
 /* ── Component ── */
 
 export default function ProductionModal({ recipeType, recipeId, recipeName, pivotIngredientId, onClose }: Props) {
   const [lines, setLines] = useState<ProdLine[]>([]);
   const [pivotName, setPivotName] = useState("");
   const [loading, setLoading] = useState(true);
-  const [prodQty, setProdQty] = useState<number | "">(""  );
+  const [prodQty, setProdQty] = useState<number | "">("");
+  const [checked, setChecked] = useState<Set<string>>(new Set());
 
   // Load lines + ingredient names
   useEffect(() => {
@@ -63,7 +66,6 @@ export default function ProductionModal({ recipeType, recipeId, recipeName, pivo
         (l: Record<string, unknown>) => l.ingredient_id && l.qty && Number(l.qty) > 0
       );
 
-      // Fetch ingredient names
       const ingIds = validLines.map((l: Record<string, unknown>) => String(l.ingredient_id));
       const { data: ings } = await supabase
         .from("ingredients")
@@ -103,6 +105,11 @@ export default function ProductionModal({ recipeType, recipeId, recipeName, pivo
     }));
   }, [lines, factor]);
 
+  const nonPivotLines = useMemo(() =>
+    scaledLines.filter(l => l.ingredient_id !== pivotIngredientId),
+    [scaledLines, pivotIngredientId]
+  );
+
   const totalWeight = useMemo(() => {
     return scaledLines
       .filter(l => l.unit === "g")
@@ -116,12 +123,86 @@ export default function ProductionModal({ recipeType, recipeId, recipeName, pivo
     setProdQty(next);
   };
 
+  const handleMultiplier = (m: number) => {
+    setProdQty(baseQty * m);
+  };
+
+  const toggleCheck = useCallback((id: string) => {
+    setChecked(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  // Print
+  const handlePrint = useCallback(() => {
+    const displayQty = prodQty === "" ? baseQty : Number(prodQty);
+    const f = baseQty > 0 && displayQty > 0 ? displayQty / baseQty : 1;
+    const printLines = lines
+      .filter(l => l.ingredient_id !== pivotIngredientId)
+      .map(l => ({ name: l.name, qty: Math.round(l.qty * f), unit: l.unit }));
+    const tw = printLines.filter(l => l.unit === "g").reduce((a, l) => a + l.qty, 0);
+
+    const date = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Production — ${recipeName}</title>
+<style>
+  @page { size: A4; margin: 20mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", sans-serif; color: #1a1a1a; }
+  .header { background: #4a6741; color: white; padding: 20px 24px; border-radius: 12px; margin-bottom: 20px; }
+  .header h1 { font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+  .header .sub { font-size: 13px; opacity: 0.8; margin-top: 4px; }
+  .pivot { background: #FFFBEB; border: 2px solid #D97706; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; }
+  .pivot .label { font-size: 11px; font-weight: 700; color: #D97706; text-transform: uppercase; letter-spacing: 1px; }
+  .pivot .value { font-size: 20px; font-weight: 800; margin-top: 6px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 1px; padding: 8px 12px; border-bottom: 2px solid #ddd6c8; }
+  td { padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+  td.qty { text-align: right; font-size: 18px; font-weight: 700; white-space: nowrap; }
+  td.unit { color: #999; font-size: 13px; width: 40px; }
+  td.check { width: 28px; }
+  .check-box { width: 18px; height: 18px; border: 2px solid #ccc; border-radius: 4px; }
+  tr:nth-child(even) { background: #faf8f4; }
+  .footer { margin-top: 20px; background: #4a6741; color: white; padding: 14px 20px; border-radius: 12px; display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; }
+  .footer .val { font-size: 20px; font-weight: 700; }
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style></head><body>
+<div class="header">
+  <div class="sub">Fiche de production — ${date}</div>
+  <h1>${recipeName}</h1>
+</div>
+<div class="pivot">
+  <div class="label">Ingredient pivot</div>
+  <div class="value">${pivotName} — ${displayQty} ${pivotLine?.unit ?? "g"}</div>
+</div>
+<table>
+  <thead><tr><th class="check"></th><th>Ingredient</th><th style="text-align:right">Quantite</th><th>Unite</th></tr></thead>
+  <tbody>${printLines.map(l => `
+    <tr><td class="check"><div class="check-box"></div></td><td>${l.name}</td><td class="qty">${l.qty}</td><td class="unit">${l.unit}</td></tr>`).join("")}
+  </tbody>
+</table>
+${tw > 0 ? `<div class="footer"><span>Poids total estime</span><span class="val">${tw} g</span></div>` : ""}
+</body></html>`;
+
+    const w = window.open("", "_blank");
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+      setTimeout(() => w.print(), 300);
+    }
+  }, [lines, prodQty, baseQty, pivotIngredientId, recipeName, pivotName, pivotLine]);
+
   // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
+
+  const checkedCount = nonPivotLines.filter(l => checked.has(l.ingredient_id ?? "")).length;
 
   return (
     <div
@@ -145,11 +226,11 @@ export default function ProductionModal({ recipeType, recipeId, recipeName, pivo
         {/* ── Header ── */}
         <div style={{
           background: "#4a6741", color: "#fff",
-          padding: "16px 20px",
+          padding: "14px 20px",
           display: "flex", alignItems: "center", justifyContent: "space-between",
           flexShrink: 0,
         }}>
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
               fontSize: 11, fontWeight: 700, textTransform: "uppercase",
               letterSpacing: 1.5, opacity: 0.7, marginBottom: 2,
@@ -160,22 +241,39 @@ export default function ProductionModal({ recipeType, recipeId, recipeName, pivo
               fontSize: 20, fontWeight: 700,
               fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
               textTransform: "uppercase", letterSpacing: 0.5,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             }}>
               {recipeName}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: "rgba(255,255,255,0.15)", border: "none",
-              color: "#fff", fontSize: 20, width: 40, height: 40,
-              borderRadius: "50%", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}
-          >
-            &#x2715;
-          </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+            {!loading && pivotLine && (
+              <button
+                type="button"
+                onClick={handlePrint}
+                style={{
+                  background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)",
+                  color: "#fff", fontSize: 12, fontWeight: 600,
+                  padding: "6px 14px", borderRadius: 8, cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Imprimer
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                background: "rgba(255,255,255,0.15)", border: "none",
+                color: "#fff", fontSize: 20, width: 36, height: 36,
+                borderRadius: "50%", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              &#x2715;
+            </button>
+          </div>
         </div>
 
         {/* ── Body ── */}
@@ -192,7 +290,7 @@ export default function ProductionModal({ recipeType, recipeId, recipeName, pivo
               <div style={{
                 background: "#FFFBEB", border: "2px solid #D97706",
                 borderRadius: 16, padding: "20px 20px 16px",
-                marginBottom: 20,
+                marginBottom: 16,
               }}>
                 <div style={{
                   fontSize: 11, fontWeight: 700, color: "#D97706",
@@ -258,40 +356,112 @@ export default function ProductionModal({ recipeType, recipeId, recipeName, pivo
                   </span>
                 </div>
 
-                <div style={{
-                  fontSize: 12, color: "#999", marginTop: 10,
-                }}>
+                {/* Multipliers */}
+                <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+                  {MULTIPLIERS.map(m => {
+                    const isActive = prodQty === baseQty * m;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => handleMultiplier(m)}
+                        style={{
+                          padding: "5px 12px", borderRadius: 8,
+                          border: isActive ? "2px solid #D97706" : "1.5px solid #ddd6c8",
+                          background: isActive ? "#D97706" : "#fff",
+                          color: isActive ? "#fff" : "#1a1a1a",
+                          fontSize: 13, fontWeight: 700, cursor: "pointer",
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        x{m}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div style={{ fontSize: 12, color: "#999", marginTop: 10 }}>
                   Recette de base : {baseQty} {pivotLine.unit}
                 </div>
               </div>
 
-              {/* Ingredient list */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {scaledLines
-                  .filter(l => l.ingredient_id !== pivotIngredientId)
-                  .map((l, i) => (
-                    <div
-                      key={l.ingredient_id ?? i}
+              {/* Progress */}
+              {nonPivotLines.length > 0 && (
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  marginBottom: 10, padding: "0 4px",
+                }}>
+                  <span style={{ fontSize: 12, color: "#999", fontWeight: 600 }}>
+                    {checkedCount}/{nonPivotLines.length} pese{checkedCount > 1 ? "s" : ""}
+                  </span>
+                  {checkedCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setChecked(new Set())}
                       style={{
-                        display: "flex", alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "14px 16px",
-                        background: i % 2 === 0 ? "#fff" : "#faf8f4",
-                        borderRadius: 12,
-                        border: "1px solid #e5ddd0",
+                        fontSize: 11, color: "#D4775A", fontWeight: 600,
+                        background: "none", border: "none", cursor: "pointer",
                       }}
                     >
+                      Reinitialiser
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Ingredient list */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {nonPivotLines.map((l, i) => {
+                  const id = l.ingredient_id ?? String(i);
+                  const isChecked = checked.has(id);
+                  return (
+                    <div
+                      key={id}
+                      onClick={() => toggleCheck(id)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={e => e.key === "Enter" && toggleCheck(id)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 12,
+                        padding: "12px 14px",
+                        background: isChecked ? "#e8f5e3" : i % 2 === 0 ? "#fff" : "#faf8f4",
+                        borderRadius: 12,
+                        border: isChecked ? "1.5px solid #4a6741" : "1px solid #e5ddd0",
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                        opacity: isChecked ? 0.7 : 1,
+                      }}
+                    >
+                      {/* Checkbox */}
+                      <div style={{
+                        width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                        border: isChecked ? "2px solid #4a6741" : "2px solid #ccc",
+                        background: isChecked ? "#4a6741" : "#fff",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        transition: "all 0.15s",
+                      }}>
+                        {isChecked && (
+                          <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
+                            <path d="M1 5L4.5 8.5L11 1.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </div>
+
+                      {/* Name */}
                       <span style={{
                         fontSize: 15, fontWeight: 500, color: "#1a1a1a",
                         flex: 1, minWidth: 0,
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        textDecoration: isChecked ? "line-through" : "none",
                       }}>
                         {l.name}
                       </span>
+
+                      {/* Qty */}
                       <span style={{
                         fontSize: 20, fontWeight: 700, color: "#1a1a1a",
                         fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                        flexShrink: 0, marginLeft: 12,
+                        flexShrink: 0,
                         whiteSpace: "nowrap",
                       }}>
                         {l.scaledQty}
@@ -300,7 +470,8 @@ export default function ProductionModal({ recipeType, recipeId, recipeName, pivo
                         </span>
                       </span>
                     </div>
-                  ))}
+                  );
+                })}
               </div>
             </>
           )}
