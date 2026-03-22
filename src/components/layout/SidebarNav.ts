@@ -89,6 +89,11 @@ export const PERFORMANCES_ITEMS: NavItemV2[] = [
   { label: "Variations & alertes", href: "/variations-prix", icon: "trendingUp" },
 ];
 
+const PERFORMANCES_KEZIA_ITEMS: NavItemV2[] = [
+  ...PERFORMANCES_ITEMS,
+  { label: "Import Kezia", href: "/kezia", icon: "fileText" },
+];
+
 export const OPERATIONS_ITEMS: NavItemV2[] = [
   { label: "Catalogue", href: "/catalogue", icon: "book" },
   { label: "Fiches techniques", href: "/recettes", icon: "fileText" },
@@ -101,7 +106,6 @@ export const EVENEMENTIEL_ITEMS: NavItemV2[] = [
   { label: "Carnet clients", href: "/clients", icon: "users" },
   { label: "Devis", href: "/devis", icon: "fileText" },
   { label: "Factures", href: "/clients/factures", icon: "fileText" },
-  { label: "Import Kezia", href: "/kezia", icon: "fileText" },
 ];
 
 // Keep legacy exports for compatibility
@@ -119,9 +123,6 @@ const COMMON_SECTIONS: NavSubSection[] = [
 
 /** Finance placeholder per source */
 const FINANCE_POPINA: NavSubSection = { label: "Finance", icon: "wallet", roles: ["group_admin"], items: [] }; // Popina — à venir
-const FINANCE_KEZIA: NavSubSection = { label: "Finance", icon: "wallet", roles: ["group_admin"], items: [
-  { label: "Import Kezia", href: "/kezia", icon: "fileText" },
-] };
 
 /** Evenementiel section */
 const EVENEMENTIEL_SECTION: NavSubSection = {
@@ -139,10 +140,15 @@ export function buildDynamicNav(
 
   for (const etab of etabs) {
     const isPiccola = etab.slug?.includes("piccola");
+    const performancesSection: NavSubSection = isPiccola
+      ? { label: "Performances", icon: "barChart", roles: ["group_admin"], items: PERFORMANCES_KEZIA_ITEMS }
+      : COMMON_SECTIONS[2]; // standard Performances
     const sections: NavSubSection[] = [
       COMMON_SECTIONS[0], // Planning
-      isPiccola ? FINANCE_KEZIA : FINANCE_POPINA,
-      ...COMMON_SECTIONS.slice(1), // Achats, Performances, Operations
+      ...(isPiccola ? [] : [FINANCE_POPINA]),
+      COMMON_SECTIONS[1], // Achats
+      performancesSection,
+      COMMON_SECTIONS[3], // Operations
       ...(isPiccola ? [EVENEMENTIEL_SECTION] : []),
     ];
 
@@ -265,7 +271,6 @@ export const SIDEBAR_NAV: NavSection[] = [
       { label: "Carnet clients", href: "/clients" },
       { label: "Devis", href: "/devis" },
       { label: "Factures", href: "/clients/factures" },
-      { label: "Import Kezia", href: "/kezia" },
     ],
   },
   {
@@ -366,7 +371,7 @@ const PAGE_SECTIONS: Record<string, string> = {
   "/recettes": "Gestion de la finance",
   "/epicerie": "Gestion de la finance",
   "/finances": "Gestion de la finance",
-  "/kezia": "Gestion de la finance",
+  "/kezia": "Performances",
   "/clients": "Gestion des clients",
   "/clients/factures": "Gestion des clients",
   "/devis": "Gestion des clients",
