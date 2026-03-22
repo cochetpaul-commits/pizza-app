@@ -552,6 +552,23 @@ export default function EventForm({ eventId }: { eventId?: string }) {
               </div>
             </div>
           </div>
+
+          {/* Prix de vente */}
+          <div style={{ marginTop: 10 }}>
+            <label style={labelStyle}>Prix de vente événement (€ HT)</label>
+            <input
+              style={{ ...inputStyle, fontWeight: 700, fontSize: 15 }}
+              type="number"
+              step="0.01"
+              min={0}
+              value={sellPrice ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                setSellPrice(v ? parseFloat(v) : null);
+              }}
+              placeholder="Ex: 3500"
+            />
+          </div>
         </div>
 
         {/* ═══ 2. CONTACT CLIENT ═══ */}
@@ -721,52 +738,46 @@ export default function EventForm({ eventId }: { eventId?: string }) {
             </div>
           )}
 
-          {/* Prix de vente — toujours visible */}
-          <div style={{
-            marginTop: 12,
-            padding: "12px 14px",
-            background: "#f2ede4",
-            borderRadius: 10,
-            border: "1px solid #ddd6c8",
-          }}>
-            <div>
-              <label style={{ ...labelStyle, fontSize: 10 }}>Prix de vente événement (€ HT)</label>
-              <input
-                style={{ ...inputStyle, height: 36, fontWeight: 800, fontSize: 15 }}
-                type="number"
-                step="0.01"
-                min={0}
-                value={sellPrice ?? ""}
-                onChange={(e) => setSellPrice(e.target.value ? parseFloat(e.target.value) : null)}
-                placeholder="Ex: 3500"
-              />
+          {/* Résumé financier */}
+          {(recipes.length > 0 || (sellPrice != null && sellPrice > 0)) && (
+            <div style={{
+              marginTop: 12,
+              padding: "12px 14px",
+              background: "#f2ede4",
+              borderRadius: 10,
+              border: "1px solid #ddd6c8",
+            }}>
+              {recipes.length > 0 && (
+                <div style={{ marginBottom: sellPrice && sellPrice > 0 ? 10 : 0 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#6f6a61" }}>Coût matière</span>
+                  <p style={{ margin: 0, fontWeight: 800, fontSize: 15, color: "#2f3a33" }}>
+                    {totalCostMatiere.toFixed(2)} €
+                  </p>
+                </div>
+              )}
+              {sellPrice != null && sellPrice > 0 && recipes.length > 0 && (
+                <div style={{ display: "flex", gap: 20 }}>
+                  <div>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "#6f6a61" }}>Marge brute</span>
+                    <p style={{ margin: 0, fontWeight: 800, fontSize: 15, color: (margeBrute ?? 0) >= 0 ? "#4a6741" : "#DC2626" }}>
+                      {(margeBrute ?? 0).toFixed(2)} €
+                    </p>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "#6f6a61" }}>Food cost</span>
+                    <p style={{
+                      margin: 0,
+                      fontWeight: 800,
+                      fontSize: 15,
+                      color: (foodCostPct ?? 0) <= 30 ? "#4a6741" : (foodCostPct ?? 0) <= 40 ? "#EA580C" : "#DC2626",
+                    }}>
+                      {(foodCostPct ?? 0).toFixed(1)} %
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
-            {sellPrice != null && sellPrice > 0 && (
-              <div style={{ display: "flex", gap: 20, marginTop: 10 }}>
-                {recipes.length > 0 && (
-                  <>
-                    <div>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: "#6f6a61" }}>Marge brute</span>
-                      <p style={{ margin: 0, fontWeight: 800, fontSize: 15, color: (margeBrute ?? 0) >= 0 ? "#4a6741" : "#DC2626" }}>
-                        {(margeBrute ?? 0).toFixed(2)} €
-                      </p>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: "#6f6a61" }}>Food cost</span>
-                      <p style={{
-                        margin: 0,
-                        fontWeight: 800,
-                        fontSize: 15,
-                        color: (foodCostPct ?? 0) <= 30 ? "#4a6741" : (foodCostPct ?? 0) <= 40 ? "#EA580C" : "#DC2626",
-                      }}>
-                        {(foodCostPct ?? 0).toFixed(1)} %
-                      </p>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
         {/* ═══ 4. DOCUMENTS ═══ */}
