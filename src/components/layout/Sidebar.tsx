@@ -211,6 +211,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           onClick={() => {
             if (items.length > 0) {
               toggleHub(hubKey);
+              // Navigate to section href but don't close sidebar (so submenu stays visible)
+              if (sub.href) router.push(sub.href);
             } else if (sub.href) {
               router.push(sub.href);
               onNavigate?.();
