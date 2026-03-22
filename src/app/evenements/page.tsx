@@ -47,7 +47,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const TYPE_COLORS: Record<string, string> = {
-  mariage: "#8B6914",
+  mariage: "#C49A1A",
   seminaire: "#2563EB",
   anniversaire: "#9D174D",
   bapteme: "#7C3AED",
@@ -256,7 +256,7 @@ export default function EventsPage() {
   // Accent color from establishment (Piccola = #efd199, Bello = #e27f57, fallback = terracotta)
   const accent = etab?.couleur ?? "#D4775A";
   // Darker version for text on light accent backgrounds
-  const accentDark = etab?.slug?.includes("piccola") ? "#8B6914" : "#b5573d";
+  const accentDark = etab?.slug?.includes("piccola") ? "#C49A1A" : "#b5573d";
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
