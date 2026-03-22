@@ -417,7 +417,7 @@ async function loadDailySalesStats(etabId: string, weekStr: string): Promise<Sta
   // Current week
   const { data: rows } = await supabase
     .from("daily_sales")
-    .select("date, ca_ttc, couverts, panier_moyen, tickets, rayons")
+    .select("date, ca_ttc, couverts, panier_moyen, tickets, rayons, marge_total, taux_marque")
     .eq("etablissement_id", etabId)
     .gte("date", fmt(monday))
     .lte("date", fmt(sunday))
@@ -431,7 +431,7 @@ async function loadDailySalesStats(etabId: string, weekStr: string): Promise<Sta
 
   const { data: prevRows } = await supabase
     .from("daily_sales")
-    .select("date, ca_ttc, couverts, panier_moyen")
+    .select("date, ca_ttc, couverts, panier_moyen, tickets, marge_total, taux_marque")
     .eq("etablissement_id", etabId)
     .gte("date", fmt(prevMon))
     .lte("date", fmt(prevSun))
@@ -444,25 +444,38 @@ async function loadDailySalesStats(etabId: string, weekStr: string): Promise<Sta
     d.setDate(monday.getDate() + i);
     const dateStr = fmt(d);
     const row = (rows ?? []).find(r => r.date === dateStr);
+    // Use tickets instead of couverts (couverts is always 0 for épicerie/traiteur)
+    const ticketCount = row?.tickets ?? 0;
     days.push({
       date: dateStr,
       label: DAY_LABELS[d.getDay()],
       totalSales: row?.ca_ttc ?? 0,
-      guestsNumber: row?.couverts ?? 0,
+      guestsNumber: ticketCount,
       ticketMoyen: row?.panier_moyen ?? 0,
     });
   }
 
   const totalSales = days.reduce((s, d) => s + d.totalSales, 0);
-  const guestsNumber = days.reduce((s, d) => s + d.guestsNumber, 0);
+  const totalTickets = days.reduce((s, d) => s + d.guestsNumber, 0);
   const activeDays = days.filter(d => d.totalSales > 0).length;
-  const ticketMoyen = guestsNumber > 0 ? totalSales / guestsNumber : 0;
+  const ticketMoyen = totalTickets > 0 ? totalSales / totalTickets : 0;
   const bestDay = days.reduce((best, d) => d.totalSales > best.totalSales ? d : best, days[0]);
+
+  // Marge data
+  const margeTotal = (rows ?? []).reduce((s, r) => s + (r.marge_total ?? 0), 0);
+  // Weighted average taux de marque
+  const tauxMarque = totalSales > 0
+    ? (rows ?? []).reduce((s, r) => s + (r.taux_marque ?? 0) * (r.ca_ttc ?? 0), 0) / totalSales
+    : 0;
 
   // Previous week totals
   const prevTotal = (prevRows ?? []).reduce((s, r) => s + (r.ca_ttc ?? 0), 0);
-  const prevGuests = (prevRows ?? []).reduce((s, r) => s + (r.couverts ?? 0), 0);
-  const prevTicket = prevGuests > 0 ? prevTotal / prevGuests : 0;
+  const prevTickets = (prevRows ?? []).reduce((s, r) => s + (r.tickets ?? 0), 0);
+  const prevTicketMoyen = prevTickets > 0 ? prevTotal / prevTickets : 0;
+  const prevMarge = (prevRows ?? []).reduce((s, r) => s + (r.marge_total ?? 0), 0);
+  const prevTauxMarque = prevTotal > 0
+    ? (prevRows ?? []).reduce((s, r) => s + (r.taux_marque ?? 0) * (r.ca_ttc ?? 0), 0) / prevTotal
+    : 0;
 
   // Categories from rayons JSON (if available)
   const categories: CategoryData[] = [];
@@ -485,12 +498,17 @@ async function loadDailySalesStats(etabId: string, weekStr: string): Promise<Sta
     week: weekStr,
     isCurrentWeek: weekStr === getCurrentWeek(),
     activeDays,
-    semaine: { totalSales, guestsNumber, ticketMoyen, bestDay: { label: bestDay.label, totalSales: bestDay.totalSales }, days },
-    semainePrec: { totalSales: prevTotal, guestsNumber: prevGuests, ticketMoyen: prevTicket },
+    semaine: { totalSales, guestsNumber: totalTickets, ticketMoyen, bestDay: { label: bestDay.label, totalSales: bestDay.totalSales }, days },
+    semainePrec: { totalSales: prevTotal, guestsNumber: prevTickets, ticketMoyen: prevTicketMoyen },
     topSemaine: [],
     categories,
     insights: { meilleurJour: null, produitEnHausse: null, caVsMoyenne: null },
-  };
+    // Extra Kezia margin data (stored in unused fields via type assertion)
+    _margeTotal: margeTotal,
+    _tauxMarque: tauxMarque,
+    _prevMarge: prevMarge,
+    _prevTauxMarque: prevTauxMarque,
+  } as StatsData;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────
@@ -677,7 +695,7 @@ export default function PilotagePage() {
                 </div>
 
                 <div style={card}>
-                  <p style={kpiLabel}>Couverts</p>
+                  <p style={kpiLabel}>{isPiccola ? "Tickets" : "Couverts"}</p>
                   <p style={kpiValue}>{s.semaine.guestsNumber}</p>
                   {delta(s.semaine.guestsNumber, s.semainePrec.guestsNumber) && (
                     <p style={{ ...deltaStyle, color: deltaColor(s.semaine.guestsNumber, s.semainePrec.guestsNumber) }}>
@@ -687,7 +705,7 @@ export default function PilotagePage() {
                 </div>
 
                 <div style={card}>
-                  <p style={kpiLabel}>Ticket moyen</p>
+                  <p style={kpiLabel}>Panier moyen</p>
                   <p style={kpiValue}>{fmtEuro(s.semaine.ticketMoyen)}</p>
                   {delta(s.semaine.ticketMoyen, s.semainePrec.ticketMoyen) && (
                     <p style={{ ...deltaStyle, color: deltaColor(s.semaine.ticketMoyen, s.semainePrec.ticketMoyen) }}>
@@ -705,6 +723,46 @@ export default function PilotagePage() {
                 </div>
 
               </div>
+
+              {/* ── BLOC 2b-kezia : MARGES KEZIA ──────────────────────── */}
+              {isPiccola && (() => {
+                const ext = s as StatsData & { _margeTotal?: number; _tauxMarque?: number; _prevMarge?: number; _prevTauxMarque?: number };
+                const marge = ext._margeTotal ?? 0;
+                const taux = ext._tauxMarque ?? 0;
+                const prevMrg = ext._prevMarge ?? 0;
+                const prevTaux = ext._prevTauxMarque ?? 0;
+                if (marge === 0 && taux === 0) return null;
+                const tauxPct = Math.round(taux * 100 * 10) / 10;
+                const prevTauxPct = Math.round(prevTaux * 100 * 10) / 10;
+                return (
+                  <>
+                    <p style={sectionLabel}>MARGES</p>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 20 }}>
+                      <div style={{ ...card, borderLeft: `4px solid ${GREEN}` }}>
+                        <p style={kpiLabel}>Marge brute</p>
+                        <p style={kpiValue}>{fmtEuroInt(marge)}</p>
+                        {prevMrg > 0 && delta(marge, prevMrg) && (
+                          <p style={{ ...deltaStyle, color: deltaColor(marge, prevMrg) }}>
+                            {delta(marge, prevMrg)}
+                          </p>
+                        )}
+                      </div>
+                      <div style={{ ...card, borderLeft: `4px solid ${tauxPct >= 25 ? GREEN : tauxPct >= 20 ? "#d4a24e" : RED}` }}>
+                        <p style={kpiLabel}>Taux de marque</p>
+                        <p style={{ ...kpiValue, color: tauxPct >= 25 ? GREEN : tauxPct >= 20 ? "#d4a24e" : RED }}>
+                          {tauxPct.toFixed(1)}%
+                        </p>
+                        {prevTauxPct > 0 && (
+                          <p style={{ ...deltaStyle, color: tauxPct >= prevTauxPct ? GREEN : RED }}>
+                            {tauxPct >= prevTauxPct ? "↑ +" : "↓ "}
+                            {(tauxPct - prevTauxPct).toFixed(1)} pts
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
 
               {/* ── BLOC 2b : INDICATEURS FINANCIERS ──────────────────── */}
               {costs && costs.foodCostPct !== null && (

@@ -45,11 +45,11 @@ export default function PiccolaMiaDashboard() {
   useEffect(() => {
     if (!isGroupAdmin) return;
     (async () => {
-      const { data } = await supabase.from("daily_sales").select("ca_ttc, couverts, panier_moyen")
+      const { data } = await supabase.from("daily_sales").select("ca_ttc, tickets, panier_moyen")
         .eq("date", today).eq("source", "kezia_pdf").limit(1).maybeSingle();
       if (data) {
         setCaToday(data.ca_ttc ?? 0);
-        setCouverts(data.couverts ?? 0);
+        setCouverts(data.tickets ?? 0);
         setPanierMoyen(data.panier_moyen ?? 0);
       }
     })();
@@ -130,7 +130,7 @@ export default function PiccolaMiaDashboard() {
         <KpiCard label="CA du jour" value={`${fmtEur(caToday)} \u20AC`} accent={COLOR}
           sub={deltaCa != null ? `${deltaCa > 0 ? "+" : ""}${deltaCa}% vs hier` : undefined}
           subColor={deltaCa != null ? (deltaCa > 0 ? T.sauge : "#DC2626") : undefined} />
-        <KpiCard label="Couverts" value={String(couverts)} accent={T.dark} />
+        <KpiCard label="Tickets" value={String(couverts)} accent={T.dark} />
         <KpiCard label="Panier moyen" value={`${panierMoyen.toFixed(1).replace(".", ",")} \u20AC`} accent={T.dark} />
         <KpiCard label="En service" value={String(shiftsToday)} accent={T.bleu} />
       </div>
