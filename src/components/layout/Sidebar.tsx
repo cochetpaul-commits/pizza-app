@@ -244,7 +244,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <button
           type="button"
           onClick={() => {
-            router.push(`/${entry.etabSlug}`);
+            const routeSlug = entry.etabSlug.replace(/_/g, "-");
+            router.push(`/${routeSlug}`);
             onNavigate?.();
           }}
           style={{
