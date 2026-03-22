@@ -146,6 +146,7 @@ export default function EventsPage() {
       const q = supabase
         .from("events")
         .select("id,name,type,date,time,location,covers,establishment,status,contact_name,sell_price")
+        .in("type", ["seminaire", "repas_staff", "autre"])
         .order("date", { ascending: true, nullsFirst: false });
       if (etabKey) q.or(`establishment.eq.${etabKey},establishment.eq.both,establishment.is.null`);
       const { data } = await q;
@@ -168,7 +169,7 @@ export default function EventsPage() {
     <>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "12px 16px 40px" }}>
         <h1 style={{ fontSize: "1.4rem", fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", letterSpacing: 1.5, textTransform: "uppercase" as const, color: "#2f3a33", margin: "0 0 16px" }}>
-          Événements
+          Entreprise
         </h1>
 
         {/* Toggle Liste / Calendrier */}

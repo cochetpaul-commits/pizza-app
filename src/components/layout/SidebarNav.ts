@@ -99,8 +99,9 @@ export const OPERATIONS_ITEMS: NavItemV2[] = [
 export const EVENEMENTIEL_ITEMS: NavItemV2[] = [
   { label: "Particuliers", href: "/evenements/clients", icon: "users" },
   { label: "Entreprise", href: "/evenements", icon: "calendarEvent" },
-  { label: "Créer devis", href: "/devis/new", icon: "fileText" },
+  { label: "Devis", href: "/devis", icon: "fileText" },
   { label: "Factures", href: "/clients/factures", icon: "fileText" },
+  { label: "Carnet clients", href: "/clients", icon: "users" },
   { label: "Import Kezia", href: "/kezia", icon: "fileText" },
 ];
 
@@ -263,7 +264,7 @@ export const SIDEBAR_NAV: NavSection[] = [
     items: [
       { label: "Particuliers", href: "/evenements/clients" },
       { label: "Carnet clients", href: "/clients" },
-      { label: "Creer devis", href: "/devis/new" },
+      { label: "Devis", href: "/devis" },
       { label: "Factures", href: "/clients/factures" },
       { label: "Evenements", href: "/evenements" },
       { label: "Import Kezia", href: "/kezia" },
@@ -315,6 +316,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/evenements": "Événements",
   "/clients": "Carnet clients",
   "/clients/factures": "Factures clients",
+  "/devis": "Devis",
   "/devis/new": "Nouveau devis",
   "/admin/utilisateurs": "Utilisateurs",
   "/messagerie": "Messagerie",

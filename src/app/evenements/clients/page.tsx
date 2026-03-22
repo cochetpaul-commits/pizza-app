@@ -1,307 +1,197 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-import { RequireRole } from "@/components/RequireRole";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { RequireRole } from "@/components/RequireRole";
+import { useEtablissement } from "@/lib/EtablissementContext";
 
-type Client = {
+type Event = {
   id: string;
-  nom: string;
-  prenom: string | null;
-  email: string | null;
-  telephone: string | null;
-  notes: string | null;
-  created_at: string;
+  name: string;
+  type: string;
+  date: string | null;
+  time: string | null;
+  location: string | null;
+  covers: number;
+  establishment: string;
+  status: string;
+  contact_name: string | null;
+  sell_price: number | null;
 };
 
-type FormData = {
-  nom: string;
-  prenom: string;
-  email: string;
-  telephone: string;
-  notes: string;
+const STATUS_LABELS: Record<string, string> = {
+  prospect: "Prospect",
+  confirme: "Confirm\u00e9",
+  en_cours: "En cours",
+  termine: "Termin\u00e9",
+  annule: "Annul\u00e9",
 };
 
-const empty: FormData = { nom: "", prenom: "", email: "", telephone: "", notes: "" };
+const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
+  prospect: { bg: "#e8e0d0", fg: "#999999" },
+  confirme: { bg: "#e8ede6", fg: "#4a6741" },
+  en_cours: { bg: "rgba(37,99,235,0.10)", fg: "#2563eb" },
+  termine: { bg: "#f0f0f0", fg: "#bbbbbb" },
+  annule: { bg: "rgba(220,38,38,0.10)", fg: "#DC2626" },
+};
 
-export default function ClientsPage() {
-  const [clients, setClients] = useState<Client[]>([]);
+const TYPE_LABELS: Record<string, string> = {
+  mariage: "Mariage",
+  anniversaire: "Anniversaire",
+  bapteme: "Bapt\u00eame",
+};
+
+function fmtDate(iso: string | null) {
+  if (!iso) return "\u2014";
+  return new Date(iso + "T00:00:00").toLocaleDateString("fr-FR", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function fmtTime(t: string | null) {
+  if (!t) return "";
+  return t.slice(0, 5);
+}
+
+export default function ParticuliersPage() {
+  const { current: etab } = useEtablissement();
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<string | null>(null);
-  const [form, setForm] = useState<FormData>(empty);
-  const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState<"upcoming" | "all" | "past">("upcoming");
 
-  const [reloadKey, setReloadKey] = useState(0);
-  const [tableError, setTableError] = useState(false);
+  const etabKey = etab?.slug?.includes("bello") ? "bellomio" : etab?.slug?.includes("piccola") ? "piccola" : null;
 
   useEffect(() => {
-    let cancelled = false;
-    supabase
-      .from("clients")
-      .select("*")
-      .order("nom")
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) {
-          setTableError(true);
-          setLoading(false);
-          return;
-        }
-        setClients((data ?? []) as Client[]);
-        setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [reloadKey]);
+    (async () => {
+      const q = supabase
+        .from("events")
+        .select("id,name,type,date,time,location,covers,establishment,status,contact_name,sell_price")
+        .in("type", ["mariage", "anniversaire", "bapteme"])
+        .order("date", { ascending: true, nullsFirst: false });
+      if (etabKey) q.or(`establishment.eq.${etabKey},establishment.eq.both,establishment.is.null`);
+      const { data } = await q;
+      setEvents(data ?? []);
+      setLoading(false);
+    })();
+  }, [etabKey]);
 
-  const reload = () => setReloadKey(k => k + 1);
-
-  const openEdit = (c: Client) => {
-    setEditing(c.id);
-    setForm({
-      nom: c.nom,
-      prenom: c.prenom ?? "",
-      email: c.email ?? "",
-      telephone: c.telephone ?? "",
-      notes: c.notes ?? "",
-    });
-    setShowForm(true);
-  };
-
-  const save = async () => {
-    if (!form.nom.trim()) return;
-    setSaving(true);
-    const payload = {
-      nom: form.nom.trim(),
-      prenom: form.prenom.trim() || null,
-      email: form.email.trim() || null,
-      telephone: form.telephone.trim() || null,
-      notes: form.notes.trim() || null,
-    };
-    if (editing) {
-      await supabase.from("clients").update(payload).eq("id", editing);
-    } else {
-      await supabase.from("clients").insert(payload);
-    }
-    setSaving(false);
-    setShowForm(false);
-    reload();
-  };
-
-  const remove = async (id: string) => {
-    if (!confirm("Supprimer ce client ?")) return;
-    await supabase.from("clients").delete().eq("id", id);
-    reload();
-  };
-
-  const set = (k: keyof FormData, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const today = new Date().toISOString().slice(0, 10);
+  const filtered = events.filter((e) => {
+    if (filter === "upcoming") return !e.date || e.date >= today;
+    if (filter === "past") return e.date && e.date < today;
+    return true;
+  });
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <div style={{ maxWidth: 600, margin: "0 auto", padding: "20px 16px 40px" }}>
-        <h1 style={heading}>Clients</h1>
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "12px 16px 40px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h1 style={{ fontSize: "1.4rem", fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", letterSpacing: 1.5, textTransform: "uppercase" as const, color: "#2f3a33", margin: 0 }}>
+            Particuliers
+          </h1>
+          <Link
+            href="/evenements/new"
+            style={{
+              background: "#D4775A",
+              color: "#fff",
+              border: "none",
+              borderRadius: 20,
+              padding: "8px 20px",
+              fontSize: 13,
+              fontWeight: 700,
+              textDecoration: "none",
+            }}
+          >
+            Nouvel evenement
+          </Link>
+        </div>
 
-        {tableError && (
-          <div style={{ background: "#FFF3E0", border: "1px solid #FFB74D", borderRadius: 10, padding: "10px 16px", marginBottom: 16, fontSize: 13, color: "#E65100" }}>
-            Table &quot;clients&quot; non configuree — cette fonctionnalite n&apos;est pas encore disponible.
+        {/* Filtres */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+          {(["upcoming", "all", "past"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              style={{
+                padding: "6px 14px",
+                borderRadius: 8,
+                border: "1px solid #ddd6c8",
+                background: filter === f ? "#D4775A" : "#fff",
+                color: filter === f ? "#fff" : "#2f3a33",
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: "pointer",
+              }}
+            >
+              {f === "upcoming" ? "\u00c0 venir" : f === "all" ? "Tous" : "Pass\u00e9s"}
+            </button>
+          ))}
+        </div>
+
+        {loading && <p className="muted">Chargement...</p>}
+
+        {!loading && filtered.length === 0 && (
+          <div className="card" style={{ textAlign: "center", padding: "2rem" }}>
+            <p className="muted">Aucun evenement particulier</p>
+            <Link href="/evenements/new" className="btn btnPrimary" style={{ marginTop: 12, background: "#D4775A", borderColor: "#D4775A" }}>
+              Creer le premier
+            </Link>
           </div>
         )}
 
-        {loading && <p style={{ color: "#999", fontSize: 13 }}>Chargement...</p>}
-
-        {!loading && clients.length === 0 && (
-          <p style={{ color: "#999", fontSize: 13, textAlign: "center", marginTop: 40 }}>
-            Aucun client pour le moment
-          </p>
-        )}
-
-        {clients.length > 0 && (
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={th}>Nom</th>
-                <th style={th}>Telephone</th>
-                <th style={th}>Email</th>
-                <th style={{ ...th, width: 40 }} />
-              </tr>
-            </thead>
-            <tbody>
-              {clients.map(c => (
-                <tr
-                  key={c.id}
-                  style={{ cursor: "pointer" }}
-                  onClick={() => openEdit(c)}
-                  onMouseEnter={e => (e.currentTarget.style.background = "#f5f0e8")}
-                  onMouseLeave={e => (e.currentTarget.style.background = "")}
-                >
-                  <td style={td}>
-                    <span style={{ fontWeight: 700 }}>{c.nom}</span>
-                    {c.prenom && <span style={{ color: "#999", marginLeft: 4 }}>{c.prenom}</span>}
-                  </td>
-                  <td style={td}>{c.telephone ?? "—"}</td>
-                  <td style={td}>{c.email ?? "—"}</td>
-                  <td style={td}>
-                    <button
-                      type="button"
-                      onClick={e => { e.stopPropagation(); remove(c.id); }}
-                      style={delBtn}
-                      title="Supprimer"
-                    >
-                      &times;
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {!loading && filtered.length > 0 && (
+          <div style={{ display: "grid", gap: 10 }}>
+            {filtered.map((e) => {
+              const sc = STATUS_COLORS[e.status] ?? STATUS_COLORS.prospect;
+              return (
+                <Link key={e.id} href={`/evenements/${e.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                  <div className="card" style={{ borderLeft: `4px solid ${sc.fg}`, cursor: "pointer" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <p style={{ margin: 0, fontWeight: 800, fontSize: 15, color: "#2f3a33" }}>{e.name}</p>
+                        <p className="muted" style={{ margin: "2px 0 0", fontSize: 12 }}>
+                          {TYPE_LABELS[e.type] ?? e.type}
+                          {e.location ? ` \u00b7 ${e.location}` : ""}
+                          {e.contact_name ? ` \u00b7 ${e.contact_name}` : ""}
+                        </p>
+                      </div>
+                      <span style={{
+                        display: "inline-block",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: "2px 8px",
+                        borderRadius: 6,
+                        background: sc.bg,
+                        color: sc.fg,
+                      }}>
+                        {STATUS_LABELS[e.status] ?? e.status}
+                      </span>
+                    </div>
+                    <div style={{ marginTop: 8, display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12 }}>
+                      <span style={{ color: "#6f6a61" }}>
+                        {fmtDate(e.date)}
+                        {e.time ? ` \u00b7 ${fmtTime(e.time)}` : ""}
+                      </span>
+                      {e.covers > 0 && (
+                        <span style={{ fontWeight: 700, color: "#2f3a33" }}>{e.covers} couverts</span>
+                      )}
+                      {e.sell_price != null && e.sell_price > 0 && (
+                        <span style={{ fontWeight: 700, color: "#4a6741" }}>
+                          {e.sell_price.toLocaleString("fr-FR")} \u20ac
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         )}
       </div>
-
-      {/* Modal */}
-      {showForm && (
-        <div style={overlay} onClick={() => setShowForm(false)}>
-          <div style={modal} onClick={e => e.stopPropagation()}>
-            <h2 style={{ margin: "0 0 16px", fontSize: 18, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-              {editing ? "Modifier le client" : "Nouveau client"}
-            </h2>
-
-            <label style={label}>Nom *</label>
-            <input style={input} value={form.nom} onChange={e => set("nom", e.target.value)} autoFocus />
-
-            <label style={label}>Prenom</label>
-            <input style={input} value={form.prenom} onChange={e => set("prenom", e.target.value)} />
-
-            <label style={label}>Telephone</label>
-            <input style={input} value={form.telephone} onChange={e => set("telephone", e.target.value)} type="tel" />
-
-            <label style={label}>Email</label>
-            <input style={input} value={form.email} onChange={e => set("email", e.target.value)} type="email" />
-
-            <label style={label}>Notes</label>
-            <textarea style={{ ...input, minHeight: 60, resize: "vertical" }} value={form.notes} onChange={e => set("notes", e.target.value)} />
-
-            <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "flex-end" }}>
-              <button type="button" className="btn" style={cancelBtn} onClick={() => setShowForm(false)}>
-                Annuler
-              </button>
-              <button type="button" className="btn" style={saveBtn} onClick={save} disabled={saving || !form.nom.trim()}>
-                {saving ? "..." : "Enregistrer"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </RequireRole>
   );
 }
-
-const heading: React.CSSProperties = {
-  margin: "0 0 16px",
-  fontSize: 28,
-  fontWeight: 700,
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-  color: "#1a1a1a",
-  letterSpacing: 1,
-  textTransform: "uppercase",
-};
-
-
-const tableStyle: React.CSSProperties = {
-  width: "100%",
-  borderCollapse: "collapse",
-  fontSize: 13,
-};
-
-const th: React.CSSProperties = {
-  textAlign: "left",
-  padding: "8px 10px",
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: 1,
-  textTransform: "uppercase",
-  color: "#b0a894",
-  borderBottom: "1px solid #ddd6c8",
-};
-
-const td: React.CSSProperties = {
-  padding: "10px 10px",
-  borderBottom: "1px solid rgba(221,214,200,0.4)",
-  fontSize: 13,
-  color: "#1a1a1a",
-};
-
-const delBtn: React.CSSProperties = {
-  background: "none",
-  border: "none",
-  color: "#ccc",
-  fontSize: 18,
-  cursor: "pointer",
-  padding: "0 4px",
-  lineHeight: 1,
-};
-
-const overlay: React.CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(0,0,0,0.4)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 200,
-  padding: 16,
-};
-
-const modal: React.CSSProperties = {
-  background: "#fff",
-  borderRadius: 16,
-  padding: "24px",
-  width: "100%",
-  maxWidth: 420,
-  boxShadow: "0 12px 40px rgba(0,0,0,0.15)",
-};
-
-const label: React.CSSProperties = {
-  display: "block",
-  fontSize: 11,
-  fontWeight: 700,
-  color: "#999",
-  marginBottom: 4,
-  marginTop: 12,
-  textTransform: "uppercase",
-  letterSpacing: 0.5,
-};
-
-const input: React.CSSProperties = {
-  width: "100%",
-  padding: "8px 12px",
-  borderRadius: 8,
-  border: "1px solid #ddd6c8",
-  fontSize: 14,
-  fontFamily: "inherit",
-  boxSizing: "border-box",
-};
-
-const cancelBtn: React.CSSProperties = {
-  background: "#f2ede4",
-  color: "#999",
-  border: "none",
-  borderRadius: 20,
-  padding: "0 16px",
-  height: 34,
-  fontSize: 12,
-  fontWeight: 600,
-  cursor: "pointer",
-};
-
-const saveBtn: React.CSSProperties = {
-  background: "#D4775A",
-  color: "#fff",
-  border: "none",
-  borderRadius: 20,
-  padding: "0 20px",
-  height: 34,
-  fontSize: 12,
-  fontWeight: 700,
-  cursor: "pointer",
-};

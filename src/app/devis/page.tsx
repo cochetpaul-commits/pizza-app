@@ -7,69 +7,74 @@ import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 
-type Facture = {
+type Devis = {
   id: string;
   numero: string;
   objet: string | null;
   status: string;
   total_ttc: number;
-  montant_paye: number;
   date_emission: string | null;
-  date_echeance: string | null;
+  date_validite: string | null;
   client: { nom: string; prenom: string | null } | null;
 };
 
 const STATUS_LABELS: Record<string, string> = {
   brouillon: "Brouillon",
-  envoyee: "Envoy\u00e9e",
-  payee: "Pay\u00e9e",
-  en_retard: "En retard",
-  annulee: "Annul\u00e9e",
+  envoye: "Envoy\u00e9",
+  accepte: "Accept\u00e9",
+  refuse: "Refus\u00e9",
+  expire: "Expir\u00e9",
 };
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
   brouillon: { bg: "#e8e0d0", fg: "#999" },
-  envoyee: { bg: "rgba(37,99,235,0.10)", fg: "#2563eb" },
-  payee: { bg: "#e8ede6", fg: "#4a6741" },
-  en_retard: { bg: "rgba(220,38,38,0.10)", fg: "#DC2626" },
-  annulee: { bg: "#f0f0f0", fg: "#bbb" },
+  envoye: { bg: "rgba(37,99,235,0.10)", fg: "#2563eb" },
+  accepte: { bg: "#e8ede6", fg: "#4a6741" },
+  refuse: { bg: "rgba(220,38,38,0.10)", fg: "#DC2626" },
+  expire: { bg: "#f0f0f0", fg: "#bbb" },
 };
 
 function fmtDate(iso: string | null) {
   if (!iso) return "\u2014";
-  return new Date(iso + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(iso + "T00:00:00").toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
-export default function FacturesListPage() {
+export default function DevisListPage() {
   const router = useRouter();
   const { current: etab } = useEtablissement();
-  const [factures, setFactures] = useState<Facture[]>([]);
+  const [devis, setDevis] = useState<Devis[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>("all");
 
   useEffect(() => {
     (async () => {
       const q = supabase
-        .from("factures")
-        .select("id,numero,objet,status,total_ttc,montant_paye,date_emission,date_echeance,client:clients(nom,prenom)")
+        .from("devis")
+        .select("id,numero,objet,status,total_ttc,date_emission,date_validite,client:clients(nom,prenom)")
         .order("created_at", { ascending: false });
       if (etab?.id) q.eq("etablissement_id", etab.id);
       const { data, error } = await q;
-      if (error) console.error("factures fetch error:", error);
-      setFactures((data ?? []) as unknown as Facture[]);
+      if (error) {
+        console.error("devis fetch error:", error);
+      }
+      setDevis((data ?? []) as unknown as Devis[]);
       setLoading(false);
     })();
   }, [etab?.id]);
 
-  const filtered = filterStatus === "all" ? factures : factures.filter((f) => f.status === filterStatus);
+  const filtered = filterStatus === "all" ? devis : devis.filter((d) => d.status === filterStatus);
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "12px 16px 40px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h1 style={h1}>Factures</h1>
+          <h1 style={h1}>Devis</h1>
           <Link
-            href="/clients/factures/new"
+            href="/devis/new"
             style={{
               background: "#D4775A",
               color: "#fff",
@@ -79,15 +84,16 @@ export default function FacturesListPage() {
               fontSize: 13,
               fontWeight: 700,
               textDecoration: "none",
+              cursor: "pointer",
             }}
           >
-            Nouvelle facture
+            Nouveau devis
           </Link>
         </div>
 
         {/* Filtres */}
         <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
-          {["all", "brouillon", "envoyee", "payee", "en_retard"].map((s) => (
+          {["all", "brouillon", "envoye", "accepte", "refuse"].map((s) => (
             <button
               key={s}
               onClick={() => setFilterStatus(s)}
@@ -102,7 +108,7 @@ export default function FacturesListPage() {
                 cursor: "pointer",
               }}
             >
-              {s === "all" ? "Toutes" : STATUS_LABELS[s] ?? s}
+              {s === "all" ? "Tous" : STATUS_LABELS[s] ?? s}
             </button>
           ))}
         </div>
@@ -111,32 +117,31 @@ export default function FacturesListPage() {
 
         {!loading && filtered.length === 0 && (
           <div className="card" style={{ textAlign: "center", padding: "2rem" }}>
-            <p className="muted">Aucune facture</p>
+            <p className="muted">Aucun devis</p>
           </div>
         )}
 
         {!loading && filtered.length > 0 && (
           <div style={{ display: "grid", gap: 10 }}>
-            {filtered.map((f) => {
-              const sc = STATUS_COLORS[f.status] ?? STATUS_COLORS.brouillon;
-              const clientName = f.client
-                ? `${f.client.nom}${f.client.prenom ? " " + f.client.prenom : ""}`
+            {filtered.map((d) => {
+              const sc = STATUS_COLORS[d.status] ?? STATUS_COLORS.brouillon;
+              const clientName = d.client
+                ? `${d.client.nom}${d.client.prenom ? " " + d.client.prenom : ""}`
                 : null;
-              const resteADu = f.total_ttc - (f.montant_paye ?? 0);
               return (
                 <div
-                  key={f.id}
+                  key={d.id}
                   className="card"
                   style={{ cursor: "pointer", borderLeft: `4px solid ${sc.fg}` }}
-                  onClick={() => router.push(`/clients/factures/${f.id}`)}
+                  onClick={() => router.push(`/devis/${d.id}`)}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <p style={{ margin: 0, fontWeight: 800, fontSize: 15, color: "#2f3a33" }}>
-                        {f.numero}
+                        {d.numero}
                       </p>
                       <p className="muted" style={{ margin: "2px 0 0", fontSize: 12 }}>
-                        {f.objet ?? "Sans objet"}
+                        {d.objet ?? "Sans objet"}
                         {clientName ? ` \u00b7 ${clientName}` : ""}
                       </p>
                     </div>
@@ -152,22 +157,17 @@ export default function FacturesListPage() {
                         flexShrink: 0,
                       }}
                     >
-                      {STATUS_LABELS[f.status] ?? f.status}
+                      {STATUS_LABELS[d.status] ?? d.status}
                     </span>
                   </div>
                   <div style={{ marginTop: 8, display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12 }}>
-                    <span style={{ color: "#6f6a61" }}>{fmtDate(f.date_emission)}</span>
-                    {f.date_echeance && (
-                      <span style={{ color: "#999" }}>Echeance {fmtDate(f.date_echeance)}</span>
+                    <span style={{ color: "#6f6a61" }}>{fmtDate(d.date_emission)}</span>
+                    {d.date_validite && (
+                      <span style={{ color: "#999" }}>Valide jusqu&apos;au {fmtDate(d.date_validite)}</span>
                     )}
                     <span style={{ fontWeight: 700, color: "#2f3a33" }}>
-                      {f.total_ttc.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} \u20ac TTC
+                      {d.total_ttc.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} \u20ac TTC
                     </span>
-                    {f.montant_paye > 0 && resteADu > 0 && (
-                      <span style={{ color: "#DC2626", fontWeight: 700 }}>
-                        Reste {resteADu.toFixed(2)} \u20ac
-                      </span>
-                    )}
                   </div>
                 </div>
               );
