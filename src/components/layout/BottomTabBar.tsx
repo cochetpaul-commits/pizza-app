@@ -188,60 +188,98 @@ type TabSection = {
 
 /* ── Sections with sub-tabs ──────────────────────── */
 
-const SECTIONS: TabSection[] = [
-  {
-    label: "Planning",
-    href: "/plannings",
-    match: ["/plannings", "/rh/", "/mes-shifts"],
-    icon: (a) => <IconCalendar active={a} />,
-    tabs: [
-      { label: "Employes", href: "/rh/equipe", match: ["/rh/equipe", "/rh/employe"], icon: (a) => <IconUsers active={a} /> },
-      { label: "Pointage", href: "/rh/pointage", match: ["/rh/pointage"], icon: (a) => <IconClock active={a} /> },
-      { label: "Conges", href: "/rh/conges", match: ["/rh/conges"], icon: (a) => <IconBeach active={a} /> },
-      { label: "Rapports", href: "/rh/rapports", match: ["/rh/rapports"], icon: (a) => <IconFileText active={a} /> },
-    ],
-  },
-  {
-    label: "Finance",
-    href: "/finances",
-    match: ["/finances", "/kezia"],
-    icon: (a) => <IconWallet active={a} />,
-    tabs: [],
-  },
-  {
-    label: "Achats",
-    href: "/stats-achats",
-    match: ["/stats-achats", "/achats", "/ingredients", "/invoices", "/fournisseurs", "/base-produits"],
-    icon: (a) => <IconShoppingBag active={a} />,
-    tabs: [
-      { label: "Stats", href: "/stats-achats", match: ["/stats-achats"], icon: (a) => <IconBarChart active={a} /> },
-      { label: "Factures", href: "/achats", match: ["/achats", "/invoices"], icon: (a) => <IconFileText active={a} /> },
-      { label: "Produits", href: "/ingredients", match: ["/ingredients"], icon: (a) => <IconTag active={a} /> },
-    ],
-  },
-  {
-    label: "Perf.",
-    href: "/pilotage",
-    match: ["/pilotage", "/variations-prix", "/alertes-prix"],
-    icon: (a) => <IconBarChart active={a} />,
-    tabs: [
-      { label: "Indicateurs", href: "/pilotage", match: ["/pilotage"], icon: (a) => <IconBarChart active={a} /> },
-      { label: "Alertes", href: "/variations-prix", match: ["/variations-prix", "/alertes-prix"], icon: (a) => <IconTrendingUp active={a} /> },
-    ],
-  },
-  {
-    label: "Ops",
-    href: "/recettes",
-    match: ["/catalogue", "/recettes", "/commandes", "/inventaire", "/epicerie", "/prep"],
-    icon: (a) => <IconPackage active={a} />,
-    tabs: [
-      { label: "Catalogue", href: "/catalogue", match: ["/catalogue"], icon: (a) => <IconGrid active={a} /> },
-      { label: "Fiches", href: "/recettes", match: ["/recettes", "/prep"], icon: (a) => <IconBook active={a} /> },
-      { label: "Commandes", href: "/commandes", match: ["/commandes"], icon: (a) => <IconTruck active={a} /> },
-      { label: "Inventaire", href: "/inventaire", match: ["/inventaire"], icon: (a) => <IconBox active={a} /> },
-    ],
-  },
-];
+function IconHeart({ active }: { active: boolean }) {
+  return (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+    </svg>
+  );
+}
+
+const SECTION_PLANNING: TabSection = {
+  label: "Planning",
+  href: "/plannings",
+  match: ["/plannings", "/rh/", "/mes-shifts"],
+  icon: (a) => <IconCalendar active={a} />,
+  tabs: [
+    { label: "Employes", href: "/rh/equipe", match: ["/rh/equipe", "/rh/employe"], icon: (a) => <IconUsers active={a} /> },
+    { label: "Pointage", href: "/rh/pointage", match: ["/rh/pointage"], icon: (a) => <IconClock active={a} /> },
+    { label: "Conges", href: "/rh/conges", match: ["/rh/conges"], icon: (a) => <IconBeach active={a} /> },
+    { label: "Rapports", href: "/rh/rapports", match: ["/rh/rapports"], icon: (a) => <IconFileText active={a} /> },
+  ],
+};
+
+const SECTION_FINANCE: TabSection = {
+  label: "Finance",
+  href: "/finances",
+  match: ["/finances"],
+  icon: (a) => <IconWallet active={a} />,
+  tabs: [],
+};
+
+const SECTION_ACHATS: TabSection = {
+  label: "Achats",
+  href: "/stats-achats",
+  match: ["/stats-achats", "/achats", "/ingredients", "/invoices", "/fournisseurs", "/base-produits"],
+  icon: (a) => <IconShoppingBag active={a} />,
+  tabs: [
+    { label: "Stats", href: "/stats-achats", match: ["/stats-achats"], icon: (a) => <IconBarChart active={a} /> },
+    { label: "Factures", href: "/achats", match: ["/achats", "/invoices"], icon: (a) => <IconFileText active={a} /> },
+    { label: "Produits", href: "/ingredients", match: ["/ingredients"], icon: (a) => <IconTag active={a} /> },
+  ],
+};
+
+const SECTION_PERF: TabSection = {
+  label: "Perf.",
+  href: "/pilotage",
+  match: ["/pilotage", "/variations-prix", "/alertes-prix"],
+  icon: (a) => <IconBarChart active={a} />,
+  tabs: [
+    { label: "Indicateurs", href: "/pilotage", match: ["/pilotage"], icon: (a) => <IconBarChart active={a} /> },
+    { label: "Alertes", href: "/variations-prix", match: ["/variations-prix", "/alertes-prix"], icon: (a) => <IconTrendingUp active={a} /> },
+  ],
+};
+
+const SECTION_PERF_PICCOLA: TabSection = {
+  label: "Perf.",
+  href: "/pilotage",
+  match: ["/pilotage", "/variations-prix", "/alertes-prix", "/kezia"],
+  icon: (a) => <IconBarChart active={a} />,
+  tabs: [
+    { label: "Indicateurs", href: "/pilotage", match: ["/pilotage"], icon: (a) => <IconBarChart active={a} /> },
+    { label: "Alertes", href: "/variations-prix", match: ["/variations-prix", "/alertes-prix"], icon: (a) => <IconTrendingUp active={a} /> },
+    { label: "Kezia", href: "/kezia", match: ["/kezia"], icon: (a) => <IconFileText active={a} /> },
+  ],
+};
+
+const SECTION_OPS: TabSection = {
+  label: "Ops",
+  href: "/recettes",
+  match: ["/catalogue", "/recettes", "/commandes", "/inventaire", "/epicerie", "/prep"],
+  icon: (a) => <IconPackage active={a} />,
+  tabs: [
+    { label: "Catalogue", href: "/catalogue", match: ["/catalogue"], icon: (a) => <IconGrid active={a} /> },
+    { label: "Fiches", href: "/recettes", match: ["/recettes", "/prep"], icon: (a) => <IconBook active={a} /> },
+    { label: "Commandes", href: "/commandes", match: ["/commandes"], icon: (a) => <IconTruck active={a} /> },
+    { label: "Inventaire", href: "/inventaire", match: ["/inventaire"], icon: (a) => <IconBox active={a} /> },
+  ],
+};
+
+const SECTION_EVENTS: TabSection = {
+  label: "Events",
+  href: "/evenements",
+  match: ["/evenements", "/clients", "/devis"],
+  icon: (a) => <IconHeart active={a} />,
+  tabs: [
+    { label: "Entreprise", href: "/evenements", match: ["/evenements"], icon: (a) => <IconShoppingBag active={a} /> },
+    { label: "Particuliers", href: "/evenements/clients", match: ["/evenements/clients"], icon: (a) => <IconUsers active={a} /> },
+    { label: "Devis", href: "/devis/new", match: ["/devis"], icon: (a) => <IconFileText active={a} /> },
+    { label: "Clients", href: "/clients", match: ["/clients"], icon: (a) => <IconBook active={a} /> },
+  ],
+};
+
+const SECTIONS_BELLO: TabSection[] = [SECTION_PLANNING, SECTION_FINANCE, SECTION_ACHATS, SECTION_PERF, SECTION_OPS];
+const SECTIONS_PICCOLA: TabSection[] = [SECTION_PLANNING, SECTION_ACHATS, SECTION_PERF_PICCOLA, SECTION_OPS, SECTION_EVENTS];
 
 const ACTIVE_COLOR = "#2D6A4F";
 const INACTIVE_COLOR = "#999";
@@ -252,8 +290,8 @@ function pathMatches(pathname: string, patterns: string[]): boolean {
   return patterns.some(m => pathname === m || pathname.startsWith(m + "/") || (m.endsWith("/") && pathname.startsWith(m)));
 }
 
-function getActiveSection(pathname: string): TabSection | null {
-  for (const section of SECTIONS) {
+function getActiveSection(pathname: string, sections: TabSection[]): TabSection | null {
+  for (const section of sections) {
     if (pathMatches(pathname, section.match)) return section;
   }
   return null;
@@ -273,7 +311,9 @@ export function BottomTabBar({ onMenuClick }: Props) {
 
   if (!role) return null;
 
-  const activeSection = getActiveSection(pathname);
+  const isPiccola = current?.slug?.includes("piccola");
+  const sections = isPiccola ? SECTIONS_PICCOLA : SECTIONS_BELLO;
+  const activeSection = getActiveSection(pathname, sections);
 
   // If inside a section with sub-tabs → show sub-tabs
   // Otherwise → show the 5 hub tabs (level 1)
@@ -281,7 +321,7 @@ export function BottomTabBar({ onMenuClick }: Props) {
 
   // Determine establishment home route
   const etabHome = current?.slug?.includes("bello") ? "/bello-mio"
-    : current?.slug?.includes("piccola") ? "/piccola-mia"
+    : isPiccola ? "/piccola-mia"
     : null;
 
   return (
@@ -379,8 +419,8 @@ export function BottomTabBar({ onMenuClick }: Props) {
             );
           })
         ) : (
-          /* ── Level 1: 5 hub tabs ── */
-          SECTIONS.map((section) => {
+          /* ── Level 1: hub tabs ── */
+          sections.map((section) => {
             const isActive = activeSection === section;
             return (
               <button
