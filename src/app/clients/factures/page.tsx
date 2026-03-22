@@ -161,11 +161,11 @@ export default function FacturesListPage() {
                       <span style={{ color: "#999" }}>Echeance {fmtDate(f.date_echeance)}</span>
                     )}
                     <span style={{ fontWeight: 700, color: "#2f3a33" }}>
-                      {f.total_ttc.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} \u20ac TTC
+                      {f.total_ttc.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} € TTC
                     </span>
                     {f.montant_paye > 0 && resteADu > 0 && (
                       <span style={{ color: "#DC2626", fontWeight: 700 }}>
-                        Reste {resteADu.toFixed(2)} \u20ac
+                        Reste {resteADu.toFixed(2)} €
                       </span>
                     )}
                   </div>

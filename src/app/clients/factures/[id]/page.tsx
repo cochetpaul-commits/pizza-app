@@ -272,7 +272,7 @@ export default function FactureDetailPage() {
                       <td style={tdStyle}><input type="number" style={{ ...inputStyle, fontSize: 13 }} value={l.quantite} onChange={(e) => updateEditLigne(i, "quantite", parseFloat(e.target.value) || 0)} min={0} step={0.5} /></td>
                       <td style={tdStyle}><select style={{ ...inputStyle, fontSize: 13 }} value={l.unite} onChange={(e) => updateEditLigne(i, "unite", e.target.value)}><option value="unite">unite</option><option value="personne">personne</option><option value="forfait">forfait</option><option value="heure">heure</option><option value="kg">kg</option></select></td>
                       <td style={tdStyle}><input type="number" style={{ ...inputStyle, fontSize: 13 }} value={l.prix_unitaire_ht} onChange={(e) => updateEditLigne(i, "prix_unitaire_ht", parseFloat(e.target.value) || 0)} min={0} step={0.01} /></td>
-                      <td style={{ ...tdStyle, fontWeight: 700, textAlign: "right" }}>{l.total_ht.toFixed(2)} \u20ac</td>
+                      <td style={{ ...tdStyle, fontWeight: 700, textAlign: "right" }}>{l.total_ht.toFixed(2)} €</td>
                       <td style={tdStyle}><button type="button" onClick={() => removeEditLigne(i)} style={{ background: "none", border: "none", color: "#ccc", fontSize: 18, cursor: "pointer" }}>&times;</button></td>
                     </tr>
                   ))}
@@ -283,14 +283,14 @@ export default function FactureDetailPage() {
 
             <section style={{ ...sectionStyle, background: "#faf7f2", borderRadius: 10, padding: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 8 }}>
-                <span>Total HT</span><span style={{ fontWeight: 700 }}>{editTotalHt.toFixed(2)} \u20ac</span>
+                <span>Total HT</span><span style={{ fontWeight: 700 }}>{editTotalHt.toFixed(2)} €</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 8 }}>
                 <span>TVA <input type="number" style={{ width: 50, ...inputStyle, fontSize: 13, display: "inline", padding: "2px 6px" }} value={tvaRate} onChange={(e) => setTvaRate(parseFloat(e.target.value) || 0)} />%</span>
-                <span>{(editTotalTtc - editTotalHt).toFixed(2)} \u20ac</span>
+                <span>{(editTotalTtc - editTotalHt).toFixed(2)} €</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 800, borderTop: "1px solid #ddd6c8", paddingTop: 8 }}>
-                <span>Total TTC</span><span>{editTotalTtc.toFixed(2)} \u20ac</span>
+                <span>Total TTC</span><span>{editTotalTtc.toFixed(2)} €</span>
               </div>
             </section>
 
@@ -342,8 +342,8 @@ export default function FactureDetailPage() {
                       <td style={tdStyle}>{l.description}</td>
                       <td style={{ ...tdStyle, textAlign: "right" }}>{l.quantite}</td>
                       <td style={tdStyle}>{l.unite}</td>
-                      <td style={{ ...tdStyle, textAlign: "right" }}>{l.prix_unitaire_ht.toFixed(2)} \u20ac</td>
-                      <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700 }}>{l.total_ht.toFixed(2)} \u20ac</td>
+                      <td style={{ ...tdStyle, textAlign: "right" }}>{l.prix_unitaire_ht.toFixed(2)} €</td>
+                      <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700 }}>{l.total_ht.toFixed(2)} €</td>
                     </tr>
                   ))}
                 </tbody>
@@ -352,21 +352,21 @@ export default function FactureDetailPage() {
 
             <section style={{ ...sectionStyle, background: "#faf7f2", borderRadius: 10, padding: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 6 }}>
-                <span>Total HT</span><span style={{ fontWeight: 700 }}>{facture.total_ht.toFixed(2)} \u20ac</span>
+                <span>Total HT</span><span style={{ fontWeight: 700 }}>{facture.total_ht.toFixed(2)} €</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 6 }}>
-                <span>TVA {facture.tva_rate}%</span><span>{(facture.total_ttc - facture.total_ht).toFixed(2)} \u20ac</span>
+                <span>TVA {facture.tva_rate}%</span><span>{(facture.total_ttc - facture.total_ht).toFixed(2)} €</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 800, borderTop: "1px solid #ddd6c8", paddingTop: 8 }}>
-                <span>Total TTC</span><span>{facture.total_ttc.toFixed(2)} \u20ac</span>
+                <span>Total TTC</span><span>{facture.total_ttc.toFixed(2)} €</span>
               </div>
               {facture.montant_paye > 0 && (
                 <>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginTop: 8, color: "#4a6741" }}>
-                    <span>Deja paye</span><span style={{ fontWeight: 700 }}>-{facture.montant_paye.toFixed(2)} \u20ac</span>
+                    <span>Deja paye</span><span style={{ fontWeight: 700 }}>-{facture.montant_paye.toFixed(2)} €</span>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginTop: 4, fontWeight: 800, color: resteADu > 0 ? "#DC2626" : "#4a6741" }}>
-                    <span>Reste a payer</span><span>{resteADu.toFixed(2)} \u20ac</span>
+                    <span>Reste a payer</span><span>{resteADu.toFixed(2)} €</span>
                   </div>
                 </>
               )}

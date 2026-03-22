@@ -166,7 +166,7 @@ export default function DevisListPage() {
                       <span style={{ color: "#999" }}>Valide jusqu&apos;au {fmtDate(d.date_validite)}</span>
                     )}
                     <span style={{ fontWeight: 700, color: "#2f3a33" }}>
-                      {d.total_ttc.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} \u20ac TTC
+                      {d.total_ttc.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} € TTC
                     </span>
                   </div>
                 </div>

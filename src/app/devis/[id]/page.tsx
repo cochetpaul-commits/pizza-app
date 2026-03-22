@@ -295,7 +295,7 @@ export default function DevisDetailPage() {
                       <td style={tdStyle}>
                         <input type="number" style={{ ...inputStyle, fontSize: 13 }} value={l.prix_unitaire_ht} onChange={(e) => updateEditLigne(i, "prix_unitaire_ht", parseFloat(e.target.value) || 0)} min={0} step={0.01} />
                       </td>
-                      <td style={{ ...tdStyle, fontWeight: 700, textAlign: "right" }}>{l.total_ht.toFixed(2)} \u20ac</td>
+                      <td style={{ ...tdStyle, fontWeight: 700, textAlign: "right" }}>{l.total_ht.toFixed(2)} €</td>
                       <td style={tdStyle}>
                         <button type="button" onClick={() => removeEditLigne(i)} style={{ background: "none", border: "none", color: "#ccc", fontSize: 18, cursor: "pointer" }}>&times;</button>
                       </td>
@@ -310,15 +310,15 @@ export default function DevisDetailPage() {
             <section style={{ ...sectionStyle, background: "#faf7f2", borderRadius: 10, padding: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 8 }}>
                 <span>Total HT</span>
-                <span style={{ fontWeight: 700 }}>{editTotalHt.toFixed(2)} \u20ac</span>
+                <span style={{ fontWeight: 700 }}>{editTotalHt.toFixed(2)} €</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 8 }}>
                 <span>TVA <input type="number" style={{ width: 50, ...inputStyle, fontSize: 13, display: "inline", padding: "2px 6px" }} value={tvaRate} onChange={(e) => setTvaRate(parseFloat(e.target.value) || 0)} />%</span>
-                <span>{(editTotalTtc - editTotalHt).toFixed(2)} \u20ac</span>
+                <span>{(editTotalTtc - editTotalHt).toFixed(2)} €</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 800, borderTop: "1px solid #ddd6c8", paddingTop: 8 }}>
                 <span>Total TTC</span>
-                <span>{editTotalTtc.toFixed(2)} \u20ac</span>
+                <span>{editTotalTtc.toFixed(2)} €</span>
               </div>
             </section>
 
@@ -375,8 +375,8 @@ export default function DevisDetailPage() {
                       <td style={tdStyle}>{l.description}</td>
                       <td style={{ ...tdStyle, textAlign: "right" }}>{l.quantite}</td>
                       <td style={tdStyle}>{l.unite}</td>
-                      <td style={{ ...tdStyle, textAlign: "right" }}>{l.prix_unitaire_ht.toFixed(2)} \u20ac</td>
-                      <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700 }}>{l.total_ht.toFixed(2)} \u20ac</td>
+                      <td style={{ ...tdStyle, textAlign: "right" }}>{l.prix_unitaire_ht.toFixed(2)} €</td>
+                      <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700 }}>{l.total_ht.toFixed(2)} €</td>
                     </tr>
                   ))}
                 </tbody>
@@ -387,20 +387,20 @@ export default function DevisDetailPage() {
             <section style={{ ...sectionStyle, background: "#faf7f2", borderRadius: 10, padding: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 6 }}>
                 <span>Total HT</span>
-                <span style={{ fontWeight: 700 }}>{devis.total_ht.toFixed(2)} \u20ac</span>
+                <span style={{ fontWeight: 700 }}>{devis.total_ht.toFixed(2)} €</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 6 }}>
                 <span>TVA {devis.tva_rate}%</span>
-                <span>{(devis.total_ttc - devis.total_ht).toFixed(2)} \u20ac</span>
+                <span>{(devis.total_ttc - devis.total_ht).toFixed(2)} €</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 800, borderTop: "1px solid #ddd6c8", paddingTop: 8 }}>
                 <span>Total TTC</span>
-                <span>{devis.total_ttc.toFixed(2)} \u20ac</span>
+                <span>{devis.total_ttc.toFixed(2)} €</span>
               </div>
               {devis.acompte_pct > 0 && (
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginTop: 8, color: "#6f6a61" }}>
                   <span>Acompte {devis.acompte_pct}%</span>
-                  <span style={{ fontWeight: 700 }}>{(devis.total_ttc * devis.acompte_pct / 100).toFixed(2)} \u20ac</span>
+                  <span style={{ fontWeight: 700 }}>{(devis.total_ttc * devis.acompte_pct / 100).toFixed(2)} €</span>
                 </div>
               )}
             </section>

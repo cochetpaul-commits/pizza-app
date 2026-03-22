@@ -96,7 +96,11 @@ function NouvelleFacturePage() {
     if (!objet.trim()) return alert("L'objet de la facture est requis.");
     setSaving(true);
 
-    const { data: numData } = await supabase.rpc("next_facture_numero", { etab_id: etab?.id ?? null });
+    const { data: authData } = await supabase.auth.getUser();
+    const uid = authData?.user?.id ?? null;
+
+    const { data: numData, error: numErr } = await supabase.rpc("next_facture_numero", { etab_id: etab?.id ?? null });
+    if (numErr) console.error("next_facture_numero error:", numErr);
     const numero = numData ?? `FAC-${new Date().getFullYear()}-001`;
 
     const dateEcheance = new Date();
@@ -119,6 +123,7 @@ function NouvelleFacturePage() {
         montant_paye: montantPaye,
         date_echeance: dateEcheance.toISOString().slice(0, 10),
         status: "brouillon",
+        user_id: uid,
       })
       .select("id")
       .single();
@@ -126,7 +131,7 @@ function NouvelleFacturePage() {
     if (error || !factureData) {
       console.error("facture insert error:", error);
       setSaving(false);
-      return alert("Erreur lors de la sauvegarde.");
+      return alert(`Erreur lors de la sauvegarde : ${error?.message ?? "inconnu"}`);
     }
 
     const lignesPayload = lignes
@@ -222,7 +227,7 @@ function NouvelleFacturePage() {
                     <td style={tdStyle}>
                       <input type="number" style={{ ...inputStyle, fontSize: 13, width: "100%" }} value={l.prix_unitaire_ht} onChange={(e) => updateLigne(l.id, "prix_unitaire_ht", parseFloat(e.target.value) || 0)} min={0} step={0.01} />
                     </td>
-                    <td style={{ ...tdStyle, fontWeight: 700, textAlign: "right" }}>{l.total_ht.toFixed(2)} \u20ac</td>
+                    <td style={{ ...tdStyle, fontWeight: 700, textAlign: "right" }}>{l.total_ht.toFixed(2)} €</td>
                     <td style={tdStyle}>
                       <button type="button" onClick={() => removeLigne(l.id)} style={{ background: "none", border: "none", color: "#ccc", fontSize: 18, cursor: "pointer" }}>&times;</button>
                     </td>
@@ -240,15 +245,15 @@ function NouvelleFacturePage() {
         <section style={{ ...section, background: "#faf7f2", borderRadius: 10, padding: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 8 }}>
             <span>Total HT</span>
-            <span style={{ fontWeight: 700 }}>{totalHt.toFixed(2)} \u20ac</span>
+            <span style={{ fontWeight: 700 }}>{totalHt.toFixed(2)} €</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 14, marginBottom: 8 }}>
             <span>TVA <input type="number" style={{ width: 50, ...inputStyle, fontSize: 13, display: "inline", padding: "2px 6px" }} value={tvaRate} onChange={(e) => setTvaRate(parseFloat(e.target.value) || 0)} />%</span>
-            <span>{(totalTtc - totalHt).toFixed(2)} \u20ac</span>
+            <span>{(totalTtc - totalHt).toFixed(2)} €</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 800, borderTop: "1px solid #ddd6c8", paddingTop: 8 }}>
             <span>Total TTC</span>
-            <span>{totalTtc.toFixed(2)} \u20ac</span>
+            <span>{totalTtc.toFixed(2)} €</span>
           </div>
         </section>
 

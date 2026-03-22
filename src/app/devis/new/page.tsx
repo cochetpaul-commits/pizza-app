@@ -90,8 +90,12 @@ function NouveauDevisPage() {
     if (!objet.trim()) return alert("L'objet du devis est requis.");
     setSaving(true);
 
+    const { data: authData } = await supabase.auth.getUser();
+    const uid = authData?.user?.id ?? null;
+
     // Get next numero
-    const { data: numData } = await supabase.rpc("next_devis_numero", { etab_id: etab?.id ?? null });
+    const { data: numData, error: numErr } = await supabase.rpc("next_devis_numero", { etab_id: etab?.id ?? null });
+    if (numErr) console.error("next_devis_numero error:", numErr);
     const numero = numData ?? `DEV-${new Date().getFullYear()}-001`;
 
     const dateValidite = new Date();
@@ -113,6 +117,7 @@ function NouveauDevisPage() {
         acompte_pct: acomptePct,
         date_validite: dateValidite.toISOString().slice(0, 10),
         status: "brouillon",
+        user_id: uid,
       })
       .select("id")
       .single();
@@ -120,7 +125,7 @@ function NouveauDevisPage() {
     if (error || !devisData) {
       console.error("devis insert error:", error);
       setSaving(false);
-      return alert("Erreur lors de la sauvegarde.");
+      return alert(`Erreur lors de la sauvegarde : ${error?.message ?? "inconnu"}`);
     }
 
     // Insert lignes
@@ -268,7 +273,7 @@ function NouveauDevisPage() {
                       />
                     </td>
                     <td style={{ ...tdStyle, fontWeight: 700, textAlign: "right" }}>
-                      {l.total_ht.toFixed(2)} \u20ac
+                      {l.total_ht.toFixed(2)} €
                     </td>
                     <td style={tdStyle}>
                       <button
@@ -293,7 +298,7 @@ function NouveauDevisPage() {
         <section style={{ ...section, background: "#faf7f2", borderRadius: 10, padding: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 8 }}>
             <span>Total HT</span>
-            <span style={{ fontWeight: 700 }}>{totalHt.toFixed(2)} \u20ac</span>
+            <span style={{ fontWeight: 700 }}>{totalHt.toFixed(2)} €</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 14, marginBottom: 8 }}>
             <span>
@@ -309,11 +314,11 @@ function NouveauDevisPage() {
               />
               %
             </span>
-            <span>{(totalTtc - totalHt).toFixed(2)} \u20ac</span>
+            <span>{(totalTtc - totalHt).toFixed(2)} €</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 800, borderTop: "1px solid #ddd6c8", paddingTop: 8 }}>
             <span>Total TTC</span>
-            <span>{totalTtc.toFixed(2)} \u20ac</span>
+            <span>{totalTtc.toFixed(2)} €</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, marginTop: 8, color: "#6f6a61" }}>
             <span>
@@ -328,7 +333,7 @@ function NouveauDevisPage() {
               />
               %
             </span>
-            <span style={{ fontWeight: 700 }}>{acompte.toFixed(2)} \u20ac</span>
+            <span style={{ fontWeight: 700 }}>{acompte.toFixed(2)} €</span>
           </div>
         </section>
 
