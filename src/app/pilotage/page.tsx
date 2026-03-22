@@ -9,6 +9,7 @@ import {
 } from "recharts";
 import { fetchApi } from "@/lib/fetchApi";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { supabase } from "@/lib/supabaseClient";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -403,6 +404,95 @@ const deltaStyle: React.CSSProperties = {
 };
 
 
+// ── Build StatsData from daily_sales (Kezia / Piccola Mia) ────────────────
+
+const DAY_LABELS = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+
+async function loadDailySalesStats(etabId: string, weekStr: string): Promise<StatsData | null> {
+  const monday = isoWeekToMonday(weekStr);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+
+  // Current week
+  const { data: rows } = await supabase
+    .from("daily_sales")
+    .select("date, ca_ttc, couverts, panier_moyen, tickets, rayons")
+    .eq("etablissement_id", etabId)
+    .gte("date", fmt(monday))
+    .lte("date", fmt(sunday))
+    .order("date");
+
+  // Previous week
+  const prevMon = new Date(monday);
+  prevMon.setDate(prevMon.getDate() - 7);
+  const prevSun = new Date(prevMon);
+  prevSun.setDate(prevMon.getDate() + 6);
+
+  const { data: prevRows } = await supabase
+    .from("daily_sales")
+    .select("date, ca_ttc, couverts, panier_moyen")
+    .eq("etablissement_id", etabId)
+    .gte("date", fmt(prevMon))
+    .lte("date", fmt(prevSun))
+    .order("date");
+
+  // Build days array (Mon-Sun)
+  const days: DayData[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const dateStr = fmt(d);
+    const row = (rows ?? []).find(r => r.date === dateStr);
+    days.push({
+      date: dateStr,
+      label: DAY_LABELS[d.getDay()],
+      totalSales: row?.ca_ttc ?? 0,
+      guestsNumber: row?.couverts ?? 0,
+      ticketMoyen: row?.panier_moyen ?? 0,
+    });
+  }
+
+  const totalSales = days.reduce((s, d) => s + d.totalSales, 0);
+  const guestsNumber = days.reduce((s, d) => s + d.guestsNumber, 0);
+  const activeDays = days.filter(d => d.totalSales > 0).length;
+  const ticketMoyen = guestsNumber > 0 ? totalSales / guestsNumber : 0;
+  const bestDay = days.reduce((best, d) => d.totalSales > best.totalSales ? d : best, days[0]);
+
+  // Previous week totals
+  const prevTotal = (prevRows ?? []).reduce((s, r) => s + (r.ca_ttc ?? 0), 0);
+  const prevGuests = (prevRows ?? []).reduce((s, r) => s + (r.couverts ?? 0), 0);
+  const prevTicket = prevGuests > 0 ? prevTotal / prevGuests : 0;
+
+  // Categories from rayons JSON (if available)
+  const categories: CategoryData[] = [];
+  const rayonTotals: Record<string, number> = {};
+  for (const row of (rows ?? [])) {
+    if (row.rayons && typeof row.rayons === "object") {
+      for (const [name, val] of Object.entries(row.rayons as Record<string, number>)) {
+        rayonTotals[name] = (rayonTotals[name] ?? 0) + (val ?? 0);
+      }
+    }
+  }
+  const rayonTotal = Object.values(rayonTotals).reduce((s, v) => s + v, 0);
+  if (rayonTotal > 0) {
+    for (const [name, ca] of Object.entries(rayonTotals).sort((a, b) => b[1] - a[1])) {
+      categories.push({ name, ca, pct: Math.round((ca / rayonTotal) * 100) });
+    }
+  }
+
+  return {
+    week: weekStr,
+    isCurrentWeek: weekStr === getCurrentWeek(),
+    activeDays,
+    semaine: { totalSales, guestsNumber, ticketMoyen, bestDay: { label: bestDay.label, totalSales: bestDay.totalSales }, days },
+    semainePrec: { totalSales: prevTotal, guestsNumber: prevGuests, ticketMoyen: prevTicket },
+    topSemaine: [],
+    categories,
+    insights: { meilleurJour: null, produitEnHausse: null, caVsMoyenne: null },
+  };
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 
 export default function PilotagePage() {
@@ -420,19 +510,35 @@ export default function PilotagePage() {
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
   const [dayLoading, setDayLoading] = useState(false);
 
+  const isPiccola = etab.current?.slug?.includes("piccola");
+  const currentEtabId = etab.current?.id;
+
   const loadStats = useCallback(async (week: string) => {
     setLoading(true);
-    const [s, m, c] = await Promise.all([
-      fetchApi(`/api/popina/stats?week=${week}`).then((r) => r.ok ? r.json() : null),
-      fetchApi("/api/meteo").then((r) => r.ok ? r.json() : null),
-      fetchApi(`/api/pilotage/costs?week=${week}`).then((r) => r.ok ? r.json() : null),
-    ]);
-    if (s) setStats(s);
-    if (m) setMeteo(m);
-    if (c) setCosts(c);
+    if (isPiccola && currentEtabId) {
+      // Piccola Mia: fetch from daily_sales (Kezia imports)
+      const [s, m, c] = await Promise.all([
+        loadDailySalesStats(currentEtabId, week),
+        fetchApi("/api/meteo").then((r) => r.ok ? r.json() : null),
+        fetchApi(`/api/pilotage/costs?week=${week}`).then((r) => r.ok ? r.json() : null),
+      ]);
+      if (s) setStats(s);
+      if (m) setMeteo(m);
+      if (c) setCosts(c);
+    } else {
+      // Bello Mio: fetch from Popina API
+      const [s, m, c] = await Promise.all([
+        fetchApi(`/api/popina/stats?week=${week}`).then((r) => r.ok ? r.json() : null),
+        fetchApi("/api/meteo").then((r) => r.ok ? r.json() : null),
+        fetchApi(`/api/pilotage/costs?week=${week}`).then((r) => r.ok ? r.json() : null),
+      ]);
+      if (s) setStats(s);
+      if (m) setMeteo(m);
+      if (c) setCosts(c);
+    }
     setLastUpdate(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
     setLoading(false);
-  }, []);
+  }, [isPiccola, currentEtabId]);
 
   // Service-hours auto-refresh (15 min during midi 10-15h / soir 18-23h30)
   const [isService, setIsService] = useState(() => {
@@ -474,6 +580,8 @@ export default function PilotagePage() {
 
   async function handleBarClick(day: DayData) {
     if (day.totalSales === 0) return;
+    // Day detail drawer only available for Popina (Bello Mio)
+    if (isPiccola) return;
     setDrawerOpen(true);
     setDayDetail(null);
     setDayLoading(true);
@@ -655,7 +763,7 @@ export default function PilotagePage() {
                 {/* Graphe — cliquable */}
                 <div style={{ ...card, padding: "16px 8px 12px" }}>
                   <p style={{ ...sectionLabel, margin: "0 0 4px 12px" }}>CA SEMAINE</p>
-                  <p style={{ margin: "0 0 12px 12px", fontSize: 10, color: "#bbb" }}>Clique sur une barre pour le détail</p>
+                  {!isPiccola && <p style={{ margin: "0 0 12px 12px", fontSize: 10, color: "#bbb" }}>Clique sur une barre pour le détail</p>}
                   <ResponsiveContainer width="100%" height={180}>
                     <BarChart data={s.semaine.days} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0ebe3" vertical={false} />
