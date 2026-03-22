@@ -387,11 +387,14 @@ export default function EventForm({ eventId }: { eventId?: string }) {
       } else {
         setSaveSuccess(true);
         setSaving(false);
-        setTimeout(() => setSaveSuccess(false), 2000);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        setTimeout(() => setSaveSuccess(false), 2500);
       }
     } catch (e) {
+      console.error("EventForm save error:", e);
       setSaveError(e instanceof Error ? e.message : "Erreur");
       setSaving(false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
