@@ -412,7 +412,7 @@ async function loadDailySalesStats(etabId: string, weekStr: string): Promise<Sta
   const monday = isoWeekToMonday(weekStr);
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
   // Current week
   const { data: rows } = await supabase
