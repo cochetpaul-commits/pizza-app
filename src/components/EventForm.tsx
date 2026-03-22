@@ -451,7 +451,14 @@ export default function EventForm({ eventId }: { eventId?: string }) {
     <>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "12px 16px 60px" }}>
 
-        {/* ── Inline action buttons ── */}
+        {/* ── Back + action buttons ── */}
+        <button
+          type="button"
+          onClick={() => router.push("/evenements")}
+          style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 0", marginBottom: 6, display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "#999" }}
+        >
+          ← Événements
+        </button>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a" }}>
             {isNew ? "Nouvel evenement" : name || "Evenement"}
