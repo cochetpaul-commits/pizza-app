@@ -23,30 +23,29 @@ type Event = {
 
 const STATUS_LABELS: Record<string, string> = {
   prospect: "Prospect",
-  confirme: "Confirm\u00e9",
+  confirme: "Confirmé",
   en_cours: "En cours",
-  termine: "Termin\u00e9",
-  annule: "Annul\u00e9",
+  termine: "Terminé",
+  annule: "Annulé",
 };
 
-const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
-  prospect: { bg: "#e8e0d0", fg: "#999999" },
-  confirme: { bg: "#e8ede6", fg: "#4a6741" },
-  en_cours: { bg: "rgba(37,99,235,0.10)", fg: "#2563eb" },
-  termine: { bg: "#f0f0f0", fg: "#bbbbbb" },
-  annule: { bg: "rgba(220,38,38,0.10)", fg: "#DC2626" },
+const STATUS_COLORS: Record<string, { bg: string; fg: string; dot: string }> = {
+  prospect: { bg: "#f5f0e8", fg: "#8c7e6a", dot: "#c4b89a" },
+  confirme: { bg: "#e6f2e6", fg: "#2d6a2e", dot: "#4caf50" },
+  en_cours: { bg: "#e3effd", fg: "#1565c0", dot: "#2196f3" },
+  termine: { bg: "#f0f0f0", fg: "#aaa", dot: "#ccc" },
+  annule: { bg: "#fde8e8", fg: "#c62828", dot: "#ef5350" },
 };
 
 const TYPE_LABELS: Record<string, string> = {
   mariage: "Mariage",
-  seminaire: "S\u00e9minaire",
+  seminaire: "Séminaire",
   anniversaire: "Anniversaire",
-  bapteme: "Bapt\u00eame",
+  bapteme: "Baptême",
   repas_staff: "Repas staff",
   autre: "Autre",
 };
 
-// Type-based accent colors for left border
 const TYPE_COLORS: Record<string, string> = {
   mariage: "#8B6914",
   seminaire: "#2563EB",
@@ -56,21 +55,28 @@ const TYPE_COLORS: Record<string, string> = {
   autre: "#6B7280",
 };
 
-// Type icons (SVG inline)
-function TypeIcon({ type }: { type: string }) {
+const TYPE_BG: Record<string, string> = {
+  mariage: "rgba(139,105,20,0.07)",
+  seminaire: "rgba(37,99,235,0.07)",
+  anniversaire: "rgba(157,23,77,0.07)",
+  bapteme: "rgba(124,58,237,0.07)",
+  repas_staff: "rgba(217,119,6,0.07)",
+  autre: "rgba(107,114,128,0.07)",
+};
+
+function TypeIcon({ type, size = 22 }: { type: string; size?: number }) {
   const color = TYPE_COLORS[type] ?? "#6B7280";
-  const size = 28;
   switch (type) {
     case "mariage":
       return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
         </svg>
       );
     case "seminaire":
     case "repas_staff":
       return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="2" y="7" width="20" height="14" rx="2" />
           <path d="M16 3v4M8 3v4M2 11h20" />
         </svg>
@@ -78,14 +84,14 @@ function TypeIcon({ type }: { type: string }) {
     case "anniversaire":
     case "bapteme":
       return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 2v4M8 6h8l1 6H7l1-6zM5 12h14v2a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4v-2z" />
           <path d="M6 22h12" />
         </svg>
       );
     default:
       return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="10" />
           <path d="M12 8v4l3 3" />
         </svg>
@@ -93,12 +99,37 @@ function TypeIcon({ type }: { type: string }) {
   }
 }
 
+function CalendarIcon({ size = 18, color = "#D4775A" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  );
+}
+
+function UsersIcon({ size = 18, color = "#2563EB" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function EuroIcon({ size = 18, color = "#4a6741" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 5.5C15.8 4.6 14.4 4 12.8 4 9 4 6 7.6 6 12s3 8 6.8 8c1.6 0 3-.6 4.2-1.5" />
+      <line x1="4" y1="10" x2="15" y2="10" /><line x1="4" y1="14" x2="15" y2="14" />
+    </svg>
+  );
+}
+
 const MONTH_NAMES = [
-  "Janvier", "F\u00e9vrier", "Mars", "Avril", "Mai", "Juin",
-  "Juillet", "Ao\u00fbt", "Septembre", "Octobre", "Novembre", "D\u00e9cembre",
+  "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
 ];
 
-const DAY_HEADERS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+const DAY_HEADERS = ["L", "M", "M", "J", "V", "S", "D"];
 
 function getCalendarDays(year: number, month: number): (number | null)[] {
   const first = new Date(year, month, 1);
@@ -111,7 +142,7 @@ function getCalendarDays(year: number, month: number): (number | null)[] {
 }
 
 function fmtDate(iso: string | null) {
-  if (!iso) return "\u2014";
+  if (!iso) return "—";
   return new Date(iso + "T00:00:00").toLocaleDateString("fr-FR", {
     weekday: "short",
     day: "numeric",
@@ -129,8 +160,7 @@ function daysUntil(iso: string | null): number | null {
   const target = new Date(iso + "T00:00:00");
   const now = new Date();
   now.setHours(0, 0, 0, 0);
-  const diff = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  return diff;
+  return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 function detectOverlaps(events: Event[]): Set<string> {
@@ -158,7 +188,6 @@ export default function EventsPage() {
   const [filter, setFilter] = useState<"upcoming" | "all" | "past">("upcoming");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
-  // Calendar state
   const now = new Date();
   const [calYear, setCalYear] = useState(now.getFullYear());
   const [calMonth, setCalMonth] = useState(now.getMonth());
@@ -198,7 +227,7 @@ export default function EventsPage() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // KPIs
+  // KPIs — upcoming events only
   const upcoming = events.filter((e) => e.date && e.date >= today && !["annule", "termine"].includes(e.status));
   const kpiCount = upcoming.length;
   const kpiCovers = upcoming.reduce((s, e) => s + (e.covers ?? 0), 0);
@@ -207,7 +236,6 @@ export default function EventsPage() {
   // Filtered events for list
   const filtered = useMemo(() => {
     let list = events;
-    // If a date is selected from calendar, filter to that date
     if (selectedDate) {
       list = list.filter((e) => e.date === selectedDate);
     } else {
@@ -222,98 +250,234 @@ export default function EventsPage() {
 
   const overlaps = detectOverlaps(events);
 
+  // Next event for hero
+  const nextEvent = upcoming[0] ?? null;
+
   return (
     <RequireRole allowedRoles={["group_admin"]}>
     <>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "12px 16px 100px" }}>
-        <h1 style={{ fontSize: "1.4rem", fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", letterSpacing: 1.5, textTransform: "uppercase" as const, color: "#2f3a33", margin: "0 0 16px" }}>
-          Evenementiel
-        </h1>
+
+        {/* ═══ HEADER ═══ */}
+        <div style={{ marginBottom: 20 }}>
+          <h1 style={{
+            fontSize: "1.5rem", fontWeight: 700,
+            fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+            letterSpacing: 1.5, textTransform: "uppercase" as const,
+            color: "#1a1a1a", margin: 0,
+          }}>
+            Événementiel
+          </h1>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: "#9a8f84" }}>
+            {kpiCount > 0
+              ? `${kpiCount} événement${kpiCount > 1 ? "s" : ""} à venir`
+              : "Aucun événement prévu"
+            }
+          </p>
+        </div>
 
         {/* ═══ KPI CARDS ═══ */}
         {!loading && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 20 }}>
-            <div style={kpiCard}>
-              <div style={kpiValue}>{kpiCount}</div>
-              <div style={kpiLabel}>{kpiCount <= 1 ? "Evenement" : "Evenements"}</div>
-              <div style={kpiSub}>a venir</div>
+            {/* Events count */}
+            <div style={kpiCardStyle}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: "rgba(212,119,90,0.10)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <CalendarIcon size={16} color="#D4775A" />
+                </div>
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a", lineHeight: 1 }}>
+                {kpiCount}
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#9a8f84", marginTop: 4, letterSpacing: 0.3 }}>
+                À venir
+              </div>
             </div>
-            <div style={kpiCard}>
-              <div style={kpiValue}>{kpiCovers}</div>
-              <div style={kpiLabel}>Couverts</div>
-              <div style={kpiSub}>prevus</div>
+
+            {/* Covers */}
+            <div style={kpiCardStyle}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: "rgba(37,99,235,0.08)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <UsersIcon size={16} color="#2563EB" />
+                </div>
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a", lineHeight: 1 }}>
+                {kpiCovers}
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#9a8f84", marginTop: 4, letterSpacing: 0.3 }}>
+                Couverts
+              </div>
             </div>
-            <div style={kpiCard}>
-              <div style={{ ...kpiValue, color: "#4a6741" }}>{kpiRevenue > 0 ? `${kpiRevenue.toLocaleString("fr-FR")}` : "0"}</div>
-              <div style={kpiLabel}>EUR</div>
-              <div style={kpiSub}>CA previsionnel</div>
+
+            {/* Revenue */}
+            <div style={kpiCardStyle}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: "rgba(74,103,65,0.08)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <EuroIcon size={16} color="#4a6741" />
+                </div>
+              </div>
+              <div style={{
+                fontSize: kpiRevenue > 0 ? 28 : 20, fontWeight: 800,
+                fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                color: kpiRevenue > 0 ? "#4a6741" : "#ccc",
+                lineHeight: 1,
+              }}>
+                {kpiRevenue > 0 ? `${kpiRevenue.toLocaleString("fr-FR")} €` : "—"}
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#9a8f84", marginTop: 4, letterSpacing: 0.3 }}>
+                CA prévisionnel
+              </div>
+              {kpiRevenue === 0 && kpiCount > 0 && (
+                <div style={{ fontSize: 9, color: "#D4775A", marginTop: 2, fontStyle: "italic" }}>
+                  Renseignez le prix sur vos events
+                </div>
+              )}
             </div>
           </div>
         )}
+
+        {/* ═══ NEXT EVENT BANNER ═══ */}
+        {!loading && nextEvent && (() => {
+          const jours = daysUntil(nextEvent.date);
+          const tc = TYPE_COLORS[nextEvent.type] ?? "#6B7280";
+          return (
+            <Link href={`/evenements/${nextEvent.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+              <div style={{
+                marginBottom: 20,
+                background: `linear-gradient(135deg, ${tc}12 0%, ${tc}06 100%)`,
+                border: `1px solid ${tc}25`,
+                borderRadius: 14,
+                padding: "14px 16px",
+                display: "flex", alignItems: "center", gap: 14,
+                cursor: "pointer",
+              }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: 12,
+                  background: `${tc}15`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  flexShrink: 0,
+                }}>
+                  <TypeIcon type={nextEvent.type} size={24} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: tc, textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>
+                    Prochain événement
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>
+                    {nextEvent.name}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#6f6a61", marginTop: 2 }}>
+                    {fmtDate(nextEvent.date)}{nextEvent.time ? ` · ${fmtTime(nextEvent.time)}` : ""}
+                    {nextEvent.covers > 0 ? ` · ${nextEvent.covers} couv.` : ""}
+                  </div>
+                </div>
+                {jours !== null && jours >= 0 && (
+                  <div style={{
+                    textAlign: "center", flexShrink: 0,
+                    background: jours <= 3 ? "#D4775A" : tc,
+                    color: "#fff",
+                    borderRadius: 10, padding: "6px 12px",
+                    minWidth: 44,
+                  }}>
+                    <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1 }}>
+                      {jours === 0 ? "!" : jours}
+                    </div>
+                    <div style={{ fontSize: 9, fontWeight: 600, opacity: 0.9, marginTop: 1 }}>
+                      {jours === 0 ? "Auj." : jours === 1 ? "demain" : "jours"}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Link>
+          );
+        })()}
 
         {/* ═══ COMPACT CALENDAR ═══ */}
         {!loading && (() => {
           const cells = getCalendarDays(calYear, calMonth);
           const todayStr = new Date().toISOString().slice(0, 10);
           return (
-            <div style={{ marginBottom: 20, background: "#fff", borderRadius: 12, border: "1px solid #ddd6c8", overflow: "hidden" }}>
+            <div style={{
+              marginBottom: 20, background: "#fff", borderRadius: 14,
+              border: "1px solid #e8e2d8",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.03)",
+              overflow: "hidden",
+            }}>
               {/* Month nav */}
               <div style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "10px 14px", borderBottom: "1px solid #f0ebe3",
+                padding: "12px 16px", background: "#faf8f5",
+                borderBottom: "1px solid #f0ebe3",
               }}>
-                <button onClick={prevMonth} style={calNavBtn}>{"\u2190"}</button>
-                <span style={{ fontSize: 14, fontWeight: 800, color: "#2f3a33" }}>
+                <button onClick={prevMonth} style={calNavBtn}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#6f6a61" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                </button>
+                <span style={{
+                  fontSize: 14, fontWeight: 800, color: "#1a1a1a",
+                  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                  textTransform: "uppercase", letterSpacing: 1,
+                }}>
                   {MONTH_NAMES[calMonth]} {calYear}
                 </span>
-                <button onClick={nextMonth} style={calNavBtn}>{"\u2192"}</button>
+                <button onClick={nextMonth} style={calNavBtn}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#6f6a61" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                </button>
               </div>
 
               {/* Day headers */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
-                {DAY_HEADERS.map((d) => (
-                  <div key={d} style={{
-                    padding: "6px 0", textAlign: "center",
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "8px 4px 4px" }}>
+                {DAY_HEADERS.map((d, i) => (
+                  <div key={`${d}-${i}`} style={{
+                    textAlign: "center",
                     fontSize: 10, fontWeight: 700, color: "#b0a894",
                     textTransform: "uppercase", letterSpacing: 0.5,
                   }}>{d}</div>
                 ))}
               </div>
 
-              {/* Day cells — compact */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+              {/* Day cells */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "0 4px 8px", gap: 2 }}>
                 {cells.map((day, i) => {
-                  if (day == null) {
-                    return <div key={`empty-${i}`} style={{ height: 38, background: "#faf7f2" }} />;
-                  }
+                  if (day == null) return <div key={`empty-${i}`} style={{ height: 36 }} />;
+
                   const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                   const dayEvents = eventsByDate.get(dateStr) ?? [];
                   const hasEvents = dayEvents.length > 0;
                   const isToday = dateStr === todayStr;
                   const isSelected = dateStr === selectedDate;
-                  const isWeekend = i % 7 >= 5;
+
                   return (
                     <button
                       key={dateStr}
                       type="button"
                       onClick={() => {
-                        if (selectedDate === dateStr) {
-                          setSelectedDate(null);
-                        } else if (hasEvents) {
-                          setSelectedDate(dateStr);
-                        }
+                        if (selectedDate === dateStr) setSelectedDate(null);
+                        else if (hasEvents) setSelectedDate(dateStr);
                       }}
                       style={{
-                        height: 38,
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 2,
-                        border: "none",
+                        height: 36,
+                        display: "flex", flexDirection: "column",
+                        alignItems: "center", justifyContent: "center",
+                        gap: 1, border: "none",
                         cursor: hasEvents ? "pointer" : "default",
-                        background: isSelected ? "#D4775A" : isToday ? "rgba(212,119,90,0.08)" : isWeekend ? "#faf7f2" : "#fff",
-                        borderRadius: 0,
+                        background: isSelected
+                          ? "#D4775A"
+                          : isToday
+                            ? "rgba(212,119,90,0.08)"
+                            : "transparent",
+                        borderRadius: 8,
                         position: "relative",
                       }}
                     >
@@ -328,8 +492,8 @@ export default function EventsPage() {
                         <div style={{ display: "flex", gap: 2 }}>
                           {dayEvents.slice(0, 3).map((ev) => (
                             <span key={ev.id} style={{
-                              width: 5, height: 5, borderRadius: "50%",
-                              background: isSelected ? "rgba(255,255,255,0.7)" : (TYPE_COLORS[ev.type] ?? "#999"),
+                              width: 4, height: 4, borderRadius: "50%",
+                              background: isSelected ? "rgba(255,255,255,0.8)" : (TYPE_COLORS[ev.type] ?? "#999"),
                               display: "inline-block",
                             }} />
                           ))}
@@ -340,10 +504,15 @@ export default function EventsPage() {
                 })}
               </div>
 
-              {/* Legend dots */}
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", padding: "8px 14px", borderTop: "1px solid #f0ebe3", fontSize: 10, color: "#9a8f84" }}>
+              {/* Legend */}
+              <div style={{
+                display: "flex", gap: 14, flexWrap: "wrap",
+                padding: "8px 16px", borderTop: "1px solid #f0ebe3",
+                background: "#faf8f5",
+                fontSize: 10, color: "#9a8f84",
+              }}>
                 {Object.entries(TYPE_COLORS).slice(0, 4).map(([type, color]) => (
-                  <span key={type} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                  <span key={type} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                     <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, display: "inline-block" }} />
                     {TYPE_LABELS[type] ?? type}
                   </span>
@@ -355,63 +524,93 @@ export default function EventsPage() {
 
         {/* Selected date indicator */}
         {selectedDate && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#2f3a33" }}>
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            marginBottom: 14, padding: "8px 14px",
+            background: "rgba(212,119,90,0.06)", borderRadius: 10,
+            border: "1px solid rgba(212,119,90,0.15)",
+          }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
               {new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
             </span>
             <button
               type="button"
               onClick={() => setSelectedDate(null)}
-              style={{ background: "none", border: "none", color: "#D4775A", fontSize: 12, fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}
+              style={{
+                background: "none", border: "none",
+                color: "#D4775A", fontSize: 12, fontWeight: 700,
+                cursor: "pointer",
+              }}
             >
               Voir tout
             </button>
           </div>
         )}
 
-        {/* ═══ FILTERS (when no date selected) ═══ */}
+        {/* ═══ FILTERS ═══ */}
         {!selectedDate && (
           <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-            {(["upcoming", "all", "past"] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                style={{
-                  padding: "6px 14px",
-                  borderRadius: 8,
-                  border: "1px solid #ddd6c8",
-                  background: filter === f ? "#D4775A" : "#fff",
-                  color: filter === f ? "#fff" : "#2f3a33",
-                  fontWeight: 700,
-                  fontSize: 13,
-                  cursor: "pointer",
-                }}
-              >
-                {f === "upcoming" ? "\u00c0 venir" : f === "all" ? "Tous" : "Pass\u00e9s"}
-              </button>
-            ))}
+            {(["upcoming", "all", "past"] as const).map((f) => {
+              const active = filter === f;
+              return (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  style={{
+                    padding: "6px 16px",
+                    borderRadius: 20,
+                    border: active ? "1.5px solid #D4775A" : "1px solid #ddd6c8",
+                    background: active ? "#D4775A" : "#fff",
+                    color: active ? "#fff" : "#6f6a61",
+                    fontWeight: 700,
+                    fontSize: 12,
+                    cursor: "pointer",
+                    letterSpacing: 0.2,
+                  }}
+                >
+                  {f === "upcoming" ? "À venir" : f === "all" ? "Tous" : "Passés"}
+                </button>
+              );
+            })}
           </div>
         )}
 
-        {loading && <p className="muted">Chargement\u2026</p>}
+        {loading && <p className="muted">Chargement…</p>}
 
-        {/* ═══ EVENT LIST ═══ */}
+        {/* ═══ EMPTY STATE ═══ */}
         {!loading && filtered.length === 0 && (
-          <div className="card" style={{ textAlign: "center", padding: "2rem" }}>
-            <p className="muted">{selectedDate ? "Aucun evenement ce jour" : "Aucun evenement"}</p>
+          <div style={{
+            textAlign: "center", padding: "3rem 1.5rem",
+            background: "#fff", borderRadius: 14,
+            border: "1px solid #e8e2d8",
+          }}>
+            <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.3 }}>
+              <CalendarIcon size={40} color="#ccc" />
+            </div>
+            <p style={{ color: "#9a8f84", fontSize: 14, margin: "0 0 16px" }}>
+              {selectedDate ? "Aucun événement ce jour" : "Aucun événement"}
+            </p>
             {!selectedDate && (
-              <Link href="/evenements/new" className="btn btnPrimary" style={{ marginTop: 12, background: "#D4775A", borderColor: "#D4775A" }}>
-                Creer le premier
+              <Link href="/evenements/new" style={{
+                display: "inline-block",
+                padding: "10px 24px", borderRadius: 20,
+                background: "#D4775A", color: "#fff",
+                fontWeight: 700, fontSize: 13,
+                textDecoration: "none",
+              }}>
+                Créer le premier
               </Link>
             )}
           </div>
         )}
 
+        {/* ═══ EVENT LIST ═══ */}
         {!loading && filtered.length > 0 && (
           <div style={{ display: "grid", gap: 10 }}>
             {filtered.map((e) => {
               const sc = STATUS_COLORS[e.status] ?? STATUS_COLORS.prospect;
               const typeColor = TYPE_COLORS[e.type] ?? "#6B7280";
+              const typeBg = TYPE_BG[e.type] ?? "rgba(107,114,128,0.07)";
               const isOverlap = overlaps.has(e.id);
               const jours = daysUntil(e.date);
               const isUpcoming = jours !== null && jours >= 0 && !["termine", "annule"].includes(e.status);
@@ -421,24 +620,30 @@ export default function EventsPage() {
                   <div
                     style={{
                       background: "#fff",
-                      borderRadius: 12,
-                      border: "1px solid #ddd6c8",
-                      borderLeft: `5px solid ${typeColor}`,
+                      borderRadius: 14,
+                      border: "1px solid #e8e2d8",
+                      borderLeft: `4px solid ${typeColor}`,
                       padding: "14px 16px",
                       cursor: "pointer",
                       position: "relative",
-                      transition: "box-shadow 150ms ease",
-                      ...(isOverlap ? { boxShadow: "inset 0 0 0 2px rgba(220,38,38,0.35)" } : {}),
+                      transition: "transform 120ms ease, box-shadow 120ms ease",
+                      ...(isOverlap ? { boxShadow: "inset 0 0 0 2px rgba(220,38,38,0.3)" } : {}),
                     }}
-                    onMouseEnter={(ev) => { if (!isOverlap) ev.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; }}
-                    onMouseLeave={(ev) => { if (!isOverlap) ev.currentTarget.style.boxShadow = "none"; }}
+                    onMouseEnter={(ev) => {
+                      ev.currentTarget.style.transform = "translateY(-1px)";
+                      if (!isOverlap) ev.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.06)";
+                    }}
+                    onMouseLeave={(ev) => {
+                      ev.currentTarget.style.transform = "none";
+                      if (!isOverlap) ev.currentTarget.style.boxShadow = "none";
+                    }}
                   >
                     {isOverlap && (
                       <span style={{
                         position: "absolute", top: 8, right: 10,
                         fontSize: 9, fontWeight: 800, color: "#DC2626",
-                        background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.25)",
-                        borderRadius: 6, padding: "2px 6px",
+                        background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.2)",
+                        borderRadius: 6, padding: "2px 7px",
                       }}>
                         Chevauchement
                       </span>
@@ -447,8 +652,8 @@ export default function EventsPage() {
                     <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                       {/* Type icon */}
                       <div style={{
-                        width: 44, height: 44, borderRadius: 10,
-                        background: `${typeColor}10`,
+                        width: 44, height: 44, borderRadius: 12,
+                        background: typeBg,
                         display: "flex", alignItems: "center", justifyContent: "center",
                         flexShrink: 0,
                       }}>
@@ -459,12 +664,12 @@ export default function EventsPage() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                           <div style={{ minWidth: 0 }}>
-                            <p style={{ margin: 0, fontWeight: 800, fontSize: 15, color: "#2f3a33", lineHeight: 1.3 }}>
+                            <p style={{ margin: 0, fontWeight: 800, fontSize: 15, color: "#1a1a1a", lineHeight: 1.3 }}>
                               {e.name}
                             </p>
                             <p style={{ margin: "3px 0 0", fontSize: 12, color: "#9a8f84" }}>
                               {TYPE_LABELS[e.type] ?? e.type}
-                              {e.location ? ` \u00b7 ${e.location}` : ""}
+                              {e.contact_name ? ` · ${e.contact_name}` : ""}
                             </p>
                           </div>
                           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
@@ -472,13 +677,15 @@ export default function EventsPage() {
                               fontSize: 10, fontWeight: 700,
                               padding: "3px 10px", borderRadius: 20,
                               background: sc.bg, color: sc.fg,
+                              display: "inline-flex", alignItems: "center", gap: 4,
                             }}>
+                              <span style={{ width: 5, height: 5, borderRadius: "50%", background: sc.dot, display: "inline-block" }} />
                               {STATUS_LABELS[e.status] ?? e.status}
                             </span>
                             {isUpcoming && jours !== null && (
                               <span style={{
                                 fontSize: 10, fontWeight: 800,
-                                color: jours <= 7 ? "#D4775A" : "#6f6a61",
+                                color: jours <= 7 ? "#D4775A" : "#9a8f84",
                               }}>
                                 {jours === 0 ? "Aujourd\u2019hui" : jours === 1 ? "Demain" : `J-${jours}`}
                               </span>
@@ -487,27 +694,28 @@ export default function EventsPage() {
                         </div>
 
                         {/* Bottom row */}
-                        <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                          <span style={{ fontSize: 12, color: "#6f6a61", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#9a8f84" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-                            </svg>
-                            {fmtDate(e.date)}{e.time ? ` \u00b7 ${fmtTime(e.time)}` : ""}
+                        <div style={{
+                          marginTop: 10, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
+                          padding: "8px 0 0",
+                          borderTop: "1px solid #f5f0e8",
+                        }}>
+                          <span style={{ fontSize: 12, color: "#6f6a61", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                            <CalendarIcon size={13} color="#b0a894" />
+                            {fmtDate(e.date)}{e.time ? ` · ${fmtTime(e.time)}` : ""}
                           </span>
                           {e.covers > 0 && (
-                            <span style={{ fontSize: 12, fontWeight: 700, color: "#2f3a33", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#9a8f84" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                              </svg>
-                              {e.covers} couverts
+                            <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                              <UsersIcon size={13} color="#b0a894" />
+                              {e.covers} couv.
                             </span>
                           )}
                           {e.sell_price != null && e.sell_price > 0 && (
                             <span style={{
                               fontSize: 13, fontWeight: 800, color: "#4a6741",
                               marginLeft: "auto",
+                              display: "inline-flex", alignItems: "center", gap: 4,
                             }}>
-                              {e.sell_price.toLocaleString("fr-FR")} \u20ac
+                              {e.sell_price.toLocaleString("fr-FR")} €
                             </span>
                           )}
                         </div>
@@ -521,29 +729,29 @@ export default function EventsPage() {
         )}
       </div>
 
-      {/* ═══ FAB — Nouvel evenement ═══ */}
+      {/* ═══ FAB ═══ */}
       <Link
         href="/evenements/new"
         style={{
           position: "fixed",
           bottom: 80,
           right: 20,
-          width: 52,
-          height: 52,
+          width: 54,
+          height: 54,
           borderRadius: "50%",
-          background: "#D4775A",
+          background: "linear-gradient(135deg, #D4775A 0%, #c66a4f 100%)",
           color: "#fff",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          boxShadow: "0 4px 16px rgba(212,119,90,0.4)",
+          boxShadow: "0 4px 20px rgba(212,119,90,0.45), 0 2px 8px rgba(0,0,0,0.1)",
           textDecoration: "none",
           fontSize: 28,
           fontWeight: 300,
           lineHeight: 1,
           zIndex: 50,
         }}
-        title="Nouvel evenement"
+        title="Nouvel événement"
       >
         +
       </Link>
@@ -554,47 +762,21 @@ export default function EventsPage() {
 
 /* ── Styles ── */
 
-const kpiCard: React.CSSProperties = {
+const kpiCardStyle: React.CSSProperties = {
   background: "#fff",
-  borderRadius: 12,
-  border: "1px solid #ddd6c8",
-  padding: "14px 12px",
-  textAlign: "center",
-};
-
-const kpiValue: React.CSSProperties = {
-  fontSize: 24,
-  fontWeight: 800,
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-  color: "#2f3a33",
-  lineHeight: 1.1,
-};
-
-const kpiLabel: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  color: "#6f6a61",
-  textTransform: "uppercase",
-  letterSpacing: 0.5,
-  marginTop: 2,
-};
-
-const kpiSub: React.CSSProperties = {
-  fontSize: 10,
-  color: "#b0a894",
-  marginTop: 1,
+  borderRadius: 14,
+  border: "1px solid #e8e2d8",
+  padding: "14px 14px 12px",
+  boxShadow: "0 1px 4px rgba(0,0,0,0.02)",
 };
 
 const calNavBtn: React.CSSProperties = {
   width: 30,
   height: 30,
   borderRadius: 8,
-  border: "1px solid #ddd6c8",
+  border: "1px solid #e8e2d8",
   background: "#fff",
   cursor: "pointer",
-  fontSize: 14,
-  fontWeight: 700,
-  color: "#6f6a61",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
