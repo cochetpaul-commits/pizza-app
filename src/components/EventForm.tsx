@@ -114,6 +114,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
   const [establishment, setEstablishment] = useState("both");
   const [status, setStatus] = useState("prospect");
   const [sellPrice, setSellPrice] = useState<number | null>(null);
+  const [sellPriceDisplay, setSellPriceDisplay] = useState("");
   const [notes, setNotes] = useState("");
 
   // Client
@@ -150,8 +151,8 @@ export default function EventForm({ eventId }: { eventId?: string }) {
       if (!u.user) return;
       setUserId(u.user.id);
 
-      let pQ = supabase.from("pizza_recipes").select("id,name,total_cost,nb_parts").eq("is_draft", false);
-      let kQ = supabase.from("kitchen_recipes").select("id,name,cost_per_portion").eq("is_draft", false);
+      let pQ = supabase.from("pizza_recipes").select("id,name");
+      let kQ = supabase.from("kitchen_recipes").select("id,name,cost_per_portion");
       let cQ = supabase.from("cocktails").select("id,name,total_cost").eq("is_draft", false);
       let eQ = supabase.from("recipes").select("id,name");
       if (etab) { pQ = pQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`); kQ = kQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`); cQ = cQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`); eQ = eQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`); }
@@ -163,8 +164,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
 
       const opts: RecipeOption[] = [];
       for (const r of pizzas.data ?? []) {
-        const cpp = r.nb_parts && r.nb_parts > 0 ? (r.total_cost ?? 0) / r.nb_parts : 0;
-        opts.push({ id: r.id, name: r.name, type: "pizza", cost_per_portion: Math.round(cpp * 100) / 100 });
+        opts.push({ id: r.id, name: r.name, type: "pizza", cost_per_portion: 0 });
       }
       for (const r of kitchens.data ?? []) {
         opts.push({ id: r.id, name: r.name, type: "cuisine", cost_per_portion: r.cost_per_portion ?? 0 });
@@ -206,6 +206,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
       setEstablishment(ev.establishment ?? "both");
       setStatus(ev.status ?? "prospect");
       setSellPrice(ev.sell_price);
+      setSellPriceDisplay(ev.sell_price != null ? String(ev.sell_price).replace(".", ",") : "");
       setNotes(ev.notes ?? "");
       setContactName(ev.contact_name ?? "");
       setContactPhone(ev.contact_phone ?? "");
@@ -560,15 +561,13 @@ export default function EventForm({ eventId }: { eventId?: string }) {
               <input
                 style={{ ...inputStyle, fontWeight: 700, fontSize: 15, flex: 1 }}
                 inputMode="decimal"
-                value={sellPrice != null ? String(sellPrice) : ""}
+                value={sellPriceDisplay}
                 onChange={(e) => {
-                  const raw = e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".");
-                  if (raw === "") {
-                    setSellPrice(null);
-                  } else {
-                    const n = parseFloat(raw);
-                    if (!isNaN(n)) setSellPrice(n);
-                  }
+                  const v = e.target.value.replace(/[^0-9.,]/g, "");
+                  setSellPriceDisplay(v);
+                  const norm = v.replace(",", ".");
+                  if (norm === "" || norm === ".") { setSellPrice(null); }
+                  else { const n = parseFloat(norm); if (!isNaN(n)) setSellPrice(n); }
                 }}
                 placeholder="3500"
               />
