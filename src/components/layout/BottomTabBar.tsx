@@ -3,6 +3,7 @@
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
+import { useEtablissement } from "@/lib/EtablissementContext";
 
 /* ── Icons ────────────────────────────────────────── */
 
@@ -268,6 +269,7 @@ export function BottomTabBar({ onMenuClick }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const { role } = useProfile();
+  const { current, isGroupView } = useEtablissement();
 
   if (!role) return null;
 
@@ -276,6 +278,11 @@ export function BottomTabBar({ onMenuClick }: Props) {
   // If inside a section with sub-tabs → show sub-tabs
   // Otherwise → show the 5 hub tabs (level 1)
   const showSubTabs = activeSection && activeSection.tabs.length > 0;
+
+  // Determine establishment home route
+  const etabHome = current?.slug?.includes("bello") ? "/bello-mio"
+    : current?.slug?.includes("piccola") ? "/piccola-mia"
+    : null;
 
   return (
     <nav className="bottom-tab-bar" style={{
@@ -297,13 +304,21 @@ export function BottomTabBar({ onMenuClick }: Props) {
         maxWidth: 500,
         margin: "0 auto",
       }}>
-        {/* Menu button — goes back to level 1 (hubs) when in sub-tabs, opens sidebar otherwise */}
+        {/* Menu button:
+            - sub-tabs visible → back to level 1 hubs (go to dashboard or etab home)
+            - level 1 + establishment selected → go to establishment dashboard
+            - level 1 + group view → open sidebar */}
         <button
           type="button"
           onClick={() => {
             if (showSubTabs) {
-              router.push("/dashboard");
+              // Back to level 1: navigate to etab home or group dashboard
+              router.push(etabHome ?? "/dashboard");
+            } else if (etabHome && !isGroupView) {
+              // At level 1 with an establishment selected → go to its dashboard
+              router.push(etabHome);
             } else {
+              // At level 1 in group view → open sidebar
               onMenuClick();
             }
           }}
