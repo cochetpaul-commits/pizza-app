@@ -128,6 +128,13 @@ export default function DashboardPage() {
   const { isGroupView, current, etablissements, setCurrent, setGroupView } = useEtablissement();
   const isAdmin = isGroupAdmin;
 
+  // Always show group view on dashboard for admins
+  useEffect(() => {
+    if (isGroupAdmin && !isGroupView) {
+      setGroupView(true);
+    }
+  }, [isGroupAdmin, isGroupView, setGroupView]);
+
   const [ca, setCa] = useState<CaData>(null);
   const [caPM, setCaPM] = useState<PmData>(null);
   const [caYesterday, setCaYesterday] = useState<number | null>(null);
