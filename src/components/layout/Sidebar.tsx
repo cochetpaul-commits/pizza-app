@@ -209,8 +209,12 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <button
           type="button"
           onClick={() => {
-            if (items.length > 0) toggleHub(hubKey);
-            if (sub.href) { router.push(sub.href); onNavigate?.(); }
+            if (items.length > 0) {
+              toggleHub(hubKey);
+            } else if (sub.href) {
+              router.push(sub.href);
+              onNavigate?.();
+            }
           }}
           onMouseEnter={() => setHoveredHub(hubKey)}
           onMouseLeave={() => setHoveredHub(null)}
