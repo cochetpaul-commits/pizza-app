@@ -81,6 +81,7 @@ export const PLANNING_ITEMS: NavItemV2[] = [
 export const ACHATS_ITEMS: NavItemV2[] = [
   { label: "Stats d'achats", href: "/stats-achats", icon: "barChart" },
   { label: "Factures", href: "/achats", icon: "fileText" },
+  { label: "Import auto", href: "/factures-auto", icon: "mail" },
   { label: "Base produits", href: "/ingredients", icon: "tag" },
 ];
 
@@ -316,6 +317,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/mes-shifts": "Mon planning",
   "/notifications": "Notifications",
   "/kezia": "Import Kezia",
+  "/factures-auto": "Import factures auto",
   "/session": "Session",
   "/recettes/new/pizza": "Nouvelle pizza",
   "/recettes/new/cuisine": "Nouvelle recette cuisine",
