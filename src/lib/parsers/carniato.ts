@@ -77,8 +77,9 @@ export function parseCarniato(text: string, etablissement: string): ParseResult 
   const detectedEtab = detectEtablissement(text);
   const etab = etablissement || detectedEtab || "bello_mio";
 
-  // Only parse page 1 (page 2 is CGV)
-  const page1 = text.split("\n")[0] || text;
+  // Only parse page 1 (page 2 is CGV — starts with "CONDITIONS GENERALES")
+  const cgvIdx = text.indexOf("CONDITIONS GENERALES");
+  const page1 = cgvIdx > 0 ? text.slice(0, cgvIdx) : text;
 
   const ingredients: ParsedIngredient[] = [];
   const logs: ParseLog[] = [];
