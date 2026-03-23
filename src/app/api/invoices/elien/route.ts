@@ -1,0 +1,66 @@
+import { NextResponse } from "next/server";
+import { pdfToText } from "@/lib/pdfToText";
+import { createClient } from "@supabase/supabase-js";
+import { runImport } from "@/lib/invoices/importEngine";
+import { parseElienInvoiceText } from "@/lib/invoices/elien";
+import { resolveEtabId, EtabError } from "@/lib/getEtablissement";
+
+export const runtime = "nodejs";
+
+function getEnv(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing env: ${name}`);
+  return v;
+}
+
+export async function POST(req: Request) {
+  try {
+    const form = await req.formData();
+    const file = form.get("file");
+    const mode = String(form.get("mode") ?? "preview");
+    const establishment = (String(form.get("establishment") ?? "bellomio")) as "bellomio" | "piccola" | "both";
+
+    if (!(file instanceof File)) {
+      return NextResponse.json({ ok: false, error: "Fichier manquant (field: file)." }, { status: 400 });
+    }
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      return NextResponse.json({ ok: false, error: "Seuls les .pdf sont supportés." }, { status: 400 });
+    }
+
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const text = await pdfToText(bytes);
+    const payload = parseElienInvoiceText(text);
+
+    const supabase = createClient(getEnv("NEXT_PUBLIC_SUPABASE_URL"), getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"), {
+      global: { headers: { Authorization: req.headers.get("authorization") ?? "" } },
+    });
+
+    const { data: auth, error: authErr } = await supabase.auth.getUser();
+    if (authErr) return NextResponse.json({ ok: false, error: authErr.message }, { status: 401 });
+    const userId = auth?.user?.id ?? null;
+    if (!userId) return NextResponse.json({ ok: false, error: "Non authentifié." }, { status: 401 });
+
+    let etabId: string;
+    try {
+      ({ etabId } = await resolveEtabId(userId, req.headers));
+    } catch (e) {
+      if (e instanceof EtabError) return NextResponse.json({ ok: false, error: e.message }, { status: e.status });
+      throw e;
+    }
+
+    const result = await runImport({
+      supabase, userId, supplierName: "ELIEN",
+      payload, sourceFileName: file.name, rawText: text, mode, establishment,
+      defaultUnit: "l", etabId,
+    });
+
+    return NextResponse.json({
+      ok: true, kind: "elien", filename: file.name, bytes: bytes.byteLength,
+      invoice: { id: result.invoiceId, already_imported: result.invoiceAlreadyImported },
+      inserted: { supplier_id: result.supplierId, ingredients_created: result.ingredientsCreated, offers_inserted: result.offersInserted },
+      parsed: payload,
+    });
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e || "Erreur import") }, { status: 500 });
+  }
+}

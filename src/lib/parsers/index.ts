@@ -18,6 +18,7 @@ import { parseVinoflo } from "./vinoflo";
 import { parseMasse } from "./masse";
 import { parseLmdw } from "./lmdw";
 import { parseSdpf } from "./sdpf";
+import { parseElien } from "./elien";
 import { parseGeneric } from "./generic";
 
 export type { ParseResult, ParsedIngredient, ParseLog, Categorie, Confidence } from "./types";
@@ -40,6 +41,7 @@ const PARSERS: Record<string, (text: string, etab: string) => ParseResult> = {
   masse: parseMasse,
   lmdw: parseLmdw,
   sdpf: parseSdpf,
+  elien: parseElien,
 };
 
 export function parseInvoice(options: ParserOptions): ParseResult {

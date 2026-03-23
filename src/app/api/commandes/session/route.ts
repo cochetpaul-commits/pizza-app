@@ -145,6 +145,8 @@ export async function PATCH(req: NextRequest) {
       .select("id")
       .eq("role", "group_admin");
 
+    const commandeLink = `/commandes?supplier_id=${session.supplier_id}`;
+
     if (admins?.length) {
       await supabaseAdmin.from("notifications").insert(
         admins.map((a: { id: string }) => ({
@@ -152,7 +154,7 @@ export async function PATCH(req: NextRequest) {
           type: "alerte",
           titre: `Commande ${supplierName} a valider`,
           corps: `Une commande ${supplierName} attend votre validation.`,
-          lien: "/commandes",
+          lien: commandeLink,
           lu: false,
         })),
       );
@@ -162,7 +164,7 @@ export async function PATCH(req: NextRequest) {
     void notifyGroupAdmins({
       title: `Commande ${supplierName}`,
       body: `Une commande ${supplierName} attend votre validation.`,
-      url: "/commandes",
+      url: commandeLink,
     });
   }
 

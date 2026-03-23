@@ -31,6 +31,7 @@ const FOURNISSEURS = [
   { value: "sum", label: "Sum" },
   { value: "armor", label: "Armor" },
   { value: "sdpf", label: "SDPF" },
+  { value: "elien", label: "Eric Elien" },
 ];
 
 const ETABLISSEMENTS = [

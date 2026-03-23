@@ -22,6 +22,7 @@ const SUPPLIER_KEYWORDS: Record<string, string[]> = {
   armor: ["ARMOR EMBALLAGES", "ARMOR-EMBALLAGES", "CAUDAN"],
   lmdw: ["LMDW", "MAISON DU WHISKY", "SOCIETE NOUVELLE DE PRODUITS ALIMENTAIRES"],
   sdpf: ["S.D.P.F", "SDPF", "PROGOURMANDS", "PRODUITS FINS"],
+  elien: ["ERIC ELIEN", "ELIEN", "ARTISAN GLACIER", "ERIC-ELIEN"],
 };
 
 function containsKeyword(text: string, keywords: string[]): boolean {
