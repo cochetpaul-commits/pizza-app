@@ -115,7 +115,7 @@ export const CLIENTS_ITEMS = EVENEMENTIEL_ITEMS;
 
 /** Common sections for every establishment */
 const COMMON_SECTIONS: NavSubSection[] = [
-  { label: "Planning", icon: "calendar", href: "/plannings", items: PLANNING_ITEMS },
+  { label: "Personnel", icon: "users", href: "/personnel", items: PLANNING_ITEMS },
   { label: "Achats", icon: "shoppingBag", roles: ["group_admin"], items: ACHATS_ITEMS },
   { label: "Performances", icon: "barChart", roles: ["group_admin"], items: PERFORMANCES_ITEMS },
   { label: "Opérations", icon: "package", roles: ["group_admin"], items: OPERATIONS_ITEMS },
@@ -288,6 +288,7 @@ export const SIDEBAR_NAV: NavSection[] = [
 export const PAGE_TITLES: Record<string, string> = {
   "/dashboard": "Accueil",
   "/rh/equipe": "Salariés",
+  "/personnel": "Personnel",
   "/plannings": "Planning",
   "/rh/pointage": "Pointage",
   "/rh/conges": "Congés",
