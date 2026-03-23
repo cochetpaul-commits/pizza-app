@@ -195,6 +195,7 @@ export default function EmployeDetailPage() {
   const [avenantSalaire, setAvenantSalaire] = useState(0);
 
   // ── Contrat modal ──
+  const [contratTab, setContratTab] = useState<"contrat" | "paie">("contrat");
   const [contratEquipes, setContratEquipes] = useState<string[]>([]);
   const [contratManagers, setContratManagers] = useState<{ id: string; label: string }[]>([]);
   const [showContratModal, setShowContratModal] = useState(false);
@@ -498,6 +499,7 @@ export default function EmployeDetailPage() {
     setCHeures(c.heures_semaine);
     setCJours(c.jours_semaine);
     setCActif(c.actif);
+    setContratTab("contrat");
     loadContratEquipes();
     setShowContratModal(true);
   };
@@ -513,6 +515,7 @@ export default function EmployeDetailPage() {
     setCHeures(39);
     setCJours(5);
     setCActif(true);
+    setContratTab("contrat");
     loadContratEquipes();
     setShowContratModal(true);
   };
@@ -1878,12 +1881,12 @@ export default function EmployeDetailPage() {
 
             {/* ── Onglets Contrat / Paie ── */}
             <div style={{ display: "flex", borderRadius: 20, border: "1px solid #ddd6c8", overflow: "hidden", marginBottom: 16 }}>
-              <button type="button" id="contrat-tab-contrat" onClick={() => { document.getElementById("contrat-section-paie")!.style.display = "none"; document.getElementById("contrat-section-contrat")!.style.display = "block"; document.getElementById("contrat-tab-contrat")!.style.background = "#f0ebe3"; document.getElementById("contrat-tab-paie")!.style.background = "#fff"; }} style={{ flex: 1, padding: "8px 0", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, background: "#f0ebe3" }}>Contrat</button>
-              <button type="button" id="contrat-tab-paie" onClick={() => { document.getElementById("contrat-section-contrat")!.style.display = "none"; document.getElementById("contrat-section-paie")!.style.display = "block"; document.getElementById("contrat-tab-paie")!.style.background = "#f0ebe3"; document.getElementById("contrat-tab-contrat")!.style.background = "#fff"; }} style={{ flex: 1, padding: "8px 0", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, background: "#fff" }}>Paie</button>
+              <button type="button" onClick={() => setContratTab("contrat")} style={{ flex: 1, padding: "8px 0", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, background: contratTab === "contrat" ? "#f0ebe3" : "#fff" }}>Contrat</button>
+              <button type="button" onClick={() => setContratTab("paie")} style={{ flex: 1, padding: "8px 0", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, background: contratTab === "paie" ? "#f0ebe3" : "#fff" }}>Paie</button>
             </div>
 
             {/* ── Section Contrat ── */}
-            <div id="contrat-section-contrat">
+            <div style={{ display: contratTab === "contrat" ? "block" : "none" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>CONTRAT</div>
 
               <div style={fieldRow}>
@@ -2031,7 +2034,7 @@ export default function EmployeDetailPage() {
             </div>
 
             {/* ── Section Paie ── */}
-            <div id="contrat-section-paie" style={{ display: "none" }}>
+            <div style={{ display: contratTab === "paie" ? "block" : "none" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>SALAIRE</div>
 
               <Checkbox label="Salarié au SMIC" checked={false} onChange={() => {}} />
