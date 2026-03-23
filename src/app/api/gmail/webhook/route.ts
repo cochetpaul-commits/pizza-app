@@ -44,10 +44,7 @@ async function resolveEtabId(slug: string | null): Promise<string | null> {
   return null;
 }
 
-async function findOrCreateSupplier(
-  name: string,
-  _etabId: string | null,
-): Promise<string | null> {
+async function findOrCreateSupplier(name: string): Promise<string | null> {
   // Search case-insensitive
   const { data: existing } = await supabaseAdmin
     .from("suppliers")
@@ -288,7 +285,7 @@ async function processMessage(messageId: string) {
       const supplierName = fournisseur
         ? fournisseur.charAt(0).toUpperCase() + fournisseur.slice(1)
         : "Unknown";
-      const supplierId = await findOrCreateSupplier(supplierName, etabId);
+      const supplierId = await findOrCreateSupplier(supplierName);
 
       if (!supplierId) {
         await logImport(messageId, from, subject, emailDate, pdf.filename, fournisseur, etabId, parseResult.invoice_number, 0, "error", "Impossible de créer le fournisseur");
