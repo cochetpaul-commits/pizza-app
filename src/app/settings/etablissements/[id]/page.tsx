@@ -35,6 +35,7 @@ type Settings = {
   cp_periode_jour: number;
   cp_periode_mois: number;
   repos_compensateurs_actif: boolean;
+  popina_location_id: string | null;
   actif: boolean;
 };
 
@@ -63,7 +64,7 @@ type Prime = {
   actif: boolean;
 };
 
-type Tab = "social" | "planification" | "modulation" | "pointeuse";
+type Tab = "social" | "planification" | "modulation" | "pointeuse" | "integrations";
 
 /* ── Constants ───────────────────────────────────────── */
 
@@ -1183,6 +1184,7 @@ export default function EtablissementDetailPage() {
           <button type="button" style={tabStyle("planification")} onClick={() => setTab("planification")}>Planification</button>
           <button type="button" style={tabStyle("modulation")} onClick={() => setTab("modulation")}>Modulation</button>
           <button type="button" style={tabStyle("pointeuse")} onClick={() => setTab("pointeuse")}>Pointeuse</button>
+          <button type="button" style={tabStyle("integrations")} onClick={() => setTab("integrations")}>Intégrations</button>
         </div>
 
         {/* Content */}
@@ -1244,6 +1246,82 @@ export default function EtablissementDetailPage() {
                   <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>L&apos;employe pointe depuis l&apos;application mobile Combo</div>
                 </div>
                 <Toggle value={true} onChange={() => {}} />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ═══ TAB: Intégrations ═══ */}
+        {tab === "integrations" && (
+          <>
+            <div style={CARD}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: "#1a1a1a" }}>Système de caisse</h2>
+              <p style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>Connectez votre logiciel de caisse pour importer automatiquement les données de vente (CA, couverts, tickets).</p>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                {[
+                  { name: "Popina", desc: "Caisse enregistreuse iPad", status: settings.popina_location_id ? "connected" : "disconnected", logo: "🟠" },
+                  { name: "Kezia", desc: "Logiciel de gestion", status: "disconnected", logo: "🔵" },
+                  { name: "Autre", desc: "Import CSV / API personnalisée", status: "disconnected", logo: "⚙️" },
+                ].map(sys => (
+                  <div key={sys.name} style={{ padding: 16, borderRadius: 10, border: sys.status === "connected" ? "2px solid #2D6A4F" : "1px solid #ddd6c8", background: sys.status === "connected" ? "rgba(45,106,79,0.04)" : "#fff" }}>
+                    <div style={{ fontSize: 24, marginBottom: 8 }}>{sys.logo}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>{sys.name}</div>
+                    <div style={{ fontSize: 11, color: "#999", marginBottom: 12 }}>{sys.desc}</div>
+                    <span style={{
+                      padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600,
+                      background: sys.status === "connected" ? "rgba(45,106,79,0.1)" : "rgba(220,38,38,0.06)",
+                      color: sys.status === "connected" ? "#2D6A4F" : "#DC2626",
+                    }}>
+                      {sys.status === "connected" ? "Connecté" : "Non connecté"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {settings.popina_location_id && (
+              <div style={{ ...CARD, marginTop: 16 }}>
+                <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: "#1a1a1a" }}>Configuration Popina</h2>
+                <div style={ROW}>
+                  <span style={{ fontSize: 14, color: "#1a1a1a" }}>Location ID</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#2D6A4F" }}>{String(settings.popina_location_id ?? "")}</span>
+                </div>
+              </div>
+            )}
+
+            <div style={{ ...CARD, marginTop: 16 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: "#1a1a1a" }}>Logiciel de paie</h2>
+              <p style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>Connectez votre logiciel de paie pour exporter automatiquement les données RH.</p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                {[
+                  { name: "Silae", desc: "Export des variables de paie", logo: "📊" },
+                  { name: "Combo Pay", desc: "Gestion de la paie intégrée", logo: "💰" },
+                  { name: "Autre", desc: "Export CSV personnalisé", logo: "📁" },
+                ].map(sys => (
+                  <div key={sys.name} style={{ padding: 16, borderRadius: 10, border: "1px solid #ddd6c8" }}>
+                    <div style={{ fontSize: 24, marginBottom: 8 }}>{sys.logo}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>{sys.name}</div>
+                    <div style={{ fontSize: 11, color: "#999", marginBottom: 12 }}>{sys.desc}</div>
+                    <span style={{ padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(220,38,38,0.06)", color: "#DC2626" }}>
+                      Non connecté
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ ...CARD, marginTop: 16 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: "#1a1a1a" }}>Météo</h2>
+              <p style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>L&apos;API météo permet de croiser les données de vente avec les conditions météorologiques.</p>
+              <div style={ROW}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>OpenWeather API</div>
+                  <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>Prévisions et historique météo</div>
+                </div>
+                <span style={{ padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(45,106,79,0.1)", color: "#2D6A4F" }}>
+                  Configuré
+                </span>
               </div>
             </div>
           </>

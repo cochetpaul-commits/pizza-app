@@ -121,6 +121,15 @@ const COMMON_SECTIONS: NavSubSection[] = [
   { label: "Opérations", icon: "package", roles: ["group_admin"], items: OPERATIONS_ITEMS },
 ];
 
+/** Ventes section */
+const VENTES_ITEMS: NavItemV2[] = [
+  { label: "Chiffre d'affaires", href: "/ventes/ca", icon: "barChart" },
+  { label: "Tickets & couverts", href: "/ventes/tickets", icon: "fileText" },
+  { label: "Produits vendus", href: "/ventes/produits", icon: "tag" },
+  { label: "Analyse météo", href: "/ventes/meteo", icon: "trendingUp" },
+];
+const VENTES_SECTION: NavSubSection = { label: "Ventes", icon: "wallet", href: "/ventes", roles: ["group_admin"], items: VENTES_ITEMS };
+
 /** Finance placeholder per source */
 const FINANCE_POPINA: NavSubSection = { label: "Finance", icon: "wallet", roles: ["group_admin"], items: [] }; // Popina — à venir
 
@@ -144,8 +153,8 @@ export function buildDynamicNav(
       ? { label: "Performances", icon: "barChart", roles: ["group_admin"], items: PERFORMANCES_KEZIA_ITEMS }
       : COMMON_SECTIONS[2]; // standard Performances
     const sections: NavSubSection[] = [
-      COMMON_SECTIONS[0], // Planning
-      ...(isPiccola ? [] : [FINANCE_POPINA]),
+      COMMON_SECTIONS[0], // Personnel
+      VENTES_SECTION, // Ventes
       COMMON_SECTIONS[1], // Achats
       performancesSection,
       COMMON_SECTIONS[3], // Operations
@@ -289,6 +298,11 @@ export const PAGE_TITLES: Record<string, string> = {
   "/dashboard": "Accueil",
   "/rh/equipe": "Salariés",
   "/personnel": "Personnel",
+  "/ventes": "Ventes",
+  "/ventes/ca": "Chiffre d'affaires",
+  "/ventes/tickets": "Tickets & couverts",
+  "/ventes/produits": "Produits vendus",
+  "/ventes/meteo": "Analyse météo",
   "/plannings": "Planning",
   "/rh/pointage": "Pointage",
   "/rh/conges": "Congés",
