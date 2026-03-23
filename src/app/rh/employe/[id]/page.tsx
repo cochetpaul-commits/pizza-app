@@ -476,15 +476,15 @@ export default function EmployeDetailPage() {
   };
 
   /* ── Load equipes + managers for contrat modal ── */
-  const loadContratEquipes = async (overrideEtabId?: string) => {
-    const etabId = overrideEtabId ?? empEtab?.id ?? (emp as Record<string, unknown>).etablissement_id as string ?? etab?.id;
+  const loadContratEquipes = async () => {
+    const etabId = (emp as Record<string, unknown>).etablissement_id as string;
     if (!etabId) return;
     const [eqRes, mgrRes] = await Promise.all([
       supabase.from("equipes").select("nom").eq("etablissement_id", etabId).eq("actif", true).order("nom"),
       supabase.from("employes").select("id, prenom, nom, role").eq("etablissement_id", etabId).eq("actif", true).in("role", ["group_admin", "manager", "admin", "direction"]).order("nom"),
     ]);
     if (eqRes.data) setContratEquipes(eqRes.data.map((e: { nom: string }) => e.nom));
-    if (mgrRes.data) setContratManagers(mgrRes.data.filter((e: { id: string }) => e.id !== (emp as Record<string, unknown>).id).map((e: { id: string; prenom: string; nom: string }) => ({ id: e.id, label: `${e.prenom} ${e.nom}` })));
+    if (mgrRes.data) setContratManagers(mgrRes.data.map((e: { id: string; prenom: string; nom: string }) => ({ id: e.id, label: `${e.prenom} ${e.nom}` })));
   };
 
   /* ── Open contrat edit ── */
@@ -1640,13 +1640,14 @@ export default function EmployeDetailPage() {
                   <div style={{ fontSize: 11, color: "#999" }}>Effacer definitivement l&apos;employe de votre etablissement.</div>
                 </div>
                 <button type="button" onClick={async () => {
-                  if (!confirm("Supprimer définitivement cet employé ? Cette opération supprimera toutes ses données (contrats, shifts, absences). Cette action est irréversible.")) return;
-                  // Supprimer les données liées d'abord (contraintes FK)
+                  if (!confirm("Supprimer définitivement cet employé ? Cette opération supprimera aussi ses contrats, absences et shifts. C'est irréversible.")) return;
                   const empId = emp.id as string;
+                  // Supprimer les données liées d'abord (contraintes FK)
                   await supabase.from("contrat_elements").delete().in("contrat_id", contrats.map(c => c.id));
                   await supabase.from("contrats").delete().eq("employe_id", empId);
-                  await supabase.from("shifts").delete().eq("employe_id", empId);
                   await supabase.from("absences").delete().eq("employe_id", empId);
+                  await supabase.from("shifts").delete().eq("employe_id", empId);
+                  // Supprimer l'employé
                   const { error } = await supabase.from("employes").delete().eq("id", empId);
                   if (error) { alert("Erreur : " + error.message); return; }
                   window.location.href = "/settings/employes";
@@ -2034,7 +2035,17 @@ export default function EmployeDetailPage() {
 
               <div style={fieldRow}>
                 <label style={labelSt}>Établissement par défaut *</label>
-                <select style={inputSt} id="contrat-etab" defaultValue={empEtab?.id ?? (emp as Record<string, unknown>).etablissement_id as string ?? ""} onChange={(e) => loadContratEquipes(e.target.value)}>
+                <select style={inputSt} id="contrat-etab" defaultValue={empEtab?.id ?? (emp as Record<string, unknown>).etablissement_id as string ?? ""} onChange={async (e) => {
+                  const newEtabId = e.target.value;
+                  if (!newEtabId) return;
+                  // Recharger équipes et managers pour le nouvel établissement
+                  const [eqRes, mgrRes] = await Promise.all([
+                    supabase.from("equipes").select("nom").eq("etablissement_id", newEtabId).eq("actif", true).order("nom"),
+                    supabase.from("employes").select("id, prenom, nom, role").eq("etablissement_id", newEtabId).eq("actif", true).in("role", ["group_admin", "manager", "admin", "direction"]).order("nom"),
+                  ]);
+                  if (eqRes.data) setContratEquipes(eqRes.data.map((eq: { nom: string }) => eq.nom));
+                  if (mgrRes.data) setContratManagers(mgrRes.data.map((m: { id: string; prenom: string; nom: string }) => ({ id: m.id, label: `${m.prenom} ${m.nom}` })));
+                }}>
                   {etablissements.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
                 </select>
               </div>
