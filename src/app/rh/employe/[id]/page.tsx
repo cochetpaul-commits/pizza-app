@@ -1913,22 +1913,41 @@ export default function EmployeDetailPage() {
 
               <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4, marginTop: 8 }}>QUALIFICATION</div>
 
-              <div style={fieldRow}>
-                <label style={labelSt}>Catégorie *</label>
-                <select style={inputSt} value={cQualification} onChange={(e) => setCQualification(e.target.value)}>
-                  <option value="">Sélectionnez une valeur...</option>
-                  <option value="Employe N1">Employé - Niveau I (Échelon 1-3)</option>
-                  <option value="Employe N2">Employé qualifié - Niveau II (Échelon 1-3)</option>
-                  <option value="Employe N3">Employé qualifié - Niveau III (Échelon 1-2)</option>
-                  <option value="Agent maitrise N4">Agent de maîtrise - Niveau IV (Échelon 1-2)</option>
-                  <option value="Cadre N5">Cadre - Niveau V (Échelon 1-3)</option>
-                  <option value="Gerant">Gérant / TNS</option>
-                </select>
+              <div style={grid2}>
+                <div style={fieldRow}>
+                  <label style={labelSt}>Niveau *</label>
+                  <select style={inputSt} id="contrat-niveau" defaultValue={cQualification?.split(" E")[0] ?? ""} onChange={() => {
+                    const niv = (document.getElementById("contrat-niveau") as HTMLSelectElement)?.value ?? "";
+                    const ech = (document.getElementById("contrat-echelon") as HTMLSelectElement)?.value ?? "";
+                    setCQualification(ech ? `${niv} ${ech}` : niv);
+                  }}>
+                    <option value="">Sélectionnez...</option>
+                    <option value="Employé N1">Employé - Niveau I</option>
+                    <option value="Employé N2">Employé qualifié - Niveau II</option>
+                    <option value="Employé N3">Employé qualifié - Niveau III</option>
+                    <option value="Agent maîtrise N4">Agent de maîtrise - Niveau IV</option>
+                    <option value="Cadre N5">Cadre - Niveau V</option>
+                    <option value="Gérant">Gérant / TNS</option>
+                  </select>
+                </div>
+                <div style={fieldRow}>
+                  <label style={labelSt}>Échelon</label>
+                  <select style={inputSt} id="contrat-echelon" defaultValue="" onChange={() => {
+                    const niv = (document.getElementById("contrat-niveau") as HTMLSelectElement)?.value ?? "";
+                    const ech = (document.getElementById("contrat-echelon") as HTMLSelectElement)?.value ?? "";
+                    setCQualification(ech ? `${niv} ${ech}` : niv);
+                  }}>
+                    <option value="">—</option>
+                    <option value="E1">Échelon 1</option>
+                    <option value="E2">Échelon 2</option>
+                    <option value="E3">Échelon 3</option>
+                  </select>
+                </div>
               </div>
 
               <div style={fieldRow}>
-                <label style={labelSt}>Autre qualification</label>
-                <input style={inputSt} value={cQualification} onChange={(e) => setCQualification(e.target.value)} />
+                <label style={labelSt}>Personnaliser la qualification</label>
+                <input style={inputSt} defaultValue="" placeholder="Ex : Chef de rang, Second de cuisine..." />
                 <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Si vous n&apos;indiquez pas de qualification, la mention &quot;Autre qualification&quot; sera indiquée par défaut dans le Registre Unique du Personnel.</div>
               </div>
 
@@ -1936,26 +1955,29 @@ export default function EmployeDetailPage() {
 
               <div style={fieldRow}>
                 <label style={labelSt}>Établissement par défaut *</label>
-                <select style={inputSt} defaultValue={(emp as Record<string, unknown>).etablissement_id as string ?? ""}>
+                <select style={inputSt} id="contrat-etab" defaultValue={empEtab?.id ?? (emp as Record<string, unknown>).etablissement_id as string ?? ""}>
                   {etablissements.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
                 </select>
               </div>
 
               <div style={fieldRow}>
                 <label style={labelSt}>Équipe par défaut *</label>
-                <select style={inputSt} defaultValue={((emp as Record<string, unknown>).equipes_access as string[] ?? [])[0] ?? ""}>
+                <select style={inputSt} id="contrat-equipe" defaultValue={((emp as Record<string, unknown>).equipes_access as string[] ?? [])[0] ?? ""}>
                   {((emp as Record<string, unknown>).equipes_access as string[] ?? []).map(eq => <option key={eq} value={eq}>{eq}</option>)}
                 </select>
               </div>
 
               <div style={fieldRow}>
                 <label style={labelSt}>Responsable hiérarchique</label>
-                <select style={inputSt} defaultValue="">
+                <select style={inputSt} id="contrat-responsable" defaultValue="">
                   <option value="">Sélectionnez...</option>
                 </select>
               </div>
 
-              <Checkbox label="Ne pas afficher dans le registre du personnel" checked={false} onChange={() => {}} />
+              <Checkbox label="Ne pas afficher dans le registre du personnel" checked={(emp as Record<string, unknown>).affichage_rup === false} onChange={async (v) => {
+                await supabase.from("employes").update({ affichage_rup: !v }).eq("id", emp.id);
+                setEmp((prev: Record<string, unknown>) => ({ ...prev, affichage_rup: !v }));
+              }} />
             </div>
 
             {/* ── Section Paie ── */}
