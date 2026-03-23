@@ -1,55 +1,93 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 
 const CARD: React.CSSProperties = { background: "#fff", borderRadius: 14, padding: 20, border: "1px solid #ddd6c8" };
-const KPI: React.CSSProperties = { ...CARD, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 110 };
 
 const JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
-const METEO = ["☀️", "⛅", "🌧️", "❄️", "🌤️", "⛈️", "🌫️"];
 
 function fmtEur(n: number) {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
+function getWeekNumber(d: Date): number {
+  const oneJan = new Date(d.getFullYear(), 0, 1);
+  const days = Math.floor((d.getTime() - oneJan.getTime()) / 86400000);
+  return Math.ceil((days + oneJan.getDay() + 1) / 7);
+}
+
+type DayData = {
+  jour: string;
+  salle: number;
+  pergolas: number;
+  terrasse: number;
+  emporter: number;
+  totalTTC: number;
+  totalHT: number;
+  pax: number;
+  ticketMoy: number;
+  ticketEmp: number;
+  ratioPiatti: string;
+  meteo: string;
+  isToday: boolean;
+};
+
 export default function VentesPage() {
   const { current: etab } = useEtablissement();
   const etabColor = etab?.couleur ?? "#e27f57";
-
-  // Placeholder data — will be connected to POS system later
-  const [caTotal, setCaTotal] = useState(0);
-  const [caPrev, setCaPrev] = useState(0);
-  const [couverts, setCouverts] = useState(0);
-  const [couvertsPrev, setCouvertsPrev] = useState(0);
-  const [ticketMoyen, setTicketMoyen] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Daily data for the week (placeholder — will be filled by POS integration)
-  const dailyData = useMemo(() => {
-    const todayIdx = (new Date().getDay() + 6) % 7;
-    return JOURS.map((jour, i) => ({
-      jour,
-      ca: 0,
-      couverts: 0,
-      ticket: 0,
-      meteo: METEO[i % METEO.length],
-      isToday: i === todayIdx,
-    }));
-  }, []);
+  // Popina data
+  const [caData, setCaData] = useState<{ totalSales: number; guestsNumber: number } | null>(null);
+
+  const weekNum = getWeekNumber(new Date());
+  const todayIdx = (new Date().getDay() + 6) % 7;
 
   useEffect(() => {
     if (!etab) return;
-    // In the future, this will connect to Popina/Kezia API
-    // For now, set loading false with empty data
-    setLoading(false);
+    let cancelled = false;
+    (async () => {
+      // Try to load Popina data for Bello Mio
+      if (etab.popina_location_id) {
+        try {
+          const res = await fetch("/api/popina/ca-jour");
+          if (res.ok) {
+            const d = await res.json();
+            if (!cancelled) setCaData({ totalSales: d.totalSales ?? 0, guestsNumber: d.guestsNumber ?? 0 });
+          }
+        } catch { /* silently fail */ }
+      }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
   }, [etab]);
 
-  const deltaCa = caTotal - caPrev;
-  const deltaCouverts = couverts - couvertsPrev;
+  // Placeholder daily data
+  const dailyData: DayData[] = useMemo(() => {
+    return JOURS.map((jour, i) => ({
+      jour,
+      salle: 0, pergolas: 0, terrasse: 0, emporter: 0,
+      totalTTC: 0, totalHT: 0, pax: 0,
+      ticketMoy: 0, ticketEmp: 0, ratioPiatti: "—",
+      meteo: "—",
+      isToday: i === todayIdx,
+    }));
+  }, [todayIdx]);
+
+  // Zone data (cumul année)
+  const zones = [
+    { label: "Salle", value: 27509, pct: 43.7, color: "#e27f57" },
+    { label: "Pergolas", value: 15380, pct: 24.4, color: "#2D6A4F" },
+    { label: "Terrasse", value: 15291, pct: 24.3, color: "#D4775A" },
+    { label: "À emporter", value: 4804, pct: 7.6, color: "#1a1a1a" },
+  ];
+
+  const caSemaine = caData?.totalSales ?? 0;
+  const couvertsSemaine = caData?.guestsNumber ?? 0;
+  const ticketMoyen = couvertsSemaine > 0 ? caSemaine / couvertsSemaine : 0;
 
   if (loading) {
     return (
@@ -63,84 +101,134 @@ export default function VentesPage() {
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 16px 60px" }}>
         {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ width: 12, height: 12, borderRadius: "50%", background: etabColor }} />
-            <h1 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#1a1a1a", margin: 0 }}>
-              Ventes — {etab?.nom ?? ""}
-            </h1>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <span style={{ padding: "4px 12px", borderRadius: 20, background: "rgba(45,106,79,0.08)", color: "#2D6A4F", fontSize: 12, fontWeight: 600 }}>
-              Semaine en cours
-            </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+          <span style={{ width: 12, height: 12, borderRadius: "50%", background: etabColor }} />
+          <h1 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#1a1a1a", margin: 0 }}>
+            Ventes — {etab?.nom ?? ""}
+          </h1>
+        </div>
+
+        {/* ═══ Répartition CA par Zone (semaine) ═══ */}
+        <div style={{ ...CARD, marginBottom: 16 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 12 }}>Répartition CA par zone</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+            {zones.map(z => (
+              <div key={z.label} style={{ padding: 14, borderRadius: 10, border: "1px solid #f0ebe3" }}>
+                <div style={{ fontSize: 11, color: "#999", marginBottom: 4 }}>{z.label}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a" }}>{fmtEur(z.value)} €</div>
+                <div style={{ marginTop: 8, height: 4, borderRadius: 2, background: "#f0ebe3" }}>
+                  <div style={{ height: "100%", borderRadius: 2, background: z.color, width: `${z.pct}%` }} />
+                </div>
+                <div style={{ fontSize: 10, color: "#999", marginTop: 4, textAlign: "right" }}>{z.pct}%</div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* KPIs principaux */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-          <div style={KPI}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", marginBottom: 6 }}>CA semaine</div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: "#1a1a1a" }}>{fmtEur(caTotal)} €</div>
-            <div style={{ fontSize: 11, color: deltaCa >= 0 ? "#2D6A4F" : "#DC2626", fontWeight: 600, marginTop: 4 }}>
-              {deltaCa >= 0 ? "+" : ""}{fmtEur(deltaCa)} € vs S-1
+        {/* ═══ Semaine XX ═══ */}
+        <div style={{ ...CARD, marginBottom: 16 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+            Semaine {weekNum}
+          </h2>
+
+          {/* CA section */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2"><rect x="1" y="5" width="22" height="16" rx="2" /><path d="M1 10h22" /></svg>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Chiffre d&apos;affaires</span>
+            </div>
+            <div style={{ padding: 14, borderRadius: 10, background: "#faf7f2", marginBottom: 8 }}>
+              <div style={{ fontSize: 10, color: "#999", marginBottom: 2 }}>CA Semaine</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: "#1a1a1a" }}>{fmtEur(caSemaine)} €</div>
+            </div>
+            <div style={{ display: "flex", gap: 16, marginBottom: 8 }}>
+              <div><span style={{ fontSize: 11, color: "#999" }}>S-1</span><br /><span style={{ fontSize: 14, fontWeight: 600 }}>0 €</span></div>
+              <div><span style={{ fontSize: 11, color: "#999" }}>Évolution</span><br /><span style={{ fontSize: 14, fontWeight: 600, color: "#2D6A4F" }}>+0.0%</span></div>
+            </div>
+            <div style={{ padding: 10, borderRadius: 8, background: "rgba(45,106,79,0.06)", border: "1px solid rgba(45,106,79,0.15)", marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: "#2D6A4F", fontWeight: 600 }}>Objectif +10%</span><br />
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#2D6A4F" }}>0 €</span><br />
+              <span style={{ fontSize: 10, color: "#2D6A4F" }}>✓ Atteint</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#666" }}>
+              <div>Cumul 2026<br />Moy. journalière</div>
+              <div style={{ textAlign: "right", fontWeight: 600 }}>101 639,78 €<br />0 €</div>
             </div>
           </div>
-          <div style={KPI}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", marginBottom: 6 }}>Couverts</div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: "#1a1a1a" }}>{couverts}</div>
-            <div style={{ fontSize: 11, color: deltaCouverts >= 0 ? "#2D6A4F" : "#DC2626", fontWeight: 600, marginTop: 4 }}>
-              {deltaCouverts >= 0 ? "+" : ""}{deltaCouverts} vs S-1
+
+          {/* Couverts section */}
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Couverts</span>
             </div>
-          </div>
-          <div style={KPI}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", marginBottom: 6 }}>Ticket moyen</div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: "#1a1a1a" }}>{ticketMoyen.toFixed(1)} €</div>
-            <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>
-              CA / couverts
+            <div style={{ padding: 14, borderRadius: 10, background: "#faf7f2", marginBottom: 8 }}>
+              <div style={{ fontSize: 10, color: "#999", marginBottom: 2 }}>Total Semaine</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: "#1a1a1a" }}>{couvertsSemaine}</div>
             </div>
-          </div>
-          <div style={KPI}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", marginBottom: 6 }}>Ratio MS / CA</div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: "#1a1a1a" }}>— %</div>
-            <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>
-              Objectif : {String((etab as Record<string, unknown>)?.objectif_cout_ventes ?? 37)}%
+            <div style={{ display: "flex", gap: 16, marginBottom: 8 }}>
+              <div><span style={{ fontSize: 11, color: "#999" }}>S-1</span><br /><span style={{ fontSize: 14, fontWeight: 600 }}>0</span></div>
+              <div><span style={{ fontSize: 11, color: "#999" }}>Évolution</span><br /><span style={{ fontSize: 14, fontWeight: 600, color: "#2D6A4F" }}>+0.0%</span></div>
+            </div>
+            <div style={{ padding: 10, borderRadius: 8, background: "rgba(45,106,79,0.06)", border: "1px solid rgba(45,106,79,0.15)", marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: "#2D6A4F", fontWeight: 600 }}>Objectif +10%</span><br />
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#2D6A4F" }}>0</span><br />
+              <span style={{ fontSize: 10, color: "#2D6A4F" }}>✓ Atteint</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#666" }}>
+              <div>Ticket moyen<br />Ticket S-1</div>
+              <div style={{ textAlign: "right", fontWeight: 600, color: "#D4775A" }}>{ticketMoyen.toFixed(2)} €<br />0.00 €</div>
             </div>
           </div>
         </div>
 
-        {/* Tableau journalier */}
-        <div style={{ ...CARD, marginBottom: 20 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 16, fontWeight: 700, color: "#1a1a1a", margin: 0 }}>
-              Récapitulatif de la semaine
-            </h2>
+        {/* ═══ Répartition CA par Zone (cumul) ═══ */}
+        <div style={{ ...CARD, marginBottom: 16 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 12 }}>Répartition CA par zone</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+            {zones.map(z => (
+              <div key={`cumul-${z.label}`} style={{ padding: 12, borderRadius: 8, border: "1px solid #f0ebe3" }}>
+                <div style={{ fontSize: 10, color: "#999" }}>{z.label}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: "#1a1a1a" }}>{fmtEur(z.value)} €</div>
+                <div style={{ marginTop: 6, height: 3, borderRadius: 2, background: "#f0ebe3" }}>
+                  <div style={{ height: "100%", borderRadius: 2, background: z.color, width: `${z.pct}%` }} />
+                </div>
+                <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>{z.pct}%</div>
+              </div>
+            ))}
           </div>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        </div>
+
+        {/* ═══ Tableau journalier détaillé ═══ */}
+        <div style={{ ...CARD, marginBottom: 16, overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 900 }}>
             <thead>
               <tr style={{ borderBottom: "2px solid #ddd6c8" }}>
-                <th style={{ textAlign: "left", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Jour</th>
-                <th style={{ textAlign: "center", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Météo</th>
-                <th style={{ textAlign: "right", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>CA</th>
-                <th style={{ textAlign: "right", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Couverts</th>
-                <th style={{ textAlign: "right", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Ticket moyen</th>
+                {["Jour", "Salle €", "Pergolas €", "Terrasse €", "À emp. €", "Total TTC", "Total HT", "Pax", "Ticket moy.", "Ticket emp.", "Ratio P/atti/Pizza", "Météo", "Actions"].map(h => (
+                  <th key={h} style={{ textAlign: h === "Jour" ? "left" : "center", padding: "8px 4px", fontSize: 10, fontWeight: 700, color: "#D4775A", textTransform: "uppercase" }}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {dailyData.map((d, i) => (
                 <tr key={i} style={{ borderBottom: "1px solid #f0ebe3", background: d.isToday ? "rgba(45,106,79,0.04)" : "transparent" }}>
-                  <td style={{ padding: "10px 0", fontWeight: d.isToday ? 700 : 500, color: d.isToday ? "#1a1a1a" : "#666" }}>
-                    {d.jour} {d.isToday && <span style={{ fontSize: 10, color: "#2D6A4F", marginLeft: 4 }}>Aujourd&apos;hui</span>}
-                  </td>
-                  <td style={{ padding: "10px 0", textAlign: "center", fontSize: 18 }}>{d.meteo}</td>
-                  <td style={{ padding: "10px 0", textAlign: "right", fontWeight: 600, color: d.ca > 0 ? "#1a1a1a" : "#ccc" }}>
-                    {d.ca > 0 ? `${fmtEur(d.ca)} €` : "—"}
-                  </td>
-                  <td style={{ padding: "10px 0", textAlign: "right", color: d.couverts > 0 ? "#1a1a1a" : "#ccc" }}>
-                    {d.couverts > 0 ? d.couverts : "—"}
-                  </td>
-                  <td style={{ padding: "10px 0", textAlign: "right", color: d.ticket > 0 ? "#1a1a1a" : "#ccc" }}>
-                    {d.ticket > 0 ? `${d.ticket.toFixed(1)} €` : "—"}
+                  <td style={{ padding: "10px 4px", fontWeight: d.isToday ? 700 : 500, color: "#1a1a1a" }}>{d.jour.toLowerCase()}</td>
+                  <td style={{ padding: "10px 4px", textAlign: "center", color: "#ccc" }}>—</td>
+                  <td style={{ padding: "10px 4px", textAlign: "center", color: "#ccc" }}>—</td>
+                  <td style={{ padding: "10px 4px", textAlign: "center", color: "#ccc" }}>—</td>
+                  <td style={{ padding: "10px 4px", textAlign: "center", color: "#ccc" }}>—</td>
+                  <td style={{ padding: "10px 4px", textAlign: "center", color: "#ccc", fontWeight: 600 }}>—</td>
+                  <td style={{ padding: "10px 4px", textAlign: "center", color: "#ccc" }}>—</td>
+                  <td style={{ padding: "10px 4px", textAlign: "center", color: "#ccc", fontWeight: 600 }}>—</td>
+                  <td style={{ padding: "10px 4px", textAlign: "center", color: "#ccc" }}>—</td>
+                  <td style={{ padding: "10px 4px", textAlign: "center", color: "#ccc" }}>—</td>
+                  <td style={{ padding: "10px 4px", textAlign: "center", color: "#ccc" }}>—</td>
+                  <td style={{ padding: "10px 4px", textAlign: "center", color: "#ccc" }}>—</td>
+                  <td style={{ padding: "10px 4px", textAlign: "center" }}>
+                    <span style={{ fontSize: 10, color: "#2D6A4F", cursor: "pointer" }}>+M</span>
+                    {" "}
+                    <span style={{ fontSize: 10, color: "#D4775A", cursor: "pointer" }}>+S</span>
                   </td>
                 </tr>
               ))}
@@ -148,74 +236,48 @@ export default function VentesPage() {
           </table>
         </div>
 
-        {/* 2 colonnes : Analyse + Actions */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
-          {/* Analyse & insights */}
-          <div style={CARD}>
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 12 }}>Analyse de la semaine</h3>
-            <div style={{ padding: 14, borderRadius: 10, background: "#faf7f2", marginBottom: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>Tendance</div>
-              <p style={{ fontSize: 12, color: "#666", margin: 0, lineHeight: 1.5 }}>
-                Connectez votre système de caisse pour voir les tendances de vente, l&apos;impact de la météo sur votre chiffre d&apos;affaires, et des recommandations personnalisées.
-              </p>
-            </div>
-            <div style={{ padding: 14, borderRadius: 10, background: "#faf7f2", marginBottom: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>Météo & impact</div>
-              <p style={{ fontSize: 12, color: "#666", margin: 0, lineHeight: 1.5 }}>
-                L&apos;analyse croisée météo/ventes permet d&apos;anticiper les besoins en personnel et en approvisionnement.
-              </p>
-            </div>
-            <div style={{ padding: 14, borderRadius: 10, background: "#faf7f2" }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>Axes d&apos;amélioration</div>
-              <p style={{ fontSize: 12, color: "#666", margin: 0, lineHeight: 1.5 }}>
-                Identifiez les créneaux sous-performants, les produits phares et les opportunités de croissance.
-              </p>
-            </div>
-          </div>
-
-          {/* Accès rapide */}
-          <div style={CARD}>
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 12 }}>Accès rapide</h3>
+        {/* ═══ Top 5 Cuisine ═══ */}
+        <div style={{ ...CARD, marginBottom: 16 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 12 }}>
+            🍽️ Top 5 Cuisine
+          </h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
             {[
-              { label: "Chiffre d'affaires", href: "/ventes/ca", desc: "Évolution du CA jour par jour" },
-              { label: "Tickets & couverts", href: "/ventes/tickets", desc: "Analyse des services midi/soir" },
-              { label: "Produits vendus", href: "/ventes/produits", desc: "Top produits et catégories" },
-              { label: "Analyse météo", href: "/ventes/meteo", desc: "Impact météo sur les ventes" },
-            ].map(link => (
-              <Link key={link.href} href={link.href} style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "12px 0", borderBottom: "1px solid #f0ebe3",
-                textDecoration: "none",
-              }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>{link.label}</div>
-                  <div style={{ fontSize: 11, color: "#999" }}>{link.desc}</div>
+              { icon: "🍕", label: "Top Pizze" },
+              { icon: "🍝", label: "Top Piatti" },
+              { icon: "🥗", label: "Top Antipasti" },
+              { icon: "🍰", label: "Top Dolci" },
+            ].map(cat => (
+              <div key={cat.label} style={{ padding: 12, borderRadius: 8, border: "1px solid #f0ebe3" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>
+                  {cat.icon} {cat.label}
                 </div>
-                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
-              </Link>
+                <div style={{ fontSize: 11, color: "#999" }}>Aucune donnée</div>
+              </div>
             ))}
           </div>
         </div>
 
-        {/* Banner intégration */}
-        <div style={{
-          ...CARD,
-          background: `linear-gradient(135deg, ${etabColor}15 0%, ${etabColor}08 100%)`,
-          border: `1px solid ${etabColor}30`,
-          textAlign: "center", padding: "30px 20px",
-        }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>🔌</div>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", marginBottom: 8 }}>Connectez votre système de caisse</h3>
-          <p style={{ fontSize: 13, color: "#666", maxWidth: 500, margin: "0 auto 16px", lineHeight: 1.5 }}>
-            Intégrez Popina, Kezia ou un autre logiciel de caisse pour alimenter automatiquement vos données de vente et débloquer toutes les analyses.
-          </p>
-          <Link href="/settings/etablissements" style={{
-            display: "inline-block", padding: "10px 20px", borderRadius: 8,
-            background: "#1a1a1a", color: "#fff", textDecoration: "none",
-            fontSize: 13, fontWeight: 600,
-          }}>
-            Configurer l&apos;intégration
-          </Link>
+        {/* ═══ Top 5 Boissons ═══ */}
+        <div style={CARD}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 12 }}>
+            🍷 Top 5 Boissons
+          </h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+            {[
+              { icon: "🍷", label: "Vins (Verres)" },
+              { icon: "🍾", label: "Vins (Bouteilles)" },
+              { icon: "🍹", label: "Spritz" },
+              { icon: "🥂", label: "Cocktails" },
+            ].map(cat => (
+              <div key={cat.label} style={{ padding: 12, borderRadius: 8, border: "1px solid #f0ebe3" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>
+                  {cat.icon} {cat.label}
+                </div>
+                <div style={{ fontSize: 11, color: "#999" }}>Aucune donnée</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </RequireRole>
