@@ -84,15 +84,8 @@ export const ACHATS_ITEMS: NavItemV2[] = [
   { label: "Base produits", href: "/ingredients", icon: "tag" },
 ];
 
-export const PERFORMANCES_ITEMS: NavItemV2[] = [
-  { label: "Indicateurs clés", href: "/pilotage", icon: "barChart" },
-  { label: "Variations & alertes", href: "/variations-prix", icon: "trendingUp" },
-];
-
-const PERFORMANCES_KEZIA_ITEMS: NavItemV2[] = [
-  ...PERFORMANCES_ITEMS,
-  { label: "Import Kezia", href: "/kezia", icon: "fileText" },
-];
+// Performances removed — kept exports for legacy compat
+export const PERFORMANCES_ITEMS: NavItemV2[] = [];
 
 export const OPERATIONS_ITEMS: NavItemV2[] = [
   { label: "Catalogue", href: "/catalogue", icon: "book" },
@@ -113,14 +106,6 @@ export const PERSONNEL_ITEMS = PLANNING_ITEMS;
 export const FINANCE_ITEMS = ACHATS_ITEMS;
 export const CLIENTS_ITEMS = EVENEMENTIEL_ITEMS;
 
-/** Common sections for every establishment */
-const COMMON_SECTIONS: NavSubSection[] = [
-  { label: "Personnel", icon: "users", href: "/personnel", items: PLANNING_ITEMS },
-  { label: "Achats", icon: "shoppingBag", roles: ["group_admin"], items: ACHATS_ITEMS },
-  { label: "Performances", icon: "barChart", roles: ["group_admin"], items: PERFORMANCES_ITEMS },
-  { label: "Opérations", icon: "package", roles: ["group_admin"], items: OPERATIONS_ITEMS },
-];
-
 /** Ventes section */
 const VENTES_ITEMS: NavItemV2[] = [
   { label: "Chiffre d'affaires", href: "/ventes/ca", icon: "barChart" },
@@ -128,14 +113,10 @@ const VENTES_ITEMS: NavItemV2[] = [
   { label: "Produits vendus", href: "/ventes/produits", icon: "tag" },
 ];
 const VENTES_SECTION: NavSubSection = { label: "Ventes", icon: "wallet", href: "/ventes", roles: ["group_admin"], items: VENTES_ITEMS };
-
-/** Finance placeholder per source */
-const FINANCE_POPINA: NavSubSection = { label: "Finance", icon: "wallet", roles: ["group_admin"], items: [] }; // Popina — à venir
-
-/** Evenementiel section */
-const EVENEMENTIEL_SECTION: NavSubSection = {
-  label: "Événementiel", icon: "calendarEvent", roles: ["group_admin"], items: EVENEMENTIEL_ITEMS,
-};
+const PERSONNEL_SECTION: NavSubSection = { label: "Personnel", icon: "users", href: "/personnel", items: PLANNING_ITEMS };
+const ACHATS_SECTION: NavSubSection = { label: "Achats", icon: "shoppingBag", roles: ["group_admin"], items: ACHATS_ITEMS };
+const OPERATIONS_SECTION: NavSubSection = { label: "Opérations", icon: "package", roles: ["group_admin"], items: OPERATIONS_ITEMS };
+const EVENEMENTIEL_SECTION: NavSubSection = { label: "Événementiel", icon: "calendarEvent", roles: ["group_admin"], items: EVENEMENTIEL_ITEMS };
 
 /** Build dynamic nav entries from a list of establishments */
 export function buildDynamicNav(
@@ -148,15 +129,11 @@ export function buildDynamicNav(
 
   for (const etab of etabs) {
     const isPiccola = etab.slug?.includes("piccola");
-    const performancesSection: NavSubSection = isPiccola
-      ? { label: "Performances", icon: "barChart", roles: ["group_admin"], items: PERFORMANCES_KEZIA_ITEMS }
-      : COMMON_SECTIONS[2]; // standard Performances
     const sections: NavSubSection[] = [
-      COMMON_SECTIONS[0], // Personnel
-      VENTES_SECTION, // Ventes
-      COMMON_SECTIONS[1], // Achats
-      performancesSection,
-      COMMON_SECTIONS[3], // Operations
+      PERSONNEL_SECTION,
+      VENTES_SECTION,
+      ACHATS_SECTION,
+      OPERATIONS_SECTION,
       ...(isPiccola ? [EVENEMENTIEL_SECTION] : []),
     ];
 
