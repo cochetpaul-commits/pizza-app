@@ -195,6 +195,8 @@ export default function EmployeDetailPage() {
   const [avenantSalaire, setAvenantSalaire] = useState(0);
 
   // ── Contrat modal ──
+  const [contratEquipes, setContratEquipes] = useState<string[]>([]);
+  const [contratManagers, setContratManagers] = useState<{ id: string; label: string }[]>([]);
   const [showContratModal, setShowContratModal] = useState(false);
   const [editContratId, setEditContratId] = useState<string | null>(null);
   const [cType, setCType] = useState("CDI");
@@ -396,6 +398,32 @@ export default function EmployeDetailPage() {
       await supabase.from("contrats").insert(payload);
     }
 
+    // Also update employee rattachement if changed
+    const newEtabId = (document.getElementById("contrat-etab") as HTMLSelectElement)?.value;
+    const newEquipe = (document.getElementById("contrat-equipe") as HTMLSelectElement)?.value;
+    const empUpdates: Record<string, unknown> = {};
+    if (newEtabId && newEtabId !== (emp as Record<string, unknown>).etablissement_id) {
+      empUpdates.etablissement_id = newEtabId;
+    }
+    if (newEquipe) {
+      const currentAccess = ((emp as Record<string, unknown>).equipes_access as string[]) ?? [];
+      if (!currentAccess.includes(newEquipe)) {
+        empUpdates.equipes_access = [newEquipe, ...currentAccess];
+      } else if (currentAccess[0] !== newEquipe) {
+        // Move to first position (default)
+        empUpdates.equipes_access = [newEquipe, ...currentAccess.filter(e => e !== newEquipe)];
+      }
+    }
+    if (Object.keys(empUpdates).length > 0) {
+      await supabase.from("employes").update(empUpdates).eq("id", id);
+      setEmp((prev: Record<string, unknown>) => ({ ...prev, ...empUpdates }));
+      // Reload empEtab if establishment changed
+      if (empUpdates.etablissement_id) {
+        const { data: etabData } = await supabase.from("etablissements").select("id, nom, couleur").eq("id", empUpdates.etablissement_id).single();
+        if (etabData) setEmpEtab(etabData as { id: string; nom: string; couleur: string });
+      }
+    }
+
     // Reload contrats
     const { data } = await supabase.from("contrats").select("*").eq("employe_id", id).order("date_debut", { ascending: false });
     setContrats(data ?? []);
@@ -446,6 +474,18 @@ export default function EmployeDetailPage() {
     setAbsences((prev) => prev.filter((a) => a.id !== absId));
   };
 
+  /* ── Load equipes + managers for contrat modal ── */
+  const loadContratEquipes = async () => {
+    const etabId = (emp as Record<string, unknown>).etablissement_id as string;
+    if (!etabId) return;
+    const [eqRes, mgrRes] = await Promise.all([
+      supabase.from("equipes").select("nom").eq("etablissement_id", etabId).eq("actif", true).order("nom"),
+      supabase.from("employes").select("id, prenom, nom, role").eq("etablissement_id", etabId).eq("actif", true).in("role", ["group_admin", "manager", "admin", "direction"]).order("nom"),
+    ]);
+    if (eqRes.data) setContratEquipes(eqRes.data.map((e: { nom: string }) => e.nom));
+    if (mgrRes.data) setContratManagers(mgrRes.data.map((e: { id: string; prenom: string; nom: string }) => ({ id: e.id, label: `${e.prenom} ${e.nom}` })));
+  };
+
   /* ── Open contrat edit ── */
   const openEditContrat = (c: Contrat) => {
     setEditContratId(c.id);
@@ -458,6 +498,7 @@ export default function EmployeDetailPage() {
     setCHeures(c.heures_semaine);
     setCJours(c.jours_semaine);
     setCActif(c.actif);
+    loadContratEquipes();
     setShowContratModal(true);
   };
 
@@ -472,6 +513,7 @@ export default function EmployeDetailPage() {
     setCHeures(39);
     setCJours(5);
     setCActif(true);
+    loadContratEquipes();
     setShowContratModal(true);
   };
 
@@ -1963,7 +2005,11 @@ export default function EmployeDetailPage() {
               <div style={fieldRow}>
                 <label style={labelSt}>Équipe par défaut *</label>
                 <select style={inputSt} id="contrat-equipe" defaultValue={((emp as Record<string, unknown>).equipes_access as string[] ?? [])[0] ?? ""}>
-                  {((emp as Record<string, unknown>).equipes_access as string[] ?? []).map(eq => <option key={eq} value={eq}>{eq}</option>)}
+                  {contratEquipes.length > 0 ? contratEquipes.map(eq => (
+                    <option key={eq} value={eq}>{eq}</option>
+                  )) : ((emp as Record<string, unknown>).equipes_access as string[] ?? []).map(eq => (
+                    <option key={eq} value={eq}>{eq}</option>
+                  ))}
                 </select>
               </div>
 
@@ -1971,7 +2017,11 @@ export default function EmployeDetailPage() {
                 <label style={labelSt}>Responsable hiérarchique</label>
                 <select style={inputSt} id="contrat-responsable" defaultValue="">
                   <option value="">Sélectionnez...</option>
+                  {contratManagers.filter(m => m.id !== (emp as Record<string, unknown>).id).map(m => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
                 </select>
+                <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Le responsable recevra les notifications relatives aux demandes d&apos;absence et aux absences de pointage de ce salarié.</div>
               </div>
 
               <Checkbox label="Ne pas afficher dans le registre du personnel" checked={(emp as Record<string, unknown>).affichage_rup === false} onChange={async (v) => {
