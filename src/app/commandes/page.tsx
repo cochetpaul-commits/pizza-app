@@ -123,7 +123,7 @@ const tile: React.CSSProperties = {
 
 const floatingBtn: React.CSSProperties = {
   position: "fixed",
-  bottom: 24,
+  bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
   left: "50%",
   transform: "translateX(-50%)",
   background: "#D4775A",
@@ -137,7 +137,7 @@ const floatingBtn: React.CSSProperties = {
   letterSpacing: 0.5,
   boxShadow: "0 6px 24px rgba(212,119,90,0.4)",
   cursor: "pointer",
-  zIndex: 100,
+  zIndex: 110,
   whiteSpace: "nowrap",
 };
 
@@ -1132,11 +1132,41 @@ function CommandesPage() {
           </div>
         )}
 
-        {/* Bouton flottant */}
+        {/* Bouton flottant — brouillon → envoyer */}
         {session && session.status === "brouillon" && activeCount > 0 && (
           <button type="button" onClick={() => envoyerSession(session.id)} disabled={saving} style={floatingBtn}>
             {saving ? "Envoi..." : `Envoyer pour validation (${activeCount} article${activeCount > 1 ? "s" : ""})`}
           </button>
+        )}
+
+        {/* Bouton flottant — en_attente → valider */}
+        {session && session.status === "en_attente" && canValidate && (
+          <div style={{ position: "fixed", bottom: "calc(70px + env(safe-area-inset-bottom, 0px))", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 10, zIndex: 110 }}>
+            <button type="button" onClick={() => rejeterSession(session.id)} disabled={saving}
+              style={{ ...floatingBtn, position: "static", bottom: "auto", left: "auto", transform: "none", background: "#fff", color: "#8B1A1A", border: "1.5px solid #8B1A1A", boxShadow: "0 6px 24px rgba(0,0,0,0.15)" }}>
+              Refuser
+            </button>
+            <button type="button" onClick={() => validerSession(session.id)} disabled={saving}
+              style={{ ...floatingBtn, position: "static", bottom: "auto", left: "auto", transform: "none", background: "#4a6741", boxShadow: "0 6px 24px rgba(74,103,65,0.4)" }}>
+              {saving ? "..." : "Valider la commande"}
+            </button>
+          </div>
+        )}
+
+        {/* Bouton flottant — validée → recevoir + PDF */}
+        {session && session.status === "validee" && (
+          <div style={{ position: "fixed", bottom: "calc(70px + env(safe-area-inset-bottom, 0px))", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 10, zIndex: 110 }}>
+            <button type="button" onClick={() => downloadPdf(session.id)}
+              style={{ ...floatingBtn, position: "static", bottom: "auto", left: "auto", transform: "none", background: "#fff", color: "#4a6741", border: "1.5px solid #4a6741", boxShadow: "0 6px 24px rgba(0,0,0,0.15)" }}>
+              PDF
+            </button>
+            {canValidate && (
+              <button type="button" onClick={() => recevoirSession(session.id)} disabled={saving}
+                style={{ ...floatingBtn, position: "static", bottom: "auto", left: "auto", transform: "none", background: "#16a34a", boxShadow: "0 6px 24px rgba(22,163,74,0.4)" }}>
+                {saving ? "..." : "Marquer recue"}
+              </button>
+            )}
+          </div>
         )}
       </div>
     </RequireRole>
