@@ -46,8 +46,9 @@ async function resolveEtabId(slug: string | null): Promise<string | null> {
 
 async function findOrCreateSupplier(
   name: string,
-  etabId: string | null,
+  _etabId: string | null,
 ): Promise<string | null> {
+  // Search case-insensitive
   const { data: existing } = await supabaseAdmin
     .from("suppliers")
     .select("id")
@@ -56,11 +57,23 @@ async function findOrCreateSupplier(
     .maybeSingle();
   if (existing?.id) return existing.id;
 
-  const { data: created } = await supabaseAdmin
+  // Also try exact match lowercase
+  const { data: exact } = await supabaseAdmin
     .from("suppliers")
-    .insert({ name, etablissement_id: etabId, is_active: true })
+    .select("id")
+    .ilike("name", name)
+    .maybeSingle();
+  if (exact?.id) return exact.id;
+
+  // Create new supplier (minimal fields to avoid NOT NULL violations)
+  const { data: created, error } = await supabaseAdmin
+    .from("suppliers")
+    .insert({ name, is_active: true })
     .select("id")
     .single();
+  if (error) {
+    console.error("findOrCreateSupplier insert error:", error);
+  }
   return created?.id ?? null;
 }
 
@@ -272,7 +285,9 @@ async function processMessage(messageId: string) {
       }
 
       // Find or create supplier
-      const supplierName = fournisseur?.toUpperCase() ?? "UNKNOWN";
+      const supplierName = fournisseur
+        ? fournisseur.charAt(0).toUpperCase() + fournisseur.slice(1)
+        : "Unknown";
       const supplierId = await findOrCreateSupplier(supplierName, etabId);
 
       if (!supplierId) {
