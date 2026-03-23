@@ -79,7 +79,6 @@ export async function POST(req: Request) {
   }
 
   // 2. Decode Pub/Sub message
-  let messageId: string;
   try {
     const body = await req.json();
     const pubsubData = body.message?.data;
