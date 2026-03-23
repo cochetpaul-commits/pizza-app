@@ -1,4 +1,4 @@
-/* Service Worker — Web Push Notifications */
+/* Service Worker — Web Push Notifications + App Badge */
 
 self.addEventListener("push", (event) => {
   const data = event.data?.json() ?? {};
@@ -9,11 +9,26 @@ self.addEventListener("push", (event) => {
     badge: "/icons/icon-192.png",
     data: { url: data.url || "/" },
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+
+  event.waitUntil(
+    self.registration.showNotification(title, options).then(() => {
+      // Set app badge with unread count if supported
+      if (navigator.setAppBadge) {
+        const count = data.badgeCount ?? 1;
+        navigator.setAppBadge(count).catch(() => {});
+      }
+    })
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+
+  // Clear badge when user interacts with notification
+  if (navigator.clearAppBadge) {
+    navigator.clearAppBadge().catch(() => {});
+  }
+
   const url = event.notification.data?.url || "/";
   event.waitUntil(
     clients.matchAll({ type: "window" }).then((clientList) => {

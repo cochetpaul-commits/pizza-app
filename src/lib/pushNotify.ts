@@ -1,7 +1,7 @@
 import webpush from "web-push";
 import { supabaseAdmin } from "./supabaseAdmin";
 
-type PushPayload = { title: string; body: string; url?: string };
+type PushPayload = { title: string; body: string; url?: string; badgeCount?: number };
 
 let vapidReady = false;
 function ensureVapid() {
@@ -14,8 +14,20 @@ function ensureVapid() {
 }
 
 /**
+ * Count pending items that deserve a badge (commandes en attente).
+ */
+async function getPendingBadgeCount(): Promise<number> {
+  const { count } = await supabaseAdmin
+    .from("commande_sessions")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "en_attente");
+  return count ?? 0;
+}
+
+/**
  * Send push notifications to all group_admin users.
  * Automatically cleans up expired/invalid subscriptions.
+ * Adds badgeCount (pending commandes) if not provided.
  */
 export async function notifyGroupAdmins(payload: PushPayload): Promise<void> {
   ensureVapid();
@@ -35,6 +47,10 @@ export async function notifyGroupAdmins(payload: PushPayload): Promise<void> {
 
   if (!subs?.length) return;
 
+  // Auto-compute badge count if not provided
+  if (payload.badgeCount == null) {
+    payload.badgeCount = await getPendingBadgeCount();
+  }
   const jsonPayload = JSON.stringify(payload);
   const expired: string[] = [];
 

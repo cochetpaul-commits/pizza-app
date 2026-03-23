@@ -44,3 +44,13 @@ export function isPwaInstalled(): boolean {
   return window.matchMedia("(display-mode: standalone)").matches
     || (navigator as unknown as { standalone?: boolean }).standalone === true;
 }
+
+/**
+ * Clear the app badge (pastille rouge on PWA icon).
+ * Called when user opens/returns to the app.
+ */
+export function clearAppBadge(): void {
+  if (typeof navigator !== "undefined" && "clearAppBadge" in navigator) {
+    (navigator as unknown as { clearAppBadge: () => Promise<void> }).clearAppBadge().catch(() => {});
+  }
+}
