@@ -59,7 +59,7 @@ type Shift = {
 };
 
 type MainTab = "infos" | "dossier" | "acces" | "conges" | "documents" | "roles";
-type DossierSubTab = "perso" | "contrats" | "temps" | "conges" | "notes" | "primes" | "dispo";
+
 
 /* ── Constants ─────────────────────────────────────────────────── */
 
@@ -112,7 +112,7 @@ export default function EmployeDetailPage() {
   const [saveOk, setSaveOk] = useState(false);
   const [mainTab, setMainTab] = useState<MainTab>("infos");
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [dossierSub, setDossierSub] = useState<DossierSubTab>("contrats");
+  
 
   // ── Employee fields ──
   const [emp, setEmp] = useState<Record<string, unknown>>({});
@@ -901,66 +901,11 @@ export default function EmployeDetailPage() {
         {/* ═══ TAB: CONTRATS (was Dossier RH) ═══ */}
         {mainTab === "dossier" && (
           <>
-            {/* Legacy perso sub-tab — hidden */}
-            {false && (
-              <>
-                <div style={section}>
-                  <p style={sectionTitle}>Etat civil</p>
-                  <div style={grid3}>
-                    <FieldSelect label="Genre" value={genre} onChange={setGenre} disabled={!canWrite}
-                      options={[["", "---"], ["H", "Homme"], ["F", "Femme"]]}
-                      tag="DPAE" />
-                    <Field label="Date de naissance" type="date" value={dateNaissance} onChange={setDateNaissance} disabled={!canWrite} tag="DPAE" />
-                    <Field label="Nationalite" value={nationalite} onChange={setNationalite} disabled={!canWrite} tag="DPAE" />
-                  </div>
-                  <div style={grid2}>
-                    <Field label="Lieu de naissance" value={lieuNaissance} onChange={setLieuNaissance} disabled={!canWrite} tag="DPAE" />
-                    <Field label="Dept. naissance" value={deptNaissance} onChange={setDeptNaissance} disabled={!canWrite} tag="DPAE" />
-                  </div>
-                  <Field label="Numero securite sociale" value={numeroSecu} onChange={setNumeroSecu} disabled={!canWrite} tag="DPAE" />
-                  <div style={grid2}>
-                    <FieldSelect label="Situation familiale" value={situationFamiliale} onChange={setSituationFamiliale} disabled={!canWrite}
-                      options={[["", "---"], ["celibataire", "Celibataire"], ["marie", "Marie(e)"], ["pacse", "Pacse(e)"], ["divorce", "Divorce(e)"], ["veuf", "Veuf(ve)"]]} />
-                    <Field label="Personnes a charge" type="number" value={String(nbPersonnesCharge)} onChange={(v) => setNbPersonnesCharge(Number(v) || 0)} disabled={!canWrite} />
-                  </div>
-                </div>
-
-                <div style={section}>
-                  <p style={sectionTitle}>Adresse</p>
-                  <Field label="Adresse" value={adresse} onChange={setAdresse} disabled={!canWrite} tag="DPAE" />
-                  <div style={grid2}>
-                    <Field label="Code postal" value={codePostal} onChange={setCodePostal} disabled={!canWrite} tag="DPAE" />
-                    <Field label="Ville" value={ville} onChange={setVille} disabled={!canWrite} tag="DPAE" />
-                  </div>
-                </div>
-
-                <div style={section}>
-                  <p style={sectionTitle}>Contact d&apos;urgence</p>
-                  <div style={grid2}>
-                    <Field label="Prenom" value={contactUrgPrenom} onChange={setContactUrgPrenom} disabled={!canWrite} tag="RUP" />
-                    <Field label="Nom" value={contactUrgNom} onChange={setContactUrgNom} disabled={!canWrite} tag="RUP" />
-                  </div>
-                  <div style={grid2}>
-                    <Field label="Lien" value={contactUrgLien} onChange={setContactUrgLien} disabled={!canWrite} placeholder="Conjoint, parent..." />
-                    <Field label="Telephone" value={contactUrgTel} onChange={setContactUrgTel} disabled={!canWrite} tag="RUP" />
-                  </div>
-                </div>
-
-                <div style={section}>
-                  <p style={sectionTitle}>Note interne</p>
-                  <textarea
-                    style={{ ...inputSt, minHeight: 80, resize: "vertical" }}
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    disabled={!canWrite}
-                    placeholder="Notes internes sur l'employe..."
-                  />
-                </div>
-              </>
-            )}
+            {/* Contrats content only — legacy sub-tabs removed */}
+            {/* Legacy removed */}
 
             {/* ─── SUB: Contrats ─── */}
-            {dossierSub === "contrats" && (
+            
               <>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                   <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700, color: "#1a1a1a", margin: 0 }}>Contrats</h2>
@@ -1147,189 +1092,6 @@ export default function EmployeDetailPage() {
                   </table>
                 </div>
               </>
-            )}
-
-            {/* Legacy sub-tabs removed — content moved to main tabs */}
-            {false && dossierSub === "temps" && (
-              <div style={section}>
-                <p style={sectionTitle}>Heures par semaine</p>
-                {weeklyHours.length === 0 ? (
-                  <div style={{ textAlign: "center", color: "#999", padding: 20 }}>Aucun shift enregistre</div>
-                ) : (
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                    <thead>
-                      <tr>
-                        <th style={thStyle}>Semaine du</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>Heures</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>Heures sup.</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {weeklyHours.map((w) => {
-                        const contractHours = activeContrat?.heures_semaine ?? 35;
-                        const overtime = Math.max(0, w.hours - contractHours);
-                        return (
-                          <tr key={w.week} style={{ borderBottom: "1px solid #f0ebe3" }}>
-                            <td style={{ padding: "6px 8px" }}>{fmtDate(w.week)}</td>
-                            <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 600 }}>
-                              {w.hours.toFixed(1)}h
-                            </td>
-                            <td style={{ padding: "6px 8px", textAlign: "right", color: overtime > 0 ? "#e27f57" : "#999" }}>
-                              {overtime > 0 ? `+${overtime.toFixed(1)}h` : "---"}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
-
-            {/* ─── SUB: Conges ─── */}
-            {false && dossierSub === "conges" && (
-              <>
-                <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
-                  <div style={counterCard}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5 }}>CP pris</span>
-                    <span style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{cpCount}j</span>
-                  </div>
-                  <div style={counterCard}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5 }}>RC pris</span>
-                    <span style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{rcCount}j</span>
-                  </div>
-                </div>
-
-                {canWrite && (
-                  <div style={{ marginBottom: 12 }}>
-                    <button type="button" onClick={() => {
-                      setADebut(new Date().toISOString().slice(0, 10));
-                      setAFin("");
-                      setAType("CP");
-                      setANbJours("");
-                      setANote("");
-                      setShowAbsenceModal(true);
-                    }} style={addBtnStyle}>+ Nouvelle absence</button>
-                  </div>
-                )}
-
-                {absences.length === 0 ? (
-                  <div style={{ ...section, textAlign: "center", color: "#999" }}>Aucune absence enregistree</div>
-                ) : (
-                  <div style={section}>
-                    {absences.map((a) => {
-                      const c = ABSENCE_COLORS[a.type] ?? { bg: "#e8e0d0", fg: "#999" };
-                      return (
-                        <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #f0ebe3" }}>
-                          <div>
-                            <span style={{ ...absencePill, background: c.bg, color: c.fg }}>
-                              {ABSENCE_LABELS[a.type] ?? a.type}
-                            </span>
-                            <span style={{ fontSize: 13, marginLeft: 10, color: "#6f6a61" }}>
-                              {fmtDate(a.date_debut)}
-                              {a.date_fin !== a.date_debut && ` -> ${fmtDate(a.date_fin)}`}
-                            </span>
-                            {a.nb_jours != null && (
-                              <span style={{ fontSize: 12, marginLeft: 8, color: "#999" }}>{a.nb_jours}j</span>
-                            )}
-                            {a.note && <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>{a.note}</div>}
-                          </div>
-                          {canWrite && (
-                            <button type="button" onClick={() => deleteAbsence(a.id)} style={{ ...editBtnSmall, color: "#DC2626", borderColor: "rgba(220,38,38,0.3)" }}>Suppr.</button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* ─── SUB: Notes et documents ─── */}
-            {false && dossierSub === "notes" && (
-              <div style={section}>
-                <p style={sectionTitle}>Notes internes</p>
-                <textarea
-                  style={{ ...inputSt, minHeight: 120, resize: "vertical" }}
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  disabled={!canWrite}
-                  placeholder="Notes internes, observations, remarques..."
-                />
-
-                <p style={{ ...sectionTitle, marginTop: 20 }}>Documents</p>
-                <div style={placeholderBox}>
-                  <span style={{ color: "#999" }}>Zone de depot de fichiers (a venir)</span>
-                  <button type="button" disabled style={{ ...addBtnStyle, opacity: 0.5, cursor: "default", marginTop: 10 }}>
-                    + Ajouter un document
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* ─── SUB: Primes et avances ─── */}
-            {false && dossierSub === "primes" && (
-              <div style={section}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                  <p style={{ ...sectionTitle, margin: 0 }}>Primes & avances</p>
-                  <button type="button" onClick={() => alert("Ajout de prime : fonctionnalite a venir")} style={addBtnStyle}>
-                    + Ajouter
-                  </button>
-                </div>
-
-                {elements.length === 0 ? (
-                  <div style={{ textAlign: "center", color: "#999", padding: 20 }}>Aucune prime ou avance enregistree</div>
-                ) : (
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                    <thead>
-                      <tr>
-                        <th style={thStyle}>Type</th>
-                        <th style={thStyle}>Libelle</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>Montant</th>
-                        <th style={thStyle}>Periode</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {elements.map((el) => (
-                        <tr key={el.id} style={{ borderBottom: "1px solid #f0ebe3" }}>
-                          <td style={{ padding: "6px 8px" }}>
-                            <span style={{ ...absencePill, background: "#f6eedf", color: "#e27f57" }}>
-                              {ELEMENT_LABELS[el.type] ?? el.type}
-                            </span>
-                          </td>
-                          <td style={{ padding: "6px 8px" }}>{el.libelle}</td>
-                          <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 700 }}>
-                            {el.montant != null ? `${el.montant.toLocaleString("fr-FR")} EUR` : "---"}
-                          </td>
-                          <td style={{ padding: "6px 8px", color: "#999" }}>
-                            {el.date_debut ? fmtDate(el.date_debut) : ""}
-                            {el.date_fin ? ` -> ${fmtDate(el.date_fin)}` : ""}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
-
-            {/* ─── SUB: Disponibilite ─── */}
-            {false && dossierSub === "dispo" && (
-              <div style={section}>
-                <p style={sectionTitle}>Disponibilite</p>
-                <div style={placeholderBox}>
-                  <span style={{ color: "#999" }}>Gestion des creneaux de disponibilite (a venir)</span>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 14, width: "100%" }}>
-                    {["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"].map(day => (
-                      <div key={day} style={{ background: "#f6eedf", borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: "#6f6a61" }}>{day}</span>
-                        <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>---</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
           </>
         )}
 
@@ -2678,57 +2440,10 @@ const pageStyle: React.CSSProperties = {
   padding: "16px 16px 60px",
 };
 
-const headerCard: React.CSSProperties = {
-  display: "flex",
-  alignItems: "flex-start",
-  gap: 16,
-  background: "#fff",
-  borderRadius: 10,
-  border: "1px solid #ddd6c8",
-  padding: "20px 22px",
-  marginBottom: 16,
-};
 
-const avatarLarge: React.CSSProperties = {
-  width: 56,
-  height: 56,
-  borderRadius: "50%",
-  background: "#D4775A",
-  color: "#fff",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: 18,
-  fontWeight: 700,
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-  flexShrink: 0,
-};
 
-const avatarImg: React.CSSProperties = {
-  width: 56,
-  height: 56,
-  borderRadius: "50%",
-  objectFit: "cover",
-  flexShrink: 0,
-};
 
-const nameStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 22,
-  fontWeight: 700,
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-  color: "#1a1a1a",
-};
 
-const rolePill: React.CSSProperties = {
-  display: "inline-block",
-  padding: "2px 10px",
-  borderRadius: 8,
-  fontSize: 11,
-  fontWeight: 700,
-  background: "#f6eedf",
-  color: "#e27f57",
-};
 
 const contratPill = (type: string): React.CSSProperties => {
   const colors: Record<string, { bg: string; fg: string }> = {
@@ -2743,10 +2458,6 @@ const contratPill = (type: string): React.CSSProperties => {
   return { display: "inline-block", padding: "2px 10px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: c.bg, color: c.fg };
 };
 
-const statutPill = (actif: boolean): React.CSSProperties => ({
-  display: "inline-block", padding: "2px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700,
-  background: actif ? "#e8ede6" : "#f0f0f0", color: actif ? "#4a6741" : "#bbb",
-});
 
 const completionBarBg: React.CSSProperties = {
   width: 120,
@@ -2788,24 +2499,7 @@ const tabBtn = (active: boolean): React.CSSProperties => ({
   gap: 6,
 });
 
-const subTabsRow: React.CSSProperties = {
-  display: "flex",
-  gap: 6,
-  marginBottom: 16,
-  flexWrap: "wrap",
-};
 
-const subTabPill = (active: boolean): React.CSSProperties => ({
-  padding: "6px 14px",
-  borderRadius: 20,
-  border: active ? "1px solid #e27f57" : "1px solid #ddd6c8",
-  background: active ? "rgba(226,127,87,0.10)" : "#fff",
-  color: active ? "#e27f57" : "#6f6a61",
-  fontSize: 12,
-  fontWeight: 600,
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-});
 
 const section: React.CSSProperties = {
   background: "#fff",
@@ -2815,15 +2509,6 @@ const section: React.CSSProperties = {
   marginBottom: 14,
 };
 
-const sectionTitle: React.CSSProperties = {
-  margin: "0 0 14px",
-  fontSize: 12,
-  fontWeight: 800,
-  letterSpacing: 1,
-  color: "#e27f57",
-  textTransform: "uppercase",
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-};
 
 const grid2: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 14px" };
 const grid3: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0 14px" };
@@ -2841,9 +2526,6 @@ const inputSt: React.CSSProperties = {
   outline: "none", boxSizing: "border-box", fontFamily: "inherit",
 };
 
-const miniLabel: React.CSSProperties = {
-  fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5,
-};
 
 const saveBtnStyle: React.CSSProperties = {
   display: "inline-flex", alignItems: "center", height: 32, padding: "0 16px",
@@ -2873,32 +2555,14 @@ const editBtnSmall: React.CSSProperties = {
   background: "#fff", color: "#6f6a61", fontSize: 11, fontWeight: 600, cursor: "pointer",
 };
 
-const eyeBtn: React.CSSProperties = {
-  marginLeft: 6, padding: "0 4px", border: "none", background: "none",
-  color: "#e27f57", fontSize: 10, fontWeight: 600, cursor: "pointer", textDecoration: "underline",
-};
 
 const absencePill: React.CSSProperties = {
   display: "inline-block", padding: "2px 10px", borderRadius: 8,
   fontSize: 12, fontWeight: 700,
 };
 
-const counterCard: React.CSSProperties = {
-  flex: 1, background: "#fff", border: "1px solid #ddd6c8", borderRadius: 10,
-  padding: "14px 16px", display: "flex", flexDirection: "column", gap: 4,
-};
 
-const placeholderBox: React.CSSProperties = {
-  background: "#f6eedf", borderRadius: 10, padding: "24px 20px",
-  display: "flex", flexDirection: "column", alignItems: "center",
-  textAlign: "center",
-};
 
-const thStyle: React.CSSProperties = {
-  textAlign: "left", padding: "6px 8px", fontSize: 10, fontWeight: 700,
-  color: "#999", textTransform: "uppercase", letterSpacing: 0.5,
-  borderBottom: "1px solid #ddd6c8",
-};
 
 const tagStyle = (tag: string): React.CSSProperties => ({
   marginLeft: 6, padding: "1px 5px", borderRadius: 4, fontSize: 9, fontWeight: 700,
