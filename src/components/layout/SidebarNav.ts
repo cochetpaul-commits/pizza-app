@@ -126,7 +126,6 @@ const VENTES_ITEMS: NavItemV2[] = [
   { label: "Chiffre d'affaires", href: "/ventes/ca", icon: "barChart" },
   { label: "Tickets & couverts", href: "/ventes/tickets", icon: "fileText" },
   { label: "Produits vendus", href: "/ventes/produits", icon: "tag" },
-  { label: "Analyse météo", href: "/ventes/meteo", icon: "trendingUp" },
 ];
 const VENTES_SECTION: NavSubSection = { label: "Ventes", icon: "wallet", href: "/ventes", roles: ["group_admin"], items: VENTES_ITEMS };
 
