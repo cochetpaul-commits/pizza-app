@@ -156,7 +156,6 @@ export default function PersonnelPage() {
   // Entrées / sorties du mois
   const thisMonth = now.toISOString().slice(0, 7);
   const entrees = employes.filter(e => e.date_anciennete?.startsWith(thisMonth)).length;
-  const sorties = employes.filter(e => !e.actif).length; // simplified
 
   const deltaHeures = totalHeures - totalHeuresPrev;
   const etabColor = etab?.couleur ?? "#e27f57";

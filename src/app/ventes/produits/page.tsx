@@ -20,7 +20,7 @@ export default function ProduitsVendusPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
-  const [catFilter, setCatFilter] = useState("all");
+  const [catFilter] = useState("all");
   const [sortBy, setSortBy] = useState<"ca" | "qty" | "name">("ca");
   const [period, setPeriod] = useState("today");
 
@@ -36,10 +36,6 @@ export default function ProduitsVendusPage() {
       if (todayRes.ok) {
         const d = await todayRes.json();
         // All products with categories
-        const allProds: Product[] = [];
-        for (const cat of (d.categories ?? []) as Category[]) {
-          // Categories don't have individual products — use topProducts
-        }
         setCategories(d.categories ?? []);
 
         // Top products from today
@@ -69,12 +65,10 @@ export default function ProduitsVendusPage() {
 
   useEffect(() => {
     if (!etab) return;
-    let cancelled = false;
     (async () => {
       await loadData(period);
     })();
-    return () => { cancelled = true; };
-  }, [etab, period]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [etab, period]);
 
   const filtered = useMemo(() => {
     let list = products;

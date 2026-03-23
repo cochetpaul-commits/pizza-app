@@ -75,17 +75,6 @@ const ABSENCE_LABELS: Record<string, string> = {
   evenement_familial: "Evenement familial",
 };
 
-const ABSENCE_COLORS: Record<string, { bg: string; fg: string }> = {
-  CP: { bg: "#e8ede6", fg: "#4a6741" },
-  maladie: { bg: "rgba(220,38,38,0.10)", fg: "#DC2626" },
-  RTT: { bg: "rgba(37,99,235,0.10)", fg: "#2563eb" },
-  absence_injustifiee: { bg: "#FFF3E0", fg: "#E65100" },
-  ferie: { bg: "#F3E5F5", fg: "#7B1FA2" },
-  repos_compensateur: { bg: "#E0F7FA", fg: "#00695C" },
-  formation: { bg: "#e8e0d0", fg: "#999" },
-  evenement_familial: { bg: "#FCE4EC", fg: "#AD1457" },
-};
-
 const ELEMENT_LABELS: Record<string, string> = {
   prime: "Prime", transport: "Transport",
   acompte: "Acompte", mutuelle_dispense: "Dispense mutuelle",
@@ -111,8 +100,6 @@ export default function EmployeDetailPage() {
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
   const [mainTab, setMainTab] = useState<MainTab>("infos");
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  
 
   // ── Employee fields ──
   const [emp, setEmp] = useState<Record<string, unknown>>({});
@@ -469,13 +456,6 @@ export default function EmployeDetailPage() {
     setSaving(false);
   };
 
-  /* ── Delete absence ── */
-  const deleteAbsence = async (absId: string) => {
-    if (!confirm("Supprimer cette absence ?")) return;
-    await supabase.from("absences").delete().eq("id", absId);
-    setAbsences((prev) => prev.filter((a) => a.id !== absId));
-  };
-
   /* ── Load equipes + managers for contrat modal ── */
   const loadContratEquipes = async () => {
     const etabId = (emp as Record<string, unknown>).etablissement_id as string;
@@ -522,42 +502,6 @@ export default function EmployeDetailPage() {
     loadContratEquipes();
     setShowContratModal(true);
   };
-
-  /* ── Computed: weekly hours from shifts ── */
-  const weeklyHours = useMemo(() => {
-    if (shifts.length === 0) return [];
-    const byWeek: Record<string, number> = {};
-    for (const s of shifts) {
-      try {
-        const d = new Date(s.date + "T00:00:00");
-        const day = d.getDay();
-        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-        const monday = new Date(d);
-        monday.setDate(diff);
-        const weekKey = monday.toISOString().slice(0, 10);
-
-        const [sh, sm] = (s.start_time || "").split(":").map(Number);
-        const [eh, em] = (s.end_time || "").split(":").map(Number);
-        if (!isNaN(sh) && !isNaN(eh)) {
-          let hours = (eh + em / 60) - (sh + sm / 60);
-          if (hours < 0) hours += 24;
-          byWeek[weekKey] = (byWeek[weekKey] ?? 0) + hours;
-        }
-      } catch { /* skip malformed */ }
-    }
-    return Object.entries(byWeek)
-      .sort((a, b) => b[0].localeCompare(a[0]))
-      .slice(0, 12)
-      .map(([week, hours]) => ({ week, hours: Math.round(hours * 100) / 100 }));
-  }, [shifts]);
-
-  /* ── CP / RC counters ── */
-  const cpCount = useMemo(() => {
-    return absences.filter(a => a.type === "CP").reduce((sum, a) => sum + (a.nb_jours ?? 0), 0);
-  }, [absences]);
-  const rcCount = useMemo(() => {
-    return absences.filter(a => a.type === "repos_compensateur").reduce((sum, a) => sum + (a.nb_jours ?? 0), 0);
-  }, [absences]);
 
   /* ── Role label ── */
   const roleLabel = useMemo(() => {
