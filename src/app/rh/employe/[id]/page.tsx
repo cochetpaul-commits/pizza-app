@@ -209,6 +209,7 @@ export default function EmployeDetailPage() {
   const [cHeures, setCHeures] = useState(39);
   const [cJours, setCJours] = useState(5);
   const [cActif, setCActif] = useState(true);
+  const [cSmic, setCSmic] = useState(false);
 
   // ── Old absence modal (legacy) ──
   const [aType, setAType] = useState("CP");
@@ -499,6 +500,7 @@ export default function EmployeDetailPage() {
     setCHeures(c.heures_semaine);
     setCJours(c.jours_semaine);
     setCActif(c.actif);
+    setCSmic(false);
     setContratTab("contrat");
     loadContratEquipes();
     setShowContratModal(true);
@@ -515,6 +517,7 @@ export default function EmployeDetailPage() {
     setCHeures(39);
     setCJours(5);
     setCActif(true);
+    setCSmic(false);
     setContratTab("contrat");
     loadContratEquipes();
     setShowContratModal(true);
@@ -2082,15 +2085,29 @@ export default function EmployeDetailPage() {
             <div style={{ display: contratTab === "paie" ? "block" : "none" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>SALAIRE</div>
 
-              <Checkbox label="Salarié au SMIC" checked={false} onChange={() => {}} />
-              <div style={{ padding: 8, borderRadius: 8, background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.12)", marginBottom: 12, fontSize: 11, color: "#2563eb" }}>
-                Pour appliquer le SMIC à un salarié vous devez renseigner au préalable le temps de travail hebdomadaire prévu au contrat de travail.
-              </div>
+              <Checkbox label="Salarié au SMIC" checked={cSmic} onChange={(v) => {
+                setCSmic(v);
+                if (v && cHeures > 0) {
+                  // SMIC horaire brut 2026 : 11,88 €
+                  const smicMensuel = Math.round(11.88 * cHeures * 52 / 12 * 100) / 100;
+                  setCRemuneration(smicMensuel);
+                }
+              }} />
+              {cSmic && cHeures <= 0 && (
+                <div style={{ padding: 8, borderRadius: 8, background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.12)", marginBottom: 12, fontSize: 11, color: "#2563eb" }}>
+                  Pour appliquer le SMIC, renseignez d&apos;abord le temps de travail hebdomadaire dans l&apos;onglet Contrat.
+                </div>
+              )}
+              {cSmic && cHeures > 0 && (
+                <div style={{ padding: 8, borderRadius: 8, background: "rgba(45,106,79,0.06)", border: "1px solid rgba(45,106,79,0.15)", marginBottom: 12, fontSize: 11, color: "#2D6A4F" }}>
+                  SMIC horaire brut 2026 : <strong>11,88 €/h</strong> — Salaire mensuel calculé sur {cHeures}h/sem : <strong>{(Math.round(11.88 * cHeures * 52 / 12 * 100) / 100).toLocaleString("fr-FR")} €</strong>
+                </div>
+              )}
 
               <div style={fieldRow}>
                 <label style={labelSt}>Salaire brut mensuel</label>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <input type="number" style={inputSt} value={cRemuneration} onChange={(e) => setCRemuneration(Number(e.target.value))} />
+                  <input type="number" style={{ ...inputSt, background: cSmic ? "#f0ebe3" : "#fff" }} value={cRemuneration} onChange={(e) => { if (!cSmic) setCRemuneration(Number(e.target.value)); }} disabled={cSmic} />
                   <span style={{ fontSize: 12, color: "#999" }}>€</span>
                 </div>
               </div>
