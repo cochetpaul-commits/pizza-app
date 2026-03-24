@@ -619,8 +619,8 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                     padding: "24px 16px", background: "rgba(0,0,0,0.03)", borderRadius: 12,
                     textAlign: "center", color: "#6f6a61", fontSize: 14, lineHeight: 1.7, marginBottom: 16,
                   }}>
-                    Aucun ingr\u00E9dient pivot d\u00E9fini.<br />
-                    Appuyez sur \u2606 en mode normal pour en choisir un.
+                    Aucun ingrédient pivot défini.<br />
+                    Appuyez sur ☆ en mode normal pour en choisir un.
                   </div>
                 ) : (
                   <>
@@ -628,7 +628,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                       background: "#FFFBEB", border: "2px solid #D97706",
                       borderRadius: 12, padding: 16, marginBottom: 12,
                     }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#D97706", marginBottom: 6 }}>\u2605 Ingr\u00E9dient pivot</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#D97706", marginBottom: 6 }}>★ Ingrédient pivot</div>
                       <div style={{ fontSize: 18, fontWeight: 800, color: "#2d2d2d", marginBottom: 12 }}>
                         {prodPivotIng?.name ?? "\u2014"}
                       </div>
@@ -669,7 +669,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                         background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10,
                         padding: "12px 16px", color: "#4a6741", fontWeight: 700, fontSize: 15, marginBottom: 16,
                       }}>
-                        Volume total estim\u00E9 : {prodTotalW.toLocaleString("fr-FR")} ml
+                        Volume total estimé : {prodTotalW.toLocaleString("fr-FR")} ml
                       </div>
                     )}
                   </>
@@ -678,7 +678,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                 {steps.length > 0 && (
                   <div className="card" style={{ marginBottom: 16 }}>
                     <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
-                      \u00C9tapes / Recette
+                      Étapes / Recette
                     </h3>
                     <ol style={{ margin: 0, paddingLeft: 20 }}>
                       {steps.map((s, i) => (
@@ -696,7 +696,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                     <div>
                       <label className="label">Nom du cocktail</label>
-                      <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Nom\u2026" />
+                      <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Nom…" />
                     </div>
 
                     <div>
@@ -722,14 +722,14 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                       <div style={{ flex: "1 1 140px" }}>
                         <label className="label">Verrerie</label>
                         <select className="input" value={glass} onChange={e => setGlass(e.target.value)}>
-                          <option value="">\u2014 verre \u2014</option>
+                          <option value="">— verre —</option>
                           {GLASS_OPTIONS.map(g => <option key={g} value={g.toLowerCase()}>{g}</option>)}
                         </select>
                       </div>
                       <div style={{ flex: "1 1 140px" }}>
-                        <label className="label">M\u00E9thode</label>
+                        <label className="label">Méthode</label>
                         <select className="input" value={method} onChange={e => setMethod(e.target.value)}>
-                          <option value="">\u2014 m\u00E9thode \u2014</option>
+                          <option value="">— méthode —</option>
                           {METHOD_OPTIONS.map(m => <option key={m} value={m.toLowerCase()}>{m}</option>)}
                         </select>
                       </div>
@@ -752,7 +752,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                 {/* Ingredients */}
                 <div className="card" style={{ marginBottom: 16 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
-                    Ingr\u00E9dients
+                    Ingrédients
                   </h3>
                   <IngredientListDnD
                     items={lines}
@@ -766,7 +766,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                   />
                   {totalCostEur > 0 && (
                     <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: "#2f3a33" }}>
-                      Co\u00FBt total : {fmtMoney(round2(totalCostEur))} \u20AC
+                      Coût total : {fmtMoney(round2(totalCostEur))} €
                     </div>
                   )}
                 </div>
@@ -774,7 +774,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                 {/* Etapes */}
                 <div className="card" style={{ marginBottom: 16 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
-                    \u00C9tapes / Recette
+                    Étapes / Recette
                   </h3>
                   <StepsList steps={steps} onChange={setSteps} />
                 </div>
@@ -782,7 +782,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                 {/* Allergenes */}
                 <div className="card" style={{ marginBottom: 16 }}>
                   <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
-                    Allerg\u00E8nes
+                    Allergènes
                   </h3>
                   <AllergenBadges allergens={computedAllergens} />
                 </div>

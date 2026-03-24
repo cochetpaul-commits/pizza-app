@@ -654,7 +654,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                     textAlign: "center", color: "#6f6a61", fontSize: 14, lineHeight: 1.7, marginBottom: 16,
                   }}>
                     Aucun ingredient pivot defini.<br />
-                    Appuyez sur \u2606 en mode normal pour en choisir un.
+                    Appuyez sur ☆ en mode normal pour en choisir un.
                   </div>
                 ) : (
                   <>
@@ -662,7 +662,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                       background: "#FFFBEB", border: "2px solid #D97706",
                       borderRadius: 12, padding: 16, marginBottom: 12,
                     }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#D97706", marginBottom: 6 }}>\u2605 Ingredient pivot</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#D97706", marginBottom: 6 }}>★ Ingredient pivot</div>
                       <div style={{ fontSize: 18, fontWeight: 800, color: "#2d2d2d", marginBottom: 12 }}>
                         {prodPivotIng?.name ?? "\u2014"}
                       </div>
@@ -730,7 +730,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                     <div>
                       <label className="label">Nom de la pizza</label>
-                      <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Nom\u2026" />
+                      <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Nom…" />
                     </div>
                     <div>
                       <label className="label">Empatement lie</label>
@@ -738,7 +738,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                         options={doughOptions}
                         value={doughRecipeId}
                         onChange={setDoughRecipeId}
-                        placeholder="Choisir un empatement\u2026"
+                        placeholder="Choisir un empatement…"
                       />
                     </div>
                     {doughRecipeId && (
@@ -751,7 +751,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                         />
                         {doughCostPerBall != null && (
                           <span style={{ marginLeft: 10, fontSize: 13, color: "#6f6a61" }}>
-                            \u2192 Cout paton : {fmtMoney(doughCostPerBall)} \u20AC
+                            → Cout paton : {fmtMoney(doughCostPerBall)} €
                           </span>
                         )}
                       </div>
@@ -766,7 +766,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                 {/* Ingredients Avant four */}
                 <div className="card" style={{ marginBottom: 16 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
-                    Ingredients \u2014 Avant four
+                    Ingredients — Avant four
                   </h3>
                   <IngredientListDnD
                     droppableId="pre"
@@ -784,7 +784,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                 {/* Ingredients Apres four */}
                 <div className="card" style={{ marginBottom: 16 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6B3A2A" }}>
-                    Ingredients \u2014 Apres four
+                    Ingredients — Apres four
                   </h3>
                   <IngredientListDnD
                     droppableId="post"
@@ -811,7 +811,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                       value={notes}
                       onChange={e => setNotes(e.target.value)}
                       rows={3}
-                      placeholder="Notes additionnelles\u2026"
+                      placeholder="Notes additionnelles…"
                       style={{
                         width: "100%", borderRadius: 8, border: "1px solid rgba(217,199,182,0.8)",
                         padding: "8px 10px", fontSize: 14, background: "rgba(255,255,255,0.8)",
