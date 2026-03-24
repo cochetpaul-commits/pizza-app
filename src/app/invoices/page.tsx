@@ -96,6 +96,10 @@ export default function InvoicesPage() {
     return "";
   }
 
+  function isImageFile(f: File): boolean {
+    return f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic)$/i.test(f.name);
+  }
+
   async function handleFileUpload(f: File) {
     setFile(f);
     setError(null);
@@ -104,7 +108,10 @@ export default function InvoicesPage() {
     try {
       const form = new FormData();
       form.append("file", f);
-      const res = await fetchApi("/api/invoices/detect", { method: "POST", body: form });
+      // Images go through Vision OCR endpoint, PDFs through standard detect
+      const endpoint = isImageFile(f) ? "/api/invoices/photo" : "/api/invoices/detect";
+      if (isImageFile(f)) form.append("mode", "detect");
+      const res = await fetchApi(endpoint, { method: "POST", body: form });
       if (!res.ok) {
         const text = await res.text();
         let msg = `Erreur ${res.status}`;
@@ -112,6 +119,7 @@ export default function InvoicesPage() {
         throw new Error(msg);
       }
       const data = await res.json();
+      if (data.ok === false) throw new Error(data.error ?? "Erreur OCR");
       setDetection(data.detection);
       setSelectedSupplier(data.detection?.supplier?.slug ?? null);
       if (data.detection?.etablissement?.slug === "bello_mio") setSelectedEtab("bellomio");
@@ -137,8 +145,12 @@ export default function InvoicesPage() {
       form.append("file", file);
       form.append("mode", "preview");
       form.append("establishment", selectedEtab);
+      if (isImageFile(file)) form.append("fournisseur", selectedSupplier);
+      const etabSlug = selectedEtab === "piccola" ? "piccola_mia" : "bello_mio";
+      if (isImageFile(file)) form.append("etablissement", etabSlug);
       const auth = getAuthHeader();
-      const res = await fetchApi(`/api/invoices/${selectedSupplier}`, {
+      const endpoint = isImageFile(file) ? "/api/invoices/photo" : `/api/invoices/${selectedSupplier}`;
+      const res = await fetchApi(endpoint, {
         method: "POST",
         headers: auth ? { Authorization: auth } : {},
         body: form,
@@ -164,8 +176,12 @@ export default function InvoicesPage() {
       form.append("file", file);
       form.append("mode", "commit");
       form.append("establishment", selectedEtab);
+      if (isImageFile(file)) form.append("fournisseur", selectedSupplier);
+      const etabSlug = selectedEtab === "piccola" ? "piccola_mia" : "bello_mio";
+      if (isImageFile(file)) form.append("etablissement", etabSlug);
       const auth = getAuthHeader();
-      const res = await fetchApi(`/api/invoices/${selectedSupplier}`, {
+      const endpoint = isImageFile(file) ? "/api/invoices/photo" : `/api/invoices/${selectedSupplier}`;
+      const res = await fetchApi(endpoint, {
         method: "POST",
         headers: auth ? { Authorization: auth } : {},
         body: form,
@@ -222,27 +238,32 @@ export default function InvoicesPage() {
                 ref={fileRef}
                 type="file"
                 style={{ display: "none" }}
+                accept=".pdf,.jpg,.jpeg,.png,.webp,image/*"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (!f) return;
-                  if (!f.name.toLowerCase().endsWith(".pdf") && f.type !== "application/pdf") {
-                    setError("Seuls les fichiers PDF sont acceptes.");
+                  const ext = f.name.toLowerCase();
+                  const isImage = f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic)$/i.test(ext);
+                  const isPdf = ext.endsWith(".pdf") || f.type === "application/pdf";
+                  if (!isPdf && !isImage) {
+                    setError("Formats acceptes : PDF, JPG, PNG, WebP.");
                     return;
                   }
                   handleFileUpload(f);
                 }}
               />
-              <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📄 📷</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
-                {loading ? "Analyse en cours..." : "Glisser une facture PDF ici"}
+                {loading ? "Analyse en cours..." : "Glisser une facture ici"}
               </div>
               <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
-                ou cliquer pour parcourir
+                PDF ou photo (JPG, PNG) — cliquer pour parcourir
               </div>
             </div>
 
             <p style={{ fontSize: 12, color: "#999", textAlign: "center", marginTop: 12 }}>
               Le fournisseur et l&apos;etablissement seront detectes automatiquement.
+              Les photos sont analysees par OCR (Google Vision).
             </p>
 
             {/* Quick links to legacy pages */}
