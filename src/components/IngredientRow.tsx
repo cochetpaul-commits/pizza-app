@@ -300,7 +300,7 @@ export const IngredientRow = React.memo(function IngredientRow({
           <div className="grid gap-2.5" style={{ gridTemplateColumns: "2fr 1fr 1fr" }}>
             <input style={inputStyle} value={edit.name} onChange={(e) => onEditChange({ ...edit, name: e.target.value })} />
             <select style={selectStyle} value={edit.category} onChange={(e) => onEditChange({ ...edit, category: e.target.value as Category })}>
-              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              {CATEGORIES.map((c) => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
             </select>
             <select style={selectStyle} value={edit.supplierId} onChange={(e) => onEditChange({ ...edit, supplierId: e.target.value })}>
               <option value="">—</option>
