@@ -420,6 +420,7 @@ function IngredientsPageInner() {
       })(),
       supplier_id,
       import_name: name,
+      ...(etab ? { etablissement_id: etab.id } : {}),
     };
     const ins = await supabase.from("ingredients").insert(baseIngredient).select("id").single();
     if (ins.error) {
@@ -1128,6 +1129,7 @@ function IngredientsPageInner() {
                           purchase_unit_label: "kg",
                           allergens: selectedIng.allergens ?? null,
                           supplier_id: selectedIng.supplier_id ?? null,
+                          ...(etab ? { etablissement_id: etab.id } : {}),
                         });
                         if (error) { alert(error.message); return; }
                         setShowRendementCalc(false);

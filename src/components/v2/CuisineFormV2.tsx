@@ -519,6 +519,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
           piece_weight_g: null,
           piece_volume_ml: null,
           supplier_id: null,
+          ...(etab ? { etablissement_id: etab.id } : {}),
         }).select("id").single<{ id: string }>();
         if (insErr) throw insErr;
         setIndexIngredientId(newIng.id);
