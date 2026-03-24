@@ -40,7 +40,7 @@ interface Props { recipeId?: string; initialProdMode?: boolean; }
 export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
   const router = useRouter();
   const { can } = useProfile();
-  const userCanWrite = can("recettes.edit");
+  const userCanWrite = can("operations.edit_recettes");
   const { current: etab } = useEtablissement();
   const isEdit = !!recipeId;
 

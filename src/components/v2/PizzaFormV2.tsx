@@ -52,7 +52,7 @@ function truncate(s: string, n: number) { return s.length > n ? s.slice(0, n) + 
 export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   const router = useRouter();
   const { can } = useProfile();
-  const userCanWrite = can("recettes.edit");
+  const userCanWrite = can("operations.edit_recettes");
   const { current: etab } = useEtablissement();
   const isEdit = !!pizzaId;
 

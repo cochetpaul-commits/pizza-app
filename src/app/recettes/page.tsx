@@ -357,7 +357,7 @@ const filterPill = (active: boolean, activeColor?: string): React.CSSProperties 
 
 function RecettesInner() {
   const { can } = useProfile();
-  const canWrite = can("recettes.edit");
+  const canWrite = can("operations.edit_recettes");
   const { current: etabCtx } = useEtablissement();
   const [authOk, setAuthOk] = useState<boolean | null>(null);
   const [pizzas,    setPizzas]    = useState<PizzaRow[]>([]);
