@@ -9,7 +9,7 @@ import { parseAllergens, mergeAllergens } from "@/lib/allergens";
 import { offerRowToCpu, enrichCpuWithConversions } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
-import { EstablishmentPicker } from "./EstablishmentPicker";
+
 import { fetchApi } from "@/lib/fetchApi";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -61,7 +61,6 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
   const [category, setCategory] = useState("plat_cuisine");
   const [yieldGrams, setYieldGrams] = useState<number | "">("");
   const [portionsCount, setPortionsCount] = useState<number | "">("");
-  const [establishments, setEstablishments] = useState<string[]>(["bellomio", "piccola"]);
   const [photoUrl, setPhotoUrl] = useState("");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -273,7 +272,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
           setCategory(String(r.category ?? "plat_cuisine"));
           setYieldGrams(r.yield_grams ? Number(r.yield_grams) : "");
           setPortionsCount(r.portions_count ? Number(r.portions_count) : "");
-          setEstablishments((r.establishments as string[]) ?? ["bellomio", "piccola"]);
+          // establishments auto-assigned from current etab context
           setPhotoUrl(String(r.photo_url ?? ""));
           if (r.photo_url) setPhotoPreview(String(r.photo_url));
           if (r.vat_rate) setVatRate(Number(r.vat_rate));
@@ -350,7 +349,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
         category,
         yield_grams: yieldGrams !== "" ? Math.round(Number(yieldGrams)) : 0,
         portions_count: portionsCount !== "" ? Math.round(Number(portionsCount)) : 0,
-        establishments,
+        establishments: etab ? [etab.slug] : ["bellomio"],
         vat_rate: vatRate,
         margin_rate,
         total_cost: totalCostRounded > 0 ? totalCostRounded : null,
@@ -891,10 +890,6 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                       </div>
                     </div>
 
-                    <div>
-                      <label className="label">Établissements</label>
-                      <EstablishmentPicker value={establishments} onChange={setEstablishments} />
-                    </div>
                   </div>
                 </div>
 

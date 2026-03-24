@@ -402,10 +402,9 @@ function RecettesInner() {
         .order("created_at", { ascending: false });
 
       if (etabCtx) {
-        pq.or(`etablissement_id.eq.${etabCtx.id},etablissement_id.is.null`);
-        kq.or(`etablissement_id.eq.${etabCtx.id},etablissement_id.is.null`);
-        cq.or(`etablissement_id.eq.${etabCtx.id},etablissement_id.is.null`);
-        eq.or(`etablissement_id.eq.${etabCtx.id},etablissement_id.is.null`);
+        pq.contains("establishments", [etabCtx.slug]);
+        kq.contains("establishments", [etabCtx.slug]);
+        cq.contains("establishments", [etabCtx.slug]);
       }
 
       Promise.all([pq, kq, cq, eq]).then(([p, k, c, e]) => {

@@ -375,6 +375,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
         margin_rate,
         total_cost: totalCost > 0 ? totalCost : null,
         steps: steps.length > 0 ? JSON.stringify(steps) : null,
+        establishments: etab ? [etab.slug] : ["bellomio"],
         is_draft: false,
       };
 

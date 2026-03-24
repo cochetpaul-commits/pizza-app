@@ -10,7 +10,7 @@ import { parseAllergens, mergeAllergens } from "@/lib/allergens";
 import { offerRowToCpu, enrichCpuWithConversions } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
-import { EstablishmentPicker } from "./EstablishmentPicker";
+
 import { fetchApi } from "@/lib/fetchApi";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -53,7 +53,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   const router = useRouter();
   const { can } = useProfile();
   const userCanWrite = can("operations.edit_recettes");
-  const { current: etab } = useEtablissement();
+  const etab = useEtablissement();
   const isEdit = !!pizzaId;
 
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
@@ -64,7 +64,6 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   const [doughRecipeId, setDoughRecipeId] = useState("");
   const [ballWeightG, setBallWeightG] = useState<number | "">(264);
   const [notes, setNotes] = useState("");
-  const [establishments, setEstablishments] = useState<string[]>(["bellomio", "piccola"]);
   const [photoUrl, setPhotoUrl] = useState("");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -325,7 +324,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
           setDoughRecipeId(String(p.dough_recipe_id ?? ""));
           setBallWeightG(p.ball_weight_g ? Number(p.ball_weight_g) : 264);
           setNotes(String(p.notes ?? ""));
-          setEstablishments((p.establishments as string[]) ?? ["bellomio", "piccola"]);
+          // establishments auto-assigned from current etab context
           setPhotoUrl(String(p.photo_url ?? ""));
           if (p.photo_url) setPhotoPreview(String(p.photo_url));
           if (p.vat_rate) setVatRate(Number(p.vat_rate));
@@ -399,7 +398,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         dough_recipe_id: doughRecipeId || null,
         notes: notesValue,
         photo_url: photoUrl || null,
-        establishments,
+        establishments: etab.current ? [etab.current.slug] : ["bellomio"],
         total_cost: totalCost > 0 ? totalCost : null,
         vat_rate: vatRate,
         margin_rate,
@@ -413,7 +412,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         if (error) throw error;
       } else {
         const { data, error } = await supabase.from("pizza_recipes")
-          .insert({ ...payload, user_id: auth.user.id, ...(etab ? { etablissement_id: etab.id } : {}) })
+          .insert({ ...payload, user_id: auth.user.id, ...(etab.current ? { etablissement_id: etab.current.id } : {}) })
           .select("id").single<{ id: string }>();
         if (error) throw error;
         pid = data.id;
@@ -514,7 +513,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
               <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a" }}>{title}</h1>
               {isEdit && (
                 <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
-                  {etab && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 8px", borderRadius: 6, background: "#D4775A", color: "#fff" }}>{etab.nom ?? "Etablissement"}</span>}
+                  {etab.current && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 8px", borderRadius: 6, background: "#D4775A", color: "#fff" }}>{etab.current.nom ?? "Etablissement"}</span>}
                   <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 8px", borderRadius: 6, background: "#f2ede4", color: "#666" }}>Pizza</span>
                 </div>
               )}
@@ -608,7 +607,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
             recipeType="pizza"
             lines={allLines}
             ingredients={ingredients}
-            etablissementId={etab?.id}
+            etablissementId={etab.current?.id}
           />
         )}
 
@@ -756,10 +755,6 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                         )}
                       </div>
                     )}
-                    <div>
-                      <label className="label">Etablissements</label>
-                      <EstablishmentPicker value={establishments} onChange={setEstablishments} />
-                    </div>
                   </div>
                 </div>
 
