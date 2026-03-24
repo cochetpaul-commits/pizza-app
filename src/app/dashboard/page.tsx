@@ -149,6 +149,13 @@ export default function DashboardPage() {
   const [heuresPM, setHeuresPM] = useState<number | null>(null);
   const [groupAlerts, setGroupAlerts] = useState<GroupAlert[]>([]);
 
+  // Monthly CA
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [monthData, setMonthData] = useState<{ caMois: number; couvertsMois: number; ticketMoyen: number; caPrevMois: number; variation: number; moyJournaliere: number; nbJours: number } | null>(null);
+
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const yesterday = useMemo(() => {
     const d = new Date();
@@ -218,6 +225,21 @@ export default function DashboardPage() {
     }
     fetchCaYesterday();
   }, [isAdmin, yesterday, isGroupView, current, etablissements]);
+
+  // Fetch CA mensuel Popina
+  useEffect(() => {
+    if (!isAdmin) return;
+    async function fetchMonthlyCa() {
+      try {
+        const res = await fetchApi(`/api/popina/ca-mois?month=${selectedMonth}`);
+        if (res.ok) {
+          const d = await res.json();
+          setMonthData(d);
+        }
+      } catch { /* silencieux */ }
+    }
+    fetchMonthlyCa();
+  }, [isAdmin, selectedMonth]);
 
   // Events (only for Piccola Mia — events are managed there)
   useEffect(() => {
@@ -497,6 +519,83 @@ export default function DashboardPage() {
             accent={ratioMSGroupe != null && ratioMSGroupe > objMS ? "#DC2626" : T.dore}
             sub={`obj. ${objMS}%`} subColor={T.dore}
             progress={ratioMSGroupe != null ? { value: ratioMSGroupe, max: objMS + 20, color: ratioMSGroupe > objMS ? "#DC2626" : T.dore } : undefined} />
+        </div>
+
+        {/* ── CA Mensuel Popina (Bello Mio) ── */}
+        <div style={{
+          background: T.white, borderRadius: 14, border: `1.5px solid ${T.border}`,
+          padding: "18px 20px", marginBottom: 20,
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <SectionLabel>CA mensuel &mdash; Bello Mio (Popina)</SectionLabel>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button type="button" onClick={() => {
+                const [y, m] = selectedMonth.split("-").map(Number);
+                const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+                setSelectedMonth(prev);
+              }} style={{
+                width: 28, height: 28, borderRadius: 8, border: `1px solid ${T.border}`,
+                background: T.white, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={T.dark} strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
+              </button>
+              <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "DM Sans, sans-serif", color: T.dark, minWidth: 90, textAlign: "center" }}>
+                {new Date(selectedMonth + "-01").toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
+              </span>
+              <button type="button" onClick={() => {
+                const [y, m] = selectedMonth.split("-").map(Number);
+                const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+                const now = new Date();
+                const maxMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+                if (next <= maxMonth) setSelectedMonth(next);
+              }} style={{
+                width: 28, height: 28, borderRadius: 8, border: `1px solid ${T.border}`,
+                background: T.white, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={T.dark} strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+              </button>
+            </div>
+          </div>
+
+          {monthData ? (
+            <>
+              {/* KPIs mensuels */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 16 }}>
+                <div style={{ textAlign: "center", padding: "10px 0" }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: T.muted }}>CA cumule</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: T.terracotta, fontFamily: "var(--font-oswald), Oswald, sans-serif", marginTop: 2 }}>{fmtEur(monthData.caMois)}&nbsp;&euro;</div>
+                </div>
+                <div style={{ textAlign: "center", padding: "10px 0" }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: T.muted }}>Couverts</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: T.dark, fontFamily: "var(--font-oswald), Oswald, sans-serif", marginTop: 2 }}>{monthData.couvertsMois}</div>
+                </div>
+                <div style={{ textAlign: "center", padding: "10px 0" }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: T.muted }}>Moy. jour</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: T.dark, fontFamily: "var(--font-oswald), Oswald, sans-serif", marginTop: 2 }}>{fmtEur(monthData.moyJournaliere)}&nbsp;&euro;</div>
+                </div>
+                <div style={{ textAlign: "center", padding: "10px 0" }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: T.muted }}>Var. M-1</div>
+                  <div style={{
+                    fontSize: 22, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif", marginTop: 2,
+                    color: monthData.variation > 0 ? T.sauge : monthData.variation < 0 ? "#DC2626" : T.muted,
+                  }}>
+                    {monthData.variation > 0 ? "+" : ""}{monthData.variation.toFixed(1).replace(".", ",")}%
+                  </div>
+                  <div style={{ fontSize: 10, color: T.muted }}>
+                    M-1 : {fmtEur(monthData.caPrevMois)}&nbsp;&euro;
+                  </div>
+                </div>
+              </div>
+
+              {/* Ticket moyen + nbJours */}
+              <div style={{ display: "flex", gap: 16, marginBottom: 12, fontSize: 12, color: T.muted, fontFamily: "DM Sans, sans-serif" }}>
+                <span>Ticket moyen : <strong style={{ color: T.dark }}>{monthData.ticketMoyen.toFixed(1).replace(".", ",")}&nbsp;&euro;</strong></span>
+                <span>{monthData.nbJours} jour{monthData.nbJours > 1 ? "s" : ""} d&apos;activite</span>
+              </div>
+            </>
+          ) : (
+            <div style={{ textAlign: "center", padding: 20, color: T.muted, fontSize: 12 }}>Chargement...</div>
+          )}
         </div>
 
         {/* ── 2 Establishment Cards ── */}

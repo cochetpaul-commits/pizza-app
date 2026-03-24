@@ -109,6 +109,7 @@ export const CLIENTS_ITEMS = EVENEMENTIEL_ITEMS;
 
 /** Ventes section */
 const VENTES_ITEMS: NavItemV2[] = [
+  { label: "Indicateurs cles", href: "/ventes/performances", icon: "barChart" },
   { label: "Chiffre d'affaires", href: "/ventes/ca", icon: "barChart" },
   { label: "Produits vendus", href: "/ventes/produits", icon: "tag" },
 ];
@@ -277,6 +278,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/ventes": "Ventes",
   "/ventes/ca": "Chiffre d'affaires",
   "/ventes/tickets": "Tickets & couverts",
+  "/ventes/performances": "Indicateurs cles",
   "/ventes/produits": "Produits vendus",
   "/ventes/meteo": "Analyse météo",
   "/plannings": "Planning",
