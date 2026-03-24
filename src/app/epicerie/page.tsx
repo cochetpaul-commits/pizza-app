@@ -104,7 +104,13 @@ export default function EpiceriePage() {
         offQ,
       ]);
       setIngredients((ings ?? []) as Ingredient[]);
-      setSuppliers((sups ?? []) as Supplier[]);
+      // Deduplicate suppliers by normalized name
+      const seen = new Map<string, Supplier>();
+      for (const s of (sups ?? []) as Supplier[]) {
+        const key = (s.name ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (!seen.has(key)) seen.set(key, s);
+      }
+      setSuppliers(Array.from(seen.values()));
       const supMap = new Map((sups ?? []).map((s: Supplier) => [s.id, s.name]));
       const offMap: Record<string, string> = {};
       const cpuMap: Record<string, { cpu: number; cpuUnit: "g" | "ml" | "pc"; pieceWeightG: number | null }> = {};
