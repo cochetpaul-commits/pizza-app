@@ -285,9 +285,28 @@ export async function GET(request: NextRequest) {
     return fmtDateUTC(d);
   });
 
-  // Fetch reports for both weeks + weather in parallel
+  // Quick connectivity check: test Popina API with a single-day fetch
   const prevMondayStr = fmtDateUTC(prevMonday);
   const fetchTo = weekDates[6] > todayParis ? todayParis : weekDates[6];
+
+  let apiError: string | null = null;
+  try {
+    const testRes = await fetch(`https://api.popina.com/v1/reports?locationId=d7442cfe-0305-4885-be9c-4853b9a3a2c2&from=${todayParis}&to=${todayParis}`, {
+      headers: { Authorization: `Bearer ${apiKey}` }, cache: "no-store",
+    });
+    if (!testRes.ok) {
+      const body = await testRes.text().catch(() => "");
+      if (body.includes("P2025") || body.includes("not found")) {
+        apiError = "Cle API Popina invalide ou revoquee. Regenerez-la dans votre compte Popina.";
+      } else {
+        apiError = `Popina API erreur ${testRes.status}`;
+      }
+    }
+  } catch {
+    apiError = "Impossible de joindre l'API Popina";
+  }
+
+  // Fetch reports for both weeks + weather in parallel
   const [reports, weatherMap] = await Promise.all([
     fetchReports(apiKey, prevMondayStr, fetchTo),
     fetchWeekWeather(weekDates),
@@ -513,6 +532,7 @@ export async function GET(request: NextRequest) {
     isCurrentWeek,
     activeDays: activeDates.length,
     today: todayParis,
+    apiError,
     kpis: {
       caSemaine, caHT: c2e(Math.round(caSemaine * 100 / 1.1)),
       paxSemaine, ticketMoyenSurPlace: ticketSurPlace, ticketMoyenEmporter: ticketEmporter,

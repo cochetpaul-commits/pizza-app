@@ -48,7 +48,11 @@ export async function fetchReports(
       headers: { Authorization: `Bearer ${apiKey}` },
       cache: "no-store",
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(`[Popina] reports ${res.status}: ${body.slice(0, 200)}`);
+      return [];
+    }
     const json = await res.json();
     // Popina wraps results in { data: [...] }
     const items = Array.isArray(json) ? json
@@ -56,7 +60,8 @@ export async function fetchReports(
                 : json ? [json]
                 : [];
     return items as PopinaReport[];
-  } catch {
+  } catch (err) {
+    console.error("[Popina] reports fetch error:", err);
     return [];
   }
 }
@@ -92,14 +97,19 @@ export async function fetchOrders(
       headers: { Authorization: `Bearer ${apiKey}` },
       cache: "no-store",
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(`[Popina] orders ${res.status}: ${body.slice(0, 200)}`);
+      return [];
+    }
     const json = await res.json();
     const items = Array.isArray(json) ? json
                 : Array.isArray(json?.data) ? json.data
                 : json ? [json]
                 : [];
     return items as PopinaOrder[];
-  } catch {
+  } catch (err) {
+    console.error("[Popina] orders fetch error:", err);
     return [];
   }
 }

@@ -37,6 +37,7 @@ type DayData = {
 
 type PerfData = {
   week: string; weekLabel: string; isCurrentWeek: boolean; activeDays: number; today: string;
+  apiError: string | null;
   kpis: {
     caSemaine: number; caHT: number; paxSemaine: number;
     ticketMoyenSurPlace: number; ticketMoyenEmporter: number;
@@ -136,6 +137,21 @@ export default function PerformancesPage() {
           <div style={{ textAlign: "center", padding: 60, color: T.muted }}>Chargement...</div>
         ) : data ? (
           <>
+            {/* ── API Error Banner ── */}
+            {data.apiError && (
+              <div style={{
+                background: "#FEF2F2", border: "1.5px solid #FECACA", borderRadius: 12,
+                padding: "14px 18px", marginBottom: 16,
+                display: "flex", alignItems: "center", gap: 10,
+              }}>
+                <span style={{ fontSize: 18 }}>&#9888;</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#991B1B" }}>Connexion Popina impossible</div>
+                  <div style={{ fontSize: 12, color: "#B91C1C", marginTop: 2 }}>{data.apiError}</div>
+                </div>
+              </div>
+            )}
+
             {/* ── CHIFFRES CLES SEMAINE ── */}
             <SectionLabel>Chiffres cles &middot; Semaine</SectionLabel>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
