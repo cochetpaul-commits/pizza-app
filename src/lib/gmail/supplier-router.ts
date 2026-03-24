@@ -41,6 +41,14 @@ export function detectFournisseurFromEmail(
     if (sub.includes("COZIGOU")) return "cozigou";
     if (sub.includes("BAR SPIRITS") || sub.includes("BARSPIRITS")) return "bar_spirits";
     if (sub.includes("LMDW")) return "lmdw";
+    if (sub.includes("MAEL")) return "mael";
+    if (sub.includes("VINOFLO")) return "vinoflo";
+    if (sub.includes("ARMOR")) return "armor";
+    if (sub.includes("SUM")) return "sum";
+    if (sub.includes("MASSE")) return "masse";
+    if (sub.includes("CARNIATO")) return "carniato";
+    if (sub.includes("SDPF")) return "sdpf";
+    if (sub.includes("ELIEN") || sub.includes("ÉLIEN")) return "elien";
     // Fallback: try generic parser
     return "generic";
   }
