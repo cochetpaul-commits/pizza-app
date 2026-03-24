@@ -299,29 +299,35 @@ export default function PerformancesPage() {
             {/* ── TOP PRODUITS PAR CATEGORIE ── */}
             {data.topByCategory.length > 0 && (
               <>
-                <SectionLabel>Top produits par categorie</SectionLabel>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-                  {data.topByCategory.slice(0, 8).map(cat => (
-                    <div key={cat.category} style={{ ...CARD, padding: "14px 16px" }}>
-                      <h4 style={{ fontSize: 13, fontWeight: 700, color: T.dark, marginBottom: 10 }}>
-                        Top {cat.category}
-                      </h4>
-                      <div style={{ display: "grid", gap: 4 }}>
-                        {cat.products.map((p, i) => (
-                          <div key={p.name} style={{
-                            display: "flex", alignItems: "center", gap: 6,
-                            padding: "5px 0", borderBottom: i < cat.products.length - 1 ? `1px solid ${T.cremeDark}` : "none",
-                          }}>
-                            <span style={{ fontSize: 10, color: T.muted, minWidth: 14 }}>{i + 1}</span>
-                            <span style={{ flex: 1, fontSize: 12, color: T.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-                            <span style={{ fontSize: 10, color: T.muted, flexShrink: 0 }}>{p.quantity}</span>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: T.terracotta, flexShrink: 0 }}>{fmtEur(p.totalSales)} &euro;</span>
-                          </div>
-                        ))}
-                      </div>
+                {/* Food categories */}
+                {data.topByCategory.filter(c => !c.category.includes("Vin") && c.category !== "Cocktails & Alcools" && c.category !== "Sans alcool").length > 0 && (
+                  <>
+                    <SectionLabel>Top Plats</SectionLabel>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+                      {data.topByCategory
+                        .filter(c => !c.category.includes("Vin") && c.category !== "Cocktails & Alcools" && c.category !== "Sans alcool")
+                        .slice(0, 4)
+                        .map(cat => (
+                        <CategoryCard key={cat.category} cat={cat} />
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </>
+                )}
+
+                {/* Drink categories */}
+                {data.topByCategory.filter(c => c.category.includes("Vin") || c.category === "Cocktails & Alcools" || c.category === "Sans alcool").length > 0 && (
+                  <>
+                    <SectionLabel>Top Boissons</SectionLabel>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+                      {data.topByCategory
+                        .filter(c => c.category.includes("Vin") || c.category === "Cocktails & Alcools" || c.category === "Sans alcool")
+                        .slice(0, 4)
+                        .map(cat => (
+                        <CategoryCard key={cat.category} cat={cat} />
+                      ))}
+                    </div>
+                  </>
+                )}
               </>
             )}
           </>
@@ -572,6 +578,34 @@ function DayDetailPopup({ day, onClose }: { day: DayData; onClose: () => void })
             </div>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+/* ── CategoryCard ── */
+function CategoryCard({ cat }: { cat: { category: string; products: Array<{ name: string; quantity: number; totalSales: number; pctChange: number | null }> } }) {
+  const CARD_STYLE: React.CSSProperties = {
+    background: T.white, borderRadius: 14, padding: "14px 16px",
+    border: `1.5px solid ${T.border}`,
+  };
+  return (
+    <div style={CARD_STYLE}>
+      <h4 style={{ fontSize: 13, fontWeight: 700, color: T.dark, marginBottom: 10 }}>
+        {cat.category}
+      </h4>
+      <div style={{ display: "grid", gap: 4 }}>
+        {cat.products.map((p, i) => (
+          <div key={p.name} style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "5px 0", borderBottom: i < cat.products.length - 1 ? `1px solid ${T.cremeDark}` : "none",
+          }}>
+            <span style={{ fontSize: 10, color: T.muted, minWidth: 14 }}>{i + 1}</span>
+            <span style={{ flex: 1, fontSize: 12, color: T.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+            <span style={{ fontSize: 10, color: T.muted, flexShrink: 0 }}>{p.quantity}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: T.terracotta, flexShrink: 0 }}>{fmtEur(p.totalSales)} &euro;</span>
+          </div>
+        ))}
       </div>
     </div>
   );

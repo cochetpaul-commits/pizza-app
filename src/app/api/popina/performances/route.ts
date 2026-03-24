@@ -28,41 +28,73 @@ const c2e = (centimes: number) => Math.round(centimes / 100 * 100) / 100;
 
 /* ── Product category inference ──────────────────────── */
 
-const PIZZA_KEYWORDS = [
-  "margherita", "regina", "diavola", "calzone", "focaccia", "napoli", "bufala",
-  "4 fromage", "quatre fromage", "formaggi", "capricciosa", "parma",
-  "crudo", "tartufata", "bergamino", "pepperoni",
-  "al tartufata", "al bergamino", "al crudo",
-];
-const ANTIPASTI_KEYWORDS = [
-  "burrata", "bruschett", "carpaccio", "vitello tonnato", "polpo", "tartare",
-  "salade", "insalata", "articho", "bresaola", "mozzarella",
-];
+/** Remove accents: è→e, ù→u, etc. */
+function stripAccents(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
 const DOLCI_KEYWORDS = [
   "tiramisu", "panna cotta", "profiterole", "cannoli", "fondant",
   "affogato", "semifreddo", "gelato", "sorbet", "mousse", "cheesecake",
+  "sorbeto", "tartufino",
 ];
 const PIATTI_KEYWORDS = [
   "ossobuco", "saltimbocca", "risotto", "linguine", "spaghetti", "penne",
   "tagliata", "gnocchi", "ravioli", "lasagne", "vongole", "carbonara",
   "bolognese", "amatriciana", "cacio", "pepe", "anatra", "agnello",
-  "scaloppine", "piccata", "marsala", "milanese",
+  "scaloppine", "piccata", "marsala", "milanese", "salmone",
 ];
-const BOISSON_KEYWORDS = [
-  "vin ", "verre", "bouteille", "chianti", "barolo", "prosecco", "amarone",
+const ANTIPASTI_KEYWORDS = [
+  "burrata", "bruschett", "carpaccio", "vitello", "polpo", "tartare",
+  "salade", "insalata", "articho", "bresaola", "mozzarella", "mortadella",
+];
+const PIZZA_KEYWORDS = [
+  "margherita", "regina", "diavola", "calzone", "focaccia", "napoli", "bufala",
+  "4 fromage", "quatre fromage", "formaggi", "capricciosa", "parma",
+  "crudo", "tartufata", "bergamino", "pepperoni", "tartufo",
+  "quattro", "al limone", "al tonno",
+];
+
+// Boissons split into sub-categories
+const VERRE_VIN_PREFIXES = ["v.", "v "];
+const BOUTEILLE_VIN_PREFIXES = ["btl.", "btl ", "bouteille"];
+const ALCOOL_KEYWORDS = [
   "spritz", "negroni", "americano", "bellini", "rossini", "cocktail",
-  "biere", "birra", "coca", "eau ", "cafe", "limonade", "jus ",
-  "digestif", "limoncello", "grappa", "amaro",
+  "biere", "birra", "digestif", "limoncello", "grappa", "amaro",
+  "aperol", "campari", "hugo", "mojito", "margarita", "gin",
+  "whisky", "rhum", "vodka", "sbagliato",
+];
+const SANS_ALCOOL_KEYWORDS = [
+  "virgin", "coca", "eau ", "eau\t", "cafe", "limonade", "jus ",
+  "the ", "the\t", "orangina", "schweppes", "perrier", "san pellegrino",
+  "sirop", "soda", "tonic",
+];
+const VIN_GENERAL_KEYWORDS = [
+  "chianti", "barolo", "prosecco", "amarone", "montepulciano",
+  "pinot", "primitivo", "negroamaro", "brunello", "tignanello",
+  "riserva", "sangiovese",
 ];
 
 function inferCategory(name: string, popinaCategory?: string): string {
   if (popinaCategory && popinaCategory.trim()) return popinaCategory;
-  const n = name.toLowerCase();
-  // Check more specific categories first
+  const raw = name.toLowerCase();
+  const n = stripAccents(raw);
+
+  // Boissons first (detect by prefix for vins)
+  if (VERRE_VIN_PREFIXES.some(p => raw.startsWith(p) || n.startsWith(p))) return "Vins (Verres)";
+  if (BOUTEILLE_VIN_PREFIXES.some(p => raw.startsWith(p) || n.startsWith(p))) return "Vins (Bouteilles)";
+  if (VIN_GENERAL_KEYWORDS.some(k => n.includes(k))) {
+    // Determine glass vs bottle by name pattern
+    if (raw.startsWith("btl") || n.includes("bouteille")) return "Vins (Bouteilles)";
+    return "Vins (Verres)";
+  }
+  if (SANS_ALCOOL_KEYWORDS.some(k => n.includes(k))) return "Sans alcool";
+  if (ALCOOL_KEYWORDS.some(k => n.includes(k))) return "Cocktails & Alcools";
+
+  // Food categories (order matters: specific first)
   if (DOLCI_KEYWORDS.some(k => n.includes(k))) return "Dolci";
   if (PIATTI_KEYWORDS.some(k => n.includes(k))) return "Piatti";
   if (ANTIPASTI_KEYWORDS.some(k => n.includes(k))) return "Antipasti";
-  if (BOISSON_KEYWORDS.some(k => n.includes(k))) return "Boissons";
   if (PIZZA_KEYWORDS.some(k => n.includes(k))) return "Pizze";
   return "Autre";
 }
