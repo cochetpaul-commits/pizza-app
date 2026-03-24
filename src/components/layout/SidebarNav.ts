@@ -81,6 +81,7 @@ export const PLANNING_ITEMS: NavItemV2[] = [
 export const ACHATS_ITEMS: NavItemV2[] = [
   { label: "Stats d'achats", href: "/stats-achats", icon: "barChart" },
   { label: "Factures", href: "/achats", icon: "fileText" },
+  { label: "Import factures", href: "/invoices", icon: "upload" },
   { label: "Import auto", href: "/factures-auto", icon: "mail" },
   { label: "Base produits", href: "/ingredients", icon: "tag" },
 ];
