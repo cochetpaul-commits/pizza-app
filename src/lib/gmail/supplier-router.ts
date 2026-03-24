@@ -63,10 +63,11 @@ const RECIPIENT_TO_ETAB: Record<string, string> = {
   "facture@piccolamia.fr": "piccola-mia",
 };
 
-/** Detect établissement from To/Cc headers */
+/** Detect établissement from To/Cc/From headers */
 export function detectEtablissementFromRecipients(
   to: string | null,
   cc: string | null,
+  from?: string | null,
 ): string | null {
   const all = [to, cc].filter(Boolean).join(",").toLowerCase();
 
@@ -74,6 +75,11 @@ export function detectEtablissementFromRecipients(
     if (all.includes(email)) return slug;
   }
 
-  // Default: if sent to gestionifratelligroup, try to detect from content later
-  return null;
+  // Detect from sender domain
+  const fromLower = (from ?? "").toLowerCase();
+  if (fromLower.includes("bellomio")) return "bello-mio";
+  if (fromLower.includes("piccolamia") || fromLower.includes("piccola")) return "piccola-mia";
+
+  // Default to bello-mio (main establishment)
+  return "bello-mio";
 }
