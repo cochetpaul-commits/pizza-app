@@ -2,15 +2,21 @@
  * LMDW (La Maison du Whisky) invoice parser
  *
  * Format LMDW — spirits/wine distributor (Clichy)
- * Invoice has main page + "Annexe Détaillée" with net prices (after discount)
+ * pdfjs-dist produces line-by-line output with newlines.
  *
- * Product line format (pdfjs-dist flat text):
- *   CODE  QTY  UNIT_PRICE  TOTAL  ...middle nums (base,deg,droits,css)...  VOLUME(0,XXX)  TVA(01/02)  [CSS]  NAME
+ * Column order in extracted text (per line):
+ *   CODE(3-6 digits + optional letter) → NAME → QTY(int) → VOL(0,XXX liters)
+ *   → DEG(xx,xx) → [C] → [PRIX_BASE] → [DROITS] → [CSS] → PU_HT(d,dd) → TOTAL(d,dd) → TVA(01|02)
  *
- * Key: Volume is always 0,XXX (liters) — serves as anchor in regex
- * Middle section has variable fields: base price, alcohol degree, droits, C (carton), CSS
- * Products: spirits, liqueurs, wines — all "boissons"
- * TVA: 20% (code 01) for spirits, 5.5% (code 02) for some aperitifs/wines
+ * Key characteristics:
+ * - Volume 0,\d{3} is unique anchor between name and numeric section
+ * - Last two comma-decimal numbers before TVA are PU_HT and TOTAL
+ * - "C" = carton (buying full case)
+ * - Multi-line names: continuation line starts with letter, no leading code
+ * - TVA: 01 = 20% (spirits), 02 = 5.5% (aperitifs/wines)
+ * - Products: spirits, liqueurs, wines — all "boissons"
+ * - Invoice number: "Facture N° : XXXXXXX" (7+ digits)
+ * - Date: "Date : DD/MM/YY"
  */
 
 import type { ParsedIngredient, ParseResult, ParseLog } from "./types";
@@ -27,12 +33,13 @@ function detectEtablissement(text: string): string | null {
 }
 
 function extractMeta(text: string) {
-  // Facture N°: 10-digit number before a date
-  const invMatch = text.match(/(\d{10})\s+\d{2}\/\d{2}\/\d{2}/);
-  // Date: DD/MM/YY (first occurrence after facture number)
-  const dateMatch = text.match(/\d{10}\s+(\d{2})\/(\d{2})\/(\d{2,4})/);
-  // Amounts: "1 383,19 EUR 1 154,76 228,43" → TTC EUR HT TVA
-  const amountMatch = text.match(/([\d\s]+,\d{2})\s+EUR\s+([\d\s]+,\d{2})\s+([\d\s]+,\d{2})/);
+  // Invoice number: "Facture N° : 1797444"
+  const invMatch = text.match(/Facture\s+N°\s*:\s*(\d{6,})/);
+  // Date: "Date : DD/MM/YY" or "Date : DD/MM/YYYY"
+  const dateMatch = text.match(/Date\s*:\s*(\d{2})\/(\d{2})\/(\d{2,4})/);
+  // Totals: "Total H.T. : 1 154,76" and "Total TTC : 1 383,19"
+  const htMatch = text.match(/Total\s+H\.T\.\s*:\s*([\d\s]+,\d{2})/);
+  const ttcMatch = text.match(/Total\s+TTC\s*:\s*([\d\s]+,\d{2})/);
 
   let invoice_date: string | null = null;
   if (dateMatch) {
@@ -43,16 +50,16 @@ function extractMeta(text: string) {
   return {
     invoice_number: invMatch?.[1] ?? null,
     invoice_date,
-    total_ht: amountMatch ? parseFrenchNumber(amountMatch[2].replace(/\s/g, "")) : null,
-    total_ttc: amountMatch ? parseFrenchNumber(amountMatch[1].replace(/\s/g, "")) : null,
+    total_ht: htMatch ? parseFrenchNumber(htMatch[1].replace(/\s/g, "")) : null,
+    total_ttc: ttcMatch ? parseFrenchNumber(ttcMatch[1].replace(/\s/g, "")) : null,
   };
 }
 
-// ── Product regex ───────────────────────────────────────────────────────────
-// CODE  QTY  PU  TOTAL  ...middle (numbers + optional C)...  VOL(0,XXX)  TVA(01|02)  [CSS(d,dd)]  NAME
-// Volume 0,\d{3} is unique anchor: no other field has 0 + comma + 3 digits
+// ── Product line regex ──────────────────────────────────────────────────────
+// CODE NAME QTY VOL ...numeric fields... TVA(01|02)
+// Anchor on: CODE at start, VOL (0,\d{3}), TVA (0[12]) at end
 const RE_PRODUCT =
-  /(\d{3,5}[A-Z]?)\s+(\d+)\s+(\d+,\d{2})\s+(\d+,\d{2})[\d,.\sC]+?(0,\d{3})\s+(0[12])\s+(?:\d,\d{2}\s+)?([A-Z][A-Za-zÀ-ÿ'][A-Za-zÀ-ÿ'\s!.,()\d/-]+?)(?=\s+\d{3,5}[A-Z]?\s+\d|\s*$)/g;
+  /^(\d{3,6}[A-Z]?)\s+(.+?)\s+(\d+)\s+(0,\d{3})\s+(.+?)\s+(0[12])\s*$/;
 
 // ── Parser ──────────────────────────────────────────────────────────────────
 
@@ -64,41 +71,103 @@ export function parseLmdw(text: string, etablissement: string): ParseResult {
   const ingredients: ParsedIngredient[] = [];
   const logs: ParseLog[] = [];
 
-  // Prefer "Annexe Détaillée" page (net prices after discount)
-  // Split by form-feed (pdfjs page separator) or fallback to newline
-  const pages = text.includes("\f") ? text.split("\f") : text.split("\n");
-  let parseText = text;
-  for (const page of pages) {
-    if (page.includes("Annexe") && page.includes("taill")) {
-      parseText = page;
-      break;
+  // Split into lines
+  const rawLines = text.split("\n");
+
+  // Pass 1: merge continuation lines with their product line
+  // A continuation line has no leading code and contains letters
+  const mergedLines: string[] = [];
+  for (const line of rawLines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    // Stop at totals/footer section
+    if (/^Montant\s+TOTAL/i.test(trimmed)) break;
+    if (/^Remise\s/i.test(trimmed)) break;
+    if (/^Total\s+H\.T/i.test(trimmed)) break;
+
+    // Is this a product line (starts with code)?
+    if (/^\d{3,6}[A-Z]?\s/.test(trimmed)) {
+      mergedLines.push(trimmed);
+    } else if (mergedLines.length > 0 && /[A-Za-zÀ-ÿ]/.test(trimmed) && !RE_PRODUCT.test(trimmed)) {
+      // Continuation: append to previous line's name area
+      // Insert before the QTY+VOL part by finding the code+name portion
+      const prev = mergedLines[mergedLines.length - 1];
+      // Find where the numeric tail starts (QTY VOL pattern)
+      const volMatch = prev.match(/\s+(\d+\s+0,\d{3}\s+.+)$/);
+      if (volMatch) {
+        const nameArea = prev.slice(0, prev.length - volMatch[0].length);
+        mergedLines[mergedLines.length - 1] = `${nameArea} ${trimmed}${volMatch[0]}`;
+      } else {
+        // Fallback: just append
+        mergedLines[mergedLines.length - 1] = `${prev} ${trimmed}`;
+      }
     }
   }
 
-  const seen = new Set<string>();
+  // Pass 2: parse each merged line
   let matchCount = 0;
+  const seen = new Set<string>();
 
-  RE_PRODUCT.lastIndex = 0;
-  let m: RegExpExecArray | null;
+  for (const line of mergedLines) {
+    const m = RE_PRODUCT.exec(line);
+    if (!m) continue;
 
-  while ((m = RE_PRODUCT.exec(parseText)) !== null) {
     const code = m[1];
-    const qty = parseInt(m[2]);
-    const unitPrice = parseFrenchNumber(m[3]);
-    const total = parseFrenchNumber(m[4]);
-    const volume = parseFrenchNumber(m[5]);
-    const name = m[7].trim();
+    const rawName = m[2].trim();
+    const qty = parseInt(m[3], 10);
+    const volume = parseFrenchNumber(m[4]);
+    const middleSection = m[5];
+    // m[6] = TVA code (unused)
 
-    // Dedup by code (safety for when annexe detection fails)
+    // Dedup by code
     if (seen.has(code)) continue;
     seen.add(code);
 
+    // Extract PU_HT and TOTAL from middle section
+    // They are the last two comma-decimal numbers
+    const decimalNums = middleSection.match(/\d+,\d{2}/g);
+    if (!decimalNums || decimalNums.length < 2) {
+      // Edge case: only one price (qty=1, no droits/css — e.g. IESSI)
+      if (decimalNums && decimalNums.length === 1) {
+        const puNet = parseFrenchNumber(decimalNums[0]);
+        matchCount++;
+        if (puNet != null && rawName) {
+          ingredients.push({
+            name: rawName,
+            reference: code,
+            unit_recette: "pcs",
+            unit_commande: "pcs",
+            volume_unitaire: volume ?? undefined,
+            prix_unitaire: puNet,
+            prix_commande: puNet * qty,
+            categorie: detectCategorieFromName(rawName) === "autre" ? "boissons" : detectCategorieFromName(rawName),
+            fournisseur_slug: "lmdw",
+            etablissement_id: etab,
+            raw_line: line.slice(0, 200),
+            confidence: "medium",
+          });
+          logs.push({
+            line_number: matchCount,
+            raw: `${code} ${rawName}`.slice(0, 120),
+            rule: "lmdw_product",
+            result: "ok",
+            detail: `${rawName} ×${qty} @${puNet}€ = ${puNet * qty}€ (${volume}L)`,
+          });
+        }
+        continue;
+      }
+      continue;
+    }
+
+    const total = parseFrenchNumber(decimalNums[decimalNums.length - 1]);
+    const puNet = parseFrenchNumber(decimalNums[decimalNums.length - 2]);
+
     matchCount++;
 
-    if (!name || unitPrice == null) {
+    if (!rawName || puNet == null) {
       logs.push({
         line_number: matchCount,
-        raw: m[0].replace(/\s+/g, " ").slice(0, 120),
+        raw: line.replace(/\s+/g, " ").slice(0, 120),
         rule: "lmdw_invalid",
         result: "error",
         detail: "Missing name or price",
@@ -106,10 +175,10 @@ export function parseLmdw(text: string, etablissement: string): ParseResult {
       continue;
     }
 
-    // Confidence: qty × unitPrice ≈ total
+    // Confidence: qty × puNet ≈ total
     let confidence: "high" | "medium" | "low" = "high";
     if (total != null && qty > 0) {
-      const expected = qty * unitPrice;
+      const expected = qty * puNet;
       const tolerance = Math.max(0.05, total * 0.02);
       if (Math.abs(expected - total) > tolerance) {
         confidence = "medium";
@@ -117,37 +186,37 @@ export function parseLmdw(text: string, etablissement: string): ParseResult {
     }
 
     // LMDW only sells alcohol — force "boissons" if no better match
-    const detected = detectCategorieFromName(name);
+    const detected = detectCategorieFromName(rawName);
     const cat = detected === "autre" ? "boissons" : detected;
 
     ingredients.push({
-      name,
+      name: rawName,
       reference: code,
       unit_recette: "pcs",
       unit_commande: "pcs",
       volume_unitaire: volume ?? undefined,
-      prix_unitaire: unitPrice,
-      prix_commande: total ?? unitPrice,
+      prix_unitaire: puNet,
+      prix_commande: total ?? puNet,
       categorie: cat,
       fournisseur_slug: "lmdw",
       etablissement_id: etab,
-      raw_line: m[0].replace(/\s+/g, " ").slice(0, 200),
+      raw_line: line.replace(/\s+/g, " ").slice(0, 200),
       confidence,
     });
 
     logs.push({
       line_number: matchCount,
-      raw: `${code} ${name}`.slice(0, 120),
+      raw: `${code} ${rawName}`.slice(0, 120),
       rule: "lmdw_product",
       result: "ok",
-      detail: `${name} ×${qty} @${unitPrice}€ = ${total}€ (${volume}L)`,
+      detail: `${rawName} ×${qty} @${puNet}€ = ${total}€ (${volume}L)`,
     });
   }
 
   if (matchCount === 0) {
     logs.push({
       line_number: 0,
-      raw: parseText.slice(0, 200),
+      raw: text.slice(0, 200),
       rule: "lmdw_no_match",
       result: "error",
       detail: "No product lines found",
