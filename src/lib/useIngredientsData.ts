@@ -129,6 +129,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
   const pageRef = useRef(0);
@@ -185,6 +186,13 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     pageRef.current = 0;
 
     try {
+      // Fetch total count (independent of pagination/search)
+      const countQuery = supabase.from("ingredients").select("id", { count: "exact", head: true });
+      if (etabRef.current) countQuery.eq("etablissement_id", etabRef.current);
+      countQuery.then(({ count }) => {
+        if (fetchIdRef.current === fetchId) setTotalCount(count);
+      });
+
       if (q) {
         const bundle = await searchIngredients(q, etabRef.current, etabSlugRef.current);
         if (fetchIdRef.current !== fetchId) return;
@@ -248,6 +256,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     loading,
     loadingMore,
     hasMore,
+    totalCount,
     loadMore,
     error,
     mutate,

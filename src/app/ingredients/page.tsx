@@ -94,7 +94,7 @@ function IngredientsPageInner() {
 
   const [q, setQ] = useState("");
   const debouncedQ = useDebounce(q, 300);
-  const { items, suppliers, supplierAliases, offers, alertMap, loading, loadingMore, hasMore, loadMore, error: dataError, mutate } = useIngredientsData(debouncedQ, etab?.id, etab?.slug);
+  const { items, suppliers, supplierAliases, offers, alertMap, loading, loadingMore, hasMore, totalCount, loadMore, error: dataError, mutate } = useIngredientsData(debouncedQ, etab?.id, etab?.slug);
 
   const [session, setSession] = useState<Session | null>(null);
 
@@ -677,7 +677,7 @@ function IngredientsPageInner() {
   const isVariations = tab === ("variations" as Tab);
 
   const TABS_MAIN = [
-    { t: "all"       as Tab, label: "Tous",         count: counts.all },
+    { t: "all"       as Tab, label: "Tous",         count: totalCount ?? counts.all },
     { t: "validated" as Tab, label: "Validés",      count: counts.validated },
     { t: "to_check"  as Tab, label: "À contrôler",  count: counts.to_check },
   ] as const;
