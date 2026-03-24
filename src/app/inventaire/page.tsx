@@ -84,7 +84,7 @@ export default function InventairePage() {
 
   async function fetchZones() {
     let q = supabase.from("storage_zones").select("*").order("display_order").order("name");
-    if (etabId) q = q.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
+    if (etabId) q = q.eq("etablissement_id", etabId);
     const { data } = await q;
     const zList = (data ?? []) as StorageZone[];
     setZones(zList);
@@ -101,10 +101,10 @@ export default function InventairePage() {
         .eq("is_active", true)
         .order("name");
       if (etabId) {
-        q = q.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
+        q = q.eq("etablissement_id", etabId);
       }
       let zq = supabase.from("storage_zones").select("*").order("display_order").order("name");
-      if (etabId) zq = zq.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
+      if (etabId) zq = zq.eq("etablissement_id", etabId);
       const [{ data, error }, { data: zData }] = await Promise.all([q, zq]);
       if (error) { console.error("ingredients query:", error); }
       setIngredients((data ?? []) as Ingredient[]);
@@ -309,7 +309,7 @@ export default function InventairePage() {
     // Reload ingredients to reflect cleared zones
     if (count > 0) {
       let q = supabase.from("ingredients").select("*").eq("is_active", true).order("name");
-      if (etab?.id) q = q.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
+      if (etab?.id) q = q.eq("etablissement_id", etab.id);
       const { data } = await q;
       setIngredients((data ?? []) as Ingredient[]);
     }

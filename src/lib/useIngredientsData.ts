@@ -58,7 +58,7 @@ async function fetchPage(page: number, etabId?: string | null, etabSlug?: string
     .range(from, from + PAGE_SIZE - 1);
 
   if (etabId) {
-    query = query.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
+    query = query.eq("etablissement_id", etabId);
   }
 
   const { data, error } = await query;
@@ -94,7 +94,7 @@ async function searchIngredients(q: string, etabId?: string | null, etabSlug?: s
     .order("name", { ascending: true });
 
   if (etabId) {
-    query = query.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
+    query = query.eq("etablissement_id", etabId);
   }
 
   const { data, error } = await query;
@@ -144,7 +144,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
       .from("suppliers")
       .select("id,name,is_active")
       .order("name", { ascending: true });
-    if (etablissementId) supQuery.or(`etablissement_id.eq.${etablissementId},etablissement_id.is.null`);
+    if (etablissementId) supQuery.eq("etablissement_id", etablissementId);
     supQuery.then(({ data, error: err }) => {
         if (!err) {
           // Deduplicate suppliers by name (case+accent insensitive) — keep the first entry as canonical

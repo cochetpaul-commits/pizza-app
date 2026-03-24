@@ -32,7 +32,7 @@ export function useChannels(etablissementId: string | null) {
       .order("created_at");
 
     if (etablissementId) {
-      query.or(`etablissement_id.eq.${etablissementId},etablissement_id.is.null`);
+      query.eq("etablissement_id", etablissementId);
     }
 
     const { data, error: err } = await query;

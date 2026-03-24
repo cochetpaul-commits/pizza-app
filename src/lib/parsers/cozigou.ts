@@ -92,13 +92,13 @@ type PageData = {
 function parsePage(pageText: string): PageData | null {
   const tokens = pageText.split(/\s+/).filter(Boolean);
 
-  // 1. Find codes block: consecutive 5-digit numbers (minimum 3)
+  // 1. Find codes block: consecutive 4-6 digit numbers (minimum 3)
   let codeStart = -1;
   let codeEnd = -1;
   for (let i = 0; i < tokens.length; i++) {
-    if (/^\d{5}$/.test(tokens[i])) {
+    if (/^\d{4,6}$/.test(tokens[i])) {
       let run = 0;
-      while (i + run < tokens.length && /^\d{5}$/.test(tokens[i + run])) run++;
+      while (i + run < tokens.length && /^\d{4,6}$/.test(tokens[i + run])) run++;
       if (run >= 3) {
         codeStart = i;
         codeEnd = i + run;
@@ -212,7 +212,8 @@ export function parseCozigou(text: string, etablissement: string): ParseResult {
   const detectedEtab = detectEtablissement(text);
   const etab = etablissement || detectedEtab || "bello_mio";
 
-  const pages = text.split("\n");
+  // Split by form-feed for multi-page PDFs; fallback to full text as single "page"
+  const pages = text.includes("\f") ? text.split("\f") : [text];
   const ingredients: ParsedIngredient[] = [];
   const logs: ParseLog[] = [];
 
@@ -246,8 +247,8 @@ export function parseCozigou(text: string, etablissement: string): ParseResult {
       const code = codes[i];
       const name = mergedNames[i] || names[i] || `ARTICLE ${code}`;
 
-      // Skip consignment lines (code 500xxx or similar)
-      if (/^5\d{4,}$/.test(code)) {
+      // Skip consignment lines (code 500xxx / 5001xx or similar)
+      if (/^50\d{2,}$/.test(code)) {
         logs.push({ line_number: i + 1, raw: `${code} ${name}`, rule: "cozigou_consignment", result: "skipped" });
         continue;
       }

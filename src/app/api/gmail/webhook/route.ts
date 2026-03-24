@@ -333,17 +333,20 @@ async function processMessage(messageId: string) {
         .filter((ing) => ing.confidence !== "low")
         .map((ing) => ({
           invoice_id: inv.id,
+          supplier_id: supplierId,
+          sku: ing.reference ?? null,
           name: ing.name,
-          reference: ing.reference ?? null,
           quantity: 1,
           unit: ing.unit_commande === "kg" ? "kg" : "pc",
           unit_price: ing.prix_unitaire,
           total_price: ing.prix_commande,
-          piece_weight_g: ing.poids_unitaire ?? null,
         }));
 
       if (lines.length > 0) {
-        await supabaseAdmin.from("supplier_invoice_lines").insert(lines);
+        const { error: linesErr } = await supabaseAdmin.from("supplier_invoice_lines").insert(lines);
+        if (linesErr) {
+          console.error("Insert invoice lines error:", linesErr);
+        }
       }
 
       // Upsert supplier offers

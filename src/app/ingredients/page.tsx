@@ -127,7 +127,7 @@ function IngredientsPageInner() {
   useEffect(() => {
     (async () => {
       let zq = supabase.from("storage_zones").select("id, name").order("display_order").order("name");
-      if (etab?.id) zq = zq.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
+      if (etab?.id) zq = zq.eq("etablissement_id", etab.id);
       const { data: zData } = await zq;
       setStorageZones((zData ?? []) as StorageZoneOption[]);
     })();

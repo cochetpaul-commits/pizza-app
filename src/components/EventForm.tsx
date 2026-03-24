@@ -155,7 +155,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
       let kQ = supabase.from("kitchen_recipes").select("id,name,cost_per_portion");
       let cQ = supabase.from("cocktails").select("id,name,total_cost").eq("is_draft", false);
       let eQ = supabase.from("recipes").select("id,name");
-      if (etab) { pQ = pQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`); kQ = kQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`); cQ = cQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`); eQ = eQ.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`); }
+      if (etab) { pQ = pQ.eq("etablissement_id", etab.id); kQ = kQ.eq("etablissement_id", etab.id); cQ = cQ.eq("etablissement_id", etab.id); eQ = eQ.eq("etablissement_id", etab.id); }
       const [pizzas, kitchens, cocktails, empats] = await Promise.all([pQ, kQ, cQ, eQ]);
       if (pizzas.error) { console.error("pizza_recipes query:", pizzas.error); }
       if (kitchens.error) { console.error("kitchen_recipes query:", kitchens.error); }

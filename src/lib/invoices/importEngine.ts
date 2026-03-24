@@ -227,7 +227,7 @@ export async function runImport(options: {
     .from("ingredients")
     .select("category")
     .eq("user_id", userId);
-  if (etabId) catQ = catQ.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
+  if (etabId) catQ = catQ.eq("etablissement_id", etabId);
   const { data: catRows, error: catErr } = await catQ.limit(1);
 
   if (catErr) throw new Error(catErr.message);
@@ -257,7 +257,7 @@ export async function runImport(options: {
         .eq("user_id", userId)
         .eq("supplier_id", supplierId)
         .in("supplier_sku", skus);
-      if (etabId) skuQ = skuQ.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
+      if (etabId) skuQ = skuQ.eq("etablissement_id", etabId);
       const { data: bySku, error: eSku } = await skuQ;
 
       if (eSku) throw new Error(eSku.message);
@@ -275,7 +275,7 @@ export async function runImport(options: {
       .from("ingredients")
       .select("id,name,import_name")
       .eq("user_id", userId);
-    if (etabId) allQ = allQ.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
+    if (etabId) allQ = allQ.eq("etablissement_id", etabId);
     const { data: allExisting, error: eAll } = await allQ;
 
     if (eAll) throw new Error(eAll.message);
@@ -360,7 +360,7 @@ export async function runImport(options: {
         .eq("user_id", userId)
         .eq("supplier_id", supplierId)
         .in("supplier_sku", skus);
-      if (etabId) skuQ2 = skuQ2.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
+      if (etabId) skuQ2 = skuQ2.eq("etablissement_id", etabId);
       const { data: bySku2, error: eSku2 } = await skuQ2;
 
       if (eSku2) throw new Error(eSku2.message);
@@ -376,7 +376,7 @@ export async function runImport(options: {
         .select("id,name,import_name")
         .eq("user_id", userId)
         .in("name", names);
-      if (etabId) nameQ2 = nameQ2.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
+      if (etabId) nameQ2 = nameQ2.eq("etablissement_id", etabId);
       const { data: byName2, error: eName2 } = await nameQ2;
 
       if (eName2) throw new Error(eName2.message);

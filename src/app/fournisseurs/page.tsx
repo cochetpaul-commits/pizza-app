@@ -37,12 +37,12 @@ export default function FournisseursPage() {
       setLoading(true);
 
       const supQuery = supabase.from("suppliers").select("id,name,is_active,email,phone,contact_name").order("name");
-      if (etab) supQuery.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
+      if (etab) supQuery.eq("etablissement_id", etab.id);
 
       const invQuery = supabase.from("supplier_invoices")
           .select("supplier_id,created_at,invoice_number")
           .order("created_at", { ascending: false });
-      if (etab) invQuery.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
+      if (etab) invQuery.eq("etablissement_id", etab.id);
 
       const [supRes, offRes, invRes] = await Promise.all([
         supQuery,

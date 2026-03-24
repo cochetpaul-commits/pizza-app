@@ -156,7 +156,7 @@ export default function StatsAchatsPage() {
           .select("supplier_id, category")
           .in("supplier_id", supplierIdsArr)
           .not("category", "is", null);
-        if (etabId) ingQ = ingQ.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
+        if (etabId) ingQ = ingQ.eq("etablissement_id", etabId);
         const { data: ingData } = await ingQ;
 
         // Count ingredients per supplier per category

@@ -135,13 +135,14 @@ export function findPdfAttachments(
 }
 
 /** Renew Gmail push notification watch (expires after 7 days) */
-export async function renewWatch(): Promise<void> {
+export async function renewWatch(): Promise<{ historyId: string; expiration: string }> {
   const token = await getAccessToken();
+  const projectId = process.env.GOOGLE_CLOUD_PROJECT || "ifratelli-gmail";
   const topicName = process.env.GOOGLE_PUBSUB_TOPIC || "gmail-factures";
   const labelId = process.env.GMAIL_LABEL_ID;
 
   const body: Record<string, unknown> = {
-    topicName: `projects/${process.env.GOOGLE_CLOUD_PROJECT || "ifratelli-app"}/topics/${topicName}`,
+    topicName: `projects/${projectId}/topics/${topicName}`,
     labelIds: labelId ? [labelId] : ["INBOX"],
   };
 
@@ -158,4 +159,7 @@ export async function renewWatch(): Promise<void> {
     const text = await res.text();
     throw new Error(`Gmail watch renewal failed: ${res.status} ${text}`);
   }
+
+  const data = await res.json();
+  return { historyId: data.historyId, expiration: data.expiration };
 }

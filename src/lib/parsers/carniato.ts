@@ -53,7 +53,7 @@ function extractMeta(text: string) {
 // CODE(4-5d) 01NAME...NUMBERS... QTY PU_NET A[24] MONTANT 8 EAN(6d 6d)
 // Using QTY(integer) + PU_NET(2dec) + A[24] + MONTANT(2dec) + EAN as anchors
 
-const RE_PRODUCT = /\b(\d{4,5})\s+01(.*?)\s+(\d+)\s+(\d+,\d{2})\s+A([24])\s+(\d+,\d{2})\s+8\s+\d{6}\s+\d{6}/g;
+const RE_PRODUCT = /\b(\d{4,6})\s+01(.*?)\s+(\d+)\s+(\d+,\d{2})\s+A([234])\s+(\d+,\d{2})\s+8\s+\d{6}\s+\d{6}/g;
 
 // ── Extract product name from raw area between 01 and QTY ───────────────
 // The area contains: NAME [NBRE_CART] [PAR_COMBIEN] [PRIX_TARIF] [remises/regie numbers]

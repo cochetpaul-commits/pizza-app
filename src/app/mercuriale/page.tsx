@@ -20,7 +20,7 @@ export default function MercurialePage() {
 
   useEffect(() => {
     const q = supabase.from("suppliers").select("id,name").eq("is_active", true).order("name");
-    if (etab) q.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
+    if (etab) q.eq("etablissement_id", etab.id);
     q.then(({ data }) => {
       setSuppliers((data ?? []) as Supplier[]);
     });

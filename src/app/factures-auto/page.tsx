@@ -45,7 +45,7 @@ export default function FacturesAutoPage() {
         .limit(100);
 
       if (etab) {
-        q = q.or(`etablissement_id.eq.${etab.id},etablissement_id.is.null`);
+        q = q.eq("etablissement_id", etab.id);
       }
 
       const { data } = await q;

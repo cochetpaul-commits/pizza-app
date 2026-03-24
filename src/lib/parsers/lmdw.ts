@@ -65,7 +65,8 @@ export function parseLmdw(text: string, etablissement: string): ParseResult {
   const logs: ParseLog[] = [];
 
   // Prefer "Annexe Détaillée" page (net prices after discount)
-  const pages = text.split("\n");
+  // Split by form-feed (pdfjs page separator) or fallback to newline
+  const pages = text.includes("\f") ? text.split("\f") : text.split("\n");
   let parseText = text;
   for (const page of pages) {
     if (page.includes("Annexe") && page.includes("taill")) {
