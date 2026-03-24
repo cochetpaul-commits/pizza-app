@@ -32,6 +32,7 @@ type DayData = {
     soir: { salle: number; pergolas: number; terrasse: number; emporter: number; total: number; pax: number; ticketMoyen: number };
   };
   topProducts: Array<{ name: string; quantity: number; totalSales: number }>;
+  weather: { midi: { temp: number; condition: string; icon: string }; soir: { temp: number; condition: string; icon: string } } | null;
 };
 
 type PerfData = {
@@ -261,7 +262,7 @@ export default function PerformancesPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                 <thead>
                   <tr style={{ background: `linear-gradient(135deg, ${T.terracotta}, #B85A3A)` }}>
-                    {["Jour", "Service", "Salle \u20AC", "Pergolas \u20AC", "Terrasse \u20AC", "A Emp. \u20AC", "Total TTC", "Total HT", "Pax", "Ticket moy.", "Ratio P/P"].map(h => (
+                    {["Jour", "Service", "Salle \u20AC", "Pergolas \u20AC", "Terrasse \u20AC", "A Emp. \u20AC", "Total TTC", "Total HT", "Pax", "Ticket moy.", "Ratio P/P", "Meteo"].map(h => (
                       <th key={h} style={{
                         padding: "10px 8px", color: "#fff", fontWeight: 700,
                         fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em",
@@ -378,9 +379,35 @@ function BarChart({ days, onDayClick, etabColor }: {
   );
 }
 
+/* ── Weather badge ── */
+function WeatherBadge({ temp, condition }: { temp: number; condition: string }) {
+  const iconMap: Record<string, string> = {
+    "ciel degage": "\u2600\uFE0F", "clear sky": "\u2600\uFE0F",
+    "peu nuageux": "\u26C5", "few clouds": "\u26C5",
+    "partiellement nuageux": "\u26C5", "scattered clouds": "\u26C5",
+    "nuageux": "\u2601\uFE0F", "broken clouds": "\u2601\uFE0F", "overcast clouds": "\u2601\uFE0F",
+    "couvert": "\u2601\uFE0F",
+    "pluie legere": "\u{1F327}\uFE0F", "light rain": "\u{1F327}\uFE0F",
+    "pluie moderee": "\u{1F327}\uFE0F", "moderate rain": "\u{1F327}\uFE0F",
+    "pluie": "\u{1F327}\uFE0F", "rain": "\u{1F327}\uFE0F",
+    "forte pluie": "\u{1F327}\uFE0F", "heavy rain": "\u{1F327}\uFE0F",
+    "orage": "\u26C8\uFE0F", "thunderstorm": "\u26C8\uFE0F",
+    "neige": "\u{1F328}\uFE0F", "snow": "\u{1F328}\uFE0F",
+    "brouillard": "\u{1F32B}\uFE0F", "mist": "\u{1F32B}\uFE0F", "fog": "\u{1F32B}\uFE0F",
+  };
+  const cond = condition.toLowerCase();
+  const icon = iconMap[cond] ?? (cond.includes("pluie") || cond.includes("rain") ? "\u{1F327}\uFE0F" : cond.includes("nuag") || cond.includes("cloud") || cond.includes("couvert") ? "\u2601\uFE0F" : cond.includes("soleil") || cond.includes("clear") || cond.includes("degage") ? "\u2600\uFE0F" : "\u2601\uFE0F");
+
+  return (
+    <span style={{ fontSize: 11, whiteSpace: "nowrap" }}>
+      {icon} {temp}&deg;
+    </span>
+  );
+}
+
 /* ── DayTableRows ── */
 function DayTableRows({ day }: { day: DayData }) {
-  const { services } = day;
+  const { services, weather } = day;
   const tdStyle = (bold: boolean, align: "left" | "right" = "right"): React.CSSProperties => ({
     padding: "8px 8px", textAlign: align, fontWeight: bold ? 700 : 400,
     color: bold ? T.dark : T.muted, whiteSpace: "nowrap", fontSize: 12,
@@ -411,6 +438,22 @@ function DayTableRows({ day }: { day: DayData }) {
         </td>
         <td style={tdStyle(true)}>
           {services.journee.ratioPiattiPizza > 0 ? `${services.journee.ratioPiattiPizza}%` : "\u2014"}
+        </td>
+        <td rowSpan={3} style={{ ...tdStyle(false, "left"), verticalAlign: "top", paddingTop: 10 }}>
+          {weather ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ fontSize: 10, color: T.muted }}>Midi</span>
+                <WeatherBadge temp={weather.midi.temp} condition={weather.midi.condition} />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ fontSize: 10, color: T.muted }}>Soir</span>
+                <WeatherBadge temp={weather.soir.temp} condition={weather.soir.condition} />
+              </div>
+            </div>
+          ) : (
+            <span style={{ fontSize: 11, color: T.muted }}>{"\u2014"}</span>
+          )}
         </td>
       </tr>
       {/* MIDI row */}
