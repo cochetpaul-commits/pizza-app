@@ -35,7 +35,7 @@ export async function POST() {
                                         Authorization: `Bearer ${token}`,
                                         "Content-Type": "application/json",
                                       },
-                            body: JSON.stringify({ topicName, labelIds: ["INBOX"] }),
+                            body: JSON.stringify({ topicName, labelIds: process.env.GMAIL_LABEL_ID ? [process.env.GMAIL_LABEL_ID] : ["INBOX"] }),
                           }
                 );
 
