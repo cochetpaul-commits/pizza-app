@@ -246,7 +246,7 @@ export default function DashboardPage() {
 
   // Events (only for Piccola Mia — events are managed there)
   useEffect(() => {
-    if (isGroupView) { setEvents([]); return; } // eslint-disable-line react-hooks/set-state-in-effect
+    if (isGroupView) { setEvents([]); return; }
     if (!current) return;
     const isPiccola = current.slug?.includes("piccola");
     if (!isPiccola) { setEvents([]); return; }
