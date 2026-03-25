@@ -104,7 +104,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, skipped: "no historyId" });
     }
     // Get recent messages from history
-    const messages = await getRecentMessages(decoded.historyId);
+    let messages = await getRecentMessages(decoded.historyId);
+    // If history returns nothing, fall back to listing recent label messages
+    if (messages.length === 0) {
+      messages = await listRecentLabelMessages();
+    }
     if (messages.length === 0) {
       return NextResponse.json({ ok: true, skipped: "no new messages" });
     }
@@ -172,9 +176,11 @@ async function getRecentMessages(historyId: string): Promise<string[]> {
 async function listRecentLabelMessages(): Promise<string[]> {
   const token = await getAccessTokenDirect();
   const labelId = process.env.GMAIL_LABEL_ID;
-  const q = labelId ? `label:${labelId}` : "has:attachment filename:pdf";
+  const params = new URLSearchParams({ maxResults: "10" });
+  if (labelId) params.set("labelIds", labelId);
+  else params.set("q", "has:attachment filename:pdf");
   const res = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&q=${encodeURIComponent(q)}`,
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
   if (!res.ok) return [];
