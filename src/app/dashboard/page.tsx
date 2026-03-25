@@ -129,12 +129,13 @@ export default function DashboardPage() {
   const { isGroupView, current, etablissements, setCurrent, setGroupView } = useEtablissement();
   const isAdmin = isGroupAdmin;
 
-  // Always show group view on dashboard for admins
+  // Dashboard shows group view by default on first load (if no etab selected)
   useEffect(() => {
-    if (isGroupAdmin && !isGroupView) {
+    if (isGroupAdmin && !isGroupView && !current) {
       setGroupView(true);
     }
-  }, [isGroupAdmin, isGroupView, setGroupView]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGroupAdmin]);
 
   const [ca, setCa] = useState<CaData>(null);
   const [caPM, setCaPM] = useState<PmData>(null);
