@@ -15,6 +15,7 @@ type PmData = { ca: number; couverts: number; panier_moyen: number } | null;
 type UpcomingEvent = { id: string; name: string; date: string | null; status: string; covers: number };
 type EtabDayData = { ca: number; couverts: number };
 type GroupAlert = { text: string; etab: string; badge: string; color: string };
+type RecentImport = { id: string; created_at: string; fournisseur: string | null; status: string };
 
 function fmtEur(n: number) {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -148,6 +149,7 @@ export default function DashboardPage() {
   const [heuresBM, setHeuresBM] = useState<number | null>(null);
   const [heuresPM, setHeuresPM] = useState<number | null>(null);
   const [groupAlerts, setGroupAlerts] = useState<GroupAlert[]>([]);
+  const [recentImports, setRecentImports] = useState<RecentImport[]>([]);
 
   // Monthly CA
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -283,6 +285,20 @@ export default function DashboardPage() {
       setPendingCommandes(count ?? 0);
     }
     if (isAdmin) fetchPending();
+  }, [isAdmin]);
+
+  // Recent email imports (errors only, for alert)
+  useEffect(() => {
+    async function fetchRecentImports() {
+      const { data } = await supabase
+        .from("email_imports")
+        .select("id,created_at,fournisseur,status")
+        .in("status", ["error", "no_match"])
+        .order("created_at", { ascending: false })
+        .limit(10);
+      setRecentImports((data ?? []) as RecentImport[]);
+    }
+    if (isAdmin) fetchRecentImports();
   }, [isAdmin]);
 
   // Shifts today (employees working tonight)
@@ -823,6 +839,20 @@ export default function DashboardPage() {
             </div>
           </Link>
         </>
+      )}
+
+      {/* Import errors alert */}
+      {recentImports.length > 0 && (
+        <div style={{ marginTop: 4, marginBottom: 20 }}>
+          <TaskCard
+            href="/achats"
+            icon="gestion"
+            title="Imports factures en erreur"
+            subtitle={`${recentImports.length} facture${recentImports.length > 1 ? "s" : ""} non importee${recentImports.length > 1 ? "s" : ""}`}
+            accent={T.terracotta}
+            count={recentImports.length}
+          />
+        </div>
       )}
 
     </div>

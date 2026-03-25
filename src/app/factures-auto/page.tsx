@@ -18,6 +18,17 @@ type ImportRow = {
   status: string;
   error_detail: string | null;
   gmail_message_id: string | null;
+  invoice_id: string | null;
+};
+
+type InvoiceLine = {
+  id: string;
+  name: string;
+  sku: string | null;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  total_price: number;
 };
 
 const STATUS_BADGE: Record<string, { label: string; bg: string; color: string }> = {
@@ -35,12 +46,15 @@ export default function FacturesAutoPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
   const [retrying, setRetrying] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [lines, setLines] = useState<InvoiceLine[]>([]);
+  const [linesLoading, setLinesLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
       let q = supabase
         .from("email_imports")
-        .select("id,created_at,email_from,email_subject,filename,fournisseur,invoice_number,nb_lignes,status,error_detail,gmail_message_id")
+        .select("id,created_at,email_from,email_subject,filename,fournisseur,invoice_number,nb_lignes,status,error_detail,gmail_message_id,invoice_id")
         .order("created_at", { ascending: false })
         .limit(100);
 
@@ -80,6 +94,24 @@ export default function FacturesAutoPage() {
     } finally {
       setRetrying(null);
     }
+  }
+
+  async function toggleExpand(row: ImportRow) {
+    if (expandedId === row.id) {
+      setExpandedId(null);
+      setLines([]);
+      return;
+    }
+    if (!row.invoice_id) return;
+    setExpandedId(row.id);
+    setLinesLoading(true);
+    const { data } = await supabase
+      .from("supplier_invoice_lines")
+      .select("id,name,sku,quantity,unit,unit_price,total_price")
+      .eq("invoice_id", row.invoice_id)
+      .order("name");
+    setLines((data ?? []) as InvoiceLine[]);
+    setLinesLoading(false);
   }
 
   const labelStyle: React.CSSProperties = {
@@ -146,15 +178,20 @@ export default function FacturesAutoPage() {
               const date = new Date(row.created_at);
               const dateStr = date.toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
+              const isExpanded = expandedId === row.id;
+              const canExpand = row.status === "ok" && row.invoice_id;
+
               return (
                 <div
                   key={row.id}
+                  onClick={() => canExpand && toggleExpand(row)}
                   style={{
                     background: "#fff",
                     border: "1px solid #ddd6c8",
                     borderRadius: 12,
                     padding: "12px 16px",
                     borderLeft: `4px solid ${badge.color}`,
+                    cursor: canExpand ? "pointer" : "default",
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
@@ -173,6 +210,9 @@ export default function FacturesAutoPage() {
                         }}>
                           {badge.label}
                         </span>
+                        {canExpand && (
+                          <span style={{ fontSize: 10, color: "#999" }}>{isExpanded ? "▲" : "▼"}</span>
+                        )}
                       </div>
                       <div style={{ fontSize: 12, color: "#6f6a61", marginBottom: 2 }}>
                         {row.filename ?? row.email_subject ?? "—"}
@@ -190,7 +230,7 @@ export default function FacturesAutoPage() {
                     </div>
                     {(row.status === "error" || row.status === "no_match") && row.gmail_message_id && (
                       <button
-                        onClick={() => handleRetry(row)}
+                        onClick={(e) => { e.stopPropagation(); handleRetry(row); }}
                         disabled={retrying === row.id}
                         style={{
                           padding: "6px 12px",
@@ -208,6 +248,54 @@ export default function FacturesAutoPage() {
                       </button>
                     )}
                   </div>
+
+                  {/* Expanded: invoice lines detail */}
+                  {isExpanded && (
+                    <div style={{ marginTop: 10, borderTop: "1px solid #eee", paddingTop: 10 }}>
+                      {linesLoading ? (
+                        <p style={{ fontSize: 12, color: "#999" }}>Chargement des lignes…</p>
+                      ) : lines.length === 0 ? (
+                        <p style={{ fontSize: 12, color: "#999" }}>Aucune ligne trouvee</p>
+                      ) : (
+                        <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+                          <thead>
+                            <tr style={{ borderBottom: "1px solid #eee", color: "#999", textAlign: "left" }}>
+                              <th style={{ padding: "4px 6px", fontWeight: 600 }}>Ingredient</th>
+                              <th style={{ padding: "4px 6px", fontWeight: 600, textAlign: "right" }}>PU</th>
+                              <th style={{ padding: "4px 6px", fontWeight: 600, textAlign: "right" }}>Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {lines.map((l) => (
+                              <tr key={l.id} style={{ borderBottom: "1px solid #f5f0e8" }}>
+                                <td style={{ padding: "4px 6px", color: "#1a1a1a" }}>
+                                  {l.name}
+                                  {l.sku && <span style={{ fontSize: 10, color: "#999", marginLeft: 6 }}>{l.sku}</span>}
+                                </td>
+                                <td style={{ padding: "4px 6px", textAlign: "right", color: "#666" }}>
+                                  {l.unit_price?.toFixed(2)} €/{l.unit}
+                                </td>
+                                <td style={{ padding: "4px 6px", textAlign: "right", fontWeight: 600, color: "#1a1a1a" }}>
+                                  {l.total_price?.toFixed(2)} €
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr style={{ borderTop: "1.5px solid #ddd6c8" }}>
+                              <td style={{ padding: "6px 6px", fontWeight: 700, color: "#1a1a1a" }}>
+                                Total ({lines.length} lignes)
+                              </td>
+                              <td />
+                              <td style={{ padding: "6px 6px", textAlign: "right", fontWeight: 700, color: "#1a1a1a" }}>
+                                {lines.reduce((s, l) => s + (l.total_price ?? 0), 0).toFixed(2)} €
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

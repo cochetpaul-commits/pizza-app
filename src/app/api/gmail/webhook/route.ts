@@ -241,7 +241,7 @@ async function processMessage(messageId: string) {
 
   // Detect fournisseur + etablissement
   const fournisseur = detectFournisseurFromEmail(from, subject);
-  const etabSlug = detectEtablissementFromRecipients(to, cc, from);
+  const etabSlug = detectEtablissementFromRecipients(to, cc, from, subject);
   const etabId = await resolveEtabId(etabSlug);
 
   const results = [];

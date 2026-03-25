@@ -30,7 +30,7 @@ type InvoiceLine = {
   total_price: number | null;
 };
 
-type Tab = "factures" | "fournisseurs";
+type Tab = "factures" | "fournisseurs" | "imports";
 
 type SupplierRow = {
   id: string; name: string; is_active: boolean;
@@ -63,6 +63,16 @@ export default function AchatsPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<string | null>(null);
   const [lines, setLines] = useState<InvoiceLine[]>([]);
   const [linesLoading, setLinesLoading] = useState(false);
+
+  // ── Auto-imports state ──
+  type AutoImport = { id: string; created_at: string; fournisseur: string | null; invoice_number: string | null; nb_lignes: number; status: string; error_detail: string | null; invoice_id: string | null; gmail_message_id: string | null };
+  const [autoImports, setAutoImports] = useState<AutoImport[]>([]);
+  const [autoLoading, setAutoLoading] = useState(false);
+  const [autoFilter, setAutoFilter] = useState<string>("all");
+  const [autoExpandedId, setAutoExpandedId] = useState<string | null>(null);
+  const [autoLines, setAutoLines] = useState<InvoiceLine[]>([]);
+  const [autoLinesLoading, setAutoLinesLoading] = useState(false);
+  const [retrying, setRetrying] = useState<string | null>(null);
 
   // ── Fournisseurs state ──
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
@@ -112,6 +122,23 @@ export default function AchatsPage() {
       setLoading(false);
     })();
   }, [etabId]);
+
+  // ── Load auto-imports ──
+  useEffect(() => {
+    if (tab !== "imports") return;
+    (async () => {
+      setAutoLoading(true);
+      let q = supabase
+        .from("email_imports")
+        .select("id,created_at,fournisseur,invoice_number,nb_lignes,status,error_detail,invoice_id,gmail_message_id")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (etabId) q = q.eq("etablissement_id", etabId);
+      const { data } = await q;
+      setAutoImports((data ?? []) as AutoImport[]);
+      setAutoLoading(false);
+    })();
+  }, [tab, etabId]);
 
   // ── Load fournisseurs ──
   useEffect(() => {
@@ -234,6 +261,7 @@ export default function AchatsPage() {
         <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
           {tabBtn("factures", "Factures")}
           {tabBtn("fournisseurs", "Fournisseurs")}
+          {tabBtn("imports", "Import auto")}
         </div>
 
         {/* ═══ TAB: FACTURES ═══ */}
@@ -442,6 +470,171 @@ export default function AchatsPage() {
                 <p style={{ color: "#999", fontSize: 14, textAlign: "center" }}>Aucun fournisseur actif.</p>
               )}
             </div>
+          )
+        )}
+
+        {/* ═══ TAB: IMPORTS AUTO ═══ */}
+        {tab === "imports" && (
+          autoLoading ? (
+            <p style={{ color: "#999", fontSize: 14, textAlign: "center", marginTop: 40 }}>Chargement...</p>
+          ) : (
+            <>
+              {/* Filter pills */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+                {([
+                  { key: "all", label: "Tous", count: autoImports.length },
+                  { key: "ok", label: "Importees", count: autoImports.filter((i) => i.status === "ok").length },
+                  { key: "error", label: "Erreurs", count: autoImports.filter((i) => i.status === "error" || i.status === "no_match").length },
+                  { key: "duplicate", label: "Doublons", count: autoImports.filter((i) => i.status === "duplicate").length },
+                ] as const).map((f) => (
+                  <button
+                    key={f.key}
+                    onClick={() => setAutoFilter(f.key)}
+                    style={{
+                      padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                      fontFamily: "DM Sans, sans-serif",
+                      border: autoFilter === f.key ? "1.5px solid #D4775A" : "1px solid #ddd6c8",
+                      background: autoFilter === f.key ? "#D4775A" : "#fff",
+                      color: autoFilter === f.key ? "#fff" : "#1a1a1a",
+                    }}
+                  >
+                    {f.label} ({f.count})
+                  </button>
+                ))}
+              </div>
+
+              {autoImports.length === 0 ? (
+                <div style={{ textAlign: "center", padding: 40, color: "#999" }}>
+                  <p style={{ fontSize: 14, margin: "0 0 4px" }}>Aucune facture importee automatiquement</p>
+                  <p style={{ fontSize: 12 }}>Envoyez vos factures a gestionifratelligroup@gmail.com</p>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {autoImports
+                    .filter((i) => {
+                      if (autoFilter === "all") return true;
+                      if (autoFilter === "error") return i.status === "error" || i.status === "no_match";
+                      return i.status === autoFilter;
+                    })
+                    .map((row) => {
+                      const isOk = row.status === "ok";
+                      const isErr = row.status === "error" || row.status === "no_match";
+                      const isDup = row.status === "duplicate";
+                      const badgeColor = isOk ? "#166534" : isErr ? "#991b1b" : isDup ? "#3730a3" : "#6b7280";
+                      const badgeBg = isOk ? "#dcfce7" : isErr ? "#fee2e2" : isDup ? "#e0e7ff" : "#f3f4f6";
+                      const badgeLabel = isOk ? "Importee" : isErr ? "Erreur" : isDup ? "Doublon" : row.status;
+                      const date = new Date(row.created_at);
+                      const dateStr = date.toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+                      const isExpanded = autoExpandedId === row.id;
+                      const canExpand = isOk && row.invoice_id;
+
+                      return (
+                        <div
+                          key={row.id}
+                          onClick={() => {
+                            if (!canExpand) return;
+                            if (isExpanded) { setAutoExpandedId(null); setAutoLines([]); return; }
+                            setAutoExpandedId(row.id);
+                            setAutoLinesLoading(true);
+                            supabase
+                              .from("supplier_invoice_lines")
+                              .select("id,name,quantity,unit,unit_price,total_price")
+                              .eq("invoice_id", row.invoice_id!)
+                              .order("name")
+                              .then(({ data }) => { setAutoLines((data ?? []) as InvoiceLine[]); setAutoLinesLoading(false); });
+                          }}
+                          style={{
+                            background: "#fff", border: "1px solid #ddd6c8", borderRadius: 10,
+                            padding: "12px 16px", borderLeft: `3px solid ${badgeColor}`,
+                            cursor: canExpand ? "pointer" : "default",
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                                <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 700, fontSize: 14, color: "#1a1a1a", textTransform: "uppercase" }}>
+                                  {row.fournisseur ?? "Inconnu"}
+                                </span>
+                                <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 8, background: badgeBg, color: badgeColor }}>
+                                  {badgeLabel}
+                                </span>
+                                {isOk && <span style={{ fontSize: 11, color: "#999" }}>{row.nb_lignes} ligne{row.nb_lignes > 1 ? "s" : ""}</span>}
+                                {canExpand && <span style={{ fontSize: 10, color: "#999" }}>{isExpanded ? "▲" : "▼"}</span>}
+                              </div>
+                              <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#999", fontFamily: "DM Sans, sans-serif" }}>
+                                <span>{dateStr}</span>
+                                {row.invoice_number && <span>N° {row.invoice_number}</span>}
+                              </div>
+                              {row.error_detail && (
+                                <div style={{ fontSize: 11, color: "#991b1b", marginTop: 4, fontStyle: "italic" }}>{row.error_detail}</div>
+                              )}
+                            </div>
+                            {isErr && row.gmail_message_id && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setRetrying(row.id);
+                                  fetch(`/api/gmail/webhook?messageId=${row.gmail_message_id}`)
+                                    .then(() => { setAutoImports((prev) => prev.filter((i) => i.id !== row.id)); })
+                                    .catch(() => alert("Erreur"))
+                                    .finally(() => setRetrying(null));
+                                }}
+                                disabled={retrying === row.id}
+                                style={{
+                                  padding: "6px 12px", borderRadius: 8, border: "1px solid #ddd6c8",
+                                  background: "#fff", cursor: "pointer", fontSize: 12, color: "#D4775A",
+                                  fontWeight: 600, fontFamily: "DM Sans, sans-serif", whiteSpace: "nowrap",
+                                }}
+                              >
+                                {retrying === row.id ? "..." : "Reimporter"}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Expanded lines */}
+                          {isExpanded && (
+                            <div style={{ marginTop: 10, borderTop: "1px solid #eee", paddingTop: 10 }}>
+                              {autoLinesLoading ? (
+                                <p style={{ fontSize: 12, color: "#999", margin: 0 }}>Chargement...</p>
+                              ) : autoLines.length === 0 ? (
+                                <p style={{ fontSize: 12, color: "#999", margin: 0 }}>Aucune ligne</p>
+                              ) : (
+                                <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse", fontFamily: "DM Sans, sans-serif" }}>
+                                  <thead>
+                                    <tr style={{ borderBottom: "1px solid #eee", color: "#999", textAlign: "left" }}>
+                                      <th style={{ padding: "4px 6px", fontWeight: 600, fontSize: 10 }}>Ingredient</th>
+                                      <th style={{ padding: "4px 6px", fontWeight: 600, fontSize: 10, textAlign: "right" }}>PU</th>
+                                      <th style={{ padding: "4px 6px", fontWeight: 600, fontSize: 10, textAlign: "right" }}>Total</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {autoLines.map((l) => (
+                                      <tr key={l.id} style={{ borderBottom: "1px solid #f5f0e8" }}>
+                                        <td style={{ padding: "4px 6px", color: "#1a1a1a" }}>{l.name ?? "—"}</td>
+                                        <td style={{ padding: "4px 6px", textAlign: "right", color: "#666" }}>{fmt(l.unit_price)}/{l.unit}</td>
+                                        <td style={{ padding: "4px 6px", textAlign: "right", fontWeight: 600 }}>{fmt(l.total_price)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                  <tfoot>
+                                    <tr style={{ borderTop: "1.5px solid #ddd6c8" }}>
+                                      <td style={{ padding: "6px", fontWeight: 700 }}>Total ({autoLines.length})</td>
+                                      <td />
+                                      <td style={{ padding: "6px", textAlign: "right", fontWeight: 700 }}>
+                                        {fmt(autoLines.reduce((s, l) => s + (l.total_price ?? 0), 0))}
+                                      </td>
+                                    </tr>
+                                  </tfoot>
+                                </table>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </>
           )
         )}
       </div>

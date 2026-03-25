@@ -13,7 +13,7 @@ const FROM_TO_SUPPLIER: Record<string, string> = {
   "compta@sum-online.fr": "sum",
   "vinoflo-mb@live.fr": "vinoflo",
   "sdpfcompta@hotmail.com": "sdpf",
-  "secretariat@eric-elien.bzh": "generic",
+  "secretariat@eric-elien.bzh": "elien",
   "cochetpaul@bellomio.fr": "metro",
 };
 
@@ -71,16 +71,24 @@ const RECIPIENT_TO_ETAB: Record<string, string> = {
   "facture@piccolamia.fr": "piccola-mia",
 };
 
-/** Detect établissement from To/Cc/From headers */
+/** Detect établissement from To/Cc/From/Subject headers */
 export function detectEtablissementFromRecipients(
   to: string | null,
   cc: string | null,
   from?: string | null,
+  subject?: string | null,
 ): string | null {
   const all = [to, cc].filter(Boolean).join(",").toLowerCase();
 
   for (const [email, slug] of Object.entries(RECIPIENT_TO_ETAB)) {
     if (all.includes(email)) return slug;
+  }
+
+  // Detect from subject keywords (e.g. "facture SUM piccola")
+  if (subject) {
+    const sub = subject.toUpperCase();
+    if (sub.includes("PICCOLA") || sub.includes("FRATELLI")) return "piccola-mia";
+    if (sub.includes("BELLO") || sub.includes("SASHA")) return "bello-mio";
   }
 
   // Detect from sender domain
