@@ -79,10 +79,7 @@ export const PLANNING_ITEMS: NavItemV2[] = [
 ];
 
 export const ACHATS_ITEMS: NavItemV2[] = [
-  { label: "Stats d'achats", href: "/stats-achats", icon: "barChart" },
   { label: "Factures", href: "/achats", icon: "fileText" },
-  { label: "Import factures", href: "/invoices", icon: "upload" },
-  { label: "Import auto", href: "/factures-auto", icon: "mail" },
   { label: "Base produits", href: "/ingredients", icon: "tag" },
 ];
 
@@ -114,11 +111,11 @@ const VENTES_ITEMS: NavItemV2[] = [
   { label: "Indicateurs cles", href: "/ventes/performances", icon: "barChart" },
   { label: "Produits vendus", href: "/ventes/produits", icon: "tag" },
 ];
-const VENTES_SECTION: NavSubSection = { label: "Ventes", icon: "wallet", href: "/ventes", roles: ["group_admin"], items: VENTES_ITEMS };
-const PERSONNEL_SECTION: NavSubSection = { label: "Personnel", icon: "users", href: "/personnel", items: PLANNING_ITEMS };
-const ACHATS_SECTION: NavSubSection = { label: "Achats", icon: "shoppingBag", roles: ["group_admin"], items: ACHATS_ITEMS };
-const OPERATIONS_SECTION: NavSubSection = { label: "Opérations", icon: "package", roles: ["group_admin"], items: OPERATIONS_ITEMS };
-const EVENEMENTIEL_SECTION: NavSubSection = { label: "Événementiel", icon: "calendarEvent", roles: ["group_admin"], items: EVENEMENTIEL_ITEMS };
+export const VENTES_SECTION: NavSubSection = { label: "Ventes", icon: "wallet", href: "/ventes", roles: ["group_admin"], items: VENTES_ITEMS };
+export const PERSONNEL_SECTION: NavSubSection = { label: "Personnel", icon: "users", href: "/personnel", items: PLANNING_ITEMS };
+export const ACHATS_SECTION: NavSubSection = { label: "Achats", icon: "shoppingBag", roles: ["group_admin"], items: ACHATS_ITEMS };
+export const OPERATIONS_SECTION: NavSubSection = { label: "Opérations", icon: "package", roles: ["group_admin"], items: OPERATIONS_ITEMS };
+export const EVENEMENTIEL_SECTION: NavSubSection = { label: "Événementiel", icon: "calendarEvent", roles: ["group_admin"], items: EVENEMENTIEL_ITEMS };
 
 /** Build dynamic nav entries from a list of establishments */
 export function buildDynamicNav(

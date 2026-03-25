@@ -259,7 +259,9 @@ function IngredientsPageInner() {
     if (next === "to_check") { patch.status_note = null; patch.validated_at = null; patch.validated_by = null; }
     const r = await supabase.from("ingredients").update(patch).eq("id", id);
     if (r.error) { alert(r.error.message); return; }
+    const sy = window.scrollY;
     await mutate();
+    requestAnimationFrame(() => window.scrollTo(0, sy));
   }, [items, offersByIngredientId, userId, mutate]);
 
   const openDeriveModal = useCallback((x: Ingredient) => {
@@ -490,6 +492,7 @@ function IngredientsPageInner() {
       packEachUnit: (off?.pack_each_unit ?? "l") as "kg" | "l" | "pc",
       packPieceWeightG: off?.piece_weight_g != null ? String(off.piece_weight_g) : "",
       allergens: parseAllergens(x.allergens),
+      pricingPkg: (off?.price_kind === "pack_simple" || off?.price_kind === "pack_composed") ? (x.order_unit_label || guessOrderUnit(off) || "pack") : "",
       orderUnitLabel: x.order_unit_label || guessOrderUnit(off),
       orderQuantity: x.order_quantity != null ? String(x.order_quantity) : "",
       storageZone: x.storage_zone ?? "",
@@ -556,12 +559,19 @@ function IngredientsPageInner() {
     const name = edit.name.trim();
     if (!name) { alert("Nom obligatoire."); return; }
     const supplier_id = normalizeSupplierId(edit.supplierId);
+    // Auto-compute order_quantity when ordering by pièce with kg/L pricing
+    let orderQuantity = parseNum(edit.orderQuantity) ?? null;
+    const orderLabel = edit.orderUnitLabel.trim();
+    if (orderLabel === "pièce" && (edit.priceKind === "unit" && (edit.unit === "kg" || edit.unit === "l"))) {
+      const pw = parseNum(edit.pieceWeightG);
+      if (pw && pw > 0) orderQuantity = pw / 1000; // 1600g → 1.6 (kg)
+    }
     const up: Partial<IngredientUpsert> = {
       name, category: edit.category, is_active: edit.is_active, supplier_id,
       piece_volume_ml: parseNum(edit.pieceVolumeMl) ?? null,
       allergens: edit.allergens.length ? edit.allergens : null,
-      order_unit_label: edit.orderUnitLabel.trim() || null,
-      order_quantity: parseNum(edit.orderQuantity) ?? null,
+      order_unit_label: orderLabel || null,
+      order_quantity: orderQuantity,
       storage_zone: edit.storageZone || null,
     } as Record<string, unknown>;
     const u1 = await supabase.from("ingredients").update(up).eq("id", editingId);
@@ -578,14 +588,10 @@ function IngredientsPageInner() {
       const editedIng = items.find((i) => i.id === editingId);
       const offerPayload = buildOfferFromEdit(editingId, userId, editedIng?.etablissement_id);
       if (!offerPayload) return;
-      const dPrev = await supabase.from("supplier_offers").update({ is_active: false }).eq("ingredient_id", editingId).eq("supplier_id", supplier_id).eq("is_active", true);
+      // Désactiver TOUTES les offres actives de cet ingrédient (tous fournisseurs)
+      const dPrev = await supabase.from("supplier_offers").update({ is_active: false }).eq("ingredient_id", editingId).eq("is_active", true);
       if (dPrev.error) { alert(dPrev.error.message); return; }
-      let off = await supabase.from("supplier_offers").insert(offerPayload);
-      if (off.error && (off.error as { code?: string }).code === "23505") {
-        const dPrev2 = await supabase.from("supplier_offers").update({ is_active: false }).eq("ingredient_id", editingId).eq("supplier_id", supplier_id).eq("is_active", true);
-        if (dPrev2.error) { alert(dPrev2.error.message); return; }
-        off = await supabase.from("supplier_offers").insert(offerPayload);
-      }
+      const off = await supabase.from("supplier_offers").insert(offerPayload);
       if (off.error) { alert(off.error.message); return; }
 
       // Mettre à jour les ingrédients dérivés si le prix unitaire a changé
@@ -596,9 +602,11 @@ function IngredientsPageInner() {
         }
       }
     }
+    const scrollY = window.scrollY;
     setEditingId(null); setEdit(null);
     if (backUrl) { router.push(backUrl); return; }
     await mutate();
+    requestAnimationFrame(() => window.scrollTo(0, scrollY));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingId, edit, userId, backUrl, router, mutate]);
 
@@ -626,7 +634,9 @@ function IngredientsPageInner() {
     if (d1.error) { alert(d1.error.message); return; }
     const d2 = await supabase.from("ingredients").delete().eq("id", id);
     if (d2.error) { alert(d2.error.message); return; }
+    const sy = window.scrollY;
     await mutate();
+    requestAnimationFrame(() => window.scrollTo(0, sy));
   }, [mutate]);
 
   const onEditChange = useCallback((next: EditState) => {
@@ -683,17 +693,19 @@ function IngredientsPageInner() {
   ] as const;
 
   const headerBtnStyle: CSSProperties = {
-    height: 34, padding: "0 14px", borderRadius: 20, fontSize: 13, fontWeight: 600,
+    height: 34, padding: "0 14px", borderRadius: 12, fontSize: 13, fontWeight: 600,
     cursor: "pointer", border: "1.5px solid #ddd6c8", background: "white", color: "#1a1a1a",
     display: "inline-flex", alignItems: "center",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
   };
 
   // Shared select style — appearance:none is required for Chrome/Safari to respect border/radius
   const selStyle: CSSProperties = {
     appearance: "none", WebkitAppearance: "none",
-    borderRadius: 20, border: "1.5px solid #ddd6c8",
+    borderRadius: 12, border: "1.5px solid #ddd6c8",
     padding: "8px 14px", fontSize: 13,
     background: "white", color: "#1a1a1a", cursor: "pointer",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
   };
 
   return (
@@ -744,7 +756,7 @@ function IngredientsPageInner() {
                 return next;
               });
             }}
-            style={{ background: "#D4775A", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: 700, fontSize: 13, padding: "8px 16px", whiteSpace: "nowrap" }}
+            style={{ background: "#D4775A", color: "white", border: "none", borderRadius: 12, cursor: "pointer", fontWeight: 700, fontSize: 13, padding: "8px 16px", whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(212,119,90,0.25)" }}
           >
             {showCreateForm ? "✕ Fermer" : "+ Ingredient"}
           </button>
@@ -762,10 +774,11 @@ function IngredientsPageInner() {
           {TABS_MAIN.map(({ t, label, count }) => (
             <button key={t} onClick={() => setTab(t)} style={{
               flexShrink: 0, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
-              borderRadius: 20, whiteSpace: "nowrap",
+              borderRadius: 12, whiteSpace: "nowrap",
               border: tab === t ? "1.5px solid #D4775A" : "1.5px solid #ddd6c8",
               background: tab === t ? "#D4775A" : "#fff",
               color: tab === t ? "#fff" : "#999",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
               transition: "all 0.15s",
             }}>{label} ({count})</button>
           ))}
@@ -788,10 +801,10 @@ function IngredientsPageInner() {
                 <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} style={{ accentColor: "#D4775A" }} />
                 Sans offre
               </label>
-              <button onClick={toggleAll} title={allCollapsed ? "Tout déplier" : "Tout replier"} style={{ width: 34, height: 34, borderRadius: 20, border: "1.5px solid #ddd6c8", background: "white", fontSize: 16, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
+              <button onClick={toggleAll} title={allCollapsed ? "Tout déplier" : "Tout replier"} style={{ width: 34, height: 34, borderRadius: 12, border: "1.5px solid #ddd6c8", background: "white", fontSize: 16, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
                 {allCollapsed ? "▸▸" : "▾▾"}
               </button>
-              <button onClick={reload} style={{ padding: "8px 12px", borderRadius: 20, border: "1.5px solid #ddd6c8", background: "white", fontSize: 14, cursor: "pointer" }}>
+              <button onClick={reload} style={{ padding: "8px 12px", borderRadius: 12, border: "1.5px solid #ddd6c8", background: "white", fontSize: 14, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
                 ↺
               </button>
             </div>
@@ -802,13 +815,13 @@ function IngredientsPageInner() {
                 placeholder="Rechercher un ingredient…"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                style={{ flex: 1, borderRadius: 20, border: "1.5px solid #ddd6c8", padding: "10px 16px", fontSize: 13, background: "white", outline: "none", color: "#1a1a1a" }}
+                style={{ flex: 1, borderRadius: 12, border: "1.5px solid #ddd6c8", padding: "10px 16px", fontSize: 13, background: "white", outline: "none", color: "#1a1a1a", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
               />
               {/* Mobile only: Filtres + compact */}
-              <button className="md:hidden" onClick={() => setShowFilters(true)} style={{ padding: "10px 14px", borderRadius: 20, border: "1.5px solid #ddd6c8", background: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+              <button className="md:hidden" onClick={() => setShowFilters(true)} style={{ padding: "10px 14px", borderRadius: 12, border: "1.5px solid #ddd6c8", background: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
                 Filtres{filterActive ? " ●" : ""}
               </button>
-              <button className="md:hidden" onClick={toggleCompact} style={{ padding: "10px 12px", borderRadius: 20, border: "1.5px solid #ddd6c8", background: "white", fontSize: 14, cursor: "pointer" }}>
+              <button className="md:hidden" onClick={toggleCompact} style={{ padding: "10px 12px", borderRadius: 12, border: "1.5px solid #ddd6c8", background: "white", fontSize: 14, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
                 {compactMode ? "⊞" : "☰"}
               </button>
             </div>

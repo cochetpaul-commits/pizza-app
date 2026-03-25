@@ -37,6 +37,16 @@
 
 *{ box-sizing: border-box; }
 
+/* ── Global button/input style: card look ─────────── */
+button, input[type="button"], input[type="submit"], select {
+  border-radius: 12px !important;
+}
+input[type="text"], input[type="search"], input[type="email"],
+input[type="password"], input[type="number"], input[type="tel"],
+textarea {
+  border-radius: 12px !important;
+}
+
 h1, h2, h3, h4 {
   font-family: var(--font-oswald), 'Oswald', sans-serif;
   font-weight: 700;

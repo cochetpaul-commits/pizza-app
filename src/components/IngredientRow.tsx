@@ -34,7 +34,7 @@ const selectStyle: CSSProperties = {
   appearance: "none", WebkitAppearance: "none" as CSSProperties["WebkitAppearance"],
   paddingRight: 28, cursor: "pointer",
 };
-const labelStyle: CSSProperties = { fontSize: 12, opacity: 0.75, marginBottom: 6 };
+
 
 const BTN_ACTION: CSSProperties = {
   width: 26, height: 26, borderRadius: 7, border: "none",
@@ -62,11 +62,16 @@ export const CategoryHeader = React.memo(function CategoryHeader({
   return (
     <button
       onClick={() => onToggle(cat)}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; e.currentTarget.style.borderColor = accent; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor = "#ddd6c8"; e.currentTarget.style.borderLeftColor = accent; }}
       style={{
         width: "100%", display: "flex", alignItems: "center", gap: 10,
-        padding: "10px 16px", background: `${accent}14`, border: `1px solid ${accent}30`,
+        padding: "12px 16px", background: "#fff",
+        border: "1.5px solid #ddd6c8", borderLeft: `3px solid ${accent}`,
         borderRadius: 12, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
         marginTop: 16, marginBottom: 6,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+        transition: "box-shadow 0.2s, border-color 0.2s",
       }}
     >
       <span style={{ width: 10, height: 10, borderRadius: "50%", background: accent, flexShrink: 0 }} />
@@ -76,7 +81,7 @@ export const CategoryHeader = React.memo(function CategoryHeader({
       }}>{CAT_LABELS[cat]}</span>
       <span style={{
         fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
-        background: `${accent}30`, color: accent,
+        background: `${accent}18`, color: accent,
       }}>{count}</span>
       <span style={{ marginLeft: "auto", fontSize: 10, color: "#b0a894", transition: "transform 0.2s", transform: isCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
     </button>
@@ -91,6 +96,7 @@ export type EditState = {
   density: string; pieceWeightG: string; packTotalQty: string; packPrice: string;
   packUnit: "kg" | "l"; packCount: string; packEachQty: string; packEachUnit: "kg" | "l" | "pc";
   packPieceWeightG: string; pieceVolumeMl: string; allergens: string[];
+  pricingPkg: string; // conditionnement prix (bouteille, sac, carton…) — independent from orderUnitLabel
   orderUnitLabel: string;
   orderQuantity: string;
   storageZone: string;
@@ -122,16 +128,14 @@ export type IngredientRowProps = {
 
 export const IngredientRow = React.memo(function IngredientRow({
   item: x, offer, supplierName, supplierIdForDisplay, alert, isEditing, compactMode, edit,
-  suppliers, storageZones, previewEditPack,
+  suppliers, storageZones,
   onStartEdit, onSaveEdit, onDelete, onSetStatus, onEditChange, onEditImportName, onCreateDerived,
 }: IngredientRowProps) {
+  const [openSections, setOpenSections] = React.useState<Record<string, boolean>>({ identite: true, prix: true, complements: false });
+  const toggleSection = (key: string) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+
   const price = formatIngredientPrice(x, offer ?? null);
   const estab = offer?.establishment ?? "both";
-  const estabBadge = estab === "bellomio"
-    ? { label: "BM", bg: "#FEF2F2", color: "#D4775A" }
-    : estab === "piccola"
-    ? { label: "PM", bg: "#F5F3FF", color: "#6B21A8" }
-    : { label: "BM·PM", bg: "#F3F4F6", color: "#6B7280" };
   const st = (x.status ?? "to_check") as IngredientStatus;
   const hasPrice = offerHasPrice(offer) || legacyHasPrice(x);
   const canValidate = hasPrice;
@@ -159,7 +163,8 @@ export const IngredientRow = React.memo(function IngredientRow({
       {/* ── DESKTOP ROW ── */}
       <div
         className="hidden md:flex"
-        style={{ alignItems: "center", padding: "10px 16px", gap: 10, background: "white", transition: "background 0.1s" }}
+        onClick={() => { if (!isEditing) onStartEdit(x); }}
+        style={{ alignItems: "center", padding: "10px 16px", gap: 10, background: "white", transition: "background 0.1s", cursor: isEditing ? "default" : "pointer" }}
       >
         {/* Avatar */}
         <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={36} editable />
@@ -178,7 +183,8 @@ export const IngredientRow = React.memo(function IngredientRow({
             )}
           </div>
           <div style={{ fontSize: 10, color: "#999999", marginTop: 1 }}>
-            {supplierName || CAT_LABELS[x.category]}
+            <span style={{ fontFamily: "monospace", color: "#bbb" }}>{x.id.slice(0, 8)}</span>
+            {" · "}{supplierName || CAT_LABELS[x.category]}
             {x.source_prep_recipe_name ? ` · Pivot: ${x.source_prep_recipe_name}` : ""}
             {x.status_note ? ` · ${x.status_note}` : ""}
             {x.is_derived && x.rendement ? ` · Rendement ${(x.rendement * 100).toFixed(1)}%` : ""}
@@ -203,7 +209,7 @@ export const IngredientRow = React.memo(function IngredientRow({
 
         {/* Prix */}
         <div style={{ flex: 1 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{price}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", whiteSpace: "pre-line" }}>{price}</span>
         </div>
 
         {/* Conditionnement */}
@@ -219,7 +225,8 @@ export const IngredientRow = React.memo(function IngredientRow({
           {supplierName && supplierIdForDisplay ? (
             <Link href={`/fournisseurs/${supplierIdForDisplay}`} style={{ color: "inherit", textDecoration: "underline dotted", textUnderlineOffset: 2 }}>{supplierName}</Link>
           ) : "—"}
-          <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: estabBadge.bg, color: estabBadge.color }}>{estabBadge.label}</span>
+          {(estab === "bellomio" || estab === "both") && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: "#FEF2F2", color: "#D4775A" }}>BM</span>}
+          {(estab === "piccola" || estab === "both") && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: "#F5F3FF", color: "#6B21A8" }}>PM</span>}
         </div>
 
         {/* Actions */}
@@ -237,12 +244,13 @@ export const IngredientRow = React.memo(function IngredientRow({
       {/* ── MOBILE ROW ── */}
       <div
         className="md:hidden"
-        style={{ padding: "12px 14px", background: "white" }}
+        onClick={() => { if (!isEditing) onStartEdit(x); }}
+        style={{ padding: "12px 14px", background: "white", cursor: isEditing ? "default" : "pointer" }}
       >
         {compactMode ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{ fontWeight: 600, fontSize: 13, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: CAT_COLORS[x.category] }}>{x.name}</div>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", flexShrink: 0 }}>{price}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", flexShrink: 0, whiteSpace: "pre-line" }}>{price}</span>
             {alert && <span style={{ fontSize: 10, color: alert.direction === "up" ? "#DC2626" : "#16A34A", flexShrink: 0 }}>{alert.direction === "up" ? "↑" : "↓"}</span>}
             {!isEditing
               ? <button onClick={() => onStartEdit(x)} style={{ ...BTN_ACTION, background: "#D4775A", color: "white", fontWeight: 700 }}>→</button>
@@ -259,7 +267,8 @@ export const IngredientRow = React.memo(function IngredientRow({
                   {x.is_derived && <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED" }}>DÉRIVÉ</span>}
                 </div>
                 <div style={{ fontSize: 10, color: "#999999", marginTop: 2 }}>
-                  {supplierName || CAT_LABELS[x.category]}
+                  <span style={{ fontFamily: "monospace", color: "#bbb" }}>{x.id.slice(0, 8)}</span>
+                  {" · "}{supplierName || CAT_LABELS[x.category]}
                   {x.status_note ? ` · ${x.status_note}` : ""}
                   {x.is_derived && x.rendement ? ` · ${(x.rendement * 100).toFixed(1)}%` : ""}
                 </div>
@@ -274,7 +283,7 @@ export const IngredientRow = React.memo(function IngredientRow({
                 )}
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{price}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", whiteSpace: "pre-line" }}>{price}</div>
                 <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 999, background: sb.bg, color: sb.color, display: "inline-block", marginTop: 3 }}>{sb.label}</span>
                 {alert && <div style={{ fontSize: 10, fontWeight: 800, color: alert.direction === "up" ? "#DC2626" : "#16A34A", marginTop: 2 }}>{alert.direction === "up" ? "↑" : "↓"} {(Math.abs(alert.change_pct) * 100).toFixed(0)}%</div>}
               </div>
@@ -295,152 +304,320 @@ export const IngredientRow = React.memo(function IngredientRow({
       </div>
 
       {/* ── EDIT FORM ── */}
-      {isEditing && edit && (
-        <div className="grid gap-2.5" style={{ padding: "14px 16px", borderTop: "1px solid #e5ddd0", background: "#faf7f2" }}>
-          <div className="grid gap-2.5" style={{ gridTemplateColumns: "2fr 1fr 1fr" }}>
-            <input style={inputStyle} value={edit.name} onChange={(e) => onEditChange({ ...edit, name: e.target.value })} />
-            <select style={selectStyle} value={edit.category} onChange={(e) => onEditChange({ ...edit, category: e.target.value as Category })}>
-              {CATEGORIES.map((c) => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
-            </select>
-            <select style={selectStyle} value={edit.supplierId} onChange={(e) => onEditChange({ ...edit, supplierId: e.target.value })}>
-              <option value="">—</option>
-              {suppliers.filter((s) => s.is_active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-          {/* Nom d'import (clé stable pour matching factures) */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{
-              flex: 1, display: "flex", alignItems: "center", gap: 6,
-              background: "#f5f0e8", border: "1.5px solid #e5ddd0", borderRadius: 10,
-              padding: "8px 12px", fontSize: 13, color: "#999", cursor: "not-allowed",
-            }}>
-              <span style={{ fontSize: 12 }}>🔒</span>
-              <span style={{ fontFamily: "monospace", fontSize: 12 }}>{edit.importName || "—"}</span>
-              <span style={{ fontSize: 10, color: "#bbb", marginLeft: "auto" }}>(verrouillé)</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => onEditImportName(x.id, edit.importName)}
-              style={{ fontSize: 11, padding: "4px 10px", borderRadius: 8, border: "1.5px solid #e5ddd0", background: "white", color: "#888", cursor: "pointer", flexShrink: 0 }}
-            >✎</button>
-          </div>
-          <div className="grid grid-cols-2 gap-2.5 items-center">
-            <div className="flex items-center gap-2.5">
-              <span className="font-extrabold">Offre fournisseur</span>
-              <label className="flex items-center gap-2">
-                <input type="checkbox" checked={edit.useOffer} onChange={(e) => onEditChange({ ...edit, useOffer: e.target.checked })} style={{ accentColor: "#D4775A" }} />
-                <span className="muted">recommandé</span>
-              </label>
-            </div>
-            <select style={selectStyle} value={edit.is_active ? "1" : "0"} onChange={(e) => onEditChange({ ...edit, is_active: e.target.value === "1" })}>
-              <option value="1">Actif</option><option value="0">Inactif</option>
-            </select>
-          </div>
-          {edit.useOffer && (
-            <>
-              <div><div style={labelStyle}>Mode prix</div>
-                <select style={selectStyle} value={edit.priceKind} onChange={(e) => onEditChange({ ...edit, priceKind: e.target.value as PriceKind })}>
-                  <option value="unit">Unitaire</option><option value="pack_simple">Pack</option><option value="pack_composed">Pack composé</option>
+      {isEditing && edit && (() => {
+        // Determine if liquid category → reference = €/L, else €/kg
+        const isLiquidCat = edit.category === "alcool_spiritueux" || edit.category === "boisson";
+        const refUnit = isLiquidCat ? "L" : "kg";
+
+        // Compute live reference price (€/kg or €/L)
+        const unitPrice = parseFloat(edit.unitPrice) || 0;
+        const pieceW = parseFloat(edit.pieceWeightG) || 0;
+        const density = parseFloat(edit.density) || 0;
+        const packPrice = parseFloat(edit.packPrice) || 0;
+        const packQty = parseFloat(edit.packTotalQty) || 0;
+        const packCount = parseFloat(edit.packCount) || 0;
+        const packEachQty = parseFloat(edit.packEachQty) || 0;
+        const packPieceW = parseFloat(edit.packPieceWeightG) || 0;
+        const volMl = parseFloat(edit.pieceVolumeMl) || 0;
+
+        let pricePerKg: number | null = null;
+        let pricePerL: number | null = null;
+        let pricePerPc: number | null = null;
+
+        if (edit.priceKind === "unit") {
+          if (edit.unit === "kg" && unitPrice > 0) { pricePerKg = unitPrice; if (density > 0) pricePerL = unitPrice * density; }
+          else if (edit.unit === "l" && unitPrice > 0) { pricePerL = unitPrice; if (density > 0) pricePerKg = unitPrice / density; }
+          else if (edit.unit === "pc" && unitPrice > 0) {
+            pricePerPc = unitPrice;
+            if (pieceW > 0) pricePerKg = unitPrice / (pieceW / 1000);
+            if (volMl > 0) pricePerL = (unitPrice / volMl) * 1000;
+          }
+        } else if (edit.priceKind === "pack_simple" && packPrice > 0) {
+          pricePerPc = packPrice;
+          if (packQty > 0 && edit.packUnit === "kg") { pricePerKg = packPrice / packQty; }
+          else if (packQty > 0 && edit.packUnit === "l") { pricePerL = packPrice / packQty; if (density > 0) pricePerKg = packPrice / (packQty * density); }
+        } else if (edit.priceKind === "pack_composed" && packPrice > 0 && packCount > 0) {
+          pricePerPc = packPrice / packCount;
+          if (edit.packEachUnit === "kg" && packEachQty > 0) pricePerKg = packPrice / (packCount * packEachQty);
+          else if (edit.packEachUnit === "l" && packEachQty > 0) { pricePerL = packPrice / (packCount * packEachQty); if (density > 0) pricePerKg = pricePerL / density; }
+          else if (edit.packEachUnit === "pc" && packPieceW > 0) pricePerKg = packPrice / (packCount * packPieceW / 1000);
+        }
+
+        const refPrice = isLiquidCat ? pricePerL : pricePerKg;
+
+        // Packaging options
+        const PACKAGINGS = ["kg", "litre", "piece", "---", "bac", "barquette", "bidon", "boite", "bouteille", "brick", "carton", "cagette", "fut", "pack", "paquet", "plateau", "poche", "sac", "sachet", "seau"] as const;
+
+        // Derive current "packaging" from edit state
+        const currentPkg = edit.priceKind === "unit"
+          ? (edit.unit === "kg" ? "kg" : edit.unit === "l" ? "litre" : "piece")
+          : (edit.pricingPkg && PACKAGINGS.includes(edit.pricingPkg as typeof PACKAGINGS[number]) ? edit.pricingPkg : "pack");
+
+        // Handle packaging change — preserve price, do NOT touch orderUnitLabel
+        const onPkgChange = (pkg: string) => {
+          const currentPrice = isBaseUnit ? edit.unitPrice : edit.packPrice;
+          if (pkg === "kg") onEditChange({ ...edit, priceKind: "unit", unit: "kg", unitPrice: currentPrice || edit.unitPrice });
+          else if (pkg === "litre") onEditChange({ ...edit, priceKind: "unit", unit: "l", unitPrice: currentPrice || edit.unitPrice });
+          else if (pkg === "piece") onEditChange({ ...edit, priceKind: "unit", unit: "pc", unitPrice: currentPrice || edit.unitPrice });
+          else onEditChange({ ...edit, priceKind: "pack_simple", packUnit: isLiquidCat ? "l" : "kg", pricingPkg: pkg, packPrice: currentPrice || edit.packPrice });
+        };
+
+        // Normalize comma to dot for numeric inputs
+        const numVal = (v: string) => v.replace(",", ".");
+
+        const isBaseUnit = currentPkg === "kg" || currentPkg === "litre" || currentPkg === "piece";
+
+        const fieldLabel: CSSProperties = { fontSize: 11, fontWeight: 700, color: "#888", marginBottom: 4 };
+
+        const SectionHeader = ({ label, sectionKey }: { label: string; sectionKey: string }) => (
+          <button
+            type="button"
+            onClick={() => toggleSection(sectionKey)}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "10px 14px", marginBottom: openSections[sectionKey] ? 12 : 0,
+              background: "#f0ebe3", border: "none", borderRadius: 8, cursor: "pointer",
+              fontFamily: "var(--font-dm), 'DM Sans', sans-serif",
+              fontSize: 13, fontWeight: 700, color: "#8a7e6b", textTransform: "uppercase" as const,
+              letterSpacing: "0.06em",
+            }}
+          >
+            <span>{label}</span>
+            <span style={{ fontSize: 10, transition: "transform 0.2s", transform: openSections[sectionKey] ? "rotate(0)" : "rotate(-90deg)" }}>▼</span>
+          </button>
+        );
+
+        return (
+        <div style={{ padding: "16px", borderTop: "1.5px solid #e5ddd0", background: "#faf7f2" }}>
+
+          {/* ─── BLOC 1: IDENTITÉ ─── */}
+          <div style={{ marginBottom: 16 }}>
+            <SectionHeader label="Informations générales" sectionKey="identite" />
+            {openSections.identite && (<>
+            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+              <div>
+                <div style={fieldLabel}>Nom</div>
+                <input style={inputStyle} value={edit.name} onChange={(e) => onEditChange({ ...edit, name: e.target.value })} />
+              </div>
+              <div>
+                <div style={fieldLabel}>Catégorie</div>
+                <select style={selectStyle} value={edit.category} onChange={(e) => onEditChange({ ...edit, category: e.target.value as Category })}>
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
                 </select>
               </div>
-              {edit.priceKind === "unit" && (
-                <>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <input style={inputStyle} placeholder="Prix unitaire" value={edit.unitPrice} onChange={(e) => onEditChange({ ...edit, unitPrice: e.target.value })} />
-                    <select style={selectStyle} value={edit.unit} onChange={(e) => onEditChange({ ...edit, unit: e.target.value as "kg" | "l" | "pc" })}>
-                      <option value="kg">kg</option><option value="l">L</option><option value="pc">pc</option>
-                    </select>
-                  </div>
-                  {edit.unit === "l" && <input style={inputStyle} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => onEditChange({ ...edit, density: e.target.value })} />}
-                  {edit.unit === "pc" && <input style={inputStyle} placeholder="Poids pièce (g)" value={edit.pieceWeightG} onChange={(e) => onEditChange({ ...edit, pieceWeightG: e.target.value })} />}
-                  {edit.unit === "pc" && <input style={inputStyle} placeholder="Volume pièce (ml)" value={edit.pieceVolumeMl} onChange={(e) => onEditChange({ ...edit, pieceVolumeMl: e.target.value })} />}
-                  <div className="muted text-[12px]">{previewEditPack || "—"}</div>
-                </>
-              )}
-              {edit.priceKind === "pack_simple" && (
-                <>
-                  <div className="grid grid-cols-3 gap-2.5">
-                    <input style={inputStyle} placeholder="Prix pack (€)" value={edit.packPrice} onChange={(e) => onEditChange({ ...edit, packPrice: e.target.value })} />
-                    <input style={inputStyle} placeholder="Qté totale (kg/L)" value={edit.packTotalQty} onChange={(e) => onEditChange({ ...edit, packTotalQty: e.target.value })} />
-                    <select style={selectStyle} value={edit.packUnit} onChange={(e) => onEditChange({ ...edit, packUnit: e.target.value as "kg" | "l" })}>
-                      <option value="kg">kg</option><option value="l">L</option>
-                    </select>
-                  </div>
-                  {edit.packUnit === "l" && <input style={inputStyle} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => onEditChange({ ...edit, density: e.target.value })} />}
-                  <div className="muted text-[12px]">{previewEditPack || "—"}</div>
-                </>
-              )}
-              {edit.priceKind === "pack_composed" && (
-                <>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <input style={inputStyle} placeholder="Prix pack (€)" value={edit.packPrice} onChange={(e) => onEditChange({ ...edit, packPrice: e.target.value })} />
-                    <input style={inputStyle} placeholder="Nombre d'unités (ex: 8)" value={edit.packCount} onChange={(e) => onEditChange({ ...edit, packCount: e.target.value })} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <select style={selectStyle} value={edit.packEachUnit} onChange={(e) => onEditChange({ ...edit, packEachUnit: e.target.value as "kg" | "l" | "pc" })}>
-                      <option value="l">L</option><option value="kg">kg</option><option value="pc">pc</option>
-                    </select>
-                    {edit.packEachUnit !== "pc"
-                      ? <input style={inputStyle} placeholder="Qté par unité (ex: 1.5)" value={edit.packEachQty} onChange={(e) => onEditChange({ ...edit, packEachQty: e.target.value })} />
-                      : <input style={inputStyle} placeholder="Poids pièce (g)" value={edit.packPieceWeightG} onChange={(e) => onEditChange({ ...edit, packPieceWeightG: e.target.value })} />}
-                  </div>
-                  {edit.packEachUnit === "l" && <input style={inputStyle} placeholder="Densité (kg/L)" value={edit.density} onChange={(e) => onEditChange({ ...edit, density: e.target.value })} />}
-                  <div className="muted text-[12px]">{previewEditPack || "—"}</div>
-                </>
-              )}
-            </>
-          )}
-          {/* Unité de commande */}
-          <div className="pt-1" style={{ marginBottom: 8 }}>
-            <div className="text-[11px] font-extrabold opacity-60 mb-1 uppercase tracking-wide">Unité de commande</div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                style={{
-                  height: 32, borderRadius: 8, border: "1.5px solid #e5ddd0",
-                  padding: "4px 10px", fontSize: 13, background: "#fff", width: 160,
-                }}
-                value={edit.orderUnitLabel}
-                onChange={(e) => onEditChange({ ...edit, orderUnitLabel: e.target.value })}
-                placeholder="ex: bac 2.5kg, cagette 3kg"
-              />
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                style={{
-                  height: 32, borderRadius: 8, border: "1.5px solid #e5ddd0",
-                  padding: "4px 10px", fontSize: 13, background: "#fff", width: 70,
-                  textAlign: "right",
-                }}
-                value={edit.orderQuantity}
-                onChange={(e) => onEditChange({ ...edit, orderQuantity: e.target.value })}
-                placeholder="qté"
-              />
-              <span style={{ fontSize: 11, color: "#999" }}>contenu</span>
+              <div>
+                <div style={fieldLabel}>Fournisseur</div>
+                <select style={selectStyle} value={edit.supplierId} onChange={(e) => onEditChange({ ...edit, supplierId: e.target.value })}>
+                  <option value="">—</option>
+                  {suppliers.filter((s) => s.is_active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
             </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "end" }}>
+              <div>
+                <div style={fieldLabel}>Nom d&apos;import</div>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "#f5f0e8", border: "1.5px solid #e5ddd0", borderRadius: 10,
+                  padding: "8px 12px", fontSize: 12, color: "#999", height: 40,
+                }}>
+                  <span style={{ fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{edit.importName || "—"}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onEditImportName(x.id, edit.importName)}
+                style={{ fontSize: 11, padding: "6px 10px", borderRadius: 8, border: "1.5px solid #e5ddd0", background: "white", color: "#888", cursor: "pointer", height: 40 }}
+              >✎</button>
+            </div>
+            </>)}
           </div>
-          {/* Lieu de stockage */}
-          <div className="pt-1" style={{ marginBottom: 8 }}>
-            <div className="text-[11px] font-extrabold opacity-60 mb-1 uppercase tracking-wide">Stockage</div>
-            <select
-              style={{
-                height: 32, borderRadius: 8, border: "1.5px solid #e5ddd0",
-                padding: "4px 10px", fontSize: 13, background: "#fff", width: 220,
-                appearance: "none" as const, cursor: "pointer",
-              }}
-              value={edit.storageZone}
-              onChange={(e) => onEditChange({ ...edit, storageZone: e.target.value })}
-            >
-              <option value="">— Aucun —</option>
-              {storageZones.map(z => (
-                <option key={z.id} value={z.name}>{z.name}</option>
-              ))}
-            </select>
+
+          {/* ─── BLOC 2: PRIX D'ACHAT ─── */}
+          <div style={{ marginBottom: 16 }}>
+            <SectionHeader label="Prix d&apos;achat" sectionKey="prix" />
+
+            {openSections.prix && (<>
+            {/* Ligne 1 : Prix / Conditionnement */}
+            <div style={{ display: "flex", gap: 8, alignItems: "end", flexWrap: "wrap", marginBottom: 10 }}>
+              <div>
+                <div style={fieldLabel}>Prix</div>
+                <input
+                  style={{ ...inputStyle, width: 120 }}
+                  value={isBaseUnit ? edit.unitPrice : edit.packPrice}
+                  onChange={(e) => isBaseUnit
+                    ? onEditChange({ ...edit, unitPrice: numVal(e.target.value) })
+                    : onEditChange({ ...edit, packPrice: numVal(e.target.value) })
+                  }
+                />
+              </div>
+              <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", paddingBottom: 8 }}>€ /</span>
+              <div>
+                <div style={fieldLabel}>Conditionnement</div>
+                <select style={{ ...selectStyle, width: 140 }} value={currentPkg} onChange={(e) => onPkgChange(e.target.value)}>
+                  <option value="kg">kg</option>
+                  <option value="litre">litre</option>
+                  <option value="piece">pièce</option>
+                  <option disabled>────────</option>
+                  <option value="bac">bac</option>
+                  <option value="barquette">barquette</option>
+                  <option value="bidon">bidon</option>
+                  <option value="boite">boite</option>
+                  <option value="bouteille">bouteille</option>
+                  <option value="brick">brick</option>
+                  <option value="carton">carton</option>
+                  <option value="cagette">cagette</option>
+                  <option value="fut">fût</option>
+                  <option value="pack">pack</option>
+                  <option value="paquet">paquet</option>
+                  <option value="plateau">plateau</option>
+                  <option value="poche">poche</option>
+                  <option value="sac">sac</option>
+                  <option value="sachet">sachet</option>
+                  <option value="seau">seau</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Ligne 2 : Conversion conditionnement → base (si packaging) */}
+            {!isBaseUnit && (
+              <div style={{ display: "flex", gap: 8, alignItems: "end", flexWrap: "wrap", marginBottom: 10, padding: "10px 12px", background: "#fff", borderRadius: 10, border: "1.5px solid #e5ddd0" }}>
+                <span style={{ fontSize: 13, color: "#666", paddingBottom: 8 }}>1 {currentPkg} contient</span>
+                <div>
+                  <input
+                    style={{ ...inputStyle, width: 90 }}
+                    value={edit.packTotalQty}
+                    onChange={(e) => onEditChange({ ...edit, packTotalQty: numVal(e.target.value) })}
+                    placeholder="qté"
+                  />
+                </div>
+                <div>
+                  <select style={{ ...selectStyle, width: 90 }} value={edit.packUnit} onChange={(e) => onEditChange({ ...edit, packUnit: e.target.value as "kg" | "l" })}>
+                    <option value="kg">kg</option>
+                    <option value="l">litre</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* Ligne 3 : Champs conditionnels pour conversion → €/kg */}
+            {(currentPkg === "piece" || (!isBaseUnit && edit.packUnit === "l") || currentPkg === "litre") && (
+              <div style={{ display: "flex", gap: 8, alignItems: "end", flexWrap: "wrap", marginBottom: 10 }}>
+                {(currentPkg === "piece") && (
+                  <>
+                    <div>
+                      <div style={fieldLabel}>Poids pièce (g)</div>
+                      <input style={{ ...inputStyle, width: 130 }} value={edit.pieceWeightG} onChange={(e) => onEditChange({ ...edit, pieceWeightG: numVal(e.target.value) })} />
+                    </div>
+                    {isLiquidCat && (
+                      <div>
+                        <div style={fieldLabel}>Volume pièce (mL)</div>
+                        <input style={{ ...inputStyle, width: 130 }} value={edit.pieceVolumeMl} onChange={(e) => onEditChange({ ...edit, pieceVolumeMl: numVal(e.target.value) })} />
+                      </div>
+                    )}
+                  </>
+                )}
+                {(currentPkg === "litre" || (!isBaseUnit && edit.packUnit === "l")) && (
+                  <div>
+                    <div style={fieldLabel}>Densité (kg/L)</div>
+                    <input style={{ ...inputStyle, width: 130 }} value={edit.density} onChange={(e) => onEditChange({ ...edit, density: numVal(e.target.value) })} />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── CONVERSION LIVE ── */}
+            <div style={{
+              marginTop: 4, padding: "10px 14px", borderRadius: 10,
+              background: refPrice ? "rgba(74,103,65,0.06)" : "rgba(220,38,38,0.04)",
+              border: `1.5px solid ${refPrice ? "rgba(74,103,65,0.20)" : "rgba(220,38,38,0.15)"}`,
+              display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+            }}>
+              <span style={{ fontSize: 14, fontWeight: 800, color: refPrice ? "#4a6741" : "#DC2626" }}>
+                {refPrice ? `= ${refPrice.toFixed(2)} €/${refUnit}` : `€/${refUnit} — donnée manquante`}
+              </span>
+              {/* Show secondary conversions */}
+              {refPrice && pricePerPc != null && pricePerPc > 0 && (
+                <span style={{ fontSize: 12, color: "#888" }}>{pricePerPc.toFixed(2)} €/pc</span>
+              )}
+              {refPrice && isLiquidCat && pricePerKg != null && pricePerKg > 0 && (
+                <span style={{ fontSize: 12, color: "#888" }}>{pricePerKg.toFixed(2)} €/kg</span>
+              )}
+              {refPrice && !isLiquidCat && pricePerL != null && pricePerL > 0 && (
+                <span style={{ fontSize: 12, color: "#888" }}>{pricePerL.toFixed(2)} €/L</span>
+              )}
+            </div>
+            </>)}
+
+            {/* Conversion live always visible even when section collapsed */}
+            {!openSections.prix && refPrice != null && (
+              <div style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(74,103,65,0.06)", display: "inline-flex", gap: 8, alignItems: "center" }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: "#4a6741" }}>= {refPrice.toFixed(2)} €/{refUnit}</span>
+                {pricePerPc != null && pricePerPc > 0 && <span style={{ fontSize: 11, color: "#888" }}>{pricePerPc.toFixed(2)} €/pc</span>}
+              </div>
+            )}
           </div>
-          {/* Allergènes */}
-          <div className="pt-1">
-            <div className="text-[11px] font-extrabold opacity-60 mb-2 uppercase tracking-wide">Allergènes</div>
-            <div className="flex flex-wrap gap-1.5">
+
+          {/* ─── BLOC 3: COMPLÉMENTS ─── */}
+          <div>
+            <SectionHeader label="Compléments" sectionKey="complements" />
+            {openSections.complements && (<>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr 1fr", gap: 8, marginBottom: 12 }}>
+              <div>
+                <div style={fieldLabel}>Unité de commande</div>
+                <select style={selectStyle} value={edit.orderUnitLabel} onChange={(e) => onEditChange({ ...edit, orderUnitLabel: e.target.value })}>
+                  <option value="">— Aucune —</option>
+                  <option value="kg">kg</option>
+                  <option value="litre">litre</option>
+                  <option value="pièce">pièce</option>
+                  <option disabled>────────</option>
+                  <option value="bac">bac</option>
+                  <option value="barquette">barquette</option>
+                  <option value="bidon">bidon</option>
+                  <option value="boite">boite</option>
+                  <option value="bouteille">bouteille</option>
+                  <option value="brick">brick</option>
+                  <option value="carton">carton</option>
+                  <option value="cagette">cagette</option>
+                  <option value="fût">fût</option>
+                  <option value="pack">pack</option>
+                  <option value="paquet">paquet</option>
+                  <option value="plateau">plateau</option>
+                  <option value="poche">poche</option>
+                  <option value="sac">sac</option>
+                  <option value="sachet">sachet</option>
+                  <option value="seau">seau</option>
+                </select>
+              </div>
+              {edit.orderUnitLabel && !["kg", "litre", "pièce"].includes(edit.orderUnitLabel) && (
+                <div>
+                  <div style={fieldLabel}>Qté</div>
+                  <input style={{ ...inputStyle, width: 60 }} value={edit.orderQuantity} onChange={(e) => onEditChange({ ...edit, orderQuantity: numVal(e.target.value) })} placeholder="ex: 6" />
+                </div>
+              )}
+              {edit.orderUnitLabel === "pièce" && currentPkg !== "piece" && (
+                <div>
+                  <div style={fieldLabel}>Poids pièce (g)</div>
+                  <input style={{ ...inputStyle, width: 100 }} value={edit.pieceWeightG} onChange={(e) => onEditChange({ ...edit, pieceWeightG: numVal(e.target.value) })} placeholder="ex: 1600" />
+                </div>
+              )}
+              <div>
+                <div style={fieldLabel}>Stockage</div>
+                <select style={selectStyle} value={edit.storageZone} onChange={(e) => onEditChange({ ...edit, storageZone: e.target.value })}>
+                  <option value="">— Aucun —</option>
+                  {storageZones.map(z => <option key={z.id} value={z.name}>{z.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={fieldLabel}>Statut</div>
+                <select style={selectStyle} value={edit.is_active ? "1" : "0"} onChange={(e) => onEditChange({ ...edit, is_active: e.target.value === "1" })}>
+                  <option value="1">Actif</option><option value="0">Inactif</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={fieldLabel}>Allergènes</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
               {ALLERGENS.map(a => {
                 const checked = edit.allergens.includes(a);
                 return (
@@ -452,10 +629,12 @@ export const IngredientRow = React.memo(function IngredientRow({
                 );
               })}
             </div>
-            <div className="muted text-[10px] mt-1">{edit.allergens.length === 0 ? "Aucun allergène" : edit.allergens.join(" · ")}</div>
+            {edit.allergens.length > 0 && <div style={{ fontSize: 10, color: "#999", marginTop: 4 }}>{edit.allergens.join(" · ")}</div>}
+            </>)}
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }, (prev, next) => {
@@ -469,7 +648,7 @@ export const IngredientRow = React.memo(function IngredientRow({
   if (prev.compactMode !== next.compactMode) return false;
   if (prev.alert?.change_pct !== next.alert?.change_pct) return false;
   if (prev.isEditing && prev.edit !== next.edit) return false;
-  if (prev.previewEditPack !== next.previewEditPack) return false;
+
   if (prev.supplierName !== next.supplierName) return false;
   if (prev.onCreateDerived !== next.onCreateDerived) return false;
   return true;
