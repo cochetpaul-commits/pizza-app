@@ -393,7 +393,7 @@ export default function DashboardPage() {
       if (evData && evData.length > 0) {
         for (const ev of evData) {
           const etabName = etablissements.find(e => e.id === ev.etablissement_id)?.nom ?? "";
-          alerts.push({ text: `Evenement demain \u2014 ${ev.covers ?? 0} couverts reserves`, etab: etabName, badge: "evenement", color: T.bleu });
+          alerts.push({ text: `Evenement demain — ${ev.covers ?? 0} couverts reserves`, etab: etabName, badge: "evenement", color: T.bleu });
         }
       }
 
@@ -453,7 +453,7 @@ export default function DashboardPage() {
                 }}>
                   <span style={{ fontWeight: 700, fontSize: 13, color: T.dark }}>{ev.name}</span>
                   <span style={{ fontSize: 11, color: T.muted }}>
-                    {ev.date ? fmtDateShort(ev.date) : "\u2014"}
+                    {ev.date ? fmtDateShort(ev.date) : "—"}
                   </span>
                 </div>
               ))}
@@ -508,14 +508,14 @@ export default function DashboardPage() {
 
         {/* ── 4 KPI Cards ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 20 }}>
-          <KpiCard label="CA Groupe" value={`${fmtEur(caTotal)}\u00A0\u20AC`} accent={T.terracotta}
+          <KpiCard label="CA Groupe" value={`${fmtEur(caTotal)} €`} accent={T.terracotta}
             sub={fmtDelta(deltaCa, "% vs hier") ?? undefined} subColor={deltaColor(deltaCa)} />
           <KpiCard label="Couverts" value={String(couvTotal)} accent={T.dark}
             sub={fmtDelta(deltaCouverts, " vs hier") ?? undefined} subColor={deltaColor(deltaCouverts)} />
-          <KpiCard label="Ticket moyen" value={`${ticketMoyenGroupe.toFixed(1).replace(".", ",")}\u00A0\u20AC`} accent={T.dark}
-            sub={deltaTicket != null ? `${deltaTicket > 0 ? "+" : ""}${deltaTicket.toFixed(1).replace(".", ",")} \u20AC vs hier` : undefined}
+          <KpiCard label="Ticket moyen" value={`${ticketMoyenGroupe.toFixed(1).replace(".", ",")} €`} accent={T.dark}
+            sub={deltaTicket != null ? `${deltaTicket > 0 ? "+" : ""}${deltaTicket.toFixed(1).replace(".", ",")} € vs hier` : undefined}
             subColor={deltaColor(deltaTicket != null ? Math.round(deltaTicket * 10) : null)} />
-          <KpiCard label="Ratio MS Groupe" value={ratioMSGroupe != null ? `${ratioMSGroupe}%` : "\u2014"}
+          <KpiCard label="Ratio MS Groupe" value={ratioMSGroupe != null ? `${ratioMSGroupe}%` : "—"}
             accent={ratioMSGroupe != null && ratioMSGroupe > objMS ? "#DC2626" : T.dore}
             sub={`obj. ${objMS}%`} subColor={T.dore}
             progress={ratioMSGroupe != null ? { value: ratioMSGroupe, max: objMS + 20, color: ratioMSGroupe > objMS ? "#DC2626" : T.dore } : undefined} />
@@ -611,13 +611,13 @@ export default function DashboardPage() {
               <span style={{ width: 12, height: 12, borderRadius: "50%", background: T.belloMio, boxShadow: `0 0 8px ${T.belloMio}60` }} />
               <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 17, color: T.dark, textTransform: "uppercase", letterSpacing: 0.5 }}>Bello Mio</span>
             </div>
-            <EtabStatRow label="CA du jour" value={`${fmtEur(ca?.totalSales ?? 0)}\u00A0\u20AC`} delta={fmtDelta(deltaCaBM, "%")} deltaColor={deltaColor(deltaCaBM)} />
+            <EtabStatRow label="CA du jour" value={`${fmtEur(ca?.totalSales ?? 0)} €`} delta={fmtDelta(deltaCaBM, "%")} deltaColor={deltaColor(deltaCaBM)} />
             <EtabStatRow label="Couverts" value={String(ca?.guestsNumber ?? 0)} delta={fmtDelta(deltaCouvBM)} deltaColor={deltaColor(deltaCouvBM)} />
-            <EtabStatRow label="Soir" value={`${fmtEur(ca?.soir.ca ?? 0)}\u00A0\u20AC`} />
+            <EtabStatRow label="Soir" value={`${fmtEur(ca?.soir.ca ?? 0)} €`} />
             <div style={{ display: "flex", gap: 14, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.belloMio}20` }}>
-              <MiniStat label="planifiees" value={heuresBM != null ? `${heuresBM} h` : "\u2014"} />
-              <MiniStat label="ratio MS" value={ratioMSBM != null ? `${ratioMSBM}%` : "\u2014"} valueColor={ratioMSBM != null && ratioMSBM > objMS ? "#DC2626" : T.sauge} />
-              <MiniStat label="masse sal." value={masseSalBM != null ? `${fmtEur(masseSalBM)}\u00A0\u20AC` : "\u2014"} />
+              <MiniStat label="planifiees" value={heuresBM != null ? `${heuresBM} h` : "—"} />
+              <MiniStat label="ratio MS" value={ratioMSBM != null ? `${ratioMSBM}%` : "—"} valueColor={ratioMSBM != null && ratioMSBM > objMS ? "#DC2626" : T.sauge} />
+              <MiniStat label="masse sal." value={masseSalBM != null ? `${fmtEur(masseSalBM)} €` : "—"} />
             </div>
             <Link
               href="/bello-mio"
@@ -647,13 +647,13 @@ export default function DashboardPage() {
               <span style={{ width: 12, height: 12, borderRadius: "50%", background: T.piccolaMia, boxShadow: `0 0 8px ${T.piccolaMia}80` }} />
               <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 17, color: T.dark, textTransform: "uppercase", letterSpacing: 0.5 }}>Piccola Mia</span>
             </div>
-            <EtabStatRow label="CA du jour" value={`${fmtEur(caPM?.ca ?? 0)}\u00A0\u20AC`} delta={fmtDelta(deltaCaPM, "%")} deltaColor={deltaColor(deltaCaPM)} />
+            <EtabStatRow label="CA du jour" value={`${fmtEur(caPM?.ca ?? 0)} €`} delta={fmtDelta(deltaCaPM, "%")} deltaColor={deltaColor(deltaCaPM)} />
             <EtabStatRow label="Couverts" value={String(caPM?.couverts ?? 0)} delta={fmtDelta(deltaCouvPM)} deltaColor={deltaColor(deltaCouvPM)} />
-            <EtabStatRow label="Soir" value={"\u2014"} />
+            <EtabStatRow label="Soir" value={"—"} />
             <div style={{ display: "flex", gap: 14, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.piccolaMia}40` }}>
-              <MiniStat label="planifiees" value={heuresPM != null ? `${heuresPM} h` : "\u2014"} />
-              <MiniStat label="ratio MS" value={ratioMSPM != null ? `${ratioMSPM}%` : "\u2014"} valueColor={ratioMSPM != null && ratioMSPM > objMS ? "#DC2626" : T.sauge} />
-              <MiniStat label="masse sal." value={masseSalPM != null ? `${fmtEur(masseSalPM)}\u00A0\u20AC` : "\u2014"} />
+              <MiniStat label="planifiees" value={heuresPM != null ? `${heuresPM} h` : "—"} />
+              <MiniStat label="ratio MS" value={ratioMSPM != null ? `${ratioMSPM}%` : "—"} valueColor={ratioMSPM != null && ratioMSPM > objMS ? "#DC2626" : T.sauge} />
+              <MiniStat label="masse sal." value={masseSalPM != null ? `${fmtEur(masseSalPM)} €` : "—"} />
             </div>
             <Link
               href="/piccola-mia"
@@ -753,12 +753,12 @@ export default function DashboardPage() {
         />
         <KpiCard
           label="CA hier"
-          value={caYesterday != null ? `${fmtEur(caYesterday)}\u00A0\u20AC` : "\u2014"}
+          value={caYesterday != null ? `${fmtEur(caYesterday)} €` : "—"}
           accent={T.terracotta}
         />
         <KpiCard
           label="Ratio MS/CA"
-          value={"\u2014"}
+          value={"—"}
           sub="bientot"
           accent={T.dore}
         />
@@ -814,8 +814,8 @@ export default function DashboardPage() {
                   }}>
                     <span style={{ fontWeight: 700, fontSize: 12, color: T.dark }}>{ev.name}</span>
                     <span style={{ fontSize: 10, color: T.muted, flexShrink: 0 }}>
-                      {ev.date ? fmtDateShort(ev.date) : "\u2014"}
-                      {ev.covers > 0 ? ` \u00B7 ${ev.covers} couv.` : ""}
+                      {ev.date ? fmtDateShort(ev.date) : "—"}
+                      {ev.covers > 0 ? ` · ${ev.covers} couv.` : ""}
                     </span>
                   </div>
                 ))}

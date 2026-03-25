@@ -19,7 +19,7 @@ export function PublishCatalogueButton({ recipeType, recipeId }: Props) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
-      if (!token) { alert("Non authentifi\u00e9"); return; }
+      if (!token) { alert("Non authentifié"); return; }
 
       const res = await fetchApi("/api/catalogue/publish", {
         method: "POST",
@@ -56,7 +56,7 @@ export function PublishCatalogueButton({ recipeType, recipeId }: Props) {
         color: done ? "#4a6741" : undefined,
       }}
     >
-      {loading ? "Publication\u2026" : done ? "Publi\u00e9 \u2713" : "Catalogue"}
+      {loading ? "Publication…" : done ? "Publié ✓" : "Catalogue"}
     </button>
   );
 }

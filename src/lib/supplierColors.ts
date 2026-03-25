@@ -25,7 +25,7 @@ const FALLBACK_COLORS = [
 
 /** Normalize a supplier name to a lookup key */
 function normalize(name: string): string {
-  return name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  return name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 }
 
 /**

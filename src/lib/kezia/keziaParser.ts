@@ -46,7 +46,7 @@ function parseFr(raw: string): number {
   // Remove currency suffixes
   s = s.replace(/\s*(Eur|€)\s*/gi, "");
   // Remove thousands separators (space or non-breaking space)
-  s = s.replace(/[\s\u00A0]/g, "");
+  s = s.replace(/[\s ]/g, "");
   // Comma → dot
   s = s.replace(",", ".");
   const n = parseFloat(s);
@@ -73,11 +73,11 @@ function findValueAfterLabel(
     if (labelRe.test(lines[i])) {
       // Try to grab number from the same line, after the label match
       const after = lines[i].replace(labelRe, "");
-      const numMatch = after.match(/-?[\d\s\u00A0]+,\d{2}/);
+      const numMatch = after.match(/-?[\d\s ]+,\d{2}/);
       if (numMatch) return parseFr(numMatch[0]);
       // Fallback: look at next line
       if (!opts?.sameLineOnly && i + 1 < lines.length) {
-        const nextMatch = lines[i + 1].match(/-?[\d\s\u00A0]+,\d{2}/);
+        const nextMatch = lines[i + 1].match(/-?[\d\s ]+,\d{2}/);
         if (nextMatch) return parseFr(nextMatch[0]);
       }
     }
@@ -90,7 +90,7 @@ function findValueAfterLabel(
  * Matches patterns like "1 234,56" or "-12,34" or "0,00".
  */
 function extractNumbers(s: string): number[] {
-  const matches = s.match(/-?[\d\s\u00A0]*\d+,\d{2}/g);
+  const matches = s.match(/-?[\d\s ]*\d+,\d{2}/g);
   if (!matches) return [];
   return matches.map(parseFr);
 }
@@ -220,7 +220,7 @@ export function parseKeziaSynthese(text: string): KeziaDaily {
     // A rayon line looks like: "RESTO 245 1 234,56 1 456,78 345,67 29,89 % 85,23 %"
     // Or "CAVE & SPIRITUEUX 12 ..."
     // The name is the leading text before the first number
-    const nameMatch = line.match(/^([A-ZÀ-Ü\s&]+?)\s+(-?[\d\s\u00A0]*\d+[,.]?\d*)/i);
+    const nameMatch = line.match(/^([A-ZÀ-Ü\s&]+?)\s+(-?[\d\s ]*\d+[,.]?\d*)/i);
     if (!nameMatch) {
       // Could be a "Total" line
       if (/^Total\b/i.test(line)) {

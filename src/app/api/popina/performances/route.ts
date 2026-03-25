@@ -30,7 +30,7 @@ const c2e = (centimes: number) => Math.round(centimes / 100 * 100) / 100;
 
 /** Remove accents: è→e, ù→u, etc. */
 function stripAccents(s: string): string {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
 const DOLCI_KEYWORDS = [
@@ -372,7 +372,7 @@ export async function GET(request: NextRequest) {
   const variationTicket = ticketMoyenPrec > 0 ? Math.round(((ticketMoyenSemaine - ticketMoyenPrec) / ticketMoyenPrec) * 100) : 0;
 
   // Best day
-  let bestDay = { label: "\u2014", ca: 0 };
+  let bestDay = { label: "—", ca: 0 };
   for (const d of activeDates) {
     const ca = c2e((reportsByDate.get(d) ?? []).reduce((s, r) => s + (r.totalSales ?? 0), 0));
     if (ca > bestDay.ca) { bestDay = { label: DAY_LABELS[new Date(d + "T12:00:00").getDay()], ca }; }

@@ -107,7 +107,7 @@ export default function EpiceriePage() {
       // Deduplicate suppliers by normalized name
       const seen = new Map<string, Supplier>();
       for (const s of (sups ?? []) as Supplier[]) {
-        const key = (s.name ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const key = (s.name ?? "").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
         if (!seen.has(key)) seen.set(key, s);
       }
       setSuppliers(Array.from(seen.values()));

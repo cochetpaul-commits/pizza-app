@@ -81,7 +81,7 @@ const SOFT = "#EDE7D9";
 
 function fmtMoney(v: number | null) {
   if (v == null || !Number.isFinite(v) || v <= 0) return "--";
-  return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " \u20AC";
+  return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
 
 function fmtPercent(v: number | null) {

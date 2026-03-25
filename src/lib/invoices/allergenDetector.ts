@@ -95,7 +95,7 @@ const ALLERGEN_RULES: AllergenRule[] = [
 export function detectAllergensFromName(name: string): string[] {
   // Apostrophes / étoiles Metro → espace ; préfixe espace pour éviter les
   // faux positifs de sous-chaîne (même technique que detectCategoryFromName)
-  const lower = " " + name.toLowerCase().replace(/['\u2019\u2018*]/g, " ");
+  const lower = " " + name.toLowerCase().replace(/['’‘*]/g, " ");
   const result: string[] = [];
   for (const rule of ALLERGEN_RULES) {
     for (const kw of rule.keywords) {

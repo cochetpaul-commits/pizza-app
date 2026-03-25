@@ -130,7 +130,7 @@ export default function StatsAchatsPage() {
         const sid = r.supplier_id ?? "?";
         allSupplierIds.add(sid);
         const name = r.suppliers?.name ?? "Inconnu";
-        const key = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+        const key = name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
         if (!bySupplier[key]) bySupplier[key] = { name, totalHT: 0, nbFactures: 0, supplierIds: [] };
         if (!bySupplier[key].supplierIds.includes(sid)) bySupplier[key].supplierIds.push(sid);
         bySupplier[key].totalHT += r.total_ht ?? 0;
@@ -222,7 +222,7 @@ export default function StatsAchatsPage() {
         byMonth[key] = (byMonth[key] ?? 0) + (r.total_ht ?? 0);
         byMonthCount[key] = (byMonthCount[key] ?? 0) + 1;
         const name = r.suppliers?.name ?? "Inconnu";
-        const skey = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+        const skey = name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
         if (!byMonthSupplier[key]) byMonthSupplier[key] = {};
         byMonthSupplier[key][skey] = (byMonthSupplier[key][skey] ?? 0) + (r.total_ht ?? 0);
       }
@@ -230,7 +230,7 @@ export default function StatsAchatsPage() {
       // Build supplier name→color map from supplierList
       const supplierColorMap: Record<string, { name: string; color: string }> = {};
       for (const s of supplierList) {
-        const skey = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+        const skey = s.name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
         supplierColorMap[skey] = { name: s.name, color: s.color };
       }
 

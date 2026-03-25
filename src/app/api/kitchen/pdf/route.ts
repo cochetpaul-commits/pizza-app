@@ -201,7 +201,7 @@ export async function POST(req: Request) {
       const cost = qty == null ? 0 : qty * cpu;
       const supplierName = ing?.supplierId ? (supplierNameById[ing.supplierId] ?? null) : null;
       return {
-        name: ing?.name ?? "\u2014",
+        name: ing?.name ?? "—",
         qty,
         unit,
         cost,

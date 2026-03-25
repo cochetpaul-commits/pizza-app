@@ -106,8 +106,8 @@ export function DevisPdfDocument(props: DevisPdfData) {
             <Text style={{ ...s.tableCell, width: "45%" }}>{l.description}</Text>
             <Text style={{ ...s.tableCell, width: "12%", textAlign: "right" }}>{l.quantite}</Text>
             <Text style={{ ...s.tableCell, width: "13%" }}>{l.unite}</Text>
-            <Text style={{ ...s.tableCell, width: "15%", textAlign: "right" }}>{l.prixUnitaireHt.toFixed(2)} \u20ac</Text>
-            <Text style={{ ...s.tableCell, width: "15%", textAlign: "right", fontFamily: "Helvetica-Bold" }}>{l.totalHt.toFixed(2)} \u20ac</Text>
+            <Text style={{ ...s.tableCell, width: "15%", textAlign: "right" }}>{l.prixUnitaireHt.toFixed(2)} €</Text>
+            <Text style={{ ...s.tableCell, width: "15%", textAlign: "right", fontFamily: "Helvetica-Bold" }}>{l.totalHt.toFixed(2)} €</Text>
           </View>
         ))}
 
@@ -115,15 +115,15 @@ export function DevisPdfDocument(props: DevisPdfData) {
         <View style={s.totalsBox}>
           <View style={s.totalRow}>
             <Text style={s.totalLabel}>Total HT</Text>
-            <Text style={s.totalValue}>{totalHt.toFixed(2)} \u20ac</Text>
+            <Text style={s.totalValue}>{totalHt.toFixed(2)} €</Text>
           </View>
           <View style={s.totalRow}>
             <Text style={s.totalLabel}>TVA ({tvaRate}%)</Text>
-            <Text style={s.totalValue}>{tvaAmount.toFixed(2)} \u20ac</Text>
+            <Text style={s.totalValue}>{tvaAmount.toFixed(2)} €</Text>
           </View>
           <View style={s.grandTotalRow}>
             <Text style={s.grandTotalLabel}>Total TTC</Text>
-            <Text style={s.grandTotalValue}>{totalTtc.toFixed(2)} \u20ac</Text>
+            <Text style={s.grandTotalValue}>{totalTtc.toFixed(2)} €</Text>
           </View>
         </View>
 
@@ -131,7 +131,7 @@ export function DevisPdfDocument(props: DevisPdfData) {
         {acomptePct > 0 && (
           <View style={s.acompteBox}>
             <Text style={s.acompteText}>
-              Acompte de {acomptePct}% a la commande : {acompte.toFixed(2)} \u20ac
+              Acompte de {acomptePct}% a la commande : {acompte.toFixed(2)} €
             </Text>
           </View>
         )}

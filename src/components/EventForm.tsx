@@ -472,7 +472,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
               onClick={handleSave}
               disabled={saving}
             >
-              {saving ? "\u2026" : isNew ? "Creer" : "Enregistrer"}
+              {saving ? "…" : isNew ? "Creer" : "Enregistrer"}
             </button>
           </div>
         </div>

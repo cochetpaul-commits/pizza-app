@@ -16,7 +16,7 @@ type Result = {
 
 function fmtEur(n: number | null | undefined): string {
   if (n == null) return "—";
-  return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " \u20ac";
+  return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
 
 function fmtPct(n: number | null | undefined): string {

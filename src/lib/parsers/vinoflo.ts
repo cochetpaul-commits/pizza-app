@@ -2,17 +2,18 @@
  * Vinoflo invoice parser
  *
  * Format Vinoflo — Italian wine distributor (Marseille)
- * Simple table: Qté | Article | Description | Prix unitaire | Total
+ * Table: QTÉ | CODE | DESCRIPTION | PRIX UNITAIRE | TOTAL
  *
  * WARNING: Vinoflo invoices are often scanned images (IMG_*.pdf).
- * pdfjs-dist extracts the embedded OCR text layer which is frequently
- * garbled (¤ instead of €, merged words, corrupted digits).
- * Columns are extracted in scrambled order (not row by row).
+ * pdfjs-dist extracts the embedded OCR text layer which has errors:
+ * - Currency: € → e, æ, ê, C, ¤
+ * - Digits: 0→æ, 0→t, 0→O, 5→æ
+ * - Merged/missing characters
  *
- * Strategy: find product names (Italian wine names) with nearby prices,
- * then match quantities from separate QTY blocks.
+ * Line format (per row):
+ *   QTY(int) CODE(int) NAME(text) UNIT_PRICE(d,dd + currency) TOTAL(d,dd + currency)
  *
- * Products: all wines (Chianti, Valpolicella, Barbera, etc.)
+ * Products: all Italian wines — "boissons"
  * TVA: 20% (alcohol)
  */
 
@@ -29,15 +30,15 @@ function detectEtablissement(text: string): string | null {
 }
 
 function extractMeta(text: string) {
-  // Invoice number: near "facture" — 4+ digit number
-  const numMatch = text.match(/facture\s*:\s*(\d{4,})/i)
-    || text.match(/\b(\d{4})\b(?=\s+\d{2}[t/])/);
-  // Date: DD/MM/YYYY or DDtMMtYYYY (OCR replaces / with t)
-  const dateMatch = text.match(/(\d{2})[t/](\d{2})[t/](\d{4})/);
-  // Sous-total + Total TTC: look for numbers near these labels
-  // OCR: "sous-lotal '1 2'17.10 ¤" → need aggressive cleaning
-  const stMatch = text.match(/sous-[lt]otal\s+['']?(\d[\d\s',.]*)\s*¤/i);
-  const ttcMatch = text.match(/Tota[lt]\s+(\d[\d\s',.]*)\s*¤/i);
+  // Invoice number: near "facture" — 4-5 digit number (not SIRET which is 14+ digits)
+  const numMatch = text.match(/facture\s*:\s*(\d{4,6})\b/i)
+    || text.match(/iacture\s*:\s*(\d{4,6})\b/i);  // OCR: f→i
+  // Date: DD/MM/YYYY or DDtMMtYYYY or DD,MM/YYYY (OCR replaces / with t or ,)
+  const dateMatch = text.match(/(\d{2})[t/,](\d{2})[t/,](\d{4})/);
+  // Sous-total HT: various OCR forms — "Sous{otal 't 227,1æ."
+  const stMatch = text.match(/[Ss]ous[{-]?[Tt]?otal\s+([\d\s't,æ]+)[€eæC¤.]/);
+  // Total TTC
+  const ttcMatch = text.match(/\bTotal\s+([\d\s',æ.]+)[€eæCX¤*]/);
 
   return {
     invoice_number: numMatch?.[1] ?? null,
@@ -50,30 +51,42 @@ function extractMeta(text: string) {
 // ── OCR cleaning ────────────────────────────────────────────────────────────
 
 function cleanOcrAmount(raw: string): number | null {
-  let s = raw.replace(/[¤€eQ;)]/g, "").replace(/'/g, "").replace(/\s+/g, "").trim();
-  // Normalize: replace common OCR digit errors
-  s = s.replace(/æ/g, "5").replace(/t/g, "0").replace(/O/g, "0");
+  let s = raw
+    .replace(/[¤€eQC;)*X]/g, "")
+    .replace(/'t/g, "1")            // OCR: 1 → 't
+    .replace(/'/g, "")
+    .replace(/\s+/g, "")
+    .trim();
+  // OCR digit substitutions for amounts
+  s = s.replace(/æ/g, "0").replace(/t/g, "0").replace(/O/g, "0");
   return parseFrenchNumber(s);
 }
 
 function cleanOcrPrice(raw: string): number | null {
-  let s = raw.replace(/[¤€eQ;)]/g, "").replace(/'/g, "").trim();
-  s = s.replace(/æ/g, "0").replace(/t\)/g, "0").replace(/I/g, "1");
-  s = s.replace(/,\s*t\s*/g, ",1").replace(/t\s*/g, "0");
-  s = s.replace(/\s+/g, "");
-  // Handle missing comma in 4-digit prices: "1420" → "14,20"
-  if (/^\d{4}$/.test(s)) {
-    s = s.slice(0, 2) + "," + s.slice(2);
-  }
+  let s = raw
+    .replace(/[¤€eQC;)*]/g, "")
+    .replace(/'/g, ",")            // OCR: , → ' in prices
+    .replace(/\s+/g, "")
+    .trim();
+  // OCR digit substitutions
+  s = s.replace(/æ/g, "0").replace(/ê/g, "0").replace(/t(?=\d)/g, "0");
   return parseFrenchNumber(s);
 }
 
-// ── Product name + price extraction ─────────────────────────────────────────
-// In pdfjs-dist output, product names appear near their unit prices:
-// "Chianti Luggiêno   6,90 ¤" or "Barbera d'Astisuæriore   11,2æ."
-// Names contain letters (Italian wine names), prices are numbers with , or .
-
-const RE_NAME_PRICE = /([A-Za-zÀ-ÿ'\\][A-Za-zÀ-ÿ' \\.,]{2,}?(?:\s+(?:BIO|IGP|IGT|DOC|DOCG|DOP))*)\s{2,}([\d',æ.I]+)\s*[¤€eæ.]/g;
+// ── Product line regex ──────────────────────────────────────────────────────
+// QTY CODE NAME UNIT_PRICE TOTAL
+// Currency chars: €, e, æ, ê, C, ¤ (OCR variations)
+// Price: digits + comma + digits, possibly corrupted
+const CURRENCY = "[€eæêC¤]";
+const PRICE = `\\d+[,.']\\d[\\dæêeIlt]*?`;
+const LINE_END = `${CURRENCY}[.\\s]*$`;
+const RE_LINE = new RegExp(
+  `^'?(\\d{1,3})\\s+[\\d']{1,4}\\s+(.+?)\\s+(${PRICE})${CURRENCY}\\s+(${PRICE})${LINE_END}`
+);
+// Fallback: line without QTY (OCR merged or missing)
+const RE_LINE_NOQTY = new RegExp(
+  `^[\\d']{1,4}\\s+(.+?)\\s+(${PRICE})${CURRENCY}\\s+(${PRICE})${LINE_END}`
+);
 
 // ── Parser ──────────────────────────────────────────────────────────────────
 
@@ -85,65 +98,99 @@ export function parseVinoflo(text: string, etablissement: string): ParseResult {
   const ingredients: ParsedIngredient[] = [];
   const logs: ParseLog[] = [];
 
-  // 1. Extract product name + unit price pairs
-  const products: { name: string; unitPrice: number; raw: string }[] = [];
-  RE_NAME_PRICE.lastIndex = 0;
-  let match: RegExpExecArray | null;
+  const lines = text.split("\n");
+  let matchCount = 0;
 
-  while ((match = RE_NAME_PRICE.exec(text)) !== null) {
-    const [full, nameRaw, priceRaw] = match;
-    const name = nameRaw
-      .replace(/\\/g, "V")         // OCR: \i → Vi
-      .replace(/â/g, "a")          // OCR: â → a
-      .replace(/ê/g, "e")          // OCR: ê → e
-      .replace(/æ/g, "a")          // OCR: æ → a (in names)
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Stop at sous-total/footer
+    if (/sous[{-]total|^TVA\b|^Total\b|^Solde\b|^Escompte/i.test(trimmed)) break;
+
+    let qty: number | null = null;
+    let name: string | null = null;
+    let unitPriceRaw: string | null = null;
+    let totalRaw: string | null = null;
+
+    // Try full format: QTY CODE NAME PRICE TOTAL
+    const m = RE_LINE.exec(trimmed);
+    if (m) {
+      qty = parseInt(m[1], 10);
+      name = m[2].trim();
+      unitPriceRaw = m[3];
+      totalRaw = m[4];
+    } else {
+      // Try without QTY: CODE NAME PRICE TOTAL
+      const m2 = RE_LINE_NOQTY.exec(trimmed);
+      if (m2) {
+        name = m2[1].trim();
+        unitPriceRaw = m2[2];
+        totalRaw = m2[3];
+      }
+    }
+
+    if (!name || !unitPriceRaw || !totalRaw) continue;
+
+    // Skip non-product lines
+    if (/factur|paiem|intér|marchand|pénalité|escompte|décret|propriété|transfer|régle|indemnité/i.test(name)) continue;
+    if (/Qté|Article|Description|Prix|Total|Sous|TVA|Solde|IBAN|Adresse|Représentant/i.test(name)) continue;
+    if (name.length < 3) continue;
+
+    const unitPrice = cleanOcrPrice(unitPriceRaw);
+    const total = cleanOcrPrice(totalRaw);
+
+    if (unitPrice == null || unitPrice <= 0) continue;
+    // Sanity check: unit price for wine typically 2-30€
+    if (unitPrice > 50) continue;
+
+    matchCount++;
+
+    // Compute qty from total/unitPrice if not captured
+    if (qty == null && total != null && total > 0) {
+      qty = Math.round(total / unitPrice);
+    }
+
+    // Clean up OCR artifacts in name
+    const cleanName = name
+      .replace(/û/g, "u")
+      .replace(/ê/g, "e")
+      .replace(/â/g, "a")
+      .replace(/æ/g, "a")
       .replace(/\s+/g, " ")
       .trim();
 
-    // Skip header/footer text
-    if (/factur|palemen|intér|marchand|pénalité|escompte|décret|propriété|transfer|régle|règle|lol\b|indemnité|forfait/i.test(name)) continue;
-    if (/Qté|Article|Description|Prix|Total|Sous|TVA|Solde|IBAN|Adresse|Représentant/i.test(name)) continue;
-    if (name.length < 4) continue;
-
-    const price = cleanOcrPrice(priceRaw);
-    if (price == null || price <= 0) continue;
-
-    // Unit prices for wine: typically 3-25€
-    if (price >= 2 && price <= 30) {
-      products.push({ name, unitPrice: price, raw: full });
+    // Confidence: verify qty × unitPrice ≈ total
+    let confidence: "high" | "medium" | "low" = "medium";
+    if (qty != null && total != null) {
+      const expected = qty * unitPrice;
+      if (Math.abs(expected - total) < 0.10) {
+        confidence = "high";
+      }
+    } else {
+      confidence = "low";
     }
-  }
-
-  // 2. Build ingredients — scanned PDFs have unreliable column extraction,
-  // so we only extract names + unit prices. Totals/quantities must be verified manually.
-  let matchCount = 0;
-
-  for (let i = 0; i < products.length; i++) {
-    matchCount++;
-    const { name, unitPrice, raw } = products[i];
-
-    // All scanned OCR results get low confidence
-    const confidence = "low" as const;
 
     ingredients.push({
-      name,
+      name: cleanName,
+      reference: undefined,
       unit_recette: "pcs",
       unit_commande: "pcs",
       prix_unitaire: unitPrice,
-      prix_commande: unitPrice,
+      prix_commande: total ?? unitPrice,
       categorie: "boissons",
       fournisseur_slug: "vinoflo",
       etablissement_id: etab,
-      raw_line: raw.replace(/\s+/g, " ").slice(0, 200),
+      raw_line: trimmed.slice(0, 200),
       confidence,
     });
 
     logs.push({
       line_number: matchCount,
-      raw: raw.replace(/\s+/g, " ").slice(0, 120),
-      rule: "vinoflo_ocr",
+      raw: cleanName.slice(0, 120),
+      rule: "vinoflo_product",
       result: "ok",
-      detail: `${name} @${unitPrice}€`,
+      detail: `${cleanName} ×${qty ?? "?"} @${unitPrice}€ = ${total ?? "?"}€`,
     });
   }
 
@@ -157,7 +204,7 @@ export function parseVinoflo(text: string, etablissement: string): ParseResult {
     });
   }
 
-  // Always warn about OCR quality for scanned PDFs
+  // Warn about OCR quality for scanned PDFs
   if (text.includes("¤") || /[æêâ]/.test(text)) {
     logs.push({
       line_number: 0,

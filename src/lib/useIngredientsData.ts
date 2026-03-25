@@ -152,7 +152,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
           const seen = new Map<string, Supplier>();
           const aliases = new Map<string, Set<string>>();
           for (const s of (data ?? []) as Supplier[]) {
-            const key = s.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+            const key = s.name.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
             if (!seen.has(key)) {
               seen.set(key, s);
               aliases.set(s.id, new Set([s.id]));

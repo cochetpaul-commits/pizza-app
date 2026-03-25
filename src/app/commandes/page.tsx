@@ -314,7 +314,7 @@ function CommandesPage() {
       // Deduplicate by name (accent+case insensitive)
       const seen = new Map<string, Supplier>();
       for (const s of (data ?? []) as Supplier[]) {
-        const key = s.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        const key = s.name.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
         if (!seen.has(key)) seen.set(key, s);
       }
       const list = Array.from(seen.values());

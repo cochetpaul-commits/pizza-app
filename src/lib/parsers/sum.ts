@@ -38,14 +38,15 @@ function extractMeta(text: string) {
   // Totals on last page: "C2   2 624,32€   5,5%   144,34€"
   // First number after C2 = HT base
   const htMatch = text.match(/\bC2\s+([\d\s]+,\d{2})€/);
-  // NET A PAYER ... last number before "Prélèvement"
-  const ttcMatch = text.match(/([\d\s]+,\d{2})€\s+([\d\s]+,\d{2})€\s*Prélèvement/);
+  // TTC: "Total TTC ... X€" or "Prélèvement X€" or from C2 line "... Total TTC ... X€"
+  const ttcMatch = text.match(/Total\s+TTC.*?([\d\s]+,\d{2})€/)
+    ?? text.match(/Pr[ée]l[èe]vement\s+([\d\s]+,\d{2})€/);
 
   return {
     invoice_number: numMatch?.[1] ?? null,
     invoice_date: dateMatch?.[1] ?? null,
     total_ht: htMatch ? parseFrenchNumber(htMatch[1]) : null,
-    total_ttc: ttcMatch ? parseFrenchNumber(ttcMatch[2]) : null,
+    total_ttc: ttcMatch ? parseFrenchNumber(ttcMatch[1]) : null,
   };
 }
 

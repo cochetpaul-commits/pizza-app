@@ -70,7 +70,7 @@ function lastOfMonth(y: number, m: number): string {
 }
 
 function downloadCSV(csv: string, filename: string) {
-  const bom = "\uFEFF";
+  const bom = "﻿";
   const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

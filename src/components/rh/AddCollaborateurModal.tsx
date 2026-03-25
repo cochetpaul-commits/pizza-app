@@ -152,7 +152,7 @@ export function AddCollaborateurModal({ etablissementId, onClose, onCreated }: P
         background: done ? "#2D6A4F" : active ? "#2D6A4F" : "#f0ebe3",
         color: done || active ? "#fff" : "#999", fontSize: 13, fontWeight: 700,
       }}>
-        {done ? "\u2713" : n}
+        {done ? "✓" : n}
       </div>
       <div>
         <div style={{ fontSize: 10, color: "#999", textTransform: "uppercase" as const }}>Etape {n}</div>

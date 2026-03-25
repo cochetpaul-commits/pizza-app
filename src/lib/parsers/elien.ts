@@ -65,7 +65,6 @@ export function parseElien(text: string, etablissement: string): ParseResult {
 
   const ingredients: ParsedIngredient[] = [];
   const logs: ParseLog[] = [];
-  const seen = new Set<string>();
   let lineNum = 0;
 
   const rows = text.split(/\r?\n/);
@@ -90,11 +89,6 @@ export function parseElien(text: string, etablissement: string): ParseResult {
     const tva = parseFrenchNumber(m[5]);
 
     if (!name || pu == null) continue;
-
-    // Dedup by name+pu (same product at same price across commands = aggregate later)
-    const key = `${name}|${pu}|${qty}|${montant}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
 
     // Extract volume from name: "4.5 L VANILLE..." or "2.5 L CITRON"
     const volMatch = name.match(/^(\d+(?:[.,]\d+)?)\s*L\s+/i);

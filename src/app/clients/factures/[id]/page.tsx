@@ -35,10 +35,10 @@ type FactureData = {
 
 const STATUS_LABELS: Record<string, string> = {
   brouillon: "Brouillon",
-  envoyee: "Envoy\u00e9e",
-  payee: "Pay\u00e9e",
+  envoyee: "Envoyée",
+  payee: "Payée",
   en_retard: "En retard",
-  annulee: "Annul\u00e9e",
+  annulee: "Annulée",
 };
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -50,7 +50,7 @@ const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
 };
 
 function fmtDate(iso: string | null) {
-  if (!iso) return "\u2014";
+  if (!iso) return "—";
   return new Date(iso + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 }
 
@@ -316,8 +316,8 @@ export default function FactureDetailPage() {
               {facture.client && (
                 <p style={{ fontSize: 14, color: "#2f3a33", margin: "8px 0" }}>
                   <strong>Client :</strong> {facture.client.nom}{facture.client.prenom ? ` ${facture.client.prenom}` : ""}
-                  {facture.client.email ? ` \u00b7 ${facture.client.email}` : ""}
-                  {facture.client.telephone ? ` \u00b7 ${facture.client.telephone}` : ""}
+                  {facture.client.email ? ` · ${facture.client.email}` : ""}
+                  {facture.client.telephone ? ` · ${facture.client.telephone}` : ""}
                 </p>
               )}
               <p style={{ fontSize: 13, color: "#6f6a61", margin: "4px 0" }}>

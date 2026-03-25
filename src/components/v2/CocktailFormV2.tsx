@@ -35,7 +35,7 @@ const COCKTAIL_TYPES = [
   { id: "signature",    label: "Signature" },
 ];
 
-const GLASS_OPTIONS = ["Tumbler", "Coupe", "Fl\u00FBte", "Highball", "Martini", "Autre"];
+const GLASS_OPTIONS = ["Tumbler", "Coupe", "Flûte", "Highball", "Martini", "Autre"];
 const METHOD_OPTIONS = ["Shaker", "Build", "Stirred", "Blender"];
 
 function tmpId() { return `tmp-${Math.random().toString(36).slice(2)}`; }
@@ -45,7 +45,7 @@ function fmtMoney(v: number) { return v.toLocaleString("fr-FR", { minimumFractio
 
 interface Props { cocktailId?: string; initialProdMode?: boolean; }
 
-function truncate(s: string, n: number) { return s.length > n ? s.slice(0, n) + "\u2026" : s; }
+function truncate(s: string, n: number) { return s.length > n ? s.slice(0, n) + "…" : s; }
 
 export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
   const router = useRouter();
@@ -169,7 +169,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
     { key: "fc", label: "Food cost & Marges" },
     { key: "recette", label: "Recette & Procede" },
     { key: "cmd", label: "Commandes fournisseurs" },
-    { key: "pop", label: "Pilotage CA \u2014 Popina" },
+    { key: "pop", label: "Pilotage CA — Popina" },
   ] : [
     { key: "recette", label: "Recette" },
   ];
@@ -431,7 +431,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
-      if (!token) { alert("Non authentifi\u00E9"); return; }
+      if (!token) { alert("Non authentifié"); return; }
       const res = await fetchApi("/api/cocktails/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
@@ -442,7 +442,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${(name || "cocktail").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.pdf`;
+      a.download = `${(name || "cocktail").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } finally { setPdfLoading(false); }
@@ -452,7 +452,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
   if (status === "loading") {
     return (
-      <main className="container"><div className="muted" style={{ marginTop: 40, textAlign: "center" }}>Chargement\u2026</div></main>
+      <main className="container"><div className="muted" style={{ marginTop: 40, textAlign: "center" }}>Chargement…</div></main>
     );
   }
   if (status === "error") {
@@ -500,14 +500,14 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
               <>
                 <button type="button" className="btn" onClick={handleExportPdf} disabled={pdfLoading}
                   style={{ fontSize: 12 }}>
-                  {pdfLoading ? "Export\u2026" : "Apercu PDF"}
+                  {pdfLoading ? "Export…" : "Apercu PDF"}
                 </button>
                 <PublishCatalogueButton recipeType="cocktail" recipeId={cocktailId!} />
               </>
             )}
             {userCanWrite && (
               <button onClick={handleSave} disabled={saving} className="btn btnPrimary">
-                {saving ? "Sauvegarde\u2026" : "Enregistrer"}
+                {saving ? "Sauvegarde…" : "Enregistrer"}
               </button>
             )}
           </div>
@@ -519,15 +519,15 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
             display: "flex", gap: 0, marginBottom: 16, borderRadius: 10,
             border: "1px solid #ddd6c8", overflow: "hidden", background: "#fff",
           }}>
-            <KpiBannerItem label="COUT REVIENT" value={effectiveCostPerPortion ? `${fmtMoney(effectiveCostPerPortion)}\u00A0\u20AC` : "-"} sub="par cocktail" color="#D4775A" />
+            <KpiBannerItem label="COUT REVIENT" value={effectiveCostPerPortion ? `${fmtMoney(effectiveCostPerPortion)} €` : "-"} sub="par cocktail" color="#D4775A" />
             <KpiBannerItem
               label="FOOD COST"
               value={foodCostPct != null ? `${foodCostPct.toFixed(1)}%` : "-"}
-              sub="objectif \u2264 32%"
+              sub="objectif ≤ 32%"
               color={foodCostPct == null ? "#999" : foodCostPct <= 28 ? "#16a34a" : foodCostPct <= 32 ? "#D97706" : "#DC2626"}
             />
-            <KpiBannerItem label="PRIX DE VENTE HT" value={sp ? `${fmtMoney(sp)}\u00A0\u20AC` : "-"} sub={prixTTC ? `${fmtMoney(prixTTC)}\u00A0\u20AC TTC` : ""} color="#1a1a1a" />
-            <KpiBannerItem label="MARGE BRUTE" value={margeBrute != null ? `${fmtMoney(margeBrute)}\u00A0\u20AC` : "-"} sub="par cocktail" color="#16a34a" />
+            <KpiBannerItem label="PRIX DE VENTE HT" value={sp ? `${fmtMoney(sp)} €` : "-"} sub={prixTTC ? `${fmtMoney(prixTTC)} € TTC` : ""} color="#1a1a1a" />
+            <KpiBannerItem label="MARGE BRUTE" value={margeBrute != null ? `${fmtMoney(margeBrute)} €` : "-"} sub="par cocktail" color="#16a34a" />
           </div>
         )}
 
@@ -611,7 +611,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                   <div style={{ fontSize: 13, opacity: 0.85 }}>
                     {prodPivotIng
                       ? `Modifie ${prodPivotIng.name}, tout se recalcule`
-                      : `${title} \u2014 appuie sur \u2606 en mode normal pour choisir un pivot`}
+                      : `${title} — appuie sur ☆ en mode normal pour choisir un pivot`}
                   </div>
                 </div>
 
@@ -631,7 +631,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                     }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: "#D97706", marginBottom: 6 }}>★ Ingrédient pivot</div>
                       <div style={{ fontSize: 18, fontWeight: 800, color: "#2d2d2d", marginBottom: 12 }}>
-                        {prodPivotIng?.name ?? "\u2014"}
+                        {prodPivotIng?.name ?? "—"}
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                         <StepperInput
@@ -656,7 +656,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                             display: "flex", justifyContent: "space-between", alignItems: "center",
                             background: "white", border: "1px solid #EFEFEF", borderRadius: 10, padding: "10px 14px",
                           }}>
-                            <span style={{ fontSize: 14, color: "#2d2d2d" }}>{truncate(ing?.name ?? "\u2014", 35)}</span>
+                            <span style={{ fontSize: 14, color: "#2d2d2d" }}>{truncate(ing?.name ?? "—", 35)}</span>
                             <span style={{ fontSize: 22, fontWeight: 800, color: "#4a6741" }}>
                               {newQty !== null ? `${newQty.toLocaleString("fr-FR")} ${l.unit}` : `${l.qty} ${l.unit}`}
                             </span>
@@ -818,7 +818,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                   )}
                   <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoChange} />
                   <button type="button" onClick={() => fileRef.current?.click()} disabled={photoUploading} className="btn">
-                    {photoUploading ? "Envoi\u2026" : photoPreview ? "Changer la photo" : "Ajouter une photo"}
+                    {photoUploading ? "Envoi…" : photoPreview ? "Changer la photo" : "Ajouter une photo"}
                   </button>
                 </div>
 
@@ -827,7 +827,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                   {saveError && <div className="errorBox" style={{ marginBottom: 8 }}>{saveError}</div>}
                   {userCanWrite && (
                     <button onClick={handleSave} disabled={saving} className="btn btnPrimary w-full">
-                      {saving ? "Sauvegarde\u2026" : "Sauvegarder"}
+                      {saving ? "Sauvegarde…" : "Sauvegarder"}
                     </button>
                   )}
                 </div>

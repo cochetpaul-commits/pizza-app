@@ -192,8 +192,8 @@ export default function CarnetClientsPage() {
                     <span style={{ fontWeight: 700 }}>{c.nom}</span>
                     {c.prenom && <span style={{ color: "#999", marginLeft: 4 }}>{c.prenom}</span>}
                   </td>
-                  <td style={td}>{c.telephone ?? "\u2014"}</td>
-                  <td style={td}>{c.email ?? "\u2014"}</td>
+                  <td style={td}>{c.telephone ?? "—"}</td>
+                  <td style={td}>{c.email ?? "—"}</td>
                   <td style={{ ...td, textAlign: "center" }}>
                     {eventCounts[c.id] ? (
                       <span style={badgeStyle}>{eventCounts[c.id]}</span>

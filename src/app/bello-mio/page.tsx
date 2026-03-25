@@ -118,12 +118,12 @@ export default function BelloMioDashboard() {
 
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-        <KpiCard label="CA du jour" value={`${fmtEur(caToday)} \u20AC`} accent={COLOR}
+        <KpiCard label="CA du jour" value={`${fmtEur(caToday)} €`} accent={COLOR}
           sub={deltaCa != null ? `${deltaCa > 0 ? "+" : ""}${deltaCa}% vs hier` : undefined}
           subColor={deltaCa != null ? (deltaCa > 0 ? T.sauge : "#DC2626") : undefined} />
         <KpiCard label="Couverts" value={String(couverts)} accent={T.dark} />
-        <KpiCard label="Ticket moyen" value={`${ticketMoyen.toFixed(1).replace(".", ",")} \u20AC`} accent={T.dark} />
-        <KpiCard label="CA soir" value={`${fmtEur(caSoir)} \u20AC`} accent={COLOR} />
+        <KpiCard label="Ticket moyen" value={`${ticketMoyen.toFixed(1).replace(".", ",")} €`} accent={T.dark} />
+        <KpiCard label="CA soir" value={`${fmtEur(caSoir)} €`} accent={COLOR} />
       </div>
 
       {/* Quick stats */}

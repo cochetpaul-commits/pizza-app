@@ -37,10 +37,10 @@ type DevisData = {
 
 const STATUS_LABELS: Record<string, string> = {
   brouillon: "Brouillon",
-  envoye: "Envoy\u00e9",
-  accepte: "Accept\u00e9",
-  refuse: "Refus\u00e9",
-  expire: "Expir\u00e9",
+  envoye: "Envoyé",
+  accepte: "Accepté",
+  refuse: "Refusé",
+  expire: "Expiré",
 };
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -52,7 +52,7 @@ const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
 };
 
 function fmtDate(iso: string | null) {
-  if (!iso) return "\u2014";
+  if (!iso) return "—";
   return new Date(iso + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 }
 
@@ -348,8 +348,8 @@ export default function DevisDetailPage() {
               {devis.client && (
                 <p style={{ fontSize: 14, color: "#2f3a33", margin: "8px 0" }}>
                   <strong>Client :</strong> {devis.client.nom}{devis.client.prenom ? ` ${devis.client.prenom}` : ""}
-                  {devis.client.email ? ` \u00b7 ${devis.client.email}` : ""}
-                  {devis.client.telephone ? ` \u00b7 ${devis.client.telephone}` : ""}
+                  {devis.client.email ? ` · ${devis.client.email}` : ""}
+                  {devis.client.telephone ? ` · ${devis.client.telephone}` : ""}
                 </p>
               )}
               <p style={{ fontSize: 13, color: "#6f6a61", margin: "4px 0" }}>

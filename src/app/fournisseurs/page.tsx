@@ -55,7 +55,7 @@ export default function FournisseursPage() {
       // Deduplicate by name (accent+case insensitive) — keep the one with most data
       const seen = new Map<string, { canonical: SupplierRow; aliasIds: string[] }>();
       for (const s of rawRows) {
-        const key = s.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        const key = s.name.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
         if (!seen.has(key)) {
           seen.set(key, { canonical: s, aliasIds: [s.id] });
         } else {

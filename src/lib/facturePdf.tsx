@@ -106,8 +106,8 @@ export function FacturePdfDocument(props: FacturePdfData) {
             <Text style={{ ...s.tableCell, width: "45%" }}>{l.description}</Text>
             <Text style={{ ...s.tableCell, width: "12%", textAlign: "right" }}>{l.quantite}</Text>
             <Text style={{ ...s.tableCell, width: "13%" }}>{l.unite}</Text>
-            <Text style={{ ...s.tableCell, width: "15%", textAlign: "right" }}>{l.prixUnitaireHt.toFixed(2)} \u20ac</Text>
-            <Text style={{ ...s.tableCell, width: "15%", textAlign: "right", fontFamily: "Helvetica-Bold" }}>{l.totalHt.toFixed(2)} \u20ac</Text>
+            <Text style={{ ...s.tableCell, width: "15%", textAlign: "right" }}>{l.prixUnitaireHt.toFixed(2)} €</Text>
+            <Text style={{ ...s.tableCell, width: "15%", textAlign: "right", fontFamily: "Helvetica-Bold" }}>{l.totalHt.toFixed(2)} €</Text>
           </View>
         ))}
 
@@ -115,26 +115,26 @@ export function FacturePdfDocument(props: FacturePdfData) {
         <View style={s.totalsBox}>
           <View style={s.totalRow}>
             <Text style={s.totalLabel}>Total HT</Text>
-            <Text style={s.totalValue}>{totalHt.toFixed(2)} \u20ac</Text>
+            <Text style={s.totalValue}>{totalHt.toFixed(2)} €</Text>
           </View>
           <View style={s.totalRow}>
             <Text style={s.totalLabel}>TVA ({tvaRate}%)</Text>
-            <Text style={s.totalValue}>{tvaAmount.toFixed(2)} \u20ac</Text>
+            <Text style={s.totalValue}>{tvaAmount.toFixed(2)} €</Text>
           </View>
           <View style={s.grandTotalRow}>
             <Text style={s.grandTotalLabel}>Total TTC</Text>
-            <Text style={s.grandTotalValue}>{totalTtc.toFixed(2)} \u20ac</Text>
+            <Text style={s.grandTotalValue}>{totalTtc.toFixed(2)} €</Text>
           </View>
           {montantPaye > 0 && (
             <View style={{ ...s.totalRow, marginTop: 6 }}>
               <Text style={{ ...s.totalLabel, color: "#166534" }}>Deja paye</Text>
-              <Text style={{ ...s.totalValue, color: "#166534" }}>-{montantPaye.toFixed(2)} \u20ac</Text>
+              <Text style={{ ...s.totalValue, color: "#166534" }}>-{montantPaye.toFixed(2)} €</Text>
             </View>
           )}
           {montantPaye > 0 && (
             <View style={{ ...s.totalRow }}>
               <Text style={{ ...s.totalLabel, fontFamily: "Helvetica-Bold" }}>Reste a payer</Text>
-              <Text style={{ ...s.totalValue }}>{resteADu.toFixed(2)} \u20ac</Text>
+              <Text style={{ ...s.totalValue }}>{resteADu.toFixed(2)} €</Text>
             </View>
           )}
         </View>
@@ -158,7 +158,7 @@ export function FacturePdfDocument(props: FacturePdfData) {
         {/* Footer */}
         <View style={s.footer}>
           <Text>SARL iFratelli Group - SIRET 123 456 789 00012 - TVA FR12345678900 - 12 rue de la Paix, 75002 Paris</Text>
-          <Text style={{ marginTop: 2 }}>En cas de retard de paiement, une penalite de 3 fois le taux d&apos;interet legal sera appliquee. Indemnite forfaitaire de recouvrement : 40 \u20ac.</Text>
+          <Text style={{ marginTop: 2 }}>En cas de retard de paiement, une penalite de 3 fois le taux d&apos;interet legal sera appliquee. Indemnite forfaitaire de recouvrement : 40 €.</Text>
         </View>
       </Page>
     </Document>

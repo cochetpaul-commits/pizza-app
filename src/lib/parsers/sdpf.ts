@@ -49,10 +49,11 @@ function extractMeta(text: string) {
     total_ht = parseFrenchNumber(totalLineMatch[1]);
   }
 
-  // Total TTC: "NET A PAYER" line or "Total TTC" line
+  // Total TTC: from V05 line (7th value = Total TTC) or "NET A PAYER" or "Conditions de règlement : XXX"
   const ttcMatch =
-    text.match(/NET\s+A\s+PAYER\s+([\d\s.,]+)/i) ??
-    text.match(/Total\s+TTC\s+([\d\s.,]+)/i);
+    text.match(/V\d+\s+[\d.,]+\s+[\d.,]+%\s+[\d.,]+\s+[\d.,]+\s+[\d.,]+\s+([\d.,]+)/) ??
+    text.match(/Conditions\s+de\s+r[èe]glement\s*:\s*([\d\s.,]+)/i) ??
+    text.match(/NET\s+A\s+PAYER[^]*?([\d.,]+)\s*$/mi);
   let total_ttc: number | null = null;
   if (ttcMatch) {
     total_ttc = parseFrenchNumber(ttcMatch[1]);
@@ -71,12 +72,13 @@ function extractMeta(text: string) {
 // "010100401037 GIANDUJA NOISETTES LAIT 35% BLOC KG TI003272 du 11/03/26 15,000 29,660 444,90"
 // or multi-line. We capture: REF NAME [UNIT] TIxxxxxx du DD/MM/YY QTY PU [REMISE] MONTANT
 
+// Primary: REF NAME [UNIT] T[IC]ref du DD/MM/YY QTY PU [REMISE] MONTANT
 const LINE_RE =
-  /(\d{6,15})\s+(.+?)\s+(KG|PCE?|PCS|L|CL|ML|BT|LOT|PIECE|UNITE?)\s+TI\d+\s+du\s+\d{2}\/\d{2}\/\d{2,4}\s+([\d.,]+)\s+([\d.,]+)\s+(?:([\d.,]+)\s+)?([\d.,]+)/gi;
+  /(\d{6,15})\s+(.+?)\s+(?:(KG|PCE?|PCS|L|CL|ML|BT|LOT|PIECE|UNITE?)\s+)?T[IC]\d+\s+du\s+\d{2}\/\d{2}\/\d{2,4}\s+([\d.,]+)\s+([\d.,]+)\s+(?:([\d.,]+)\s+)?([\d.,]+)/gi;
 
-// Alternate: single-line without TI ref
+// Alternate: single-line without TI/TC ref (just numbers at end)
 const LINE_ALT_RE =
-  /(\d{6,15})\s+(.+?)\s+(KG|PCE?|PCS|L|CL|ML|BT|LOT|PIECE|UNITE?)\s+([\d.,]+)\s+([\d.,]+)\s+(?:([\d.,]+)\s+)?([\d.,]+)/gi;
+  /(\d{6,15})\s+(.+?)\s+(?:(KG|PCE?|PCS|L|CL|ML|BT|LOT|PIECE|UNITE?)\s+)?([\d.,]+)\s+([\d.,]+)\s+(?:([\d.,]+)\s+)?([\d.,]+)/gi;
 
 function parseLines(text: string, etab: string): { ingredients: ParsedIngredient[]; logs: ParseLog[] } {
   const ingredients: ParsedIngredient[] = [];
@@ -92,7 +94,7 @@ function parseLines(text: string, etab: string): { ingredients: ParsedIngredient
     matchCount++;
     const sku = m[1];
     const name = m[2].trim().replace(/\s+/g, " ");
-    const rawUnit = m[3].toUpperCase();
+    const rawUnit = m[3]?.toUpperCase() ?? null;
     const qty = parseFrenchNumber(m[4]);
     const pu = parseFrenchNumber(m[5]);
     // m[6] is optional remise
@@ -107,7 +109,8 @@ function parseLines(text: string, etab: string): { ingredients: ParsedIngredient
       continue;
     }
 
-    const isKg = rawUnit === "KG";
+    // Detect unit: explicit keyword or infer from qty (fractional = kg)
+    const isKg = rawUnit === "KG" || (rawUnit == null && qty != null && qty < 100 && qty % 1 !== 0);
     const unitRecette = isKg ? "kg" as const : "pcs" as const;
     const unitCommande = isKg ? "kg" as const : "pcs" as const;
     const cat = detectCategorieFromName(name);
@@ -142,7 +145,7 @@ function parseLines(text: string, etab: string): { ingredients: ParsedIngredient
       matchCount++;
       const sku = m[1];
       const name = m[2].trim().replace(/\s+/g, " ");
-      const rawUnit = m[3].toUpperCase();
+      const rawUnit = m[3]?.toUpperCase() ?? null;
       const qty = parseFrenchNumber(m[4]);
       const pu = parseFrenchNumber(m[5]);
       const montant = parseFrenchNumber(m[7]);
@@ -153,7 +156,7 @@ function parseLines(text: string, etab: string): { ingredients: ParsedIngredient
 
       if (!name || pu == null) continue;
 
-      const isKg = rawUnit === "KG";
+      const isKg = rawUnit === "KG" || (rawUnit == null && qty != null && qty < 100 && qty % 1 !== 0);
       const cat = detectCategorieFromName(name);
 
       ingredients.push({

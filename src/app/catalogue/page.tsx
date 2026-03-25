@@ -32,7 +32,7 @@ const TYPE_LABELS: Record<string, string> = {
   pizza: "Pizza",
   cuisine: "Cuisine",
   cocktail: "Cocktail",
-  empatement: "Emp\u00e2tement",
+  empatement: "Empâtement",
 };
 
 const CUISINE_CAT_ORDER = [
@@ -46,10 +46,10 @@ const CUISINE_CAT_ORDER = [
 ];
 
 const CAT_LABELS: Record<string, string> = {
-  preparation: "Pr\u00e9paration",
+  preparation: "Préparation",
   sauce: "Sauce",
-  entree: "Entr\u00e9e",
-  plat_cuisine: "Plat cuisin\u00e9",
+  entree: "Entrée",
+  plat_cuisine: "Plat cuisiné",
   accompagnement: "Accompagnement",
   dessert: "Dessert",
   autre: "Autre",
@@ -70,13 +70,13 @@ const ALLERGEN_LABELS: Record<string, string> = {
   lait: "Lait",
   oeuf: "Oeuf",
   poisson: "Poisson",
-  crustaces: "Crustac\u00e9s",
+  crustaces: "Crustacés",
   soja: "Soja",
   arachide: "Arachide",
-  "fruits-a-coque": "Fruits \u00e0 coque",
-  celeri: "C\u00e9leri",
+  "fruits-a-coque": "Fruits à coque",
+  celeri: "Céleri",
   moutarde: "Moutarde",
-  sesame: "S\u00e9same",
+  sesame: "Sésame",
   sulfites: "Sulfites",
   lupin: "Lupin",
   mollusques: "Mollusques",
@@ -282,8 +282,8 @@ export default function CataloguePage() {
       {!loading && filtered.length === 0 && (
         <p style={{ textAlign: "center", color: "#999", padding: 60, fontSize: 14 }}>
           {fiches.length === 0
-            ? "Aucune fiche export\u00e9e. Publiez depuis une recette."
-            : "Aucun r\u00e9sultat."}
+            ? "Aucune fiche exportée. Publiez depuis une recette."
+            : "Aucun résultat."}
         </p>
       )}
 
@@ -612,7 +612,7 @@ function FicheCard({ fiche, onOpen }: { fiche: Fiche; onOpen: (f: Fiche) => void
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1 }}>{stepCount}</div>
                   <div style={{ fontSize: 8, opacity: 0.7, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                    {stepCount > 1 ? "\u00e9tapes" : "\u00e9tape"}
+                    {stepCount > 1 ? "étapes" : "étape"}
                   </div>
                 </div>
               )}

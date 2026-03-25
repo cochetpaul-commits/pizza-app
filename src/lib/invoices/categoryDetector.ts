@@ -67,9 +67,9 @@ export function normalizeIngredientName(name: string): string {
   return name
     .toLowerCase()
     .replace(/[«»""‟„‹›]/g, '"')
-    .replace(/['\u2019\u2018\u201b]/g, "'")
+    .replace(/['’‘‛]/g, "'")
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9"'\s%/]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -81,7 +81,7 @@ export function detectCategoryFromName(name: string): Category {
   //  - * → espace : Metro préfixe les produits sous froid de "*" (*SAUMON → saumon)
   // Préfixe espace : évite les faux positifs de sous-chaîne
   // ex: "moule" dans "semoule", "gin" dans "origin"
-  const lower = " " + name.toLowerCase().replace(/['\u2019\u2018*]/g, " ");
+  const lower = " " + name.toLowerCase().replace(/['’‘*]/g, " ");
   for (const rule of RULES) {
     for (const kw of rule.keywords) {
       if (lower.includes(" " + kw)) return rule.category;

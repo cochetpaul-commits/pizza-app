@@ -71,8 +71,13 @@ export function parseLmdw(text: string, etablissement: string): ParseResult {
   const ingredients: ParsedIngredient[] = [];
   const logs: ParseLog[] = [];
 
+  // Prefer "Annexe Détaillée" section (net prices after discount)
+  // No form-feed separator — Annexe is just later in same text
+  const annexeIdx = text.indexOf("Annexe D");
+  const parseText = annexeIdx > 0 ? text.slice(annexeIdx) : text;
+
   // Split into lines
-  const rawLines = text.split("\n");
+  const rawLines = parseText.split("\n");
 
   // Pass 1: merge continuation lines with their product line
   // A continuation line has no leading code and contains letters
@@ -84,6 +89,8 @@ export function parseLmdw(text: string, etablissement: string): ParseResult {
     if (/^Montant\s+TOTAL/i.test(trimmed)) break;
     if (/^Remise\s/i.test(trimmed)) break;
     if (/^Total\s+H\.T/i.test(trimmed)) break;
+    if (/^Les\s+éventuels/i.test(trimmed)) break;
+    if (/^Base\s+TVA/i.test(trimmed)) break;
 
     // Is this a product line (starts with code)?
     if (/^\d{3,6}[A-Z]?\s/.test(trimmed)) {

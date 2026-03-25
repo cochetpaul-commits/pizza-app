@@ -155,14 +155,14 @@ export default function PerformancesPage() {
             {/* ── CHIFFRES CLES SEMAINE ── */}
             <SectionLabel>Chiffres cles &middot; Semaine</SectionLabel>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-              <KpiCard label="CA Semaine" value={`${fmtEur(data.kpis.caSemaine)} \u20AC`}
+              <KpiCard label="CA Semaine" value={`${fmtEur(data.kpis.caSemaine)} €`}
                 variation={data.kpis.variationCA} />
               <KpiCard label="Couverts" value={String(data.kpis.paxSemaine)}
                 variation={data.kpis.variationPax} />
-              <KpiCard label="Panier moyen" value={`${fmtEur2(data.kpis.ticketMoyenSurPlace)} \u20AC`}
+              <KpiCard label="Panier moyen" value={`${fmtEur2(data.kpis.ticketMoyenSurPlace)} €`}
                 variation={data.kpis.variationTicket} />
               <KpiCard label="Meilleur jour" value={data.kpis.bestDay.label}
-                sub={`${fmtEur(data.kpis.bestDay.ca)} \u20AC`} />
+                sub={`${fmtEur(data.kpis.bestDay.ca)} €`} />
             </div>
 
             {/* ── KPIs GLOBAUX (CA Global, Couverts, Ticket SP, Ticket Emporter) ── */}
@@ -278,7 +278,7 @@ export default function PerformancesPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                 <thead>
                   <tr style={{ background: `linear-gradient(135deg, ${T.terracotta}, #B85A3A)` }}>
-                    {["Jour", "Service", "Salle \u20AC", "Pergolas \u20AC", "Terrasse \u20AC", "A Emp. \u20AC", "Total TTC", "Total HT", "Pax", "Ticket moy.", "Ratio P/P", "Meteo"].map(h => (
+                    {["Jour", "Service", "Salle €", "Pergolas €", "Terrasse €", "A Emp. €", "Total TTC", "Total HT", "Pax", "Ticket moy.", "Ratio P/P", "Meteo"].map(h => (
                       <th key={h} style={{
                         padding: "10px 8px", color: "#fff", fontWeight: 700,
                         fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em",
@@ -360,7 +360,7 @@ function KpiCard({ label, value, variation, sub }: {
           fontSize: 12, fontWeight: 600, marginTop: 6,
           color: variation > 0 ? T.sauge : variation < 0 ? "#DC2626" : T.muted,
         }}>
-          {variation > 0 ? "\u2191" : variation < 0 ? "\u2193" : ""} {variation > 0 ? "+" : ""}{variation}%
+          {variation > 0 ? "↑" : variation < 0 ? "↓" : ""} {variation > 0 ? "+" : ""}{variation}%
         </div>
       )}
       {sub && <div style={{ fontSize: 13, fontWeight: 700, color: T.terracotta, marginTop: 2 }}>{sub}</div>}
@@ -381,7 +381,7 @@ function BarChart({ days, onDayClick, etabColor }: {
         const h = day.ca > 0 ? Math.max(8, (day.ca / maxCA) * 160) : 4;
         return (
           <div key={day.date} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-            <span style={{ fontSize: 10, color: T.muted, fontWeight: 600 }}>{day.ca > 0 ? `${fmtEur(day.ca)}\u20AC` : ""}</span>
+            <span style={{ fontSize: 10, color: T.muted, fontWeight: 600 }}>{day.ca > 0 ? `${fmtEur(day.ca)}€` : ""}</span>
             <div
               onClick={() => day.isActive && day.ca > 0 && onDayClick(day)}
               style={{
@@ -391,7 +391,7 @@ function BarChart({ days, onDayClick, etabColor }: {
                 transition: "all 0.2s",
                 position: "relative",
               }}
-              title={day.isActive ? `${day.labelFull} — ${fmtEur(day.ca)} \u20AC` : ""}
+              title={day.isActive ? `${day.labelFull} — ${fmtEur(day.ca)} €` : ""}
             />
             <span style={{ fontSize: 11, fontWeight: 600, color: T.dark }}>{day.label}</span>
           </div>
@@ -404,21 +404,21 @@ function BarChart({ days, onDayClick, etabColor }: {
 /* ── Weather badge ── */
 function WeatherBadge({ temp, condition }: { temp: number; condition: string }) {
   const iconMap: Record<string, string> = {
-    "ciel degage": "\u2600\uFE0F", "clear sky": "\u2600\uFE0F",
-    "peu nuageux": "\u26C5", "few clouds": "\u26C5",
-    "partiellement nuageux": "\u26C5", "scattered clouds": "\u26C5",
-    "nuageux": "\u2601\uFE0F", "broken clouds": "\u2601\uFE0F", "overcast clouds": "\u2601\uFE0F",
-    "couvert": "\u2601\uFE0F",
-    "pluie legere": "\u{1F327}\uFE0F", "light rain": "\u{1F327}\uFE0F",
-    "pluie moderee": "\u{1F327}\uFE0F", "moderate rain": "\u{1F327}\uFE0F",
-    "pluie": "\u{1F327}\uFE0F", "rain": "\u{1F327}\uFE0F",
-    "forte pluie": "\u{1F327}\uFE0F", "heavy rain": "\u{1F327}\uFE0F",
-    "orage": "\u26C8\uFE0F", "thunderstorm": "\u26C8\uFE0F",
-    "neige": "\u{1F328}\uFE0F", "snow": "\u{1F328}\uFE0F",
-    "brouillard": "\u{1F32B}\uFE0F", "mist": "\u{1F32B}\uFE0F", "fog": "\u{1F32B}\uFE0F",
+    "ciel degage": "☀️", "clear sky": "☀️",
+    "peu nuageux": "⛅", "few clouds": "⛅",
+    "partiellement nuageux": "⛅", "scattered clouds": "⛅",
+    "nuageux": "☁️", "broken clouds": "☁️", "overcast clouds": "☁️",
+    "couvert": "☁️",
+    "pluie legere": "\u{1F327}️", "light rain": "\u{1F327}️",
+    "pluie moderee": "\u{1F327}️", "moderate rain": "\u{1F327}️",
+    "pluie": "\u{1F327}️", "rain": "\u{1F327}️",
+    "forte pluie": "\u{1F327}️", "heavy rain": "\u{1F327}️",
+    "orage": "⛈️", "thunderstorm": "⛈️",
+    "neige": "\u{1F328}️", "snow": "\u{1F328}️",
+    "brouillard": "\u{1F32B}️", "mist": "\u{1F32B}️", "fog": "\u{1F32B}️",
   };
   const cond = condition.toLowerCase();
-  const icon = iconMap[cond] ?? (cond.includes("pluie") || cond.includes("rain") ? "\u{1F327}\uFE0F" : cond.includes("nuag") || cond.includes("cloud") || cond.includes("couvert") ? "\u2601\uFE0F" : cond.includes("soleil") || cond.includes("clear") || cond.includes("degage") ? "\u2600\uFE0F" : "\u2601\uFE0F");
+  const icon = iconMap[cond] ?? (cond.includes("pluie") || cond.includes("rain") ? "\u{1F327}️" : cond.includes("nuag") || cond.includes("cloud") || cond.includes("couvert") ? "☁️" : cond.includes("soleil") || cond.includes("clear") || cond.includes("degage") ? "☀️" : "☁️");
 
   return (
     <span style={{ fontSize: 11, whiteSpace: "nowrap" }}>
@@ -455,11 +455,11 @@ function DayTableRows({ day }: { day: DayData }) {
             background: services.journee.ticketMoyen >= 42 ? "#DEF7EC" : services.journee.ticketMoyen > 0 ? "#FEF3CD" : "transparent",
             color: services.journee.ticketMoyen >= 42 ? "#03543F" : T.dore, fontWeight: 700,
           }}>
-            {services.journee.ticketMoyen > 0 ? `${fmtEur2(services.journee.ticketMoyen)}\u20AC` : "\u2014"}
+            {services.journee.ticketMoyen > 0 ? `${fmtEur2(services.journee.ticketMoyen)}€` : "—"}
           </span>
         </td>
         <td style={tdStyle(true)}>
-          {services.journee.ratioPiattiPizza > 0 ? `${services.journee.ratioPiattiPizza}%` : "\u2014"}
+          {services.journee.ratioPiattiPizza > 0 ? `${services.journee.ratioPiattiPizza}%` : "—"}
         </td>
         <td rowSpan={3} style={{ ...tdStyle(false, "left"), verticalAlign: "top", paddingTop: 10 }}>
           {weather ? (
@@ -474,7 +474,7 @@ function DayTableRows({ day }: { day: DayData }) {
               </div>
             </div>
           ) : (
-            <span style={{ fontSize: 11, color: T.muted }}>{"\u2014"}</span>
+            <span style={{ fontSize: 11, color: T.muted }}>{"—"}</span>
           )}
         </td>
       </tr>
@@ -490,7 +490,7 @@ function DayTableRows({ day }: { day: DayData }) {
         <td style={tdStyle(false)}>{fmtEur(services.midi.total)} &euro;</td>
         <td style={tdStyle(false)}></td>
         <td style={tdStyle(false)}>{services.midi.pax}</td>
-        <td style={tdStyle(false)}>{services.midi.ticketMoyen > 0 ? `${fmtEur(services.midi.ticketMoyen)}\u20AC` : "\u2014"}</td>
+        <td style={tdStyle(false)}>{services.midi.ticketMoyen > 0 ? `${fmtEur(services.midi.ticketMoyen)}€` : "—"}</td>
         <td style={tdStyle(false)}></td>
       </tr>
       {/* SOIR row */}
@@ -505,7 +505,7 @@ function DayTableRows({ day }: { day: DayData }) {
         <td style={tdStyle(false)}>{fmtEur(services.soir.total)} &euro;</td>
         <td style={tdStyle(false)}></td>
         <td style={tdStyle(false)}>{services.soir.pax}</td>
-        <td style={tdStyle(false)}>{services.soir.ticketMoyen > 0 ? `${fmtEur(services.soir.ticketMoyen)}\u20AC` : "\u2014"}</td>
+        <td style={tdStyle(false)}>{services.soir.ticketMoyen > 0 ? `${fmtEur(services.soir.ticketMoyen)}€` : "—"}</td>
         <td style={tdStyle(false)}></td>
       </tr>
     </>

@@ -20,10 +20,10 @@ type Devis = {
 
 const STATUS_LABELS: Record<string, string> = {
   brouillon: "Brouillon",
-  envoye: "Envoy\u00e9",
-  accepte: "Accept\u00e9",
-  refuse: "Refus\u00e9",
-  expire: "Expir\u00e9",
+  envoye: "Envoyé",
+  accepte: "Accepté",
+  refuse: "Refusé",
+  expire: "Expiré",
 };
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -35,7 +35,7 @@ const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
 };
 
 function fmtDate(iso: string | null) {
-  if (!iso) return "\u2014";
+  if (!iso) return "—";
   return new Date(iso + "T00:00:00").toLocaleDateString("fr-FR", {
     day: "numeric",
     month: "short",
@@ -142,7 +142,7 @@ export default function DevisListPage() {
                       </p>
                       <p className="muted" style={{ margin: "2px 0 0", fontSize: 12 }}>
                         {d.objet ?? "Sans objet"}
-                        {clientName ? ` \u00b7 ${clientName}` : ""}
+                        {clientName ? ` · ${clientName}` : ""}
                       </p>
                     </div>
                     <span

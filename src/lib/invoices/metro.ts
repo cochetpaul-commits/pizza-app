@@ -44,7 +44,7 @@ function extractMeta(text: string): Pick<ParsedInvoice, "invoice_number" | "invo
   const invoiceMatch = text.match(/N[\xb0\xba]\s*FACTURE\s+([0-9\/()A-Z]+)/i);
   const dateMatch = text.match(/Date\s+facture\s*:\s*(\d{2}-\d{2}-\d{4})/i);
   const htMatch = text.match(/Total\s+H\.?T\.?\s*[: ]+([0-9][0-9\s.,]*)/i);
-  const ttcMatch = text.match(/Total\s+[\u00e0a]\s+payer\s+([0-9][0-9\s.,]*)/i);
+  const ttcMatch = text.match(/Total\s+[àa]\s+payer\s+([0-9][0-9\s.,]*)/i);
   return {
     invoice_number: invoiceMatch?.[1]?.trim() ?? null,
     invoice_date: dateMatch?.[1] ?? null,

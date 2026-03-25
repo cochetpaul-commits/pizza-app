@@ -217,10 +217,10 @@ export default function LmdwInvoicePage() {
           )}
 
           <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "1rem", marginBottom: "1rem" }}>
-            <p><strong>Facture :</strong> {parsed.invoice_number ?? "\u2014"}</p>
-            <p><strong>Date :</strong> {parsed.invoice_date ?? "\u2014"}</p>
-            <p><strong>Total HT :</strong> {parsed.total_ht != null ? `${parsed.total_ht} \u20ac` : "\u2014"}</p>
-            <p><strong>Total TTC :</strong> {parsed.total_ttc != null ? `${parsed.total_ttc} \u20ac` : "\u2014"}</p>
+            <p><strong>Facture :</strong> {parsed.invoice_number ?? "—"}</p>
+            <p><strong>Date :</strong> {parsed.invoice_date ?? "—"}</p>
+            <p><strong>Total HT :</strong> {parsed.total_ht != null ? `${parsed.total_ht} €` : "—"}</p>
+            <p><strong>Total TTC :</strong> {parsed.total_ttc != null ? `${parsed.total_ttc} €` : "—"}</p>
             <p><strong>Lignes :</strong> {parsed.lines.length}</p>
           </div>
 
@@ -239,13 +239,13 @@ export default function LmdwInvoicePage() {
             <tbody>
               {parsed.lines.map((l, i) => (
                 <tr key={i} style={{ borderBottom: "1px solid #e2e8f0" }}>
-                  <td style={td}>{l.sku ?? "\u2014"}</td>
-                  <td style={td}>{l.name ?? "\u2014"}</td>
-                  <td style={td}>{l.quantity ?? "\u2014"}</td>
-                  <td style={td}>{l.unit ?? "\u2014"}</td>
-                  <td style={td}>{l.unit_price != null ? `${l.unit_price.toFixed(2)} \u20ac` : "\u2014"}</td>
-                  <td style={td}>{l.total_price != null ? `${l.total_price.toFixed(2)} \u20ac` : "\u2014"}</td>
-                  <td style={td}>{l.tax_rate != null ? `${l.tax_rate}%` : "\u2014"}</td>
+                  <td style={td}>{l.sku ?? "—"}</td>
+                  <td style={td}>{l.name ?? "—"}</td>
+                  <td style={td}>{l.quantity ?? "—"}</td>
+                  <td style={td}>{l.unit ?? "—"}</td>
+                  <td style={td}>{l.unit_price != null ? `${l.unit_price.toFixed(2)} €` : "—"}</td>
+                  <td style={td}>{l.total_price != null ? `${l.total_price.toFixed(2)} €` : "—"}</td>
+                  <td style={td}>{l.tax_rate != null ? `${l.tax_rate}%` : "—"}</td>
                 </tr>
               ))}
             </tbody>

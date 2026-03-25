@@ -21,10 +21,10 @@ type Facture = {
 
 const STATUS_LABELS: Record<string, string> = {
   brouillon: "Brouillon",
-  envoyee: "Envoy\u00e9e",
-  payee: "Pay\u00e9e",
+  envoyee: "Envoyée",
+  payee: "Payée",
   en_retard: "En retard",
-  annulee: "Annul\u00e9e",
+  annulee: "Annulée",
 };
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -36,7 +36,7 @@ const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
 };
 
 function fmtDate(iso: string | null) {
-  if (!iso) return "\u2014";
+  if (!iso) return "—";
   return new Date(iso + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
 }
 
@@ -137,7 +137,7 @@ export default function FacturesListPage() {
                       </p>
                       <p className="muted" style={{ margin: "2px 0 0", fontSize: 12 }}>
                         {f.objet ?? "Sans objet"}
-                        {clientName ? ` \u00b7 ${clientName}` : ""}
+                        {clientName ? ` · ${clientName}` : ""}
                       </p>
                     </div>
                     <span

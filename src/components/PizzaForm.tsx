@@ -674,7 +674,7 @@ setPriceLabelByIngredient(priceLabelMap);
             />
             {doughBadge && (
               <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>
-                {fmtKg2(doughBadge.costPerKg)} {"\u2022"} {fmtMoney(doughBadge.costPerBall)}/paton
+                {fmtKg2(doughBadge.costPerKg)} {"•"} {fmtMoney(doughBadge.costPerBall)}/paton
               </div>
             )}
           </div>

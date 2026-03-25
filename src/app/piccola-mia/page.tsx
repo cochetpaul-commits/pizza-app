@@ -127,11 +127,11 @@ export default function PiccolaMiaDashboard() {
 
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-        <KpiCard label="CA du jour" value={`${fmtEur(caToday)} \u20AC`} accent={COLOR}
+        <KpiCard label="CA du jour" value={`${fmtEur(caToday)} €`} accent={COLOR}
           sub={deltaCa != null ? `${deltaCa > 0 ? "+" : ""}${deltaCa}% vs hier` : undefined}
           subColor={deltaCa != null ? (deltaCa > 0 ? T.sauge : "#DC2626") : undefined} />
         <KpiCard label="Tickets" value={String(couverts)} accent={T.dark} />
-        <KpiCard label="Panier moyen" value={`${panierMoyen.toFixed(1).replace(".", ",")} \u20AC`} accent={T.dark} />
+        <KpiCard label="Panier moyen" value={`${panierMoyen.toFixed(1).replace(".", ",")} €`} accent={T.dark} />
         <KpiCard label="En service" value={String(shiftsToday)} accent={T.bleu} />
       </div>
 
@@ -159,8 +159,8 @@ export default function PiccolaMiaDashboard() {
               }}>
                 <span style={{ fontWeight: 700, fontSize: 13, color: T.dark }}>{ev.name}</span>
                 <span style={{ fontSize: 11, color: T.muted }}>
-                  {ev.date ? new Date(ev.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : "\u2014"}
-                  {ev.covers > 0 ? ` \u00B7 ${ev.covers} couv.` : ""}
+                  {ev.date ? new Date(ev.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : "—"}
+                  {ev.covers > 0 ? ` · ${ev.covers} couv.` : ""}
                 </span>
               </Link>
             ))}

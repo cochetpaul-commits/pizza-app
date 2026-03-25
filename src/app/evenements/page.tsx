@@ -715,7 +715,7 @@ export default function EventsPage() {
                                 fontSize: 10, fontWeight: 800,
                                 color: jours <= 7 ? accentDark : "#9a8f84",
                               }}>
-                                {jours === 0 ? "Aujourd\u2019hui" : jours === 1 ? "Demain" : `J-${jours}`}
+                                {jours === 0 ? "Aujourd’hui" : jours === 1 ? "Demain" : `J-${jours}`}
                               </span>
                             )}
                           </div>

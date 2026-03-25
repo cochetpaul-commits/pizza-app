@@ -540,7 +540,7 @@ export default function FinancesPage() {
                   { key: "ca" as SortKey, label: "CA" },
                   { key: "foodCostPct" as SortKey, label: "Food Cost" },
                   { key: "margin" as SortKey, label: "Marge" },
-                  { key: "quantity" as SortKey, label: "Qt\u00e9" },
+                  { key: "quantity" as SortKey, label: "Qté" },
                 ] as const).map((btn) => (
                   <button key={btn.key} onClick={() => handleSort(btn.key)} style={{
                     padding: "5px 10px", fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
