@@ -103,6 +103,9 @@ export type Ingredient = {
   order_unit_label?: string | null;
   order_quantity?: number | null;
 
+  // Établissements qui utilisent cet ingrédient
+  establishments?: string[] | null;
+
   // Lieu de stockage (inventaire)
   storage_zone?: string | null;
 

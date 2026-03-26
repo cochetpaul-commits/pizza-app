@@ -496,6 +496,7 @@ function IngredientsPageInner() {
       orderUnitLabel: x.order_unit_label || guessOrderUnit(off),
       orderQuantity: x.order_quantity != null ? String(x.order_quantity) : "",
       storageZone: x.storage_zone ?? "",
+      establishments: x.establishments ?? ["bellomio", "piccola"],
     });
   }, [offersByIngredientId, guessOrderUnit]);
 
@@ -573,6 +574,7 @@ function IngredientsPageInner() {
       order_unit_label: orderLabel || null,
       order_quantity: orderQuantity,
       storage_zone: edit.storageZone || null,
+      establishments: edit.establishments.length ? edit.establishments : ["bellomio", "piccola"],
     } as Record<string, unknown>;
     const u1 = await supabase.from("ingredients").update(up).eq("id", editingId);
     if (u1.error) {

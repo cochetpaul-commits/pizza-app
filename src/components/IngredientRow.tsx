@@ -100,6 +100,7 @@ export type EditState = {
   orderUnitLabel: string;
   orderQuantity: string;
   storageZone: string;
+  establishments: string[];
 };
 
 // ─── IngredientRow ──────────────────────────────────────────────────────────
@@ -608,6 +609,23 @@ export const IngredientRow = React.memo(function IngredientRow({
                   <option value="1">Actif</option><option value="0">Inactif</option>
                 </select>
               </div>
+            </div>
+
+            <div style={fieldLabel}>Établissements</div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              {([["bellomio", "Bello Mio", "#D4775A"], ["piccola", "Piccola Mia", "#6B21A8"]] as const).map(([key, label, color]) => {
+                const checked = edit.establishments.includes(key);
+                return (
+                  <label key={key} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, background: checked ? `${color}18` : "rgba(0,0,0,0.04)", border: `1.5px solid ${checked ? color : "rgba(0,0,0,0.10)"}`, color: checked ? color : "#6B6257", transition: "all 120ms" }}>
+                    <input type="checkbox" checked={checked} style={{ margin: 0 }}
+                      onChange={() => {
+                        const next = checked ? edit.establishments.filter(e => e !== key) : [...edit.establishments, key];
+                        onEditChange({ ...edit, establishments: next });
+                      }} />
+                    {label}
+                  </label>
+                );
+              })}
             </div>
 
             <div style={fieldLabel}>Allergènes</div>
