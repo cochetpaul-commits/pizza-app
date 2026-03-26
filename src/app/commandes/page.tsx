@@ -114,9 +114,10 @@ const tile: React.CSSProperties = {
   background: "#fff",
   padding: "8px 14px",
   display: "flex",
+  flexWrap: "wrap",
   alignItems: "center",
   justifyContent: "space-between",
-  gap: 8,
+  gap: 6,
   borderBottom: "1px solid #f0ebe2",
   minHeight: 36,
 };
@@ -927,11 +928,13 @@ function CommandesPage() {
                           <span style={{
                             fontSize: 13, fontWeight: Number(quantities[item.id] ?? 0) > 0 ? 700 : 500,
                             color: Number(quantities[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
-                            lineHeight: 1.3, wordBreak: "break-word",
+                            lineHeight: 1.3, flex: 1, minWidth: 0,
                           }}>{item.name}</span>
-                          {unitPriceBadge(item)}
                         </div>
-                        <StepperInput value={quantities[item.id] ?? ""} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+                          {unitPriceBadge(item)}
+                          <StepperInput value={quantities[item.id] ?? ""} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -945,11 +948,13 @@ function CommandesPage() {
                       <span style={{
                         fontSize: 13, fontWeight: Number(quantities[item.id] ?? 0) > 0 ? 700 : 500,
                         color: Number(quantities[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        lineHeight: 1.3, flex: 1, minWidth: 0,
                       }}>{item.name}</span>
-                      {unitPriceBadge(item)}
                     </div>
-                    <StepperInput value={quantities[item.id] ?? ""} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+                      {unitPriceBadge(item)}
+                      <StepperInput value={quantities[item.id] ?? ""} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
+                    </div>
                   </div>
                 ))}
               </div>
