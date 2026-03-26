@@ -158,7 +158,6 @@ export default function SimulationPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("reel");
   const [caSimule, setCaSimule] = useState(85000);
-  const [tnsRevenu, setTnsRevenu] = useState(3200);
   const [simRows, setSimRows] = useState<SimRow[]>([]);
   const [selectedTns, setSelectedTns] = useState<string | null>(null);
 
@@ -501,6 +500,7 @@ export default function SimulationPage() {
                 {(() => {
                   const sel = tnsEmployes.find((c) => c.emp.id === selectedTns);
                   if (!sel) return null;
+                  const tnsNet = sel.brut; // remuneration nette from contrat
                   const heuresMois = sel.heuresSemaine * 52 / 12;
 
                   return (
@@ -514,38 +514,34 @@ export default function SimulationPage() {
                           Calcul charges TNS — {sel.emp.prenom}
                         </h2>
 
-                        {/* TNS revenue slider */}
+                        {/* TNS revenue display */}
                         <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
                           <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Remuneration nette :</span>
-                          <input
-                            type="range" min={1000} max={10000} step={100}
-                            value={tnsRevenu} onChange={(e) => setTnsRevenu(Number(e.target.value))}
-                            style={{ flex: 1, minWidth: 100, accentColor: "#9BA3B5" }}
-                          />
                           <span style={{ fontSize: 26, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                            {fmt(tnsRevenu)} &euro;
+                            {fmt(tnsNet)} &euro;
                           </span>
+                          <span style={{ fontSize: 12, color: "#999" }}>(contrat actif)</span>
                         </div>
 
                         {/* 3 KPIs */}
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 20 }}>
                           <div style={{ ...kpiCard, borderColor: "#8B7EC820" }}>
                             <div style={{ fontSize: 22, fontWeight: 700, color: "#8B7EC8", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                              {fmt(tnsRevenu * TAUX_CHARGES_TNS)} &euro;
+                              {fmt(tnsNet * TAUX_CHARGES_TNS)} &euro;
                             </div>
                             <div style={kpiLabel}>Charges TNS</div>
                             <div style={kpiSub}>{(TAUX_CHARGES_TNS * 100).toFixed(1)} % du net</div>
                           </div>
                           <div style={kpiCard}>
                             <div style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                              {fmt(tnsRevenu * (1 + TAUX_CHARGES_TNS))} &euro;
+                              {fmt(tnsNet * (1 + TAUX_CHARGES_TNS))} &euro;
                             </div>
                             <div style={kpiLabel}>Cout reel mensuel</div>
                             <div style={kpiSub}>net + charges</div>
                           </div>
                           <div style={kpiCard}>
                             <div style={{ fontSize: 22, fontWeight: 700, color: accent, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                              {heuresMois > 0 ? fmtDec(tnsRevenu * (1 + TAUX_CHARGES_TNS) / heuresMois) : "—"} &euro;
+                              {heuresMois > 0 ? fmtDec(tnsNet * (1 + TAUX_CHARGES_TNS) / heuresMois) : "\u2014"} &euro;
                             </div>
                             <div style={kpiLabel}>Cout / heure</div>
                             <div style={kpiSub}>{sel.heuresSemaine}h/sem</div>
@@ -558,7 +554,7 @@ export default function SimulationPage() {
                         </h3>
                         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                           {TNS_DETAIL.map((d) => {
-                            const montant = tnsRevenu * (d.taux / 100);
+                            const montant = tnsNet * (d.taux / 100);
                             const maxTaux = 17.75;
                             return (
                               <div key={d.label}>
