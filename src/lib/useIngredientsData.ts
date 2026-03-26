@@ -61,27 +61,17 @@ async function fetchPage(page: number, etabId?: string | null, etabSlug?: string
     query = query.eq("etablissement_id", etabId);
   }
 
+  // Filter by establishments array (contains the current establishment slug)
+  const myEstab = etabSlug ? slugToOfferEstab(etabSlug) : null;
+  if (myEstab) {
+    query = query.contains("establishments", [myEstab]);
+  }
+
   const { data, error } = await query;
 
   if (error) throw new Error(error.message);
-  let items = (data ?? []) as Ingredient[];
+  const items = (data ?? []) as Ingredient[];
   const offers = await fetchOffersForIds(items.map((i) => i.id));
-
-  // Filter out ingredients whose offer is exclusive to another establishment
-  if (etabSlug) {
-    const myEstab = slugToOfferEstab(etabSlug);
-    if (myEstab) {
-      const offerMap = new Map<string, string>();
-      for (const o of offers) offerMap.set(o.ingredient_id, o.establishment ?? "both");
-      items = items.filter((i) => {
-        const e = offerMap.get(i.id);
-        // No offer → keep (ingredient has no offer, not filtered)
-        if (!e) return true;
-        // "both" or matches current → keep
-        return e === "both" || e === myEstab;
-      });
-    }
-  }
 
   return { items, offers, hasMore: items.length === PAGE_SIZE };
 }
@@ -97,25 +87,17 @@ async function searchIngredients(q: string, etabId?: string | null, etabSlug?: s
     query = query.eq("etablissement_id", etabId);
   }
 
+  // Filter by establishments array
+  const myEstab = etabSlug ? slugToOfferEstab(etabSlug) : null;
+  if (myEstab) {
+    query = query.contains("establishments", [myEstab]);
+  }
+
   const { data, error } = await query;
 
   if (error) throw new Error(error.message);
-  let items = (data ?? []) as Ingredient[];
+  const items = (data ?? []) as Ingredient[];
   const offers = await fetchOffersForIds(items.map((i) => i.id));
-
-  // Filter out ingredients whose offer is exclusive to another establishment
-  if (etabSlug) {
-    const myEstab = slugToOfferEstab(etabSlug);
-    if (myEstab) {
-      const offerMap = new Map<string, string>();
-      for (const o of offers) offerMap.set(o.ingredient_id, o.establishment ?? "both");
-      items = items.filter((i) => {
-        const e = offerMap.get(i.id);
-        if (!e) return true;
-        return e === "both" || e === myEstab;
-      });
-    }
-  }
 
   return { items, offers };
 }
