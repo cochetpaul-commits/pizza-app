@@ -488,6 +488,7 @@ export default function EmployeDetailPage() {
   };
 
   /* ── Open contrat edit ── */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const openEditContrat = (c: Contrat) => {
     setEditContratId(c.id);
     setCType(c.type);

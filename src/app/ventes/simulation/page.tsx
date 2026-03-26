@@ -55,7 +55,7 @@ type Tab = "reel" | "tns" | "simulateur";
 
 /* ── Constants ─────────────────────────────────────────────────── */
 
-const SMIC_MENSUEL = 1802;
+// const SMIC_MENSUEL = 1802; // unused for now
 const SMIC_HORAIRE = 11.88;
 const TAUX_CHARGES_PATRONALES = 0.45;
 const TAUX_CHARGES_SALARIALES = 0.22;
@@ -74,7 +74,7 @@ const TNS_DETAIL = [
   { label: "Formation professionnelle", taux: 0.25, color: "#9BA3B5" },
 ];
 
-const TNS_TOTAL_TAUX = TNS_DETAIL.reduce((a, d) => a + d.taux, 0);
+// const TNS_TOTAL_TAUX = TNS_DETAIL.reduce((a, d) => a + d.taux, 0); // unused for now
 
 /* ── Avatar colors ─────────────────────────────────────────────── */
 const AVATAR_COLORS = [
@@ -257,10 +257,8 @@ export default function SimulationPage() {
     });
   };
 
-  // Auto-select first TNS
-  useEffect(() => {
-    if (tnsEmployes.length > 0 && !selectedTns) setSelectedTns(tnsEmployes[0].emp.id);
-  }, [tnsEmployes, selectedTns]);
+  // Auto-select first TNS (derive, no effect needed)
+  const effectiveTns = selectedTns ?? (tnsEmployes.length > 0 ? tnsEmployes[0].emp.id : null);
 
   /* ── Simulateur ── */
   const simCosts = useMemo(() => {
@@ -509,7 +507,7 @@ export default function SimulationPage() {
                 {/* Left: TNS cards */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {tnsEmployes.map((c) => {
-                    const isSelected = selectedTns === c.emp.id;
+                    const isSelected = effectiveTns === c.emp.id;
                     const isOvr = salaryOverrides[c.emp.id] !== undefined;
                     return (
                       <button
@@ -549,7 +547,7 @@ export default function SimulationPage() {
 
                 {/* Right: selected TNS detail */}
                 {(() => {
-                  const sel = tnsEmployes.find((c) => c.emp.id === selectedTns);
+                  const sel = tnsEmployes.find((c) => c.emp.id === effectiveTns);
                   if (!sel) return null;
                   const baseContrat = baseCosts.find((c) => c.emp.id === sel.emp.id);
                   const baseNet = baseContrat?.brut ?? 0;

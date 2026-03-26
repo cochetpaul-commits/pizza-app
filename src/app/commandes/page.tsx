@@ -114,12 +114,9 @@ const tile: React.CSSProperties = {
   background: "#fff",
   padding: "8px 14px",
   display: "flex",
-  flexWrap: "wrap",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 6,
+  flexDirection: "column",
+  gap: 4,
   borderBottom: "1px solid #f0ebe2",
-  minHeight: 36,
 };
 
 const floatingBtn: React.CSSProperties = {
@@ -922,16 +919,16 @@ function CommandesPage() {
                     </div>
                     {favoris.map((item) => (
                       <div key={item.id} style={tile}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                           <button type="button" onClick={() => toggleFavori(item.id, true)} style={starBtnStyle(true)} title="Retirer des habituels">&#x2B50;</button>
                           <IngredientAvatar ingredientId={item.id} name={item.name} category={(item.category ?? "autre") as Category} size={28} />
                           <span style={{
                             fontSize: 13, fontWeight: Number(quantities[item.id] ?? 0) > 0 ? 700 : 500,
                             color: Number(quantities[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
-                            lineHeight: 1.3, flex: 1, minWidth: 0,
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0,
                           }}>{item.name}</span>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: 28 }}>
                           {unitPriceBadge(item)}
                           <StepperInput value={quantities[item.id] ?? ""} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
                         </div>
@@ -942,16 +939,16 @@ function CommandesPage() {
 
                 {others.map((item) => (
                   <div key={item.id} style={tile}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                       <button type="button" onClick={() => toggleFavori(item.id, false)} style={starBtnStyle(false)} title="Ajouter aux habituels">&#x2B50;</button>
                       <IngredientAvatar ingredientId={item.id} name={item.name} category={(item.category ?? "autre") as Category} size={28} />
                       <span style={{
                         fontSize: 13, fontWeight: Number(quantities[item.id] ?? 0) > 0 ? 700 : 500,
                         color: Number(quantities[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
-                        lineHeight: 1.3, flex: 1, minWidth: 0,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0,
                       }}>{item.name}</span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: 28 }}>
                       {unitPriceBadge(item)}
                       <StepperInput value={quantities[item.id] ?? ""} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
                     </div>
