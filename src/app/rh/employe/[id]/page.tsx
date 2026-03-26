@@ -930,39 +930,60 @@ export default function EmployeDetailPage() {
             accident_travail: { label: "Accident du travail", color: "#DC2626" },
             maternite: { label: "Maternite/Paternite", color: "#7B1FA2" },
           };
-          const cpAcquis = absences.filter(a => a.type === "conge_paye").length;
+          const cpPris = absences.filter(a => a.type === "conge_paye" || a.type === "CP").length;
 
           return (
             <>
               {/* Compteurs CP */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
                 {[
-                  { label: "CP Acquis", value: `${(cpAcquis * 2.5).toFixed(1)} j`, color: "#2D6A4F" },
-                  { label: "CP Pris", value: `${cpAcquis} j`, color: "#D4775A" },
-                  { label: "Solde CP", value: `${((cpAcquis * 2.5) - cpAcquis).toFixed(1)} j`, color: "#2563eb" },
+                  { label: "CP Acquis", value: `${(cpPris * 2.5).toFixed(1)} j`, color: "#2D6A4F" },
+                  { label: "CP Pris", value: `${cpPris} j`, color: "#D4775A" },
+                  { label: "Solde CP", value: `${((cpPris * 2.5) - cpPris).toFixed(1)} j`, color: "#2563eb" },
                 ].map(kpi => (
-                  <div key={kpi.label} style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 16, textAlign: "center" }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", marginBottom: 4 }}>{kpi.label}</div>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: kpi.color }}>{kpi.value}</div>
+                  <div key={kpi.label} style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 10, padding: 14, textAlign: "center" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", marginBottom: 4 }}>{kpi.label}</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: kpi.color, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{kpi.value}</div>
                   </div>
                 ))}
               </div>
 
-              {/* Liste des absences */}
-              <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(45,106,79,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                    </span>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Absences</span>
-                  </div>
-                  <button type="button" onClick={() => setShowAbsenceModal(true)} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                    + Demande d&apos;absence
+              {/* Nouvelle absence — inline */}
+              <AccordionSection
+                title="Nouvelle absence"
+                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>}
+                iconColor="#2D6A4F" iconBg="rgba(45,106,79,0.1)"
+              >
+                <div style={grid2}>
+                  <FieldSelect label="Type d'absence" value={aType} onChange={setAType}
+                    options={Object.entries(ABSENCE_TYPES).map(([k, v]) => [k, v.label])} />
+                  <Field label="Nb jours" type="number" value={String(aNbJours)} onChange={(v) => setANbJours(v ? Number(v) : "")} />
+                </div>
+                <div style={grid2}>
+                  <Field label="Date debut" type="date" value={aDebut} onChange={setADebut} />
+                  <Field label="Date fin" type="date" value={aFin} onChange={setAFin} />
+                </div>
+                <Field label="Note" value={aNote} onChange={setANote} placeholder="Commentaire optionnel..." />
+                <div style={{ marginTop: 8 }}>
+                  <button type="button" onClick={handleSaveAbsence} disabled={saving || !aDebut} style={{
+                    padding: "8px 18px", borderRadius: 8, border: "none",
+                    background: "#1a1a1a", color: "#fff", fontSize: 12, fontWeight: 600,
+                    cursor: !aDebut ? "not-allowed" : "pointer", opacity: saving || !aDebut ? 0.5 : 1,
+                  }}>
+                    {saving ? "..." : "Enregistrer l'absence"}
                   </button>
                 </div>
+              </AccordionSection>
+
+              {/* Historique absences */}
+              <AccordionSection
+                title={`Historique des absences (${absences.length})`}
+                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>}
+                iconColor="#D4775A" iconBg="rgba(212,119,90,0.1)"
+                defaultOpen
+              >
                 {absences.length === 0 ? (
-                  <p style={{ fontSize: 13, color: "#999", textAlign: "center", padding: "20px 0" }}>Aucune absence enregistree</p>
+                  <p style={{ fontSize: 13, color: "#999", textAlign: "center", margin: 0 }}>Aucune absence enregistree</p>
                 ) : (
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead><tr style={{ borderBottom: "2px solid #ddd6c8" }}>
@@ -992,7 +1013,7 @@ export default function EmployeDetailPage() {
                     </tbody>
                   </table>
                 )}
-              </div>
+              </AccordionSection>
             </>
           );
         })()}
@@ -1000,112 +1021,63 @@ export default function EmployeDetailPage() {
         {/* ═══ TAB: Documents ═══ */}
         {mainTab === "documents" && (() => {
           const DOSSIERS = [
-            { key: "contrats", label: "Contrats de travail", icon: "fileText" },
-            { key: "fiches_paie", label: "Fiches de paie", icon: "wallet" },
-            { key: "documents_sociaux", label: "Documents sociaux", icon: "clipboard" },
-            { key: "arrets_maladie", label: "Arrets maladie", icon: "beach" },
-            { key: "formations", label: "Formations", icon: "book" },
-            { key: "autres", label: "Autres documents", icon: "package" },
+            { key: "contrats", label: "Contrats de travail" },
+            { key: "fiches_paie", label: "Fiches de paie" },
+            { key: "documents_sociaux", label: "Documents sociaux" },
+            { key: "arrets_maladie", label: "Arrets maladie" },
+            { key: "formations", label: "Formations" },
+            { key: "autres", label: "Autres documents" },
           ];
+          const uploadFile = (folder: string) => {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = ".pdf,.jpg,.jpeg,.png,.doc,.docx";
+            input.onchange = async (e) => {
+              const file = (e.target as HTMLInputElement).files?.[0];
+              if (!file) return;
+              const path = `employes/${emp.id}/${folder}/${Date.now()}_${file.name}`;
+              await supabase.storage.from("public").upload(path, file, { upsert: true });
+              setSaveOk(true); setTimeout(() => setSaveOk(false), 2000);
+            };
+            input.click();
+          };
 
           return (
             <>
-              {/* Documents */}
-              <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginBottom: 16 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(37,99,235,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-                    </span>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Documents</span>
-                  </div>
-                  <button type="button" onClick={() => {
-                    const input = document.createElement("input");
-                    input.type = "file";
-                    input.accept = ".pdf,.jpg,.jpeg,.png,.doc,.docx";
-                    input.onchange = async (e) => {
-                      const file = (e.target as HTMLInputElement).files?.[0];
-                      if (!file) return;
-                      const path = `employes/${emp.id}/documents/${Date.now()}_${file.name}`;
-                      await supabase.storage.from("public").upload(path, file, { upsert: true });
-                      setSaveOk(true); setTimeout(() => setSaveOk(false), 2000);
-                    };
-                    input.click();
-                  }} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-                    + Ajouter un document
-                  </button>
+              <AccordionSection
+                title="Documents"
+                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>}
+                iconColor="#2563eb" iconBg="rgba(37,99,235,0.1)"
+                defaultOpen
+              >
+                <div style={{ textAlign: "center", padding: "16px 0", color: "#999", fontSize: 13 }}>
+                  Aucun document. Utilisez les dossiers ci-dessous pour deposer vos fichiers.
                 </div>
+                <button type="button" onClick={() => uploadFile("documents")} style={{ display: "block", margin: "0 auto", padding: "8px 18px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                  + Ajouter un document
+                </button>
+              </AccordionSection>
 
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-                  <span style={{ padding: "4px 10px", borderRadius: 20, border: "1px solid #ddd6c8", fontSize: 11, fontWeight: 600, color: "#1a1a1a" }}>
-                    Type de document 0/{DOSSIERS.length}
-                  </span>
-                  <input type="text" placeholder="Rechercher par nom de document" style={{ flex: 1, padding: "4px 10px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 12, minWidth: 200 }} />
+              <AccordionSection
+                title="Bulletins de paie"
+                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>}
+                iconColor="#D4775A" iconBg="rgba(212,119,90,0.1)"
+              >
+                <div style={{ textAlign: "center", padding: "16px 0", color: "#999", fontSize: 13 }}>
+                  Aucun bulletin de paie importe.
                 </div>
+              </AccordionSection>
 
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                  <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
-                    <th style={{ textAlign: "left", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Document</th>
-                    <th style={{ textAlign: "left", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Type</th>
-                    <th style={{ textAlign: "left", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Signature</th>
-                    <th style={{ textAlign: "left", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Date</th>
-                    <th style={{ textAlign: "left", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Actions</th>
-                  </tr></thead>
-                </table>
-                <div style={{ textAlign: "center", padding: "30px 0" }}>
-                  <svg width={40} height={40} viewBox="0 0 24 24" fill="none" stroke="#ddd6c8" strokeWidth="1.5"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                  <p style={{ fontSize: 13, color: "#999", marginTop: 8 }}>Pas de document a afficher</p>
-                  <p style={{ fontSize: 12, color: "#999" }}>Ajoutez votre premier document et faites-le signer simplement</p>
-                </div>
-              </div>
-
-              {/* Bulletins de paie */}
-              <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginBottom: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(212,119,90,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-                  </span>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Bulletins de paie</span>
-                </div>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginBottom: 8 }}>
-                  <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
-                    <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Document</th>
-                  </tr></thead>
-                </table>
-                <div style={{ textAlign: "center", padding: "30px 0" }}>
-                  <svg width={40} height={40} viewBox="0 0 24 24" fill="none" stroke="#ddd6c8" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
-                  <p style={{ fontSize: 13, color: "#1a1a1a", fontWeight: 600, marginTop: 8 }}>Aucun bulletin de paie importe</p>
-                  <p style={{ fontSize: 12, color: "#999" }}>Pour importer des bulletins de paie, vous pouvez vous rendre dans l&apos;espace &quot;distribution des bulletins de paie&quot;</p>
-                  <button type="button" style={{ marginTop: 8, padding: "8px 16px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                    Distribution des bulletins de paie
-                  </button>
-                </div>
-              </div>
-
-              {/* Dossiers */}
-              <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                  <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(160,132,92,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>
-                  </span>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Dossiers</span>
-                </div>
+              <AccordionSection
+                title="Dossiers"
+                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>}
+                iconColor="#A0845C" iconBg="rgba(160,132,92,0.1)"
+                defaultOpen
+              >
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
                   {DOSSIERS.map(d => (
-                    <div key={d.key} onClick={() => {
-                      const input = document.createElement("input");
-                      input.type = "file";
-                      input.accept = ".pdf,.jpg,.jpeg,.png,.doc,.docx";
-                      input.onchange = async (e) => {
-                        const file = (e.target as HTMLInputElement).files?.[0];
-                        if (!file) return;
-                        const path = `employes/${emp.id}/${d.key}/${Date.now()}_${file.name}`;
-                        const { error: uploadErr } = await supabase.storage.from("public").upload(path, file, { upsert: true });
-                        if (uploadErr) { /* silently fail */ }
-                        else { setSaveOk(true); setTimeout(() => setSaveOk(false), 2000); }
-                      };
-                      input.click();
-                    }} style={{ padding: 14, borderRadius: 10, border: "1px solid #f0ebe3", background: "#faf7f2", textAlign: "center", cursor: "pointer", transition: "background 0.12s" }}
+                    <div key={d.key} onClick={() => uploadFile(d.key)}
+                      style={{ padding: 14, borderRadius: 10, border: "1px solid #f0ebe3", background: "#faf7f2", textAlign: "center", cursor: "pointer", transition: "background 0.12s" }}
                       onMouseOver={e => (e.currentTarget.style.background = "#f0ebe3")}
                       onMouseOut={e => (e.currentTarget.style.background = "#faf7f2")}
                     >
@@ -1117,7 +1089,7 @@ export default function EmployeDetailPage() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </AccordionSection>
             </>
           );
         })()}
@@ -1153,94 +1125,98 @@ export default function EmployeDetailPage() {
           );
 
           return (
-            <div style={section}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
-                <span style={{ fontSize: 17, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Role et Permissions</span>
-              </div>
-
-              {/* 3 Role cards */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 24 }}>
-                {(["employe", "manager", "admin"] as PermRole[]).map(r => {
-                  const info = ROLE_INFO[r];
-                  const active = empRole === r;
-                  return (
-                    <button key={r} type="button" onClick={() => changeRole(r)} style={{
-                      padding: 16, borderRadius: 12, cursor: "pointer", textAlign: "left",
-                      border: active ? `2px solid ${info.color}` : "1px solid #ddd6c8",
-                      background: active ? info.bg : "#fff",
-                    }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                        <div style={{
-                          width: 18, height: 18, borderRadius: "50%",
-                          border: active ? `5px solid ${info.color}` : "2px solid #ddd6c8",
-                          background: active ? info.color : "#fff",
-                        }} />
-                        <span style={{ fontSize: 14, fontWeight: 700, color: active ? info.color : "#1a1a1a" }}>{info.label}</span>
-                      </div>
-                      <p style={{ fontSize: 11, color: "#666", lineHeight: 1.4, margin: 0 }}>{info.description}</p>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Permission matrix with functional toggles */}
-              {PERM_SECTIONS.map(sec => (
-                <div key={sec.label} style={{ marginBottom: 12 }}>
-                  <div style={{ padding: "8px 12px", background: "#faf7f2", borderRadius: 6, marginBottom: 2 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{sec.label}</span>
-                  </div>
-                  {sec.permissions.map(p => {
-                    const defaultVal = perms[p.key];
-                    const isToggle = defaultVal === "toggle";
-                    const isOn = isToggle ? (customPerms[p.key] ?? false) : defaultVal === true;
-
+            <>
+              <AccordionSection
+                title="Role"
+                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>}
+                iconColor="#D4775A" iconBg="rgba(212,119,90,0.1)"
+                defaultOpen
+              >
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                  {(["employe", "manager", "admin"] as PermRole[]).map(r => {
+                    const info = ROLE_INFO[r];
+                    const active = empRole === r;
                     return (
-                      <div key={p.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderBottom: "1px solid #f0ebe3" }}>
-                        <span style={{ fontSize: 13, color: "#1a1a1a" }}>{p.label}</span>
-                        <span style={{ flexShrink: 0, marginLeft: 12 }}>
-                          {isToggle ? (
-                            <button type="button" onClick={() => togglePerm(p.key, isOn)} style={{
-                              width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer",
-                              background: isOn ? "#2D6A4F" : "#ddd6c8", position: "relative",
-                            }}>
-                              <span style={{
-                                position: "absolute", top: 2, left: isOn ? 20 : 2,
-                                width: 18, height: 18, borderRadius: "50%", background: "#fff",
-                                transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
-                              }} />
-                            </button>
-                          ) : defaultVal === true ? <CheckIcon /> : <XIcon />}
-                        </span>
-                      </div>
+                      <button key={r} type="button" onClick={() => changeRole(r)} style={{
+                        padding: 14, borderRadius: 10, cursor: "pointer", textAlign: "left",
+                        border: active ? `2px solid ${info.color}` : "1px solid #ddd6c8",
+                        background: active ? info.bg : "#fff",
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                          <div style={{
+                            width: 16, height: 16, borderRadius: "50%",
+                            border: active ? `4px solid ${info.color}` : "2px solid #ddd6c8",
+                            background: active ? info.color : "#fff",
+                          }} />
+                          <span style={{ fontSize: 13, fontWeight: 700, color: active ? info.color : "#1a1a1a" }}>{info.label}</span>
+                        </div>
+                        <p style={{ fontSize: 11, color: "#666", lineHeight: 1.4, margin: 0 }}>{info.description}</p>
+                      </button>
                     );
                   })}
                 </div>
-              ))}
+              </AccordionSection>
 
-              {/* Delete account */}
-              <div style={{ marginTop: 24, padding: "16px 12px", borderTop: "1px solid #f0ebe3", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>Supprimer le compte employe</div>
-                  <div style={{ fontSize: 11, color: "#999" }}>Effacer definitivement l&apos;employe de votre etablissement.</div>
+              <AccordionSection
+                title="Permissions detaillees"
+                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>}
+                iconColor="#2563eb" iconBg="rgba(37,99,235,0.1)"
+              >
+                {PERM_SECTIONS.map(sec => (
+                  <div key={sec.label} style={{ marginBottom: 10 }}>
+                    <div style={{ padding: "6px 10px", background: "#faf7f2", borderRadius: 6, marginBottom: 2 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a" }}>{sec.label}</span>
+                    </div>
+                    {sec.permissions.map(p => {
+                      const defaultVal = perms[p.key];
+                      const isToggle = defaultVal === "toggle";
+                      const isOn = isToggle ? (customPerms[p.key] ?? false) : defaultVal === true;
+                      return (
+                        <div key={p.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderBottom: "1px solid #f0ebe3" }}>
+                          <span style={{ fontSize: 12, color: "#1a1a1a" }}>{p.label}</span>
+                          <span style={{ flexShrink: 0, marginLeft: 12 }}>
+                            {isToggle ? (
+                              <button type="button" onClick={() => togglePerm(p.key, isOn)} style={{
+                                width: 36, height: 20, borderRadius: 10, border: "none", cursor: "pointer",
+                                background: isOn ? "#2D6A4F" : "#ddd6c8", position: "relative",
+                              }}>
+                                <span style={{ position: "absolute", top: 2, left: isOn ? 18 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
+                              </button>
+                            ) : defaultVal === true ? <CheckIcon /> : <XIcon />}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </AccordionSection>
+
+              <AccordionSection
+                title="Zone de danger"
+                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>}
+                iconColor="#DC2626" iconBg="rgba(220,38,38,0.1)"
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>Supprimer le compte employe</div>
+                    <div style={{ fontSize: 11, color: "#999" }}>Effacer definitivement l&apos;employe de votre etablissement.</div>
+                  </div>
+                  <button type="button" onClick={async () => {
+                    if (!confirm("Supprimer definitivement cet employe ? Ses contrats, absences et shifts seront aussi supprimes. Irreversible.")) return;
+                    const empId = emp.id as string;
+                    await supabase.from("contrat_elements").delete().in("contrat_id", contrats.map(c => c.id));
+                    await supabase.from("contrats").delete().eq("employe_id", empId);
+                    await supabase.from("absences").delete().eq("employe_id", empId);
+                    await supabase.from("shifts").delete().eq("employe_id", empId);
+                    const { error } = await supabase.from("employes").delete().eq("id", empId);
+                    if (error) { alert("Erreur : " + error.message); return; }
+                    window.location.href = "/settings/employes";
+                  }} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid rgba(220,38,38,0.3)", background: "rgba(220,38,38,0.06)", color: "#DC2626", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    Supprimer le compte
+                  </button>
                 </div>
-                <button type="button" onClick={async () => {
-                  if (!confirm("Supprimer définitivement cet employé ? Cette opération supprimera aussi ses contrats, absences et shifts. C'est irréversible.")) return;
-                  const empId = emp.id as string;
-                  // Supprimer les données liées d'abord (contraintes FK)
-                  await supabase.from("contrat_elements").delete().in("contrat_id", contrats.map(c => c.id));
-                  await supabase.from("contrats").delete().eq("employe_id", empId);
-                  await supabase.from("absences").delete().eq("employe_id", empId);
-                  await supabase.from("shifts").delete().eq("employe_id", empId);
-                  // Supprimer l'employé
-                  const { error } = await supabase.from("employes").delete().eq("id", empId);
-                  if (error) { alert("Erreur : " + error.message); return; }
-                  window.location.href = "/settings/employes";
-                }} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid rgba(220,38,38,0.3)", background: "rgba(220,38,38,0.06)", color: "#DC2626", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                  Supprimer le compte
-                </button>
-              </div>
-            </div>
+              </AccordionSection>
+            </>
           );
         })()}
 
@@ -1251,196 +1227,127 @@ export default function EmployeDetailPage() {
 
           return (
             <>
-              {/* Planification et acces */}
-              <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginBottom: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                  <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(45,106,79,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                  </span>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Planification et acces</span>
+              <AccordionSection
+                title="Acces aux equipes"
+                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>}
+                iconColor="#2D6A4F" iconBg="rgba(45,106,79,0.1)"
+                defaultOpen
+              >
+                <p style={{ fontSize: 12, color: "#999", marginBottom: 10 }}>Equipes sur lesquelles le salarie peut etre planifie.</p>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {empEquipes.length > 0 ? empEquipes.map(eq => (
+                    <span key={eq} style={{ padding: "4px 10px", borderRadius: 6, background: "#e8ede6", fontSize: 12, fontWeight: 600, color: "#2D6A4F" }}>{eq}</span>
+                  )) : <span style={{ color: "#999", fontSize: 13 }}>Aucune equipe assignee</span>}
                 </div>
+              </AccordionSection>
 
-                {/* Acces aux equipes */}
-                <div style={{ border: "1px solid #f0ebe3", borderRadius: 10, padding: 16, marginBottom: 16 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>Acces aux equipes</span>
+              <AccordionSection
+                title="Affichage planning"
+                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>}
+                iconColor="#D4775A" iconBg="rgba(212,119,90,0.1)"
+                defaultOpen
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#faf7f2", borderRadius: 8, marginBottom: 8 }}>
+                  <div>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>Afficher sur le planning</span>
+                    <p style={{ fontSize: 11, color: "#999", margin: "2px 0 0" }}>Apparait aux dates du contrat. Desactiver cache l&apos;historique.</p>
                   </div>
-                  <p style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>Donne de la visibilite au salarie sur plus d&apos;equipes (exemple : plannings). Necessaire pour etre planifie.</p>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                    <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
-                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Etablissement</th>
-                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Equipes</th>
-                    </tr></thead>
-                    <tbody>
-                      <tr style={{ borderBottom: "1px solid #f0ebe3" }}>
-                        <td style={{ padding: "10px 0" }}>{etab?.nom ?? "—"}</td>
-                        <td style={{ padding: "10px 0" }}>
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                            {empEquipes.length > 0 ? empEquipes.map(eq => (
-                              <span key={eq} style={{ padding: "2px 8px", borderRadius: 4, background: "#f0ebe3", fontSize: 12, fontWeight: 500 }}>{eq}</span>
-                            )) : <span style={{ color: "#999" }}>—</span>}
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <button type="button" onClick={async () => {
+                    const next = !affichagePlanning;
+                    await supabase.from("employes").update({ affichage_planning: next }).eq("id", emp.id);
+                    setEmp((prev: Record<string, unknown>) => ({ ...prev, affichage_planning: next }));
+                  }} style={{
+                    width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer",
+                    background: affichagePlanning ? "#2D6A4F" : "#ddd6c8", position: "relative", flexShrink: 0,
+                  }}>
+                    <span style={{ position: "absolute", top: 2, left: affichagePlanning ? 20 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
+                  </button>
                 </div>
+              </AccordionSection>
 
-                {/* Affichage sur le planning */}
-                <div style={{ border: "1px solid #f0ebe3", borderRadius: 10, padding: 16 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>Affichage sur le planning</span>
-                  </div>
-                  <p style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>Permet au salarie d&apos;etre planifie sur plus d&apos;equipes. Necessite d&apos;avoir acces aux equipes ci-dessus.</p>
-
-                  <div style={{ padding: 12, borderRadius: 8, background: "#faf7f2", marginBottom: 12 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>Afficher le salarie sur le planning</span>
-                      <button type="button" onClick={async () => {
-                        const next = !affichagePlanning;
-                        await supabase.from("employes").update({ affichage_planning: next }).eq("id", emp.id);
-                        setEmp((prev: Record<string, unknown>) => ({ ...prev, affichage_planning: next }));
-                      }} style={{
-                        width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer",
-                        background: affichagePlanning ? "#2D6A4F" : "#ddd6c8", position: "relative",
-                      }}>
-                        <span style={{ position: "absolute", top: 2, left: affichagePlanning ? 20 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
-                      </button>
-                    </div>
-                    <p style={{ fontSize: 11, color: "#999", margin: 0, lineHeight: 1.4 }}>
-                      Permet de faire apparaitre le salarie sur le planning aux dates de son contrat. En le desactivant, tout l&apos;historique de planification sera cache.
-                    </p>
-                  </div>
-
-                  <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-                    <button type="button" onClick={() => setShowPlanifModal(true)} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-                      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                      Modifier
-                    </button>
-                  </div>
-
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                    <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
-                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Etablissement</th>
-                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Equipes</th>
-                    </tr></thead>
-                    <tbody>
-                      <tr>
-                        <td style={{ padding: "10px 0" }}>{etab?.nom ?? "—"}</td>
-                        <td style={{ padding: "10px 0" }}>
-                          <div style={{ display: "flex", gap: 6 }}>
-                            {empEquipes.map(eq => (
-                              <span key={eq} style={{ padding: "2px 8px", borderRadius: 4, background: "#f0ebe3", fontSize: 12 }}>{eq}</span>
-                            ))}
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Temps de travail + Disponibilites — 2 columns */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                {/* Temps de travail */}
-                <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(212,119,90,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                      </span>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Temps de travail</span>
-                    </div>
-                  </div>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                    <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
-                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Periode</th>
-                      <th style={{ textAlign: "right", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Heures travaillees</th>
-                    </tr></thead>
-                    <tbody>
-                      {(() => {
-                        const now = new Date();
-                        // Calculate hours per month from shifts
-                        const monthlyHours: Record<string, number> = {};
-                        for (const s of shifts) {
-                          const d = new Date(s.date);
-                          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-                          const start = s.heure_debut ?? s.start_time ?? "00:00";
-                          const end = s.heure_fin ?? s.end_time ?? "00:00";
-                          const [sh, sm] = start.split(":").map(Number);
-                          const [eh, em] = end.split(":").map(Number);
-                          let dur = (eh * 60 + em) - (sh * 60 + sm);
-                          if (dur < 0) dur += 1440;
-                          dur -= (s.pause_minutes ?? 0);
-                          monthlyHours[key] = (monthlyHours[key] ?? 0) + dur / 60;
-                        }
-                        return Array.from({ length: 6 }, (_, i) => {
-                          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-                          const h = monthlyHours[key] ?? 0;
-                          const hh = Math.floor(h);
-                          const mm = Math.round((h - hh) * 60);
-                          return (
-                            <tr key={i} style={{ borderBottom: "1px solid #f0ebe3" }}>
-                              <td style={{ padding: "8px 0", textTransform: "capitalize" }}>{d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}</td>
-                              <td style={{ padding: "8px 0", textAlign: "right", fontWeight: h > 0 ? 600 : 400, color: h > 0 ? "#1a1a1a" : "#999" }}>
-                                {h > 0 ? `${hh}h${mm > 0 ? String(mm).padStart(2, "0") : "00"}` : "—"}
-                              </td>
-                            </tr>
-                          );
-                        });
-                      })()}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Disponibilites */}
-                <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(212,119,90,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                      </span>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Disponibilites</span>
-                    </div>
-                    <button type="button" onClick={() => setShowDispoModal(true)} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-                      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                      Modifier
-                    </button>
-                  </div>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                    <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
-                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", width: 100 }}>Jour</th>
-                      <th style={{ textAlign: "center", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Disponibilité</th>
-                    </tr></thead>
-                    <tbody>
-                      {JOURS.map((j, idx) => {
-                        const dispos = ((emp as Record<string, unknown>).disponibilites as Record<string, unknown>) ?? {};
-                        const val = String(dispos[String(idx)] ?? "journee");
+              <AccordionSection
+                title="Temps de travail (6 derniers mois)"
+                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>}
+                iconColor="#A0845C" iconBg="rgba(160,132,92,0.1)"
+              >
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
+                    <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Periode</th>
+                    <th style={{ textAlign: "right", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Heures</th>
+                  </tr></thead>
+                  <tbody>
+                    {(() => {
+                      const now = new Date();
+                      const monthlyHours: Record<string, number> = {};
+                      for (const s of shifts) {
+                        const d = new Date(s.date);
+                        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+                        const start = s.heure_debut ?? s.start_time ?? "00:00";
+                        const end = s.heure_fin ?? s.end_time ?? "00:00";
+                        const [sh, sm] = start.split(":").map(Number);
+                        const [eh, em] = end.split(":").map(Number);
+                        let dur = (eh * 60 + em) - (sh * 60 + sm);
+                        if (dur < 0) dur += 1440;
+                        dur -= (s.pause_minutes ?? 0);
+                        monthlyHours[key] = (monthlyHours[key] ?? 0) + dur / 60;
+                      }
+                      return Array.from({ length: 6 }, (_, i) => {
+                        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+                        const h = monthlyHours[key] ?? 0;
+                        const hh = Math.floor(h);
+                        const mm = Math.round((h - hh) * 60);
                         return (
-                          <tr key={j} style={{ borderBottom: "1px solid #f0ebe3" }}>
-                            <td style={{ padding: "8px 0", fontWeight: 500 }}>{j}</td>
-                            <td style={{ padding: "4px 0", textAlign: "center" }}>
-                              <select id={`dispo-inline-${idx}`} defaultValue={val === "false" || val === "indisponible" ? "indisponible" : val === "matin" ? "matin" : val === "soir" ? "soir" : "journee"} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd6c8", fontSize: 12, cursor: "pointer" }}>
-                                <option value="journee">Journée</option>
-                                <option value="matin">Matin</option>
-                                <option value="soir">Soir</option>
-                                <option value="indisponible">Indisponible</option>
-                              </select>
+                          <tr key={i} style={{ borderBottom: "1px solid #f0ebe3" }}>
+                            <td style={{ padding: "8px 0", textTransform: "capitalize" }}>{d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}</td>
+                            <td style={{ padding: "8px 0", textAlign: "right", fontWeight: h > 0 ? 600 : 400, color: h > 0 ? "#1a1a1a" : "#999" }}>
+                              {h > 0 ? `${hh}h${mm > 0 ? String(mm).padStart(2, "0") : "00"}` : "\u2014"}
                             </td>
                           </tr>
                         );
-                      })}
-                    </tbody>
-                  </table>
-                  <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
-                    <button type="button" onClick={async () => {
-                      const dispos: Record<string, string> = {};
-                      for (let i = 0; i < 7; i++) {
-                        const sel = document.getElementById(`dispo-inline-${i}`) as HTMLSelectElement;
-                        if (sel) dispos[String(i)] = sel.value;
+                      });
+                    })()}
+                  </tbody>
+                </table>
+              </AccordionSection>
+
+              <AccordionSection
+                title="Disponibilites"
+                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>}
+                iconColor="#2563eb" iconBg="rgba(37,99,235,0.1)"
+                defaultOpen
+              >
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
+                    <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", width: 100 }}>Jour</th>
+                    <th style={{ textAlign: "center", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Disponibilite</th>
+                  </tr></thead>
+                  <tbody>
+                    {JOURS.map((j, idx) => {
+                      const dispos = ((emp as Record<string, unknown>).disponibilites as Record<string, unknown>) ?? {};
+                      const val = String(dispos[String(idx)] ?? "journee");
+                      return (
+                        <tr key={j} style={{ borderBottom: "1px solid #f0ebe3" }}>
+                          <td style={{ padding: "8px 0", fontWeight: 500 }}>{j}</td>
+                          <td style={{ padding: "4px 0", textAlign: "center" }}>
+                            <select id={`dispo-inline-${idx}`} defaultValue={val === "false" || val === "indisponible" ? "indisponible" : val === "matin" ? "matin" : val === "soir" ? "soir" : "journee"} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd6c8", fontSize: 12, cursor: "pointer" }}>
+                              <option value="journee">Journee</option>
+                              <option value="matin">Matin</option>
+                              <option value="soir">Soir</option>
+                              <option value="indisponible">Indisponible</option>
+                            </select>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
+                  <button type="button" onClick={async () => {
+                    const dispos: Record<string, string> = {};
+                    for (let i = 0; i < 7; i++) {
+                      const sel = document.getElementById(`dispo-inline-${i}`) as HTMLSelectElement;
+                      if (sel) dispos[String(i)] = sel.value;
                       }
                       await supabase.from("employes").update({ disponibilites: dispos }).eq("id", emp.id);
                       setEmp((prev: Record<string, unknown>) => ({ ...prev, disponibilites: dispos }));
@@ -1452,35 +1359,29 @@ export default function EmployeDetailPage() {
                       Enregistrer
                     </button>
                   </div>
-                </div>
-              </div>
+              </AccordionSection>
 
-              {/* Invitation */}
-              <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginTop: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(37,99,235,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7l-10 7L2 7" /></svg>
-                  </span>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Invitation</span>
-                </div>
-                <p style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>Envoyer une invitation par email pour acceder a l&apos;application.</p>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button type="button" onClick={async () => {
-                    if (!email) return;
-                    const { data: { session } } = await supabase.auth.getSession();
-                    const res = await fetch("/api/admin/invite", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
-                      body: JSON.stringify({ email, displayName: `${prenom} ${nom}`, role: (emp as Record<string, unknown>).role ?? "employe" }),
-                    });
-                    if (res.ok) alert("Invitation envoyee a " + email);
-                    else alert("Erreur: " + (await res.text()));
-                  }} style={addBtnStyle} disabled={!email}>
-                    Envoyer une invitation
-                  </button>
-                </div>
+              <AccordionSection
+                title="Invitation"
+                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7l-10 7L2 7" /></svg>}
+                iconColor="#2563eb" iconBg="rgba(37,99,235,0.1)"
+              >
+                <p style={{ fontSize: 12, color: "#999", marginBottom: 10 }}>Envoyer une invitation par email pour acceder a l&apos;application.</p>
+                <button type="button" onClick={async () => {
+                  if (!email) return;
+                  const { data: { session } } = await supabase.auth.getSession();
+                  const res = await fetch("/api/admin/invite", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+                    body: JSON.stringify({ email, displayName: `${prenom} ${nom}`, role: (emp as Record<string, unknown>).role ?? "employe" }),
+                  });
+                  if (res.ok) alert("Invitation envoyee a " + email);
+                  else alert("Erreur: " + (await res.text()));
+                }} style={addBtnStyle} disabled={!email}>
+                  Envoyer une invitation
+                </button>
                 {!email && <p style={{ fontSize: 12, color: "#e27f57", marginTop: 6 }}>Ajoutez un email pour pouvoir envoyer une invitation.</p>}
-              </div>
+              </AccordionSection>
             </>
           );
         })()}
