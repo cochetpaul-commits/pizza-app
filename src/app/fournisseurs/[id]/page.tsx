@@ -104,13 +104,13 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
       {/* Back + title */}
       <div style={{ marginBottom: 20 }}>
         <button
-          onClick={() => router.push("/achats")}
+          onClick={() => router.push("/fournisseurs")}
           style={{
             fontFamily: "DM Sans, sans-serif", fontSize: 13, color: "#999",
             background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 8,
           }}
         >
-          ← Retour aux achats
+          ← Retour aux fournisseurs
         </button>
         <h1 style={{ fontFamily: "Oswald, sans-serif", fontWeight: 700, fontSize: 22, color: "#1a1a1a", margin: 0 }}>
           {supplier.name}
