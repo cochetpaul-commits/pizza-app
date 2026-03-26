@@ -675,171 +675,43 @@ export default function EmployeDetailPage() {
 
         {/* ═══ TAB: INFORMATIONS GENERALES ═══ */}
         {mainTab === "infos" && (
-          <>
-            <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700, color: "#1a1a1a", marginBottom: 16 }}>Informations personnelles</h2>
-
-            {/* 2-column layout */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              {/* Left: Etat civil */}
-              <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                  <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(45,106,79,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-                  </span>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Etat civil</span>
-                </div>
-                <FieldSelect label="Genre" value={genre} onChange={setGenre} disabled={!canWrite}
-                  options={[["", "— Sélectionner —"], ["M", "Homme"], ["F", "Femme"]]} />
-                <Field label="Prénom" value={prenom} onChange={setPrenom} disabled={!canWrite} />
-                <Field label="Nom de naissance" value={nom} onChange={setNom} disabled={!canWrite} />
-                <Field label="Nationalite" value={nationalite} onChange={setNationalite} disabled={!canWrite} />
-                <Field label="Date de naissance" type="date" value={dateNaissance} onChange={setDateNaissance} disabled={!canWrite} />
-                <Field label="Lieu de naissance" value={lieuNaissance} onChange={setLieuNaissance} disabled={!canWrite} />
-                <FieldSelect label="Département de naissance" value={deptNaissance} onChange={setDeptNaissance} disabled={!canWrite}
-                  options={[["", "Sélectionnez..."],
-                    ["01", "01 - Ain"], ["02", "02 - Aisne"], ["03", "03 - Allier"], ["04", "04 - Alpes-de-Haute-Provence"], ["05", "05 - Hautes-Alpes"],
-                    ["06", "06 - Alpes-Maritimes"], ["07", "07 - Ardèche"], ["08", "08 - Ardennes"], ["09", "09 - Ariège"], ["10", "10 - Aube"],
-                    ["11", "11 - Aude"], ["12", "12 - Aveyron"], ["13", "13 - Bouches-du-Rhône"], ["14", "14 - Calvados"], ["15", "15 - Cantal"],
-                    ["16", "16 - Charente"], ["17", "17 - Charente-Maritime"], ["18", "18 - Cher"], ["19", "19 - Corrèze"], ["2A", "2A - Corse-du-Sud"],
-                    ["2B", "2B - Haute-Corse"], ["21", "21 - Côte-d'Or"], ["22", "22 - Côtes-d'Armor"], ["23", "23 - Creuse"], ["24", "24 - Dordogne"],
-                    ["25", "25 - Doubs"], ["26", "26 - Drôme"], ["27", "27 - Eure"], ["28", "28 - Eure-et-Loir"], ["29", "29 - Finistère"],
-                    ["30", "30 - Gard"], ["31", "31 - Haute-Garonne"], ["32", "32 - Gers"], ["33", "33 - Gironde"], ["34", "34 - Hérault"],
-                    ["35", "35 - Ille-et-Vilaine"], ["36", "36 - Indre"], ["37", "37 - Indre-et-Loire"], ["38", "38 - Isère"], ["39", "39 - Jura"],
-                    ["40", "40 - Landes"], ["41", "41 - Loir-et-Cher"], ["42", "42 - Loire"], ["43", "43 - Haute-Loire"], ["44", "44 - Loire-Atlantique"],
-                    ["45", "45 - Loiret"], ["46", "46 - Lot"], ["47", "47 - Lot-et-Garonne"], ["48", "48 - Lozère"], ["49", "49 - Maine-et-Loire"],
-                    ["50", "50 - Manche"], ["51", "51 - Marne"], ["52", "52 - Haute-Marne"], ["53", "53 - Mayenne"], ["54", "54 - Meurthe-et-Moselle"],
-                    ["55", "55 - Meuse"], ["56", "56 - Morbihan"], ["57", "57 - Moselle"], ["58", "58 - Nièvre"], ["59", "59 - Nord"],
-                    ["60", "60 - Oise"], ["61", "61 - Orne"], ["62", "62 - Pas-de-Calais"], ["63", "63 - Puy-de-Dôme"], ["64", "64 - Pyrénées-Atlantiques"],
-                    ["65", "65 - Hautes-Pyrénées"], ["66", "66 - Pyrénées-Orientales"], ["67", "67 - Bas-Rhin"], ["68", "68 - Haut-Rhin"], ["69", "69 - Rhône"],
-                    ["70", "70 - Haute-Saône"], ["71", "71 - Saône-et-Loire"], ["72", "72 - Sarthe"], ["73", "73 - Savoie"], ["74", "74 - Haute-Savoie"],
-                    ["75", "75 - Paris"], ["76", "76 - Seine-Maritime"], ["77", "77 - Seine-et-Marne"], ["78", "78 - Yvelines"],
-                    ["79", "79 - Deux-Sèvres"], ["80", "80 - Somme"], ["81", "81 - Tarn"], ["82", "82 - Tarn-et-Garonne"],
-                    ["83", "83 - Var"], ["84", "84 - Vaucluse"], ["85", "85 - Vendée"], ["86", "86 - Vienne"], ["87", "87 - Haute-Vienne"],
-                    ["88", "88 - Vosges"], ["89", "89 - Yonne"], ["90", "90 - Territoire de Belfort"],
-                    ["91", "91 - Essonne"], ["92", "92 - Hauts-de-Seine"], ["93", "93 - Seine-Saint-Denis"], ["94", "94 - Val-de-Marne"], ["95", "95 - Val-d'Oise"],
-                    ["971", "971 - Guadeloupe"], ["972", "972 - Martinique"], ["973", "973 - Guyane"], ["974", "974 - La Réunion"], ["976", "976 - Mayotte"],
-                  ]} />
-                <FieldSelect label="Situation familiale" value={situationFamiliale} onChange={setSituationFamiliale} disabled={!canWrite}
-                  options={[["", "Sélectionnez..."], ["celibataire", "Célibataire"], ["marie", "Marié(e)"], ["pacse", "Pacsé(e)"], ["divorce", "Divorcé(e)"], ["veuf", "Veuf/Veuve"], ["separe", "Séparé(e)"], ["concubinage", "Concubinage"]]} />
-                <Field label="Nb personnes a charge" type="number" value={String(nbPersonnesCharge)} onChange={(v) => setNbPersonnesCharge(Number(v))} disabled={!canWrite} />
-              </div>
-
-              {/* Right: Coordonnees + Contact urgence */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                    <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(37,99,235,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7l-10 7L2 7" /></svg>
-                    </span>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Coordonnees</span>
-                  </div>
-                  <Field label="Email" type="email" value={email} onChange={setEmail} disabled={!canWrite} />
-                  <Field label="Tel. mobile" value={telMobile} onChange={setTelMobile} disabled={!canWrite} />
-                  <Field label="Tel. fixe" value={telFixe} onChange={setTelFixe} disabled={!canWrite} />
-                  <Field label="Adresse" value={adresse} onChange={setAdresse} disabled={!canWrite} />
-                  <Field label="Code postal" value={codePostal} onChange={setCodePostal} disabled={!canWrite} />
-                  <Field label="Ville" value={ville} onChange={setVille} disabled={!canWrite} />
-                </div>
-
-                <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                    <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(220,38,38,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
-                    </span>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Contact d&apos;urgence</span>
-                  </div>
-                  <Field label="Prenom" value={contactUrgPrenom} onChange={setContactUrgPrenom} disabled={!canWrite} />
-                  <Field label="Nom" value={contactUrgNom} onChange={setContactUrgNom} disabled={!canWrite} />
-                  <Field label="Lien" value={contactUrgLien} onChange={setContactUrgLien} disabled={!canWrite} />
-                  <Field label="Tel. mobile" value={contactUrgTel} onChange={setContactUrgTel} disabled={!canWrite} />
-                </div>
-              </div>
-            </div>
-
-            {/* Infos professionnelles */}
-            <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginTop: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(160,132,92,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>
-                </span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Informations professionnelles</span>
-              </div>
-              <div style={grid2}>
-                <Field label="Date d'anciennete" type="date" value={dateAnciennete} onChange={setDateAnciennete} disabled={!canWrite} />
-                <Field label="Matricule" value={matricule} onChange={setMatricule} disabled={!canWrite} />
-              </div>
-            </div>
-
-            {/* Bancaire */}
-            <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginTop: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(160,132,92,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><rect x="1" y="5" width="22" height="16" rx="2" /><path d="M1 10h22" /></svg>
-                </span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Informations administratives et bancaires</span>
-              </div>
-              <div style={{ padding: 10, borderRadius: 8, background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.12)", marginBottom: 12, fontSize: 12, color: "#666" }}>
-                Depuis le 27 decembre 2022, le salaire doit imperativement etre verse sur un compte bancaire dont le collaborateur est titulaire ou co-titulaire.
-              </div>
-              <Field label="Nom du titulaire du compte" value={titulaireCompte} onChange={setTitulaireCompte} disabled={!canWrite} />
-              <Field label="IBAN" value={iban} onChange={setIban} disabled={!canWrite} />
-              <Field label="BIC" value={bic} onChange={setBic} disabled={!canWrite} />
-            </div>
-
-            {/* Medical */}
-            <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginTop: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(37,99,235,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-                </span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Informations medicales</span>
-              </div>
-              <div style={{ padding: 10, borderRadius: 8, background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.12)", marginBottom: 12, fontSize: 12, color: "#2563eb" }}>
-                Le numero doit comporter 15 chiffres et commencer par 1 ou 2. Si le numero commence par 7 ou 8, il s&apos;agit d&apos;un NIA (numero provisoire).
-              </div>
-              <Field label="Numero de Securite sociale" value={numeroSecu} onChange={setNumeroSecu} disabled={!canWrite} />
-              <Checkbox label="Personne en situation de handicap" checked={handicap} onChange={setHandicap} disabled={!canWrite} />
-              {handicap && <Field label="Type de handicap" value={typeHandicap} onChange={setTypeHandicap} disabled={!canWrite} />}
-              <div style={grid2}>
-                <Field label="Date derniere visite medicale" type="date" value={dateVisiteMedicale} onChange={setDateVisiteMedicale} disabled={!canWrite} />
-                <Field label="Prochaine visite medicale" type="date" value={prochaineVisite} onChange={setProchaineVisite} disabled={!canWrite} />
-              </div>
-              <Checkbox label="Visite medicale renforcee" checked={visiteRenforcee} onChange={setVisiteRenforcee} disabled={!canWrite} />
-            </div>
-
-            {/* Autorisations de travail */}
-            <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginTop: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(123,31,162,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#7B1FA2" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
-                </span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Autorisations de travail</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 14, color: "#1a1a1a" }}>Travailleur etranger avec autorisation de travail</span>
-                <button type="button" onClick={() => setTravailleurEtranger(!travailleurEtranger)} disabled={!canWrite} style={{
-                  width: 40, height: 22, borderRadius: 11, border: "none", cursor: canWrite ? "pointer" : "default",
-                  background: travailleurEtranger ? "#2D6A4F" : "#ddd6c8", position: "relative",
-                }}>
-                  <span style={{
-                    position: "absolute", top: 2, left: travailleurEtranger ? 20 : 2,
-                    width: 18, height: 18, borderRadius: "50%", background: "#fff",
-                    transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
-                  }} />
-                </button>
-              </div>
-            </div>
-
-            {/* Save bar */}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16, padding: "16px 0", borderTop: "1px solid #f0ebe3" }}>
-              <button type="button" onClick={() => window.location.reload()} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#1a1a1a" }}>
-                Annuler
-              </button>
-              <button type="button" onClick={handleSave} disabled={saving} style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: saving ? 0.5 : 1 }}>
-                {saving ? "..." : "Enregistrer les modifications"}
-              </button>
-            </div>
-          </>
+          <InfosTab
+            canWrite={canWrite}
+            accent={empEtab?.couleur ?? etab?.couleur ?? "#D4775A"}
+            genre={genre} setGenre={setGenre}
+            prenom={prenom} setPrenom={setPrenom}
+            nom={nom} setNom={setNom}
+            nationalite={nationalite} setNationalite={setNationalite}
+            dateNaissance={dateNaissance} setDateNaissance={setDateNaissance}
+            lieuNaissance={lieuNaissance} setLieuNaissance={setLieuNaissance}
+            deptNaissance={deptNaissance} setDeptNaissance={setDeptNaissance}
+            situationFamiliale={situationFamiliale} setSituationFamiliale={setSituationFamiliale}
+            nbPersonnesCharge={nbPersonnesCharge} setNbPersonnesCharge={setNbPersonnesCharge}
+            email={email} setEmail={setEmail}
+            telMobile={telMobile} setTelMobile={setTelMobile}
+            telFixe={telFixe} setTelFixe={setTelFixe}
+            adresse={adresse} setAdresse={setAdresse}
+            codePostal={codePostal} setCodePostal={setCodePostal}
+            ville={ville} setVille={setVille}
+            contactUrgPrenom={contactUrgPrenom} setContactUrgPrenom={setContactUrgPrenom}
+            contactUrgNom={contactUrgNom} setContactUrgNom={setContactUrgNom}
+            contactUrgLien={contactUrgLien} setContactUrgLien={setContactUrgLien}
+            contactUrgTel={contactUrgTel} setContactUrgTel={setContactUrgTel}
+            dateAnciennete={dateAnciennete} setDateAnciennete={setDateAnciennete}
+            matricule={matricule} setMatricule={setMatricule}
+            titulaireCompte={titulaireCompte} setTitulaireCompte={setTitulaireCompte}
+            iban={iban} setIban={setIban}
+            bic={bic} setBic={setBic}
+            numeroSecu={numeroSecu} setNumeroSecu={setNumeroSecu}
+            handicap={handicap} setHandicap={setHandicap}
+            typeHandicap={typeHandicap} setTypeHandicap={setTypeHandicap}
+            dateVisiteMedicale={dateVisiteMedicale} setDateVisiteMedicale={setDateVisiteMedicale}
+            visiteRenforcee={visiteRenforcee} setVisiteRenforcee={setVisiteRenforcee}
+            prochaineVisite={prochaineVisite} setProchaineVisite={setProchaineVisite}
+            travailleurEtranger={travailleurEtranger} setTravailleurEtranger={setTravailleurEtranger}
+            note={note} setNote={setNote}
+            saving={saving} handleSave={handleSave}
+          />
         )}
 
         {/* ═══ TAB: CONTRATS (was Dossier RH) ═══ */}
@@ -2373,6 +2245,268 @@ function PlanifEquipes({ etabId, currentAccess, empId, onUpdate }: {
         );
       })}
     </div>
+  );
+}
+
+/* ── InfosTab — Accordion-based layout ─────────────────────────── */
+
+function AccordionSection({ title, icon, iconColor, iconBg, defaultOpen = false, children }: {
+  title: string; icon: React.ReactNode; iconColor?: string; iconBg?: string; defaultOpen?: boolean; children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ border: "1px solid #ddd6c8", borderRadius: 12, marginBottom: 10, overflow: "hidden", background: "#fff" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          display: "flex", alignItems: "center", gap: 10, width: "100%",
+          padding: "14px 18px", border: "none", cursor: "pointer",
+          background: open ? "#faf7f2" : "#fff",
+          borderLeft: open ? `3px solid ${iconColor ?? "#D4775A"}` : "3px solid transparent",
+          transition: "background 0.15s, border-color 0.15s",
+        }}
+      >
+        <span style={{
+          width: 26, height: 26, borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center",
+          background: iconBg ?? "rgba(212,119,90,0.1)", flexShrink: 0,
+        }}>
+          {icon}
+        </span>
+        <span style={{ flex: 1, textAlign: "left", fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{title}</span>
+        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2"
+          style={{ transform: open ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s" }}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      {open && (
+        <div style={{ padding: "4px 18px 18px" }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const DEPT_OPTIONS: [string, string][] = [
+  ["", "Selectionnez..."],
+  ["01", "01 - Ain"], ["02", "02 - Aisne"], ["03", "03 - Allier"], ["04", "04 - Alpes-de-Haute-Provence"], ["05", "05 - Hautes-Alpes"],
+  ["06", "06 - Alpes-Maritimes"], ["07", "07 - Ardeche"], ["08", "08 - Ardennes"], ["09", "09 - Ariege"], ["10", "10 - Aube"],
+  ["11", "11 - Aude"], ["12", "12 - Aveyron"], ["13", "13 - Bouches-du-Rhone"], ["14", "14 - Calvados"], ["15", "15 - Cantal"],
+  ["16", "16 - Charente"], ["17", "17 - Charente-Maritime"], ["18", "18 - Cher"], ["19", "19 - Correze"], ["2A", "2A - Corse-du-Sud"],
+  ["2B", "2B - Haute-Corse"], ["21", "21 - Cote-d'Or"], ["22", "22 - Cotes-d'Armor"], ["23", "23 - Creuse"], ["24", "24 - Dordogne"],
+  ["25", "25 - Doubs"], ["26", "26 - Drome"], ["27", "27 - Eure"], ["28", "28 - Eure-et-Loir"], ["29", "29 - Finistere"],
+  ["30", "30 - Gard"], ["31", "31 - Haute-Garonne"], ["32", "32 - Gers"], ["33", "33 - Gironde"], ["34", "34 - Herault"],
+  ["35", "35 - Ille-et-Vilaine"], ["36", "36 - Indre"], ["37", "37 - Indre-et-Loire"], ["38", "38 - Isere"], ["39", "39 - Jura"],
+  ["40", "40 - Landes"], ["41", "41 - Loir-et-Cher"], ["42", "42 - Loire"], ["43", "43 - Haute-Loire"], ["44", "44 - Loire-Atlantique"],
+  ["45", "45 - Loiret"], ["46", "46 - Lot"], ["47", "47 - Lot-et-Garonne"], ["48", "48 - Lozere"], ["49", "49 - Maine-et-Loire"],
+  ["50", "50 - Manche"], ["51", "51 - Marne"], ["52", "52 - Haute-Marne"], ["53", "53 - Mayenne"], ["54", "54 - Meurthe-et-Moselle"],
+  ["55", "55 - Meuse"], ["56", "56 - Morbihan"], ["57", "57 - Moselle"], ["58", "58 - Nievre"], ["59", "59 - Nord"],
+  ["60", "60 - Oise"], ["61", "61 - Orne"], ["62", "62 - Pas-de-Calais"], ["63", "63 - Puy-de-Dome"], ["64", "64 - Pyrenees-Atlantiques"],
+  ["65", "65 - Hautes-Pyrenees"], ["66", "66 - Pyrenees-Orientales"], ["67", "67 - Bas-Rhin"], ["68", "68 - Haut-Rhin"], ["69", "69 - Rhone"],
+  ["70", "70 - Haute-Saone"], ["71", "71 - Saone-et-Loire"], ["72", "72 - Sarthe"], ["73", "73 - Savoie"], ["74", "74 - Haute-Savoie"],
+  ["75", "75 - Paris"], ["76", "76 - Seine-Maritime"], ["77", "77 - Seine-et-Marne"], ["78", "78 - Yvelines"],
+  ["79", "79 - Deux-Sevres"], ["80", "80 - Somme"], ["81", "81 - Tarn"], ["82", "82 - Tarn-et-Garonne"],
+  ["83", "83 - Var"], ["84", "84 - Vaucluse"], ["85", "85 - Vendee"], ["86", "86 - Vienne"], ["87", "87 - Haute-Vienne"],
+  ["88", "88 - Vosges"], ["89", "89 - Yonne"], ["90", "90 - Territoire de Belfort"],
+  ["91", "91 - Essonne"], ["92", "92 - Hauts-de-Seine"], ["93", "93 - Seine-Saint-Denis"], ["94", "94 - Val-de-Marne"], ["95", "95 - Val-d'Oise"],
+  ["971", "971 - Guadeloupe"], ["972", "972 - Martinique"], ["973", "973 - Guyane"], ["974", "974 - La Reunion"], ["976", "976 - Mayotte"],
+];
+
+const SIT_OPTIONS: [string, string][] = [
+  ["", "Selectionnez..."], ["celibataire", "Celibataire"], ["marie", "Marie(e)"], ["pacse", "Pacse(e)"],
+  ["divorce", "Divorce(e)"], ["veuf", "Veuf/Veuve"], ["separe", "Separe(e)"], ["concubinage", "Concubinage"],
+];
+
+function InfosTab(props: {
+  canWrite: boolean; accent: string;
+  genre: string; setGenre: (v: string) => void;
+  prenom: string; setPrenom: (v: string) => void;
+  nom: string; setNom: (v: string) => void;
+  nationalite: string; setNationalite: (v: string) => void;
+  dateNaissance: string; setDateNaissance: (v: string) => void;
+  lieuNaissance: string; setLieuNaissance: (v: string) => void;
+  deptNaissance: string; setDeptNaissance: (v: string) => void;
+  situationFamiliale: string; setSituationFamiliale: (v: string) => void;
+  nbPersonnesCharge: number; setNbPersonnesCharge: (v: number) => void;
+  email: string; setEmail: (v: string) => void;
+  telMobile: string; setTelMobile: (v: string) => void;
+  telFixe: string; setTelFixe: (v: string) => void;
+  adresse: string; setAdresse: (v: string) => void;
+  codePostal: string; setCodePostal: (v: string) => void;
+  ville: string; setVille: (v: string) => void;
+  contactUrgPrenom: string; setContactUrgPrenom: (v: string) => void;
+  contactUrgNom: string; setContactUrgNom: (v: string) => void;
+  contactUrgLien: string; setContactUrgLien: (v: string) => void;
+  contactUrgTel: string; setContactUrgTel: (v: string) => void;
+  dateAnciennete: string; setDateAnciennete: (v: string) => void;
+  matricule: string; setMatricule: (v: string) => void;
+  titulaireCompte: string; setTitulaireCompte: (v: string) => void;
+  iban: string; setIban: (v: string) => void;
+  bic: string; setBic: (v: string) => void;
+  numeroSecu: string; setNumeroSecu: (v: string) => void;
+  handicap: boolean; setHandicap: (v: boolean) => void;
+  typeHandicap: string; setTypeHandicap: (v: string) => void;
+  dateVisiteMedicale: string; setDateVisiteMedicale: (v: string) => void;
+  visiteRenforcee: boolean; setVisiteRenforcee: (v: boolean) => void;
+  prochaineVisite: string; setProchaineVisite: (v: string) => void;
+  travailleurEtranger: boolean; setTravailleurEtranger: (v: boolean) => void;
+  note: string; setNote: (v: string) => void;
+  saving: boolean; handleSave: () => void;
+}) {
+  const p = props;
+  const cw = p.canWrite;
+  const ic = (color: string) => <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>;
+
+  return (
+    <>
+      <AccordionSection
+        title="Etat civil"
+        icon={ic("#2D6A4F")}
+        iconColor="#2D6A4F" iconBg="rgba(45,106,79,0.1)"
+        defaultOpen
+      >
+        <div style={grid2}>
+          <FieldSelect label="Genre" value={p.genre} onChange={p.setGenre} disabled={!cw}
+            options={[["", "-- Selectionner --"], ["M", "Homme"], ["F", "Femme"]]} />
+          <Field label="Nationalite" value={p.nationalite} onChange={p.setNationalite} disabled={!cw} />
+        </div>
+        <div style={grid2}>
+          <Field label="Prenom" value={p.prenom} onChange={p.setPrenom} disabled={!cw} />
+          <Field label="Nom de naissance" value={p.nom} onChange={p.setNom} disabled={!cw} />
+        </div>
+        <div style={grid2}>
+          <Field label="Date de naissance" type="date" value={p.dateNaissance} onChange={p.setDateNaissance} disabled={!cw} />
+          <Field label="Lieu de naissance" value={p.lieuNaissance} onChange={p.setLieuNaissance} disabled={!cw} />
+        </div>
+        <div style={grid2}>
+          <FieldSelect label="Departement de naissance" value={p.deptNaissance} onChange={p.setDeptNaissance} disabled={!cw} options={DEPT_OPTIONS} />
+          <FieldSelect label="Situation familiale" value={p.situationFamiliale} onChange={p.setSituationFamiliale} disabled={!cw} options={SIT_OPTIONS} />
+        </div>
+        <Field label="Nb personnes a charge" type="number" value={String(p.nbPersonnesCharge)} onChange={(v) => p.setNbPersonnesCharge(Number(v))} disabled={!cw} />
+      </AccordionSection>
+
+      <AccordionSection
+        title="Coordonnees"
+        icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7l-10 7L2 7" /></svg>}
+        iconColor="#2563eb" iconBg="rgba(37,99,235,0.1)"
+        defaultOpen
+      >
+        <div style={grid2}>
+          <Field label="Email" type="email" value={p.email} onChange={p.setEmail} disabled={!cw} />
+          <Field label="Tel. mobile" value={p.telMobile} onChange={p.setTelMobile} disabled={!cw} />
+        </div>
+        <Field label="Tel. fixe" value={p.telFixe} onChange={p.setTelFixe} disabled={!cw} />
+        <Field label="Adresse" value={p.adresse} onChange={p.setAdresse} disabled={!cw} />
+        <div style={grid2}>
+          <Field label="Code postal" value={p.codePostal} onChange={p.setCodePostal} disabled={!cw} />
+          <Field label="Ville" value={p.ville} onChange={p.setVille} disabled={!cw} />
+        </div>
+      </AccordionSection>
+
+      <AccordionSection
+        title="Contact d'urgence"
+        icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>}
+        iconColor="#DC2626" iconBg="rgba(220,38,38,0.1)"
+      >
+        <div style={grid2}>
+          <Field label="Prenom" value={p.contactUrgPrenom} onChange={p.setContactUrgPrenom} disabled={!cw} />
+          <Field label="Nom" value={p.contactUrgNom} onChange={p.setContactUrgNom} disabled={!cw} />
+        </div>
+        <div style={grid2}>
+          <Field label="Lien" value={p.contactUrgLien} onChange={p.setContactUrgLien} disabled={!cw} />
+          <Field label="Tel. mobile" value={p.contactUrgTel} onChange={p.setContactUrgTel} disabled={!cw} />
+        </div>
+      </AccordionSection>
+
+      <AccordionSection
+        title="Informations professionnelles"
+        icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>}
+        iconColor="#A0845C" iconBg="rgba(160,132,92,0.1)"
+      >
+        <div style={grid2}>
+          <Field label="Date d'anciennete" type="date" value={p.dateAnciennete} onChange={p.setDateAnciennete} disabled={!cw} />
+          <Field label="Matricule" value={p.matricule} onChange={p.setMatricule} disabled={!cw} />
+        </div>
+      </AccordionSection>
+
+      <AccordionSection
+        title="Informations bancaires"
+        icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><rect x="1" y="5" width="22" height="16" rx="2" /><path d="M1 10h22" /></svg>}
+        iconColor="#A0845C" iconBg="rgba(160,132,92,0.1)"
+      >
+        <div style={{ padding: 10, borderRadius: 8, background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.12)", marginBottom: 12, fontSize: 12, color: "#666" }}>
+          Le salaire doit etre verse sur un compte dont le collaborateur est titulaire ou co-titulaire.
+        </div>
+        <Field label="Nom du titulaire du compte" value={p.titulaireCompte} onChange={p.setTitulaireCompte} disabled={!cw} />
+        <div style={grid2}>
+          <Field label="IBAN" value={p.iban} onChange={p.setIban} disabled={!cw} />
+          <Field label="BIC" value={p.bic} onChange={p.setBic} disabled={!cw} />
+        </div>
+      </AccordionSection>
+
+      <AccordionSection
+        title="Informations medicales"
+        icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>}
+        iconColor="#2563eb" iconBg="rgba(37,99,235,0.1)"
+      >
+        <div style={{ padding: 10, borderRadius: 8, background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.12)", marginBottom: 12, fontSize: 12, color: "#2563eb" }}>
+          Le numero de Securite sociale doit comporter 15 chiffres (1 ou 2 en debut). 7 ou 8 = NIA provisoire.
+        </div>
+        <Field label="Numero de Securite sociale" value={p.numeroSecu} onChange={p.setNumeroSecu} disabled={!cw} />
+        <Checkbox label="Personne en situation de handicap" checked={p.handicap} onChange={p.setHandicap} disabled={!cw} />
+        {p.handicap && <Field label="Type de handicap" value={p.typeHandicap} onChange={p.setTypeHandicap} disabled={!cw} />}
+        <div style={grid2}>
+          <Field label="Derniere visite medicale" type="date" value={p.dateVisiteMedicale} onChange={p.setDateVisiteMedicale} disabled={!cw} />
+          <Field label="Prochaine visite medicale" type="date" value={p.prochaineVisite} onChange={p.setProchaineVisite} disabled={!cw} />
+        </div>
+        <Checkbox label="Visite medicale renforcee" checked={p.visiteRenforcee} onChange={p.setVisiteRenforcee} disabled={!cw} />
+      </AccordionSection>
+
+      <AccordionSection
+        title="Autorisations de travail"
+        icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#7B1FA2" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>}
+        iconColor="#7B1FA2" iconBg="rgba(123,31,162,0.1)"
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 14, color: "#1a1a1a" }}>Travailleur etranger avec autorisation de travail</span>
+          <button type="button" onClick={() => p.setTravailleurEtranger(!p.travailleurEtranger)} disabled={!cw} style={{
+            width: 40, height: 22, borderRadius: 11, border: "none", cursor: cw ? "pointer" : "default",
+            background: p.travailleurEtranger ? "#2D6A4F" : "#ddd6c8", position: "relative",
+          }}>
+            <span style={{
+              position: "absolute", top: 2, left: p.travailleurEtranger ? 20 : 2,
+              width: 18, height: 18, borderRadius: "50%", background: "#fff",
+              transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+            }} />
+          </button>
+        </div>
+      </AccordionSection>
+
+      <AccordionSection
+        title="Notes"
+        icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#6f6a61" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>}
+        iconColor="#6f6a61" iconBg="rgba(111,106,97,0.1)"
+      >
+        <textarea
+          value={p.note}
+          onChange={(e) => p.setNote(e.target.value)}
+          disabled={!cw}
+          placeholder="Notes internes sur le collaborateur..."
+          style={{ ...inputSt, minHeight: 80, resize: "vertical", fontFamily: "inherit" }}
+        />
+      </AccordionSection>
+
+      {/* Save bar */}
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16, padding: "16px 0", borderTop: "1px solid #f0ebe3" }}>
+        <button type="button" onClick={() => window.location.reload()} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#1a1a1a" }}>
+          Annuler
+        </button>
+        <button type="button" onClick={p.handleSave} disabled={p.saving} style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: p.saving ? 0.5 : 1 }}>
+          {p.saving ? "..." : "Enregistrer les modifications"}
+        </button>
+      </div>
+    </>
   );
 }
 
