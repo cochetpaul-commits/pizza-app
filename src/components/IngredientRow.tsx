@@ -1,6 +1,5 @@
 import React from "react";
 import type { CSSProperties } from "react";
-import Link from "next/link";
 import {
   CATEGORIES,
   CAT_COLORS,
@@ -125,12 +124,13 @@ export type IngredientRowProps = {
   onEditChange: (next: EditState) => void;
   onEditImportName: (id: string, current: string) => void;
   onCreateDerived?: (x: Ingredient) => void;
+  onOpenSupplier?: (supplierId: string) => void;
 };
 
 export const IngredientRow = React.memo(function IngredientRow({
   item: x, offer, supplierName, supplierIdForDisplay, alert, isEditing, compactMode, edit,
   suppliers, storageZones,
-  onStartEdit, onSaveEdit, onDelete, onSetStatus, onEditChange, onEditImportName, onCreateDerived,
+  onStartEdit, onSaveEdit, onDelete, onSetStatus, onEditChange, onEditImportName, onCreateDerived, onOpenSupplier,
 }: IngredientRowProps) {
   const [openSections, setOpenSections] = React.useState<Record<string, boolean>>({ identite: true, prix: true, complements: false });
   const toggleSection = (key: string) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
@@ -224,7 +224,7 @@ export const IngredientRow = React.memo(function IngredientRow({
         {/* Fournisseur */}
         <div style={{ flex: 1, fontSize: 12, color: "#666", display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
           {supplierName && supplierIdForDisplay ? (
-            <Link href={`/fournisseurs/${supplierIdForDisplay}`} style={{ color: "inherit", textDecoration: "underline dotted", textUnderlineOffset: 2 }}>{supplierName}</Link>
+            <button onClick={(e) => { e.stopPropagation(); onOpenSupplier?.(supplierIdForDisplay); }} style={{ color: "inherit", textDecoration: "underline dotted", textUnderlineOffset: 2, background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit", fontSize: "inherit" }}>{supplierName}</button>
           ) : "—"}
           {(estab === "bellomio" || estab === "both") && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: "#FEF2F2", color: "#D4775A" }}>BM</span>}
           {(estab === "piccola" || estab === "both") && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: "#F5F3FF", color: "#6B21A8" }}>PM</span>}

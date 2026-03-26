@@ -38,6 +38,7 @@ import { PriceAlertsPanel } from "@/components/PriceAlertsPanel";
 import { parseAllergens } from "@/lib/allergens";
 import { CategoryHeader, IngredientRow, type EditState, type StorageZoneOption } from "@/components/IngredientRow";
 import { useProfile } from "@/lib/ProfileContext";
+import { getSupplierColor } from "@/lib/supplierColors";
 import { updateDerivedIngredients, computeDerivedPrice, computeRendement } from "@/lib/rendement";
 import DuplicatePanel from "@/components/DuplicatePanel";
 import { detectDuplicates, type DuplicatePair } from "@/lib/duplicateDetection";
@@ -207,6 +208,12 @@ function IngredientsPageInner() {
   const [showFilters, setShowFilters] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showDuplicates, setShowDuplicates] = useState(false);
+
+  // Supplier modal
+  const [modalSupplierId, setModalSupplierId] = useState<string | null>(null);
+  const [supplierForm, setSupplierForm] = useState({ contact_name: "", phone: "", email: "", franco_minimum: "", notes: "" });
+  const [supplierSaving, setSupplierSaving] = useState(false);
+  const [supplierSaved, setSupplierSaved] = useState(false);
   const [showRendementCalc, setShowRendementCalc] = useState(false);
   const [rcIngredientId, setRcIngredientId] = useState<string>("");
   const [rcPoidsBrut, setRcPoidsBrut] = useState<number | "">(1000);
@@ -653,6 +660,37 @@ function IngredientsPageInner() {
     setEdit(prev => prev ? { ...prev, importName: next.trim() } : prev);
   }, []);
 
+  // ─── Supplier modal ─────────────────────────────────────────────────────
+  const openSupplierModal = useCallback(async (supplierId: string) => {
+    setModalSupplierId(supplierId);
+    setSupplierSaved(false);
+    const { data } = await supabase.from("suppliers").select("contact_name,phone,email,franco_minimum,notes").eq("id", supplierId).single();
+    if (data) {
+      setSupplierForm({
+        contact_name: data.contact_name ?? "", phone: data.phone ?? "",
+        email: data.email ?? "", franco_minimum: data.franco_minimum != null ? String(data.franco_minimum) : "",
+        notes: data.notes ?? "",
+      });
+    }
+  }, []);
+
+  const saveSupplierModal = useCallback(async () => {
+    if (!modalSupplierId) return;
+    setSupplierSaving(true);
+    const francoVal = supplierForm.franco_minimum.trim();
+    const { error } = await supabase.from("suppliers").update({
+      email: supplierForm.email.trim() || null,
+      phone: supplierForm.phone.trim() || null,
+      contact_name: supplierForm.contact_name.trim() || null,
+      notes: supplierForm.notes.trim() || null,
+      franco_minimum: francoVal ? parseFloat(francoVal) : null,
+    }).eq("id", modalSupplierId);
+    setSupplierSaving(false);
+    if (error) { alert(error.message); return; }
+    setSupplierSaved(true);
+    setTimeout(() => setSupplierSaved(false), 2000);
+  }, [modalSupplierId, supplierForm]);
+
   // ─── Infinite scroll sentinel ────────────────────────────────────────────
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -981,6 +1019,7 @@ function IngredientsPageInner() {
                             onEditChange={onEditChange}
                             onEditImportName={onEditImportName}
                             onCreateDerived={userCanWrite ? openDeriveModal : undefined}
+                            onOpenSupplier={openSupplierModal}
                           />
                         </div>
                       );
@@ -1198,6 +1237,42 @@ function IngredientsPageInner() {
           </div>
         </>
       )}
+
+      {/* ═══ MODALE FICHE FOURNISSEUR ═══ */}
+      {modalSupplierId && (() => {
+        const sup = suppliersMap.get(modalSupplierId);
+        const supName = sup?.name ?? "Fournisseur";
+        const supColor = getSupplierColor(supName);
+        const lblSt: CSSProperties = { fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginBottom: 4 };
+        const inpSt: CSSProperties = { fontFamily: "DM Sans, sans-serif", fontSize: 14, padding: "10px 12px", border: "1.5px solid #e5ddd0", borderRadius: 10, width: "100%", background: "#fff", color: "#1a1a1a", outline: "none" };
+        return (
+          <div onClick={() => setModalSupplierId(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 520, boxShadow: "0 12px 40px rgba(0,0,0,0.18)", borderLeft: `5px solid ${supColor}`, maxHeight: "90vh", overflowY: "auto" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 20px 12px" }}>
+                <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 20, color: supColor, textTransform: "uppercase" }}>{supName}</span>
+                <button onClick={() => setModalSupplierId(null)} style={{ width: 30, height: 30, borderRadius: 8, border: "none", background: "rgba(0,0,0,0.06)", color: "#999", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+              </div>
+              <div style={{ padding: "0 20px 20px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                  <div><div style={lblSt}>Contact</div><input style={inpSt} value={supplierForm.contact_name} onChange={(e) => setSupplierForm(f => ({ ...f, contact_name: e.target.value }))} placeholder="Prenom Nom" /></div>
+                  <div><div style={lblSt}>Telephone</div><input style={inpSt} value={supplierForm.phone} onChange={(e) => setSupplierForm(f => ({ ...f, phone: e.target.value }))} placeholder="06 xx xx xx xx" type="tel" /></div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                  <div><div style={lblSt}>Email</div><input style={inpSt} value={supplierForm.email} onChange={(e) => setSupplierForm(f => ({ ...f, email: e.target.value }))} placeholder="contact@fournisseur.fr" type="email" /></div>
+                  <div><div style={lblSt}>Franco minimum (EUR HT)</div><input style={inpSt} value={supplierForm.franco_minimum} onChange={(e) => setSupplierForm(f => ({ ...f, franco_minimum: e.target.value }))} placeholder="ex: 800" /></div>
+                </div>
+                <div style={{ marginBottom: 16 }}><div style={lblSt}>Notes</div><textarea style={{ ...inpSt, resize: "vertical" }} value={supplierForm.notes} onChange={(e) => setSupplierForm(f => ({ ...f, notes: e.target.value }))} placeholder="Delai de livraison, conditions..." rows={2} /></div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <button onClick={saveSupplierModal} disabled={supplierSaving} style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600, background: supColor, color: "#fff", border: "none", borderRadius: 20, padding: "8px 20px", cursor: "pointer", opacity: supplierSaving ? 0.6 : 1 }}>
+                    {supplierSaving ? "..." : supplierSaved ? "Enregistre !" : "Enregistrer"}
+                  </button>
+                  <Link href={`/ingredients?supplier=${modalSupplierId}`} onClick={() => setModalSupplierId(null)} style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: supColor, textDecoration: "none", fontWeight: 600 }}>Voir les articles →</Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
