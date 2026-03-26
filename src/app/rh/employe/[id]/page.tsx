@@ -209,6 +209,25 @@ export default function EmployeDetailPage() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showSalary, setShowSalary] = useState(false);
 
+  /* ── Sync active contrat fields for inline editing ── */
+  useEffect(() => {
+    const ac = contrats.find((c) => c.actif);
+    if (ac && !editContratId) {
+      setCType(ac.type);
+      setCDebut(ac.date_debut);
+      setCFin(ac.date_fin ?? "");
+      setCRemuneration(ac.remuneration);
+      setCEmploi(ac.emploi ?? "");
+      setCQualification(ac.qualification ?? "");
+      setCHeures(ac.heures_semaine);
+      setCJours(ac.jours_semaine);
+      setCActif(ac.actif);
+      setEditContratId(ac.id);
+      loadContratEquipes();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contrats]);
+
   /* ── Completion % ── */
   const completionPct = useMemo(() => {
     const values: Record<string, unknown> = {
@@ -714,200 +733,185 @@ export default function EmployeDetailPage() {
           />
         )}
 
-        {/* ═══ TAB: CONTRATS (was Dossier RH) ═══ */}
+        {/* ═══ TAB: CONTRATS ═══ */}
         {mainTab === "dossier" && (
           <>
-            {/* Contrats content only — legacy sub-tabs removed */}
-            {/* Legacy removed */}
+            {/* Contrat en cours — inline editable */}
+            <AccordionSection
+              title={activeContrat ? `Contrat en cours — ${CONTRAT_LABELS[activeContrat.type] ?? activeContrat.type}` : "Contrat en cours"}
+              icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>}
+              iconColor="#D4775A" iconBg="rgba(212,119,90,0.1)"
+              defaultOpen
+            >
+              {activeContrat ? (
+                <>
+                  {/* Inline editable contract fields */}
+                  <div style={grid2}>
+                    <FieldSelect label="Type de contrat" value={cType} onChange={setCType} disabled={!canWrite} tag="DPAE"
+                      options={Object.entries(CONTRAT_LABELS).map(([k, v]) => [k, v])} />
+                    <Field label="Emploi / Poste" value={cEmploi} onChange={setCEmploi} disabled={!canWrite} tag="DPAE" />
+                  </div>
+                  <div style={grid2}>
+                    <Field label="Date de debut" type="date" value={cDebut} onChange={setCDebut} disabled={!canWrite} tag="DPAE" />
+                    <Field label="Date de fin" type="date" value={cFin} onChange={setCFin} disabled={!canWrite} />
+                  </div>
+                  <div style={grid2}>
+                    <Field label="Remuneration brute mensuelle (EUR)" type="number" value={String(cRemuneration)} onChange={(v) => setCRemuneration(Number(v))} disabled={!canWrite} tag="DPAE" />
+                    <Field label="Qualification" value={cQualification} onChange={setCQualification} disabled={!canWrite} />
+                  </div>
+                  <div style={grid2}>
+                    <Field label="Heures / semaine" type="number" value={String(cHeures)} onChange={(v) => setCHeures(Number(v))} disabled={!canWrite} tag="DPAE" />
+                    <Field label="Jours / semaine" type="number" value={String(cJours)} onChange={(v) => setCJours(Number(v))} disabled={!canWrite} />
+                  </div>
 
-            {/* ─── SUB: Contrats ─── */}
-            
-              <>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                  <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700, color: "#1a1a1a", margin: 0 }}>Contrats</h2>
+                  {/* Etablissement + Equipe */}
+                  <div style={grid2}>
+                    <div style={fieldRow}>
+                      <label style={labelSt}>Etablissement <span style={tagStyle("DPAE")}>DPAE</span></label>
+                      <select id="contrat-etab" style={inputSt} defaultValue={(emp as Record<string, unknown>).etablissement_id as string ?? ""} disabled={!canWrite}>
+                        {etablissements.map((e) => <option key={e.id} value={e.id}>{e.nom}</option>)}
+                      </select>
+                    </div>
+                    <div style={fieldRow}>
+                      <label style={labelSt}>Equipe</label>
+                      <select id="contrat-equipe" style={inputSt} defaultValue={((emp as Record<string, unknown>).equipes_access as string[] ?? [])[0] ?? ""} disabled={!canWrite}>
+                        <option value="">— Selectionner —</option>
+                        {contratEquipes.map((eq) => <option key={eq} value={eq}>{eq}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
                   {canWrite && (
-                    <button type="button" onClick={openNewContrat} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                      + Nouveau contrat
+                    <div style={{ display: "flex", gap: 8, marginTop: 12, paddingTop: 12, borderTop: "1px solid #f0ebe3" }}>
+                      <button type="button" onClick={handleSaveContrat} disabled={saving} style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: saving ? 0.5 : 1 }}>
+                        {saving ? "..." : "Enregistrer le contrat"}
+                      </button>
+                      <button type="button" onClick={() => handleTerminateContrat(activeContrat.id)} style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid rgba(220,38,38,0.3)", background: "rgba(220,38,38,0.06)", color: "#DC2626", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        Terminer le contrat
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ textAlign: "center", padding: 20, color: "#999", fontSize: 13 }}>
+                  Aucun contrat actif.
+                  {canWrite && (
+                    <button type="button" onClick={openNewContrat} style={{ display: "block", margin: "10px auto 0", padding: "8px 18px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      + Creer un contrat
                     </button>
                   )}
                 </div>
+              )}
+            </AccordionSection>
 
-                {/* Contrat en cours */}
-                {activeContrat && (() => {
-                  const c = activeContrat;
-                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                  const cElems = elements.filter((e) => e.contrat_id === c.id);
-                  return (
-                    <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginBottom: 16 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(212,119,90,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-                          </span>
-                          <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Contrat en cours</span>
-                        </div>
-                        {canWrite && (
-                          <div style={{ position: "relative" }}>
-                            <button type="button" onClick={() => {
-                              const el = document.getElementById("contract-actions");
-                              if (el) el.style.display = el.style.display === "block" ? "none" : "block";
-                            }} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#1a1a1a", display: "flex", alignItems: "center", gap: 4 }}>
-                              ... Actions
-                              <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
-                            </button>
-                            <div id="contract-actions" style={{ display: "none", position: "absolute", right: 0, top: "calc(100% + 4px)", background: "#fff", border: "1px solid #ddd6c8", borderRadius: 8, padding: "4px 0", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.1)", minWidth: 200 }}>
-                              <button type="button" onClick={() => { openEditContrat(c); document.getElementById("contract-actions")!.style.display = "none"; }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 16px", background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#1a1a1a", textAlign: "left" }}>
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                                Afficher le detail
-                              </button>
-                              <button type="button" onClick={() => {
-                                document.getElementById("contract-actions")!.style.display = "none";
-                                setAvenantStep(1);
-                                setAvenantChanges([]);
-                                setAvenantHeures(c.heures_semaine);
-                                setAvenantSalaire(c.remuneration);
-                                setAvenantDate(new Date().toISOString().slice(0, 10));
-                                setShowAvenantModal(true);
-                              }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 16px", background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#1a1a1a", textAlign: "left" }}>
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                                Declarer un changement
-                              </button>
-                              <button type="button" onClick={() => { handleTerminateContrat(c.id); document.getElementById("contract-actions")!.style.display = "none"; }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 16px", background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#DC2626", textAlign: "left" }}>
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="8 12 12 16 16 12" /></svg>
-                                Terminer le contrat
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+            {/* Nouveau contrat (si pas de contrat actif ou demande) */}
+            {showContratModal && !editContratId && (
+              <AccordionSection
+                title="Nouveau contrat"
+                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>}
+                iconColor="#2D6A4F" iconBg="rgba(45,106,79,0.1)"
+                defaultOpen
+              >
+                <div style={grid2}>
+                  <FieldSelect label="Type de contrat" value={cType} onChange={setCType} tag="DPAE"
+                    options={Object.entries(CONTRAT_LABELS).map(([k, v]) => [k, v])} />
+                  <Field label="Emploi / Poste" value={cEmploi} onChange={setCEmploi} tag="DPAE" />
+                </div>
+                <div style={grid2}>
+                  <Field label="Date de debut" type="date" value={cDebut} onChange={setCDebut} tag="DPAE" />
+                  <Field label="Date de fin" type="date" value={cFin} onChange={setCFin} />
+                </div>
+                <div style={grid2}>
+                  <Field label="Remuneration brute mensuelle (EUR)" type="number" value={String(cRemuneration)} onChange={(v) => setCRemuneration(Number(v))} tag="DPAE" />
+                  <Field label="Qualification" value={cQualification} onChange={setCQualification} />
+                </div>
+                <div style={grid2}>
+                  <Field label="Heures / semaine" type="number" value={String(cHeures)} onChange={(v) => setCHeures(Number(v))} tag="DPAE" />
+                  <Field label="Jours / semaine" type="number" value={String(cJours)} onChange={(v) => setCJours(Number(v))} />
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 12, paddingTop: 12, borderTop: "1px solid #f0ebe3" }}>
+                  <button type="button" onClick={handleSaveContrat} disabled={saving} style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: saving ? 0.5 : 1 }}>
+                    {saving ? "..." : "Creer le contrat"}
+                  </button>
+                  <button type="button" onClick={() => setShowContratModal(false)} style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", color: "#1a1a1a", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    Annuler
+                  </button>
+                </div>
+              </AccordionSection>
+            )}
 
-                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                        <tbody>
-                          {[
-                            ["Type", CONTRAT_LABELS[c.type] ?? c.type],
-                            ["Debut du contrat", fmtDate(c.date_debut)],
-                            ["Remuneration", `${c.remuneration.toLocaleString("fr-FR")} EUR`],
-                            ["Emploi", c.emploi ?? "—"],
-                            ["Duree de travail hebdomadaire", `${c.heures_semaine} heures`],
-                            ["Nb. de jours travailles par semaine", `${c.jours_semaine} jours`],
-                            ["Qualification", c.qualification ?? "—"],
-                          ].map(([label, value]) => (
-                            <tr key={label} style={{ borderBottom: "1px solid #f0ebe3" }}>
-                              <td style={{ padding: "10px 0", color: "#1a1a1a", fontWeight: 500 }}>{label}</td>
-                              <td style={{ padding: "10px 0", color: "#1a1a1a", textAlign: "right" }}>{value}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+            {/* Historique */}
+            {contrats.length > 1 && (
+              <AccordionSection
+                title={`Historique des contrats (${contrats.length})`}
+                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>}
+                iconColor="#A0845C" iconBg="rgba(160,132,92,0.1)"
+              >
+                {contrats.map(c => (
+                  <div key={c.id} style={{ marginBottom: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <span style={contratPill(c.type)}>{CONTRAT_LABELS[c.type] ?? c.type}</span>
+                      <span style={{ fontSize: 12, color: "#999" }}>du {fmtDate(c.date_debut)}{c.date_fin ? ` au ${fmtDate(c.date_fin)}` : ""}</span>
+                      {c.actif && <span style={{ fontSize: 10, fontWeight: 700, color: "#2D6A4F", background: "#e8ede6", padding: "2px 6px", borderRadius: 4 }}>Actif</span>}
                     </div>
-                  );
-                })()}
-
-                {/* Historique contrats */}
-                {contrats.length > 0 && (
-                  <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginBottom: 16 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                      <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(160,132,92,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
-                      </span>
-                      <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Tous les contrats et avenants</span>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, padding: "8px 12px", background: "#faf7f2", borderRadius: 8, fontSize: 12 }}>
+                      <div><span style={{ color: "#999" }}>Remuneration</span><br /><strong>{c.remuneration.toLocaleString("fr-FR")} EUR</strong></div>
+                      <div><span style={{ color: "#999" }}>Heures/sem</span><br /><strong>{c.heures_semaine}h</strong></div>
+                      <div><span style={{ color: "#999" }}>Emploi</span><br /><strong>{c.emploi ?? "\u2014"}</strong></div>
                     </div>
-                    {contrats.map(c => (
-                      <div key={c.id} style={{ marginBottom: 16 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                          <span style={{ fontSize: 12, color: "#999" }}>{fmtDate(c.date_debut)}</span>
-                          <span style={{ fontSize: 12, color: "#1a1a1a", fontWeight: 600 }}>{c.actif ? "Contrat actif" : "Nouveau contrat"}</span>
-                        </div>
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, background: "#faf7f2", borderRadius: 8, overflow: "hidden" }}>
-                          <tbody>
-                            {[
-                              ["Type", CONTRAT_LABELS[c.type] ?? c.type],
-                              ["Debut du contrat", fmtDate(c.date_debut)],
-                              ["Remuneration", `${c.remuneration.toLocaleString("fr-FR")} EUR`],
-                              ["Emploi", c.emploi ?? "—"],
-                              ["Duree de travail hebdomadaire", `${c.heures_semaine} heures`],
-                              ["Nb. de jours travailles par semaine", `${c.jours_semaine} jours`],
-                              ["Qualification", c.qualification ?? "—"],
-                            ].map(([label, value]) => (
-                              <tr key={label} style={{ borderBottom: "1px solid #f0ebe3" }}>
-                                <td style={{ padding: "8px 12px", color: "#666" }}>{label}</td>
-                                <td style={{ padding: "8px 12px", color: "#1a1a1a" }}>{value}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                  </div>
+                ))}
+              </AccordionSection>
+            )}
+
+            {/* Mutuelle */}
+            <AccordionSection
+              title="Mutuelle"
+              icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><path d="M20.42 4.58a5.4 5.4 0 0 0-7.65 0L12 5.34l-.77-.76a5.4 5.4 0 0 0-7.65 7.65L12 20.7l8.42-8.42a5.4 5.4 0 0 0 0-7.65z" /></svg>}
+              iconColor="#D4775A" iconBg="rgba(212,119,90,0.1)"
+            >
+              <p style={{ fontSize: 13, color: "#999", textAlign: "center", margin: 0 }}>
+                Aucune dispense de mutuelle enregistree. Le collaborateur est considere comme couvert.
+              </p>
+            </AccordionSection>
+
+            {/* Primes et acomptes */}
+            <AccordionSection
+              title={`Primes et acomptes (${elements.length})`}
+              icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>}
+              iconColor="#A0845C" iconBg="rgba(160,132,92,0.1)"
+            >
+              {elements.length === 0 ? (
+                <p style={{ fontSize: 13, color: "#999", textAlign: "center", margin: 0 }}>Aucune prime ou acompte</p>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
+                    <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Date</th>
+                    <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Type</th>
+                    <th style={{ textAlign: "right", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Montant</th>
+                  </tr></thead>
+                  <tbody>
+                    {elements.map(el => (
+                      <tr key={el.id} style={{ borderBottom: "1px solid #f0ebe3" }}>
+                        <td style={{ padding: "8px 0" }}>{el.date_debut ? fmtDate(el.date_debut) : "\u2014"}</td>
+                        <td style={{ padding: "8px 0" }}>{ELEMENT_LABELS[el.type] ?? el.type} — {el.libelle}</td>
+                        <td style={{ padding: "8px 0", textAlign: "right", fontWeight: 600 }}>{el.montant ? `${el.montant} EUR` : "\u2014"}</td>
+                      </tr>
                     ))}
-                  </div>
-                )}
+                  </tbody>
+                </table>
+              )}
+            </AccordionSection>
 
-                {/* Mutuelle */}
-                <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginBottom: 16 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                    <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(212,119,90,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-                    </span>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Mutuelle</span>
-                  </div>
-                  <p style={{ fontSize: 13, color: "#999", textAlign: "center" }}>
-                    Aucune dispense de mutuelle n&apos;a ete enregistree pour ce collaborateur. Il est donc automatiquement considere comme couvert par une mutuelle.
-                  </p>
-                </div>
-
-                {/* Indemnites transport */}
-                <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20, marginBottom: 16 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(45,106,79,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3" /></svg>
-                      </span>
-                      <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Indemnites de transport mensuelles</span>
-                    </div>
-                    <button type="button" onClick={() => setShowTransportModal(true)} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>+ Ajouter</button>
-                  </div>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, marginBottom: 8 }}>
-                    <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
-                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Nom du dispositif</th>
-                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Montant mensuel</th>
-                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Periode</th>
-                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Etat</th>
-                    </tr></thead>
-                  </table>
-                  <p style={{ fontSize: 13, color: "#999", textAlign: "center" }}>Aucune indemnite de transport</p>
-                </div>
-
-                {/* Primes et acomptes */}
-                <div style={{ ...section, border: "1px solid #ddd6c8", borderRadius: 14, padding: 20 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(160,132,92,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
-                      </span>
-                      <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>Primes, acomptes et indemnites</span>
-                    </div>
-                    <button type="button" onClick={() => setShowPrimeModal(true)} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>+ Ajouter</button>
-                  </div>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, marginBottom: 8 }}>
-                    <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
-                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Date</th>
-                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Type</th>
-                      <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Montant</th>
-                    </tr></thead>
-                    <tbody>
-                      {elements.length === 0 ? (
-                        <tr><td colSpan={3} style={{ padding: "16px 0", textAlign: "center", color: "#999" }}>Pas de prime ou d&apos;acompte</td></tr>
-                      ) : elements.map(el => (
-                        <tr key={el.id} style={{ borderBottom: "1px solid #f0ebe3" }}>
-                          <td style={{ padding: "8px 0" }}>{el.date_debut ? fmtDate(el.date_debut) : "—"}</td>
-                          <td style={{ padding: "8px 0" }}>{ELEMENT_LABELS[el.type] ?? el.type} — {el.libelle}</td>
-                          <td style={{ padding: "8px 0" }}>{el.montant ? `${el.montant} EUR` : "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
+            {/* Bouton nouveau contrat */}
+            {canWrite && !showContratModal && (
+              <div style={{ marginTop: 10 }}>
+                <button type="button" onClick={openNewContrat} style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#1a1a1a" }}>
+                  + Nouveau contrat
+                </button>
+              </div>
+            )}
           </>
         )}
 
