@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo, useCallback } from "react";
 import type { CSSProperties } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { calculerPate, type EmpatementType, type FlourMixItem, type PateResult } from "@/lib/pateEngine";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -16,13 +17,16 @@ type RecipeLine = {
 };
 
 type EmpData = {
+  emp_type: EmpatementType;
   balls_count: number;
   ball_weight: number;
-  hydration: number;
-  salt: number;
+  hydration: number;   // percentage (e.g. 71)
+  salt: number;        // percentage (e.g. 2.1)
   honey: number;
   oil: number;
   yeast: number;
+  biga_yeast: number;
+  flour_mix: FlourMixItem[];
 };
 
 type Recipe = {
@@ -93,19 +97,45 @@ function parseAllergenArray(raw: unknown): string[] {
   return [];
 }
 
-function computeEmpLines(d: EmpData, countOverride?: number, weightOverride?: number): RecipeLine[] {
-  const bc = countOverride ?? d.balls_count;
-  const bw = weightOverride ?? d.ball_weight;
-  const totalDough = bc * bw;
-  const flour = totalDough / (1 + d.hydration + d.salt + d.honey + d.oil + d.yeast);
+function computeEmpResult(d: EmpData, countOverride?: number, weightOverride?: number): PateResult {
+  return calculerPate({
+    type: d.emp_type,
+    nbPatons: countOverride ?? d.balls_count,
+    poidsPaton: weightOverride ?? d.ball_weight,
+    recipe: {
+      hydration_total: d.hydration,
+      salt_percent: d.salt,
+      honey_percent: d.honey,
+      oil_percent: d.oil,
+      yeast_percent: d.yeast,
+      biga_yeast_percent: d.biga_yeast,
+    },
+    flourMix: d.flour_mix,
+  });
+}
+
+function phaseToLines(phase: PateResult["phases"][0]): RecipeLine[] {
   const lines: RecipeLine[] = [
-    { ingredient_name: "Farine", qty: Math.round(flour), unit: "g" },
-    { ingredient_name: "Eau", qty: Math.round(flour * d.hydration), unit: "g" },
-    { ingredient_name: "Sel", qty: Math.round(flour * d.salt * 10) / 10, unit: "g" },
+    { ingredient_name: "Farine", qty: phase.flour_g, unit: "g" },
+    { ingredient_name: "Eau", qty: phase.water_g, unit: "g" },
   ];
-  if (d.honey > 0) lines.push({ ingredient_name: "Miel", qty: Math.round(flour * d.honey * 10) / 10, unit: "g" });
-  if (d.oil > 0) lines.push({ ingredient_name: "Huile", qty: Math.round(flour * d.oil * 10) / 10, unit: "g" });
-  if (d.yeast > 0) lines.push({ ingredient_name: "Levure", qty: Math.round(flour * d.yeast * 10) / 10, unit: "g" });
+  if (phase.salt_g > 0) lines.push({ ingredient_name: "Sel", qty: phase.salt_g, unit: "g" });
+  if (phase.honey_g > 0) lines.push({ ingredient_name: "Miel", qty: phase.honey_g, unit: "g" });
+  if (phase.oil_g > 0) lines.push({ ingredient_name: "Huile", qty: phase.oil_g, unit: "g" });
+  if (phase.yeast_g > 0) lines.push({ ingredient_name: "Levure", qty: phase.yeast_g, unit: "g" });
+  return lines;
+}
+
+function resultToLines(r: PateResult): RecipeLine[] {
+  const t = r.totals;
+  const lines: RecipeLine[] = [
+    { ingredient_name: "Farine", qty: t.flour_total_g, unit: "g" },
+    { ingredient_name: "Eau", qty: t.water_g, unit: "g" },
+  ];
+  if (t.salt_g > 0) lines.push({ ingredient_name: "Sel", qty: t.salt_g, unit: "g" });
+  if (t.honey_g > 0) lines.push({ ingredient_name: "Miel", qty: t.honey_g, unit: "g" });
+  if (t.oil_g > 0) lines.push({ ingredient_name: "Huile", qty: t.oil_g, unit: "g" });
+  if (t.yeast_g > 0) lines.push({ ingredient_name: "Levure", qty: t.yeast_g, unit: "g" });
   return lines;
 }
 
@@ -281,25 +311,37 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
   // ── Empâtement ──
   const { data: empatements } = await supabase
     .from("recipes")
-    .select("id, name, balls_count, ball_weight, flour_mix, hydration_total, salt_percent, honey_percent, oil_percent, yeast_percent, pivot_ingredient_id")
+    .select("id, name, type, balls_count, ball_weight, flour_mix, hydration_total, salt_percent, honey_percent, oil_percent, yeast_percent, biga_yeast_percent, procedure, pivot_ingredient_id")
     .order("name");
 
   for (const e of (empatements ?? [])) {
     const bc = e.balls_count ?? 1;
     const bw = e.ball_weight ?? 250;
+    const empType = (e.type === "biga" || e.type === "focaccia" ? e.type : "direct") as EmpatementType;
+    let flourMix: FlourMixItem[] = [{ name: "Farine", percent: 100 }];
+    if (e.flour_mix) {
+      try {
+        const parsed = typeof e.flour_mix === "string" ? JSON.parse(e.flour_mix) : e.flour_mix;
+        if (Array.isArray(parsed) && parsed.length > 0) flourMix = parsed;
+      } catch { /* ignore */ }
+    }
     const empData: EmpData = {
+      emp_type: empType,
       balls_count: bc, ball_weight: bw,
-      hydration: (e.hydration_total ?? 60) / 100,
-      salt: (e.salt_percent ?? 2.5) / 100,
-      honey: (e.honey_percent ?? 0) / 100,
-      oil: (e.oil_percent ?? 0) / 100,
-      yeast: (e.yeast_percent ?? 0.3) / 100,
+      hydration: e.hydration_total ?? 60,
+      salt: e.salt_percent ?? 2.5,
+      honey: e.honey_percent ?? 0,
+      oil: e.oil_percent ?? 0,
+      yeast: e.yeast_percent ?? 0.3,
+      biga_yeast: e.biga_yeast_percent ?? 0.5,
+      flour_mix: flourMix,
     };
-    const lines = computeEmpLines(empData);
+    const result = computeEmpResult(empData);
+    const lines = resultToLines(result);
 
     recipes.push({
       id: `emp-${e.id}`, type: "production", name: e.name, category: "empatement",
-      photo_url: null, lines, steps: [],
+      photo_url: null, lines, steps: parseJsonSteps(e.procedure),
       pivot_ingredient_id: e.pivot_ingredient_id,
       yield_info: `${bc} pâton${bc > 1 ? "s" : ""} × ${bw} g`,
       allergens: ["gluten"],
@@ -684,18 +726,22 @@ export default function CataloguePage() {
         const mColor = TYPE_COLORS[modalRecipe.type];
         const isEmp = !!modalRecipe.emp_data;
 
-        // Empâtement: recalculate lines from overrides
+        // Empâtement: recalculate from pateEngine
         let displayLines = modalRecipe.lines;
         let hasChanged = false;
         let empYield = modalRecipe.yield_info;
+        let empResult: PateResult | null = null;
         if (isEmp && modalRecipe.emp_data) {
           const ov = empOverrides[modalRecipe.id];
           const bc = ov?.count ?? modalRecipe.emp_data.balls_count;
           const bw = ov?.weight ?? modalRecipe.emp_data.ball_weight;
           hasChanged = bc !== modalRecipe.emp_data.balls_count || bw !== modalRecipe.emp_data.ball_weight;
-          if (hasChanged) {
-            displayLines = computeEmpLines(modalRecipe.emp_data, bc, bw);
-            empYield = `${bc} pâton${bc > 1 ? "s" : ""} × ${bw} g = ${fmtQty(bc * bw)} g`;
+          try { empResult = computeEmpResult(modalRecipe.emp_data, bc, bw); } catch { /* ignore */ }
+          if (empResult) {
+            displayLines = resultToLines(empResult);
+            if (hasChanged) {
+              empYield = `${bc} pâton${bc > 1 ? "s" : ""} × ${bw} g = ${fmtQty(bc * bw)} g`;
+            }
           }
         }
 
@@ -870,35 +916,74 @@ export default function CataloguePage() {
                 </div>
               )}
 
-              {/* Ingredients table */}
+              {/* Ingredients — phases for biga, flat list for others */}
               <div style={{ padding: "0 20px" }}>
-                <div style={{
-                  fontSize: 12, fontWeight: 700, color: mColor,
-                  textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8,
-                }}>
-                  Ingrédients
-                </div>
-                <div style={{ marginBottom: 16 }}>
-                  {displayLines.map((line, idx) => (
-                    <div key={idx} style={{
-                      display: "flex", justifyContent: "space-between", alignItems: "center",
-                      padding: "10px 14px", borderRadius: 8,
-                      background: idx % 2 === 0 ? "#faf7f2" : "transparent",
+                {empResult && empResult.phases.length > 1 ? (
+                  /* Biga: show each phase separately */
+                  empResult.phases.map((phase, phIdx) => {
+                    const pLines = phaseToLines(phase);
+                    return (
+                      <div key={phIdx} style={{ marginBottom: 16 }}>
+                        <div style={{
+                          fontSize: 12, fontWeight: 700, color: mColor,
+                          textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8,
+                        }}>
+                          {phase.name}
+                        </div>
+                        {pLines.map((line, idx) => (
+                          <div key={idx} style={{
+                            display: "flex", justifyContent: "space-between", alignItems: "center",
+                            padding: "10px 14px", borderRadius: 8,
+                            background: idx % 2 === 0 ? "#faf7f2" : "transparent",
+                          }}>
+                            <span style={{ color: "#1a1a1a", fontWeight: 500, fontSize: 15 }}>
+                              {line.ingredient_name}
+                            </span>
+                            <span style={{
+                              fontWeight: 800, fontSize: 16,
+                              color: hasChanged ? "#D4775A" : "#1a1a1a",
+                              fontVariantNumeric: "tabular-nums",
+                            }}>
+                              {line.qty > 0 ? fmtQty(line.qty) : "—"}
+                              <span style={{ fontWeight: 500, color: "#999", fontSize: 12, marginLeft: 4 }}>g</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })
+                ) : (
+                  /* Single phase or standard pivot: flat list */
+                  <>
+                    <div style={{
+                      fontSize: 12, fontWeight: 700, color: mColor,
+                      textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8,
                     }}>
-                      <span style={{ color: "#1a1a1a", fontWeight: 500, fontSize: 15 }}>
-                        {line.ingredient_name}
-                      </span>
-                      <span style={{
-                        fontWeight: 800, fontSize: 16,
-                        color: hasChanged ? "#D4775A" : "#1a1a1a",
-                        fontVariantNumeric: "tabular-nums",
-                      }}>
-                        {line.qty > 0 ? fmtQty(line.qty) : "—"}
-                        <span style={{ fontWeight: 500, color: "#999", fontSize: 12, marginLeft: 4 }}>{line.unit}</span>
-                      </span>
+                      Ingrédients
                     </div>
-                  ))}
-                </div>
+                    <div style={{ marginBottom: 16 }}>
+                      {displayLines.map((line, idx) => (
+                        <div key={idx} style={{
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          padding: "10px 14px", borderRadius: 8,
+                          background: idx % 2 === 0 ? "#faf7f2" : "transparent",
+                        }}>
+                          <span style={{ color: "#1a1a1a", fontWeight: 500, fontSize: 15 }}>
+                            {line.ingredient_name}
+                          </span>
+                          <span style={{
+                            fontWeight: 800, fontSize: 16,
+                            color: hasChanged ? "#D4775A" : "#1a1a1a",
+                            fontVariantNumeric: "tabular-nums",
+                          }}>
+                            {line.qty > 0 ? fmtQty(line.qty) : "—"}
+                            <span style={{ fontWeight: 500, color: "#999", fontSize: 12, marginLeft: 4 }}>{line.unit}</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Steps */}
