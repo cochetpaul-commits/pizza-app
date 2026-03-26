@@ -770,7 +770,7 @@ export default function InventairePage() {
             {filterNonSaisis ? "Tous les articles ont été saisis" : "Aucun article dans cette zone"}
           </p>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
             {categoryGroups.map(({ cat, label, color, items }) => {
               const isCollapsed = collapsedCats.has(cat);
               // Category summary
@@ -785,42 +785,39 @@ export default function InventairePage() {
 
               return (
                 <div key={cat}>
-                  {/* Category header */}
+                  {/* Category header — same style as ingredients index */}
                   <button
                     type="button"
                     onClick={() => toggleCat(cat)}
+                    onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; e.currentTarget.style.borderColor = color; }}
+                    onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor = "#ddd6c8"; (e.currentTarget.style as CSSStyleDeclaration).borderLeftColor = color; }}
                     style={{
                       width: "100%", display: "flex", alignItems: "center", gap: 10,
-                      padding: "10px 14px", borderRadius: 10,
-                      background: color + "12",
-                      border: `1.5px solid ${color}30`,
-                      cursor: "pointer", textAlign: "left",
-                      transition: "all 0.15s",
+                      padding: "12px 16px", background: "#fff",
+                      border: "1.5px solid #ddd6c8", borderLeft: `3px solid ${color}`,
+                      borderRadius: 12, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                      marginTop: 12, marginBottom: 6,
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                      transition: "box-shadow 0.2s, border-color 0.2s",
                     }}
                   >
-                    {/* Color bar */}
-                    <div style={{
-                      width: 4, height: 28, borderRadius: 2, background: color, flexShrink: 0,
-                    }} />
-                    {/* Label */}
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
-                        {label}
-                      </div>
-                      <div style={{ fontSize: 10, color: "#999", marginTop: 1 }}>
-                        {catSaisis}/{items.length} saisis
-                        {catValue > 0 && ` · ${fmtMoney(catValue)}`}
-                      </div>
-                    </div>
-                    {/* Non-saisis badge */}
-                    {catNonSaisis > 0 && !readOnly && (
-                      <span style={{
-                        fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 8,
-                        background: color + "20", color,
-                      }}>
-                        {catNonSaisis} restant{catNonSaisis > 1 ? "s" : ""}
-                      </span>
-                    )}
+                    {/* Colored dot */}
+                    <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                    {/* UPPERCASE label in category color */}
+                    <span style={{
+                      fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700,
+                      letterSpacing: "0.14em", textTransform: "uppercase", color,
+                    }}>{label}</span>
+                    {/* Count badge */}
+                    <span style={{
+                      fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
+                      background: `${color}18`, color,
+                    }}>{items.length}</span>
+                    {/* Saisis / value info */}
+                    <span style={{ fontSize: 11, color: "#999", marginLeft: 4 }}>
+                      {catSaisis}/{items.length}
+                      {catValue > 0 && ` · ${fmtMoney(catValue)}`}
+                    </span>
                     {/* Tout à 0 button */}
                     {isActive && catNonSaisis > 0 && (
                       <button
@@ -829,7 +826,7 @@ export default function InventairePage() {
                         style={{
                           fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 6,
                           border: "1px solid #ddd6c8", background: "#fff", color: "#999",
-                          cursor: "pointer", whiteSpace: "nowrap",
+                          cursor: "pointer", whiteSpace: "nowrap", marginLeft: "auto",
                         }}
                         title="Confirmer tous les articles non saisis comme 0"
                       >
@@ -837,14 +834,12 @@ export default function InventairePage() {
                       </button>
                     )}
                     {/* Chevron */}
-                    <span style={{ fontSize: 14, color: "#999", flexShrink: 0, transition: "transform 0.15s", transform: isCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>
-                      &#9662;
-                    </span>
+                    <span style={{ marginLeft: isActive && catNonSaisis > 0 ? 0 : "auto", fontSize: 10, color: "#b0a894", transition: "transform 0.2s", transform: isCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>&#x25BC;</span>
                   </button>
 
                   {/* Items */}
                   {!isCollapsed && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 2, marginLeft: 4 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 2 }}>
                       {items.map((ing) => {
                         const qty = quantities[ing.id];
                         const qtyNum = typeof qty === "number" ? qty : 0;
@@ -858,10 +853,12 @@ export default function InventairePage() {
                             key={ing.id}
                             style={{
                               display: "flex", alignItems: "center", gap: 10,
-                              padding: "8px 14px",
-                              background: hasQty ? "#fff" : isZeroConfirmed ? "#faf8f4" : "#faf8f4",
-                              borderRadius: 8,
-                              borderLeft: `3px solid ${hasQty ? color : isZeroConfirmed ? "#ccc" : "transparent"}`,
+                              padding: "10px 14px",
+                              background: "#fff",
+                              borderRadius: 12,
+                              border: "1.5px solid #ddd6c8",
+                              borderLeft: `3px solid ${hasQty ? color : isZeroConfirmed ? "#ccc" : "#ddd6c8"}`,
+                              marginBottom: 4,
                               transition: "all 0.15s",
                             }}
                           >
