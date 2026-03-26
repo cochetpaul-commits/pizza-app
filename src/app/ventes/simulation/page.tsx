@@ -160,6 +160,8 @@ export default function SimulationPage() {
   const [caSimule, setCaSimule] = useState(85000);
   const [simRows, setSimRows] = useState<SimRow[]>([]);
   const [selectedTns, setSelectedTns] = useState<string | null>(null);
+  // Salary overrides for simulation (empId → new brut/net amount)
+  const [salaryOverrides, setSalaryOverrides] = useState<Record<string, number>>({});
 
   /* ── Load ── */
   useEffect(() => {
@@ -189,10 +191,41 @@ export default function SimulationPage() {
     return () => { cancelled = true; };
   }, [etab]);
 
-  /* ── Costs ── */
-  const costs = useMemo(() => {
+  /* ── Costs (base from contracts) ── */
+  const baseCosts = useMemo(() => {
     return employes.filter((e) => e.contrats?.some((c) => c.actif)).map((e) => calcCostLine(e));
   }, [employes]);
+
+  /* ── Costs (with salary overrides applied) ── */
+  const costs = useMemo(() => {
+    return baseCosts.map((c) => {
+      const override = salaryOverrides[c.emp.id];
+      if (override === undefined || override === c.brut) return c;
+      // Recalculate with overridden salary
+      const heuresMois = c.heuresSemaine * 52 / 12;
+      if (c.isTNS) {
+        const chargesP = override * TAUX_CHARGES_TNS;
+        return {
+          ...c, brut: override, net: override,
+          chargesPatronales: chargesP,
+          coutEmployeur: override + chargesP,
+          coutHoraire: heuresMois > 0 ? (override + chargesP) / heuresMois : 0,
+        };
+      }
+      const chargesP = override * TAUX_CHARGES_PATRONALES;
+      const fillon = calcFillon(override, heuresMois);
+      const coutEmp = override + chargesP - fillon;
+      return {
+        ...c, brut: override,
+        net: override * (1 - TAUX_CHARGES_SALARIALES),
+        chargesPatronales: chargesP,
+        fillon,
+        coutEmployeur: coutEmp,
+        tauxReel: override > 0 ? (chargesP - fillon) / override * 100 : 0,
+        coutHoraire: heuresMois > 0 ? coutEmp / heuresMois : 0,
+      };
+    });
+  }, [baseCosts, salaryOverrides]);
 
   const salaries = costs.filter((c) => !c.isTNS);
   const tnsEmployes = costs.filter((c) => c.isTNS);
@@ -207,6 +240,21 @@ export default function SimulationPage() {
   const tauxMoyen = totalBrut > 0 ? (totalCharges / (totalBrut + tnsEmployes.reduce((a, c) => a + c.brut, 0))) * 100 : 0;
   const ratioMS = caSimule > 0 ? (totalMS / caSimule) * 100 : 0;
   const caNeeded = totalMS / (OBJECTIF_MS_CA / 100);
+
+  // Base MS (without overrides) for comparison
+  const baseTotalMS = useMemo(() => baseCosts.reduce((acc, c) => acc + c.coutEmployeur, 0), [baseCosts]);
+  const hasOverrides = Object.keys(salaryOverrides).length > 0;
+
+  const setSalaryOverride = (empId: string, value: number) => {
+    setSalaryOverrides((prev) => ({ ...prev, [empId]: value }));
+  };
+  const resetOverride = (empId: string) => {
+    setSalaryOverrides((prev) => {
+      const next = { ...prev };
+      delete next[empId];
+      return next;
+    });
+  };
 
   // Auto-select first TNS
   useEffect(() => {
@@ -461,6 +509,7 @@ export default function SimulationPage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {tnsEmployes.map((c) => {
                     const isSelected = selectedTns === c.emp.id;
+                    const isOvr = salaryOverrides[c.emp.id] !== undefined;
                     return (
                       <button
                         key={c.emp.id}
@@ -476,8 +525,9 @@ export default function SimulationPage() {
                       >
                         <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a" }}>{c.emp.prenom}</div>
                         <div style={{ fontSize: 12, color: "#999" }}>Gerant TNS</div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: accent, marginTop: 4 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: isOvr ? accent : "#1a1a1a", marginTop: 4 }}>
                           {fmt(c.brut)} &euro; net
+                          {isOvr && <span style={{ fontSize: 10, fontWeight: 500, color: "#999" }}> (modifie)</span>}
                         </div>
                       </button>
                     );
@@ -500,8 +550,11 @@ export default function SimulationPage() {
                 {(() => {
                   const sel = tnsEmployes.find((c) => c.emp.id === selectedTns);
                   if (!sel) return null;
-                  const tnsNet = sel.brut; // remuneration nette from contrat
+                  const baseContrat = baseCosts.find((c) => c.emp.id === sel.emp.id);
+                  const baseNet = baseContrat?.brut ?? 0;
+                  const tnsNet = sel.brut; // current (possibly overridden)
                   const heuresMois = sel.heuresSemaine * 52 / 12;
+                  const isOverridden = salaryOverrides[sel.emp.id] !== undefined;
 
                   return (
                     <div>
@@ -514,13 +567,32 @@ export default function SimulationPage() {
                           Calcul charges TNS — {sel.emp.prenom}
                         </h2>
 
-                        {/* TNS revenue display */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Remuneration nette :</span>
-                          <span style={{ fontSize: 26, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                            {fmt(tnsNet)} &euro;
-                          </span>
-                          <span style={{ fontSize: 12, color: "#999" }}>(contrat actif)</span>
+                        {/* TNS revenue slider */}
+                        <div style={{ marginBottom: 20 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 6, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Remuneration nette :</span>
+                            <span style={{ fontSize: 26, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: isOverridden ? accent : "#1a1a1a" }}>
+                              {fmt(tnsNet)} &euro;
+                            </span>
+                            {isOverridden && (
+                              <button type="button" onClick={() => resetOverride(sel.emp.id)} style={{
+                                fontSize: 11, color: "#999", background: "none", border: "1px solid #ddd6c8",
+                                borderRadius: 12, padding: "2px 10px", cursor: "pointer",
+                              }}>
+                                Reinitialiser ({fmt(baseNet)} &euro;)
+                              </button>
+                            )}
+                          </div>
+                          <input
+                            type="range" min={1000} max={15000} step={100}
+                            value={tnsNet}
+                            onChange={(e) => setSalaryOverride(sel.emp.id, Number(e.target.value))}
+                            style={{ width: "100%", accentColor: "#9BA3B5" }}
+                          />
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#999", marginTop: 2 }}>
+                            <span>1 000 &euro;</span>
+                            <span>15 000 &euro;</span>
+                          </div>
                         </div>
 
                         {/* 3 KPIs */}
@@ -601,301 +673,393 @@ export default function SimulationPage() {
         {/* ═══ TAB 3: SIMULATEUR D'EMBAUCHE ═══ */}
         {tab === "simulateur" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-              <div>
-                <h2 style={{
-                  margin: 0, fontSize: 18, fontWeight: 700,
-                  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                  textTransform: "uppercase", letterSpacing: 0.5,
-                }}>
-                  Simulation de recrutement
-                </h2>
-                {simRows.length > 0 && (
-                  <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>
-                    {simRows.length} nouveau{simRows.length > 1 ? "x" : ""} collaborateur{simRows.length > 1 ? "s" : ""} · cout total {fmt(simTotalCost)} &euro;/mois
-                  </div>
-                )}
-              </div>
-              <button type="button" onClick={addSimRow} style={{
-                padding: "10px 20px", borderRadius: 8, border: "none",
-                background: accent, color: "#fff",
-                fontSize: 13, fontWeight: 700, cursor: "pointer",
-              }}>
-                + Ajouter un collaborateur
-              </button>
-            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 16 }}>
+              {/* ── Left column ── */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-            <div style={{ display: "grid", gridTemplateColumns: simRows.length > 0 ? "1fr 340px" : "1fr", gap: 16 }}>
-              {/* Left: collaborator cards */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {simRows.length === 0 ? (
-                  <div style={card}>
-                    <div style={{ textAlign: "center", padding: 32, color: "#999", fontSize: 13 }}>
-                      Ajoutez un collaborateur pour simuler l&apos;impact sur la masse salariale.
-                    </div>
+                {/* Augmentations individuelles */}
+                <div style={card}>
+                  <h3 style={{
+                    margin: "0 0 12px", fontSize: 14, fontWeight: 700,
+                    fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                    textTransform: "uppercase", letterSpacing: 0.5,
+                  }}>
+                    Augmentations au cas par cas
+                  </h3>
+                  <div style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>
+                    Ajustez les salaires pour simuler l&apos;impact d&apos;augmentations individuelles.
                   </div>
-                ) : (
-                  simCosts.map((s, idx) => {
-                    const r = s.row;
-                    return (
-                      <div key={r.id} style={{ ...card, position: "relative" }}>
-                        {/* Header */}
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <div style={{
-                              width: 32, height: 32, borderRadius: "50%",
-                              background: accent, color: "#fff",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              fontSize: 14, fontWeight: 700,
-                            }}>
-                              {idx + 1}
-                            </div>
-                            <input
-                              style={{ border: "none", fontSize: 15, fontWeight: 600, outline: "none", background: "transparent", width: 180 }}
-                              value={r.nom}
-                              onChange={(e) => updateSim(r.id, { nom: e.target.value })}
-                            />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {costs.map((c, i) => {
+                      const base = baseCosts.find((b) => b.emp.id === c.emp.id);
+                      const baseBrut = base?.brut ?? 0;
+                      const isOvr = salaryOverrides[c.emp.id] !== undefined;
+                      const diff = c.coutEmployeur - (base?.coutEmployeur ?? 0);
+                      return (
+                        <div key={c.emp.id} style={{
+                          display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
+                          borderRadius: 8, background: isOvr ? `${accent}06` : "#faf7f2",
+                          border: isOvr ? `1px solid ${accent}30` : "1px solid #f0ebe3",
+                        }}>
+                          <div style={{
+                            width: 30, height: 30, borderRadius: "50%",
+                            background: avatarColor(i), color: "#fff",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 10, fontWeight: 700, flexShrink: 0,
+                          }}>
+                            {(c.emp.prenom?.[0] ?? "").toUpperCase()}{(c.emp.nom?.[0] ?? "").toUpperCase()}
                           </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                            <div style={{ textAlign: "right" }}>
-                              <div style={{ fontSize: 18, fontWeight: 700, color: accent, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                                {fmt(s.selected)} &euro;
+                          <div style={{ minWidth: 100, flexShrink: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600 }}>{c.emp.prenom} {c.emp.nom}</div>
+                            <div style={{ fontSize: 10, color: "#999" }}>
+                              {c.isTNS ? "TNS" : c.contratType} {c.heuresSemaine}h
+                            </div>
+                          </div>
+                          <input
+                            type="range"
+                            min={c.isTNS ? 1000 : 1400}
+                            max={c.isTNS ? 15000 : 5000}
+                            step={50}
+                            value={c.brut}
+                            onChange={(e) => setSalaryOverride(c.emp.id, Number(e.target.value))}
+                            style={{ flex: 1, accentColor: isOvr ? accent : "#ccc" }}
+                          />
+                          <div style={{ textAlign: "right", minWidth: 80, flexShrink: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: isOvr ? accent : "#1a1a1a" }}>
+                              {fmt(c.brut)} &euro;
+                            </div>
+                            {isOvr && diff !== 0 && (
+                              <div style={{ fontSize: 10, color: diff > 0 ? "#DC2626" : "#4a6741", fontWeight: 600 }}>
+                                {diff > 0 ? "+" : ""}{fmt(diff)} &euro;
                               </div>
-                              <div style={{ fontSize: 11, color: "#999" }}>{fmtDec(s.eurH)} &euro;/h</div>
-                            </div>
-                            <button type="button" onClick={() => removeSim(r.id)} style={{
-                              width: 28, height: 28, borderRadius: "50%",
-                              border: "1px solid #ddd6c8", background: "#fff",
-                              cursor: "pointer", fontSize: 14, color: "#999",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                            }}>&times;</button>
+                            )}
                           </div>
+                          {isOvr && (
+                            <button type="button" onClick={() => resetOverride(c.emp.id)} style={{
+                              fontSize: 14, color: "#999", background: "none", border: "none",
+                              cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0,
+                            }} title={`Reinitialiser (${fmt(baseBrut)} \u20AC)`}>&times;</button>
+                          )}
                         </div>
+                      );
+                    })}
+                  </div>
+                  {hasOverrides && (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, paddingTop: 10, borderTop: "1px solid #f0ebe3" }}>
+                      <span style={{ fontSize: 12, color: "#6f6a61" }}>
+                        Impact augmentations : <strong style={{ color: totalMS > baseTotalMS ? "#DC2626" : "#4a6741" }}>
+                          {totalMS > baseTotalMS ? "+" : ""}{fmt(totalMS - baseTotalMS)} &euro;/mois
+                        </strong>
+                      </span>
+                      <button type="button" onClick={() => setSalaryOverrides({})} style={{
+                        fontSize: 11, color: "#999", background: "none", border: "1px solid #ddd6c8",
+                        borderRadius: 12, padding: "3px 12px", cursor: "pointer",
+                      }}>
+                        Tout reinitialiser
+                      </button>
+                    </div>
+                  )}
+                </div>
 
-                        {/* Type + Remplace */}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-                          <div>
-                            <div style={miniLabel}>Type de contrat</div>
-                            <div style={{ display: "flex", gap: 6 }}>
-                              {(["CDI", "CDD", "extra", "apprenti"] as const).map((t) => (
-                                <button key={t} type="button" onClick={() => updateSim(r.id, { type: t })} style={{
-                                  padding: "5px 12px", borderRadius: 16,
-                                  border: r.type === t ? `1.5px solid ${accent}` : "1px solid #ddd6c8",
-                                  background: r.type === t ? `${accent}12` : "#fff",
-                                  color: r.type === t ? accent : "#6f6a61",
-                                  fontSize: 12, fontWeight: 600, cursor: "pointer",
-                                  textTransform: "capitalize",
+                {/* Recrutements */}
+                <div style={card}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <div>
+                      <h3 style={{
+                        margin: 0, fontSize: 14, fontWeight: 700,
+                        fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                        textTransform: "uppercase", letterSpacing: 0.5,
+                      }}>
+                        Simulation de recrutement
+                      </h3>
+                      {simRows.length > 0 && (
+                        <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>
+                          {simRows.length} nouveau{simRows.length > 1 ? "x" : ""} collaborateur{simRows.length > 1 ? "s" : ""} · cout total {fmt(simTotalCost)} &euro;/mois
+                        </div>
+                      )}
+                    </div>
+                    <button type="button" onClick={addSimRow} style={{
+                      padding: "8px 16px", borderRadius: 8, border: "none",
+                      background: accent, color: "#fff",
+                      fontSize: 12, fontWeight: 700, cursor: "pointer",
+                    }}>
+                      + Ajouter un collaborateur
+                    </button>
+                  </div>
+
+                  {simRows.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: 20, color: "#999", fontSize: 13 }}>
+                      Ajoutez un collaborateur pour simuler un recrutement.
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {simCosts.map((s, idx) => {
+                        const r = s.row;
+                        return (
+                          <div key={r.id} style={{ padding: 14, borderRadius: 10, border: "1px solid #f0ebe3", background: "#faf7f2" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <div style={{
+                                  width: 28, height: 28, borderRadius: "50%",
+                                  background: accent, color: "#fff",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  fontSize: 13, fontWeight: 700,
                                 }}>
-                                  {t === "extra" ? "Extra" : t === "apprenti" ? "Apprenti" : t}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <div style={miniLabel}>Remplace</div>
-                            <select style={selectStyle} value={r.remplace} onChange={(e) => updateSim(r.id, { remplace: e.target.value })}>
-                              <option value="nouveau">Recrutement additionnel</option>
-                              {costs.map((c) => (
-                                <option key={c.emp.id} value={c.emp.id}>{c.emp.prenom} {c.emp.nom}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-
-                        {/* Sliders */}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-                          <div>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                              <span style={miniLabel}>Salaire brut</span>
-                              <span style={{ fontSize: 13, fontWeight: 700 }}>{fmt(r.brut)} &euro;</span>
-                            </div>
-                            <input
-                              type="range" min={1400} max={4500} step={50}
-                              value={r.brut} onChange={(e) => updateSim(r.id, { brut: Number(e.target.value) })}
-                              style={{ width: "100%", accentColor: accent }}
-                            />
-                          </div>
-                          <div>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                              <span style={miniLabel}>Heures / semaine</span>
-                              <span style={{ fontSize: 13, fontWeight: 700 }}>{r.heures}h</span>
-                            </div>
-                            <input
-                              type="range" min={10} max={45} step={1}
-                              value={r.heures} onChange={(e) => updateSim(r.id, { heures: Number(e.target.value) })}
-                              style={{ width: "100%", accentColor: accent }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Cost breakdown by type */}
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
-                          {([
-                            { label: "CDI", val: fmt(s.coutCDI) + " \u20AC" },
-                            { label: "CDD", val: fmt(s.coutCDD) + " \u20AC" },
-                            { label: "Extra", val: fmtDec(s.extraHoraire) + " \u20AC/h" },
-                            { label: "Apprenti", val: fmt(s.coutApprenti) + " \u20AC" },
-                          ] as const).map((b) => (
-                            <div key={b.label} style={{
-                              padding: "8px 10px", borderRadius: 8, textAlign: "center",
-                              border: r.type === b.label.toLowerCase() ? `1.5px solid ${accent}` : "1px solid #f0ebe3",
-                              background: r.type === b.label.toLowerCase() ? `${accent}08` : "#faf7f2",
-                            }}>
-                              <div style={{ fontSize: 10, fontWeight: 700, color: r.type === b.label.toLowerCase() ? accent : "#999", textTransform: "uppercase" }}>
-                                {b.label}
+                                  {idx + 1}
+                                </div>
+                                <input
+                                  style={{ border: "none", fontSize: 14, fontWeight: 600, outline: "none", background: "transparent", width: 160 }}
+                                  value={r.nom}
+                                  onChange={(e) => updateSim(r.id, { nom: e.target.value })}
+                                />
                               </div>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{b.val}</div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <div style={{ textAlign: "right" }}>
+                                  <div style={{ fontSize: 16, fontWeight: 700, color: accent, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
+                                    {fmt(s.selected)} &euro;
+                                  </div>
+                                  <div style={{ fontSize: 10, color: "#999" }}>{fmtDec(s.eurH)} &euro;/h</div>
+                                </div>
+                                <button type="button" onClick={() => removeSim(r.id)} style={{
+                                  width: 24, height: 24, borderRadius: "50%",
+                                  border: "1px solid #ddd6c8", background: "#fff",
+                                  cursor: "pointer", fontSize: 13, color: "#999",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                }}>&times;</button>
+                              </div>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
+
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                              <div>
+                                <div style={miniLabel}>Type de contrat</div>
+                                <div style={{ display: "flex", gap: 4 }}>
+                                  {(["CDI", "CDD", "extra", "apprenti"] as const).map((t) => (
+                                    <button key={t} type="button" onClick={() => updateSim(r.id, { type: t })} style={{
+                                      padding: "4px 10px", borderRadius: 14,
+                                      border: r.type === t ? `1.5px solid ${accent}` : "1px solid #ddd6c8",
+                                      background: r.type === t ? `${accent}12` : "#fff",
+                                      color: r.type === t ? accent : "#6f6a61",
+                                      fontSize: 11, fontWeight: 600, cursor: "pointer",
+                                      textTransform: "capitalize",
+                                    }}>
+                                      {t === "extra" ? "Extra" : t === "apprenti" ? "Apprenti" : t}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              <div>
+                                <div style={miniLabel}>Remplace</div>
+                                <select style={{ ...selectStyle, padding: "5px 8px", fontSize: 12 }} value={r.remplace} onChange={(e) => updateSim(r.id, { remplace: e.target.value })}>
+                                  <option value="nouveau">Recrutement additionnel</option>
+                                  {costs.map((c) => (
+                                    <option key={c.emp.id} value={c.emp.id}>{c.emp.prenom} {c.emp.nom}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 10 }}>
+                              <div>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                                  <span style={miniLabel}>Salaire brut</span>
+                                  <span style={{ fontSize: 12, fontWeight: 700 }}>{fmt(r.brut)} &euro;</span>
+                                </div>
+                                <input type="range" min={1400} max={4500} step={50} value={r.brut}
+                                  onChange={(e) => updateSim(r.id, { brut: Number(e.target.value) })}
+                                  style={{ width: "100%", accentColor: accent }} />
+                              </div>
+                              <div>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                                  <span style={miniLabel}>Heures / semaine</span>
+                                  <span style={{ fontSize: 12, fontWeight: 700 }}>{r.heures}h</span>
+                                </div>
+                                <input type="range" min={10} max={45} step={1} value={r.heures}
+                                  onChange={(e) => updateSim(r.id, { heures: Number(e.target.value) })}
+                                  style={{ width: "100%", accentColor: accent }} />
+                              </div>
+                            </div>
+
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+                              {([
+                                { label: "CDI", val: fmt(s.coutCDI) + " \u20AC" },
+                                { label: "CDD", val: fmt(s.coutCDD) + " \u20AC" },
+                                { label: "Extra", val: fmtDec(s.extraHoraire) + " \u20AC/h" },
+                                { label: "Apprenti", val: fmt(s.coutApprenti) + " \u20AC" },
+                              ] as const).map((b) => (
+                                <div key={b.label} style={{
+                                  padding: "6px 8px", borderRadius: 6, textAlign: "center",
+                                  border: r.type === b.label.toLowerCase() ? `1.5px solid ${accent}` : "1px solid #e8e2d8",
+                                  background: r.type === b.label.toLowerCase() ? `${accent}08` : "#fff",
+                                }}>
+                                  <div style={{ fontSize: 9, fontWeight: 700, color: r.type === b.label.toLowerCase() ? accent : "#999", textTransform: "uppercase" }}>
+                                    {b.label}
+                                  </div>
+                                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{b.val}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Right: Impact panel */}
-              {simRows.length > 0 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {/* Impact masse salariale */}
-                  <div style={card}>
-                    <h3 style={{
-                      margin: "0 0 14px", fontSize: 14, fontWeight: 700,
-                      fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                      textTransform: "uppercase", letterSpacing: 0.5,
-                    }}>
-                      Impact masse salariale
-                    </h3>
+              {/* ── Right column: always visible ── */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* Impact masse salariale */}
+                <div style={card}>
+                  <h3 style={{
+                    margin: "0 0 14px", fontSize: 14, fontWeight: 700,
+                    fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                    textTransform: "uppercase", letterSpacing: 0.5,
+                  }}>
+                    Impact masse salariale
+                  </h3>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
-                      <div style={{ padding: "10px 12px", borderRadius: 8, background: "#faf7f2", border: "1px solid #f0ebe3" }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>MS actuelle</div>
-                        <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmt(totalMS)} &euro;</div>
-                        <div style={{ fontSize: 11, color: "#999" }}>{ratioMS.toFixed(1)}% du CA</div>
-                      </div>
-                      <div style={{ padding: "10px 12px", borderRadius: 8, background: `${accent}08`, border: `1px solid ${accent}30` }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>MS projetee</div>
-                        <div style={{ fontSize: 20, fontWeight: 700, color: accent, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmt(msProjetee)} &euro;</div>
-                        <div style={{ fontSize: 11, color: "#999" }}>{ratioProjecte.toFixed(1)}% du CA</div>
-                      </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+                    <div style={{ padding: "10px 12px", borderRadius: 8, background: "#faf7f2", border: "1px solid #f0ebe3" }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>MS base</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmt(baseTotalMS)} &euro;</div>
+                      <div style={{ fontSize: 11, color: "#999" }}>{caSimule > 0 ? (baseTotalMS / caSimule * 100).toFixed(1) : "—"}% du CA</div>
                     </div>
-
-                    {/* Ratio bars */}
-                    <div style={{ marginBottom: 10 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                        <span style={{ color: "#6f6a61" }}>Ratio actuel</span>
-                        <span style={{ fontWeight: 700, color: ratioMS <= OBJECTIF_MS_CA ? "#4a6741" : "#DC2626" }}>
-                          {ratioMS.toFixed(1)}% <span style={{ color: "#ccc", fontWeight: 400 }}>/ cible {OBJECTIF_MS_CA}%</span>
-                        </span>
-                      </div>
-                      <div style={barBg}>
-                        <div style={{
-                          height: "100%", borderRadius: 4, transition: "width 0.3s",
-                          width: `${Math.min((ratioMS / 50) * 100, 100)}%`,
-                          background: ratioMS <= OBJECTIF_MS_CA ? "#4a6741" : "#DC2626",
-                        }} />
-                      </div>
-                    </div>
-                    <div style={{ marginBottom: 14 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                        <span style={{ color: "#6f6a61" }}>Ratio avec {simRows.length} recrutement{simRows.length > 1 ? "s" : ""}</span>
-                        <span style={{ fontWeight: 700, color: ratioProjecte <= OBJECTIF_MS_CA ? "#4a6741" : "#DC2626" }}>
-                          {ratioProjecte.toFixed(1)}% <span style={{ color: "#ccc", fontWeight: 400 }}>/ cible {OBJECTIF_MS_CA}%</span>
-                        </span>
-                      </div>
-                      <div style={barBg}>
-                        <div style={{
-                          height: "100%", borderRadius: 4, transition: "width 0.3s",
-                          width: `${Math.min((ratioProjecte / 50) * 100, 100)}%`,
-                          background: accent,
-                        }} />
-                      </div>
-                    </div>
-
-                    {/* Collaborator list */}
-                    <div style={{ borderTop: "1px solid #f0ebe3", paddingTop: 10 }}>
-                      {simCosts.map((s, idx) => (
-                        <div key={s.row.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <div style={{ width: 8, height: 8, borderRadius: "50%", background: avatarColor(idx) }} />
-                            <span style={{ fontSize: 12, color: "#4a3f35" }}>{s.row.nom}</span>
-                          </div>
-                          <span style={{ fontSize: 12, fontWeight: 600 }}>{fmt(s.selected)} &euro;/mois</span>
-                        </div>
-                      ))}
-                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0ebe3" }}>
-                        <span style={{ fontSize: 12, fontWeight: 700 }}>Total nouveaux</span>
-                        <span style={{ fontSize: 12, fontWeight: 700 }}>{fmt(simTotalCost)} &euro;/mois</span>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ fontSize: 11, color: "#999" }}>Impact annuel net</span>
-                        <span style={{ fontSize: 11, fontWeight: 600 }}>{fmt((simTotalCost - replacedCost) * 12)} &euro;/an</span>
-                      </div>
+                    <div style={{ padding: "10px 12px", borderRadius: 8, background: `${accent}08`, border: `1px solid ${accent}30` }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>MS projetee</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: accent, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmt(msProjetee)} &euro;</div>
+                      <div style={{ fontSize: 11, color: "#999" }}>{ratioProjecte.toFixed(1)}% du CA</div>
                     </div>
                   </div>
 
-                  {/* CA à atteindre */}
-                  <div style={card}>
-                    <h3 style={{
-                      margin: "0 0 14px", fontSize: 14, fontWeight: 700,
-                      fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                      textTransform: "uppercase", letterSpacing: 0.5,
-                    }}>
-                      CA a atteindre
-                    </h3>
-
+                  {/* Ratio bars */}
+                  <div style={{ marginBottom: 10 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                      <span style={{ color: "#6f6a61" }}>Objectif ratio MS</span>
-                      <span style={{ fontWeight: 700 }}>{OBJECTIF_MS_CA}%</span>
+                      <span style={{ color: "#6f6a61" }}>Ratio base</span>
+                      <span style={{ fontWeight: 700, color: (baseTotalMS / caSimule * 100) <= OBJECTIF_MS_CA ? "#4a6741" : "#DC2626" }}>
+                        {(baseTotalMS / caSimule * 100).toFixed(1)}% <span style={{ color: "#ccc", fontWeight: 400 }}>/ cible {OBJECTIF_MS_CA}%</span>
+                      </span>
                     </div>
-                    <div style={{ ...barBg, marginBottom: 12 }}>
-                      <div style={{ height: "100%", borderRadius: 4, width: `${OBJECTIF_MS_CA}%`, background: accent, opacity: 0.3 }} />
-                    </div>
-
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                      <span style={{ color: "#6f6a61" }}>CA actuel mensuel</span>
-                      <span style={{ fontWeight: 700 }}>{fmt(caSimule)} &euro;</span>
-                    </div>
-                    <div style={{ ...barBg, marginBottom: 16 }}>
+                    <div style={barBg}>
                       <div style={{
                         height: "100%", borderRadius: 4, transition: "width 0.3s",
-                        width: `${Math.min((caSimule / 200000) * 100, 100)}%`,
-                        background: "#5B9BD5",
+                        width: `${Math.min((baseTotalMS / caSimule * 100 / 50) * 100, 100)}%`,
+                        background: (baseTotalMS / caSimule * 100) <= OBJECTIF_MS_CA ? "#4a6741" : "#DC2626",
                       }} />
                     </div>
+                  </div>
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                      <span style={{ color: "#6f6a61" }}>Ratio projete</span>
+                      <span style={{ fontWeight: 700, color: ratioProjecte <= OBJECTIF_MS_CA ? "#4a6741" : "#DC2626" }}>
+                        {ratioProjecte.toFixed(1)}% <span style={{ color: "#ccc", fontWeight: 400 }}>/ cible {OBJECTIF_MS_CA}%</span>
+                      </span>
+                    </div>
+                    <div style={barBg}>
+                      <div style={{
+                        height: "100%", borderRadius: 4, transition: "width 0.3s",
+                        width: `${Math.min((ratioProjecte / 50) * 100, 100)}%`,
+                        background: accent,
+                      }} />
+                    </div>
+                  </div>
 
+                  {/* Detail list */}
+                  <div style={{ borderTop: "1px solid #f0ebe3", paddingTop: 10 }}>
+                    {hasOverrides && (
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+                        <span style={{ fontSize: 12, color: "#4a3f35" }}>Augmentations</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: totalMS > baseTotalMS ? "#DC2626" : "#4a6741" }}>
+                          {totalMS > baseTotalMS ? "+" : ""}{fmt(totalMS - baseTotalMS)} &euro;/mois
+                        </span>
+                      </div>
+                    )}
+                    {simCosts.map((s, idx) => (
+                      <div key={s.row.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ width: 8, height: 8, borderRadius: "50%", background: avatarColor(idx) }} />
+                          <span style={{ fontSize: 12, color: "#4a3f35" }}>{s.row.nom}</span>
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 600 }}>{fmt(s.selected)} &euro;/mois</span>
+                      </div>
+                    ))}
+                    {(hasOverrides || simRows.length > 0) && (
+                      <>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0ebe3" }}>
+                          <span style={{ fontSize: 12, fontWeight: 700 }}>Impact total</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: (msProjetee - baseTotalMS) > 0 ? "#DC2626" : "#4a6741" }}>
+                            {(msProjetee - baseTotalMS) > 0 ? "+" : ""}{fmt(msProjetee - baseTotalMS)} &euro;/mois
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ fontSize: 11, color: "#999" }}>Impact annuel</span>
+                          <span style={{ fontSize: 11, fontWeight: 600 }}>{fmt((msProjetee - baseTotalMS) * 12)} &euro;/an</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* CA à atteindre */}
+                <div style={card}>
+                  <h3 style={{
+                    margin: "0 0 14px", fontSize: 14, fontWeight: 700,
+                    fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                    textTransform: "uppercase", letterSpacing: 0.5,
+                  }}>
+                    CA a atteindre
+                  </h3>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                    <span style={{ color: "#6f6a61" }}>Objectif ratio MS</span>
+                    <span style={{ fontWeight: 700 }}>{OBJECTIF_MS_CA}%</span>
+                  </div>
+                  <div style={{ ...barBg, marginBottom: 12 }}>
+                    <div style={{ height: "100%", borderRadius: 4, width: `${OBJECTIF_MS_CA}%`, background: accent, opacity: 0.3 }} />
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                    <span style={{ color: "#6f6a61" }}>CA actuel mensuel</span>
+                    <span style={{ fontWeight: 700 }}>{fmt(caSimule)} &euro;</span>
+                  </div>
+                  <div style={{ ...barBg, marginBottom: 16 }}>
                     <div style={{
-                      padding: "14px 16px", borderRadius: 10,
-                      background: "#faf7f2", border: "1px solid #f0ebe3",
-                    }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>CA necessaire / mois</div>
-                      <div style={{ fontSize: 26, fontWeight: 700, color: accent, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                        {fmt(caNeededProjecte)} &euro;
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 6 }}>
-                        <span style={{ color: "#6f6a61" }}>Progression</span>
-                        <span style={{ fontWeight: 700, color: caNeededProjecte > caSimule ? "#DC2626" : "#4a6741" }}>
-                          {caNeededProjecte > caSimule ? "+" : ""}{fmt(caNeededProjecte - caSimule)} &euro;
-                        </span>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                        <span style={{ color: "#6f6a61" }}>Annuel</span>
-                        <span style={{ fontWeight: 700 }}>{fmt(caNeededProjecte * 12)} &euro;</span>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                        <span style={{ color: "#6f6a61" }}>Productivite cible</span>
-                        <span style={{ fontWeight: 700 }}>
-                          {(() => {
-                            const totalHeures = costs.reduce((a, c) => a + (c.heuresSemaine * 52 / 12), 0)
-                              + simRows.reduce((a, r) => a + (r.heures * 52 / 12), 0);
-                            return totalHeures > 0 ? fmtDec(caNeededProjecte / totalHeures) : "—";
-                          })()} &euro;/h
-                        </span>
-                      </div>
+                      height: "100%", borderRadius: 4, transition: "width 0.3s",
+                      width: `${Math.min((caSimule / 200000) * 100, 100)}%`,
+                      background: "#5B9BD5",
+                    }} />
+                  </div>
+
+                  <div style={{
+                    padding: "14px 16px", borderRadius: 10,
+                    background: "#faf7f2", border: "1px solid #f0ebe3",
+                  }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>CA necessaire / mois</div>
+                    <div style={{ fontSize: 26, fontWeight: 700, color: accent, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
+                      {fmt(caNeededProjecte)} &euro;
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 6 }}>
+                      <span style={{ color: "#6f6a61" }}>Progression</span>
+                      <span style={{ fontWeight: 700, color: caNeededProjecte > caSimule ? "#DC2626" : "#4a6741" }}>
+                        {caNeededProjecte > caSimule ? "+" : ""}{fmt(caNeededProjecte - caSimule)} &euro;
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                      <span style={{ color: "#6f6a61" }}>Annuel</span>
+                      <span style={{ fontWeight: 700 }}>{fmt(caNeededProjecte * 12)} &euro;</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                      <span style={{ color: "#6f6a61" }}>Productivite cible</span>
+                      <span style={{ fontWeight: 700 }}>
+                        {(() => {
+                          const totalHeures = costs.reduce((a, c) => a + (c.heuresSemaine * 52 / 12), 0)
+                            + simRows.reduce((a, r) => a + (r.heures * 52 / 12), 0);
+                          return totalHeures > 0 ? fmtDec(caNeededProjecte / totalHeures) : "\u2014";
+                        })()} &euro;/h
+                      </span>
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           </>
         )}
