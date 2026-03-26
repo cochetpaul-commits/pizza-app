@@ -163,8 +163,8 @@ export const IngredientRow = React.memo(function IngredientRow({
       {/* ── DESKTOP ROW ── */}
       <div
         className="hidden md:flex"
-        onClick={() => { if (!isEditing) onStartEdit(x); }}
-        style={{ alignItems: "center", padding: "10px 16px", gap: 10, background: "white", transition: "background 0.1s", cursor: isEditing ? "default" : "pointer" }}
+        onClick={() => { if (isEditing) onSaveEdit(); else onStartEdit(x); }}
+        style={{ alignItems: "center", padding: "10px 16px", gap: 10, background: "white", transition: "background 0.1s", cursor: "pointer" }}
       >
         {/* Avatar */}
         <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={36} editable />
@@ -202,7 +202,7 @@ export const IngredientRow = React.memo(function IngredientRow({
           {st !== "validated" && (
             <div style={{ display: "flex", gap: 4, marginTop: 5, flexWrap: "wrap" }}>
               <button onClick={() => onSetStatus(x.id, "to_check")} style={{ height: 22, padding: "0 8px", borderRadius: 5, border: "1px solid #e5ddd0", background: "white", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>À contrôler</button>
-              <button disabled={!canValidate} onClick={() => { if (!canValidate) return; onSetStatus(x.id, "validated"); }} style={{ height: 22, padding: "0 8px", borderRadius: 5, border: "1px solid #4a6741", background: "rgba(74,103,65,0.08)", fontSize: 10, fontWeight: 600, cursor: canValidate ? "pointer" : "not-allowed", color: "#4a6741", opacity: !canValidate ? 0.4 : 1 }}>Valider</button>
+              <button disabled={!canValidate} onClick={(e) => { e.stopPropagation(); if (!canValidate) return; onSetStatus(x.id, "validated"); }} style={{ height: 22, padding: "0 8px", borderRadius: 5, border: "1px solid #4a6741", background: "rgba(74,103,65,0.08)", fontSize: 10, fontWeight: 600, cursor: canValidate ? "pointer" : "not-allowed", color: "#4a6741", opacity: !canValidate ? 0.4 : 1 }}>Valider</button>
             </div>
           )}
         </div>
@@ -230,32 +230,28 @@ export const IngredientRow = React.memo(function IngredientRow({
         </div>
 
         {/* Actions */}
-        <div style={{ width: 110, display: "flex", gap: 5, alignItems: "center", justifyContent: "flex-end" }}>
+        <div style={{ width: 90, display: "flex", gap: 5, alignItems: "center", justifyContent: "flex-end" }}>
           {!x.is_derived && onCreateDerived && (
-            <button onClick={() => onCreateDerived(x)} title="Créer un dérivé" style={{ ...BTN_ACTION, background: "rgba(124,58,237,0.10)", color: "#7C3AED", fontSize: 12, fontWeight: 700 }}>⚗</button>
+            <button onClick={(e) => { e.stopPropagation(); onCreateDerived(x); }} title="Créer un dérivé" style={{ ...BTN_ACTION, background: "rgba(124,58,237,0.10)", color: "#7C3AED", fontSize: 12, fontWeight: 700 }}>⚗</button>
           )}
-          {!isEditing
-            ? <button onClick={() => onStartEdit(x)} title="Modifier" style={{ ...BTN_ACTION, background: "#D4775A", color: "white", fontWeight: 700 }}>→</button>
-            : <button onClick={onSaveEdit} style={{ ...BTN_ACTION, background: "#4a6741", color: "white", fontSize: 11, fontWeight: 700 }}>OK</button>}
-          <button onClick={() => onDelete(x.id, x.name)} title="Supprimer" style={{ ...BTN_ACTION, background: "#ede6d9", color: "#aaa" }}>✕</button>
+          {isEditing && <button onClick={(e) => { e.stopPropagation(); onSaveEdit(); }} style={{ ...BTN_ACTION, background: "#4a6741", color: "white", fontSize: 11, fontWeight: 700 }}>OK</button>}
+          <button onClick={(e) => { e.stopPropagation(); onDelete(x.id, x.name); }} title="Supprimer" style={{ ...BTN_ACTION, background: "#ede6d9", color: "#aaa" }}>✕</button>
         </div>
       </div>
 
       {/* ── MOBILE ROW ── */}
       <div
         className="md:hidden"
-        onClick={() => { if (!isEditing) onStartEdit(x); }}
-        style={{ padding: "12px 14px", background: "white", cursor: isEditing ? "default" : "pointer" }}
+        onClick={() => { if (isEditing) onSaveEdit(); else onStartEdit(x); }}
+        style={{ padding: "12px 14px", background: "white", cursor: "pointer" }}
       >
         {compactMode ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{ fontWeight: 600, fontSize: 13, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: CAT_COLORS[x.category] }}>{x.name}</div>
             <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", flexShrink: 0, whiteSpace: "pre-line" }}>{price}</span>
             {alert && <span style={{ fontSize: 10, color: alert.direction === "up" ? "#DC2626" : "#16A34A", flexShrink: 0 }}>{alert.direction === "up" ? "↑" : "↓"}</span>}
-            {!isEditing
-              ? <button onClick={() => onStartEdit(x)} style={{ ...BTN_ACTION, background: "#D4775A", color: "white", fontWeight: 700 }}>→</button>
-              : <button onClick={onSaveEdit} style={{ ...BTN_ACTION, background: "#4a6741", color: "white", fontSize: 10, fontWeight: 700 }}>OK</button>}
-            <button onClick={() => onDelete(x.id, x.name)} style={{ ...BTN_ACTION, background: "#ede6d9", color: "#aaa" }}>✕</button>
+            {isEditing && <button onClick={(e) => { e.stopPropagation(); onSaveEdit(); }} style={{ ...BTN_ACTION, background: "#4a6741", color: "white", fontSize: 10, fontWeight: 700 }}>OK</button>}
+            <button onClick={(e) => { e.stopPropagation(); onDelete(x.id, x.name); }} style={{ ...BTN_ACTION, background: "#ede6d9", color: "#aaa" }}>✕</button>
           </div>
         ) : (
           <>
@@ -290,14 +286,12 @@ export const IngredientRow = React.memo(function IngredientRow({
             </div>
             {!hasPrice && <div style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", marginTop: 4 }}>prix manquant</div>}
             <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-              {st !== "validated" && <button onClick={() => { if (!canValidate) return; onSetStatus(x.id, "validated"); }} disabled={!canValidate} style={{ flex: 1, height: 30, borderRadius: 7, border: "1px solid #4a6741", background: "rgba(74,103,65,0.08)", fontSize: 11, fontWeight: 700, cursor: canValidate ? "pointer" : "not-allowed", color: "#4a6741", opacity: !canValidate ? 0.4 : 1 }}>Valider</button>}
-              {!isEditing
-                ? <button onClick={() => onStartEdit(x)} style={{ flex: 1, height: 30, borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", color: "#D4775A", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Modifier</button>
-                : <button onClick={onSaveEdit} style={{ flex: 1, height: 30, borderRadius: 7, border: "none", background: "#4a6741", color: "white", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>OK</button>}
+              {st !== "validated" && <button onClick={(e) => { e.stopPropagation(); if (!canValidate) return; onSetStatus(x.id, "validated"); }} disabled={!canValidate} style={{ flex: 1, height: 30, borderRadius: 7, border: "1px solid #4a6741", background: "rgba(74,103,65,0.08)", fontSize: 11, fontWeight: 700, cursor: canValidate ? "pointer" : "not-allowed", color: "#4a6741", opacity: !canValidate ? 0.4 : 1 }}>Valider</button>}
+              {isEditing && <button onClick={(e) => { e.stopPropagation(); onSaveEdit(); }} style={{ flex: 1, height: 30, borderRadius: 7, border: "none", background: "#4a6741", color: "white", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>OK</button>}
               {!x.is_derived && onCreateDerived && (
-                <button onClick={() => onCreateDerived(x)} title="Créer un dérivé" style={{ width: 30, height: 30, borderRadius: 7, border: "1px solid rgba(124,58,237,0.25)", background: "rgba(124,58,237,0.08)", color: "#7C3AED", fontSize: 13, cursor: "pointer" }}>⚗</button>
+                <button onClick={(e) => { e.stopPropagation(); onCreateDerived(x); }} title="Créer un dérivé" style={{ width: 30, height: 30, borderRadius: 7, border: "1px solid rgba(124,58,237,0.25)", background: "rgba(124,58,237,0.08)", color: "#7C3AED", fontSize: 13, cursor: "pointer" }}>⚗</button>
               )}
-              <button onClick={() => onDelete(x.id, x.name)} style={{ width: 30, height: 30, borderRadius: 7, border: "none", background: "#ede6d9", color: "#aaa", fontSize: 14, cursor: "pointer" }}>✕</button>
+              <button onClick={(e) => { e.stopPropagation(); onDelete(x.id, x.name); }} style={{ width: 30, height: 30, borderRadius: 7, border: "none", background: "#ede6d9", color: "#aaa", fontSize: 14, cursor: "pointer" }}>✕</button>
             </div>
           </>
         )}
