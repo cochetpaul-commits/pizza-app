@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { getSupplierColor } from "@/lib/supplierColors";
 
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -52,10 +53,10 @@ export default function FournisseursPage() {
 
       const rawRows = (supRes.data ?? []) as SupplierRow[];
 
-      // Deduplicate by name (accent+case insensitive) — keep the one with most data
+      // Deduplicate by name (accent+case insensitive)
       const seen = new Map<string, { canonical: SupplierRow; aliasIds: string[] }>();
       for (const s of rawRows) {
-        const key = s.name.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+        const key = s.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
         if (!seen.has(key)) {
           seen.set(key, { canonical: s, aliasIds: [s.id] });
         } else {
@@ -71,7 +72,7 @@ export default function FournisseursPage() {
         if (o.supplier_id) offerCounts.set(o.supplier_id, (offerCounts.get(o.supplier_id) ?? 0) + 1);
       }
 
-      // Last import per supplier (already ordered desc)
+      // Last import per supplier
       const lastImports = new Map<string, { created_at: string; invoice_number: string | null }>();
       for (const inv of (invRes.data ?? [])) {
         if (inv.supplier_id && !lastImports.has(inv.supplier_id)) {
@@ -109,14 +110,19 @@ export default function FournisseursPage() {
 
   function renderCard(s: SupplierRow) {
     const st = stats.get(s.id);
+    const sColor = getSupplierColor(s.name);
     return (
-      <div key={s.id} className="card" style={{ padding: 14 }}>
+      <div key={s.id} style={{
+        border: "1px solid #ddd6c8", borderRadius: 12, padding: "14px 16px",
+        background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+        borderLeft: `4px solid ${sColor}`,
+      }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <Link
                 href={`/fournisseurs/${s.id}`}
-                style={{ fontWeight: 900, fontSize: 15, color: "#D4775A", textDecoration: "none" }}
+                style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 700, fontSize: 15, color: sColor, textDecoration: "none" }}
               >
                 {s.name}
               </Link>
@@ -128,37 +134,33 @@ export default function FournisseursPage() {
               )}
             </div>
 
-            <div className="muted" style={{ fontSize: 12, marginTop: 4, display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {s.contact_name && <span>👤 {s.contact_name}</span>}
-              {s.email && <span>✉️ {s.email}</span>}
-              {s.phone && <span>📞 {s.phone}</span>}
-              {!s.contact_name && !s.email && !s.phone && (
-                <span style={{ fontStyle: "italic" }}>Coordonnées non renseignées</span>
-              )}
+            <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginTop: 4 }}>
+              {s.contact_name || s.email || s.phone
+                ? [s.contact_name, s.email, s.phone].filter(Boolean).join(" · ")
+                : "Coordonnees non renseignees"}
             </div>
 
-            <div style={{ marginTop: 6, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13 }}>
-                <strong>{st?.refCount ?? 0}</strong>
-                <span className="muted" style={{ fontWeight: 400, marginLeft: 3 }}>réf.</span>
+            <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, marginTop: 6, display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <span><strong>{st?.refCount ?? 0}</strong> <span style={{ color: "#999" }}>ref.</span></span>
+              <span style={{ color: "#999", fontSize: 12 }}>
+                {st?.lastImport
+                  ? `Import : ${fmtDate(st.lastImport)}${st.lastImportNumber ? ` · ${st.lastImportNumber}` : ""}`
+                  : "Aucun import"}
               </span>
-              {st?.lastImport && (
-                <span className="muted" style={{ fontSize: 12 }}>
-                  Import : {fmtDate(st.lastImport)}
-                  {st.lastImportNumber ? ` · ${st.lastImportNumber}` : ""}
-                </span>
-              )}
-              {!st?.lastImport && (
-                <span className="muted" style={{ fontSize: 12, fontStyle: "italic" }}>Aucun import</span>
-              )}
             </div>
           </div>
 
-          {/* Actions */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0, alignItems: "flex-end" }}>
-            <Link href={`/fournisseurs/${s.id}`} className="btn btnPrimary">Fiche →</Link>
-            <Link href={`/ingredients?supplier=${s.id}`} className="btn">Ingrédients</Link>
-          </div>
+          <Link
+            href={`/fournisseurs/${s.id}`}
+            style={{
+              fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600,
+              background: "#D4775A", color: "#fff", borderRadius: 20,
+              padding: "7px 16px", textDecoration: "none", whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+          >
+            Fiche
+          </Link>
         </div>
       </div>
     );
@@ -166,39 +168,39 @@ export default function FournisseursPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin", "cuisine", "salle"]}>
-    <>
-      <main style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 26, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", letterSpacing: 1.5, textTransform: "uppercase" as const }}>Fournisseurs</div>
-          <div className="muted" style={{ marginTop: 2 }}>
-            Coordonnées, références et historique d&apos;imports.
-          </div>
-        </div>
+      <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
+        <h1 style={{
+          fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24,
+          color: "#1a1a1a", margin: "0 0 20px", textTransform: "uppercase", letterSpacing: "0.04em",
+        }}>
+          Fournisseurs
+        </h1>
 
-        {loading && <div className="muted">Chargement…</div>}
+        {loading && <p style={{ color: "#999", fontSize: 14, textAlign: "center", marginTop: 40 }}>Chargement...</p>}
 
         {!loading && (
-          <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {active.map(renderCard)}
 
             {inactive.length > 0 && (
               <>
-                <div className="muted" style={{ fontSize: 12, marginTop: 4, fontWeight: 700, letterSpacing: 0.5 }}>
-                  INACTIFS
+                <div style={{
+                  fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 700,
+                  color: "#999", letterSpacing: "0.08em", textTransform: "uppercase",
+                  marginTop: 16, marginBottom: 4,
+                }}>
+                  Inactifs
                 </div>
                 {inactive.map(renderCard)}
               </>
             )}
 
             {suppliers.length === 0 && (
-              <div className="card" style={{ padding: 20, textAlign: "center" }}>
-                <div className="muted">Aucun fournisseur en base.</div>
-              </div>
+              <p style={{ color: "#999", fontSize: 14, textAlign: "center" }}>Aucun fournisseur en base.</p>
             )}
           </div>
         )}
       </main>
-    </>
     </RequireRole>
   );
 }
