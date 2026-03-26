@@ -1,51 +1,50 @@
 "use client";
 
-import { useCallback, useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
+import type { CSSProperties } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { useEtablissement } from "@/lib/EtablissementContext";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type Fiche = {
+type RecipeType = "pizza" | "cuisine" | "cocktail" | "production";
+
+type RecipeLine = {
+  ingredient_name: string;
+  qty: number;
+  unit: string;
+};
+
+type Recipe = {
   id: string;
-  recipe_type: string;
-  recipe_id: string;
+  type: RecipeType;
   name: string;
   category: string | null;
   photo_url: string | null;
-  pdf_url: string;
-  ingredient_count: number | null;
-  step_count: number | null;
-  allergens: string[] | null;
-  exported_at: string;
+  lines: RecipeLine[];
+  steps: string[];
+  pivot_ingredient_id: string | null;
+  yield_info: string | null; // "8 portions" or "1200 g"
+  allergens: string[];
 };
 
-// ── Colors ───────────────────────────────────────────────────────────────────
+// ── Constants ────────────────────────────────────────────────────────────────
 
-const TYPE_COLORS: Record<string, string> = {
+const TYPE_COLORS: Record<RecipeType, string> = {
   pizza: "#8B1A1A",
   cuisine: "#4a6741",
   cocktail: "#D4775A",
-  empatement: "#8a7b6b",
+  production: "#6b5b3e",
 };
 
-const TYPE_LABELS: Record<string, string> = {
+const TYPE_LABELS: Record<RecipeType, string> = {
   pizza: "Pizza",
   cuisine: "Cuisine",
   cocktail: "Cocktail",
-  empatement: "Empâtement",
+  production: "Production",
 };
 
-const CUISINE_CAT_ORDER = [
-  "preparation",
-  "sauce",
-  "entree",
-  "plat_cuisine",
-  "accompagnement",
-  "dessert",
-  "autre",
-];
-
-const CAT_LABELS: Record<string, string> = {
+const CUISINE_CAT_LABELS: Record<string, string> = {
   preparation: "Préparation",
   sauce: "Sauce",
   entree: "Entrée",
@@ -55,888 +54,650 @@ const CAT_LABELS: Record<string, string> = {
   autre: "Autre",
 };
 
-const CAT_COLORS: Record<string, string> = {
-  preparation: "#6b8e5e",
-  sauce: "#c2703e",
-  entree: "#4a7a8c",
-  plat_cuisine: "#8B1A1A",
-  accompagnement: "#7a6b4e",
-  dessert: "#9b5a8a",
-  autre: "#666",
-};
-
-const ALLERGEN_LABELS: Record<string, string> = {
-  gluten: "Gluten",
-  lait: "Lait",
-  oeuf: "Oeuf",
-  poisson: "Poisson",
-  crustaces: "Crustacés",
-  soja: "Soja",
-  arachide: "Arachide",
-  "fruits-a-coque": "Fruits à coque",
-  celeri: "Céleri",
-  moutarde: "Moutarde",
-  sesame: "Sésame",
-  sulfites: "Sulfites",
-  lupin: "Lupin",
-  mollusques: "Mollusques",
-};
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
+function fmtQty(v: number): string {
+  if (v === 0) return "0";
+  if (v >= 100) return Math.round(v).toLocaleString("fr-FR");
+  if (v >= 10) return v.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+  return v.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
 }
 
-function relativeDate(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const diff = Math.floor((now.getTime() - d.getTime()) / 86400000);
-  if (diff === 0) return "Aujourd'hui";
-  if (diff === 1) return "Hier";
-  if (diff < 7) return `Il y a ${diff}j`;
-  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+function initials(name: string): string {
+  return name.split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? "").join("");
+}
+
+function parseJsonSteps(raw: unknown): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.filter((s): s is string => typeof s === "string" && s.trim() !== "");
+  if (typeof raw === "string") {
+    try { const arr = JSON.parse(raw); if (Array.isArray(arr)) return arr.filter((s): s is string => typeof s === "string"); } catch { /* ignore */ }
+    return raw.split("\n").filter(s => s.trim());
+  }
+  return [];
+}
+
+function parseAllergenArray(raw: unknown): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "string") { try { return JSON.parse(raw); } catch { return []; } }
+  return [];
+}
+
+// ── Data fetching ────────────────────────────────────────────────────────────
+
+async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
+  const recipes: Recipe[] = [];
+
+  // Helper: filter by establishment
+  const matchEstab = (establishments: string[] | null) => {
+    if (!etabSlug) return true;
+    if (!establishments || establishments.length === 0) return true;
+    return establishments.includes(etabSlug);
+  };
+
+  // ── Pizza ──
+  const { data: pizzas } = await supabase
+    .from("pizza_recipes")
+    .select("id, name, photo_url, notes, pivot_ingredient_id, ball_weight_g, establishments")
+    .order("name");
+  const pizzaIds = (pizzas ?? []).map(p => p.id);
+  const { data: pizzaIngs } = pizzaIds.length ? await supabase
+    .from("pizza_ingredients")
+    .select("pizza_id, ingredient_id, qty, unit, sort_order, ingredients(name, allergens)")
+    .in("pizza_id", pizzaIds)
+    .order("sort_order") : { data: [] };
+
+  for (const p of (pizzas ?? [])) {
+    if (!matchEstab(p.establishments)) continue;
+    const pIngs = (pizzaIngs ?? []).filter((i: Record<string, unknown>) => i.pizza_id === p.id);
+    const allergenSet = new Set<string>();
+    const lines: RecipeLine[] = pIngs.map((i: Record<string, unknown>) => {
+      const ing = i.ingredients as Record<string, unknown> | null;
+      for (const a of parseAllergenArray(ing?.allergens)) allergenSet.add(a);
+      return { ingredient_name: (ing?.name as string) ?? "?", qty: Number(i.qty) || 0, unit: String(i.unit ?? "g") };
+    });
+    recipes.push({
+      id: p.id, type: "pizza", name: p.name, category: null,
+      photo_url: p.photo_url, lines, steps: parseJsonSteps(p.notes),
+      pivot_ingredient_id: p.pivot_ingredient_id,
+      yield_info: p.ball_weight_g ? `Pâton ${p.ball_weight_g} g` : null,
+      allergens: [...allergenSet],
+    });
+  }
+
+  // ── Cuisine ──
+  const { data: kitchens } = await supabase
+    .from("kitchen_recipes")
+    .select("id, name, category, photo_url, procedure, pivot_ingredient_id, yield_grams, portions_count, establishments")
+    .eq("is_active", true)
+    .order("name");
+  const kitchenIds = (kitchens ?? []).map(k => k.id);
+  const { data: kitchenIngs } = kitchenIds.length ? await supabase
+    .from("kitchen_recipe_lines")
+    .select("recipe_id, ingredient_id, qty, unit, sort_order, ingredients(name, allergens)")
+    .in("recipe_id", kitchenIds)
+    .order("sort_order") : { data: [] };
+
+  for (const k of (kitchens ?? [])) {
+    if (!matchEstab(k.establishments)) continue;
+    // Skip if category is "preparation" — those go to Production
+    if (k.category === "preparation") continue;
+    const kIngs = (kitchenIngs ?? []).filter((i: Record<string, unknown>) => i.recipe_id === k.id);
+    const allergenSet = new Set<string>();
+    const lines: RecipeLine[] = kIngs.map((i: Record<string, unknown>) => {
+      const ing = i.ingredients as Record<string, unknown> | null;
+      for (const a of parseAllergenArray(ing?.allergens)) allergenSet.add(a);
+      const rawUnit = String(i.unit ?? "g");
+      let qty = Number(i.qty) || 0;
+      let unit = rawUnit;
+      if (rawUnit === "ml") { qty = qty / 10; unit = "cL"; }
+      return { ingredient_name: (ing?.name as string) ?? "?", qty, unit };
+    });
+    let yieldInfo: string | null = null;
+    if (k.portions_count) yieldInfo = `${k.portions_count} portion${k.portions_count > 1 ? "s" : ""}`;
+    else if (k.yield_grams) yieldInfo = `${k.yield_grams} g`;
+    recipes.push({
+      id: k.id, type: "cuisine", name: k.name, category: k.category,
+      photo_url: k.photo_url, lines, steps: parseJsonSteps(k.procedure),
+      pivot_ingredient_id: k.pivot_ingredient_id, yield_info: yieldInfo,
+      allergens: [...allergenSet],
+    });
+  }
+
+  // ── Cocktail ──
+  const { data: cocktails } = await supabase
+    .from("cocktails")
+    .select("id, name, image_url, steps, pivot_ingredient_id, glass, establishments")
+    .order("name");
+  const cocktailIds = (cocktails ?? []).map(c => c.id);
+  const { data: cocktailIngs } = cocktailIds.length ? await supabase
+    .from("cocktail_ingredients")
+    .select("cocktail_id, ingredient_id, qty, unit, sort_order, ingredients(name, allergens)")
+    .in("cocktail_id", cocktailIds)
+    .order("sort_order") : { data: [] };
+
+  for (const c of (cocktails ?? [])) {
+    if (!matchEstab(c.establishments)) continue;
+    const cIngs = (cocktailIngs ?? []).filter((i: Record<string, unknown>) => i.cocktail_id === c.id);
+    const allergenSet = new Set<string>();
+    const lines: RecipeLine[] = cIngs.map((i: Record<string, unknown>) => {
+      const ing = i.ingredients as Record<string, unknown> | null;
+      for (const a of parseAllergenArray(ing?.allergens)) allergenSet.add(a);
+      return { ingredient_name: (ing?.name as string) ?? "?", qty: Number(i.qty) || 0, unit: String(i.unit ?? "cL") };
+    });
+    recipes.push({
+      id: c.id, type: "cocktail", name: c.name, category: null,
+      photo_url: c.image_url, lines, steps: parseJsonSteps(c.steps),
+      pivot_ingredient_id: c.pivot_ingredient_id,
+      yield_info: c.glass ? `Verre : ${c.glass}` : null,
+      allergens: [...allergenSet],
+    });
+  }
+
+  // ── Production (prep_recipes + kitchen_recipes with category "preparation") ──
+  const { data: preps } = await supabase
+    .from("prep_recipes")
+    .select("id, name, photo_url, procedure, pivot_ingredient_id, yield_grams, establishments")
+    .order("name");
+  const prepIds = (preps ?? []).map(p => p.id);
+  const { data: prepIngs } = prepIds.length ? await supabase
+    .from("prep_recipe_lines")
+    .select("recipe_id, ingredient_id, qty, unit, sort_order, ingredients(name, allergens)")
+    .in("recipe_id", prepIds)
+    .order("sort_order") : { data: [] };
+
+  for (const p of (preps ?? [])) {
+    if (!matchEstab(p.establishments)) continue;
+    const pIngs = (prepIngs ?? []).filter((i: Record<string, unknown>) => i.recipe_id === p.id);
+    const allergenSet = new Set<string>();
+    const lines: RecipeLine[] = pIngs.map((i: Record<string, unknown>) => {
+      const ing = i.ingredients as Record<string, unknown> | null;
+      for (const a of parseAllergenArray(ing?.allergens)) allergenSet.add(a);
+      const rawUnit = String(i.unit ?? "g");
+      let qty = Number(i.qty) || 0;
+      let unit = rawUnit;
+      if (rawUnit === "ml") { qty = qty / 10; unit = "cL"; }
+      return { ingredient_name: (ing?.name as string) ?? "?", qty, unit };
+    });
+    recipes.push({
+      id: `prep-${p.id}`, type: "production", name: p.name, category: "prep",
+      photo_url: p.photo_url, lines, steps: parseJsonSteps(p.procedure),
+      pivot_ingredient_id: p.pivot_ingredient_id,
+      yield_info: p.yield_grams ? `${p.yield_grams} g` : null,
+      allergens: [...allergenSet],
+    });
+  }
+
+  // Kitchen recipes with category "preparation" → also production
+  for (const k of (kitchens ?? [])) {
+    if (!matchEstab(k.establishments)) continue;
+    if (k.category !== "preparation") continue;
+    const kIngs = (kitchenIngs ?? []).filter((i: Record<string, unknown>) => i.recipe_id === k.id);
+    const allergenSet = new Set<string>();
+    const lines: RecipeLine[] = kIngs.map((i: Record<string, unknown>) => {
+      const ing = i.ingredients as Record<string, unknown> | null;
+      for (const a of parseAllergenArray(ing?.allergens)) allergenSet.add(a);
+      const rawUnit = String(i.unit ?? "g");
+      let qty = Number(i.qty) || 0;
+      let unit = rawUnit;
+      if (rawUnit === "ml") { qty = qty / 10; unit = "cL"; }
+      return { ingredient_name: (ing?.name as string) ?? "?", qty, unit };
+    });
+    recipes.push({
+      id: k.id, type: "production", name: k.name, category: "preparation",
+      photo_url: k.photo_url, lines, steps: parseJsonSteps(k.procedure),
+      pivot_ingredient_id: k.pivot_ingredient_id,
+      yield_info: k.yield_grams ? `${k.yield_grams} g` : null,
+      allergens: [...allergenSet],
+    });
+  }
+
+  // ── Empâtement ──
+  const { data: empatements } = await supabase
+    .from("recipes")
+    .select("id, name, balls_count, ball_weight, flour_mix, hydration_total, salt_percent, honey_percent, oil_percent, yeast_percent, pivot_ingredient_id")
+    .order("name");
+
+  for (const e of (empatements ?? [])) {
+    const totalDough = (e.balls_count ?? 1) * (e.ball_weight ?? 250);
+    // Compute flour from hydration: flour = totalDough / (1 + hydration/100 + salt/100 + ...)
+    const h = (e.hydration_total ?? 60) / 100;
+    const s = (e.salt_percent ?? 2.5) / 100;
+    const hn = (e.honey_percent ?? 0) / 100;
+    const o = (e.oil_percent ?? 0) / 100;
+    const y = (e.yeast_percent ?? 0.3) / 100;
+    const flour = totalDough / (1 + h + s + hn + o + y);
+
+    const lines: RecipeLine[] = [
+      { ingredient_name: "Farine", qty: Math.round(flour), unit: "g" },
+      { ingredient_name: "Eau", qty: Math.round(flour * h), unit: "g" },
+      { ingredient_name: "Sel", qty: Math.round(flour * s * 10) / 10, unit: "g" },
+    ];
+    if (hn > 0) lines.push({ ingredient_name: "Miel", qty: Math.round(flour * hn * 10) / 10, unit: "g" });
+    if (o > 0) lines.push({ ingredient_name: "Huile", qty: Math.round(flour * o * 10) / 10, unit: "g" });
+    if (y > 0) lines.push({ ingredient_name: "Levure", qty: Math.round(flour * y * 10) / 10, unit: "g" });
+
+    recipes.push({
+      id: `emp-${e.id}`, type: "production", name: e.name, category: "empatement",
+      photo_url: null, lines, steps: [],
+      pivot_ingredient_id: e.pivot_ingredient_id,
+      yield_info: `${e.balls_count ?? 1} pâton${(e.balls_count ?? 1) > 1 ? "s" : ""} × ${e.ball_weight ?? 250} g`,
+      allergens: ["gluten"],
+    });
+  }
+
+  return recipes;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function CataloguePage() {
-  const [fiches, setFiches] = useState<Fiche[]>([]);
+  const { current: etab } = useEtablissement();
+  const etabSlug = etab?.slug ?? null;
+
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
-  const [typeFilter, setTypeFilter] = useState<string | null>(null);
-  const [viewerFiche, setViewerFiche] = useState<Fiche | null>(null);
+  const [typeFilter, setTypeFilter] = useState<RecipeType | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
+
+  // Production pivot overrides: { recipeId: qty }
+  const [pivotOverrides, setPivotOverrides] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    supabase
-      .from("catalogue_fiches")
-      .select("id, recipe_type, recipe_id, name, category, photo_url, pdf_url, ingredient_count, step_count, allergens, exported_at")
-      .order("recipe_type")
-      .order("name")
-      .then(({ data }) => {
-        setFiches(data ?? []);
-        setLoading(false);
-      });
-  }, []);
+    fetchAllRecipes(etabSlug).then(r => { setRecipes(r); setLoading(false); });
+  }, [etabSlug]);
 
   const filtered = useMemo(() => {
-    let arr = fiches;
-    if (typeFilter) arr = arr.filter((f) => f.recipe_type === typeFilter);
+    let arr = recipes;
+    if (typeFilter) arr = arr.filter(r => r.type === typeFilter);
     if (q.trim()) {
       const low = q.toLowerCase();
-      arr = arr.filter((f) => f.name.toLowerCase().includes(low));
+      arr = arr.filter(r => r.name.toLowerCase().includes(low));
     }
     return arr;
-  }, [fiches, typeFilter, q]);
+  }, [recipes, typeFilter, q]);
 
-  // Group by type, then by category (for cuisine)
+  const typeCounts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const r of recipes) c[r.type] = (c[r.type] ?? 0) + 1;
+    return c;
+  }, [recipes]);
+
+  // Group by type, then by category
   const groups = useMemo(() => {
-    const map: Record<string, Fiche[]> = {};
-    for (const f of filtered) {
-      const key =
-        f.recipe_type === "cuisine" && f.category
-          ? `cuisine:${f.category}`
-          : f.recipe_type;
+    const map: Record<string, Recipe[]> = {};
+    for (const r of filtered) {
+      const key = r.category ? `${r.type}:${r.category}` : r.type;
       if (!map[key]) map[key] = [];
-      map[key].push(f);
+      map[key].push(r);
     }
-    const order = ["pizza", "cuisine", "cocktail", "empatement"];
+    const typeOrder: RecipeType[] = ["pizza", "cuisine", "cocktail", "production"];
+    const cuisineCatOrder = ["entree", "plat_cuisine", "accompagnement", "dessert", "sauce", "autre"];
+    const prodCatOrder = ["preparation", "prep", "empatement"];
     return Object.entries(map).sort(([a], [b]) => {
-      const ia = order.indexOf(a.split(":")[0]);
-      const ib = order.indexOf(b.split(":")[0]);
+      const ta = a.split(":")[0];
+      const tb = b.split(":")[0];
+      const ia = typeOrder.indexOf(ta as RecipeType);
+      const ib = typeOrder.indexOf(tb as RecipeType);
       if (ia !== ib) return ia - ib;
-      // Sort cuisine categories by CUISINE_CAT_ORDER
-      const catA = a.includes(":") ? a.split(":")[1] : "";
-      const catB = b.includes(":") ? b.split(":")[1] : "";
-      const ca = CUISINE_CAT_ORDER.indexOf(catA);
-      const cb = CUISINE_CAT_ORDER.indexOf(catB);
-      if (ca !== -1 && cb !== -1) return ca - cb;
-      return a.localeCompare(b, "fr");
+      const ca = a.includes(":") ? a.split(":")[1] : "";
+      const cb = b.includes(":") ? b.split(":")[1] : "";
+      const catOrder = ta === "production" ? prodCatOrder : cuisineCatOrder;
+      return catOrder.indexOf(ca) - catOrder.indexOf(cb);
     });
   }, [filtered]);
 
+  const toggleCat = useCallback((key: string) => {
+    setCollapsedCats(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const toggleOpen = useCallback((id: string) => {
+    setOpenId(prev => prev === id ? null : id);
+  }, []);
+
   function groupLabel(key: string): string {
-    if (key.startsWith("cuisine:")) {
-      const cat = key.split(":")[1];
-      return CAT_LABELS[cat] ?? cat;
-    }
-    return TYPE_LABELS[key] ?? key;
+    const [type, cat] = key.split(":");
+    if (!cat) return TYPE_LABELS[type as RecipeType] ?? type;
+    if (type === "cuisine") return CUISINE_CAT_LABELS[cat] ?? cat;
+    if (cat === "empatement") return "Empâtement";
+    if (cat === "prep" || cat === "preparation") return "Préparations";
+    return cat;
   }
 
   function groupColor(key: string): string {
-    const type = key.split(":")[0];
+    const type = key.split(":")[0] as RecipeType;
     return TYPE_COLORS[type] ?? "#1a1a1a";
   }
 
-  const typeCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const f of fiches) {
-      counts[f.recipe_type] = (counts[f.recipe_type] ?? 0) + 1;
-    }
-    return counts;
-  }, [fiches]);
-
-  // Navigate between fiches in modal
-  const navigateViewer = useCallback(
-    (dir: 1 | -1) => {
-      if (!viewerFiche) return;
-      const idx = filtered.findIndex((f) => f.id === viewerFiche.id);
-      const next = filtered[idx + dir];
-      if (next) setViewerFiche(next);
-    },
-    [viewerFiche, filtered],
-  );
+  // Pill style
+  const pill = (active: boolean, color: string): CSSProperties => ({
+    padding: "7px 14px", borderRadius: 20, fontSize: 12, fontWeight: 700,
+    border: active ? "none" : `1.5px solid ${color}40`,
+    background: active ? color : "transparent",
+    color: active ? "#fff" : color,
+    cursor: "pointer", whiteSpace: "nowrap",
+  });
 
   return (
-    <main className="container" style={{ paddingBottom: 40 }}>
-      {/* Header */}
-      <div style={{ marginBottom: 16 }}>
-        <h1
-          style={{
-            margin: 0,
-            fontSize: 28,
-            fontWeight: 700,
-            fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-            color: "#1a1a1a",
-            textTransform: "uppercase",
-            letterSpacing: 1,
-          }}
-        >
+    <div style={{ background: "#f2ede4", minHeight: "100vh" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 60px" }}>
+
+        {/* Header */}
+        <h1 style={{
+          fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 26,
+          color: "#1a1a1a", margin: "0 0 4px", textTransform: "uppercase", letterSpacing: "0.04em",
+        }}>
           Catalogue
         </h1>
-        <span style={{ fontSize: 13, color: "#999" }}>
-          {fiches.length} fiche{fiches.length > 1 ? "s" : ""} technique
-          {fiches.length > 1 ? "s" : ""}
-        </span>
-      </div>
-
-      {/* Search */}
-      <input
-        type="search"
-        placeholder="Rechercher une fiche..."
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        style={{
-          width: "100%",
-          padding: "10px 14px",
-          borderRadius: 12,
-          border: "1.5px solid #ddd6c8",
-          background: "#fff",
-          fontSize: 14,
-          outline: "none",
-          boxSizing: "border-box",
-          marginBottom: 12,
-        }}
-      />
-
-      {/* Type filter tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: 6,
-          overflowX: "auto",
-          paddingBottom: 6,
-          marginBottom: 16,
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => setTypeFilter(null)}
-          style={tabPill(!typeFilter, "#1a1a1a")}
-        >
-          Tous ({fiches.length})
-        </button>
-        {(["pizza", "cuisine", "cocktail", "empatement"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTypeFilter(typeFilter === t ? null : t)}
-            style={tabPill(typeFilter === t, TYPE_COLORS[t])}
-          >
-            {TYPE_LABELS[t]} ({typeCounts[t] ?? 0})
-          </button>
-        ))}
-      </div>
-
-      {/* Loading */}
-      {loading && (
-        <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
-          <div
-            style={{
-              width: 28,
-              height: 28,
-              border: "3px solid #ddd6c8",
-              borderTopColor: "#D4775A",
-              borderRadius: "50%",
-              animation: "spin 0.8s linear infinite",
-            }}
-          />
-        </div>
-      )}
-
-      {/* Empty */}
-      {!loading && filtered.length === 0 && (
-        <p style={{ textAlign: "center", color: "#999", padding: 60, fontSize: 14 }}>
-          {fiches.length === 0
-            ? "Aucune fiche exportée. Publiez depuis une recette."
-            : "Aucun résultat."}
+        <p style={{ fontSize: 13, color: "#999", margin: "0 0 20px" }}>
+          {recipes.length} recette{recipes.length > 1 ? "s" : ""} — consultation équipe
         </p>
-      )}
 
-      {/* Groups */}
-      {(() => {
-        const cuisineGroups = groups.filter(([k]) => k.startsWith("cuisine:"));
-        const otherGroups = groups.filter(([k]) => !k.startsWith("cuisine:"));
+        {/* Search */}
+        <input
+          type="search"
+          placeholder="Rechercher une recette..."
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          style={{
+            width: "100%", padding: "10px 14px", borderRadius: 12,
+            border: "1.5px solid #ddd6c8", background: "#fff", fontSize: 14,
+            outline: "none", boxSizing: "border-box", marginBottom: 14,
+          }}
+        />
 
-        return (
-          <>
-            {/* Non-cuisine groups: standard grid */}
-            {otherGroups.map(([key, items]) => {
-              const color = groupColor(key);
-              return (
-                <div key={key} style={{ marginBottom: 28 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                    <div style={{ width: 4, height: 20, borderRadius: 2, background: color }} />
-                    <span style={{ fontSize: 14, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                      {groupLabel(key)}
-                    </span>
-                    <span style={{ fontSize: 11, color: "#999" }}>{items.length}</span>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 16 }}>
-                    {items.map((f) => (
-                      <FicheCard key={f.id} fiche={f} onOpen={setViewerFiche} />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+        {/* Type filter pills */}
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
+          <button onClick={() => setTypeFilter(null)} style={pill(!typeFilter, "#1a1a1a")}>
+            Tous ({recipes.length})
+          </button>
+          {(["pizza", "cuisine", "cocktail", "production"] as const).map(t => (
+            <button key={t} onClick={() => setTypeFilter(typeFilter === t ? null : t)} style={pill(typeFilter === t, TYPE_COLORS[t])}>
+              {TYPE_LABELS[t]} ({typeCounts[t] ?? 0})
+            </button>
+          ))}
+        </div>
 
-            {/* Cuisine groups: solitaire horizontal columns */}
-            {cuisineGroups.length > 0 && (
-              <div style={{ marginBottom: 28 }}>
-                {/* Section header */}
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                  <div style={{ width: 4, height: 20, borderRadius: 2, background: TYPE_COLORS.cuisine }} />
-                  <span style={{ fontSize: 14, fontWeight: 700, color: TYPE_COLORS.cuisine, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                    Cuisine
-                  </span>
-                  <span style={{ fontSize: 11, color: "#999" }}>
-                    {cuisineGroups.reduce((s, [, items]) => s + items.length, 0)}
-                  </span>
-                </div>
+        {/* Loading */}
+        {loading && <p style={{ textAlign: "center", color: "#999", padding: 40 }}>Chargement...</p>}
 
-                {/* Horizontal solitaire columns */}
-                <div className="catalogue-solitaire" style={{
-                  display: "flex",
-                  gap: 12,
-                  overflowX: "auto",
-                  paddingBottom: 12,
-                  alignItems: "flex-start",
+        {/* Empty */}
+        {!loading && filtered.length === 0 && (
+          <p style={{ textAlign: "center", color: "#999", padding: 40, fontSize: 14 }}>Aucune recette trouvée.</p>
+        )}
+
+        {/* Groups */}
+        {groups.map(([key, items]) => {
+          const color = groupColor(key);
+          const isCollapsed = collapsedCats.has(key);
+          return (
+            <div key={key} style={{ marginBottom: 8 }}>
+              {/* Category header */}
+              <button
+                onClick={() => toggleCat(key)}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 10,
+                  padding: "12px 16px", background: "#fff",
+                  border: "1.5px solid #ddd6c8", borderLeft: `3px solid ${color}`,
+                  borderRadius: 12, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                  marginBottom: 6, boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                }}
+              >
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                <span style={{
+                  fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700,
+                  letterSpacing: "0.14em", textTransform: "uppercase", color,
                 }}>
-                  {cuisineGroups.map(([key, items]) => {
-                    const cat = key.split(":")[1];
-                    const catColor = CAT_COLORS[cat] ?? TYPE_COLORS.cuisine;
-                    return (
-                      <div key={key} style={{ minWidth: 130, maxWidth: 150, flex: "0 0 auto" }}>
-                        {/* Category header */}
+                  {groupLabel(key)}
+                </span>
+                <span style={{
+                  fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
+                  background: `${color}18`, color,
+                }}>
+                  {items.length}
+                </span>
+                <span style={{
+                  marginLeft: "auto", fontSize: 10, color: "#b0a894",
+                  transition: "transform 0.2s",
+                  transform: isCollapsed ? "rotate(-90deg)" : "rotate(0)",
+                }}>
+                  ▼
+                </span>
+              </button>
+
+              {/* Recipe rows */}
+              {!isCollapsed && items.map(recipe => {
+                const isOpen = openId === recipe.id;
+                const isProduction = recipe.type === "production";
+                const pivotQtyOverride = pivotOverrides[recipe.id];
+                const basePivotQty = recipe.lines[0]?.qty || 1;
+                const factor = isProduction && pivotQtyOverride != null && pivotQtyOverride > 0
+                  ? pivotQtyOverride / basePivotQty
+                  : 1;
+
+                return (
+                  <div key={recipe.id} style={{ marginBottom: 2 }}>
+                    {/* Row */}
+                    <div
+                      onClick={() => toggleOpen(recipe.id)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 12,
+                        padding: "10px 16px", background: isOpen ? "#fff" : "rgba(255,255,255,0.7)",
+                        borderRadius: isOpen ? "10px 10px 0 0" : 10,
+                        cursor: "pointer", borderBottom: isOpen ? "1px solid #ede6d9" : "none",
+                        transition: "background 0.15s",
+                      }}
+                      onMouseEnter={e => { if (!isOpen) (e.currentTarget as HTMLElement).style.background = "#fff"; }}
+                      onMouseLeave={e => { if (!isOpen) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.7)"; }}
+                    >
+                      {/* Thumbnail */}
+                      <div style={{
+                        width: 40, height: 40, borderRadius: 8, flexShrink: 0, overflow: "hidden",
+                        background: recipe.photo_url
+                          ? `url(${recipe.photo_url}) center/cover`
+                          : `linear-gradient(135deg, ${color}25 0%, ${color}10 100%)`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        border: `1px solid ${color}20`,
+                      }}>
+                        {!recipe.photo_url && (
+                          <span style={{ fontSize: 14, fontWeight: 700, color: `${color}60`, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
+                            {initials(recipe.name)}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Name + meta */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: catColor,
-                          textTransform: "uppercase",
-                          letterSpacing: 1,
-                          fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                          marginBottom: 8,
-                          paddingBottom: 4,
-                          borderBottom: `2px solid ${catColor}`,
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
+                          fontFamily: "DM Sans, sans-serif", fontWeight: 700, fontSize: 14,
+                          color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                         }}>
-                          {CAT_LABELS[cat] ?? cat}
-                          <span style={{ fontSize: 10, fontWeight: 500, color: "#999", marginLeft: 6 }}>{items.length}</span>
+                          {recipe.name}
                         </div>
-                        {/* Stacked cards */}
-                        <div style={{ position: "relative" }}>
-                          {items.map((f, i) => (
-                            <div
-                              key={f.id}
-                              style={{
-                                marginBottom: i < items.length - 1 ? -32 : 0,
-                                position: "relative",
-                                zIndex: i,
-                                transition: "transform 0.15s ease, z-index 0s",
+                        <div style={{ fontSize: 11, color: "#999", marginTop: 1 }}>
+                          {recipe.lines.length} ingr.
+                          {recipe.steps.length > 0 && ` · ${recipe.steps.length} étape${recipe.steps.length > 1 ? "s" : ""}`}
+                          {recipe.yield_info && ` · ${recipe.yield_info}`}
+                        </div>
+                      </div>
+
+                      {/* Allergen dots */}
+                      {recipe.allergens.length > 0 && (
+                        <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+                          {recipe.allergens.slice(0, 3).map(a => (
+                            <span key={a} style={{
+                              fontSize: 8, fontWeight: 800, padding: "2px 5px", borderRadius: 4,
+                              background: "rgba(220,38,38,0.08)", color: "#DC2626",
+                              border: "1px solid rgba(220,38,38,0.18)",
+                            }}>
+                              {a.slice(0, 3).toUpperCase()}
+                            </span>
+                          ))}
+                          {recipe.allergens.length > 3 && (
+                            <span style={{ fontSize: 8, color: "#999" }}>+{recipe.allergens.length - 3}</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Chevron */}
+                      <span style={{
+                        fontSize: 10, color: "#b0a894", flexShrink: 0,
+                        transition: "transform 0.2s",
+                        transform: isOpen ? "rotate(180deg)" : "rotate(0)",
+                      }}>
+                        ▼
+                      </span>
+                    </div>
+
+                    {/* Expanded fiche */}
+                    {isOpen && (
+                      <div style={{
+                        background: "#fff", borderRadius: "0 0 10px 10px",
+                        padding: "16px 20px 20px", marginBottom: 4,
+                        borderLeft: `3px solid ${color}`,
+                      }}>
+                        {/* Photo banner */}
+                        {recipe.photo_url && (
+                          <div style={{
+                            width: "100%", height: 180, borderRadius: 10,
+                            background: `url(${recipe.photo_url}) center/cover`,
+                            marginBottom: 16,
+                          }} />
+                        )}
+
+                        {/* Production: pivot input */}
+                        {isProduction && recipe.lines.length > 0 && (
+                          <div style={{
+                            display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                            padding: "10px 14px", borderRadius: 10,
+                            background: `${color}10`, border: `1.5px solid ${color}30`,
+                            marginBottom: 16,
+                          }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color }}>
+                              ★ {recipe.lines[0].ingredient_name}
+                            </span>
+                            <input
+                              type="number"
+                              value={pivotOverrides[recipe.id] ?? ""}
+                              placeholder={String(recipe.lines[0].qty)}
+                              onClick={e => e.stopPropagation()}
+                              onChange={e => {
+                                const v = e.target.value;
+                                setPivotOverrides(prev => ({
+                                  ...prev,
+                                  [recipe.id]: v === "" ? undefined as unknown as number : parseFloat(v),
+                                }));
                               }}
-                              className="solitaire-card"
-                            >
-                              <SolitaireCard fiche={f} catColor={catColor} onOpen={setViewerFiche} />
+                              style={{
+                                width: 90, height: 34, borderRadius: 8,
+                                border: `1.5px solid ${color}40`, padding: "0 10px",
+                                fontSize: 15, fontWeight: 700, textAlign: "center",
+                                background: "#fff", color: "#1a1a1a", outline: "none",
+                              }}
+                            />
+                            <span style={{ fontSize: 12, color: "#999" }}>{recipe.lines[0].unit}</span>
+                            {factor !== 1 && (
+                              <span style={{ fontSize: 11, fontWeight: 700, color, marginLeft: "auto" }}>
+                                × {factor.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Ingredients table */}
+                        <div style={{
+                          fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700,
+                          color: color, textTransform: "uppercase", letterSpacing: "0.06em",
+                          marginBottom: 8,
+                        }}>
+                          Ingrédients
+                        </div>
+                        <div style={{ marginBottom: 16 }}>
+                          {recipe.lines.map((line, idx) => {
+                            const displayQty = isProduction ? line.qty * factor : line.qty;
+                            return (
+                              <div key={idx} style={{
+                                display: "flex", justifyContent: "space-between", alignItems: "center",
+                                padding: "8px 12px", borderRadius: 6,
+                                background: idx % 2 === 0 ? "#faf7f2" : "transparent",
+                              }}>
+                                <span style={{ color: "#1a1a1a", fontWeight: 500, fontSize: 14 }}>
+                                  {line.ingredient_name}
+                                </span>
+                                <span style={{
+                                  fontWeight: 800, fontSize: 14,
+                                  color: isProduction && factor !== 1 ? "#D4775A" : "#1a1a1a",
+                                  fontVariantNumeric: "tabular-nums",
+                                }}>
+                                  {displayQty > 0 ? fmtQty(displayQty) : "—"} <span style={{ fontWeight: 500, color: "#999", fontSize: 12 }}>{line.unit}</span>
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Steps */}
+                        {recipe.steps.length > 0 && (
+                          <>
+                            <div style={{
+                              fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700,
+                              color: color, textTransform: "uppercase", letterSpacing: "0.06em",
+                              marginBottom: 8,
+                            }}>
+                              Procédé
                             </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                              {recipe.steps.map((step, idx) => (
+                                <div key={idx} style={{ display: "flex", gap: 10, fontSize: 14, lineHeight: 1.5 }}>
+                                  <span style={{
+                                    width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
+                                    background: `${color}15`, color, fontSize: 12, fontWeight: 800,
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                  }}>
+                                    {idx + 1}
+                                  </span>
+                                  <span style={{ color: "#333", paddingTop: 2 }}>{step}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+
+                        {/* Yield + allergens footer */}
+                        <div style={{
+                          display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center",
+                          paddingTop: 12, borderTop: "1px solid #ede6d9",
+                        }}>
+                          {recipe.yield_info && (
+                            <span style={{
+                              fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 6,
+                              background: `${color}12`, color,
+                            }}>
+                              {recipe.yield_info}
+                            </span>
+                          )}
+                          {recipe.allergens.map(a => (
+                            <span key={a} style={{
+                              fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+                              background: "rgba(220,38,38,0.08)", color: "#DC2626",
+                            }}>
+                              {a}
+                            </span>
                           ))}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </>
-        );
-      })()}
-
-      {/* PDF Viewer Modal */}
-      {viewerFiche && (
-        <PdfViewerModal
-          fiche={viewerFiche}
-          onClose={() => setViewerFiche(null)}
-          onPrev={() => navigateViewer(-1)}
-          onNext={() => navigateViewer(1)}
-          hasPrev={filtered.findIndex((f) => f.id === viewerFiche.id) > 0}
-          hasNext={filtered.findIndex((f) => f.id === viewerFiche.id) < filtered.length - 1}
-        />
-      )}
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes flipIn { from { transform: rotateY(90deg); } to { transform: rotateY(0); } }
-        @keyframes modalIn {
-          from { opacity: 0; transform: scale(0.95); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        .solitaire-card:hover {
-          z-index: 50 !important;
-          transform: translateY(-8px);
-        }
-        .solitaire-card:hover > div {
-          box-shadow: 0 6px 20px rgba(0,0,0,0.15) !important;
-        }
-        .catalogue-solitaire::-webkit-scrollbar {
-          height: 4px;
-        }
-        .catalogue-solitaire::-webkit-scrollbar-thumb {
-          background: #ddd6c8;
-          border-radius: 2px;
-        }
-      `}</style>
-    </main>
-  );
-}
-
-// ── Tab pill style ───────────────────────────────────────────────────────────
-
-function tabPill(active: boolean, color: string): React.CSSProperties {
-  return {
-    padding: "7px 14px",
-    borderRadius: 10,
-    fontSize: 12,
-    fontWeight: 700,
-    border: active ? "none" : `1.5px solid ${color}40`,
-    background: active ? color : `${color}14`,
-    color: active ? "#fff" : color,
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-  };
-}
-
-// ── Flip Card ────────────────────────────────────────────────────────────────
-
-function FicheCard({ fiche, onOpen }: { fiche: Fiche; onOpen: (f: Fiche) => void }) {
-  const [flipped, setFlipped] = useState(false);
-  const color = TYPE_COLORS[fiche.recipe_type] ?? "#1a1a1a";
-  const hasPhoto = !!fiche.photo_url;
-  const allergens = fiche.allergens ?? [];
-  const ingredientCount = fiche.ingredient_count ?? 0;
-  const stepCount = fiche.step_count ?? 0;
-
-  return (
-    <div
-      style={{ perspective: 600, cursor: "pointer" }}
-      onMouseEnter={() => setFlipped(true)}
-      onMouseLeave={() => setFlipped(false)}
-      onClick={() => onOpen(fiche)}
-    >
-      <div
-        style={{
-          position: "relative",
-          transformStyle: "preserve-3d",
-          transition: "transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
-          transform: flipped ? "rotateY(180deg)" : "rotateY(0)",
-          borderRadius: 12,
-        }}
-      >
-        {/* ── FRONT ── */}
-        <div
-          style={{
-            backfaceVisibility: "hidden",
-            borderRadius: 12,
-            overflow: "hidden",
-            background: "#fff",
-            border: "1px solid #ddd6c8",
-            boxShadow: flipped
-              ? "6px 8px 24px rgba(0,0,0,0.14)"
-              : "0 2px 8px rgba(0,0,0,0.06)",
-            transition: "box-shadow 0.3s",
-          }}
-        >
-          {/* Cover */}
-          <div
-            style={{
-              aspectRatio: "1",
-              background: hasPhoto
-                ? `url(${fiche.photo_url}) center/cover`
-                : `linear-gradient(135deg, ${color}20 0%, ${color}08 100%)`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              position: "relative",
-            }}
-          >
-            {!hasPhoto && (
-              <span
-                style={{
-                  fontSize: 36,
-                  fontWeight: 700,
-                  color: `${color}40`,
-                  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                }}
-              >
-                {initials(fiche.name)}
-              </span>
-            )}
-            <span
-              style={{
-                position: "absolute",
-                top: 8,
-                right: 8,
-                fontSize: 9,
-                fontWeight: 700,
-                padding: "2px 7px",
-                borderRadius: 6,
-                background: color,
-                color: "#fff",
-                textTransform: "uppercase",
-                letterSpacing: 0.5,
-              }}
-            >
-              {TYPE_LABELS[fiche.recipe_type]?.[0] ?? "?"}
-            </span>
-          </div>
-
-          {/* Title bar */}
-          <div style={{ padding: "8px 10px", borderTop: `2px solid ${color}` }}>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: "#1a1a1a",
-                fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                textTransform: "uppercase",
-                letterSpacing: "0.03em",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {fiche.name}
-            </div>
-            {fiche.category && (
-              <div style={{ fontSize: 9, color, fontWeight: 600, marginTop: 2 }}>
-                {CAT_LABELS[fiche.category] ?? fiche.category}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── BACK ── */}
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            backfaceVisibility: "hidden",
-            transform: "rotateY(180deg)",
-            borderRadius: 12,
-            overflow: "hidden",
-            background: `linear-gradient(160deg, ${color} 0%, ${color}cc 100%)`,
-            color: "#fff",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "space-between",
-            boxShadow: "6px 8px 24px rgba(0,0,0,0.14)",
-          }}
-        >
-          {/* Top info */}
-          <div style={{ padding: "14px 12px 0" }}>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 700,
-                fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
-                marginBottom: 6,
-                lineHeight: 1.2,
-              }}
-            >
-              {fiche.name}
-            </div>
-            {fiche.category && (
-              <div
-                style={{
-                  fontSize: 10,
-                  opacity: 0.8,
-                  marginBottom: 10,
-                  fontWeight: 600,
-                }}
-              >
-                {CAT_LABELS[fiche.category] ?? fiche.category}
-              </div>
-            )}
-
-            {/* Stats */}
-            <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-              {ingredientCount > 0 && (
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1 }}>{ingredientCount}</div>
-                  <div style={{ fontSize: 8, opacity: 0.7, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                    ingr.
+                    )}
                   </div>
-                </div>
-              )}
-              {stepCount > 0 && (
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1 }}>{stepCount}</div>
-                  <div style={{ fontSize: 8, opacity: 0.7, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                    {stepCount > 1 ? "étapes" : "étape"}
-                  </div>
-                </div>
-              )}
+                );
+              })}
             </div>
-
-            {/* Allergens */}
-            {allergens.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-                {allergens.slice(0, 5).map((a) => (
-                  <span
-                    key={a}
-                    style={{
-                      fontSize: 8,
-                      padding: "2px 5px",
-                      borderRadius: 4,
-                      background: "rgba(255,255,255,0.2)",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {ALLERGEN_LABELS[a] ?? a}
-                  </span>
-                ))}
-                {allergens.length > 5 && (
-                  <span style={{ fontSize: 8, opacity: 0.7 }}>+{allergens.length - 5}</span>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Bottom */}
-          <div style={{ padding: "0 12px 12px" }}>
-            <div style={{ fontSize: 9, opacity: 0.6, marginBottom: 8 }}>
-              {relativeDate(fiche.exported_at)}
-            </div>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                textAlign: "center",
-                padding: "6px 0",
-                borderRadius: 8,
-                background: "rgba(255,255,255,0.2)",
-                backdropFilter: "blur(4px)",
-                letterSpacing: 0.5,
-              }}
-            >
-              Consulter la fiche
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Solitaire Card (compact, for stacked layout) ─────────────────────────────
-
-function SolitaireCard({
-  fiche,
-  catColor,
-  onOpen,
-}: {
-  fiche: Fiche;
-  catColor: string;
-  onOpen: (f: Fiche) => void;
-}) {
-  const hasPhoto = !!fiche.photo_url;
-
-  return (
-    <div
-      onClick={() => onOpen(fiche)}
-      style={{
-        borderRadius: 10,
-        overflow: "hidden",
-        background: "#fff",
-        border: `1.5px solid ${catColor}30`,
-        boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
-        cursor: "pointer",
-        transition: "box-shadow 0.15s, transform 0.15s",
-      }}
-    >
-      {/* Cover */}
-      <div
-        style={{
-          height: 80,
-          background: hasPhoto
-            ? `url(${fiche.photo_url}) center/cover`
-            : `linear-gradient(135deg, ${catColor}20 0%, ${catColor}08 100%)`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {!hasPhoto && (
-          <span
-            style={{
-              fontSize: 24,
-              fontWeight: 700,
-              color: `${catColor}40`,
-              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-            }}
-          >
-            {initials(fiche.name)}
-          </span>
-        )}
-      </div>
-
-      {/* Title */}
-      <div style={{
-        padding: "6px 8px",
-        borderTop: `2px solid ${catColor}`,
-      }}>
-        <div style={{
-          fontSize: 10,
-          fontWeight: 700,
-          color: "#1a1a1a",
-          fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-          textTransform: "uppercase",
-          letterSpacing: "0.03em",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}>
-          {fiche.name}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── PDF Viewer Modal ─────────────────────────────────────────────────────────
-
-function PdfViewerModal({
-  fiche,
-  onClose,
-  onPrev,
-  onNext,
-  hasPrev,
-  hasNext,
-}: {
-  fiche: Fiche;
-  onClose: () => void;
-  onPrev: () => void;
-  onNext: () => void;
-  hasPrev: boolean;
-  hasNext: boolean;
-}) {
-  const color = TYPE_COLORS[fiche.recipe_type] ?? "#1a1a1a";
-
-  // Keyboard navigation
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-      if (e.key === "ArrowLeft" && hasPrev) onPrev();
-      if (e.key === "ArrowRight" && hasNext) onNext();
-    }
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose, onPrev, onNext, hasPrev, hasNext]);
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        background: "rgba(0,0,0,0.75)",
-        backdropFilter: "blur(6px)",
-        display: "flex",
-        flexDirection: "column",
-        animation: "modalIn 0.25s ease-out",
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      {/* Top bar */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "12px 20px",
-          background: "rgba(0,0,0,0.4)",
-          flexShrink: 0,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span
-            style={{
-              fontSize: 9,
-              fontWeight: 700,
-              padding: "3px 8px",
-              borderRadius: 6,
-              background: color,
-              color: "#fff",
-              textTransform: "uppercase",
-              letterSpacing: 0.5,
-            }}
-          >
-            {TYPE_LABELS[fiche.recipe_type]}
-          </span>
-          <span
-            style={{
-              color: "#fff",
-              fontSize: 15,
-              fontWeight: 700,
-              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-              textTransform: "uppercase",
-              letterSpacing: "0.03em",
-            }}
-          >
-            {fiche.name}
-          </span>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <a
-            href={fiche.pdf_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              fontSize: 11,
-              color: "#fff",
-              textDecoration: "none",
-              padding: "5px 12px",
-              borderRadius: 8,
-              border: "1px solid rgba(255,255,255,0.3)",
-              fontWeight: 600,
-            }}
-          >
-            Ouvrir dans un nouvel onglet
-          </a>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#fff",
-              fontSize: 24,
-              cursor: "pointer",
-              padding: "0 4px",
-              lineHeight: 1,
-            }}
-          >
-            &times;
-          </button>
-        </div>
-      </div>
-
-      {/* PDF iframe + nav arrows */}
-      <div style={{ flex: 1, position: "relative", display: "flex" }}>
-        {/* Prev arrow */}
-        {hasPrev && (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onPrev(); }}
-            style={{
-              position: "absolute",
-              left: 8,
-              top: "50%",
-              transform: "translateY(-50%)",
-              zIndex: 10,
-              width: 40,
-              height: 40,
-              borderRadius: "50%",
-              background: "rgba(0,0,0,0.5)",
-              border: "none",
-              color: "#fff",
-              fontSize: 20,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              backdropFilter: "blur(4px)",
-            }}
-          >
-            &lsaquo;
-          </button>
-        )}
-
-        {/* PDF */}
-        <iframe
-          key={fiche.id}
-          src={fiche.pdf_url}
-          style={{
-            flex: 1,
-            border: "none",
-            background: "#f5f0e8",
-            margin: "12px 60px",
-            borderRadius: 8,
-          }}
-          title={fiche.name}
-        />
-
-        {/* Next arrow */}
-        {hasNext && (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onNext(); }}
-            style={{
-              position: "absolute",
-              right: 8,
-              top: "50%",
-              transform: "translateY(-50%)",
-              zIndex: 10,
-              width: 40,
-              height: 40,
-              borderRadius: "50%",
-              background: "rgba(0,0,0,0.5)",
-              border: "none",
-              color: "#fff",
-              fontSize: 20,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              backdropFilter: "blur(4px)",
-            }}
-          >
-            &rsaquo;
-          </button>
-        )}
+          );
+        })}
       </div>
     </div>
   );
