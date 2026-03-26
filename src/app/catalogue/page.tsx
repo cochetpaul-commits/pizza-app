@@ -304,6 +304,9 @@ export default function CataloguePage() {
   // Production pivot overrides: { recipeId: qty }
   const [pivotOverrides, setPivotOverrides] = useState<Record<string, number>>({});
 
+  // Production modal
+  const [modalRecipe, setModalRecipe] = useState<Recipe | null>(null);
+
   useEffect(() => {
     fetchAllRecipes(etabSlug).then(r => { setRecipes(r); setLoading(false); });
   }, [etabSlug]);
@@ -474,17 +477,12 @@ export default function CataloguePage() {
               {!isCollapsed && items.map(recipe => {
                 const isOpen = openId === recipe.id;
                 const isProduction = recipe.type === "production";
-                const pivotQtyOverride = pivotOverrides[recipe.id];
-                const basePivotQty = recipe.lines[0]?.qty || 1;
-                const factor = isProduction && pivotQtyOverride != null && pivotQtyOverride > 0
-                  ? pivotQtyOverride / basePivotQty
-                  : 1;
 
                 return (
                   <div key={recipe.id} style={{ marginBottom: 2 }}>
                     {/* Row */}
                     <div
-                      onClick={() => toggleOpen(recipe.id)}
+                      onClick={() => isProduction ? setModalRecipe(recipe) : toggleOpen(recipe.id)}
                       style={{
                         display: "flex", alignItems: "center", gap: 12,
                         padding: "10px 16px", background: isOpen ? "#fff" : "rgba(255,255,255,0.7)",
@@ -570,45 +568,6 @@ export default function CataloguePage() {
                           }} />
                         )}
 
-                        {/* Production: pivot input */}
-                        {isProduction && recipe.lines.length > 0 && (
-                          <div style={{
-                            display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
-                            padding: "10px 14px", borderRadius: 10,
-                            background: `${color}10`, border: `1.5px solid ${color}30`,
-                            marginBottom: 16,
-                          }}>
-                            <span style={{ fontSize: 12, fontWeight: 700, color }}>
-                              ★ {recipe.lines[0].ingredient_name}
-                            </span>
-                            <input
-                              type="number"
-                              value={pivotOverrides[recipe.id] ?? ""}
-                              placeholder={String(recipe.lines[0].qty)}
-                              onClick={e => e.stopPropagation()}
-                              onChange={e => {
-                                const v = e.target.value;
-                                setPivotOverrides(prev => ({
-                                  ...prev,
-                                  [recipe.id]: v === "" ? undefined as unknown as number : parseFloat(v),
-                                }));
-                              }}
-                              style={{
-                                width: 90, height: 34, borderRadius: 8,
-                                border: `1.5px solid ${color}40`, padding: "0 10px",
-                                fontSize: 15, fontWeight: 700, textAlign: "center",
-                                background: "#fff", color: "#1a1a1a", outline: "none",
-                              }}
-                            />
-                            <span style={{ fontSize: 12, color: "#999" }}>{recipe.lines[0].unit}</span>
-                            {factor !== 1 && (
-                              <span style={{ fontSize: 11, fontWeight: 700, color, marginLeft: "auto" }}>
-                                × {factor.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
-                              </span>
-                            )}
-                          </div>
-                        )}
-
                         {/* Ingredients table */}
                         <div style={{
                           fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700,
@@ -618,9 +577,7 @@ export default function CataloguePage() {
                           Ingrédients
                         </div>
                         <div style={{ marginBottom: 16 }}>
-                          {recipe.lines.map((line, idx) => {
-                            const displayQty = isProduction ? line.qty * factor : line.qty;
-                            return (
+                          {recipe.lines.map((line, idx) => (
                               <div key={idx} style={{
                                 display: "flex", justifyContent: "space-between", alignItems: "center",
                                 padding: "8px 12px", borderRadius: 6,
@@ -630,15 +587,13 @@ export default function CataloguePage() {
                                   {line.ingredient_name}
                                 </span>
                                 <span style={{
-                                  fontWeight: 800, fontSize: 14,
-                                  color: isProduction && factor !== 1 ? "#D4775A" : "#1a1a1a",
+                                  fontWeight: 800, fontSize: 14, color: "#1a1a1a",
                                   fontVariantNumeric: "tabular-nums",
                                 }}>
-                                  {displayQty > 0 ? fmtQty(displayQty) : "—"} <span style={{ fontWeight: 500, color: "#999", fontSize: 12 }}>{line.unit}</span>
+                                  {line.qty > 0 ? fmtQty(line.qty) : "—"} <span style={{ fontWeight: 500, color: "#999", fontSize: 12 }}>{line.unit}</span>
                                 </span>
                               </div>
-                            );
-                          })}
+                          ))}
                         </div>
 
                         {/* Steps */}
@@ -699,6 +654,197 @@ export default function CataloguePage() {
           );
         })}
       </div>
+
+      {/* ═══ MODALE PRODUCTION ═══ */}
+      {modalRecipe && (() => {
+        const mColor = TYPE_COLORS.production;
+        const mPivotOverride = pivotOverrides[modalRecipe.id];
+        const mBasePivot = modalRecipe.lines[0]?.qty || 1;
+        const mFactor = mPivotOverride != null && mPivotOverride > 0 ? mPivotOverride / mBasePivot : 1;
+        return (
+          <div
+            onClick={() => setModalRecipe(null)}
+            style={{
+              position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              zIndex: 1000, padding: 16,
+            }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: "#fff", borderRadius: 16, width: "100%", maxWidth: 560,
+                boxShadow: "0 12px 40px rgba(0,0,0,0.2)",
+                borderLeft: `5px solid ${mColor}`,
+                maxHeight: "90vh", overflowY: "auto",
+              }}
+            >
+              {/* Header */}
+              <div style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "18px 20px 10px",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {modalRecipe.photo_url && (
+                    <div style={{
+                      width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+                      background: `url(${modalRecipe.photo_url}) center/cover`,
+                      border: `1px solid ${mColor}20`,
+                    }} />
+                  )}
+                  <div>
+                    <div style={{
+                      fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700,
+                      fontSize: 20, color: mColor, textTransform: "uppercase",
+                    }}>
+                      {modalRecipe.name}
+                    </div>
+                    {modalRecipe.yield_info && (
+                      <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>{modalRecipe.yield_info}</div>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setModalRecipe(null)}
+                  style={{
+                    width: 32, height: 32, borderRadius: 8, border: "none",
+                    background: "rgba(0,0,0,0.06)", color: "#999", fontSize: 16,
+                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Pivot input */}
+              {modalRecipe.lines.length > 0 && (
+                <div style={{ padding: "0 20px", marginBottom: 16 }}>
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+                    padding: "12px 16px", borderRadius: 12,
+                    background: `${mColor}08`, border: `1.5px solid ${mColor}25`,
+                  }}>
+                    <span style={{
+                      fontSize: 16, fontWeight: 800, color: mColor,
+                    }}>
+                      ★
+                    </span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: mColor }}>
+                      {modalRecipe.lines[0].ingredient_name}
+                    </span>
+                    <input
+                      type="number"
+                      value={pivotOverrides[modalRecipe.id] ?? ""}
+                      placeholder={String(modalRecipe.lines[0].qty)}
+                      onChange={e => {
+                        const v = e.target.value;
+                        setPivotOverrides(prev => ({
+                          ...prev,
+                          [modalRecipe.id]: v === "" ? undefined as unknown as number : parseFloat(v),
+                        }));
+                      }}
+                      style={{
+                        width: 100, height: 38, borderRadius: 10,
+                        border: `2px solid ${mColor}40`, padding: "0 12px",
+                        fontSize: 16, fontWeight: 800, textAlign: "center",
+                        background: "#fff", color: "#1a1a1a", outline: "none",
+                      }}
+                    />
+                    <span style={{ fontSize: 13, color: "#999", fontWeight: 600 }}>{modalRecipe.lines[0].unit}</span>
+                    {mFactor !== 1 && (
+                      <span style={{
+                        fontSize: 13, fontWeight: 800, color: mColor, marginLeft: "auto",
+                        padding: "4px 10px", borderRadius: 8, background: `${mColor}12`,
+                      }}>
+                        × {mFactor.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Ingredients table */}
+              <div style={{ padding: "0 20px" }}>
+                <div style={{
+                  fontSize: 12, fontWeight: 700, color: mColor,
+                  textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8,
+                }}>
+                  Ingrédients
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  {modalRecipe.lines.map((line, idx) => {
+                    const displayQty = line.qty * mFactor;
+                    return (
+                      <div key={idx} style={{
+                        display: "flex", justifyContent: "space-between", alignItems: "center",
+                        padding: "10px 14px", borderRadius: 8,
+                        background: idx % 2 === 0 ? "#faf7f2" : "transparent",
+                      }}>
+                        <span style={{ color: "#1a1a1a", fontWeight: 500, fontSize: 15 }}>
+                          {line.ingredient_name}
+                        </span>
+                        <span style={{
+                          fontWeight: 800, fontSize: 16,
+                          color: mFactor !== 1 ? "#D4775A" : "#1a1a1a",
+                          fontVariantNumeric: "tabular-nums",
+                        }}>
+                          {displayQty > 0 ? fmtQty(displayQty) : "—"}
+                          <span style={{ fontWeight: 500, color: "#999", fontSize: 12, marginLeft: 4 }}>{line.unit}</span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Steps */}
+              {modalRecipe.steps.length > 0 && (
+                <div style={{ padding: "0 20px" }}>
+                  <div style={{
+                    fontSize: 12, fontWeight: 700, color: mColor,
+                    textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8,
+                  }}>
+                    Procédé
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                    {modalRecipe.steps.map((step, idx) => (
+                      <div key={idx} style={{ display: "flex", gap: 10, fontSize: 14, lineHeight: 1.5 }}>
+                        <span style={{
+                          width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
+                          background: `${mColor}15`, color: mColor, fontSize: 12, fontWeight: 800,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                          {idx + 1}
+                        </span>
+                        <span style={{ color: "#333", paddingTop: 2 }}>{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Footer: allergens */}
+              {modalRecipe.allergens.length > 0 && (
+                <div style={{
+                  padding: "12px 20px 18px",
+                  borderTop: "1px solid #ede6d9",
+                  display: "flex", gap: 8, flexWrap: "wrap",
+                }}>
+                  {modalRecipe.allergens.map(a => (
+                    <span key={a} style={{
+                      fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+                      background: "rgba(220,38,38,0.08)", color: "#DC2626",
+                    }}>
+                      {a}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
