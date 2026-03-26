@@ -44,7 +44,7 @@ async function resolveEtabId(slug: string | null): Promise<string | null> {
   return null;
 }
 
-async function findOrCreateSupplier(name: string): Promise<string | null> {
+async function findOrCreateSupplier(name: string, etabId: string | null): Promise<string | null> {
   // Search case-insensitive
   const { data: existing } = await supabaseAdmin
     .from("suppliers")
@@ -62,10 +62,10 @@ async function findOrCreateSupplier(name: string): Promise<string | null> {
     .maybeSingle();
   if (exact?.id) return exact.id;
 
-  // Create new supplier (minimal fields to avoid NOT NULL violations)
+  // Create new supplier
   const { data: created, error } = await supabaseAdmin
     .from("suppliers")
-    .insert({ name, is_active: true })
+    .insert({ name, is_active: true, ...(etabId ? { etablissement_id: etabId } : {}) })
     .select("id")
     .single();
   if (error) {
@@ -291,7 +291,7 @@ async function processMessage(messageId: string) {
       const supplierName = fournisseur
         ? fournisseur.charAt(0).toUpperCase() + fournisseur.slice(1)
         : "Unknown";
-      const supplierId = await findOrCreateSupplier(supplierName);
+      const supplierId = await findOrCreateSupplier(supplierName, etabId);
 
       if (!supplierId) {
         await logImport(messageId, from, subject, emailDate, pdf.filename, fournisseur, etabId, parseResult.invoice_number, 0, "error", "Impossible de créer le fournisseur");
@@ -375,6 +375,7 @@ async function processMessage(messageId: string) {
               supplier_sku: ing.reference ?? null,
               piece_weight_g: ing.poids_unitaire ?? null,
               piece_volume_ml: ing.volume_unitaire ?? null,
+              ...(etabId ? { etablissement_id: etabId } : {}),
             })
             .select("id")
             .single();
