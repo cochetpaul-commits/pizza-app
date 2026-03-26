@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, type CSSProperties } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -438,10 +439,10 @@ export default function SimulationPage() {
                             }}>
                               {(c.emp.prenom?.[0] ?? "").toUpperCase()}{(c.emp.nom?.[0] ?? "").toUpperCase()}
                             </div>
-                            <div>
+                            <Link href={`/rh/employe/${c.emp.id}`} style={{ textDecoration: "none", color: "inherit" }}>
                               <div style={{ fontWeight: 700, fontSize: 13 }}>{c.emp.prenom}</div>
                               <div style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase" }}>{c.emp.nom}</div>
-                            </div>
+                            </Link>
                           </div>
                         </td>
                         <td style={td}>
@@ -523,7 +524,7 @@ export default function SimulationPage() {
                           borderLeft: isSelected ? `4px solid ${accent}` : "1px solid #ddd6c8",
                         }}
                       >
-                        <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a" }}>{c.emp.prenom}</div>
+                        <Link href={`/rh/employe/${c.emp.id}`} onClick={(e) => e.stopPropagation()} style={{ textDecoration: "none", color: "#1a1a1a", fontSize: 16, fontWeight: 700 }}>{c.emp.prenom}</Link>
                         <div style={{ fontSize: 12, color: "#999" }}>Gerant TNS</div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: isOvr ? accent : "#1a1a1a", marginTop: 4 }}>
                           {fmt(c.brut)} &euro; net
@@ -710,7 +711,7 @@ export default function SimulationPage() {
                             {(c.emp.prenom?.[0] ?? "").toUpperCase()}{(c.emp.nom?.[0] ?? "").toUpperCase()}
                           </div>
                           <div style={{ minWidth: 100, flexShrink: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600 }}>{c.emp.prenom} {c.emp.nom}</div>
+                            <Link href={`/rh/employe/${c.emp.id}`} style={{ textDecoration: "none", color: "#1a1a1a", fontSize: 12, fontWeight: 600 }}>{c.emp.prenom} {c.emp.nom}</Link>
                             <div style={{ fontSize: 10, color: "#999" }}>
                               {c.isTNS ? "TNS" : c.contratType} {c.heuresSemaine}h
                             </div>
