@@ -75,7 +75,6 @@ export const PLANNING_ITEMS: NavItemV2[] = [
   { label: "Congés", href: "/rh/conges", icon: "beach" },
   { label: "Émargement", href: "/rh/emargement", icon: "clipboard" },
   { label: "Rapport de paie", href: "/rh/rapports", icon: "fileText" },
-  { label: "Simulation", href: "/rh/masse-salariale", icon: "calculator", roles: ["group_admin"] },
 ];
 
 export const ACHATS_ITEMS: NavItemV2[] = [
@@ -110,6 +109,7 @@ export const CLIENTS_ITEMS = EVENEMENTIEL_ITEMS;
 const VENTES_ITEMS: NavItemV2[] = [
   { label: "Indicateurs cles", href: "/ventes/performances", icon: "barChart" },
   { label: "Produits vendus", href: "/ventes/produits", icon: "tag" },
+  { label: "Simulation", href: "/ventes/simulation", icon: "calculator" },
 ];
 export const VENTES_SECTION: NavSubSection = { label: "Ventes", icon: "wallet", href: "/ventes", roles: ["group_admin"], items: VENTES_ITEMS };
 export const PERSONNEL_SECTION: NavSubSection = { label: "Personnel", icon: "users", href: "/personnel", items: PLANNING_ITEMS };
@@ -215,7 +215,7 @@ export const SIDEBAR_NAV: NavSection[] = [
       { label: "Pointage", href: "/rh/pointage" },
       { label: "Congés", href: "/rh/conges" },
       { label: "Feuille d'émargement", href: "/rh/emargement" },
-      { label: "Simulation", href: "/rh/masse-salariale", roles: ["group_admin"] },
+      { label: "Simulation", href: "/ventes/simulation", roles: ["group_admin"] },
     ],
   },
   {
@@ -282,7 +282,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/rh/pointage": "Pointage",
   "/rh/conges": "Congés",
   "/rh/emargement": "Émargement",
-  "/rh/masse-salariale": "Simulation & Masse salariale",
+  "/ventes/simulation": "Simulation",
   "/rh/rapports": "Rapports RH",
   "/settings/planning": "Gestion du planning",
   "/settings/etablissements": "Établissements",
@@ -341,7 +341,7 @@ const PAGE_SECTIONS: Record<string, string> = {
   "/rh/pointage": "Gestion du personnel",
   "/rh/conges": "Gestion du personnel",
   "/rh/emargement": "Gestion du personnel",
-  "/rh/masse-salariale": "Gestion du personnel",
+  "/ventes/simulation": "Ventes",
   "/rh/rapports": "Gestion du personnel",
   "/settings/planning": "Paramètres",
   "/settings/finance": "Paramètres",
