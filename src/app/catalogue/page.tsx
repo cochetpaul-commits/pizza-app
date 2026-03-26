@@ -325,6 +325,8 @@ export default function CataloguePage() {
 
   // Pivot overrides: { recipeId: qty }
   const [pivotOverrides, setPivotOverrides] = useState<Record<string, number>>({});
+  // Empâtement overrides: { recipeId: { count, weight } }
+  const [empOverrides, setEmpOverrides] = useState<Record<string, { count?: number; weight?: number }>>({});
 
   // Pivot modal (any recipe with pivot or emp_data)
   const [modalRecipe, setModalRecipe] = useState<Recipe | null>(null);
@@ -677,12 +679,35 @@ export default function CataloguePage() {
         })}
       </div>
 
-      {/* ═══ MODALE PRODUCTION ═══ */}
+      {/* ═══ MODALE PIVOT ═══ */}
       {modalRecipe && (() => {
-        const mColor = TYPE_COLORS.production;
+        const mColor = TYPE_COLORS[modalRecipe.type];
+        const isEmp = !!modalRecipe.emp_data;
+
+        // Empâtement: recalculate lines from overrides
+        let displayLines = modalRecipe.lines;
+        let hasChanged = false;
+        let empYield = modalRecipe.yield_info;
+        if (isEmp && modalRecipe.emp_data) {
+          const ov = empOverrides[modalRecipe.id];
+          const bc = ov?.count ?? modalRecipe.emp_data.balls_count;
+          const bw = ov?.weight ?? modalRecipe.emp_data.ball_weight;
+          hasChanged = bc !== modalRecipe.emp_data.balls_count || bw !== modalRecipe.emp_data.ball_weight;
+          if (hasChanged) {
+            displayLines = computeEmpLines(modalRecipe.emp_data, bc, bw);
+            empYield = `${bc} pâton${bc > 1 ? "s" : ""} × ${bw} g = ${fmtQty(bc * bw)} g`;
+          }
+        }
+
+        // Standard pivot: factor
         const mPivotOverride = pivotOverrides[modalRecipe.id];
         const mBasePivot = modalRecipe.lines[0]?.qty || 1;
-        const mFactor = mPivotOverride != null && mPivotOverride > 0 ? mPivotOverride / mBasePivot : 1;
+        const mFactor = !isEmp && mPivotOverride != null && mPivotOverride > 0 ? mPivotOverride / mBasePivot : 1;
+        if (!isEmp && mFactor !== 1) {
+          displayLines = modalRecipe.lines.map(l => ({ ...l, qty: l.qty * mFactor }));
+          hasChanged = true;
+        }
+
         return (
           <div
             onClick={() => setModalRecipe(null)}
@@ -721,9 +746,9 @@ export default function CataloguePage() {
                     }}>
                       {modalRecipe.name}
                     </div>
-                    {modalRecipe.yield_info && (
-                      <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>{modalRecipe.yield_info}</div>
-                    )}
+                    <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>
+                      {isEmp ? (empYield ?? "") : (modalRecipe.yield_info ?? "")}
+                    </div>
                   </div>
                 </div>
                 <button
@@ -739,19 +764,78 @@ export default function CataloguePage() {
                 </button>
               </div>
 
-              {/* Pivot input */}
-              {modalRecipe.lines.length > 0 && (
+              {/* Empâtement: pâtons + grammage */}
+              {isEmp && modalRecipe.emp_data && (
+                <div style={{ padding: "0 20px", marginBottom: 16 }}>
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                    padding: "12px 16px", borderRadius: 12,
+                    background: `${mColor}08`, border: `1.5px solid ${mColor}25`,
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: mColor }}>Pâtons</span>
+                      <input
+                        type="number"
+                        value={empOverrides[modalRecipe.id]?.count ?? ""}
+                        placeholder={String(modalRecipe.emp_data.balls_count)}
+                        onChange={e => {
+                          const v = e.target.value;
+                          setEmpOverrides(prev => ({
+                            ...prev,
+                            [modalRecipe.id]: { ...prev[modalRecipe.id], count: v === "" ? undefined : parseInt(v) },
+                          }));
+                        }}
+                        style={{
+                          width: 80, height: 38, borderRadius: 10,
+                          border: `2px solid ${mColor}40`, padding: "0 10px",
+                          fontSize: 16, fontWeight: 800, textAlign: "center",
+                          background: "#fff", color: "#1a1a1a", outline: "none",
+                        }}
+                      />
+                    </div>
+                    <span style={{ fontSize: 16, color: "#ccc", fontWeight: 300 }}>×</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input
+                        type="number"
+                        value={empOverrides[modalRecipe.id]?.weight ?? ""}
+                        placeholder={String(modalRecipe.emp_data.ball_weight)}
+                        onChange={e => {
+                          const v = e.target.value;
+                          setEmpOverrides(prev => ({
+                            ...prev,
+                            [modalRecipe.id]: { ...prev[modalRecipe.id], weight: v === "" ? undefined : parseInt(v) },
+                          }));
+                        }}
+                        style={{
+                          width: 80, height: 38, borderRadius: 10,
+                          border: `2px solid ${mColor}40`, padding: "0 10px",
+                          fontSize: 16, fontWeight: 800, textAlign: "center",
+                          background: "#fff", color: "#1a1a1a", outline: "none",
+                        }}
+                      />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "#999" }}>g</span>
+                    </div>
+                    {hasChanged && (
+                      <span style={{
+                        fontSize: 13, fontWeight: 800, color: mColor, marginLeft: "auto",
+                        padding: "4px 10px", borderRadius: 8, background: `${mColor}12`,
+                      }}>
+                        {fmtQty((empOverrides[modalRecipe.id]?.count ?? modalRecipe.emp_data.balls_count) * (empOverrides[modalRecipe.id]?.weight ?? modalRecipe.emp_data.ball_weight))} g
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Standard pivot: ★ ingredient input */}
+              {!isEmp && modalRecipe.lines.length > 0 && (
                 <div style={{ padding: "0 20px", marginBottom: 16 }}>
                   <div style={{
                     display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
                     padding: "12px 16px", borderRadius: 12,
                     background: `${mColor}08`, border: `1.5px solid ${mColor}25`,
                   }}>
-                    <span style={{
-                      fontSize: 16, fontWeight: 800, color: mColor,
-                    }}>
-                      ★
-                    </span>
+                    <span style={{ fontSize: 16, fontWeight: 800, color: mColor }}>★</span>
                     <span style={{ fontSize: 14, fontWeight: 700, color: mColor }}>
                       {modalRecipe.lines[0].ingredient_name}
                     </span>
@@ -795,28 +879,25 @@ export default function CataloguePage() {
                   Ingrédients
                 </div>
                 <div style={{ marginBottom: 16 }}>
-                  {modalRecipe.lines.map((line, idx) => {
-                    const displayQty = line.qty * mFactor;
-                    return (
-                      <div key={idx} style={{
-                        display: "flex", justifyContent: "space-between", alignItems: "center",
-                        padding: "10px 14px", borderRadius: 8,
-                        background: idx % 2 === 0 ? "#faf7f2" : "transparent",
+                  {displayLines.map((line, idx) => (
+                    <div key={idx} style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "10px 14px", borderRadius: 8,
+                      background: idx % 2 === 0 ? "#faf7f2" : "transparent",
+                    }}>
+                      <span style={{ color: "#1a1a1a", fontWeight: 500, fontSize: 15 }}>
+                        {line.ingredient_name}
+                      </span>
+                      <span style={{
+                        fontWeight: 800, fontSize: 16,
+                        color: hasChanged ? "#D4775A" : "#1a1a1a",
+                        fontVariantNumeric: "tabular-nums",
                       }}>
-                        <span style={{ color: "#1a1a1a", fontWeight: 500, fontSize: 15 }}>
-                          {line.ingredient_name}
-                        </span>
-                        <span style={{
-                          fontWeight: 800, fontSize: 16,
-                          color: mFactor !== 1 ? "#D4775A" : "#1a1a1a",
-                          fontVariantNumeric: "tabular-nums",
-                        }}>
-                          {displayQty > 0 ? fmtQty(displayQty) : "—"}
-                          <span style={{ fontWeight: 500, color: "#999", fontSize: 12, marginLeft: 4 }}>{line.unit}</span>
-                        </span>
-                      </div>
-                    );
-                  })}
+                        {line.qty > 0 ? fmtQty(line.qty) : "—"}
+                        <span style={{ fontWeight: 500, color: "#999", fontSize: 12, marginLeft: 4 }}>{line.unit}</span>
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
 
