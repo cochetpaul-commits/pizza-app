@@ -15,6 +15,16 @@ type RecipeLine = {
   unit: string;
 };
 
+type EmpData = {
+  balls_count: number;
+  ball_weight: number;
+  hydration: number;
+  salt: number;
+  honey: number;
+  oil: number;
+  yeast: number;
+};
+
 type Recipe = {
   id: string;
   type: RecipeType;
@@ -26,6 +36,7 @@ type Recipe = {
   pivot_ingredient_id: string | null;
   yield_info: string | null; // "8 portions" or "1200 g"
   allergens: string[];
+  emp_data?: EmpData;
 };
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -80,6 +91,22 @@ function parseAllergenArray(raw: unknown): string[] {
   if (Array.isArray(raw)) return raw;
   if (typeof raw === "string") { try { return JSON.parse(raw); } catch { return []; } }
   return [];
+}
+
+function computeEmpLines(d: EmpData, countOverride?: number, weightOverride?: number): RecipeLine[] {
+  const bc = countOverride ?? d.balls_count;
+  const bw = weightOverride ?? d.ball_weight;
+  const totalDough = bc * bw;
+  const flour = totalDough / (1 + d.hydration + d.salt + d.honey + d.oil + d.yeast);
+  const lines: RecipeLine[] = [
+    { ingredient_name: "Farine", qty: Math.round(flour), unit: "g" },
+    { ingredient_name: "Eau", qty: Math.round(flour * d.hydration), unit: "g" },
+    { ingredient_name: "Sel", qty: Math.round(flour * d.salt * 10) / 10, unit: "g" },
+  ];
+  if (d.honey > 0) lines.push({ ingredient_name: "Miel", qty: Math.round(flour * d.honey * 10) / 10, unit: "g" });
+  if (d.oil > 0) lines.push({ ingredient_name: "Huile", qty: Math.round(flour * d.oil * 10) / 10, unit: "g" });
+  if (d.yeast > 0) lines.push({ ingredient_name: "Levure", qty: Math.round(flour * d.yeast * 10) / 10, unit: "g" });
+  return lines;
 }
 
 // ── Data fetching ────────────────────────────────────────────────────────────
@@ -258,30 +285,25 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
     .order("name");
 
   for (const e of (empatements ?? [])) {
-    const totalDough = (e.balls_count ?? 1) * (e.ball_weight ?? 250);
-    // Compute flour from hydration: flour = totalDough / (1 + hydration/100 + salt/100 + ...)
-    const h = (e.hydration_total ?? 60) / 100;
-    const s = (e.salt_percent ?? 2.5) / 100;
-    const hn = (e.honey_percent ?? 0) / 100;
-    const o = (e.oil_percent ?? 0) / 100;
-    const y = (e.yeast_percent ?? 0.3) / 100;
-    const flour = totalDough / (1 + h + s + hn + o + y);
-
-    const lines: RecipeLine[] = [
-      { ingredient_name: "Farine", qty: Math.round(flour), unit: "g" },
-      { ingredient_name: "Eau", qty: Math.round(flour * h), unit: "g" },
-      { ingredient_name: "Sel", qty: Math.round(flour * s * 10) / 10, unit: "g" },
-    ];
-    if (hn > 0) lines.push({ ingredient_name: "Miel", qty: Math.round(flour * hn * 10) / 10, unit: "g" });
-    if (o > 0) lines.push({ ingredient_name: "Huile", qty: Math.round(flour * o * 10) / 10, unit: "g" });
-    if (y > 0) lines.push({ ingredient_name: "Levure", qty: Math.round(flour * y * 10) / 10, unit: "g" });
+    const bc = e.balls_count ?? 1;
+    const bw = e.ball_weight ?? 250;
+    const empData: EmpData = {
+      balls_count: bc, ball_weight: bw,
+      hydration: (e.hydration_total ?? 60) / 100,
+      salt: (e.salt_percent ?? 2.5) / 100,
+      honey: (e.honey_percent ?? 0) / 100,
+      oil: (e.oil_percent ?? 0) / 100,
+      yeast: (e.yeast_percent ?? 0.3) / 100,
+    };
+    const lines = computeEmpLines(empData);
 
     recipes.push({
       id: `emp-${e.id}`, type: "production", name: e.name, category: "empatement",
       photo_url: null, lines, steps: [],
       pivot_ingredient_id: e.pivot_ingredient_id,
-      yield_info: `${e.balls_count ?? 1} pâton${(e.balls_count ?? 1) > 1 ? "s" : ""} × ${e.ball_weight ?? 250} g`,
+      yield_info: `${bc} pâton${bc > 1 ? "s" : ""} × ${bw} g`,
       allergens: ["gluten"],
+      emp_data: empData,
     });
   }
 
@@ -301,10 +323,10 @@ export default function CataloguePage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
 
-  // Production pivot overrides: { recipeId: qty }
+  // Pivot overrides: { recipeId: qty }
   const [pivotOverrides, setPivotOverrides] = useState<Record<string, number>>({});
 
-  // Production modal
+  // Pivot modal (any recipe with pivot or emp_data)
   const [modalRecipe, setModalRecipe] = useState<Recipe | null>(null);
 
   useEffect(() => {
@@ -476,13 +498,13 @@ export default function CataloguePage() {
               {/* Recipe rows */}
               {!isCollapsed && items.map(recipe => {
                 const isOpen = openId === recipe.id;
-                const isProduction = recipe.type === "production";
+                const hasPivot = !!recipe.pivot_ingredient_id || !!recipe.emp_data;
 
                 return (
                   <div key={recipe.id} style={{ marginBottom: 2 }}>
                     {/* Row */}
                     <div
-                      onClick={() => isProduction ? setModalRecipe(recipe) : toggleOpen(recipe.id)}
+                      onClick={() => hasPivot ? setModalRecipe(recipe) : toggleOpen(recipe.id)}
                       style={{
                         display: "flex", alignItems: "center", gap: 12,
                         padding: "10px 16px", background: isOpen ? "#fff" : "rgba(255,255,255,0.7)",
