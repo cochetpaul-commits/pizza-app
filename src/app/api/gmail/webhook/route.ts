@@ -334,19 +334,17 @@ async function processMessage(messageId: string) {
         continue;
       }
 
-      // Insert invoice lines
-      const lines = parseResult.ingredients
-        .filter((ing) => ing.confidence !== "low")
-        .map((ing) => ({
-          invoice_id: inv.id,
-          supplier_id: supplierId,
-          sku: ing.reference ?? null,
-          name: ing.name,
-          quantity: 1,
-          unit: ing.unit_commande === "kg" ? "kg" : "pc",
-          unit_price: ing.prix_unitaire,
-          total_price: ing.prix_commande,
-        }));
+      // Insert invoice lines (all lines, no confidence filter — this is invoice history)
+      const lines = parseResult.ingredients.map((ing) => ({
+        invoice_id: inv.id,
+        supplier_id: supplierId,
+        sku: ing.reference ?? null,
+        name: ing.name,
+        quantity: 1,
+        unit: ing.unit_commande === "kg" ? "kg" : "pc",
+        unit_price: ing.prix_unitaire,
+        total_price: ing.prix_commande,
+      }));
 
       if (lines.length > 0) {
         const { error: linesErr } = await supabaseAdmin.from("supplier_invoice_lines").insert(lines);
@@ -399,13 +397,13 @@ async function processMessage(messageId: string) {
       }
 
       // Log success
-      await logImport(messageId, from, subject, emailDate, pdf.filename, fournisseur, etabId, parseResult.invoice_number, nbLignes, "ok", null, inv.id);
+      await logImport(messageId, from, subject, emailDate, pdf.filename, fournisseur, etabId, parseResult.invoice_number, lines.length, "ok", null, inv.id);
 
       // Create notification
       await supabaseAdmin.from("notifications").insert({
         type: "facture_importee",
         titre: `Facture ${supplierName} importée`,
-        message: `${pdf.filename} — ${nbLignes} lignes, ${parseResult.total_ttc?.toFixed(2) ?? "?"} € TTC`,
+        message: `${pdf.filename} — ${lines.length} lignes, ${parseResult.total_ttc?.toFixed(2) ?? "?"} € TTC`,
         metadata: { invoice_id: inv.id, fournisseur, filename: pdf.filename },
       }).then(() => {}, () => {}); // ignore notification errors
 
