@@ -85,6 +85,7 @@ export default function PerformancesPage() {
   const [importMsg, setImportMsg] = useState("");
   const [exporting, setExporting] = useState(false);
   const [mixDDOpen, setMixDDOpen] = useState<{ label: string; color: string } | null>(null);
+  const [meteo, setMeteo] = useState<Record<string, { emoji: string; desc: string; temp: number }>>({});
 
   // Date navigation
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -124,6 +125,16 @@ export default function PerformancesPage() {
         setData(json.stats);
         setPrev(json.prev ?? null);
       }
+      // Fetch meteo
+      try {
+        const mRes = await fetch(`/api/meteo?from=${from}&to=${to}`);
+        const mJson = await mRes.json();
+        const mMap: Record<string, { emoji: string; desc: string; temp: number }> = {};
+        for (const m of mJson.meteo ?? []) {
+          mMap[`${m.date_service}:${m.service}`] = { emoji: m.emoji, desc: m.description, temp: m.temp };
+        }
+        setMeteo(mMap);
+      } catch { setMeteo({}); }
     } catch {
       setData(null);
       setPrev(null);
@@ -556,7 +567,7 @@ export default function PerformancesPage() {
               <div style={S.card}>
                 <div style={S.sec}>Par service · {mode.toUpperCase()} · couverts</div>
                 <div style={{ overflow: "hidden", borderRadius: 8, border: "1px solid #e0d8ce" }}>
-                  <RecapTable services={W.services} mode={mode} />
+                  <RecapTable services={W.services} mode={mode} meteo={meteo} dates={W.dates} days={W.days} />
                 </div>
               </div>
             )}
@@ -772,13 +783,18 @@ function PlaceBlock({ label, color, ca, pct, couverts, tm }: { label: string; co
   );
 }
 
-function RecapTable({ services, mode }: { services: WeekData["services"]; mode: "ttc" | "ht" }) {
+function RecapTable({ services, mode, meteo, dates, days }: { services: WeekData["services"]; mode: "ttc" | "ht"; meteo: Record<string, { emoji: string; desc: string; temp: number }>; dates: string[]; days: string[] }) {
+  // Map day name → date for meteo lookup
+  const dayToDate: Record<string, string> = {};
+  for (let i = 0; i < days.length; i++) {
+    dayToDate[days[i]] = dates[i];
+  }
   const byDay: Record<string, WeekData["services"]> = {};
   for (const s of services) {
     if (!byDay[s.jour]) byDay[s.jour] = [];
     byDay[s.jour].push(s);
   }
-  const days = Object.keys(byDay);
+  const dayKeys = Object.keys(byDay);
 
   return (
     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
@@ -793,10 +809,11 @@ function RecapTable({ services, mode }: { services: WeekData["services"]; mode: 
           <th style={{ ...thSt(), color: "#D4775A" }}>Total</th>
           <th style={thSt()}>Cvts</th>
           <th style={thSt()}>CVT M SP</th>
+          <th style={{ ...thSt("center"), width: 40 }}>Meteo</th>
         </tr>
       </thead>
       <tbody>
-        {days.map((jour, di) => {
+        {dayKeys.map((jour, di) => {
           const svcs = byDay[jour];
           return svcs.map((s, si) => {
             const caVal = mode === "ttc" ? s.ttc : s.ht;
@@ -816,6 +833,15 @@ function RecapTable({ services, mode }: { services: WeekData["services"]; mode: 
                 <td style={{ ...tdSt, fontWeight: 700, fontSize: 13, color: "#D4775A" }}>{fmt(caVal)}</td>
                 <td style={{ ...tdSt, fontWeight: 600 }}>{s.cov}</td>
                 <td style={tdSt}><span style={{ background: tmBg, color: tmColor, padding: "3px 9px", borderRadius: 5, fontSize: 11, fontWeight: 700 }}>{tmSp.toFixed(0)}{"\u20AC"}</span></td>
+                {(() => {
+                  const dateKey = dayToDate[s.jour];
+                  const m = dateKey ? meteo[`${dateKey}:${s.svc}`] : null;
+                  return (
+                    <td style={{ ...tdSt, textAlign: "center", fontSize: 18, lineHeight: 1, padding: "8px 6px" }}>
+                      {m ? <span title={`${m.desc} ${m.temp}°C`}>{m.emoji}</span> : ""}
+                    </td>
+                  );
+                })()}
               </tr>
             );
           });
@@ -830,7 +856,7 @@ function zCell(val: number | undefined, color: string) {
   return <td style={{ ...tdSt, fontWeight: 600, color }}>{fmt(val)}</td>;
 }
 
-const thSt = (align: "left" | "right" = "right"): CSSProperties => ({
+const thSt = (align: "left" | "right" | "center" = "right"): CSSProperties => ({
   fontSize: 9, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600,
   padding: "11px 14px", textAlign: align, whiteSpace: "nowrap", borderBottom: "1px solid #e0d8ce",
   color: "#777",
