@@ -204,7 +204,7 @@ export default function PerformancesPage() {
               background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
             }}>
               {importing ? "Import..." : "Importer XLSX"}
-              <input type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={e => {
+              <input type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => {
                 const f = e.target.files?.[0];
                 if (f) handleImport(f);
                 e.target.value = "";

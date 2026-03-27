@@ -54,11 +54,12 @@ function calcHT(ttc: number, taxRate: number): number {
 
 /** Detect file format */
 function detectFormat(rows: unknown[][]): "commandes" | "products" {
-  const first = rows[0] as string[];
-  if (first && String(first[0] ?? "").toLowerCase() === "jour") return "products";
   for (let i = 0; i < Math.min(rows.length, 15); i++) {
     const row = rows[i] as string[];
-    if (row && row[0] && String(row[0]).includes("Ouvert")) return "commandes";
+    if (!row || !row[0]) continue;
+    const v = String(row[0]).toLowerCase().trim();
+    if (v === "jour") return "products";
+    if (v.includes("ouvert")) return "commandes";
   }
   return "commandes";
 }
@@ -188,10 +189,18 @@ export async function POST(req: NextRequest) {
     if (!etablissementId) return NextResponse.json({ error: "etablissement_id manquant" }, { status: 400 });
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const workbook = XLSX.read(buffer, { type: "buffer" });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+    let rows: unknown[][];
+
+    if (file.name.endsWith(".csv")) {
+      // Parse CSV (semicolon-separated, French format)
+      const text = buffer.toString("utf-8");
+      rows = text.split("\n").map(line => line.split(";").map(cell => cell.trim()));
+    } else {
+      const workbook = XLSX.read(buffer, { type: "buffer" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+    }
 
     const format = detectFormat(rows);
     let insertRows: Record<string, unknown>[];
@@ -228,8 +237,8 @@ export async function POST(req: NextRequest) {
         .lte("date_service", maxDate);
     }
 
-    // Insert in batches
-    const BATCH = 500;
+    // Insert in batches (smaller for large files)
+    const BATCH = 200;
     let inserted = 0;
     for (let i = 0; i < insertRows.length; i += BATCH) {
       const batch = insertRows.slice(i, i + BATCH);
