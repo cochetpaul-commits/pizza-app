@@ -1,623 +1,624 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
+import { useEffect, useState, useRef, useCallback, type CSSProperties } from "react";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
-import { fetchApi } from "@/lib/fetchApi";
-
-/* ── Tokens ── */
-const T = {
-  dark: "#1a1a1a", muted: "#999", border: "#ddd6c8", white: "#fff",
-  terracotta: "#D4775A", sauge: "#4A7C59", dore: "#B8860B",
-  creme: "#f2ede4", cremeDark: "#f0ebe3",
-  salle: "#D4775A", pergolas: "#B8860B", terrasse: "#4A7C59", emporter: "#8B6914",
-};
-
-function fmtEur(n: number) {
-  return n.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-}
-
-function fmtEur2(n: number) {
-  return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+import Chart from "chart.js/auto";
 
 /* ── Types ── */
-type DayData = {
-  date: string; label: string; labelFull: string;
-  ca: number; pax: number; ticketMoyen: number; isActive: boolean;
+type WeekData = {
+  dates: string[];
+  days: string[];
+  ca_ttc: number; ca_ht: number; couverts: number; ann_pct: number;
+  day_ttc: number[]; day_ht: number[]; day_cov: number[];
+  tm_ttc: number[]; tm_ht: number[];
+  zones: Record<string, number[]>;
+  place_sur: number; place_emp: number; cov_sur: number; cov_emp: number;
   services: {
-    journee: { salle: number; pergolas: number; terrasse: number; emporter: number; total: number; totalHT: number; pax: number; ticketMoyen: number; ticketEmporter: number; ratioPiattiPizza: number };
-    midi: { salle: number; pergolas: number; terrasse: number; emporter: number; total: number; pax: number; ticketMoyen: number };
-    soir: { salle: number; pergolas: number; terrasse: number; emporter: number; total: number; pax: number; ticketMoyen: number };
-  };
-  topProducts: Array<{ name: string; quantity: number; totalSales: number }>;
-  weather: { midi: { temp: number; condition: string; icon: string }; soir: { temp: number; condition: string; icon: string } } | null;
+    jour: string; svc: string; ttc: number; ht: number; cov: number; tm: number;
+    sp: number; emp: number; sp_tkt: number; tm_sp: number;
+    z: Record<string, number>;
+  }[];
+  mix_labels: string[]; mix_ttc: number[]; mix_ht: number[];
+  top10_names: string[]; top10_ca: number[]; top10_qty: number[];
+  cat_products: Record<string, { n: string; qty: number; ca: number }[]>;
+  top3_cats: { cat: string; rows: { n: string; ca: string }[]; flop: { n: string; ca: string; qty: number } | null }[];
+  serveurs: string[]; serv_ca: number[];
+  ratios: { anti: number; anti_n: number; dolci: number; dolci_n: number; vin: number; vin_n: number };
 };
 
-type PerfData = {
-  week: string; weekLabel: string; isCurrentWeek: boolean; activeDays: number; today: string;
-  apiError: string | null;
-  kpis: {
-    caSemaine: number; caHT: number; paxSemaine: number;
-    ticketMoyenSurPlace: number; ticketMoyenEmporter: number;
-    bestDay: { label: string; ca: number };
-    variationCA: number; variationPax: number; variationTicket: number;
-    caSemainePrec: number; paxSemainePrec: number; ticketMoyenPrec: number;
-  };
-  zones: { salle: number; pergolas: number; terrasse: number; emporter: number };
-  zonePcts: { salle: number; pergolas: number; terrasse: number; emporter: number };
-  days: DayData[];
-  topSemaine: Array<{ name: string; quantity: number; totalSales: number; isNew: boolean; pctChange: number | null }>;
-  topByCategory: Array<{ category: string; products: Array<{ name: string; quantity: number; totalSales: number; pctChange: number | null }> }>;
-};
+type ViewTab = "jour" | "semaine" | "mois";
 
 /* ── Helpers ── */
-function getISOWeek(dateStr?: string): string {
-  const d = dateStr ? new Date(dateStr + "T12:00:00Z") : new Date();
-  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return `${d.getUTCFullYear()}-${String(week).padStart(2, "0")}`;
-}
+const fmt = (v: number) => Math.round(v).toLocaleString("fr-FR") + "\u20AC";
+const fmtK = (v: number) => "\u20AC" + Math.round(v / 1000) + "k";
+const ZC: Record<string, string> = { Salle: "#46655a", Pergolas: "#5e8278", Terrasse: "#c4a882", emp: "#D4775A" };
+const MIX_COLORS = ["#D4775A", "#8fa8a0", "#46655a", "#7c5c3a", "#c4a882", "#e0b896", "#5e7a8a", "#a8b89c"];
 
-function prevWeek(w: string): string {
-  const [y, wn] = w.split("-").map(Number);
-  if (wn <= 1) return `${y - 1}-52`;
-  return `${y}-${String(wn - 1).padStart(2, "0")}`;
-}
+/* ── Chart helper ── */
+const charts: Record<string, Chart> = {};
+function destroyChart(id: string) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
 
-function nextWeek(w: string): string {
-  const [y, wn] = w.split("-").map(Number);
-  if (wn >= 52) return `${y + 1}-01`;
-  return `${y}-${String(wn + 1).padStart(2, "0")}`;
-}
+/* ── Styles ── */
+const S = {
+  card: { background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 } as CSSProperties,
+  sec: { fontSize: 9, textTransform: "uppercase" as const, letterSpacing: ".12em", color: "#777", fontWeight: 500, marginBottom: 12 } as CSSProperties,
+  bigNum: { fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 46, fontWeight: 700, color: "#fff", lineHeight: 1, letterSpacing: "-.02em" } as CSSProperties,
+};
 
-/* ── Main Page ── */
+/* ══════════════════════════════════════════════════════
+   COMPONENT
+   ══════════════════════════════════════════════════════ */
+
 export default function PerformancesPage() {
   const { current: etab } = useEtablissement();
-  const etabColor = etab?.couleur ?? T.terracotta;
+  const accent = etab?.couleur ?? "#D4775A";
 
-  const [week, setWeek] = useState(getISOWeek);
-  const [data, setData] = useState<PerfData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
+  const [viewTab, setViewTab] = useState<ViewTab>("semaine");
+  const [mode, setMode] = useState<"ttc" | "ht">("ttc");
+  const [data, setData] = useState<WeekData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
+  const [mixDDOpen, setMixDDOpen] = useState<{ label: string; color: string } | null>(null);
 
-  const currentWeek = getISOWeek();
+  // Date navigation
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
 
-  const load = useCallback(async (w: string) => {
+  // Compute date range based on viewTab
+  const getRange = useCallback(() => {
+    const d = new Date(selectedDate + "T12:00:00");
+    if (viewTab === "jour") {
+      return { from: selectedDate, to: selectedDate };
+    }
+    if (viewTab === "semaine") {
+      const dow = d.getDay() || 7;
+      const mon = new Date(d);
+      mon.setDate(d.getDate() - dow + 1);
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+      return { from: mon.toISOString().slice(0, 10), to: sun.toISOString().slice(0, 10) };
+    }
+    // mois
+    const first = new Date(d.getFullYear(), d.getMonth(), 1);
+    const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    return { from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10) };
+  }, [selectedDate, viewTab]);
+
+  // Load data
+  const loadData = useCallback(async () => {
+    if (!etab) return;
     setLoading(true);
+    const { from, to } = getRange();
     try {
-      const res = await fetchApi(`/api/popina/performances?week=${w}`);
-      if (res.ok) setData(await res.json());
-    } catch { /* silencieux */ }
+      const res = await fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${from}&to=${to}`);
+      const json = await res.json();
+      if (json.empty || !json.stats) {
+        setData(null);
+      } else {
+        setData(json.stats);
+      }
+    } catch {
+      setData(null);
+    }
     setLoading(false);
-  }, []);
+  }, [etab, getRange]);
 
-  useEffect(() => { load(week); }, [week, load]); // eslint-disable-line react-hooks/set-state-in-effect
+  useEffect(() => { loadData(); }, [loadData]);
 
-  const CARD: React.CSSProperties = {
-    background: T.white, borderRadius: 14, padding: "16px 20px",
-    border: `1.5px solid ${T.border}`,
+  // Import handler
+  const handleImport = async (file: File) => {
+    if (!etab) return;
+    setImporting(true);
+    setImportMsg("");
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("etablissement_id", etab.id);
+    try {
+      const res = await fetch("/api/ventes/import", { method: "POST", body: fd });
+      const json = await res.json();
+      if (json.ok) {
+        setImportMsg(`${json.inserted} lignes importees (${json.range})`);
+        loadData();
+      } else {
+        setImportMsg("Erreur : " + (json.error || "inconnue"));
+      }
+    } catch (e) {
+      setImportMsg("Erreur : " + String(e));
+    }
+    setImporting(false);
   };
+
+  // Navigate dates
+  const navigate = (dir: -1 | 1) => {
+    const d = new Date(selectedDate + "T12:00:00");
+    if (viewTab === "jour") d.setDate(d.getDate() + dir);
+    else if (viewTab === "semaine") d.setDate(d.getDate() + dir * 7);
+    else d.setMonth(d.getMonth() + dir);
+    setSelectedDate(d.toISOString().slice(0, 10));
+  };
+
+  const { from, to } = getRange();
+  const rangeLabel = viewTab === "jour"
+    ? new Date(selectedDate + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+    : viewTab === "semaine"
+      ? `Semaine du ${new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} au ${new Date(to + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`
+      : new Date(selectedDate + "T12:00:00").toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+
+  const W = data;
+  const ca = W ? (mode === "ttc" ? W.ca_ttc : W.ca_ht) : 0;
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 16px 60px" }}>
+      <div style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 16px 60px" }}>
 
-        {/* ── Week Selector ── */}
-        <div style={{
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-          padding: "12px 24px", background: T.creme, borderRadius: 12,
-          marginBottom: 16, border: `1px solid ${T.border}`,
-        }}>
-          <button type="button" onClick={() => setWeek(prevWeek(week))} style={{
-            background: "none", border: "none", cursor: "pointer", padding: 8,
-            color: T.terracotta, fontSize: 18, fontWeight: 700,
-          }}>&larr;</button>
-          <span style={{
-            fontFamily: "DM Sans, sans-serif", fontSize: 14, fontWeight: 600, color: T.dark,
-          }}>
-            {data?.weekLabel ?? `Semaine ${week}`}
-          </span>
-          <button type="button" onClick={() => { if (week < currentWeek) setWeek(nextWeek(week)); }}
-            style={{
-              background: "none", border: "none", cursor: "pointer", padding: 8,
-              color: week < currentWeek ? T.terracotta : T.border, fontSize: 18, fontWeight: 700,
-            }}>&rarr;</button>
+        {/* ── Import + View tabs ── */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
+          <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 10, overflow: "hidden" }}>
+            {(["jour", "semaine", "mois"] as ViewTab[]).map(t => (
+              <button key={t} type="button" onClick={() => setViewTab(t)} style={{
+                padding: "8px 18px", border: "none", borderRight: "1px solid rgba(0,0,0,.08)",
+                background: viewTab === t ? accent : "transparent",
+                color: viewTab === t ? "#fff" : "#777",
+                fontSize: 12, fontWeight: 600, cursor: "pointer",
+                fontFamily: "var(--font-oswald), Oswald, sans-serif", textTransform: "uppercase", letterSpacing: ".05em",
+              }}>
+                {t === "jour" ? "Journalier" : t === "semaine" ? "Hebdomadaire" : "Mensuel"}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <label style={{
+              padding: "7px 14px", borderRadius: 8, border: "none",
+              background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
+            }}>
+              {importing ? "Import..." : "Importer XLSX"}
+              <input type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={e => {
+                const f = e.target.files?.[0];
+                if (f) handleImport(f);
+                e.target.value = "";
+              }} />
+            </label>
+            <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
+              <button type="button" onClick={() => setMode("ttc")} style={{
+                padding: "4px 14px", borderRadius: 16, border: "none", cursor: "pointer",
+                background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#777",
+                fontSize: 11, fontWeight: 500,
+              }}>TTC</button>
+              <button type="button" onClick={() => setMode("ht")} style={{
+                padding: "4px 14px", borderRadius: 16, border: "none", cursor: "pointer",
+                background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#777",
+                fontSize: 11, fontWeight: 500,
+              }}>HT</button>
+            </div>
+          </div>
+        </div>
+        {importMsg && <div style={{ fontSize: 12, color: accent, marginBottom: 10 }}>{importMsg}</div>}
+
+        {/* ── Date navigation ── */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid rgba(70,101,90,.2)" }}>
+          <div>
+            <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".16em", color: accent, fontWeight: 500, marginBottom: 4 }}>
+              {etab?.nom ?? "Etablissement"} · {viewTab === "jour" ? "Rapport journalier" : viewTab === "semaine" ? "Briefing hebdomadaire" : "Rapport mensuel"}
+            </div>
+            <h1 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-.01em" }}>
+              {rangeLabel}
+            </h1>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" onClick={() => navigate(-1)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16 }}>&larr;</button>
+            <button type="button" onClick={() => navigate(1)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16 }}>&rarr;</button>
+          </div>
         </div>
 
-        {/* ── Back link ── */}
-        <Link href="/ventes" style={{ fontSize: 12, color: T.muted, textDecoration: "none", display: "flex", alignItems: "center", gap: 4, marginBottom: 12 }}>
-          <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
-          Retour aux ventes
-        </Link>
+        {/* ── Loading / Empty ── */}
+        {loading && <div style={{ textAlign: "center", padding: 60, color: "#999" }}>Chargement...</div>}
 
-        {loading && !data ? (
-          <div style={{ textAlign: "center", padding: 60, color: T.muted }}>Chargement...</div>
-        ) : data ? (
+        {!loading && !W && (
+          <div style={{ ...S.card, textAlign: "center", padding: 60 }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", marginBottom: 6 }}>Aucune donnee pour cette periode</div>
+            <div style={{ fontSize: 12, color: "#777" }}>Importez un fichier XLSX pour alimenter le dashboard.</div>
+          </div>
+        )}
+
+        {/* ── Dashboard ── */}
+        {!loading && W && (
           <>
-            {/* ── API Error Banner ── */}
-            {data.apiError && (
+            {/* CA Hero card */}
+            <div style={{ ...S.card, padding: 0, overflow: "hidden", marginBottom: 18 }}>
               <div style={{
-                background: "#FEF2F2", border: "1.5px solid #FECACA", borderRadius: 12,
-                padding: "14px 18px", marginBottom: 16,
-                display: "flex", alignItems: "center", gap: 10,
+                background: `linear-gradient(135deg, ${accent}cc 0%, ${accent} 60%, ${accent}bb 100%)`,
+                padding: "22px 24px 20px", position: "relative",
               }}>
-                <span style={{ fontSize: 18 }}>&#9888;</span>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#991B1B" }}>Connexion Popina impossible</div>
-                  <div style={{ fontSize: 12, color: "#B91C1C", marginTop: 2 }}>{data.apiError}</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".16em", color: "rgba(255,255,255,.5)", fontWeight: 500, marginBottom: 8 }}>
+                      CA {mode.toUpperCase()} — {viewTab === "jour" ? "Journee" : viewTab === "semaine" ? "Semaine" : "Mois"}
+                    </div>
+                    <div style={S.bigNum}>{fmt(ca)}</div>
+                    {mode === "ttc" && <div style={{ fontSize: 12, color: "rgba(255,255,255,.55)", marginTop: 6 }}>HT <span style={{ color: "rgba(255,255,255,.7)", fontWeight: 500 }}>{fmt(W.ca_ht)}</span></div>}
+                  </div>
                 </div>
-              </div>
-            )}
-
-            {/* ── CHIFFRES CLES SEMAINE ── */}
-            <SectionLabel>Chiffres cles &middot; Semaine</SectionLabel>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-              <KpiCard label="CA Semaine" value={`${fmtEur(data.kpis.caSemaine)} €`}
-                variation={data.kpis.variationCA} />
-              <KpiCard label="Couverts" value={String(data.kpis.paxSemaine)}
-                variation={data.kpis.variationPax} />
-              <KpiCard label="Panier moyen" value={`${fmtEur2(data.kpis.ticketMoyenSurPlace)} €`}
-                variation={data.kpis.variationTicket} />
-              <KpiCard label="Meilleur jour" value={data.kpis.bestDay.label}
-                sub={`${fmtEur(data.kpis.bestDay.ca)} €`} />
-            </div>
-
-            {/* ── KPIs GLOBAUX (CA Global, Couverts, Ticket SP, Ticket Emporter) ── */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-              <div style={{ ...CARD }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>CA Global TTC</div>
-                <div style={{ fontSize: 26, fontWeight: 700, color: T.dark, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{fmtEur(data.kpis.caSemaine)} &euro;</div>
-                <div style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>HT: {fmtEur(data.kpis.caHT)} &euro;</div>
-              </div>
-              <div style={{ ...CARD }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Couverts totaux</div>
-                <div style={{ fontSize: 26, fontWeight: 700, color: T.dark, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{data.kpis.paxSemaine}</div>
-              </div>
-              <div style={{ ...CARD }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Ticket moyen sur place</div>
-                <div style={{
-                  fontSize: 22, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif",
-                  color: T.dark,
-                  display: "inline-block", padding: "2px 10px", borderRadius: 6,
-                  background: data.kpis.ticketMoyenSurPlace >= 42 ? "#DEF7EC" : "#FEF3CD",
-                }}>
-                  {fmtEur2(data.kpis.ticketMoyenSurPlace)}&euro;
+                <div style={{ display: "flex", gap: 28, marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,.12)" }}>
+                  <div>
+                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.45)", fontWeight: 500, marginBottom: 4 }}>Tickets</div>
+                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff" }}>{W.couverts}</div>
+                  </div>
+                  <div style={{ width: 1, background: "rgba(255,255,255,.1)" }} />
+                  <div>
+                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.45)", fontWeight: 500, marginBottom: 4 }}>TM / ticket</div>
+                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff" }}>
+                      {W.couverts > 0 ? "\u20AC" + (ca / W.couverts).toFixed(1) : "\u2014"}
+                    </div>
+                    {W.cov_sur > 0 && <div style={{ fontSize: 10, color: "rgba(255,255,255,.5)", marginTop: 2 }}>Sur place <span style={{ color: "rgba(255,255,255,.7)", fontWeight: 500 }}>{"\u20AC" + (W.place_sur / W.cov_sur).toFixed(1)}</span></div>}
+                  </div>
+                  <div style={{ width: 1, background: "rgba(255,255,255,.1)" }} />
+                  <div>
+                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.45)", fontWeight: 500, marginBottom: 4 }}>Annulations</div>
+                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff" }}>{W.ann_pct.toFixed(1)}%</div>
+                  </div>
                 </div>
-                <div style={{ fontSize: 11, color: T.muted, marginTop: 4 }}>Objectif: &ge; 42&euro;</div>
-              </div>
-              <div style={{ ...CARD }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Ticket moyen a emporter</div>
-                <div style={{ fontSize: 26, fontWeight: 700, color: T.dark, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{fmtEur(data.kpis.ticketMoyenEmporter)} &euro;</div>
               </div>
             </div>
 
-            {/* ── REPARTITION CA PAR ZONE ── */}
-            <div style={{ ...CARD, marginBottom: 20 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: T.dark, marginBottom: 14 }}>Repartition CA par Zone</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-                {(["salle", "pergolas", "terrasse", "emporter"] as const).map(zone => {
-                  const colors = { salle: T.salle, pergolas: T.pergolas, terrasse: T.terrasse, emporter: T.emporter };
-                  const labels = { salle: "Salle", pergolas: "Pergolas", terrasse: "Terrasse", emporter: "A Emporter" };
-                  const bgColors = { salle: "#FDF2EF", pergolas: "#FFF8E7", terrasse: "#EFF8F1", emporter: "#F5F0E8" };
+            {/* Upsell ratios */}
+            <div style={S.card}>
+              <div style={S.sec}>Upsell · performance</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+                <UpsellCard label="Antipasti" emoji="🥗" n={W.ratios.anti_n} total={W.couverts} color="#D4775A" targets={{ ok: 30, good: 50, avg: 12 }} />
+                <UpsellCard label="Desserts" emoji="🍮" n={W.ratios.dolci_n} total={W.couverts} color="#b5904a" targets={{ ok: 80, good: 100, avg: 9 }} />
+                <UpsellCard label="Vins" emoji="🍷" n={W.ratios.vin_n} total={W.couverts} color="#7c5c3a" targets={{ ok: 60, good: 80, avg: 6 }} />
+              </div>
+            </div>
+
+            {/* Zones */}
+            {W.days.length > 1 && (
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${Object.keys(W.zones).filter(z => W.zones[z].some(v => v > 0)).length}, 1fr)`, gap: 10, marginBottom: 6 }}>
+                {Object.entries(W.zones).filter(([, vals]) => vals.some(v => v > 0)).map(([zone, vals]) => {
+                  const tot = vals.reduce((a, b) => a + b, 0);
+                  const maxV = Math.max(...vals.filter(Boolean));
+                  const color = ZC[zone === "\u00C0 emporter" ? "emp" : zone] ?? "#888";
                   return (
-                    <div key={zone} style={{
-                      background: bgColors[zone], borderRadius: 12, padding: "14px 16px",
-                      border: `1px solid ${colors[zone]}20`,
-                    }}>
-                      <div style={{ fontSize: 11, color: T.muted, fontWeight: 600, marginBottom: 4 }}>{labels[zone]}</div>
-                      <div style={{ fontSize: 22, fontWeight: 700, color: T.dark, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
-                        {fmtEur(data.zones[zone])} &euro;
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-                        <div style={{ flex: 1, height: 4, borderRadius: 2, background: `${colors[zone]}20` }}>
-                          <div style={{ height: "100%", borderRadius: 2, background: colors[zone], width: `${data.zonePcts[zone]}%` }} />
+                    <div key={zone} style={{ ...S.card, padding: "14px 16px" }}>
+                      <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".1em", color, fontWeight: 600, marginBottom: 8 }}>{zone}</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 26, fontWeight: 700, marginBottom: 10 }}>{fmt(tot)}</div>
+                      {W.days.map((d, i) => (
+                        <div key={d} style={{ marginBottom: 7 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 3 }}>
+                            <span style={{ color: "#777" }}>{d.slice(0, 3)}</span>
+                            {vals[i] > 0 ? <span style={{ fontWeight: 500 }}>{fmt(vals[i])}</span> : <span style={{ color: "#bbb" }}>{"\u2014"}</span>}
+                          </div>
+                          <div style={{ height: 4, background: "rgba(0,0,0,.07)", borderRadius: 2, overflow: "hidden" }}>
+                            {vals[i] > 0 && <div style={{ height: "100%", width: `${maxV ? (vals[i] / maxV * 100) : 0}%`, background: color, borderRadius: 2 }} />}
+                          </div>
                         </div>
-                        <span style={{ fontSize: 11, color: T.muted, fontWeight: 600 }}>{data.zonePcts[zone]}%</span>
-                      </div>
+                      ))}
                     </div>
                   );
                 })}
               </div>
+            )}
+
+            {/* Sur place vs emporter */}
+            <div style={S.card}>
+              <div style={S.sec}>Sur place vs a emporter</div>
+              <div style={{ display: "flex", gap: 0 }}>
+                <PlaceBlock label="Sur place" color="#46655a" ca={W.place_sur} pct={W.place_sur + W.place_emp > 0 ? Math.round(W.place_sur / (W.place_sur + W.place_emp) * 100) : 0} tickets={W.cov_sur} tm={W.cov_sur > 0 ? (W.place_sur / W.cov_sur).toFixed(1) : "0"} />
+                <div style={{ width: 1, background: "rgba(0,0,0,.08)", margin: "0 20px", flexShrink: 0 }} />
+                <PlaceBlock label="A emporter" color="#D4775A" ca={W.place_emp} pct={W.place_sur + W.place_emp > 0 ? Math.round(W.place_emp / (W.place_sur + W.place_emp) * 100) : 0} tickets={W.cov_emp} tm={W.cov_emp > 0 ? (W.place_emp / W.cov_emp).toFixed(1) : "0"} />
+              </div>
             </div>
 
-            {/* ── CA SEMAINE (bar chart) + TOP 5 PRODUITS ── */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
-              {/* Bar chart */}
-              <div style={CARD}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, color: T.dark, marginBottom: 2 }}>CA Semaine</h3>
-                <div style={{ fontSize: 11, color: T.muted, marginBottom: 16 }}>Clique sur une barre pour le detail</div>
-                <BarChart days={data.days} onDayClick={setSelectedDay} etabColor={etabColor} />
+            {/* Recap table */}
+            {W.services.length > 0 && (
+              <div style={S.card}>
+                <div style={S.sec}>Par service · {mode.toUpperCase()} · tickets</div>
+                <div style={{ overflow: "hidden", borderRadius: 8, border: "1px solid #e0d8ce" }}>
+                  <RecapTable services={W.services} mode={mode} />
+                </div>
               </div>
+            )}
 
-              {/* Top 5 produits */}
-              <div style={CARD}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, color: T.dark, marginBottom: 12 }}>Top 5 Produits &middot; Semaine</h3>
-                <div style={{ display: "grid", gap: 6 }}>
-                  {data.topSemaine.map((p, i) => (
-                    <div key={p.name} style={{
-                      display: "flex", alignItems: "center", gap: 10,
-                      padding: "10px 12px", borderRadius: 10,
-                      borderBottom: `3px solid ${i === 0 ? T.terracotta : i === 1 ? T.dore : T.border}`,
-                      background: T.white,
-                    }}>
-                      <span style={{
-                        fontSize: 11, fontWeight: 700,
-                        color: i < 3 ? T.terracotta : T.muted,
-                        minWidth: 20,
-                      }}>#{i + 1}</span>
-                      <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: T.dark }}>{p.name}</span>
-                      {p.pctChange != null && (
-                        <span style={{
-                          fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
-                          background: p.pctChange > 0 ? "#DEF7EC" : p.pctChange < 0 ? "#FDE8E8" : "#F3F4F6",
-                          color: p.pctChange > 0 ? "#03543F" : p.pctChange < 0 ? "#9B1C1C" : T.muted,
-                        }}>
-                          {p.pctChange > 0 ? "+" : ""}{p.pctChange}%
-                        </span>
+            {/* Mix chart */}
+            <div style={S.card}>
+              <div style={{ ...S.sec, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span>Ventes par categorie · CA {mode.toUpperCase()}</span>
+                <span style={{ fontSize: 10, color: "#777", fontStyle: "italic", textTransform: "none", letterSpacing: 0 }}>Cliquer une barre pour le detail</span>
+              </div>
+              <ChartCanvas id="mix" height={220} data={W} mode={mode} type="mix" onBarClick={(label, color) => setMixDDOpen({ label, color })} />
+              {mixDDOpen && W.cat_products[mixDDOpen.label] && (
+                <MixDropdown label={mixDDOpen.label} color={mixDDOpen.color} products={W.cat_products[mixDDOpen.label]} onClose={() => setMixDDOpen(null)} />
+              )}
+            </div>
+
+            {/* Top 10 */}
+            <div style={S.card}>
+              <div style={S.sec}>Top 10 produits · CA TTC</div>
+              <ChartCanvas id="top10" height={380} data={W} mode={mode} type="top10" />
+            </div>
+
+            {/* Top 3 par categorie */}
+            {W.top3_cats.length > 0 && (
+              <div style={S.card}>
+                <div style={S.sec}>Top 3 par categorie</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+                  {W.top3_cats.map((cat, ci) => (
+                    <div key={ci} style={{ background: "#fff", borderRadius: 10, padding: "12px 14px", border: "1px solid rgba(0,0,0,.08)" }}>
+                      <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".1em", color: MIX_COLORS[ci] ?? "#777", fontWeight: 500, marginBottom: 8 }}>{cat.cat}</div>
+                      {cat.rows.map((r, ri) => (
+                        <div key={ri} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", borderBottom: "1px solid rgba(0,0,0,.04)", fontSize: 11 }}>
+                          <span><span style={{ fontSize: 9, color: "#bbb", marginRight: 4 }}>{ri + 1}</span>{r.n}</span>
+                          <span style={{ fontFamily: "var(--font-cormorant), Cormorant Garamond, serif", fontSize: 13, fontWeight: 600, color: accent }}>{r.ca}</span>
+                        </div>
+                      ))}
+                      {cat.flop && (
+                        <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0 2px", marginTop: 4, borderTop: "1px dashed rgba(0,0,0,.08)", fontSize: 11 }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ fontSize: 9, color: "#c62828", fontWeight: 600 }}>▼</span><span style={{ color: "#777" }}>{cat.flop.n}</span></span>
+                          <span style={{ fontFamily: "var(--font-cormorant), Cormorant Garamond, serif", fontSize: 13, fontWeight: 600, color: "#777" }}>{cat.flop.ca}</span>
+                        </div>
                       )}
-                      {p.isNew && p.pctChange == null && (
-                        <span style={{
-                          fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
-                          background: "#FEF3CD", color: T.dore,
-                        }}>Nouveau</span>
-                      )}
-                      <span style={{ fontSize: 13, fontWeight: 700, color: T.terracotta }}>{fmtEur(p.totalSales)} &euro;</span>
-                      <span style={{ fontSize: 11, color: T.muted }}>{p.quantity}x</span>
                     </div>
                   ))}
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* ── TABLEAU DETAILLE SEMAINE ── */}
-            <div style={{ ...CARD, marginBottom: 20, overflowX: "auto" }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: T.dark, marginBottom: 14 }}>Detail par jour</h3>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                <thead>
-                  <tr style={{ background: `linear-gradient(135deg, ${T.terracotta}, #B85A3A)` }}>
-                    {["Jour", "Service", "Salle €", "Pergolas €", "Terrasse €", "A Emp. €", "Total TTC", "Total HT", "Pax", "Ticket moy.", "Ratio P/P", "Meteo"].map(h => (
-                      <th key={h} style={{
-                        padding: "10px 8px", color: "#fff", fontWeight: 700,
-                        fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em",
-                        textAlign: h === "Jour" || h === "Service" ? "left" : "right",
-                        whiteSpace: "nowrap",
-                      }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.days.filter(d => d.isActive).map((day) => (
-                    <DayTableRows key={day.date} day={day} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* ── TOP PRODUITS PAR CATEGORIE ── */}
-            {data.topByCategory.length > 0 && (
-              <>
-                {/* Food categories */}
-                {data.topByCategory.filter(c => !c.category.includes("Vin") && c.category !== "Cocktails & Alcools" && c.category !== "Sans alcool").length > 0 && (
-                  <>
-                    <SectionLabel>Top Plats</SectionLabel>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-                      {data.topByCategory
-                        .filter(c => !c.category.includes("Vin") && c.category !== "Cocktails & Alcools" && c.category !== "Sans alcool")
-                        .slice(0, 4)
-                        .map(cat => (
-                        <CategoryCard key={cat.category} cat={cat} />
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                {/* Drink categories */}
-                {data.topByCategory.filter(c => c.category.includes("Vin") || c.category === "Cocktails & Alcools" || c.category === "Sans alcool").length > 0 && (
-                  <>
-                    <SectionLabel>Top Boissons</SectionLabel>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-                      {data.topByCategory
-                        .filter(c => c.category.includes("Vin") || c.category === "Cocktails & Alcools" || c.category === "Sans alcool")
-                        .slice(0, 4)
-                        .map(cat => (
-                        <CategoryCard key={cat.category} cat={cat} />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </>
+            {/* Serveurs */}
+            {W.serveurs.length > 0 && (
+              <div style={S.card}>
+                <div style={S.sec}>Performance serveurs · CA TTC</div>
+                <ChartCanvas id="serv" height={Math.max(120, W.serveurs.length * 38)} data={W} mode={mode} type="serv" />
+              </div>
             )}
           </>
-        ) : (
-          <div style={{ textAlign: "center", padding: 60, color: T.muted }}>Erreur de chargement</div>
-        )}
-
-        {/* ── DAY DETAIL POPUP ── */}
-        {selectedDay && (
-          <DayDetailPopup day={selectedDay} onClose={() => setSelectedDay(null)} />
         )}
       </div>
     </RequireRole>
   );
 }
 
-/* ── KpiCard ── */
-function KpiCard({ label, value, variation, sub }: {
-  label: string; value: string; variation?: number; sub?: string;
+/* ── Sub-components ── */
+
+function UpsellCard({ label, emoji, n, total, color, targets }: {
+  label: string; emoji: string; n: number; total: number; color: string;
+  targets: { ok: number; good: number; avg: number };
 }) {
+  const pct = total > 0 ? Math.round(n / total * 100) : 0;
+  const missing = Math.max(0, total - n);
+  const gain = missing * targets.avg;
+  const status = pct >= targets.good ? { t: "Objectif atteint", c: "#2e7d32", bg: "#e8f5e9" }
+    : pct >= targets.ok ? { t: "En progression", c: "#e65100", bg: "#fff3e0" }
+    : { t: "A travailler", c: "#c62828", bg: "#ffebee" };
+
   return (
-    <div style={{
-      background: T.white, borderRadius: 14, padding: "16px 18px",
-      border: `1.5px solid ${T.border}`,
-    }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 700, color: T.dark, fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1.1 }}>{value}</div>
-      {variation !== undefined && (
-        <div style={{
-          fontSize: 12, fontWeight: 600, marginTop: 6,
-          color: variation > 0 ? T.sauge : variation < 0 ? "#DC2626" : T.muted,
-        }}>
-          {variation > 0 ? "↑" : variation < 0 ? "↓" : ""} {variation > 0 ? "+" : ""}{variation}%
-        </div>
-      )}
-      {sub && <div style={{ fontSize: 13, fontWeight: 700, color: T.terracotta, marginTop: 2 }}>{sub}</div>}
+    <div style={{ padding: "14px 16px", background: "#f9f6f0", borderRadius: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 18 }}>{emoji}</span>
+        <span style={{ fontSize: 12, fontWeight: 500 }}>{label}</span>
+      </div>
+      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 26, fontWeight: 700, color, lineHeight: 1, marginBottom: 4 }}>{pct}%</div>
+      <div style={{ fontSize: 12, color: "#777", marginBottom: 10 }}>des tables · <strong style={{ color: "#1a1a1a" }}>{n > 0 ? `1 table sur ${Math.round(total / n)}` : "\u2014"}</strong></div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 8 }}>
+        <span style={{ color: "#777" }}>{n} sur {total} tickets</span>
+        <span style={{ color, fontWeight: 500 }}>+{fmt(gain)} potentiel</span>
+      </div>
+      <div style={{ position: "relative", height: 8, background: "rgba(0,0,0,.07)", borderRadius: 4, overflow: "hidden", marginBottom: 8 }}>
+        <div style={{ position: "absolute", top: 0, left: 0, height: "100%", width: `${Math.min(100, pct)}%`, background: color, borderRadius: 4 }} />
+        <div style={{ position: "absolute", top: 0, left: `${targets.ok}%`, height: "100%", width: 2, background: "rgba(0,0,0,.15)" }} />
+        <div style={{ position: "absolute", top: 0, left: `${targets.good}%`, height: "100%", width: 2, background: "rgba(0,0,0,.25)" }} />
+      </div>
+      <div style={{ display: "inline-block", padding: "2px 8px", borderRadius: 6, fontSize: 10, fontWeight: 500, background: status.bg, color: status.c }}>{status.t}</div>
     </div>
   );
 }
 
-/* ── BarChart ── */
-function BarChart({ days, onDayClick, etabColor }: {
-  days: DayData[]; onDayClick: (d: DayData) => void; etabColor: string;
-}) {
-  const maxCA = Math.max(...days.map(d => d.ca), 1);
-  const barColor = etabColor;
-
+function PlaceBlock({ label, color, ca, pct, tickets, tm }: { label: string; color: string; ca: number; pct: number; tickets: number; tm: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 180 }}>
-      {days.map(day => {
-        const h = day.ca > 0 ? Math.max(8, (day.ca / maxCA) * 160) : 4;
-        return (
-          <div key={day.date} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-            <span style={{ fontSize: 10, color: T.muted, fontWeight: 600 }}>{day.ca > 0 ? `${fmtEur(day.ca)}€` : ""}</span>
-            <div
-              onClick={() => day.isActive && day.ca > 0 && onDayClick(day)}
-              style={{
-                width: "100%", maxWidth: 48, height: h, borderRadius: "6px 6px 0 0",
-                background: day.isActive ? barColor : `${barColor}30`,
-                cursor: day.isActive && day.ca > 0 ? "pointer" : "default",
-                transition: "all 0.2s",
-                position: "relative",
-              }}
-              title={day.isActive ? `${day.labelFull} — ${fmtEur(day.ca)} €` : ""}
-            />
-            <span style={{ fontSize: 11, fontWeight: 600, color: T.dark }}>{day.label}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ── Weather badge ── */
-function WeatherBadge({ temp, condition }: { temp: number; condition: string }) {
-  const iconMap: Record<string, string> = {
-    "ciel degage": "☀️", "clear sky": "☀️",
-    "peu nuageux": "⛅", "few clouds": "⛅",
-    "partiellement nuageux": "⛅", "scattered clouds": "⛅",
-    "nuageux": "☁️", "broken clouds": "☁️", "overcast clouds": "☁️",
-    "couvert": "☁️",
-    "pluie legere": "\u{1F327}️", "light rain": "\u{1F327}️",
-    "pluie moderee": "\u{1F327}️", "moderate rain": "\u{1F327}️",
-    "pluie": "\u{1F327}️", "rain": "\u{1F327}️",
-    "forte pluie": "\u{1F327}️", "heavy rain": "\u{1F327}️",
-    "orage": "⛈️", "thunderstorm": "⛈️",
-    "neige": "\u{1F328}️", "snow": "\u{1F328}️",
-    "brouillard": "\u{1F32B}️", "mist": "\u{1F32B}️", "fog": "\u{1F32B}️",
-  };
-  const cond = condition.toLowerCase();
-  const icon = iconMap[cond] ?? (cond.includes("pluie") || cond.includes("rain") ? "\u{1F327}️" : cond.includes("nuag") || cond.includes("cloud") || cond.includes("couvert") ? "☁️" : cond.includes("soleil") || cond.includes("clear") || cond.includes("degage") ? "☀️" : "☁️");
-
-  return (
-    <span style={{ fontSize: 11, whiteSpace: "nowrap" }}>
-      {icon} {temp}&deg;
-    </span>
-  );
-}
-
-/* ── DayTableRows ── */
-function DayTableRows({ day }: { day: DayData }) {
-  const { services, weather } = day;
-  const tdStyle = (bold: boolean, align: "left" | "right" = "right"): React.CSSProperties => ({
-    padding: "8px 8px", textAlign: align, fontWeight: bold ? 700 : 400,
-    color: bold ? T.dark : T.muted, whiteSpace: "nowrap", fontSize: 12,
-  });
-  const borderBottom = `1px solid ${T.cremeDark}`;
-
-  return (
-    <>
-      {/* JOURNEE row */}
-      <tr style={{ borderBottom, background: "#FAFAF8" }}>
-        <td rowSpan={3} style={{ ...tdStyle(true, "left"), fontWeight: 700, fontSize: 13, verticalAlign: "top", paddingTop: 12 }}>{day.labelFull}</td>
-        <td style={{ ...tdStyle(true, "left"), fontSize: 11 }}>Journee</td>
-        <td style={tdStyle(true)}>{fmtEur(services.journee.salle)} &euro;</td>
-        <td style={tdStyle(true)}>{fmtEur(services.journee.pergolas)} &euro;</td>
-        <td style={tdStyle(true)}>{fmtEur(services.journee.terrasse)} &euro;</td>
-        <td style={tdStyle(true)}>{fmtEur(services.journee.emporter)} &euro;</td>
-        <td style={{ ...tdStyle(true), color: T.dark, fontWeight: 700 }}>{fmtEur(services.journee.total)} &euro;</td>
-        <td style={tdStyle(true)}>{fmtEur(services.journee.totalHT)} &euro;</td>
-        <td style={tdStyle(true)}>{services.journee.pax}</td>
-        <td style={tdStyle(true)}>
-          <span style={{
-            display: "inline-block", padding: "2px 6px", borderRadius: 4, fontSize: 11,
-            background: services.journee.ticketMoyen >= 42 ? "#DEF7EC" : services.journee.ticketMoyen > 0 ? "#FEF3CD" : "transparent",
-            color: services.journee.ticketMoyen >= 42 ? "#03543F" : T.dore, fontWeight: 700,
-          }}>
-            {services.journee.ticketMoyen > 0 ? `${fmtEur2(services.journee.ticketMoyen)}€` : "—"}
-          </span>
-        </td>
-        <td style={tdStyle(true)}>
-          {services.journee.ratioPiattiPizza > 0 ? `${services.journee.ratioPiattiPizza}%` : "—"}
-        </td>
-        <td rowSpan={3} style={{ ...tdStyle(false, "left"), verticalAlign: "top", paddingTop: 10 }}>
-          {weather ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ fontSize: 10, color: T.muted }}>Midi</span>
-                <WeatherBadge temp={weather.midi.temp} condition={weather.midi.condition} />
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ fontSize: 10, color: T.muted }}>Soir</span>
-                <WeatherBadge temp={weather.soir.temp} condition={weather.soir.condition} />
-              </div>
-            </div>
-          ) : (
-            <span style={{ fontSize: 11, color: T.muted }}>{"—"}</span>
-          )}
-        </td>
-      </tr>
-      {/* MIDI row */}
-      <tr style={{ borderBottom }}>
-        <td style={{ ...tdStyle(false, "left"), fontSize: 11 }}>
-          <span style={{ marginRight: 4 }}>&#9728;&#65039;</span>Midi
-        </td>
-        <td style={tdStyle(false)}>{fmtEur(services.midi.salle)} &euro;</td>
-        <td style={tdStyle(false)}>{fmtEur(services.midi.pergolas)} &euro;</td>
-        <td style={tdStyle(false)}>{fmtEur(services.midi.terrasse)} &euro;</td>
-        <td style={tdStyle(false)}>{fmtEur(services.midi.emporter)} &euro;</td>
-        <td style={tdStyle(false)}>{fmtEur(services.midi.total)} &euro;</td>
-        <td style={tdStyle(false)}></td>
-        <td style={tdStyle(false)}>{services.midi.pax}</td>
-        <td style={tdStyle(false)}>{services.midi.ticketMoyen > 0 ? `${fmtEur(services.midi.ticketMoyen)}€` : "—"}</td>
-        <td style={tdStyle(false)}></td>
-      </tr>
-      {/* SOIR row */}
-      <tr style={{ borderBottom: `2px solid ${T.border}` }}>
-        <td style={{ ...tdStyle(false, "left"), fontSize: 11 }}>
-          <span style={{ marginRight: 4 }}>&#127769;</span>Soir
-        </td>
-        <td style={tdStyle(false)}>{fmtEur(services.soir.salle)} &euro;</td>
-        <td style={tdStyle(false)}>{fmtEur(services.soir.pergolas)} &euro;</td>
-        <td style={tdStyle(false)}>{fmtEur(services.soir.terrasse)} &euro;</td>
-        <td style={tdStyle(false)}>{fmtEur(services.soir.emporter)} &euro;</td>
-        <td style={tdStyle(false)}>{fmtEur(services.soir.total)} &euro;</td>
-        <td style={tdStyle(false)}></td>
-        <td style={tdStyle(false)}>{services.soir.pax}</td>
-        <td style={tdStyle(false)}>{services.soir.ticketMoyen > 0 ? `${fmtEur(services.soir.ticketMoyen)}€` : "—"}</td>
-        <td style={tdStyle(false)}></td>
-      </tr>
-    </>
-  );
-}
-
-/* ── Day Detail Popup ── */
-function DayDetailPopup({ day, onClose }: { day: DayData; onClose: () => void }) {
-  const dateObj = new Date(day.date + "T12:00:00");
-  const dateLabel = dateObj.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-
-  return (
-    <div onClick={onClose} style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000,
-      display: "flex", alignItems: "flex-end", justifyContent: "center",
-    }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        background: T.white, borderRadius: "20px 20px 0 0", padding: "24px 24px 32px",
-        width: "100%", maxWidth: 1100, maxHeight: "70vh", overflowY: "auto",
-        boxShadow: "0 -8px 40px rgba(0,0,0,0.15)",
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h3 style={{
-            fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700,
-            color: T.dark, textTransform: "uppercase",
-          }}>{dateLabel}</h3>
-          <button type="button" onClick={onClose} style={{
-            background: "none", border: "none", cursor: "pointer", fontSize: 20, color: T.muted, padding: 8,
-          }}>&times;</button>
-        </div>
-
-        {/* 3 KPI cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
-          <div style={{ background: T.creme, borderRadius: 12, padding: "14px 18px", textAlign: "center" }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", marginBottom: 4 }}>CA</div>
-            <div style={{ fontSize: 26, fontWeight: 700, color: T.dark, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{fmtEur(day.ca)} &euro;</div>
-          </div>
-          <div style={{ background: T.creme, borderRadius: 12, padding: "14px 18px", textAlign: "center" }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", marginBottom: 4 }}>Couverts</div>
-            <div style={{ fontSize: 26, fontWeight: 700, color: T.dark, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{day.pax}</div>
-          </div>
-          <div style={{ background: T.creme, borderRadius: 12, padding: "14px 18px", textAlign: "center" }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", marginBottom: 4 }}>Ticket moy.</div>
-            <div style={{ fontSize: 26, fontWeight: 700, color: T.dark, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{fmtEur2(day.ticketMoyen)} &euro;</div>
-          </div>
-        </div>
-
-        {/* Top 5 produits du jour */}
-        {day.topProducts.length > 0 && (
-          <>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: T.muted, marginBottom: 10 }}>
-              Top 5 produits
-            </div>
-            <div style={{ display: "grid", gap: 6 }}>
-              {day.topProducts.map((p, i) => (
-                <div key={p.name} style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "12px 16px", borderRadius: 10,
-                  background: T.creme, border: `1px solid ${T.border}`,
-                }}>
-                  <span style={{
-                    fontSize: 11, fontWeight: 700,
-                    color: i < 3 ? T.terracotta : T.muted, minWidth: 20,
-                  }}>#{i + 1}</span>
-                  <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: T.dark }}>{p.name}</span>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: T.terracotta }}>{fmtEur(p.totalSales)} &euro;</span>
-                  <span style={{ fontSize: 12, color: T.muted }}>{p.quantity}x</span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+    <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color }}>{label}</div>
+        <div style={{ fontSize: 10, color: "#777" }}>{pct}% du CA</div>
+      </div>
+      <div style={{ height: 4, background: "rgba(0,0,0,.06)", borderRadius: 2, overflow: "hidden", marginBottom: 14 }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 2 }} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+        <div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700 }}>{fmt(ca)}</div><div style={{ fontSize: 9, color: "#777", textTransform: "uppercase", marginTop: 2 }}>CA</div></div>
+        <div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700 }}>{tickets}</div><div style={{ fontSize: 9, color: "#777", textTransform: "uppercase", marginTop: 2 }}>Tickets</div></div>
+        <div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700, color }}>{"\u20AC" + tm}</div><div style={{ fontSize: 9, color: "#777", textTransform: "uppercase", marginTop: 2 }}>TM</div></div>
       </div>
     </div>
   );
 }
 
-/* ── CategoryCard ── */
-function CategoryCard({ cat }: { cat: { category: string; products: Array<{ name: string; quantity: number; totalSales: number; pctChange: number | null }> } }) {
-  const CARD_STYLE: React.CSSProperties = {
-    background: T.white, borderRadius: 14, padding: "14px 16px",
-    border: `1.5px solid ${T.border}`,
-  };
+function RecapTable({ services, mode }: { services: WeekData["services"]; mode: "ttc" | "ht" }) {
+  const byDay: Record<string, WeekData["services"]> = {};
+  for (const s of services) {
+    if (!byDay[s.jour]) byDay[s.jour] = [];
+    byDay[s.jour].push(s);
+  }
+  const days = Object.keys(byDay);
+
   return (
-    <div style={CARD_STYLE}>
-      <h4 style={{ fontSize: 13, fontWeight: 700, color: T.dark, marginBottom: 10 }}>
-        {cat.category}
-      </h4>
-      <div style={{ display: "grid", gap: 4 }}>
-        {cat.products.map((p, i) => (
-          <div key={p.name} style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "5px 0", borderBottom: i < cat.products.length - 1 ? `1px solid ${T.cremeDark}` : "none",
-          }}>
-            <span style={{ fontSize: 10, color: T.muted, minWidth: 14 }}>{i + 1}</span>
-            <span style={{ flex: 1, fontSize: 12, color: T.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-            <span style={{ fontSize: 10, color: T.muted, flexShrink: 0 }}>{p.quantity}</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: T.terracotta, flexShrink: 0 }}>{fmtEur(p.totalSales)} &euro;</span>
-          </div>
-        ))}
+    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+      <thead>
+        <tr style={{ background: "#f5f0e8" }}>
+          <th style={thSt("left")}>Jour</th>
+          <th style={thSt("left")}>Svc</th>
+          <th style={{ ...thSt(), color: ZC.Salle }}>Salle</th>
+          <th style={{ ...thSt(), color: ZC.Pergolas }}>Pergolas</th>
+          <th style={{ ...thSt(), color: ZC.Terrasse }}>Terrasse</th>
+          <th style={{ ...thSt(), color: ZC.emp }}>Emp.</th>
+          <th style={{ ...thSt(), color: "#D4775A" }}>Total</th>
+          <th style={thSt()}>TM sp.</th>
+        </tr>
+      </thead>
+      <tbody>
+        {days.map((jour, di) => {
+          const svcs = byDay[jour];
+          return svcs.map((s, si) => {
+            const caVal = mode === "ttc" ? s.ttc : s.ht;
+            const bg = di % 2 === 0 ? "#fff" : "#faf7f2";
+            const tmColor = s.tm_sp >= 80 ? "#2e7d32" : s.tm_sp >= 65 ? "#e65100" : "#c62828";
+            const tmBg = s.tm_sp >= 80 ? "#e8f5e9" : s.tm_sp >= 65 ? "#fff3e0" : "#ffebee";
+            return (
+              <tr key={`${jour}-${s.svc}`} style={{ background: bg, borderTop: si === 0 && di > 0 ? "1px solid #e0d8ce" : si > 0 ? "1px solid rgba(0,0,0,.05)" : "none" }}>
+                {si === 0 && <td rowSpan={svcs.length} style={{ padding: "0 16px", fontWeight: 700, fontSize: 15, verticalAlign: "middle", borderRight: "1px solid #e0d8ce" }}>{jour}</td>}
+                <td style={tdSt}><span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: s.svc === "midi" ? ZC.Pergolas : "#1a1a1a" }}>{s.svc === "midi" ? "Midi" : "Soir"}</span></td>
+                {zCell(s.z.Salle, ZC.Salle)}
+                {zCell(s.z.Pergolas, ZC.Pergolas)}
+                {zCell(s.z.Terrasse, ZC.Terrasse)}
+                {zCell(s.z.emp, ZC.emp)}
+                <td style={{ ...tdSt, fontWeight: 700, fontSize: 13, color: "#D4775A" }}>{fmt(caVal)}</td>
+                <td style={tdSt}><span style={{ background: tmBg, color: tmColor, padding: "3px 9px", borderRadius: 5, fontSize: 11, fontWeight: 700 }}>{s.tm_sp.toFixed(0)}{"\u20AC"}</span></td>
+              </tr>
+            );
+          });
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function zCell(val: number | undefined, color: string) {
+  if (!val) return <td style={{ ...tdSt, color: "rgba(0,0,0,.2)" }}>{"\u2014"}</td>;
+  return <td style={{ ...tdSt, fontWeight: 600, color }}>{fmt(val)}</td>;
+}
+
+const thSt = (align: "left" | "right" = "right"): CSSProperties => ({
+  fontSize: 9, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600,
+  padding: "11px 14px", textAlign: align, whiteSpace: "nowrap", borderBottom: "1px solid #e0d8ce",
+  color: "#777",
+});
+
+const tdSt: CSSProperties = { padding: "13px 14px", textAlign: "right" };
+
+function MixDropdown({ label, color, products, onClose }: {
+  label: string; color: string; products: { n: string; qty: number; ca: number }[]; onClose: () => void;
+}) {
+  const total = products.reduce((s, p) => s + p.ca, 0);
+  const maxCA = products[0]?.ca ?? 1;
+  return (
+    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(0,0,0,.08)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".1em", color }}>{label} — {products.length} produits</div>
+        <button type="button" onClick={onClose} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 16, color: "#777", padding: "0 4px" }}>&times;</button>
       </div>
+      {products.map((p, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid rgba(0,0,0,.04)", fontSize: 12 }}>
+          <span style={{ fontSize: 10, color: "#bbb", width: 16, textAlign: "right", flexShrink: 0 }}>{i + 1}</span>
+          <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.n}</span>
+          <div style={{ width: 80, height: 4, background: "rgba(0,0,0,.06)", borderRadius: 2, overflow: "hidden", flexShrink: 0 }}>
+            <div style={{ height: "100%", width: `${maxCA ? Math.round(p.ca / maxCA * 100) : 0}%`, background: color, opacity: .75, borderRadius: 2 }} />
+          </div>
+          <span style={{ width: 36, textAlign: "right", color: "#777", flexShrink: 0, fontSize: 10 }}>{total ? (p.ca / total * 100).toFixed(1) : 0}%</span>
+          <span style={{ width: 55, textAlign: "right", fontWeight: 500, flexShrink: 0, fontFamily: "var(--font-cormorant), Cormorant Garamond, serif", fontSize: 14 }}>{p.ca.toLocaleString("fr-FR")}{"\u20AC"}</span>
+          <span style={{ width: 34, textAlign: "right", color: "#bbb", flexShrink: 0, fontSize: 10 }}>{p.qty}x</span>
+        </div>
+      ))}
     </div>
   );
 }
 
-/* ── SectionLabel ── */
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{
-      fontFamily: "DM Sans, sans-serif", fontSize: 10, fontWeight: 700,
-      letterSpacing: "0.16em", textTransform: "uppercase",
-      color: T.muted, marginBottom: 10, marginTop: 4,
-    }}>{children}</div>
-  );
+/* ── Chart component ── */
+function ChartCanvas({ id, height, data, mode, type, onBarClick }: {
+  id: string; height: number; data: WeekData; mode: "ttc" | "ht"; type: "mix" | "top10" | "serv";
+  onBarClick?: (label: string, color: string) => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    destroyChart(id);
+
+    if (type === "mix") {
+      const vals = mode === "ttc" ? data.mix_ttc : data.mix_ht;
+      const total = vals.reduce((a, b) => a + b, 0);
+      charts[id] = new Chart(canvasRef.current, {
+        type: "bar",
+        data: { labels: data.mix_labels, datasets: [{ data: vals, backgroundColor: MIX_COLORS.slice(0, vals.length), borderRadius: 4, borderSkipped: false }] },
+        options: {
+          indexAxis: "y", responsive: true, maintainAspectRatio: false,
+          layout: { padding: { right: 80 } },
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${fmt(ctx.raw as number)} — ${((ctx.raw as number) / total * 100).toFixed(1)}%` } } },
+          scales: {
+            x: { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { callback: v => fmtK(v as number), color: "#aaa", font: { size: 11 } }, border: { display: false } },
+            y: { grid: { display: false }, ticks: { color: "#444", font: { size: 12 } }, border: { display: false } },
+          },
+          onClick: (_evt, elements) => {
+            if (elements.length && onBarClick) {
+              const i = elements[0].index;
+              onBarClick(data.mix_labels[i], MIX_COLORS[i % MIX_COLORS.length]);
+            }
+          },
+        },
+        plugins: [{
+          id: "barLabels",
+          afterDatasetsDraw(chart) {
+            const ctx = chart.ctx;
+            chart.data.datasets.forEach((ds, di) => {
+              chart.getDatasetMeta(di).data.forEach((bar, i) => {
+                const val = ds.data[i] as number;
+                const pct = (val / total * 100).toFixed(0);
+                ctx.save();
+                ctx.font = "500 11px DM Sans, sans-serif";
+                ctx.fillStyle = "#555";
+                ctx.textAlign = "left";
+                ctx.textBaseline = "middle";
+                ctx.fillText(`${Math.round(val / 1000)}k\u20AC  ${pct}%`, bar.x + 6, bar.y);
+                ctx.restore();
+              });
+            });
+          },
+        }],
+      });
+    }
+
+    if (type === "top10") {
+      const gradStart = [196, 90, 54], gradEnd = [240, 196, 180];
+      const n = data.top10_names.length;
+      const colors = data.top10_names.map((_, i) => {
+        const t = n > 1 ? i / (n - 1) : 0;
+        return `rgb(${Math.round(gradStart[0] + (gradEnd[0] - gradStart[0]) * t)},${Math.round(gradStart[1] + (gradEnd[1] - gradStart[1]) * t)},${Math.round(gradStart[2] + (gradEnd[2] - gradStart[2]) * t)})`;
+      });
+      charts[id] = new Chart(canvasRef.current, {
+        type: "bar",
+        data: { labels: data.top10_names, datasets: [{ data: data.top10_ca, backgroundColor: colors, borderRadius: 4 }] },
+        options: {
+          indexAxis: "y", responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `CA : \u20AC${(ctx.raw as number).toLocaleString("fr-FR")} \u00b7 ${data.top10_qty[ctx.dataIndex]} ventes` } } },
+          scales: {
+            x: { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { callback: v => "\u20AC" + v, color: "#aaa", font: { size: 11 } }, border: { display: false } },
+            y: { grid: { display: false }, ticks: { color: "#444", font: { size: 11 } }, border: { display: false } },
+          },
+        },
+      });
+    }
+
+    if (type === "serv") {
+      const gradStart = [46, 101, 90], gradEnd = [155, 195, 185];
+      const n = data.serveurs.length;
+      const colors = data.serveurs.map((_, i) => {
+        const t = n > 1 ? i / (n - 1) : 0;
+        return `rgb(${Math.round(gradStart[0] + (gradEnd[0] - gradStart[0]) * t)},${Math.round(gradStart[1] + (gradEnd[1] - gradStart[1]) * t)},${Math.round(gradStart[2] + (gradEnd[2] - gradStart[2]) * t)})`;
+      });
+      charts[id] = new Chart(canvasRef.current, {
+        type: "bar",
+        data: { labels: data.serveurs, datasets: [{ data: data.serv_ca, backgroundColor: colors, borderRadius: 4 }] },
+        options: {
+          indexAxis: "y", responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `CA : ${fmt(ctx.raw as number)} (${((ctx.raw as number) / data.ca_ttc * 100).toFixed(1)}%)` } } },
+          scales: {
+            x: { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { callback: v => fmtK(v as number), color: "#aaa", font: { size: 11 } }, border: { display: false } },
+            y: { grid: { display: false }, ticks: { color: "#444", font: { size: 12 } }, border: { display: false } },
+          },
+        },
+      });
+    }
+
+    return () => { destroyChart(id); };
+  }, [id, data, mode, type, onBarClick]);
+
+  return <div style={{ position: "relative", height }}><canvas ref={canvasRef} /></div>;
 }
