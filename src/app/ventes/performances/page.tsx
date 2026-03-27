@@ -65,6 +65,7 @@ export default function PerformancesPage() {
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState("");
+  const [exporting, setExporting] = useState(false);
   const [mixDDOpen, setMixDDOpen] = useState<{ label: string; color: string } | null>(null);
 
   // Date navigation
@@ -153,6 +154,28 @@ export default function PerformancesPage() {
       ? `Semaine du ${new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} au ${new Date(to + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`
       : new Date(selectedDate + "T12:00:00").toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
 
+  // PDF export
+  const handleExportPDF = async () => {
+    if (!data || !etab) return;
+    setExporting(true);
+    try {
+      const res = await fetch("/api/ventes/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stats: data, prev, mode, viewTab, rangeLabel, etabName: etab.nom ?? "Etablissement" }),
+      });
+      if (!res.ok) { setExporting(false); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `rapport-${viewTab}-${etab.nom?.replace(/\s/g, "_")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { /* ignore */ }
+    setExporting(false);
+  };
+
   const W = data;
   const ca = W ? (mode === "ttc" ? W.ca_ttc : W.ca_ht) : 0;
 
@@ -187,6 +210,15 @@ export default function PerformancesPage() {
                 e.target.value = "";
               }} />
             </label>
+            {data && (
+              <button type="button" onClick={handleExportPDF} disabled={exporting} style={{
+                padding: "7px 14px", borderRadius: 8, border: "1px solid #e0d8ce",
+                background: "#fff", color: "#1a1a1a", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                opacity: exporting ? 0.5 : 1,
+              }}>
+                {exporting ? "Export..." : "PDF"}
+              </button>
+            )}
             <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
               <button type="button" onClick={() => setMode("ttc")} style={{
                 padding: "4px 14px", borderRadius: 16, border: "none", cursor: "pointer",
