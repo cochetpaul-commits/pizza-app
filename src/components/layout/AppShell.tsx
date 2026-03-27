@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React from "react";
 import { usePathname } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
-import { Sidebar, SidebarDrawer } from "./Sidebar";
+import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { BottomTabBar } from "./BottomTabBar";
 
@@ -16,10 +16,6 @@ function isExcluded(pathname: string): boolean {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { role, loading } = useProfile();
-  const [drawerOpen, setDrawerOpen] = useState(false);
-
-  const openDrawer = useCallback(() => setDrawerOpen(true), []);
-  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
   if (isExcluded(pathname) || loading || !role) {
     return <>{children}</>;
@@ -28,14 +24,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <Sidebar />
-      <SidebarDrawer open={drawerOpen} onClose={closeDrawer} />
 
       <div className="app-main">
-        <TopBar onMenuClick={openDrawer} />
+        <TopBar />
         <main>{children}</main>
       </div>
 
-      <BottomTabBar onMenuClick={openDrawer} />
+      <BottomTabBar />
     </>
   );
 }

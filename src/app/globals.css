@@ -6,14 +6,14 @@
   --creme-dark: #e8e0d0;
   --terre: #e27f57;
   --terre-light: #c9b99a;
-  --noir: #1a1a1a;
+  --noir: #2c2c2c;
   --sidebar-width: 240px;
   --sidebar-collapsed-width: 60px;
   --etab-color: #b45f57;
   --sauge: #4a6741;
   --sauge-light: #e8ede6;
   --bordeaux: #8B1A1A;
-  --gris: #999999;
+  --gris: #6b6b6b;
   --border: #ddd6c8;
 
   --surface: rgba(255,255,255,0.55);
@@ -33,6 +33,120 @@
   --radius2: 10px;
 
   --shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+/* ── Liquid Glass — iOS 26 style ───────────────────── */
+
+/* Glass surface tokens */
+:root {
+  --glass-bg: rgba(255,255,255,0.55);
+  --glass-bg-hover: rgba(255,255,255,0.70);
+  --glass-border: rgba(255,255,255,0.35);
+  --glass-blur: 20px;
+  --glass-shadow: 0 2px 12px rgba(0,0,0,0.06), 0 0 0 0.5px rgba(0,0,0,0.04);
+  --glass-shadow-hover: 0 8px 28px rgba(0,0,0,0.10), 0 0 0 0.5px rgba(0,0,0,0.06);
+  --glass-sidebar: rgba(245,245,247,0.82);
+  --glass-sidebar-border: rgba(0,0,0,0.08);
+}
+
+/* Glassmorphism sidebar */
+.sidebar-desktop {
+  background: var(--glass-sidebar) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border-right: 1px solid var(--glass-sidebar-border);
+}
+
+/* Glass cards */
+.card, .kvItem {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border-color: var(--glass-border) !important;
+  box-shadow: var(--glass-shadow);
+  transition: box-shadow 0.2s ease, background 0.2s ease;
+}
+
+/* Glass dashboard cards */
+.dash-card {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border-color: var(--glass-border) !important;
+  box-shadow: var(--glass-shadow);
+}
+.dash-card:hover {
+  background: var(--glass-bg-hover) !important;
+  box-shadow: var(--glass-shadow-hover);
+}
+.dash-hero {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+.dash-green, .dash-warm {
+  background: var(--glass-bg) !important;
+}
+
+/* Glass inputs */
+.input, select.input, textarea.input {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-color: var(--glass-border) !important;
+  color: var(--text);
+}
+.input:focus {
+  background: var(--glass-bg-hover) !important;
+  border-color: var(--terre) !important;
+}
+select.input option {
+  background: var(--creme);
+  color: var(--text);
+}
+
+/* Glass buttons */
+.btn {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-color: var(--glass-border) !important;
+  color: var(--text);
+}
+.btn:hover {
+  background: var(--glass-bg-hover) !important;
+}
+.btnPrimary, .btnPrimary:hover {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Floating action button */
+.etab-fab-wrap {
+  display: none !important;
+}
+button.etab-fab {
+  border-radius: 16px !important;
+  overflow: hidden;
+}
+@media (max-width: 767px) {
+  .etab-fab-wrap {
+    display: block !important;
+  }
+}
+
+/* Glass mobile bars */
+.topbar-mobile {
+  background: var(--glass-sidebar) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+  border-bottom: 1px solid var(--glass-sidebar-border) !important;
+}
+.bottom-tab-bar {
+  background: var(--glass-sidebar) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+  border-top: 1px solid var(--glass-sidebar-border) !important;
 }
 
 *{ box-sizing: border-box; }
@@ -81,6 +195,7 @@ html, body{
 .topbar-mobile {
   display: none !important;
 }
+/* Never show topbar on mobile — notifications handled elsewhere */
 
 .app-main {
   margin-left: var(--sidebar-width);
@@ -98,7 +213,7 @@ html, body{
     display: none;
   }
   .topbar-mobile {
-    display: flex !important;
+    display: none !important;
   }
   .app-main {
     margin-left: 0;

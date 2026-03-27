@@ -5,6 +5,7 @@ import { ProfileProvider } from "@/lib/ProfileContext";
 import { EtablissementProvider } from "@/lib/EtablissementContext";
 import { TopBarProvider } from "@/components/layout/TopBarContext";
 import { AppShell } from "@/components/layout/AppShell";
+import { ThemeProvider } from "@/lib/ThemeContext";
 import { clearAppBadge } from "@/lib/pushSubscription";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -20,14 +21,16 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <ProfileProvider>
-      <EtablissementProvider>
-        <TopBarProvider>
-          <AppShell>
-            {children}
-          </AppShell>
-        </TopBarProvider>
-      </EtablissementProvider>
-    </ProfileProvider>
+    <ThemeProvider>
+      <ProfileProvider>
+        <EtablissementProvider>
+          <TopBarProvider>
+            <AppShell>
+              {children}
+            </AppShell>
+          </TopBarProvider>
+        </EtablissementProvider>
+      </ProfileProvider>
+    </ThemeProvider>
   );
 }

@@ -44,15 +44,15 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const C = {
-  bg: "#1a1512",
-  bgItem: "rgba(255,255,255,0.04)",
-  bgItemActive: "rgba(255,255,255,0.08)",
-  textMuted: "rgba(255,255,255,0.45)",
-  textNormal: "rgba(255,255,255,0.7)",
-  textActive: "#fff",
-  divider: "rgba(255,255,255,0.06)",
+  bg: "transparent",
+  bgItem: "rgba(0,0,0,0.03)",
+  bgItemActive: "rgba(0,0,0,0.06)",
+  textMuted: "rgba(0,0,0,0.40)",
+  textNormal: "rgba(0,0,0,0.65)",
+  textActive: "#2c2c2c",
+  divider: "rgba(0,0,0,0.06)",
   ifratelli: "#b45f57",
-  piccolaMia: "#efd199",
+  piccolaMia: "#c4a24e",
 };
 
 function isRoleAllowed(roles: Role[] | undefined, role: Role | null): boolean {
@@ -106,8 +106,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const isPiccola = current?.slug?.includes("piccola");
   const sections: NavSubSection[] = isAdmin
     ? isGroupView
-      ? [VENTES_SECTION, ACHATS_SECTION]  // Groupe = piloter
-      : [                                  // Établissement = agir
+      ? []  // Vue groupe = pas de sections, juste le dashboard
+      : [   // Établissement = toutes les sections
           PERSONNEL_SECTION,
           VENTES_SECTION,
           ACHATS_SECTION,
@@ -138,14 +138,14 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           margin: "1px 8px", borderRadius: 6,
           textDecoration: "none",
           fontSize: 13, fontWeight: active ? 600 : 400,
-          color: active ? C.textActive : hovered ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.5)",
-          background: active ? `${etabColor}12` : hovered ? "rgba(255,255,255,0.04)" : "transparent",
+          color: active ? C.textActive : hovered ? C.textNormal : C.textMuted,
+          background: active ? `${etabColor}12` : hovered ? C.bgItem : "transparent",
           borderLeft: active ? `2px solid ${etabColor}60` : "2px solid transparent",
           transition: "background 0.12s, color 0.12s",
           whiteSpace: "nowrap", overflow: "hidden",
         }}
       >
-        <span style={{ color: active ? etabColor : "rgba(255,255,255,0.3)", fontSize: 8, flexShrink: 0 }}>●</span>
+        <span style={{ color: active ? etabColor : C.textMuted, fontSize: 8, flexShrink: 0 }}>●</span>
         <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{item.label}</span>
       </Link>
     );
@@ -169,10 +169,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       display: "flex", alignItems: "center", gap: 8,
       width: "calc(100% - 16px)", padding: "8px 12px 8px 16px",
       margin: "1px 8px", borderRadius: 6,
-      background: isOpen ? `${etabColor}14` : hovered ? "rgba(255,255,255,0.06)" : "transparent",
+      background: isOpen ? `${etabColor}14` : hovered ? C.bgItem : "transparent",
       border: "none", cursor: items.length > 0 ? "pointer" : "default",
       borderLeft: isOpen ? `2px solid ${etabColor}80` : "2px solid transparent",
-      color: (isOpen || hasActiveChild) ? "rgba(255,255,255,0.9)" : hovered ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.5)",
+      color: (isOpen || hasActiveChild) ? C.textActive : hovered ? C.textNormal : C.textMuted,
       fontSize: 14, fontWeight: 700,
       whiteSpace: "nowrap", overflow: "hidden",
       transition: "background 0.15s, color 0.15s, border-color 0.15s",
@@ -195,7 +195,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           onMouseLeave={() => setHoveredHub(null)}
           style={hubBtnStyle}
         >
-          {SectionIcon && <SectionIcon size={15} color={(isOpen || hasActiveChild) ? `${etabColor}CC` : hovered ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.35)"} />}
+          {SectionIcon && <SectionIcon size={15} color={(isOpen || hasActiveChild) ? `${etabColor}CC` : hovered ? C.textMuted : C.textMuted} />}
           <span style={{ flex: 1, textAlign: "left" }}>{sub.label}</span>
         </button>
         {isOpen && (
@@ -247,7 +247,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             padding: "8px 16px", margin: "1px 8px", width: "calc(100% - 16px)",
             borderRadius: 6, border: "none", cursor: "pointer",
             borderLeft: settingsOpen ? `2px solid ${etabColor}80` : "2px solid transparent",
-            fontSize: 14, fontWeight: 700, color: settingsOpen ? "rgba(255,255,255,0.9)" : C.textNormal,
+            fontSize: 14, fontWeight: 700, color: settingsOpen ? C.textActive : C.textNormal,
             background: settingsOpen ? C.bgItemActive : "transparent",
             transition: "background 0.15s, color 0.15s",
           }}
@@ -290,14 +290,14 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 display: "flex", alignItems: "center", gap: 8,
                 width: "calc(100% - 16px)", padding: "8px 12px 8px 28px",
                 margin: "1px 8px", borderRadius: 6,
-                background: isOpen ? "rgba(255,255,255,0.04)" : "transparent",
+                background: isOpen ? C.bgItem : "transparent",
                 border: "none", cursor: "pointer",
                 borderLeft: isOpen ? `2px solid ${etabColor}60` : "2px solid transparent",
-                color: isOpen ? C.textActive : "rgba(255,255,255,0.5)",
+                color: isOpen ? C.textActive : C.textMuted,
                 fontSize: 14, fontWeight: 700, whiteSpace: "nowrap",
                 transition: "background 0.15s, color 0.15s",
               }}>
-                {SubIcon && <SubIcon size={15} color={isOpen ? etabColor : "rgba(255,255,255,0.35)"} />}
+                {SubIcon && <SubIcon size={15} color={isOpen ? etabColor : C.textMuted} />}
                 <span style={{ flex: 1, textAlign: "left" }}>{sub.label}</span>
               </button>
               {isOpen && items.map(item => {
@@ -308,7 +308,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                       display: "flex", alignItems: "center", gap: 8,
                       padding: "5px 16px 5px 44px", margin: "1px 8px", borderRadius: 6,
                       textDecoration: "none", fontSize: 13, fontWeight: active ? 600 : 400,
-                      color: active ? C.textActive : "rgba(255,255,255,0.55)",
+                      color: active ? C.textActive : C.textMuted,
                       background: active ? C.bgItemActive : "transparent",
                     }}>
                     <span>{item.label}</span>
@@ -361,7 +361,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <Image src="/logo-ifratelli.png" alt="iFratelli" width={32} height={32}
           style={{ width: 32, height: 32, objectFit: "contain", borderRadius: 6, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontSize: 15, fontWeight: 700, color: "#fff", letterSpacing: 0.5, lineHeight: 1 }}>
+          <span style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontSize: 15, fontWeight: 700, color: C.textActive, letterSpacing: 0.5, lineHeight: 1 }}>
             iFratelli
           </span>
           {role && (
@@ -372,114 +372,132 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       </div>
 
-      {/* Etablissement selector */}
-      {isAdmin && etablissements.length > 0 && (
-        <div ref={dropdownRef} style={{ padding: "10px 8px 4px", position: "relative" }}>
-          <button
-            type="button"
-            onClick={() => setEtabDropdownOpen(prev => !prev)}
-            style={{
-              display: "flex", alignItems: "center", gap: 8,
-              width: "100%", padding: "8px 12px",
-              borderRadius: 8, border: `1.5px solid ${etabColor}80`,
-              background: `${etabColor}20`, cursor: "pointer",
-              transition: "border-color 0.15s, background 0.15s",
-            }}
-          >
-            <IconStore size={15} color={etabColor} />
-            <span style={{
-              flex: 1, textAlign: "left", fontSize: 13, fontWeight: 600,
-              color: C.textActive, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            }}>
-              {etabLabel}
-            </span>
-            <span style={{ fontSize: 10, color: C.textMuted, transition: "transform 0.2s", transform: etabDropdownOpen ? "rotate(180deg)" : "rotate(0)" }}>
-              ▼
-            </span>
-          </button>
-
-          {/* Dropdown menu */}
-          {etabDropdownOpen && (
-            <div style={{
-              position: "absolute", left: 8, right: 8, top: "100%",
-              marginTop: 4, zIndex: 50,
-              background: "#2a2420", border: `1px solid ${C.divider}`,
-              borderRadius: 8, overflow: "hidden",
-              boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-            }}>
-              {/* Vue Groupe option */}
-              <button
-                type="button"
-                onClick={() => {
-                  setGroupView(true);
-                  setEtabDropdownOpen(false);
-                }}
-                style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  width: "100%", padding: "10px 12px",
-                  border: "none", cursor: "pointer",
-                  background: isGroupView ? `${C.ifratelli}18` : "transparent",
-                  borderLeft: isGroupView ? `3px solid ${C.ifratelli}` : "3px solid transparent",
-                  transition: "background 0.12s",
-                }}
-                onMouseEnter={e => { if (!isGroupView) e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
-                onMouseLeave={e => { if (!isGroupView) e.currentTarget.style.background = "transparent"; }}
-              >
-                <IconBuilding size={14} color={isGroupView ? C.ifratelli : C.textMuted} />
-                <span style={{ fontSize: 13, fontWeight: isGroupView ? 700 : 500, color: isGroupView ? C.textActive : C.textNormal }}>
-                  Vue Groupe
-                </span>
-              </button>
-
-              <div style={{ height: 1, background: C.divider, margin: "0 8px" }} />
-
-              {/* Each establishment */}
-              {etablissements.map(etab => {
-                const isSelected = !isGroupView && current?.id === etab.id;
-                const color = etab.couleur ?? C.ifratelli;
-                return (
-                  <button
-                    key={etab.id}
-                    type="button"
-                    onClick={() => {
-                      setGroupView(false);
-                      setCurrent(etab);
-                      setEtabDropdownOpen(false);
-                    }}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 8,
-                      width: "100%", padding: "10px 12px",
-                      border: "none", cursor: "pointer",
-                      background: isSelected ? `${color}18` : "transparent",
-                      borderLeft: isSelected ? `3px solid ${color}` : "3px solid transparent",
-                      transition: "background 0.12s",
-                    }}
-                    onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
-                    onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = isSelected ? `${color}18` : "transparent"; }}
-                  >
-                    <IconStore size={14} color={isSelected ? color : C.textMuted} />
-                    <span style={{ fontSize: 13, fontWeight: isSelected ? 700 : 500, color: isSelected ? C.textActive : C.textNormal }}>
-                      {etab.nom}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Nav */}
       <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "8px 0" }}>
         {isAdmin ? (
           <>
-            {/* Accueil */}
-            {renderStandaloneItem({ kind: "item", label: "Accueil", href: "/dashboard", icon: "dashboard" })}
+            {/* Vue Groupe */}
+            <Link
+              href="/dashboard"
+              onClick={() => { setGroupView(true); handleNav(); }}
+              style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "8px 16px", margin: "1px 8px", borderRadius: 6,
+                textDecoration: "none", fontSize: 13, fontWeight: isGroupView ? 600 : 500,
+                color: isGroupView ? C.textActive : C.textNormal,
+                background: isGroupView ? C.bgItemActive : "transparent",
+                borderLeft: isGroupView ? `3px solid ${C.ifratelli}` : "3px solid transparent",
+                transition: "background 0.12s",
+                whiteSpace: "nowrap", overflow: "hidden",
+              }}
+            >
+              <IconBuilding size={16} color={isGroupView ? C.ifratelli : C.textMuted} />
+              <span>Vue Groupe</span>
+            </Link>
 
             <div style={{ height: 1, background: C.divider, margin: "8px 16px" }} />
 
-            {/* Sections */}
-            {sections.map(sub => renderHub(sub))}
+            {/* Establishments as accordion hubs */}
+            {etablissements.map(etab => {
+              const isEtabSelected = !isGroupView && current?.id === etab.id;
+              const color = etab.couleur ?? C.ifratelli;
+              const etabOpen = openHub?.startsWith(`etab:${etab.id}`);
+              const isPiccolaEtab = etab.slug?.includes("piccola");
+
+              const etabSections: NavSubSection[] = [
+                PERSONNEL_SECTION,
+                VENTES_SECTION,
+                ACHATS_SECTION,
+                OPERATIONS_SECTION,
+                ...(isPiccolaEtab ? [EVENEMENTIEL_SECTION] : []),
+              ];
+
+              return (
+                <div key={etab.id} style={{ marginBottom: 4 }}>
+                  {/* Establishment header — card style */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGroupView(false);
+                      setCurrent(etab);
+                      setOpenHub(prev => prev === `etab:${etab.id}` ? null : `etab:${etab.id}`);
+                    }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      width: "calc(100% - 16px)", padding: "10px 14px",
+                      margin: "2px 8px", borderRadius: 10,
+                      background: isEtabSelected
+                        ? `linear-gradient(135deg, ${color}50 0%, ${color}30 100%)`
+                        : `linear-gradient(135deg, ${color}35 0%, ${color}18 100%)`,
+                      border: "none", cursor: "pointer",
+                      borderLeft: `4px solid ${isEtabSelected ? color : `${color}90`}`,
+                      color: C.textActive,
+                      fontSize: 14, fontWeight: 700,
+                      whiteSpace: "nowrap", overflow: "hidden",
+                      transition: "background 0.15s, border-color 0.15s",
+                      boxShadow: isEtabSelected ? `0 2px 8px ${color}20` : "none",
+                    }}
+                  >
+                    <IconStore size={16} color={color} />
+                    <span style={{ flex: 1, textAlign: "left", letterSpacing: 0.3 }}>{etab.nom}</span>
+                    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5"
+                      style={{ transform: etabOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s", flexShrink: 0, opacity: 0.7 }}>
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+
+                  {/* Sub-sections for this establishment */}
+                  {etabOpen && (
+                    <div style={{ marginBottom: 4 }}>
+                      {etabSections.map(sub => {
+                        if (!isRoleAllowed(sub.roles, role)) return null;
+                        const items = sub.items.filter(i => isRoleAllowed(i.roles, role));
+                        if (items.length === 0 && !sub.href) return null;
+
+                        const subKey = `etab:${etab.id}:${sub.label}`;
+                        const subOpen = openHub === subKey;
+                        const SectionIcon = sub.icon ? ICON_MAP[sub.icon] : null;
+                        const hasActiveChild = items.some(it => isActive(it.href));
+
+                        return (
+                          <div key={subKey} style={{ marginBottom: 2 }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setGroupView(false);
+                                setCurrent(etab);
+                                setOpenHub(prev => prev === subKey ? `etab:${etab.id}` : subKey);
+                                if (sub.href) router.push(sub.href);
+                              }}
+                              style={{
+                                display: "flex", alignItems: "center", gap: 8,
+                                width: "calc(100% - 16px)", padding: "6px 12px 6px 28px",
+                                margin: "1px 8px", borderRadius: 6,
+                                background: subOpen ? `${color}10` : "transparent",
+                                border: "none", cursor: "pointer",
+                                borderLeft: subOpen ? `2px solid ${color}60` : "2px solid transparent",
+                                color: (subOpen || hasActiveChild) ? C.textActive : C.textMuted,
+                                fontSize: 13, fontWeight: 600,
+                                whiteSpace: "nowrap", overflow: "hidden",
+                                transition: "background 0.15s, color 0.15s",
+                              }}
+                            >
+                              {SectionIcon && <SectionIcon size={14} color={(subOpen || hasActiveChild) ? `${color}CC` : C.textMuted} />}
+                              <span style={{ flex: 1, textAlign: "left" }}>{sub.label}</span>
+                            </button>
+                            {subOpen && (
+                              <div style={{ marginBottom: 4 }}>
+                                {items.map(item => renderItem(item))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
 
             <div style={{ height: 1, background: C.divider, margin: "8px 16px" }} />
 
