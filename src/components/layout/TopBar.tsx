@@ -4,18 +4,18 @@ import React from "react";
 import { NotificationBell } from "@/components/NotificationBell";
 
 /**
- * Mobile-only top bar: just notification bell in top-right corner.
+ * Mobile-only: notification bell fixed top-right. No bar/background.
  */
 export function TopBar() {
   return (
-    <header className="topbar-mobile" style={{
+    <div className="topbar-mobile" style={{
       display: "none",
-      alignItems: "center",
-      justifyContent: "flex-end",
-      height: 48, padding: "0 12px",
-      background: "transparent",
+      position: "fixed",
+      top: "env(safe-area-inset-top, 8px)",
+      right: 12,
+      zIndex: 120,
     }}>
       <NotificationBell />
-    </header>
+    </div>
   );
 }

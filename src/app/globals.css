@@ -213,7 +213,7 @@ html, body{
     display: none;
   }
   .topbar-mobile {
-    display: none !important;
+    display: flex !important;
   }
   .app-main {
     margin-left: 0;
