@@ -450,10 +450,11 @@ function aggregate(rows: Row[]) {
   // Global averages
   const avgDurMin = orderDurs.length > 0 ? Math.round(orderDurs.reduce((s, o) => s + o.dur, 0) / orderDurs.length) : 0;
 
-  // Duration by zone
+  // Duration by zone (exclude "A emporter" — no table rotation there)
   const durByZone: Record<string, { count: number; totalDur: number; totalCov: number }> = {};
   for (const o of orderDurs) {
-    const z = o.salle.toLowerCase().includes("emporter") ? "\u00C0 emporter" : o.salle;
+    if (o.salle.toLowerCase().includes("emporter")) continue;
+    const z = o.salle;
     if (!durByZone[z]) durByZone[z] = { count: 0, totalDur: 0, totalCov: 0 };
     durByZone[z].count++;
     durByZone[z].totalDur += o.dur;
