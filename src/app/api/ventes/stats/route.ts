@@ -38,22 +38,34 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "etablissement_id, from, to requis" }, { status: 400 });
   }
 
-  const { data, error } = await supabase
-    .from("ventes_lignes")
-    .select("date_service,service,salle,operateur,categorie,sous_categorie,description,quantite,annule,ttc,ht,couverts,num_fiscal,statut,ouvert_a,type_ligne")
-    .eq("etablissement_id", etabId)
-    .gte("date_service", from)
-    .lte("date_service", to)
-    .order("ouvert_a", { ascending: true });
+  // Paginate — Supabase defaults to 1000 rows max
+  const allData: Row[] = [];
+  const PAGE = 1000;
+  let offset = 0;
+  let hasMore = true;
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from("ventes_lignes")
+      .select("date_service,service,salle,operateur,categorie,sous_categorie,description,quantite,annule,ttc,ht,couverts,num_fiscal,statut,ouvert_a,type_ligne")
+      .eq("etablissement_id", etabId)
+      .gte("date_service", from)
+      .lte("date_service", to)
+      .order("ouvert_a", { ascending: true })
+      .range(offset, offset + PAGE - 1);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    allData.push(...((data ?? []) as Row[]));
+    hasMore = (data?.length ?? 0) === PAGE;
+    offset += PAGE;
   }
 
-  const rows = (data ?? []) as Row[];
-  if (rows.length === 0) {
+  if (allData.length === 0) {
     return NextResponse.json({ empty: true, stats: null });
   }
+
+  const rows = allData;
 
   // Aggregate
   const stats = aggregate(rows);
