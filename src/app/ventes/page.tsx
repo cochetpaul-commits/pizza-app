@@ -27,7 +27,7 @@ type WeekData = {
   top10_names: string[]; top10_ca_ttc: number[]; top10_ca_ht: number[]; top10_qty: number[];
   cat_products: Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]>;
   top3_cats: { cat: string; rows: { n: string; ca_ttc: string; ca_ht: string }[]; flop: { n: string; ca_ttc: string; ca_ht: string; qty: number } | null }[];
-  serveurs: string[]; serv_ca_ttc: number[]; serv_ca_ht: number[];
+  serveurs: string[]; serv_ca_ttc: number[]; serv_ca_ht: number[]; serv_tickets: number[]; serv_cov: number[];
   ratios: {
     anti: { tables: number; coverts: number; ca_ttc: number; ca_ht: number };
     dolci: { tables: number; coverts: number; ca_ttc: number; ca_ht: number };
@@ -316,7 +316,7 @@ export default function PerformancesPage() {
                     <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,.1)" }}>
                       {W.couverts > 0 ? "\u20AC" + (ca / W.couverts).toFixed(1) : "\u2014"}
                     </div>
-                    {W.cov_sur > 0 && <div style={{ fontSize: 10, color: "rgba(255,255,255,.6)", marginTop: 2 }}>CVT SM SP <span style={{ color: "#fff", fontWeight: 700 }}>{"\u20AC" + ((mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur).toFixed(1)}</span></div>}
+                    {W.cov_sur > 0 && <div style={{ fontSize: 10, color: "rgba(255,255,255,.6)", marginTop: 2 }}>CVT M SP <span style={{ color: "#fff", fontWeight: 700 }}>{"\u20AC" + ((mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur).toFixed(1)}</span></div>}
                     {prev && prev.couverts > 0 && <DeltaBadge cur={ca / W.couverts} prev={(mode === "ttc" ? prev.ca_ttc : prev.ca_ht) / prev.couverts} decimals={1} prefix="\u20AC" />}
                   </div>
                   <div style={{ width: 1, background: "rgba(255,255,255,.1)" }} />
@@ -363,16 +363,39 @@ export default function PerformancesPage() {
             </div>
 
             {/* Zones */}
-            {W.days.length > 1 && (
-              <div style={{ display: "grid", gridTemplateColumns: `repeat(${Object.keys(mode === "ttc" ? W.zones_ttc : W.zones_ht).filter(z => (mode === "ttc" ? W.zones_ttc : W.zones_ht)[z].some(v => v > 0)).length}, 1fr)`, gap: 10, marginBottom: 6 }}>
-                {Object.entries(mode === "ttc" ? W.zones_ttc : W.zones_ht).filter(([, vals]) => vals.some(v => v > 0)).map(([zone, vals]) => {
+            {W.days.length > 0 && (() => {
+              // Zone capacity config (tables × max couverts)
+              const ZONE_CAPACITY: Record<string, { tables: number; maxCov: number }> = {
+                Salle: { tables: 17, maxCov: 8 * 2 + 4 * 4 + 3 * 5 + 2 * 4 }, // 8×2 + 4×4 + 3×5 + 2×4 = 55
+                Pergolas: { tables: 8, maxCov: 6 * 2 + 2 * 4 }, // 6×2 + 2×4 = 20
+                Terrasse: { tables: 16, maxCov: 10 * 2 + 5 * 4 + 1 * 6 }, // 10×2 + 5×4 + 1×6 = 46
+              };
+              const zones = mode === "ttc" ? W.zones_ttc : W.zones_ht;
+              const activeZones = Object.entries(zones).filter(([, vals]) => vals.some(v => v > 0));
+              const totalCA = activeZones.reduce((s, [, vals]) => s + vals.reduce((a, b) => a + b, 0), 0);
+
+              return (
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${activeZones.length}, 1fr)`, gap: 10, marginBottom: 6 }}>
+                {activeZones.map(([zone, vals]) => {
                   const tot = vals.reduce((a, b) => a + b, 0);
                   const maxV = Math.max(...vals.filter(Boolean));
-                  const color = ZC[zone === "\u00C0 emporter" ? "emp" : zone] ?? "#888";
+                  const zKey = zone === "\u00C0 emporter" ? "emp" : zone;
+                  const color = ZC[zKey] ?? "#888";
+                  const cap = ZONE_CAPACITY[zone];
+                  const pctCA = totalCA > 0 ? Math.round(tot / totalCA * 100) : 0;
+
                   return (
                     <div key={zone} style={{ ...S.card, padding: "14px 16px" }}>
-                      <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".1em", color, fontWeight: 600, marginBottom: 8 }}>{zone}</div>
-                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 26, fontWeight: 700, marginBottom: 10 }}>{fmt(tot)}</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                        <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".1em", color, fontWeight: 600 }}>{zone}</div>
+                        <div style={{ fontSize: 10, color: "#777" }}>{pctCA}% du CA</div>
+                      </div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 26, fontWeight: 700, marginBottom: 4 }}>{fmt(tot)}</div>
+                      {cap && (
+                        <div style={{ fontSize: 10, color: "#777", marginBottom: 10 }}>
+                          {cap.tables} tables · {cap.maxCov} cvts max
+                        </div>
+                      )}
                       {W.days.map((d, i) => (
                         <div key={d} style={{ marginBottom: 7 }}>
                           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 3 }}>
@@ -388,7 +411,8 @@ export default function PerformancesPage() {
                   );
                 })}
               </div>
-            )}
+              );
+            })()}
 
             {/* Sur place vs emporter */}
             <div style={S.card}>
@@ -580,7 +604,7 @@ function UpsellCard({ label, emoji, data, totalTables, totalCov, color, targets,
       </div>
       <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 28, fontWeight: 700, color, lineHeight: 1, marginBottom: 4 }}>{pct}%</div>
       <div style={{ fontSize: 11, color: "#777", marginBottom: 6 }}>
-        des tables · <strong style={{ color: "#1a1a1a" }}>{data.tables > 0 ? `1 table sur ${Math.round(totalTables / data.tables)}` : "\u2014"}</strong>
+        des tables · <strong style={{ color: "#1a1a1a" }}>{data.coverts > 0 ? `1 cvt sur ${Math.round(totalCov / data.coverts)}` : "\u2014"}</strong>
       </div>
       {/* Tables + Couverts */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8, fontSize: 10 }}>
@@ -678,7 +702,8 @@ function RecapTable({ services, mode }: { services: WeekData["services"]; mode: 
           <th style={{ ...thSt(), color: ZC.Terrasse }}>Terrasse</th>
           <th style={{ ...thSt(), color: ZC.emp }}>Emp.</th>
           <th style={{ ...thSt(), color: "#D4775A" }}>Total</th>
-          <th style={thSt()}>CVT SM SP</th>
+          <th style={thSt()}>Cvts</th>
+          <th style={thSt()}>CVT M SP</th>
         </tr>
       </thead>
       <tbody>
@@ -700,6 +725,7 @@ function RecapTable({ services, mode }: { services: WeekData["services"]; mode: 
                 {zCell(z?.Terrasse, ZC.Terrasse)}
                 {zCell(z?.emp, ZC.emp)}
                 <td style={{ ...tdSt, fontWeight: 700, fontSize: 13, color: "#D4775A" }}>{fmt(caVal)}</td>
+                <td style={{ ...tdSt, fontWeight: 600 }}>{s.cov}</td>
                 <td style={tdSt}><span style={{ background: tmBg, color: tmColor, padding: "3px 9px", borderRadius: 5, fontSize: 11, fontWeight: 700 }}>{tmSp.toFixed(0)}{"\u20AC"}</span></td>
               </tr>
             );
@@ -863,7 +889,14 @@ function ChartCanvas({ id, height, data, mode, type, onBarClick }: {
         data: { labels: data.serveurs, datasets: [{ data: mode === "ttc" ? data.serv_ca_ttc : data.serv_ca_ht, backgroundColor: colors, borderRadius: 4 }] },
         options: {
           indexAxis: "y", responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `CA : ${fmt(ctx.raw as number)} (${((ctx.raw as number) / data.ca_ttc * 100).toFixed(1)}%)` } } },
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => {
+            const i = ctx.dataIndex;
+            const caVal = ctx.raw as number;
+            const tkt = data.serv_tickets?.[i] ?? 0;
+            const cov = data.serv_cov?.[i] ?? 0;
+            const cvtM = cov > 0 ? (caVal / cov).toFixed(1) : "—";
+            return [`CA : ${fmt(caVal)} (${(caVal / (mode === "ttc" ? data.ca_ttc : data.ca_ht) * 100).toFixed(1)}%)`, `${tkt} tickets · ${cov} cvts · CVT M ${"\u20AC"}${cvtM}`];
+          } } } },
           scales: {
             x: { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { callback: v => fmtK(v as number), color: "#aaa", font: { size: 11 } }, border: { display: false } },
             y: { grid: { display: false }, ticks: { color: "#444", font: { size: 12 } }, border: { display: false } },

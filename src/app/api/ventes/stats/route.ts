@@ -332,19 +332,34 @@ function aggregate(rows: Row[]) {
     };
   });
 
-  // Serveurs (TTC + HT)
-  const servMap: Record<string, { ttc: number; ht: number }> = {};
+  // Serveurs (TTC + HT + couverts + tickets)
+  const servMap: Record<string, { ttc: number; ht: number; orders: Set<string> }> = {};
   for (const r of validRows) {
     const op = r.operateur?.trim();
     if (!op) continue;
-    if (!servMap[op]) servMap[op] = { ttc: 0, ht: 0 };
+    if (!servMap[op]) servMap[op] = { ttc: 0, ht: 0, orders: new Set() };
     servMap[op].ttc += Number(r.ttc);
     servMap[op].ht += Number(r.ht);
+    servMap[op].orders.add(`${r.date_service}:${r.num_fiscal}`);
   }
   const servEntries = Object.entries(servMap).sort((a, b) => b[1].ttc - a[1].ttc);
   const serveurs = servEntries.map(([k]) => k);
   const serv_ca_ttc = servEntries.map(([, v]) => Math.round(v.ttc));
   const serv_ca_ht = servEntries.map(([, v]) => Math.round(v.ht));
+  const serv_tickets = servEntries.map(([, v]) => v.orders.size);
+  // Couverts per server
+  const serv_cov = servEntries.map(([name]) => {
+    const serverOrders = new Map<string, number>();
+    for (const r of allRows) {
+      if (r.operateur?.trim() !== name) continue;
+      const key = `${r.date_service}:${r.num_fiscal}`;
+      if (!serverOrders.has(key)) serverOrders.set(key, Number(r.couverts) || 0);
+    }
+    let total = 0;
+    let allZ = true;
+    for (const v of serverOrders.values()) { total += v; if (v > 0) allZ = false; }
+    return allZ ? serverOrders.size : total;
+  });
 
   // Ratios upsell (based on unique tables/tickets + couverts)
   const orderKey = (r: Row) => `${r.date_service}:${r.num_fiscal}`;
@@ -439,7 +454,7 @@ function aggregate(rows: Row[]) {
     top10_names, top10_ca_ttc, top10_ca_ht, top10_qty,
     cat_products: catProds,
     top3_cats,
-    serveurs, serv_ca_ttc, serv_ca_ht,
+    serveurs, serv_ca_ttc, serv_ca_ht, serv_tickets, serv_cov,
     ratios: {
       anti, dolci, vin, alcool, boissons, digestif, cafe,
       avgCovPerTable,
