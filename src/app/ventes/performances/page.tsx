@@ -9,21 +9,25 @@ import Chart from "chart.js/auto";
 type WeekData = {
   dates: string[];
   days: string[];
-  ca_ttc: number; ca_ht: number; couverts: number; ann_pct: number;
+  ca_ttc: number; ca_ht: number; couverts: number; tickets: number; ann_pct: number;
   day_ttc: number[]; day_ht: number[]; day_cov: number[];
   tm_ttc: number[]; tm_ht: number[];
-  zones: Record<string, number[]>;
-  place_sur: number; place_emp: number; cov_sur: number; cov_emp: number;
+  zones_ttc: Record<string, number[]>; zones_ht: Record<string, number[]>;
+  place_sur_ttc: number; place_sur_ht: number;
+  place_emp_ttc: number; place_emp_ht: number;
+  cov_sur: number; cov_emp: number;
   services: {
-    jour: string; svc: string; ttc: number; ht: number; cov: number; tm: number;
-    sp: number; emp: number; sp_tkt: number; tm_sp: number;
-    z: Record<string, number>;
+    jour: string; svc: string; ttc: number; ht: number; cov: number;
+    tm_ttc: number; tm_ht: number;
+    sp_ttc: number; sp_ht: number; emp_ttc: number; emp_ht: number;
+    sp_cov: number; tm_sp_ttc: number; tm_sp_ht: number;
+    z_ttc: Record<string, number>; z_ht: Record<string, number>;
   }[];
   mix_labels: string[]; mix_ttc: number[]; mix_ht: number[];
-  top10_names: string[]; top10_ca: number[]; top10_qty: number[];
-  cat_products: Record<string, { n: string; qty: number; ca: number }[]>;
-  top3_cats: { cat: string; rows: { n: string; ca: string }[]; flop: { n: string; ca: string; qty: number } | null }[];
-  serveurs: string[]; serv_ca: number[];
+  top10_names: string[]; top10_ca_ttc: number[]; top10_ca_ht: number[]; top10_qty: number[];
+  cat_products: Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]>;
+  top3_cats: { cat: string; rows: { n: string; ca_ttc: string; ca_ht: string }[]; flop: { n: string; ca_ttc: string; ca_ht: string; qty: number } | null }[];
+  serveurs: string[]; serv_ca_ttc: number[]; serv_ca_ht: number[];
   ratios: { anti: number; anti_n: number; dolci: number; dolci_n: number; vin: number; vin_n: number };
 };
 
@@ -242,16 +246,17 @@ export default function PerformancesPage() {
                 </div>
                 <div style={{ display: "flex", gap: 28, marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,.12)" }}>
                   <div>
-                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.45)", fontWeight: 500, marginBottom: 4 }}>Tickets</div>
+                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.45)", fontWeight: 500, marginBottom: 4 }}>Couverts</div>
                     <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff" }}>{W.couverts}</div>
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,.45)", marginTop: 2 }}>{W.tickets} tickets</div>
                   </div>
                   <div style={{ width: 1, background: "rgba(255,255,255,.1)" }} />
                   <div>
-                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.45)", fontWeight: 500, marginBottom: 4 }}>TM / ticket</div>
+                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.45)", fontWeight: 500, marginBottom: 4 }}>TM / couvert</div>
                     <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff" }}>
                       {W.couverts > 0 ? "\u20AC" + (ca / W.couverts).toFixed(1) : "\u2014"}
                     </div>
-                    {W.cov_sur > 0 && <div style={{ fontSize: 10, color: "rgba(255,255,255,.5)", marginTop: 2 }}>Sur place <span style={{ color: "rgba(255,255,255,.7)", fontWeight: 500 }}>{"\u20AC" + (W.place_sur / W.cov_sur).toFixed(1)}</span></div>}
+                    {W.cov_sur > 0 && <div style={{ fontSize: 10, color: "rgba(255,255,255,.5)", marginTop: 2 }}>Sur place <span style={{ color: "rgba(255,255,255,.7)", fontWeight: 500 }}>{"\u20AC" + ((mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur).toFixed(1)}</span></div>}
                   </div>
                   <div style={{ width: 1, background: "rgba(255,255,255,.1)" }} />
                   <div>
@@ -266,16 +271,16 @@ export default function PerformancesPage() {
             <div style={S.card}>
               <div style={S.sec}>Upsell · performance</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
-                <UpsellCard label="Antipasti" emoji="🥗" n={W.ratios.anti_n} total={W.couverts} color="#D4775A" targets={{ ok: 30, good: 50, avg: 12 }} />
-                <UpsellCard label="Desserts" emoji="🍮" n={W.ratios.dolci_n} total={W.couverts} color="#b5904a" targets={{ ok: 80, good: 100, avg: 9 }} />
-                <UpsellCard label="Vins" emoji="🍷" n={W.ratios.vin_n} total={W.couverts} color="#7c5c3a" targets={{ ok: 60, good: 80, avg: 6 }} />
+                <UpsellCard label="Antipasti" emoji="🥗" n={W.ratios.anti_n} total={W.tickets} color="#D4775A" targets={{ ok: 30, good: 50, avg: 12 }} />
+                <UpsellCard label="Desserts" emoji="🍮" n={W.ratios.dolci_n} total={W.tickets} color="#b5904a" targets={{ ok: 80, good: 100, avg: 9 }} />
+                <UpsellCard label="Vins" emoji="🍷" n={W.ratios.vin_n} total={W.tickets} color="#7c5c3a" targets={{ ok: 60, good: 80, avg: 6 }} />
               </div>
             </div>
 
             {/* Zones */}
             {W.days.length > 1 && (
-              <div style={{ display: "grid", gridTemplateColumns: `repeat(${Object.keys(W.zones).filter(z => W.zones[z].some(v => v > 0)).length}, 1fr)`, gap: 10, marginBottom: 6 }}>
-                {Object.entries(W.zones).filter(([, vals]) => vals.some(v => v > 0)).map(([zone, vals]) => {
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${Object.keys(mode === "ttc" ? W.zones_ttc : W.zones_ht).filter(z => (mode === "ttc" ? W.zones_ttc : W.zones_ht)[z].some(v => v > 0)).length}, 1fr)`, gap: 10, marginBottom: 6 }}>
+                {Object.entries(mode === "ttc" ? W.zones_ttc : W.zones_ht).filter(([, vals]) => vals.some(v => v > 0)).map(([zone, vals]) => {
                   const tot = vals.reduce((a, b) => a + b, 0);
                   const maxV = Math.max(...vals.filter(Boolean));
                   const color = ZC[zone === "\u00C0 emporter" ? "emp" : zone] ?? "#888";
@@ -304,16 +309,23 @@ export default function PerformancesPage() {
             <div style={S.card}>
               <div style={S.sec}>Sur place vs a emporter</div>
               <div style={{ display: "flex", gap: 0 }}>
-                <PlaceBlock label="Sur place" color="#46655a" ca={W.place_sur} pct={W.place_sur + W.place_emp > 0 ? Math.round(W.place_sur / (W.place_sur + W.place_emp) * 100) : 0} tickets={W.cov_sur} tm={W.cov_sur > 0 ? (W.place_sur / W.cov_sur).toFixed(1) : "0"} />
-                <div style={{ width: 1, background: "rgba(0,0,0,.08)", margin: "0 20px", flexShrink: 0 }} />
-                <PlaceBlock label="A emporter" color="#D4775A" ca={W.place_emp} pct={W.place_sur + W.place_emp > 0 ? Math.round(W.place_emp / (W.place_sur + W.place_emp) * 100) : 0} tickets={W.cov_emp} tm={W.cov_emp > 0 ? (W.place_emp / W.cov_emp).toFixed(1) : "0"} />
+                {(() => {
+                  const surCA = mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht;
+                  const empCA = mode === "ttc" ? W.place_emp_ttc : W.place_emp_ht;
+                  const tot = surCA + empCA;
+                  return (<>
+                    <PlaceBlock label="Sur place" color="#46655a" ca={surCA} pct={tot > 0 ? Math.round(surCA / tot * 100) : 0} couverts={W.cov_sur} tm={W.cov_sur > 0 ? (surCA / W.cov_sur).toFixed(1) : "0"} />
+                    <div style={{ width: 1, background: "rgba(0,0,0,.08)", margin: "0 20px", flexShrink: 0 }} />
+                    <PlaceBlock label="A emporter" color="#D4775A" ca={empCA} pct={tot > 0 ? Math.round(empCA / tot * 100) : 0} couverts={W.cov_emp} tm={W.cov_emp > 0 ? (empCA / W.cov_emp).toFixed(1) : "0"} />
+                  </>);
+                })()}
               </div>
             </div>
 
             {/* Recap table */}
             {W.services.length > 0 && (
               <div style={S.card}>
-                <div style={S.sec}>Par service · {mode.toUpperCase()} · tickets</div>
+                <div style={S.sec}>Par service · {mode.toUpperCase()} · couverts</div>
                 <div style={{ overflow: "hidden", borderRadius: 8, border: "1px solid #e0d8ce" }}>
                   <RecapTable services={W.services} mode={mode} />
                 </div>
@@ -328,7 +340,7 @@ export default function PerformancesPage() {
               </div>
               <ChartCanvas id="mix" height={220} data={W} mode={mode} type="mix" onBarClick={(label, color) => setMixDDOpen({ label, color })} />
               {mixDDOpen && W.cat_products[mixDDOpen.label] && (
-                <MixDropdown label={mixDDOpen.label} color={mixDDOpen.color} products={W.cat_products[mixDDOpen.label]} onClose={() => setMixDDOpen(null)} />
+                <MixDropdown label={mixDDOpen.label} color={mixDDOpen.color} products={W.cat_products[mixDDOpen.label]} onClose={() => setMixDDOpen(null)} mode={mode} />
               )}
             </div>
 
@@ -349,13 +361,13 @@ export default function PerformancesPage() {
                       {cat.rows.map((r, ri) => (
                         <div key={ri} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", borderBottom: "1px solid rgba(0,0,0,.04)", fontSize: 11 }}>
                           <span><span style={{ fontSize: 9, color: "#bbb", marginRight: 4 }}>{ri + 1}</span>{r.n}</span>
-                          <span style={{ fontFamily: "var(--font-cormorant), Cormorant Garamond, serif", fontSize: 13, fontWeight: 600, color: accent }}>{r.ca}</span>
+                          <span style={{ fontFamily: "var(--font-cormorant), Cormorant Garamond, serif", fontSize: 13, fontWeight: 600, color: accent }}>{mode === "ttc" ? r.ca_ttc : r.ca_ht}</span>
                         </div>
                       ))}
                       {cat.flop && (
                         <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0 2px", marginTop: 4, borderTop: "1px dashed rgba(0,0,0,.08)", fontSize: 11 }}>
                           <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ fontSize: 9, color: "#c62828", fontWeight: 600 }}>▼</span><span style={{ color: "#777" }}>{cat.flop.n}</span></span>
-                          <span style={{ fontFamily: "var(--font-cormorant), Cormorant Garamond, serif", fontSize: 13, fontWeight: 600, color: "#777" }}>{cat.flop.ca}</span>
+                          <span style={{ fontFamily: "var(--font-cormorant), Cormorant Garamond, serif", fontSize: 13, fontWeight: 600, color: "#777" }}>{mode === "ttc" ? cat.flop.ca_ttc : cat.flop.ca_ht}</span>
                         </div>
                       )}
                     </div>
@@ -413,7 +425,7 @@ function UpsellCard({ label, emoji, n, total, color, targets }: {
   );
 }
 
-function PlaceBlock({ label, color, ca, pct, tickets, tm }: { label: string; color: string; ca: number; pct: number; tickets: number; tm: string }) {
+function PlaceBlock({ label, color, ca, pct, couverts, tm }: { label: string; color: string; ca: number; pct: number; couverts: number; tm: string }) {
   return (
     <div style={{ flex: 1 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
@@ -425,7 +437,7 @@ function PlaceBlock({ label, color, ca, pct, tickets, tm }: { label: string; col
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
         <div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700 }}>{fmt(ca)}</div><div style={{ fontSize: 9, color: "#777", textTransform: "uppercase", marginTop: 2 }}>CA</div></div>
-        <div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700 }}>{tickets}</div><div style={{ fontSize: 9, color: "#777", textTransform: "uppercase", marginTop: 2 }}>Tickets</div></div>
+        <div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700 }}>{couverts}</div><div style={{ fontSize: 9, color: "#777", textTransform: "uppercase", marginTop: 2 }}>Couverts</div></div>
         <div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700, color }}>{"\u20AC" + tm}</div><div style={{ fontSize: 9, color: "#777", textTransform: "uppercase", marginTop: 2 }}>TM</div></div>
       </div>
     </div>
@@ -459,19 +471,21 @@ function RecapTable({ services, mode }: { services: WeekData["services"]; mode: 
           const svcs = byDay[jour];
           return svcs.map((s, si) => {
             const caVal = mode === "ttc" ? s.ttc : s.ht;
+            const z = mode === "ttc" ? s.z_ttc : s.z_ht;
+            const tmSp = mode === "ttc" ? s.tm_sp_ttc : s.tm_sp_ht;
             const bg = di % 2 === 0 ? "#fff" : "#faf7f2";
-            const tmColor = s.tm_sp >= 80 ? "#2e7d32" : s.tm_sp >= 65 ? "#e65100" : "#c62828";
-            const tmBg = s.tm_sp >= 80 ? "#e8f5e9" : s.tm_sp >= 65 ? "#fff3e0" : "#ffebee";
+            const tmColor = tmSp >= 80 ? "#2e7d32" : tmSp >= 65 ? "#e65100" : "#c62828";
+            const tmBg = tmSp >= 80 ? "#e8f5e9" : tmSp >= 65 ? "#fff3e0" : "#ffebee";
             return (
               <tr key={`${jour}-${s.svc}`} style={{ background: bg, borderTop: si === 0 && di > 0 ? "1px solid #e0d8ce" : si > 0 ? "1px solid rgba(0,0,0,.05)" : "none" }}>
                 {si === 0 && <td rowSpan={svcs.length} style={{ padding: "0 16px", fontWeight: 700, fontSize: 15, verticalAlign: "middle", borderRight: "1px solid #e0d8ce" }}>{jour}</td>}
                 <td style={tdSt}><span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: s.svc === "midi" ? ZC.Pergolas : "#1a1a1a" }}>{s.svc === "midi" ? "Midi" : "Soir"}</span></td>
-                {zCell(s.z.Salle, ZC.Salle)}
-                {zCell(s.z.Pergolas, ZC.Pergolas)}
-                {zCell(s.z.Terrasse, ZC.Terrasse)}
-                {zCell(s.z.emp, ZC.emp)}
+                {zCell(z?.Salle, ZC.Salle)}
+                {zCell(z?.Pergolas, ZC.Pergolas)}
+                {zCell(z?.Terrasse, ZC.Terrasse)}
+                {zCell(z?.emp, ZC.emp)}
                 <td style={{ ...tdSt, fontWeight: 700, fontSize: 13, color: "#D4775A" }}>{fmt(caVal)}</td>
-                <td style={tdSt}><span style={{ background: tmBg, color: tmColor, padding: "3px 9px", borderRadius: 5, fontSize: 11, fontWeight: 700 }}>{s.tm_sp.toFixed(0)}{"\u20AC"}</span></td>
+                <td style={tdSt}><span style={{ background: tmBg, color: tmColor, padding: "3px 9px", borderRadius: 5, fontSize: 11, fontWeight: 700 }}>{tmSp.toFixed(0)}{"\u20AC"}</span></td>
               </tr>
             );
           });
@@ -494,29 +508,33 @@ const thSt = (align: "left" | "right" = "right"): CSSProperties => ({
 
 const tdSt: CSSProperties = { padding: "13px 14px", textAlign: "right" };
 
-function MixDropdown({ label, color, products, onClose }: {
-  label: string; color: string; products: { n: string; qty: number; ca: number }[]; onClose: () => void;
+function MixDropdown({ label, color, products, onClose, mode = "ttc" }: {
+  label: string; color: string; products: { n: string; qty: number; ca_ttc: number; ca_ht: number }[]; onClose: () => void; mode?: "ttc" | "ht";
 }) {
-  const total = products.reduce((s, p) => s + p.ca, 0);
-  const maxCA = products[0]?.ca ?? 1;
+  const getCA = (p: { ca_ttc: number; ca_ht: number }) => mode === "ttc" ? p.ca_ttc : p.ca_ht;
+  const total = products.reduce((s, p) => s + getCA(p), 0);
+  const maxCA = products[0] ? getCA(products[0]) : 1;
   return (
     <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(0,0,0,.08)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".1em", color }}>{label} — {products.length} produits</div>
         <button type="button" onClick={onClose} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 16, color: "#777", padding: "0 4px" }}>&times;</button>
       </div>
-      {products.map((p, i) => (
+      {products.map((p, i) => {
+        const pca = getCA(p);
+        return (
         <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid rgba(0,0,0,.04)", fontSize: 12 }}>
           <span style={{ fontSize: 10, color: "#bbb", width: 16, textAlign: "right", flexShrink: 0 }}>{i + 1}</span>
           <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.n}</span>
           <div style={{ width: 80, height: 4, background: "rgba(0,0,0,.06)", borderRadius: 2, overflow: "hidden", flexShrink: 0 }}>
-            <div style={{ height: "100%", width: `${maxCA ? Math.round(p.ca / maxCA * 100) : 0}%`, background: color, opacity: .75, borderRadius: 2 }} />
+            <div style={{ height: "100%", width: `${maxCA ? Math.round(pca / maxCA * 100) : 0}%`, background: color, opacity: .75, borderRadius: 2 }} />
           </div>
-          <span style={{ width: 36, textAlign: "right", color: "#777", flexShrink: 0, fontSize: 10 }}>{total ? (p.ca / total * 100).toFixed(1) : 0}%</span>
-          <span style={{ width: 55, textAlign: "right", fontWeight: 500, flexShrink: 0, fontFamily: "var(--font-cormorant), Cormorant Garamond, serif", fontSize: 14 }}>{p.ca.toLocaleString("fr-FR")}{"\u20AC"}</span>
+          <span style={{ width: 36, textAlign: "right", color: "#777", flexShrink: 0, fontSize: 10 }}>{total ? (pca / total * 100).toFixed(1) : 0}%</span>
+          <span style={{ width: 55, textAlign: "right", fontWeight: 500, flexShrink: 0, fontFamily: "var(--font-cormorant), Cormorant Garamond, serif", fontSize: 14 }}>{pca.toLocaleString("fr-FR")}{"\u20AC"}</span>
           <span style={{ width: 34, textAlign: "right", color: "#bbb", flexShrink: 0, fontSize: 10 }}>{p.qty}x</span>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -584,7 +602,7 @@ function ChartCanvas({ id, height, data, mode, type, onBarClick }: {
       });
       charts[id] = new Chart(canvasRef.current, {
         type: "bar",
-        data: { labels: data.top10_names, datasets: [{ data: data.top10_ca, backgroundColor: colors, borderRadius: 4 }] },
+        data: { labels: data.top10_names, datasets: [{ data: mode === "ttc" ? data.top10_ca_ttc : data.top10_ca_ht, backgroundColor: colors, borderRadius: 4 }] },
         options: {
           indexAxis: "y", responsive: true, maintainAspectRatio: false,
           plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `CA : \u20AC${(ctx.raw as number).toLocaleString("fr-FR")} \u00b7 ${data.top10_qty[ctx.dataIndex]} ventes` } } },
@@ -605,7 +623,7 @@ function ChartCanvas({ id, height, data, mode, type, onBarClick }: {
       });
       charts[id] = new Chart(canvasRef.current, {
         type: "bar",
-        data: { labels: data.serveurs, datasets: [{ data: data.serv_ca, backgroundColor: colors, borderRadius: 4 }] },
+        data: { labels: data.serveurs, datasets: [{ data: mode === "ttc" ? data.serv_ca_ttc : data.serv_ca_ht, backgroundColor: colors, borderRadius: 4 }] },
         options: {
           indexAxis: "y", responsive: true, maintainAspectRatio: false,
           plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `CA : ${fmt(ctx.raw as number)} (${((ctx.raw as number) / data.ca_ttc * 100).toFixed(1)}%)` } } },

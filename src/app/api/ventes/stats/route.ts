@@ -60,25 +60,38 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ empty: false, stats });
 }
 
+/** Get couverts for a unique order (dedup by num_fiscal+date) */
+function getCouverts(rows: Row[]): number {
+  const seen = new Map<string, number>();
+  for (const r of rows) {
+    const key = `${r.date_service}:${r.num_fiscal}`;
+    if (!seen.has(key)) {
+      seen.set(key, Number(r.couverts) || 0);
+    }
+  }
+  let total = 0;
+  for (const v of seen.values()) total += v;
+  return total;
+}
+
+function getCouvertsByKey(rows: Row[], keyFn: (r: Row) => string): Record<string, number> {
+  const orderCov = new Map<string, { key: string; cov: number }>();
+  for (const r of rows) {
+    const orderKey = `${r.date_service}:${r.num_fiscal}`;
+    if (!orderCov.has(orderKey)) {
+      orderCov.set(orderKey, { key: keyFn(r), cov: Number(r.couverts) || 0 });
+    }
+  }
+  const result: Record<string, number> = {};
+  for (const v of orderCov.values()) {
+    result[v.key] = (result[v.key] || 0) + v.cov;
+  }
+  return result;
+}
+
 function aggregate(rows: Row[]) {
-  // Filter non-annulés for CA calculations
   const validRows = rows.filter(r => !r.annule && r.ttc > 0);
   const allRows = rows;
-
-  // Unique tickets (by num_fiscal + date)
-  const tickets = new Set<string>();
-  const ticketsByDay: Record<string, Set<string>> = {};
-  const ticketsBySvc: Record<string, Set<string>> = {};
-
-  for (const r of allRows) {
-    const key = `${r.date_service}:${r.num_fiscal}`;
-    tickets.add(key);
-    if (!ticketsByDay[r.date_service]) ticketsByDay[r.date_service] = new Set();
-    ticketsByDay[r.date_service].add(key);
-    const svcKey = `${r.date_service}:${r.service}`;
-    if (!ticketsBySvc[svcKey]) ticketsBySvc[svcKey] = new Set();
-    ticketsBySvc[svcKey].add(key);
-  }
 
   // Unique dates
   const dates = [...new Set(validRows.map(r => r.date_service))].sort();
@@ -90,6 +103,12 @@ function aggregate(rows: Row[]) {
   // CA totals
   const ca_ttc = validRows.reduce((s, r) => s + Number(r.ttc), 0);
   const ca_ht = validRows.reduce((s, r) => s + Number(r.ht), 0);
+
+  // Total couverts (dedup by order)
+  const totalCouverts = getCouverts(allRows);
+
+  // Nb tickets (unique orders)
+  const tickets = new Set(allRows.map(r => `${r.date_service}:${r.num_fiscal}`));
   const totalTickets = tickets.size;
 
   // Annulations
@@ -99,35 +118,42 @@ function aggregate(rows: Row[]) {
   // CA par jour
   const day_ttc = dates.map(d => validRows.filter(r => r.date_service === d).reduce((s, r) => s + Number(r.ttc), 0));
   const day_ht = dates.map(d => validRows.filter(r => r.date_service === d).reduce((s, r) => s + Number(r.ht), 0));
-  const day_cov = dates.map(d => ticketsByDay[d]?.size ?? 0);
+
+  // Couverts par jour (dedup by order per day)
+  const covByDay = getCouvertsByKey(allRows, r => r.date_service);
+  const day_cov = dates.map(d => covByDay[d] || 0);
   const tm_ttc = dates.map((_, i) => day_cov[i] > 0 ? day_ttc[i] / day_cov[i] : 0);
   const tm_ht = dates.map((_, i) => day_cov[i] > 0 ? day_ht[i] / day_cov[i] : 0);
 
-  // Zones par jour
-  const zoneNames = ["Salle", "Pergolas", "Terrasse", "À emporter"];
-  const zones: Record<string, number[]> = {};
+  // Zones par jour (TTC + HT)
+  const zoneNames = ["Salle", "Pergolas", "Terrasse", "\u00C0 emporter"];
+  const isEmp = (r: Row) => r.salle?.toLowerCase().includes("emporter");
+  const zoneMatch = (z: string) => z === "\u00C0 emporter" ? isEmp : (r: Row) => r.salle === z;
+
+  const zones_ttc: Record<string, number[]> = {};
+  const zones_ht: Record<string, number[]> = {};
   for (const z of zoneNames) {
-    zones[z] = dates.map(d => {
-      const zoneMatch = z === "À emporter" ? (r: Row) => r.salle?.toLowerCase().includes("emporter") : (r: Row) => r.salle === z;
-      return validRows.filter(r => r.date_service === d && zoneMatch(r)).reduce((s, r) => s + Number(r.ttc), 0);
-    });
+    const matcher = zoneMatch(z);
+    zones_ttc[z] = dates.map(d => validRows.filter(r => r.date_service === d && matcher(r)).reduce((s, r) => s + Number(r.ttc), 0));
+    zones_ht[z] = dates.map(d => validRows.filter(r => r.date_service === d && matcher(r)).reduce((s, r) => s + Number(r.ht), 0));
   }
 
-  // Sur place vs emporter
-  const empRows = validRows.filter(r => r.salle?.toLowerCase().includes("emporter"));
-  const spRows = validRows.filter(r => !r.salle?.toLowerCase().includes("emporter"));
-  const place_emp = empRows.reduce((s, r) => s + Number(r.ttc), 0);
-  const place_sur = spRows.reduce((s, r) => s + Number(r.ttc), 0);
-  const empTickets = new Set(empRows.map(r => `${r.date_service}:${r.num_fiscal}`));
-  const spTickets = new Set(spRows.map(r => `${r.date_service}:${r.num_fiscal}`));
-  const cov_emp = empTickets.size;
-  const cov_sur = spTickets.size;
+  // Sur place vs emporter (TTC + HT)
+  const empRows = validRows.filter(isEmp);
+  const spRows = validRows.filter(r => !isEmp(r));
+  const place_emp_ttc = empRows.reduce((s, r) => s + Number(r.ttc), 0);
+  const place_sur_ttc = spRows.reduce((s, r) => s + Number(r.ttc), 0);
+  const place_emp_ht = empRows.reduce((s, r) => s + Number(r.ht), 0);
+  const place_sur_ht = spRows.reduce((s, r) => s + Number(r.ht), 0);
+  const cov_emp = getCouverts(empRows.length > 0 ? allRows.filter(isEmp) : []);
+  const cov_sur = getCouverts(spRows.length > 0 ? allRows.filter(r => !isEmp(r)) : []);
 
-  // Services (par jour + midi/soir)
+  // Services (par jour + midi/soir) — with couverts
   const services: {
-    jour: string; svc: string; ttc: number; ht: number; cov: number; tm: number;
-    sp: number; emp: number; sp_tkt: number; tm_sp: number;
-    z: Record<string, number>;
+    jour: string; svc: string; ttc: number; ht: number; cov: number; tm_ttc: number; tm_ht: number;
+    sp_ttc: number; sp_ht: number; emp_ttc: number; emp_ht: number;
+    sp_cov: number; tm_sp_ttc: number; tm_sp_ht: number;
+    z_ttc: Record<string, number>; z_ht: Record<string, number>;
   }[] = [];
 
   for (const d of dates) {
@@ -136,35 +162,41 @@ function aggregate(rows: Row[]) {
     for (const svc of ["midi", "soir"]) {
       const svcRows = validRows.filter(r => r.date_service === d && r.service === svc);
       if (svcRows.length === 0) continue;
-      const svcKey = `${d}:${svc}`;
-      const cov = ticketsBySvc[svcKey]?.size ?? 0;
+      const svcAllRows = allRows.filter(r => r.date_service === d && r.service === svc);
+      const cov = getCouverts(svcAllRows);
       const ttc = svcRows.reduce((s, r) => s + Number(r.ttc), 0);
       const ht = svcRows.reduce((s, r) => s + Number(r.ht), 0);
-      const spSvc = svcRows.filter(r => !r.salle?.toLowerCase().includes("emporter"));
-      const empSvc = svcRows.filter(r => r.salle?.toLowerCase().includes("emporter"));
-      const spTkt = new Set(spSvc.map(r => `${r.date_service}:${r.num_fiscal}`)).size;
-      const spCA = spSvc.reduce((s, r) => s + Number(r.ttc), 0);
-      const empCA = empSvc.reduce((s, r) => s + Number(r.ttc), 0);
+      const spSvc = svcRows.filter(r => !isEmp(r));
+      const empSvc = svcRows.filter(r => isEmp(r));
+      const spCov = getCouverts(svcAllRows.filter(r => !isEmp(r)));
+      const spTTC = spSvc.reduce((s, r) => s + Number(r.ttc), 0);
+      const spHT = spSvc.reduce((s, r) => s + Number(r.ht), 0);
+      const empTTC = empSvc.reduce((s, r) => s + Number(r.ttc), 0);
+      const empHT = empSvc.reduce((s, r) => s + Number(r.ht), 0);
 
-      const z: Record<string, number> = {};
+      const z_ttc: Record<string, number> = {};
+      const z_ht: Record<string, number> = {};
       for (const zn of zoneNames) {
-        const zMatch = zn === "À emporter"
-          ? (r: Row) => r.salle?.toLowerCase().includes("emporter")
-          : (r: Row) => r.salle === zn;
-        z[zn === "À emporter" ? "emp" : zn] = svcRows.filter(zMatch).reduce((s, r) => s + Number(r.ttc), 0);
+        const m = zoneMatch(zn);
+        const key = zn === "\u00C0 emporter" ? "emp" : zn;
+        z_ttc[key] = svcRows.filter(m).reduce((s, r) => s + Number(r.ttc), 0);
+        z_ht[key] = svcRows.filter(m).reduce((s, r) => s + Number(r.ht), 0);
       }
 
       services.push({
         jour: jourCap, svc, ttc, ht, cov,
-        tm: cov > 0 ? ttc / cov : 0,
-        sp: spCA, emp: empCA,
-        sp_tkt: spTkt, tm_sp: spTkt > 0 ? spCA / spTkt : 0,
-        z,
+        tm_ttc: cov > 0 ? ttc / cov : 0,
+        tm_ht: cov > 0 ? ht / cov : 0,
+        sp_ttc: spTTC, sp_ht: spHT, emp_ttc: empTTC, emp_ht: empHT,
+        sp_cov: spCov,
+        tm_sp_ttc: spCov > 0 ? spTTC / spCov : 0,
+        tm_sp_ht: spCov > 0 ? spHT / spCov : 0,
+        z_ttc, z_ht,
       });
     }
   }
 
-  // Mix catégories
+  // Mix catégories (TTC + HT)
   const catMap: Record<string, { ttc: number; ht: number }> = {};
   for (const r of validRows) {
     const cat = r.categorie || "Autre";
@@ -172,7 +204,6 @@ function aggregate(rows: Row[]) {
     catMap[cat].ttc += Number(r.ttc);
     catMap[cat].ht += Number(r.ht);
   }
-  // Remove zero/messages categories
   const mixEntries = Object.entries(catMap)
     .filter(([k, v]) => v.ttc > 0 && !k.toUpperCase().includes("MESSAGE"))
     .sort((a, b) => b[1].ttc - a[1].ttc);
@@ -180,23 +211,25 @@ function aggregate(rows: Row[]) {
   const mix_ttc = mixEntries.map(([, v]) => Math.round(v.ttc));
   const mix_ht = mixEntries.map(([, v]) => Math.round(v.ht));
 
-  // Top 10 produits
-  const prodMap: Record<string, { ca: number; qty: number }> = {};
+  // Top 10 produits (TTC + HT)
+  const prodMap: Record<string, { ca_ttc: number; ca_ht: number; qty: number }> = {};
   for (const r of validRows) {
     if (r.type_ligne !== "Produit" || !r.description) continue;
     if (r.categorie?.toUpperCase().includes("MESSAGE")) continue;
     const key = r.description;
-    if (!prodMap[key]) prodMap[key] = { ca: 0, qty: 0 };
-    prodMap[key].ca += Number(r.ttc);
+    if (!prodMap[key]) prodMap[key] = { ca_ttc: 0, ca_ht: 0, qty: 0 };
+    prodMap[key].ca_ttc += Number(r.ttc);
+    prodMap[key].ca_ht += Number(r.ht);
     prodMap[key].qty += Number(r.quantite);
   }
-  const top10 = Object.entries(prodMap).sort((a, b) => b[1].ca - a[1].ca).slice(0, 10);
+  const top10 = Object.entries(prodMap).sort((a, b) => b[1].ca_ttc - a[1].ca_ttc).slice(0, 10);
   const top10_names = top10.map(([k]) => k);
-  const top10_ca = top10.map(([, v]) => Math.round(v.ca));
+  const top10_ca_ttc = top10.map(([, v]) => Math.round(v.ca_ttc));
+  const top10_ca_ht = top10.map(([, v]) => Math.round(v.ca_ht));
   const top10_qty = top10.map(([, v]) => v.qty);
 
-  // Produits par catégorie (cat_products)
-  const catProds: Record<string, { n: string; qty: number; ca: number }[]> = {};
+  // Produits par catégorie (TTC + HT)
+  const catProds: Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]> = {};
   for (const r of validRows) {
     if (r.type_ligne !== "Produit" || !r.description) continue;
     if (r.categorie?.toUpperCase().includes("MESSAGE")) continue;
@@ -204,78 +237,91 @@ function aggregate(rows: Row[]) {
     if (!catProds[cat]) catProds[cat] = [];
     const existing = catProds[cat].find(p => p.n === r.description);
     if (existing) {
-      existing.ca += Number(r.ttc);
+      existing.ca_ttc += Number(r.ttc);
+      existing.ca_ht += Number(r.ht);
       existing.qty += Number(r.quantite);
     } else {
-      catProds[cat].push({ n: r.description, qty: Number(r.quantite), ca: Number(r.ttc) });
+      catProds[cat].push({ n: r.description, qty: Number(r.quantite), ca_ttc: Number(r.ttc), ca_ht: Number(r.ht) });
     }
   }
   for (const cat of Object.keys(catProds)) {
-    catProds[cat].sort((a, b) => b.ca - a.ca);
-    catProds[cat] = catProds[cat].map(p => ({ ...p, ca: Math.round(p.ca) }));
+    catProds[cat].sort((a, b) => b.ca_ttc - a.ca_ttc);
+    catProds[cat] = catProds[cat].map(p => ({ ...p, ca_ttc: Math.round(p.ca_ttc), ca_ht: Math.round(p.ca_ht) }));
   }
 
   // Top 3 par catégorie
-  const top3_cats = mixEntries.slice(0, 8).map(([cat, v]) => {
+  const top3_cats = mixEntries.slice(0, 8).map(([cat]) => {
     const prods = catProds[cat] || [];
-    const top3 = prods.slice(0, 3).map(p => ({ n: p.n, ca: `${p.ca.toLocaleString("fr-FR")}\u20AC` }));
+    const top3 = prods.slice(0, 3).map(p => ({
+      n: p.n,
+      ca_ttc: `${p.ca_ttc.toLocaleString("fr-FR")}\u20AC`,
+      ca_ht: `${p.ca_ht.toLocaleString("fr-FR")}\u20AC`,
+    }));
     const flop = prods.length > 3 ? prods[prods.length - 1] : null;
     return {
       cat,
       rows: top3,
-      flop: flop ? { n: flop.n, ca: `${flop.ca.toLocaleString("fr-FR")}\u20AC`, qty: flop.qty } : null,
+      flop: flop ? {
+        n: flop.n,
+        ca_ttc: `${flop.ca_ttc.toLocaleString("fr-FR")}\u20AC`,
+        ca_ht: `${flop.ca_ht.toLocaleString("fr-FR")}\u20AC`,
+        qty: flop.qty,
+      } : null,
     };
   });
 
-  // Serveurs
-  const servMap: Record<string, number> = {};
+  // Serveurs (TTC + HT)
+  const servMap: Record<string, { ttc: number; ht: number }> = {};
   for (const r of validRows) {
     const op = r.operateur?.trim();
     if (!op) continue;
-    servMap[op] = (servMap[op] || 0) + Number(r.ttc);
+    if (!servMap[op]) servMap[op] = { ttc: 0, ht: 0 };
+    servMap[op].ttc += Number(r.ttc);
+    servMap[op].ht += Number(r.ht);
   }
-  const servEntries = Object.entries(servMap).sort((a, b) => b[1] - a[1]);
+  const servEntries = Object.entries(servMap).sort((a, b) => b[1].ttc - a[1].ttc);
   const serveurs = servEntries.map(([k]) => k);
-  const serv_ca = servEntries.map(([, v]) => Math.round(v));
+  const serv_ca_ttc = servEntries.map(([, v]) => Math.round(v.ttc));
+  const serv_ca_ht = servEntries.map(([, v]) => Math.round(v.ht));
 
-  // Paiements — on ne peut pas les extraire du fichier produit, on les laisse vides
-  // (les paiements sont dans un export séparé de Popina)
-
-  // Ratios upsell
+  // Ratios upsell (based on couverts, not tickets)
   const antiRows = validRows.filter(r => r.categorie?.toUpperCase().includes("ANTIPASTI"));
   const dolciRows = validRows.filter(r => r.categorie?.toUpperCase().includes("DOLCI"));
   const vinRows = validRows.filter(r =>
     r.categorie?.toUpperCase().includes("VIN") ||
     r.sous_categorie?.toLowerCase().includes("vin")
   );
-  const anti_tickets = new Set(antiRows.map(r => `${r.date_service}:${r.num_fiscal}`)).size;
-  const dolci_tickets = new Set(dolciRows.map(r => `${r.date_service}:${r.num_fiscal}`)).size;
-  const vin_tickets = new Set(vinRows.map(r => `${r.date_service}:${r.num_fiscal}`)).size;
+  // Count unique orders (tables) that ordered each category
+  const anti_tables = new Set(antiRows.map(r => `${r.date_service}:${r.num_fiscal}`)).size;
+  const dolci_tables = new Set(dolciRows.map(r => `${r.date_service}:${r.num_fiscal}`)).size;
+  const vin_tables = new Set(vinRows.map(r => `${r.date_service}:${r.num_fiscal}`)).size;
 
   return {
     dates,
     days: dayNames.map(d => d.charAt(0).toUpperCase() + d.slice(1)),
     ca_ttc: Math.round(ca_ttc * 100) / 100,
     ca_ht: Math.round(ca_ht * 100) / 100,
-    couverts: totalTickets,
+    couverts: totalCouverts,
+    tickets: totalTickets,
     ann_pct: Math.round(ann_pct * 10) / 10,
     day_ttc, day_ht, day_cov, tm_ttc, tm_ht,
-    zones,
-    place_sur: Math.round(place_sur), place_emp: Math.round(place_emp),
+    zones_ttc, zones_ht,
+    place_sur_ttc: Math.round(place_sur_ttc), place_sur_ht: Math.round(place_sur_ht),
+    place_emp_ttc: Math.round(place_emp_ttc), place_emp_ht: Math.round(place_emp_ht),
     cov_sur, cov_emp,
     services,
     mix_labels, mix_ttc, mix_ht,
-    top10_names, top10_ca, top10_qty,
+    top10_names, top10_ca_ttc, top10_ca_ht, top10_qty,
     cat_products: catProds,
     top3_cats,
-    serveurs, serv_ca,
+    serveurs, serv_ca_ttc, serv_ca_ht,
     ratios: {
-      anti: totalTickets > 0 ? Math.round(anti_tickets / totalTickets * 100) / 100 : 0,
-      anti_n: anti_tickets,
-      dolci: totalTickets > 0 ? Math.round(dolci_tickets / totalTickets * 100) / 100 : 0,
-      dolci_n: dolci_tickets,
-      vin: totalTickets > 0 ? Math.round(vin_tickets / totalTickets * 100) / 100 : 0,
-      vin_n: vin_tickets,
+      anti: totalTickets > 0 ? Math.round(anti_tables / totalTickets * 100) / 100 : 0,
+      anti_n: anti_tables,
+      dolci: totalTickets > 0 ? Math.round(dolci_tables / totalTickets * 100) / 100 : 0,
+      dolci_n: dolci_tables,
+      vin: totalTickets > 0 ? Math.round(vin_tables / totalTickets * 100) / 100 : 0,
+      vin_n: vin_tables,
     },
   };
 }
