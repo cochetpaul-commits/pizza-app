@@ -376,23 +376,27 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "8px 0" }}>
         {isAdmin ? (
           <>
-            {/* Vue Groupe */}
+            {/* iFratelli Group */}
             <Link
               href="/dashboard"
               onClick={() => { setGroupView(true); handleNav(); }}
               style={{
                 display: "flex", alignItems: "center", gap: 10,
-                padding: "8px 16px", margin: "1px 8px", borderRadius: 6,
-                textDecoration: "none", fontSize: 13, fontWeight: isGroupView ? 600 : 500,
-                color: isGroupView ? C.textActive : C.textNormal,
-                background: isGroupView ? C.bgItemActive : "transparent",
-                borderLeft: isGroupView ? `3px solid ${C.ifratelli}` : "3px solid transparent",
-                transition: "background 0.12s",
+                width: "calc(100% - 16px)", padding: "10px 14px",
+                margin: "2px 8px", borderRadius: 10,
+                textDecoration: "none", fontSize: 14, fontWeight: 700,
+                color: C.textActive,
+                background: isGroupView
+                  ? `linear-gradient(135deg, ${C.ifratelli}50 0%, ${C.ifratelli}30 100%)`
+                  : `linear-gradient(135deg, ${C.ifratelli}35 0%, ${C.ifratelli}18 100%)`,
+                borderLeft: `4px solid ${isGroupView ? C.ifratelli : `${C.ifratelli}90`}`,
+                boxShadow: isGroupView ? `0 2px 8px ${C.ifratelli}20` : "none",
+                transition: "background 0.15s, border-color 0.15s",
                 whiteSpace: "nowrap", overflow: "hidden",
               }}
             >
-              <IconBuilding size={16} color={isGroupView ? C.ifratelli : C.textMuted} />
-              <span>Vue Groupe</span>
+              <IconStore size={16} color={C.ifratelli} />
+              <span style={{ flex: 1, letterSpacing: 0.3 }}>iFratelli Group</span>
             </Link>
 
             <div style={{ height: 1, background: C.divider, margin: "8px 16px" }} />

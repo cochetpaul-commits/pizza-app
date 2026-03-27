@@ -385,8 +385,8 @@ export function BottomTabBar() {
             background: isGroupView ? "rgba(180,95,87,0.08)" : "transparent",
             borderLeft: isGroupView ? "3px solid #b45f57" : "3px solid transparent",
           }}>
-            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#b45f57" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
-            <span style={{ fontSize: 14, fontWeight: isGroupView ? 700 : 500, color: "#2c2c2c" }}>Vue Groupe</span>
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#b45f57" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18" /><path d="M9 8h1" /><path d="M9 12h1" /><path d="M9 16h1" /><path d="M14 8h1" /><path d="M14 12h1" /><path d="M14 16h1" /><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16" /></svg>
+            <span style={{ fontSize: 14, fontWeight: isGroupView ? 700 : 500, color: "#2c2c2c" }}>iFratelli Group</span>
           </button>
           <div style={{ height: 1, background: "rgba(0,0,0,0.06)", margin: "0 12px" }} />
           {etablissements.map(e => {
@@ -400,7 +400,7 @@ export function BottomTabBar() {
                 background: isSelected ? `${clr}12` : "transparent",
                 borderLeft: isSelected ? `3px solid ${clr}` : "3px solid transparent",
               }}>
-                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={clr} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
+                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={clr} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18" /><path d="M9 8h1" /><path d="M9 12h1" /><path d="M9 16h1" /><path d="M14 8h1" /><path d="M14 12h1" /><path d="M14 16h1" /><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16" /></svg>
                 <span style={{ fontSize: 14, fontWeight: isSelected ? 700 : 500, color: "#2c2c2c" }}>{e.nom}</span>
               </button>
             );
