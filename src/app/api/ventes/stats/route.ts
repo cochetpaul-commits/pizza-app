@@ -89,9 +89,24 @@ function getCouvertsByKey(rows: Row[], keyFn: (r: Row) => string): Record<string
   return result;
 }
 
+/** Normalize category names: PIZZE→Pizze, CUCINA→Cuisine, etc. */
+const CAT_MAP: Record<string, string> = {
+  PIZZE: "Pizze", CUCINA: "Cuisine", DOLCI: "Dolci", VINI: "Vins",
+  ALCOOL: "Alcool", ANTIPASTI: "Antipasti", BEVANDE: "Boissons",
+  "BEVANDE CALDE": "Boissons chaudes", DIGESTIVI: "Digestifs",
+  MESSAGES: "Messages",
+};
+function normCat(cat: string | null): string {
+  if (!cat) return "Autre";
+  return CAT_MAP[cat.toUpperCase()] ?? CAT_MAP[cat] ?? cat;
+}
+
 function aggregate(rows: Row[]) {
-  const validRows = rows.filter(r => !r.annule && r.ttc > 0);
-  const allRows = rows;
+  // IMPORTANT: only use "Produit" lines — ignore "Paiement" and "Total"
+  const productRows = rows.filter(r => r.type_ligne === "Produit");
+  const validRows = productRows.filter(r => !r.annule && Number(r.ttc) > 0);
+  // For couverts/tickets, use all product rows (even annulés) to count orders
+  const allRows = productRows;
 
   // Unique dates
   const dates = [...new Set(validRows.map(r => r.date_service))].sort();
@@ -199,13 +214,13 @@ function aggregate(rows: Row[]) {
   // Mix catégories (TTC + HT)
   const catMap: Record<string, { ttc: number; ht: number }> = {};
   for (const r of validRows) {
-    const cat = r.categorie || "Autre";
+    const cat = normCat(r.categorie);
     if (!catMap[cat]) catMap[cat] = { ttc: 0, ht: 0 };
     catMap[cat].ttc += Number(r.ttc);
     catMap[cat].ht += Number(r.ht);
   }
   const mixEntries = Object.entries(catMap)
-    .filter(([k, v]) => v.ttc > 0 && !k.toUpperCase().includes("MESSAGE"))
+    .filter(([k, v]) => v.ttc > 0 && k !== "Messages" && k !== "Autre")
     .sort((a, b) => b[1].ttc - a[1].ttc);
   const mix_labels = mixEntries.map(([k]) => k);
   const mix_ttc = mixEntries.map(([, v]) => Math.round(v.ttc));
@@ -214,8 +229,9 @@ function aggregate(rows: Row[]) {
   // Top 10 produits (TTC + HT)
   const prodMap: Record<string, { ca_ttc: number; ca_ht: number; qty: number }> = {};
   for (const r of validRows) {
-    if (r.type_ligne !== "Produit" || !r.description) continue;
-    if (r.categorie?.toUpperCase().includes("MESSAGE")) continue;
+    if (!r.description) continue;
+    const nc = normCat(r.categorie);
+    if (nc === "Messages" || nc === "Autre") continue;
     const key = r.description;
     if (!prodMap[key]) prodMap[key] = { ca_ttc: 0, ca_ht: 0, qty: 0 };
     prodMap[key].ca_ttc += Number(r.ttc);
@@ -231,9 +247,9 @@ function aggregate(rows: Row[]) {
   // Produits par catégorie (TTC + HT)
   const catProds: Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]> = {};
   for (const r of validRows) {
-    if (r.type_ligne !== "Produit" || !r.description) continue;
-    if (r.categorie?.toUpperCase().includes("MESSAGE")) continue;
-    const cat = r.categorie || "Autre";
+    if (!r.description) continue;
+    const cat = normCat(r.categorie);
+    if (cat === "Messages" || cat === "Autre") continue;
     if (!catProds[cat]) catProds[cat] = [];
     const existing = catProds[cat].find(p => p.n === r.description);
     if (existing) {
@@ -284,13 +300,13 @@ function aggregate(rows: Row[]) {
   const serv_ca_ttc = servEntries.map(([, v]) => Math.round(v.ttc));
   const serv_ca_ht = servEntries.map(([, v]) => Math.round(v.ht));
 
-  // Ratios upsell (based on couverts, not tickets)
-  const antiRows = validRows.filter(r => r.categorie?.toUpperCase().includes("ANTIPASTI"));
-  const dolciRows = validRows.filter(r => r.categorie?.toUpperCase().includes("DOLCI"));
-  const vinRows = validRows.filter(r =>
-    r.categorie?.toUpperCase().includes("VIN") ||
-    r.sous_categorie?.toLowerCase().includes("vin")
-  );
+  // Ratios upsell (based on unique tables/tickets)
+  const antiRows = validRows.filter(r => normCat(r.categorie) === "Antipasti");
+  const dolciRows = validRows.filter(r => normCat(r.categorie) === "Dolci");
+  const vinRows = validRows.filter(r => {
+    const nc = normCat(r.categorie);
+    return nc === "Vins" || r.sous_categorie?.toLowerCase().includes("vin");
+  });
   // Count unique orders (tables) that ordered each category
   const anti_tables = new Set(antiRows.map(r => `${r.date_service}:${r.num_fiscal}`)).size;
   const dolci_tables = new Set(dolciRows.map(r => `${r.date_service}:${r.num_fiscal}`)).size;
