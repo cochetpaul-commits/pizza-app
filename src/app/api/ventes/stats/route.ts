@@ -62,14 +62,35 @@ export async function GET(req: NextRequest) {
   }
 
   if (allData.length === 0) {
-    return NextResponse.json({ empty: true, stats: null });
+    return NextResponse.json({ empty: true, stats: null, prev: null });
   }
 
   const rows = allData;
 
+  // Fetch A-1 (same period, previous year) for comparison
+  const fromA1 = (parseInt(from.slice(0, 4)) - 1) + from.slice(4);
+  const toA1 = (parseInt(to.slice(0, 4)) - 1) + to.slice(4);
+  const prevData: Row[] = [];
+  let prevOffset = 0;
+  let prevMore = true;
+  while (prevMore) {
+    const { data: pd } = await supabase
+      .from("ventes_lignes")
+      .select("date_service,service,salle,operateur,categorie,sous_categorie,description,quantite,annule,ttc,ht,couverts,num_fiscal,statut,ouvert_a,type_ligne")
+      .eq("etablissement_id", etabId)
+      .gte("date_service", fromA1)
+      .lte("date_service", toA1)
+      .order("ouvert_a", { ascending: true })
+      .range(prevOffset, prevOffset + PAGE - 1);
+    prevData.push(...((pd ?? []) as Row[]));
+    prevMore = (pd?.length ?? 0) === PAGE;
+    prevOffset += PAGE;
+  }
+
   // Aggregate
   const stats = aggregate(rows);
-  return NextResponse.json({ empty: false, stats });
+  const prev = prevData.length > 0 ? aggregate(prevData) : null;
+  return NextResponse.json({ empty: false, stats, prev });
 }
 
 /** Get couverts for a unique order (dedup by num_fiscal+date) */

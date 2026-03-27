@@ -61,6 +61,7 @@ export default function PerformancesPage() {
   const [viewTab, setViewTab] = useState<ViewTab>("semaine");
   const [mode, setMode] = useState<"ttc" | "ht">("ttc");
   const [data, setData] = useState<WeekData | null>(null);
+  const [prev, setPrev] = useState<WeekData | null>(null); // A-1
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState("");
@@ -99,11 +100,14 @@ export default function PerformancesPage() {
       const json = await res.json();
       if (json.empty || !json.stats) {
         setData(null);
+        setPrev(null);
       } else {
         setData(json.stats);
+        setPrev(json.prev ?? null);
       }
     } catch {
       setData(null);
+      setPrev(null);
     }
     setLoading(false);
   }, [etab, getRange]);
@@ -243,12 +247,26 @@ export default function PerformancesPage() {
                     <div style={S.bigNum}>{fmt(ca)}</div>
                     {mode === "ttc" && <div style={{ fontSize: 12, color: "rgba(255,255,255,.55)", marginTop: 6 }}>HT <span style={{ color: "rgba(255,255,255,.7)", fontWeight: 500 }}>{fmt(W.ca_ht)}</span></div>}
                   </div>
+                  {prev && (() => {
+                    const prevCA = mode === "ttc" ? prev.ca_ttc : prev.ca_ht;
+                    const d = ca - prevCA;
+                    const pct = prevCA > 0 ? (d / prevCA * 100) : 0;
+                    return (
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 12, fontWeight: 500, color: d >= 0 ? "rgba(165,214,167,.9)" : "#fca5a5" }}>
+                          {d >= 0 ? "+" : ""}{pct.toFixed(1)}%
+                        </div>
+                        <div style={{ fontSize: 10, color: "rgba(255,255,255,.4)", marginTop: 2 }}>vs A-1</div>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div style={{ display: "flex", gap: 28, marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,.12)" }}>
                   <div>
                     <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.45)", fontWeight: 500, marginBottom: 4 }}>Couverts</div>
                     <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff" }}>{W.couverts}</div>
                     <div style={{ fontSize: 10, color: "rgba(255,255,255,.45)", marginTop: 2 }}>{W.tickets} tickets</div>
+                    {prev && <DeltaBadge cur={W.couverts} prev={prev.couverts} />}
                   </div>
                   <div style={{ width: 1, background: "rgba(255,255,255,.1)" }} />
                   <div>
@@ -257,11 +275,25 @@ export default function PerformancesPage() {
                       {W.couverts > 0 ? "\u20AC" + (ca / W.couverts).toFixed(1) : "\u2014"}
                     </div>
                     {W.cov_sur > 0 && <div style={{ fontSize: 10, color: "rgba(255,255,255,.5)", marginTop: 2 }}>Sur place <span style={{ color: "rgba(255,255,255,.7)", fontWeight: 500 }}>{"\u20AC" + ((mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur).toFixed(1)}</span></div>}
+                    {prev && prev.couverts > 0 && <DeltaBadge cur={ca / W.couverts} prev={(mode === "ttc" ? prev.ca_ttc : prev.ca_ht) / prev.couverts} decimals={1} prefix="\u20AC" />}
                   </div>
                   <div style={{ width: 1, background: "rgba(255,255,255,.1)" }} />
-                  <div>
-                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.45)", fontWeight: 500, marginBottom: 4 }}>Annulations</div>
-                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff" }}>{W.ann_pct.toFixed(1)}%</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.45)", fontWeight: 500, marginBottom: 4 }}>vs A-1</div>
+                    {prev ? (() => {
+                      const prevCA = mode === "ttc" ? prev.ca_ttc : prev.ca_ht;
+                      const d = ca - prevCA;
+                      return (
+                        <>
+                          <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: d >= 0 ? "#a5d6a7" : "#ef9a9a", lineHeight: 1 }}>
+                            {d >= 0 ? "+" : ""}{fmt(Math.abs(d))}
+                          </div>
+                          <div style={{ fontSize: 10, color: "rgba(255,255,255,.45)", marginTop: 3 }}>A-1 : {fmt(prevCA)}</div>
+                        </>
+                      );
+                    })() : (
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "rgba(255,255,255,.3)" }}>{"\u2014"}</div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -321,6 +353,49 @@ export default function PerformancesPage() {
                 })()}
               </div>
             </div>
+
+            {/* Comparatif A-1 */}
+            {prev && W.days.length > 1 && (
+              <div style={S.card}>
+                <div style={S.sec}>Comparatif · CA {mode.toUpperCase()} par jour vs A-1</div>
+                <div style={{ marginBottom: 8, display: "flex", gap: 16 }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "#777" }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 2, background: accent }} /> {new Date(from + "T12:00:00").getFullYear()} (courante)
+                  </span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "#777" }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 2, background: "#46655a" }} /> {new Date(from + "T12:00:00").getFullYear() - 1} (A-1)
+                  </span>
+                </div>
+                {W.days.map((d, i) => {
+                  const cur = (mode === "ttc" ? W.day_ttc : W.day_ht)[i] ?? 0;
+                  const prevDay = (mode === "ttc" ? prev.day_ttc : prev.day_ht)[i] ?? 0;
+                  const maxV = Math.max(...(mode === "ttc" ? W.day_ttc : W.day_ht), ...(mode === "ttc" ? prev.day_ttc : prev.day_ht));
+                  const diff = cur - prevDay;
+                  return (
+                    <div key={d} style={{ marginBottom: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, fontSize: 11 }}>
+                        <span style={{ width: 72, fontWeight: 500 }}>{d}</span>
+                        <div style={{ flex: 1, height: 10, background: `${accent}22`, borderRadius: 3, overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${maxV ? cur / maxV * 100 : 0}%`, background: accent, borderRadius: 3 }} />
+                        </div>
+                        <span style={{ width: 58, textAlign: "right", fontWeight: 600, color: accent, fontSize: 11 }}>{fmt(cur)}</span>
+                        <span style={{ width: 62, textAlign: "right", fontSize: 10, fontWeight: 500, color: diff >= 0 ? "#2e7d32" : "#c62828" }}>
+                          {diff >= 0 ? "+" : ""}{fmt(Math.abs(diff))}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
+                        <span style={{ width: 72, fontSize: 10, color: "#777" }}>A-1</span>
+                        <div style={{ flex: 1, height: 7, background: "rgba(70,101,90,.12)", borderRadius: 3, overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${maxV ? prevDay / maxV * 100 : 0}%`, background: "#46655a", opacity: .6, borderRadius: 3 }} />
+                        </div>
+                        <span style={{ width: 58, textAlign: "right", color: "#777", fontSize: 11 }}>{prevDay > 0 ? fmt(prevDay) : "\u2014"}</span>
+                        <span style={{ width: 62 }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Recap table */}
             {W.services.length > 0 && (
@@ -391,6 +466,18 @@ export default function PerformancesPage() {
 }
 
 /* ── Sub-components ── */
+
+function DeltaBadge({ cur, prev, decimals = 0, prefix = "" }: { cur: number; prev: number; decimals?: number; prefix?: string }) {
+  const d = cur - prev;
+  const pct = prev > 0 ? (d / prev * 100) : 0;
+  const up = d >= 0;
+  const val = decimals > 0 ? Math.abs(d).toFixed(decimals) : Math.round(Math.abs(d)).toLocaleString("fr-FR");
+  return (
+    <div style={{ fontSize: 10, color: up ? "rgba(165,214,167,.9)" : "#fca5a5", marginTop: 2, fontWeight: 500 }}>
+      {up ? "\u2191 +" : "\u2193 "}{prefix}{val} ({Math.abs(pct).toFixed(1)}%)
+    </div>
+  );
+}
 
 function UpsellCard({ label, emoji, n, total, color, targets }: {
   label: string; emoji: string; n: number; total: number; color: string;
