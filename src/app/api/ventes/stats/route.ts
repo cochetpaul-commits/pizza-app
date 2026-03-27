@@ -346,17 +346,64 @@ function aggregate(rows: Row[]) {
   const serv_ca_ttc = servEntries.map(([, v]) => Math.round(v.ttc));
   const serv_ca_ht = servEntries.map(([, v]) => Math.round(v.ht));
 
-  // Ratios upsell (based on unique tables/tickets)
-  const antiRows = validRows.filter(r => normCat(r.categorie) === "Antipasti");
-  const dolciRows = validRows.filter(r => normCat(r.categorie) === "Dolci");
-  const vinRows = validRows.filter(r => {
+  // Ratios upsell (based on unique tables/tickets + couverts)
+  const orderKey = (r: Row) => `${r.date_service}:${r.num_fiscal}`;
+
+  // Build order-level data: couverts per order, categories ordered
+  const orderData = new Map<string, { cov: number; cats: Set<string>; ca_ttc: number; ca_ht: number }>();
+  for (const r of allRows) {
+    const key = orderKey(r);
+    if (!orderData.has(key)) {
+      orderData.set(key, { cov: Number(r.couverts) || 0, cats: new Set(), ca_ttc: 0, ca_ht: 0 });
+    }
+    const od = orderData.get(key)!;
     const nc = normCat(r.categorie);
-    return nc === "Vins" || r.sous_categorie?.toLowerCase().includes("vin");
-  });
-  // Count unique orders (tables) that ordered each category
-  const anti_tables = new Set(antiRows.map(r => `${r.date_service}:${r.num_fiscal}`)).size;
-  const dolci_tables = new Set(dolciRows.map(r => `${r.date_service}:${r.num_fiscal}`)).size;
-  const vin_tables = new Set(vinRows.map(r => `${r.date_service}:${r.num_fiscal}`)).size;
+    if (nc !== "Messages" && nc !== "Autre" && !r.annule) {
+      od.cats.add(nc);
+      od.ca_ttc += Number(r.ttc);
+      od.ca_ht += Number(r.ht);
+    }
+  }
+
+  // If couverts are all 0 (Popina format), estimate 1 per order
+  let allCovZero = true;
+  for (const od of orderData.values()) { if (od.cov > 0) { allCovZero = false; break; } }
+  if (allCovZero) { for (const od of orderData.values()) od.cov = 1; }
+
+  // Count tables & couverts for each upsell category
+  function upsellStats(catFilter: (cats: Set<string>) => boolean) {
+    let tables = 0, coverts = 0, ca_ttc_total = 0, ca_ht_total = 0;
+    for (const od of orderData.values()) {
+      if (catFilter(od.cats)) {
+        tables++;
+        coverts += od.cov;
+      }
+    }
+    // CA for the category
+    for (const r of validRows) {
+      const nc = normCat(r.categorie);
+      if (catFilter(new Set([nc]))) {
+        ca_ttc_total += Number(r.ttc);
+        ca_ht_total += Number(r.ht);
+      }
+    }
+    return { tables, coverts, ca_ttc: Math.round(ca_ttc_total), ca_ht: Math.round(ca_ht_total) };
+  }
+
+  const anti = upsellStats(cats => cats.has("Antipasti"));
+  const dolci = upsellStats(cats => cats.has("Dolci"));
+  const vin = upsellStats(cats => cats.has("Vins"));
+  const alcool = upsellStats(cats => cats.has("Alcool"));
+  const boissons = upsellStats(cats => cats.has("Boissons") || cats.has("Alcool") || cats.has("Vins"));
+  const digestif = upsellStats(cats => cats.has("Digestifs"));
+  const cafe = upsellStats(cats => cats.has("Boissons chaudes"));
+
+  // Avg couverts per table
+  const totalOrderCov = Array.from(orderData.values()).reduce((s, od) => s + od.cov, 0);
+  const avgCovPerTable = totalTickets > 0 ? Math.round(totalOrderCov / totalTickets * 10) / 10 : 0;
+
+  // Avg time per table (from ouvert_a to ferme_a)
+  // We'd need ferme_a but aggregate doesn't have it — skip for now
 
   // Paiements — aggregate type_ligne='Paiement' lines
   const payRows = rows.filter(r => r.type_ligne === "Paiement" && Number(r.ttc) > 0);
@@ -394,12 +441,8 @@ function aggregate(rows: Row[]) {
     top3_cats,
     serveurs, serv_ca_ttc, serv_ca_ht,
     ratios: {
-      anti: totalTickets > 0 ? Math.round(anti_tables / totalTickets * 100) / 100 : 0,
-      anti_n: anti_tables,
-      dolci: totalTickets > 0 ? Math.round(dolci_tables / totalTickets * 100) / 100 : 0,
-      dolci_n: dolci_tables,
-      vin: totalTickets > 0 ? Math.round(vin_tables / totalTickets * 100) / 100 : 0,
-      vin_n: vin_tables,
+      anti, dolci, vin, alcool, boissons, digestif, cafe,
+      avgCovPerTable,
     },
     pay,
   };
