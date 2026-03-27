@@ -371,7 +371,9 @@ export default function PerformancesPage() {
             </div>
 
             {/* Duration & Rotation */}
-            {W.duration && W.duration.totalOrders > 0 && (
+            {W.duration && W.duration.totalOrders > 0 && (() => {
+              const P = prev?.duration;
+              return (
               <div style={S.card}>
                 <div style={S.sec}>Duree & rotation des tables</div>
                 {/* KPIs row */}
@@ -379,14 +381,17 @@ export default function PerformancesPage() {
                   <div style={{ background: "#f9f6f0", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
                     <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 28, fontWeight: 700, color: "#D4775A" }}>{W.duration.avgDurMin}<span style={{ fontSize: 14, fontWeight: 500, color: "#777" }}>min</span></div>
                     <div style={{ fontSize: 10, color: "#777", marginTop: 4 }}>Duree moy. / table</div>
+                    {P && P.avgDurMin > 0 && <DeltaBadgeSmall cur={W.duration.avgDurMin} prev={P.avgDurMin} suffix="min" inverse />}
                   </div>
                   <div style={{ background: "#f9f6f0", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
                     <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 28, fontWeight: 700, color: "#46655a" }}>{W.duration.avgRotation}x</div>
                     <div style={{ fontSize: 10, color: "#777", marginTop: 4 }}>Rotation moy. / table</div>
+                    {P && P.avgRotation > 0 && <DeltaBadgeSmall cur={W.duration.avgRotation} prev={P.avgRotation} suffix="x" />}
                   </div>
                   <div style={{ background: "#f9f6f0", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
                     <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 28, fontWeight: 700, color: "#7c5c3a" }}>{W.duration.totalOrders}</div>
                     <div style={{ fontSize: 10, color: "#777", marginTop: 4 }}>Tables servies</div>
+                    {P && P.totalOrders > 0 && <DeltaBadgeSmall cur={W.duration.totalOrders} prev={P.totalOrders} />}
                   </div>
                 </div>
                 {/* By zone */}
@@ -418,9 +423,9 @@ export default function PerformancesPage() {
                     );
                   })}
                 </div>
-                {/* By service */}
+                {/* By service — Soir first, then Midi */}
                 <div style={{ display: "flex", gap: 10 }}>
-                  {W.duration.bySvc.map(sv => (
+                  {[...W.duration.bySvc].sort((a, b) => a.svc === "soir" ? -1 : 1).map(sv => (
                     <div key={sv.svc} style={{ flex: 1, background: "#fff", borderRadius: 8, padding: "8px 12px", border: "1px solid #f0ebe3", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
                         <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: sv.svc === "midi" ? "#5e8278" : "#1a1a1a" }}>{sv.svc === "midi" ? "Midi" : "Soir"}</span>
@@ -431,7 +436,8 @@ export default function PerformancesPage() {
                   ))}
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {/* Zones */}
             {W.days.length > 0 && (() => {
@@ -637,6 +643,18 @@ export default function PerformancesPage() {
 }
 
 /* ── Sub-components ── */
+
+function DeltaBadgeSmall({ cur, prev, suffix = "", inverse = false }: { cur: number; prev: number; suffix?: string; inverse?: boolean }) {
+  const d = cur - prev;
+  const pct = prev > 0 ? (d / prev * 100) : 0;
+  const good = inverse ? d <= 0 : d >= 0;
+  return (
+    <div style={{ fontSize: 10, marginTop: 4, fontWeight: 500, color: good ? "#2e7d32" : "#c62828" }}>
+      {d >= 0 ? "\u2191 +" : "\u2193 "}{Math.abs(d).toFixed(d % 1 !== 0 ? 1 : 0)}{suffix} ({Math.abs(pct).toFixed(1)}%)
+      <span style={{ color: "#bbb", fontWeight: 400 }}> vs A-1</span>
+    </div>
+  );
+}
 
 function DeltaBadge({ cur, prev, decimals = 0, prefix = "" }: { cur: number; prev: number; decimals?: number; prefix?: string }) {
   const d = cur - prev;
