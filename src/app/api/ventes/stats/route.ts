@@ -345,6 +345,22 @@ function aggregate(rows: Row[]) {
   const dolci_tables = new Set(dolciRows.map(r => `${r.date_service}:${r.num_fiscal}`)).size;
   const vin_tables = new Set(vinRows.map(r => `${r.date_service}:${r.num_fiscal}`)).size;
 
+  // Paiements — aggregate type_ligne='Paiement' lines
+  const payRows = rows.filter(r => r.type_ligne === "Paiement" && Number(r.ttc) > 0);
+  const payMap: Record<string, number> = {};
+  for (const r of payRows) {
+    const label = (r.description || "Autre").trim();
+    payMap[label] = (payMap[label] || 0) + Number(r.ttc);
+  }
+  const payTotal = Object.values(payMap).reduce((a, b) => a + b, 0);
+  const pay = Object.entries(payMap)
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, val]) => ({
+      l: `${label} · ${payTotal > 0 ? Math.round(val / payTotal * 100) : 0}%`,
+      v: Math.round(val),
+      pct: payTotal > 0 ? Math.round(val / payTotal * 100) : 0,
+    }));
+
   return {
     dates,
     days: dayNames.map(d => d.charAt(0).toUpperCase() + d.slice(1)),
@@ -372,5 +388,6 @@ function aggregate(rows: Row[]) {
       vin: totalTickets > 0 ? Math.round(vin_tables / totalTickets * 100) / 100 : 0,
       vin_n: vin_tables,
     },
+    pay,
   };
 }

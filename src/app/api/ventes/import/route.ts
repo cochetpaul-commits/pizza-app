@@ -82,8 +82,8 @@ function parseCommandes(rows: unknown[][], etablissementId: string, fileName: st
     const r = row as unknown[];
     const ouvertA = parseDate(r[0]);
     const typeLigne = String(r[11] || "");
-    // Skip Paiement and Total lines
-    if (typeLigne === "Paiement" || typeLigne === "Total") return null;
+    // Skip Total lines only — keep Paiement for payment analysis
+    if (typeLigne === "Total") return null;
     return {
       etablissement_id: etablissementId,
       ouvert_a: ouvertA,
@@ -99,7 +99,7 @@ function parseCommandes(rows: unknown[][], etablissementId: string, fileName: st
       operateur: String(r[8] || "").trim(),
       categorie: String(r[9] || ""),
       sous_categorie: String(r[10] || ""),
-      type_ligne: "Produit",
+      type_ligne: typeLigne || "Produit",
       description: String(r[12] || ""),
       menu: String(r[13] || ""),
       quantite: parseInt(String(r[14] || "1")) || 1,

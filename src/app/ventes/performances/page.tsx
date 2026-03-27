@@ -29,6 +29,7 @@ type WeekData = {
   top3_cats: { cat: string; rows: { n: string; ca_ttc: string; ca_ht: string }[]; flop: { n: string; ca_ttc: string; ca_ht: string; qty: number } | null }[];
   serveurs: string[]; serv_ca_ttc: number[]; serv_ca_ht: number[];
   ratios: { anti: number; anti_n: number; dolci: number; dolci_n: number; vin: number; vin_n: number };
+  pay: { l: string; v: number; pct: number }[];
 };
 
 type ViewTab = "jour" | "semaine" | "mois";
@@ -486,8 +487,31 @@ export default function PerformancesPage() {
             {/* Serveurs */}
             {W.serveurs.length > 0 && (
               <div style={S.card}>
-                <div style={S.sec}>Performance serveurs · CA TTC</div>
+                <div style={S.sec}>Performance serveurs · CA {mode.toUpperCase()}</div>
                 <ChartCanvas id="serv" height={Math.max(120, W.serveurs.length * 38)} data={W} mode={mode} type="serv" />
+              </div>
+            )}
+
+            {/* Paiements */}
+            {W.pay && W.pay.length > 0 && (
+              <div style={S.card}>
+                <div style={S.sec}>Modes de paiement</div>
+                <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: 20, alignItems: "center" }}>
+                  <ChartCanvas id="payChart" height={140} data={W} mode={mode} type="pay" />
+                  <div>
+                    {W.pay.map((p, i) => {
+                      const colors = ["#c8960a", "#e0b020", "#f0c840", "#f5d96a", "#f9e9a0"];
+                      return (
+                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid rgba(0,0,0,.05)" }}>
+                          <div style={{ width: 8, height: 8, borderRadius: "50%", background: colors[i % colors.length], flexShrink: 0 }} />
+                          <div style={{ flex: 1, fontSize: 12, color: "#777" }}>{p.l}</div>
+                          <div style={{ fontFamily: "var(--font-cormorant), Cormorant Garamond, serif", fontSize: 15, fontWeight: 600 }}>{fmt(p.v)}</div>
+                          <div style={{ width: 28, textAlign: "right", fontSize: 10, color: "#777" }}>{p.pct}%</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
           </>
@@ -660,7 +684,7 @@ function MixDropdown({ label, color, products, onClose, mode = "ttc" }: {
 
 /* ── Chart component ── */
 function ChartCanvas({ id, height, data, mode, type, onBarClick }: {
-  id: string; height: number; data: WeekData; mode: "ttc" | "ht"; type: "mix" | "top10" | "serv";
+  id: string; height: number; data: WeekData; mode: "ttc" | "ht"; type: "mix" | "top10" | "serv" | "pay";
   onBarClick?: (label: string, color: string) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -750,6 +774,22 @@ function ChartCanvas({ id, height, data, mode, type, onBarClick }: {
             x: { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { callback: v => fmtK(v as number), color: "#aaa", font: { size: 11 } }, border: { display: false } },
             y: { grid: { display: false }, ticks: { color: "#444", font: { size: 12 } }, border: { display: false } },
           },
+        },
+      });
+    }
+
+    if (type === "pay" && data.pay && data.pay.length > 0) {
+      const payColors = ["#c8960a", "#e0b020", "#f0c840", "#f5d96a", "#f9e9a0"];
+      charts[id] = new Chart(canvasRef.current, {
+        type: "doughnut",
+        data: {
+          labels: data.pay.map(p => p.l),
+          datasets: [{ data: data.pay.map(p => p.v), backgroundColor: payColors.slice(0, data.pay.length), borderWidth: 2, borderColor: "#fff" }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.label} : ${fmt(ctx.raw as number)}` } } },
+          cutout: "62%",
         },
       });
     }
