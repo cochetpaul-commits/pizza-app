@@ -33,6 +33,11 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const from = searchParams.get("from");
   const to = searchParams.get("to");
+  const action = searchParams.get("action");
+
+  // Cron trigger: GET ?action=fetch → same as POST (fetch forecast & store)
+  if (action === "fetch") return fetchAndStore();
+
   if (!from || !to) return NextResponse.json({ error: "from, to requis" }, { status: 400 });
 
   const { data } = await supabase
@@ -45,8 +50,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ meteo: data ?? [] });
 }
 
-/** POST — fetch 5-day forecast from OpenWeather and store in DB */
-export async function POST() {
+async function fetchAndStore() {
   try {
     const res = await fetch(
       `https://api.openweathermap.org/data/2.5/forecast?lat=${LAT}&lon=${LON}&appid=${OW_KEY}&units=metric&lang=fr`
@@ -87,4 +91,9 @@ export async function POST() {
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
+}
+
+/** POST — fetch 5-day forecast from OpenWeather and store in DB */
+export async function POST() {
+  return fetchAndStore();
 }
