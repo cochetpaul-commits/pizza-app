@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
-import { fetchReports } from "@/lib/popinaClient";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/rh/productivite?from=YYYY-MM-DD&to=YYYY-MM-DD
- *
- * Compare shifts planifies vs CA Popina par jour.
- * Retourne par jour : nb_shifts, heures_planifiees, ca_popina, couverts_popina
+ * Retourne par jour : nb_shifts, heures_planifiees, ca, couverts
  */
 export async function GET(req: NextRequest) {
   let etabId: string;
@@ -27,13 +24,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "from et to requis" }, { status: 400 });
   }
 
-  // Get etab for popina_location_id
-  const { data: etabData } = await supabaseAdmin
-    .from("etablissements")
-    .select("popina_location_id")
-    .eq("id", etabId)
-    .single();
-
   // Fetch shifts
   const { data: shifts } = await supabaseAdmin
     .from("shifts")
@@ -42,7 +32,6 @@ export async function GET(req: NextRequest) {
     .gte("date", from)
     .lte("date", to);
 
-  // Group shifts by date
   const shiftsByDate = new Map<string, { count: number; hours: number }>();
   for (const s of shifts ?? []) {
     const existing = shiftsByDate.get(s.date) ?? { count: 0, hours: 0 };
@@ -56,34 +45,41 @@ export async function GET(req: NextRequest) {
     shiftsByDate.set(s.date, existing);
   }
 
-  // Fetch Popina reports
-  const apiKey = process.env.POPINA_API_KEY;
-  const popinaByDate = new Map<string, { ca: number; couverts: number }>();
+  // Fetch CA from ventes_lignes (replaces Popina API)
+  const { data: ventes } = await supabaseAdmin
+    .from("ventes_lignes")
+    .select("date_service, ttc, couverts, num_fiscal, type_ligne")
+    .eq("etablissement_id", etabId)
+    .eq("type_ligne", "Produit")
+    .gte("date_service", from)
+    .lte("date_service", to);
 
-  if (apiKey && etabData?.popina_location_id) {
-    const reports = await fetchReports(apiKey, from, to, etabData.popina_location_id);
-    for (const r of reports) {
-      const date = r.startedAt?.slice(0, 10);
-      if (!date) continue;
-      const existing = popinaByDate.get(date) ?? { ca: 0, couverts: 0 };
-      existing.ca += (r.totalSales ?? 0) / 100;
-      existing.couverts += r.guestsNumber ?? 0;
-      popinaByDate.set(date, existing);
+  const ventesByDate = new Map<string, { ca: number; orders: Set<string>; covTotal: number }>();
+  for (const v of ventes ?? []) {
+    const date = v.date_service;
+    if (!ventesByDate.has(date)) ventesByDate.set(date, { ca: 0, orders: new Set(), covTotal: 0 });
+    const d = ventesByDate.get(date)!;
+    d.ca += Number(v.ttc) || 0;
+    const key = `${date}:${v.num_fiscal}`;
+    if (!d.orders.has(key)) {
+      d.orders.add(key);
+      d.covTotal += Number(v.couverts) || 0;
     }
   }
 
-  // Build daily comparison
-  const allDates = new Set([...shiftsByDate.keys(), ...popinaByDate.keys()]);
+  const allDates = new Set([...shiftsByDate.keys(), ...ventesByDate.keys()]);
   const days = Array.from(allDates).sort().map((date) => {
     const s = shiftsByDate.get(date) ?? { count: 0, hours: 0 };
-    const p = popinaByDate.get(date) ?? { ca: 0, couverts: 0 };
+    const v = ventesByDate.get(date);
+    const ca = v ? Math.round(v.ca) : 0;
+    const couverts = v ? (v.covTotal > 0 ? v.covTotal : v.orders.size) : 0;
     return {
       date,
       nb_shifts: s.count,
       heures_planifiees: Math.round(s.hours * 10) / 10,
-      ca_popina: Math.round(p.ca),
-      couverts_popina: p.couverts,
-      ca_par_heure: s.hours > 0 ? Math.round(p.ca / s.hours) : 0,
+      ca_popina: ca,
+      couverts_popina: couverts,
+      ca_par_heure: s.hours > 0 ? Math.round(ca / s.hours) : 0,
     };
   });
 

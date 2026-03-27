@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import {
-  fetchReports, getParisDate,
-  dateToISOWeek, isoWeekToMonday, fmtDateUTC,
-} from "@/lib/popinaClient";
+  getParisDate, dateToISOWeek, isoWeekToMonday, fmtDateUTC,
+} from "@/lib/dateHelpers";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 
 export const runtime = "nodejs";
@@ -117,9 +116,6 @@ function getCatLabel(category: string): string {
 }
 
 export async function GET(request: NextRequest) {
-  const apiKey = process.env.POPINA_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "POPINA_API_KEY manquant" }, { status: 500 });
-
   let etabId: string;
   try {
     ({ etabId } = await getEtablissement(request));
@@ -171,33 +167,44 @@ export async function GET(request: NextRequest) {
   const trendFromStr = fmtDateUTC(trendFrom);
 
   // ── Parallel fetch ──
-  const [reports, recipeCosts] = await Promise.all([
-    fetchReports(apiKey, trendFromStr, fetchTo),
-    loadRecipeCosts(etabId),
-  ]);
+  // Fetch sales from ventes_lignes (replaces Popina API)
+  const PAGE = 1000;
+  const allVentes: { date_service: string; description: string; categorie: string; quantite: number; ttc: number }[] = [];
+  let vOff = 0;
+  let vMore = true;
+  while (vMore) {
+    const { data: vd } = await supabaseAdmin
+      .from("ventes_lignes")
+      .select("date_service,description,categorie,quantite,ttc")
+      .eq("etablissement_id", etabId)
+      .eq("type_ligne", "Produit")
+      .gte("date_service", trendFromStr)
+      .lte("date_service", fetchTo)
+      .range(vOff, vOff + PAGE - 1);
+    allVentes.push(...(vd ?? []));
+    vMore = (vd?.length ?? 0) === PAGE;
+    vOff += PAGE;
+  }
+
+  const recipeCosts = await loadRecipeCosts(etabId);
 
   // ── Group sales by date ──
   const byDate = new Map<string, Map<string, { quantity: number; totalSales: number; category: string }>>();
 
-  for (const r of reports) {
-    if (!r.startedAt) continue;
-    const date = toParisDate(r.startedAt);
+  for (const v of allVentes) {
+    const date = v.date_service;
+    if (!date || !v.description) continue;
     if (!byDate.has(date)) byDate.set(date, new Map());
     const dayMap = byDate.get(date)!;
-
-    for (const p of r.reportProducts ?? []) {
-      const name = p.productName ?? "Inconnu";
-      const prev = dayMap.get(name);
-      if (prev) {
-        prev.quantity += p.productQuantity ?? 0;
-        prev.totalSales += p.productSales ?? 0;
-      } else {
-        dayMap.set(name, {
-          quantity: p.productQuantity ?? 0,
-          totalSales: p.productSales ?? 0,
-          category: p.productCategory ?? "",
-        });
-      }
+    const name = v.description;
+    const prev = dayMap.get(name);
+    const qty = Number(v.quantite) || 1;
+    const sales = Math.round((Number(v.ttc) || 0) * 100); // centimes for compatibility
+    if (prev) {
+      prev.quantity += qty;
+      prev.totalSales += sales;
+    } else {
+      dayMap.set(name, { quantity: qty, totalSales: sales, category: v.categorie || "" });
     }
   }
 

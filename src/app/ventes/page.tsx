@@ -76,7 +76,7 @@ export default function PerformancesPage() {
   const { current: etab } = useEtablissement();
   const accent = etab?.couleur ?? "#D4775A";
 
-  const [viewTab, setViewTab] = useState<ViewTab>("semaine");
+  const [viewTab, setViewTab] = useState<ViewTab>("jour");
   const [mode, setMode] = useState<"ttc" | "ht">("ttc");
   const [data, setData] = useState<WeekData | null>(null);
   const [prev, setPrev] = useState<WeekData | null>(null); // A-1
@@ -436,7 +436,7 @@ export default function PerformancesPage() {
                 </div>
                 {/* By service — Soir first, then Midi */}
                 <div style={{ display: "flex", gap: 10 }}>
-                  {[...W.duration.bySvc].sort((a, b) => a.svc === "soir" ? -1 : 1).map(sv => (
+                  {[...W.duration.bySvc].sort((a, b) => a.svc === "midi" ? -1 : 1).map(sv => (
                     <div key={sv.svc} style={{ flex: 1, background: "#fff", borderRadius: 8, padding: "8px 12px", border: "1px solid #f0ebe3", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
                         <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: sv.svc === "midi" ? "#5e8278" : "#1a1a1a" }}>{sv.svc === "midi" ? "Midi" : "Soir"}</span>

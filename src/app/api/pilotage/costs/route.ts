@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import {
-  fetchReports, getParisDate,
-  dateToISOWeek, isoWeekToMonday, fmtDateUTC,
-} from "@/lib/popinaClient";
+  getParisDate, dateToISOWeek, isoWeekToMonday, fmtDateUTC,
+} from "@/lib/dateHelpers";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 
 export const runtime = "nodejs";
@@ -39,9 +38,6 @@ type RecipeCost = {
 };
 
 export async function GET(request: NextRequest) {
-  const apiKey = process.env.POPINA_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "POPINA_API_KEY manquant" }, { status: 500 });
-
   let etabId: string;
   try {
     ({ etabId } = await getEtablissement(request));
@@ -69,9 +65,8 @@ export async function GET(request: NextRequest) {
 
   const fetchTo = weekDates[6] > todayParis ? todayParis : weekDates[6];
 
-  // ── Fetch Popina sales + Supabase recipes in parallel ──
-  const [reports, pizzaRes, kitchenRes, cocktailRes] = await Promise.all([
-    fetchReports(apiKey, weekDates[0], fetchTo),
+  // ── Fetch sales from ventes_lignes + Supabase recipes in parallel ──
+  const [pizzaRes, kitchenRes, cocktailRes] = await Promise.all([
     supabaseAdmin.from("pizza_recipes")
       .select("name,total_cost,sell_price")
       .eq("is_draft", false)
@@ -123,31 +118,37 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // ── Aggregate Popina product sales for active dates ──
-  function toParisDate(iso: string): string {
-    return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(new Date(iso));
+  // ── Fetch sales from ventes_lignes ──
+  const PAGE = 1000;
+  const allVentes: { date_service: string; description: string; categorie: string; quantite: number; ttc: number }[] = [];
+  let vOff = 0;
+  let vMore = true;
+  while (vMore) {
+    const { data: vd } = await supabaseAdmin
+      .from("ventes_lignes")
+      .select("date_service,description,categorie,quantite,ttc")
+      .eq("etablissement_id", etabId)
+      .eq("type_ligne", "Produit")
+      .gte("date_service", weekDates[0])
+      .lte("date_service", fetchTo)
+      .range(vOff, vOff + PAGE - 1);
+    allVentes.push(...(vd ?? []));
+    vMore = (vd?.length ?? 0) === PAGE;
+    vOff += PAGE;
   }
 
   const prodSales = new Map<string, { quantity: number; totalSales: number; category: string }>();
-
-  for (const r of reports) {
-    if (!r.startedAt) continue;
-    const date = toParisDate(r.startedAt);
-    if (!activeDates.includes(date)) continue;
-
-    for (const p of r.reportProducts ?? []) {
-      const name = p.productName ?? "Inconnu";
-      const prev = prodSales.get(name);
-      if (prev) {
-        prev.quantity += p.productQuantity ?? 0;
-        prev.totalSales += p.productSales ?? 0;
-      } else {
-        prodSales.set(name, {
-          quantity: p.productQuantity ?? 0,
-          totalSales: p.productSales ?? 0,
-          category: p.productCategory ?? "",
-        });
-      }
+  for (const v of allVentes) {
+    if (!v.description || !activeDates.includes(v.date_service)) continue;
+    const name = v.description;
+    const qty = Number(v.quantite) || 1;
+    const sales = Math.round((Number(v.ttc) || 0) * 100);
+    const prev = prodSales.get(name);
+    if (prev) {
+      prev.quantity += qty;
+      prev.totalSales += sales;
+    } else {
+      prodSales.set(name, { quantity: qty, totalSales: sales, category: v.categorie || "" });
     }
   }
 
@@ -224,27 +225,38 @@ export async function GET(request: NextRequest) {
     : prevWeekDates;
 
   const prevFetchTo = prevWeekDates[6] > todayParis ? todayParis : prevWeekDates[6];
-  const prevReports = await fetchReports(apiKey, prevWeekDates[0], prevFetchTo);
+
+  // Fetch prev week from ventes_lignes
+  const prevVentes: typeof allVentes = [];
+  let pvOff = 0;
+  let pvMore = true;
+  while (pvMore) {
+    const { data: pvd } = await supabaseAdmin
+      .from("ventes_lignes")
+      .select("date_service,description,categorie,quantite,ttc")
+      .eq("etablissement_id", etabId)
+      .eq("type_ligne", "Produit")
+      .gte("date_service", prevWeekDates[0])
+      .lte("date_service", prevFetchTo)
+      .range(pvOff, pvOff + PAGE - 1);
+    prevVentes.push(...(pvd ?? []));
+    pvMore = (pvd?.length ?? 0) === PAGE;
+    pvOff += PAGE;
+  }
 
   let prevTotalCA = 0;
   let prevTotalCOGS = 0;
   let prevMatchedCA = 0;
 
-  for (const r of prevReports) {
-    if (!r.startedAt) continue;
-    const date = toParisDate(r.startedAt);
-    if (!prevActiveDates.includes(date)) continue;
-
-    for (const p of r.reportProducts ?? []) {
-      const ca = Math.round((p.productSales ?? 0) / 100 * 100) / 100;
-      prevTotalCA += ca;
-
-      const recipe = recipeCosts.get(normalize(p.productName ?? ""));
-      if (recipe) {
-        const cost = Math.round(recipe.cost * (p.productQuantity ?? 0) * 100) / 100;
-        prevTotalCOGS += cost;
-        prevMatchedCA += ca;
-      }
+  for (const v of prevVentes) {
+    if (!v.description || !prevActiveDates.includes(v.date_service)) continue;
+    const ca = Number(v.ttc) || 0;
+    prevTotalCA += ca;
+    const recipe = recipeCosts.get(normalize(v.description));
+    if (recipe) {
+      const cost = Math.round(recipe.cost * (Number(v.quantite) || 1) * 100) / 100;
+      prevTotalCOGS += cost;
+      prevMatchedCA += ca;
     }
   }
 

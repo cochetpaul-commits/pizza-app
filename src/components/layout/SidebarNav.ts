@@ -107,7 +107,6 @@ export const CLIENTS_ITEMS = EVENEMENTIEL_ITEMS;
 
 /** Ventes section */
 const VENTES_ITEMS: NavItemV2[] = [
-  { label: "Indicateurs cles", href: "/ventes", icon: "barChart" },
   { label: "Produits vendus", href: "/ventes/produits", icon: "tag" },
   { label: "Simulation", href: "/ventes/simulation", icon: "calculator" },
 ];
