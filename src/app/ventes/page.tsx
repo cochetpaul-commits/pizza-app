@@ -57,6 +57,33 @@ const fmtK = (v: number) => "\u20AC" + Math.round(v / 1000) + "k";
 const ZC: Record<string, string> = { Salle: "#46655a", Pergolas: "#5e8278", Terrasse: "#c4a882", emp: "#D4775A" };
 const MIX_COLORS = ["#D4775A", "#8fa8a0", "#46655a", "#7c5c3a", "#c4a882", "#e0b896", "#5e7a8a", "#a8b89c"];
 
+/* ── Week aggregation helpers (for monthly view) ── */
+type WeekBucket = { label: string; indices: number[] };
+
+function buildWeekBuckets(dates: string[]): WeekBucket[] {
+  if (!dates.length) return [];
+  const buckets: WeekBucket[] = [];
+  let cur: WeekBucket | null = null;
+  for (let i = 0; i < dates.length; i++) {
+    const d = new Date(dates[i] + "T12:00:00");
+    const dow = d.getDay() || 7; // Monday=1 ... Sunday=7
+    const mon = new Date(d);
+    mon.setDate(d.getDate() - dow + 1);
+    const key = `S.${mon.getDate()}/${mon.getMonth() + 1}`;
+    if (!cur || cur.label !== key) {
+      cur = { label: key, indices: [i] };
+      buckets.push(cur);
+    } else {
+      cur.indices.push(i);
+    }
+  }
+  return buckets;
+}
+
+function sumByBuckets(vals: number[], buckets: WeekBucket[]): number[] {
+  return buckets.map(b => b.indices.reduce((s, i) => s + (vals[i] ?? 0), 0));
+}
+
 /* ── Chart helper ── */
 const charts: Record<string, Chart> = {};
 function destroyChart(id: string) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
@@ -210,7 +237,7 @@ export default function PerformancesPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <div style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 16px 60px" }}>
+      <div className="ventes-container" style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 16px 60px" }}>
 
         {/* ── Import + View tabs ── */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
@@ -302,11 +329,11 @@ export default function PerformancesPage() {
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
-                    <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".16em", color: "rgba(255,255,255,.65)", fontWeight: 600, marginBottom: 8 }}>
+                    <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".16em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 8 }}>
                       CA {mode.toUpperCase()} — {viewTab === "jour" ? "Journee" : viewTab === "semaine" ? "Semaine courante" : "Mois"}
                     </div>
-                    <div style={{ ...S.bigNum, textShadow: "0 2px 8px rgba(0,0,0,.15)" }}>{fmt(ca)}</div>
-                    {mode === "ttc" && <div style={{ fontSize: 13, color: "rgba(255,255,255,.7)", marginTop: 6, fontWeight: 500 }}>HT <span style={{ color: "#fff", fontWeight: 700 }}>{fmt(W.ca_ht)}</span></div>}
+                    <div style={{ ...S.bigNum, textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>{fmt(ca)}</div>
+                    {mode === "ttc" && <div style={{ fontSize: 13, color: "rgba(255,255,255,.85)", marginTop: 6, fontWeight: 500 }}>HT <span style={{ color: "#fff", fontWeight: 700 }}>{fmt(W.ca_ht)}</span></div>}
                   </div>
                   {prev && (() => {
                     const prevCA = mode === "ttc" ? prev.ca_ttc : prev.ca_ht;
@@ -317,43 +344,43 @@ export default function PerformancesPage() {
                         <div style={{ fontSize: 12, fontWeight: 500, color: d >= 0 ? "rgba(165,214,167,.9)" : "#fca5a5" }}>
                           {d >= 0 ? "+" : ""}{pct.toFixed(1)}%
                         </div>
-                        <div style={{ fontSize: 10, color: "rgba(255,255,255,.4)", marginTop: 2 }}>vs A-1</div>
+                        <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>vs A-1</div>
                       </div>
                     );
                   })()}
                 </div>
-                <div style={{ display: "flex", gap: 28, marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,.12)" }}>
+                <div className="ventes-hero-kpis" style={{ display: "flex", gap: 28, marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,.12)" }}>
                   <div>
-                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.6)", fontWeight: 600, marginBottom: 4 }}>Couverts</div>
-                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,.1)" }}>{W.couverts}</div>
-                    <div style={{ fontSize: 10, color: "rgba(255,255,255,.6)", marginTop: 2 }}>{W.tickets} tickets</div>
+                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>Couverts</div>
+                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>{W.couverts}</div>
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>{W.tickets} tickets</div>
                     {prev && <DeltaBadge cur={W.couverts} prev={prev.couverts} />}
                   </div>
                   <div style={{ width: 1, background: "rgba(255,255,255,.1)" }} />
                   <div>
-                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.6)", fontWeight: 600, marginBottom: 4 }}>CVT moyen</div>
-                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,.1)" }}>
+                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>CVT moyen</div>
+                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>
                       {W.couverts > 0 ? "\u20AC" + (ca / W.couverts).toFixed(1) : "\u2014"}
                     </div>
-                    {W.cov_sur > 0 && <div style={{ fontSize: 10, color: "rgba(255,255,255,.6)", marginTop: 2 }}>CVT M SP <span style={{ color: "#fff", fontWeight: 700 }}>{"\u20AC" + ((mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur).toFixed(1)}</span></div>}
+                    {W.cov_sur > 0 && <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>CVT M SP <span style={{ color: "#fff", fontWeight: 700 }}>{"\u20AC" + ((mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur).toFixed(1)}</span></div>}
                     {prev && prev.couverts > 0 && <DeltaBadge cur={ca / W.couverts} prev={(mode === "ttc" ? prev.ca_ttc : prev.ca_ht) / prev.couverts} decimals={1} prefix="\u20AC" />}
                   </div>
                   <div style={{ width: 1, background: "rgba(255,255,255,.1)" }} />
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.6)", fontWeight: 600, marginBottom: 4 }}>vs A-1</div>
+                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>vs A-1</div>
                     {prev ? (() => {
                       const prevCA = mode === "ttc" ? prev.ca_ttc : prev.ca_ht;
                       const d = ca - prevCA;
                       return (
                         <>
-                          <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: d >= 0 ? "#a5d6a7" : "#ef9a9a", lineHeight: 1 }}>
+                          <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: d >= 0 ? "#a5d6a7" : "#fca5a5", lineHeight: 1, textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>
                             {d >= 0 ? "+" : ""}{fmt(Math.abs(d))}
                           </div>
-                          <div style={{ fontSize: 10, color: "rgba(255,255,255,.45)", marginTop: 3 }}>A-1 : {fmt(prevCA)}</div>
+                          <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 3 }}>A-1 : {fmt(prevCA)}</div>
                         </>
                       );
                     })() : (
-                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "rgba(255,255,255,.3)" }}>{"\u2014"}</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "rgba(255,255,255,.3)", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>{"\u2014"}</div>
                     )}
                   </div>
                 </div>
@@ -368,12 +395,12 @@ export default function PerformancesPage() {
                   {W.tickets} tables · {W.couverts} couverts · moy. {W.ratios.avgCovPerTable} cvt/table
                 </span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
+              <div className="ventes-upsell-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
                 <UpsellCard label="Antipasti" emoji="🥗" data={W.ratios.anti} totalTables={W.tickets} totalCov={W.couverts} color="#D4775A" targets={{ ok: 30, good: 50, avgPrice: 12 }} mode={mode} action="Suggerer en debut de service" />
                 <UpsellCard label="Desserts" emoji="🍮" data={W.ratios.dolci} totalTables={W.tickets} totalCov={W.couverts} color="#b5904a" targets={{ ok: 80, good: 100, avgPrice: 9 }} mode={mode} action="Proposer systematiquement en fin de plat" />
                 <UpsellCard label="Vins" emoji="🍷" data={W.ratios.vin} totalTables={W.tickets} totalCov={W.couverts} color="#7c5c3a" targets={{ ok: 60, good: 80, avgPrice: 6 }} mode={mode} action="Suggerer un verre a l'ouverture du menu" />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 14 }}>
+              <div className="ventes-upsell-mini-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 14 }}>
                 <UpsellCardMini label="Alcool (hors vin)" emoji="🍹" data={W.ratios.alcool} totalTables={W.tickets} color="#c15f2e" mode={mode} />
                 <UpsellCardMini label="Boissons (tout)" emoji="🥤" data={W.ratios.boissons} totalTables={W.tickets} color="#5e7a8a" mode={mode} />
                 <UpsellCardMini label="Cafe / Chaud" emoji="☕" data={W.ratios.cafe} totalTables={W.tickets} color="#6f5c3a" mode={mode} />
@@ -461,12 +488,15 @@ export default function PerformancesPage() {
               const zones = mode === "ttc" ? W.zones_ttc : W.zones_ht;
               const activeZones = Object.entries(zones).filter(([, vals]) => vals.some(v => v > 0));
               const totalCA = activeZones.reduce((s, [, vals]) => s + vals.reduce((a, b) => a + b, 0), 0);
+              const weekBuckets = viewTab === "mois" ? buildWeekBuckets(W.dates) : null;
 
               return (
-              <div style={{ display: "grid", gridTemplateColumns: `repeat(${activeZones.length}, 1fr)`, gap: 10, marginBottom: 6 }}>
+              <div className="ventes-zone-grid" style={{ display: "grid", gridTemplateColumns: `repeat(${activeZones.length}, 1fr)`, gap: 10, marginBottom: 6 }}>
                 {activeZones.map(([zone, vals]) => {
                   const tot = vals.reduce((a, b) => a + b, 0);
-                  const maxV = Math.max(...vals.filter(Boolean));
+                  const dispLabels = weekBuckets ? weekBuckets.map(b => b.label) : W.days;
+                  const dispVals = weekBuckets ? sumByBuckets(vals, weekBuckets) : vals;
+                  const maxV = Math.max(...dispVals.filter(Boolean));
                   const zKey = zone === "\u00C0 emporter" ? "emp" : zone;
                   const color = ZC[zKey] ?? "#888";
                   const cap = ZONE_CAPACITY[zone];
@@ -484,14 +514,14 @@ export default function PerformancesPage() {
                           {cap.tables} tables · {cap.maxCov} cvts max
                         </div>
                       )}
-                      {W.days.map((d, i) => (
+                      {dispLabels.map((d, i) => (
                         <div key={d} style={{ marginBottom: 7 }}>
                           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 3 }}>
-                            <span style={{ color: "#777" }}>{d.slice(0, 3)}</span>
-                            {vals[i] > 0 ? <span style={{ fontWeight: 500 }}>{fmt(vals[i])}</span> : <span style={{ color: "#bbb" }}>{"\u2014"}</span>}
+                            <span style={{ color: "#777" }}>{weekBuckets ? d : d.slice(0, 3)}</span>
+                            {dispVals[i] > 0 ? <span style={{ fontWeight: 500 }}>{fmt(dispVals[i])}</span> : <span style={{ color: "#bbb" }}>{"\u2014"}</span>}
                           </div>
                           <div style={{ height: 4, background: "rgba(0,0,0,.07)", borderRadius: 2, overflow: "hidden" }}>
-                            {vals[i] > 0 && <div style={{ height: "100%", width: `${maxV ? (vals[i] / maxV * 100) : 0}%`, background: color, borderRadius: 2 }} />}
+                            {dispVals[i] > 0 && <div style={{ height: "100%", width: `${maxV ? (dispVals[i] / maxV * 100) : 0}%`, background: color, borderRadius: 2 }} />}
                           </div>
                         </div>
                       ))}
@@ -520,9 +550,17 @@ export default function PerformancesPage() {
             </div>
 
             {/* Comparatif A-1 */}
-            {prev && W.days.length > 1 && (
+            {prev && W.days.length > 1 && (() => {
+              const compBuckets = viewTab === "mois" ? buildWeekBuckets(W.dates) : null;
+              const curDayVals = mode === "ttc" ? W.day_ttc : W.day_ht;
+              const prevDayVals = mode === "ttc" ? prev.day_ttc : prev.day_ht;
+              const compLabels = compBuckets ? compBuckets.map(b => b.label) : W.days;
+              const compCur = compBuckets ? sumByBuckets(curDayVals, compBuckets) : curDayVals;
+              const compPrev = compBuckets ? sumByBuckets(prevDayVals, compBuckets) : prevDayVals;
+              const compMax = Math.max(...compCur, ...compPrev);
+              return (
               <div style={S.card}>
-                <div style={S.sec}>Comparatif · CA {mode.toUpperCase()} par jour vs A-1</div>
+                <div style={S.sec}>Comparatif · CA {mode.toUpperCase()} {viewTab === "mois" ? "par semaine" : "par jour"} vs A-1</div>
                 <div style={{ marginBottom: 8, display: "flex", gap: 16 }}>
                   <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "#777" }}>
                     <span style={{ width: 8, height: 8, borderRadius: 2, background: accent }} /> {new Date(from + "T12:00:00").getFullYear()} (courante)
@@ -531,17 +569,16 @@ export default function PerformancesPage() {
                     <span style={{ width: 8, height: 8, borderRadius: 2, background: "#46655a" }} /> {new Date(from + "T12:00:00").getFullYear() - 1} (A-1)
                   </span>
                 </div>
-                {W.days.map((d, i) => {
-                  const cur = (mode === "ttc" ? W.day_ttc : W.day_ht)[i] ?? 0;
-                  const prevDay = (mode === "ttc" ? prev.day_ttc : prev.day_ht)[i] ?? 0;
-                  const maxV = Math.max(...(mode === "ttc" ? W.day_ttc : W.day_ht), ...(mode === "ttc" ? prev.day_ttc : prev.day_ht));
+                {compLabels.map((d, i) => {
+                  const cur = compCur[i] ?? 0;
+                  const prevDay = compPrev[i] ?? 0;
                   const diff = cur - prevDay;
                   return (
                     <div key={d} style={{ marginBottom: 10 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, fontSize: 11 }}>
-                        <span style={{ width: 72, fontWeight: 500 }}>{d}</span>
+                        <span style={{ width: 72, fontWeight: 500 }}>{compBuckets ? d : d}</span>
                         <div style={{ flex: 1, height: 10, background: `${accent}22`, borderRadius: 3, overflow: "hidden" }}>
-                          <div style={{ height: "100%", width: `${maxV ? cur / maxV * 100 : 0}%`, background: accent, borderRadius: 3 }} />
+                          <div style={{ height: "100%", width: `${compMax ? cur / compMax * 100 : 0}%`, background: accent, borderRadius: 3 }} />
                         </div>
                         <span style={{ width: 58, textAlign: "right", fontWeight: 600, color: accent, fontSize: 11 }}>{fmt(cur)}</span>
                         <span style={{ width: 62, textAlign: "right", fontSize: 10, fontWeight: 500, color: diff >= 0 ? "#2e7d32" : "#c62828" }}>
@@ -551,7 +588,7 @@ export default function PerformancesPage() {
                       <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
                         <span style={{ width: 72, fontSize: 10, color: "#777" }}>A-1</span>
                         <div style={{ flex: 1, height: 7, background: "rgba(70,101,90,.12)", borderRadius: 3, overflow: "hidden" }}>
-                          <div style={{ height: "100%", width: `${maxV ? prevDay / maxV * 100 : 0}%`, background: "#46655a", opacity: .6, borderRadius: 3 }} />
+                          <div style={{ height: "100%", width: `${compMax ? prevDay / compMax * 100 : 0}%`, background: "#46655a", opacity: .6, borderRadius: 3 }} />
                         </div>
                         <span style={{ width: 58, textAlign: "right", color: "#777", fontSize: 11 }}>{prevDay > 0 ? fmt(prevDay) : "\u2014"}</span>
                         <span style={{ width: 62 }} />
@@ -560,14 +597,15 @@ export default function PerformancesPage() {
                   );
                 })}
               </div>
-            )}
+              );
+            })()}
 
             {/* Recap table */}
             {W.services.length > 0 && (
               <div style={S.card}>
                 <div style={S.sec}>Par service · {mode.toUpperCase()} · couverts</div>
-                <div style={{ overflow: "hidden", borderRadius: 8, border: "1px solid #e0d8ce" }}>
-                  <RecapTable services={W.services} mode={mode} meteo={meteo} dates={W.dates} days={W.days} />
+                <div className="ventes-recap-wrap" style={{ overflow: "hidden", borderRadius: 8, border: "1px solid #e0d8ce" }}>
+                  <RecapTable services={W.services} mode={mode} meteo={meteo} dates={W.dates} days={W.days} viewTab={viewTab} />
                 </div>
               </div>
             )}
@@ -582,7 +620,7 @@ export default function PerformancesPage() {
             {W.top3_cats.length > 0 && (
               <div style={S.card}>
                 <div style={S.sec}>Top 3 par categorie · CA {mode.toUpperCase()}</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+                <div className="ventes-top3-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
                   {W.top3_cats.map((cat, ci) => (
                     <div key={ci} style={{ background: "#fff", borderRadius: 10, padding: "12px 14px", border: "1px solid rgba(0,0,0,.08)" }}>
                       <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".1em", color: MIX_COLORS[ci] ?? "#777", fontWeight: 600, marginBottom: 8 }}>{cat.cat}</div>
@@ -673,7 +711,7 @@ function DeltaBadge({ cur, prev, decimals = 0, prefix = "" }: { cur: number; pre
   const up = d >= 0;
   const val = decimals > 0 ? Math.abs(d).toFixed(decimals) : Math.round(Math.abs(d)).toLocaleString("fr-FR");
   return (
-    <div style={{ fontSize: 10, color: up ? "rgba(165,214,167,.9)" : "#fca5a5", marginTop: 2, fontWeight: 500 }}>
+    <div style={{ fontSize: 10, color: up ? "#a5d6a7" : "#fca5a5", marginTop: 2, fontWeight: 500 }}>
       {up ? "\u2191 +" : "\u2193 "}{prefix}{val} ({Math.abs(pct).toFixed(1)}%)
     </div>
   );
@@ -783,24 +821,54 @@ function PlaceBlock({ label, color, ca, pct, couverts, tm }: { label: string; co
   );
 }
 
-function RecapTable({ services, mode, meteo, dates, days }: { services: WeekData["services"]; mode: "ttc" | "ht"; meteo: Record<string, { emoji: string; desc: string; temp: number }>; dates: string[]; days: string[] }) {
+function RecapTable({ services, mode, meteo, dates, days, viewTab }: { services: WeekData["services"]; mode: "ttc" | "ht"; meteo: Record<string, { emoji: string; desc: string; temp: number }>; dates: string[]; days: string[]; viewTab: ViewTab }) {
   // Map day name → date for meteo lookup
   const dayToDate: Record<string, string> = {};
   for (let i = 0; i < days.length; i++) {
     dayToDate[days[i]] = dates[i];
   }
-  const byDay: Record<string, WeekData["services"]> = {};
-  for (const s of services) {
-    if (!byDay[s.jour]) byDay[s.jour] = [];
-    byDay[s.jour].push(s);
+
+  // Group services by week when in monthly view
+  const useWeeks = viewTab === "mois";
+  type GroupEntry = { groupLabel: string; services: WeekData["services"] };
+  const groups: GroupEntry[] = [];
+
+  if (useWeeks) {
+    const weekBuckets = buildWeekBuckets(dates);
+    const dateToWeek: Record<string, string> = {};
+    for (const b of weekBuckets) {
+      for (const idx of b.indices) {
+        if (dates[idx]) dateToWeek[dates[idx]] = b.label;
+      }
+    }
+    const weekMap: Record<string, WeekData["services"]> = {};
+    const weekOrder: string[] = [];
+    for (const s of services) {
+      const date = dayToDate[s.jour];
+      const wk = date ? (dateToWeek[date] ?? s.jour) : s.jour;
+      if (!weekMap[wk]) { weekMap[wk] = []; weekOrder.push(wk); }
+      weekMap[wk].push(s);
+    }
+    for (const wk of weekOrder) {
+      groups.push({ groupLabel: wk, services: weekMap[wk] });
+    }
+  } else {
+    const byDay: Record<string, WeekData["services"]> = {};
+    const dayOrder: string[] = [];
+    for (const s of services) {
+      if (!byDay[s.jour]) { byDay[s.jour] = []; dayOrder.push(s.jour); }
+      byDay[s.jour].push(s);
+    }
+    for (const d of dayOrder) {
+      groups.push({ groupLabel: d, services: byDay[d] });
+    }
   }
-  const dayKeys = Object.keys(byDay);
 
   return (
-    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+    <table className="ventes-recap-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 700 }}>
       <thead>
         <tr style={{ background: "#f5f0e8" }}>
-          <th style={thSt("left")}>Jour</th>
+          <th style={thSt("left")}>{useWeeks ? "Sem." : "Jour"}</th>
           <th style={thSt("left")}>Svc</th>
           <th style={{ ...thSt(), color: ZC.Salle }}>Salle</th>
           <th style={{ ...thSt(), color: ZC.Pergolas }}>Pergolas</th>
@@ -813,8 +881,8 @@ function RecapTable({ services, mode, meteo, dates, days }: { services: WeekData
         </tr>
       </thead>
       <tbody>
-        {dayKeys.map((jour, di) => {
-          const svcs = byDay[jour];
+        {groups.map((group, di) => {
+          const svcs = group.services;
           return svcs.map((s, si) => {
             const caVal = mode === "ttc" ? s.ttc : s.ht;
             const z = mode === "ttc" ? s.z_ttc : s.z_ht;
@@ -823,9 +891,9 @@ function RecapTable({ services, mode, meteo, dates, days }: { services: WeekData
             const tmColor = tmSp >= 80 ? "#2e7d32" : tmSp >= 65 ? "#e65100" : "#c62828";
             const tmBg = tmSp >= 80 ? "#e8f5e9" : tmSp >= 65 ? "#fff3e0" : "#ffebee";
             return (
-              <tr key={`${jour}-${s.svc}`} style={{ background: bg, borderTop: si === 0 && di > 0 ? "1px solid #e0d8ce" : si > 0 ? "1px solid rgba(0,0,0,.05)" : "none" }}>
-                {si === 0 && <td rowSpan={svcs.length} style={{ padding: "0 16px", fontWeight: 700, fontSize: 15, verticalAlign: "middle", borderRight: "1px solid #e0d8ce" }}>{jour}</td>}
-                <td style={tdSt}><span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: s.svc === "midi" ? ZC.Pergolas : "#1a1a1a" }}>{s.svc === "midi" ? "Midi" : "Soir"}</span></td>
+              <tr key={`${group.groupLabel}-${s.jour}-${s.svc}`} style={{ background: bg, borderTop: si === 0 && di > 0 ? "1px solid #e0d8ce" : si > 0 ? "1px solid rgba(0,0,0,.05)" : "none" }}>
+                {si === 0 && <td rowSpan={svcs.length} style={{ padding: "0 16px", fontWeight: 700, fontSize: useWeeks ? 12 : 15, verticalAlign: "middle", borderRight: "1px solid #e0d8ce" }}>{useWeeks ? group.groupLabel : s.jour}</td>}
+                <td style={tdSt}><span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: s.svc === "midi" ? ZC.Pergolas : "#1a1a1a" }}>{s.svc === "midi" ? "Midi" : "Soir"}{useWeeks ? ` ${s.jour.slice(0, 3)}` : ""}</span></td>
                 {zCell(z?.Salle, ZC.Salle)}
                 {zCell(z?.Pergolas, ZC.Pergolas)}
                 {zCell(z?.Terrasse, ZC.Terrasse)}

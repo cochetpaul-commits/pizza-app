@@ -787,3 +787,35 @@ input[type='number'] {
   }
   @page { size: A4; margin: 16mm; }
 }
+
+/* ── Ventes page responsive ───────────────────────── */
+@media (max-width: 767px) {
+  .ventes-container {
+    padding: 12px 10px 60px !important;
+  }
+  .ventes-hero-kpis {
+    flex-wrap: wrap !important;
+    gap: 16px !important;
+  }
+  .ventes-hero-kpis > div:not([style*="width: 1"]) {
+    font-size: 0.9em;
+  }
+  .ventes-upsell-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .ventes-upsell-mini-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .ventes-zone-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .ventes-top3-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .ventes-recap-wrap {
+    overflow-x: auto !important;
+  }
+  .ventes-recap-table {
+    min-width: 700px;
+  }
+}
