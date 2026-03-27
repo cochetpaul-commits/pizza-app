@@ -93,7 +93,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ empty: false, stats, prev });
 }
 
-/** Get couverts for a unique order (dedup by num_fiscal+date) */
+/** Get couverts for a unique order (dedup by num_fiscal+date).
+ *  Falls back to ticket count if all couverts are 0 (Popina products format). */
 function getCouverts(rows: Row[]): number {
   const seen = new Map<string, number>();
   for (const r of rows) {
@@ -104,6 +105,8 @@ function getCouverts(rows: Row[]): number {
   }
   let total = 0;
   for (const v of seen.values()) total += v;
+  // Fallback: if all couverts are 0, use ticket count as estimate
+  if (total === 0 && seen.size > 0) return seen.size;
   return total;
 }
 
@@ -116,8 +119,18 @@ function getCouvertsByKey(rows: Row[], keyFn: (r: Row) => string): Record<string
     }
   }
   const result: Record<string, number> = {};
+  let allZero = true;
   for (const v of orderCov.values()) {
     result[v.key] = (result[v.key] || 0) + v.cov;
+    if (v.cov > 0) allZero = false;
+  }
+  // Fallback: if all couverts are 0, count tickets per key
+  if (allZero && orderCov.size > 0) {
+    const ticketCount: Record<string, number> = {};
+    for (const v of orderCov.values()) {
+      ticketCount[v.key] = (ticketCount[v.key] || 0) + 1;
+    }
+    return ticketCount;
   }
   return result;
 }
