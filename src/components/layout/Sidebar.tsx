@@ -395,7 +395,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 whiteSpace: "nowrap", overflow: "hidden",
               }}
             >
-              <IconStore size={16} color={C.ifratelli} />
+              <IconBuilding size={16} color={C.ifratelli} />
               <span style={{ flex: 1, letterSpacing: 0.3 }}>iFratelli Group</span>
             </Link>
 
