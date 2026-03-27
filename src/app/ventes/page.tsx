@@ -39,6 +39,14 @@ type WeekData = {
     avgCovPerTable: number;
   };
   pay: { l: string; v: number; pct: number }[];
+  duration: {
+    avgDurMin: number;
+    byZone: { zone: string; avgDur: number; tables: number; couverts: number }[];
+    bySvc: { svc: string; avgDur: number; tables: number }[];
+    avgRotation: number;
+    rotByZone: { zone: string; avgRotation: number; maxRotation: number }[];
+    totalOrders: number;
+  };
 };
 
 type ViewTab = "jour" | "semaine" | "mois";
@@ -361,6 +369,69 @@ export default function PerformancesPage() {
                 <UpsellCardMini label="Digestifs" emoji="🥃" data={W.ratios.digestif} totalTables={W.tickets} color="#46655a" mode={mode} />
               </div>
             </div>
+
+            {/* Duration & Rotation */}
+            {W.duration && W.duration.totalOrders > 0 && (
+              <div style={S.card}>
+                <div style={S.sec}>Duree & rotation des tables</div>
+                {/* KPIs row */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
+                  <div style={{ background: "#f9f6f0", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
+                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 28, fontWeight: 700, color: "#D4775A" }}>{W.duration.avgDurMin}<span style={{ fontSize: 14, fontWeight: 500, color: "#777" }}>min</span></div>
+                    <div style={{ fontSize: 10, color: "#777", marginTop: 4 }}>Duree moy. / table</div>
+                  </div>
+                  <div style={{ background: "#f9f6f0", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
+                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 28, fontWeight: 700, color: "#46655a" }}>{W.duration.avgRotation}x</div>
+                    <div style={{ fontSize: 10, color: "#777", marginTop: 4 }}>Rotation moy. / table</div>
+                  </div>
+                  <div style={{ background: "#f9f6f0", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
+                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 28, fontWeight: 700, color: "#7c5c3a" }}>{W.duration.totalOrders}</div>
+                    <div style={{ fontSize: 10, color: "#777", marginTop: 4 }}>Tables servies</div>
+                  </div>
+                </div>
+                {/* By zone */}
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${W.duration.byZone.length}, 1fr)`, gap: 10, marginBottom: 10 }}>
+                  {W.duration.byZone.map(z => {
+                    const rot = W.duration.rotByZone.find(r => r.zone === z.zone);
+                    const zKey = z.zone === "\u00C0 emporter" ? "emp" : z.zone;
+                    const color = ZC[zKey] ?? "#777";
+                    return (
+                      <div key={z.zone} style={{ background: "#fff", borderRadius: 8, padding: "10px 12px", border: "1px solid #f0ebe3" }}>
+                        <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".1em", color, fontWeight: 600, marginBottom: 6 }}>{z.zone}</div>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                          <div>
+                            <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700 }}>{z.avgDur}<span style={{ fontSize: 11, color: "#777" }}>min</span></div>
+                            <div style={{ fontSize: 9, color: "#777" }}>duree moy.</div>
+                          </div>
+                          {rot && (
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700, color }}>{rot.avgRotation}x</div>
+                              <div style={{ fontSize: 9, color: "#777" }}>rotation</div>
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 10, color: "#777" }}>{z.tables} tables · {z.couverts} cvts</div>
+                        {rot && rot.maxRotation > 1 && (
+                          <div style={{ fontSize: 10, color, fontWeight: 500, marginTop: 2 }}>max {rot.maxRotation}x rotation</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* By service */}
+                <div style={{ display: "flex", gap: 10 }}>
+                  {W.duration.bySvc.map(sv => (
+                    <div key={sv.svc} style={{ flex: 1, background: "#fff", borderRadius: 8, padding: "8px 12px", border: "1px solid #f0ebe3", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: sv.svc === "midi" ? "#5e8278" : "#1a1a1a" }}>{sv.svc === "midi" ? "Midi" : "Soir"}</span>
+                        <span style={{ fontSize: 10, color: "#777", marginLeft: 6 }}>{sv.tables} tables</span>
+                      </div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>{sv.avgDur}<span style={{ fontSize: 10, color: "#777" }}>min</span></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Zones */}
             {W.days.length > 0 && (() => {

@@ -25,7 +25,9 @@ type Row = {
   num_fiscal: string;
   statut: string;
   ouvert_a: string;
+  ferme_a: string;
   type_ligne: string;
+  table_num: string;
 };
 
 export async function GET(req: NextRequest) {
@@ -46,7 +48,7 @@ export async function GET(req: NextRequest) {
   while (hasMore) {
     const { data, error } = await supabase
       .from("ventes_lignes")
-      .select("date_service,service,salle,operateur,categorie,sous_categorie,description,quantite,annule,ttc,ht,couverts,num_fiscal,statut,ouvert_a,type_ligne")
+      .select("date_service,service,salle,operateur,categorie,sous_categorie,description,quantite,annule,ttc,ht,couverts,num_fiscal,statut,ouvert_a,ferme_a,type_ligne,table_num")
       .eq("etablissement_id", etabId)
       .gte("date_service", from)
       .lte("date_service", to)
@@ -76,7 +78,7 @@ export async function GET(req: NextRequest) {
   while (prevMore) {
     const { data: pd } = await supabase
       .from("ventes_lignes")
-      .select("date_service,service,salle,operateur,categorie,sous_categorie,description,quantite,annule,ttc,ht,couverts,num_fiscal,statut,ouvert_a,type_ligne")
+      .select("date_service,service,salle,operateur,categorie,sous_categorie,description,quantite,annule,ttc,ht,couverts,num_fiscal,statut,ouvert_a,ferme_a,type_ligne,table_num")
       .eq("etablissement_id", etabId)
       .gte("date_service", fromA1)
       .lte("date_service", toA1)
@@ -420,6 +422,88 @@ function aggregate(rows: Row[]) {
   // Avg time per table (from ouvert_a to ferme_a)
   // We'd need ferme_a but aggregate doesn't have it — skip for now
 
+  // Duration & rotation per table
+  type OrderDur = { salle: string; table: string; service: string; date: string; cov: number; dur: number; ca_ttc: number };
+  const orderDurs: OrderDur[] = [];
+  for (const [key, od] of orderData.entries()) {
+    // Find ouvert_a and ferme_a from first row of this order
+    const orderRows = allRows.filter(r => `${r.date_service}:${r.num_fiscal}` === key);
+    if (orderRows.length === 0) continue;
+    const first = orderRows[0];
+    if (!first.ouvert_a || !first.ferme_a) continue;
+    const open = new Date(first.ouvert_a).getTime();
+    const close = new Date(first.ferme_a).getTime();
+    if (isNaN(open) || isNaN(close) || close <= open) continue;
+    const durMin = Math.round((close - open) / 60000);
+    if (durMin < 5 || durMin > 600) continue; // filter aberrations
+    orderDurs.push({
+      salle: first.salle || "",
+      table: first.table_num || "",
+      service: first.service || "",
+      date: first.date_service,
+      cov: od.cov,
+      dur: durMin,
+      ca_ttc: od.ca_ttc,
+    });
+  }
+
+  // Global averages
+  const avgDurMin = orderDurs.length > 0 ? Math.round(orderDurs.reduce((s, o) => s + o.dur, 0) / orderDurs.length) : 0;
+
+  // Duration by zone
+  const durByZone: Record<string, { count: number; totalDur: number; totalCov: number }> = {};
+  for (const o of orderDurs) {
+    const z = o.salle.toLowerCase().includes("emporter") ? "\u00C0 emporter" : o.salle;
+    if (!durByZone[z]) durByZone[z] = { count: 0, totalDur: 0, totalCov: 0 };
+    durByZone[z].count++;
+    durByZone[z].totalDur += o.dur;
+    durByZone[z].totalCov += o.cov;
+  }
+  const zoneDurations = Object.entries(durByZone).map(([zone, d]) => ({
+    zone,
+    avgDur: d.count > 0 ? Math.round(d.totalDur / d.count) : 0,
+    tables: d.count,
+    couverts: d.totalCov,
+  }));
+
+  // Duration by service
+  const durBySvc: Record<string, { count: number; totalDur: number }> = {};
+  for (const o of orderDurs) {
+    if (!durBySvc[o.service]) durBySvc[o.service] = { count: 0, totalDur: 0 };
+    durBySvc[o.service].count++;
+    durBySvc[o.service].totalDur += o.dur;
+  }
+  const svcDurations = Object.entries(durBySvc).map(([svc, d]) => ({
+    svc,
+    avgDur: d.count > 0 ? Math.round(d.totalDur / d.count) : 0,
+    tables: d.count,
+  }));
+
+  // Rotation: count unique orders per physical table per service per day
+  const tableSlots: Record<string, Set<string>> = {}; // key = date:service:salle:table → set of order keys
+  for (const o of orderDurs) {
+    if (!o.table || o.salle.toLowerCase().includes("emporter")) continue;
+    const slotKey = `${o.date}:${o.service}:${o.salle}:${o.table}`;
+    if (!tableSlots[slotKey]) tableSlots[slotKey] = new Set();
+    tableSlots[slotKey].add(`${o.date}:${o.table}:${o.dur}`);
+  }
+  const rotations = Object.values(tableSlots).map(s => s.size);
+  const avgRotation = rotations.length > 0 ? Math.round(rotations.reduce((a, b) => a + b, 0) / rotations.length * 10) / 10 : 0;
+
+  // Rotation by zone
+  const rotByZone: Record<string, number[]> = {};
+  for (const [slotKey, orders] of Object.entries(tableSlots)) {
+    const parts = slotKey.split(":");
+    const zone = parts[2]; // salle name
+    if (!rotByZone[zone]) rotByZone[zone] = [];
+    rotByZone[zone].push(orders.size);
+  }
+  const zoneRotations = Object.entries(rotByZone).map(([zone, rots]) => ({
+    zone,
+    avgRotation: rots.length > 0 ? Math.round(rots.reduce((a, b) => a + b, 0) / rots.length * 10) / 10 : 0,
+    maxRotation: rots.length > 0 ? Math.max(...rots) : 0,
+  }));
+
   // Paiements — aggregate type_ligne='Paiement' lines
   const payRows = rows.filter(r => r.type_ligne === "Paiement" && Number(r.ttc) > 0);
   const payMap: Record<string, number> = {};
@@ -460,5 +544,13 @@ function aggregate(rows: Row[]) {
       avgCovPerTable,
     },
     pay,
+    duration: {
+      avgDurMin,
+      byZone: zoneDurations,
+      bySvc: svcDurations,
+      avgRotation,
+      rotByZone: zoneRotations,
+      totalOrders: orderDurs.length,
+    },
   };
 }
