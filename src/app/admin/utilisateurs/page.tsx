@@ -37,7 +37,7 @@ function fmtDate(iso: string) {
 }
 
 function UsersContent() {
-  const { current: _etab } = useEtablissement(); // eslint-disable-line @typescript-eslint/no-unused-vars
+  const { current: _etab } = useEtablissement();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

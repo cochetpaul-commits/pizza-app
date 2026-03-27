@@ -104,7 +104,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   // Determine which sections to show based on context
   const isPiccola = current?.slug?.includes("piccola");
-  const sections: NavSubSection[] = isAdmin
+  const _sections: NavSubSection[] = isAdmin
     ? isGroupView
       ? []  // Vue groupe = pas de sections, juste le dashboard
       : [   // Établissement = toutes les sections
@@ -154,7 +154,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   /* ── Render hub (level 2 — accordion section) ── */
   const [hoveredHub, setHoveredHub] = useState<string | null>(null);
 
-  const renderHub = (sub: NavSubSection) => {
+  const _renderHub = (sub: NavSubSection) => {
     if (!isRoleAllowed(sub.roles, role)) return null;
     const items = sub.items.filter(i => isRoleAllowed(i.roles, role));
     if (items.length === 0 && !sub.href) return null;
@@ -347,7 +347,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   };
 
   /* ── Etab selector label ── */
-  const etabLabel = isGroupView ? "iFratelli Group" : (current?.nom ?? "Choisir...");
+  const _etabLabel = isGroupView ? "iFratelli Group" : (current?.nom ?? "Choisir...");
 
   return (
     <div style={{

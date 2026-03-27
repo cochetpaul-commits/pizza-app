@@ -7,17 +7,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 
 /* ── Icons ────────────────────────────────────────── */
 
-function IconMenu() {
-  return (
-    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="3" y1="12" x2="21" y2="12" />
-      <line x1="3" y1="6" x2="21" y2="6" />
-      <line x1="3" y1="18" x2="21" y2="18" />
-    </svg>
-  );
-}
-
-function IconCalendar({ active }: { active: boolean }) {
+function IconCalendar({ active: _active }: { active: boolean }) {
   return (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -28,7 +18,7 @@ function IconCalendar({ active }: { active: boolean }) {
   );
 }
 
-function IconWallet({ active }: { active: boolean }) {
+function IconWallet({ active: _active }: { active: boolean }) {
   return (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <rect x="2" y="5" width="20" height="16" rx="2" />
@@ -38,7 +28,7 @@ function IconWallet({ active }: { active: boolean }) {
   );
 }
 
-function IconShoppingBag({ active }: { active: boolean }) {
+function IconShoppingBag({ active: _active }: { active: boolean }) {
   return (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
@@ -58,7 +48,7 @@ function IconBarChart({ active }: { active: boolean }) {
   );
 }
 
-function IconPackage({ active }: { active: boolean }) {
+function IconPackage({ active: _active }: { active: boolean }) {
   return (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
@@ -98,7 +88,7 @@ function IconBeach({ active }: { active: boolean }) {
   );
 }
 
-function IconFileText({ active }: { active: boolean }) {
+function IconFileText({ active: _active }: { active: boolean }) {
   return (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -118,7 +108,7 @@ function IconTrendingUp({ active }: { active: boolean }) {
   );
 }
 
-function IconBook({ active }: { active: boolean }) {
+function IconBook({ active: _active }: { active: boolean }) {
   return (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
@@ -138,7 +128,7 @@ function IconTruck({ active }: { active: boolean }) {
   );
 }
 
-function IconBox({ active }: { active: boolean }) {
+function IconBox({ active: _active }: { active: boolean }) {
   return (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
@@ -146,7 +136,7 @@ function IconBox({ active }: { active: boolean }) {
   );
 }
 
-function IconTag({ active }: { active: boolean }) {
+function IconTag({ active: _active }: { active: boolean }) {
   return (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
@@ -155,7 +145,7 @@ function IconTag({ active }: { active: boolean }) {
   );
 }
 
-function IconGrid({ active }: { active: boolean }) {
+function IconGrid({ active: _active }: { active: boolean }) {
   return (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="3" width="7" height="7" />
@@ -188,7 +178,7 @@ type TabSection = {
 
 /* ── Sections with sub-tabs ──────────────────────── */
 
-function IconHeart({ active }: { active: boolean }) {
+function IconHeart({ active: _active }: { active: boolean }) {
   return (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
@@ -271,7 +261,6 @@ const SECTION_EVENTS: TabSection = {
 const SECTIONS_BELLO: TabSection[] = [SECTION_HOME, SECTION_PERSONNEL, SECTION_VENTES, SECTION_ACHATS, SECTION_OPS];
 const SECTIONS_PICCOLA: TabSection[] = [SECTION_HOME, SECTION_PERSONNEL, SECTION_VENTES, SECTION_ACHATS, SECTION_OPS, SECTION_EVENTS];
 
-const ACTIVE_COLOR = "#2D6A4F";
 const INACTIVE_COLOR = "#999";
 
 /* ── Helpers ──────────────────────────────────────── */
@@ -288,15 +277,6 @@ function getActiveSection(pathname: string, sections: TabSection[]): TabSection 
 }
 
 /* ── Component ────────────────────────────────────── */
-
-function IconStoreLocal({ size = 22, color = "currentColor" }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      <polyline points="9 22 9 12 15 12 15 22" />
-    </svg>
-  );
-}
 
 export function BottomTabBar() {
   const pathname = usePathname();

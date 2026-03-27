@@ -21,21 +21,19 @@ export function useTheme() {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [mode, setModeState] = useState<ThemeMode>("auto");
-  const [systemDark, setSystemDark] = useState(false);
-
-  // Load saved preference
-  useEffect(() => {
+  const [mode, setModeState] = useState<ThemeMode>(() => {
+    if (typeof window === "undefined") return "auto";
     const saved = localStorage.getItem("theme-mode") as ThemeMode | null;
-    if (saved && ["auto", "light", "dark"].includes(saved)) {
-      setModeState(saved);
-    }
-  }, []);
+    return saved && ["auto", "light", "dark"].includes(saved) ? saved : "auto";
+  });
+  const [systemDark, setSystemDark] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
 
-  // Listen to system preference
+  // Listen to system preference changes
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    setSystemDark(mq.matches);
     const handler = (e: MediaQueryListEvent) => setSystemDark(e.matches);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);

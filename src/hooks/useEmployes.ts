@@ -22,7 +22,7 @@ export function useEmployes(etablissementId: string | null) {
     const mapped: EmployeAvecContrat[] = (data ?? []).map((e) => {
       const contrats = (e.contrats ?? []) as Contrat[];
       const contrat_actif = contrats.find((c) => c.actif) ?? null;
-      const { contrats: _contrats, ...rest } = e; // eslint-disable-line @typescript-eslint/no-unused-vars
+      const { contrats: _contrats, ...rest } = e;
       return { ...rest, contrat_actif } as EmployeAvecContrat;
     });
     setEmployes(mapped);

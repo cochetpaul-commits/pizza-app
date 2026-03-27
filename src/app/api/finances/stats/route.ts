@@ -37,10 +37,6 @@ type RecipeCost = {
   category: string;
 };
 
-function toParisDate(iso: string): string {
-  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(new Date(iso));
-}
-
 /** Get all dates in a month as YYYY-MM-DD strings */
 function getMonthDates(monthStr: string): string[] {
   const [y, m] = monthStr.split("-").map(Number);

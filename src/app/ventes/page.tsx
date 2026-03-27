@@ -169,6 +169,7 @@ export default function PerformancesPage() {
     setLoading(false);
   }, [etab, getRange]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch on mount/deps change
   useEffect(() => { loadData(); }, [loadData]);
 
   // Import handler
@@ -463,7 +464,7 @@ export default function PerformancesPage() {
                 </div>
                 {/* By service — Soir first, then Midi */}
                 <div style={{ display: "flex", gap: 10 }}>
-                  {[...W.duration.bySvc].sort((a, b) => a.svc === "midi" ? -1 : 1).map(sv => (
+                  {[...W.duration.bySvc].sort((a, _b) => a.svc === "midi" ? -1 : 1).map(sv => (
                     <div key={sv.svc} style={{ flex: 1, background: "#fff", borderRadius: 8, padding: "8px 12px", border: "1px solid #f0ebe3", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
                         <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: sv.svc === "midi" ? "#5e8278" : "#1a1a1a" }}>{sv.svc === "midi" ? "Midi" : "Soir"}</span>
@@ -728,7 +729,7 @@ function UpsellCard({ label, emoji, data, totalTables, totalCov, color, targets,
   const missing = Math.max(0, totalTables - data.tables);
   const gain = missing * targets.avgPrice;
   const ca = mode === "ttc" ? data.ca_ttc : data.ca_ht;
-  const tmPerCov = data.coverts > 0 ? ca / data.coverts : 0;
+  const _tmPerCov = data.coverts > 0 ? ca / data.coverts : 0;
 
   const status = pct >= targets.good ? { t: "\u2713 Objectif atteint", c: "#2e7d32", bg: "#e8f5e9" }
     : pct >= targets.ok ? { t: "\u2192 En progression", c: "#e65100", bg: "#fff3e0" }
