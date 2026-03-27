@@ -510,6 +510,24 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                 {saving ? "Sauvegarde…" : "Enregistrer"}
               </button>
             )}
+            {isEdit && userCanWrite && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!confirm("Supprimer cette recette ? Cette action est irreversible.")) return;
+                  const { error } = await supabase.from("cocktails").delete().eq("id", cocktailId);
+                  if (error) { alert(error.message); return; }
+                  router.push("/recettes");
+                }}
+                style={{
+                  fontSize: 11, fontWeight: 600, padding: "6px 12px", borderRadius: 8,
+                  border: "1px solid rgba(220,38,38,0.3)", background: "rgba(220,38,38,0.06)",
+                  color: "#DC2626", cursor: "pointer",
+                }}
+              >
+                Supprimer
+              </button>
+            )}
           </div>
         </div>
 
