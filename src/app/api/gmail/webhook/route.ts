@@ -176,9 +176,11 @@ async function getRecentMessages(historyId: string): Promise<string[]> {
 async function listRecentLabelMessages(): Promise<string[]> {
   const token = await getAccessTokenDirect();
   const labelId = process.env.GMAIL_LABEL_ID;
-  const params = new URLSearchParams({ maxResults: "10" });
+  const params = new URLSearchParams({ maxResults: "5" });
   if (labelId) params.set("labelIds", labelId);
-  else params.set("q", "has:attachment filename:pdf");
+  // Only look at messages from the last 2 hours to avoid re-processing old emails
+  const qParts = ["has:attachment", "filename:pdf", "newer_than:2h"];
+  params.set("q", qParts.join(" "));
   const res = await fetch(
     `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`,
     { headers: { Authorization: `Bearer ${token}` } },
