@@ -221,11 +221,9 @@ export default function PerformancesPage() {
       setPrev(null);
     }
     setLoading(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etab, getRange, compareMode, compareFrom, compareTo]);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch on mount/deps change
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { loadData(); }, [loadData]); // eslint-disable-line react-hooks/set-state-in-effect -- async data fetch
 
   // Import handler
   const handleImport = async (file: File) => {
@@ -265,7 +263,6 @@ export default function PerformancesPage() {
   };
 
   // Keyboard shortcuts: left/right arrow keys to navigate
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;

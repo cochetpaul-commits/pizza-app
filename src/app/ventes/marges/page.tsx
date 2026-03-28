@@ -242,9 +242,8 @@ export default function MargesPage() {
     setLoading(false);
   }, [etab, getRange]);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
-    loadData();
+    loadData(); // eslint-disable-line react-hooks/set-state-in-effect -- data fetch on mount/deps change
   }, [loadData]);
 
   // Navigate dates
