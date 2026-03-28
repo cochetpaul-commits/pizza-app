@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback, type CSSProperties } from "react";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import Link from "next/link";
 import Chart from "chart.js/auto";
 
 /* ── Types ── */
@@ -48,6 +49,20 @@ type ApiData = {
 };
 
 type ViewTab = "semaine" | "mois";
+
+type SortKey =
+  | "name"
+  | "categorie"
+  | "qty"
+  | "ca_ttc"
+  | "ca_ht"
+  | "prix_revient"
+  | "cout_total"
+  | "marge_brute"
+  | "marge_pct"
+  | "food_cost_pct";
+
+const STRING_SORT_KEYS: SortKey[] = ["name", "categorie"];
 
 /* ── Helpers ── */
 const fmt = (v: number) => Math.round(v).toLocaleString("fr-FR") + "\u20AC";
@@ -166,11 +181,13 @@ export default function MargesPage() {
   const [viewTab, setViewTab] = useState<ViewTab>("semaine");
   const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [sortCol, setSortCol] = useState<string>("ca_ttc");
+  const [sortKey, setSortKey] = useState<SortKey>("ca_ttc");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [filterCat, setFilterCat] = useState<string>("all");
   const [filterMatch, setFilterMatch] = useState<"all" | "matched" | "unmatched">("all");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const PER_PAGE = 25;
 
   // Date navigation
   const [selectedDate, setSelectedDate] = useState(() =>
@@ -372,8 +389,16 @@ export default function MargesPage() {
 
     // Sort
     prods.sort((a, b) => {
-      const av = (a as Record<string, unknown>)[sortCol];
-      const bv = (b as Record<string, unknown>)[sortCol];
+      const av = (a as Record<string, unknown>)[sortKey];
+      const bv = (b as Record<string, unknown>)[sortKey];
+
+      if (STRING_SORT_KEYS.includes(sortKey)) {
+        const as = typeof av === "string" ? av.toLowerCase() : "";
+        const bs = typeof bv === "string" ? bv.toLowerCase() : "";
+        const cmp = as.localeCompare(bs, "fr-FR");
+        return sortDir === "desc" ? -cmp : cmp;
+      }
+
       const an = typeof av === "number" ? av : av === null ? -Infinity : 0;
       const bn = typeof bv === "number" ? bv : bv === null ? -Infinity : 0;
       return sortDir === "desc" ? bn - an : an - bn;
@@ -382,43 +407,90 @@ export default function MargesPage() {
     return prods;
   };
 
-  const handleSort = (col: string) => {
-    if (sortCol === col) {
+  const handleSort = (col: SortKey) => {
+    if (sortKey === col) {
       setSortDir(sortDir === "desc" ? "asc" : "desc");
     } else {
-      setSortCol(col);
+      setSortKey(col);
       setSortDir("desc");
     }
+    setPage(1);
   };
 
-  const sortArrow = (col: string) =>
-    sortCol === col ? (sortDir === "desc" ? " \u25BC" : " \u25B2") : "";
+  const sortArrow = (col: SortKey) =>
+    sortKey === col ? (sortDir === "desc" ? " \u25BC" : " \u25B2") : "";
 
-  // Upsell insights
+  // Insights
   const getInsights = () => {
-    if (!data) return { bestMargin: [], worstFoodCost: [], catRanking: [] };
+    if (!data) return {
+      topMarginEur: [] as ProductRow[],
+      foodCostAlerts: [] as { product: ProductRow; lostMoney: number }[],
+      unmatchedHighVol: [] as ProductRow[],
+      catSummary: [] as CategoryRow[],
+      pricingImpact: [] as { product: ProductRow; priceIncrease: number }[],
+    };
+
     const matched = data.products.filter(
-      (p) => p.matched && p.marge_pct !== null,
+      (p) => p.matched && p.marge_brute !== null,
     );
-    const bestMargin = [...matched]
-      .sort((a, b) => (b.marge_pct ?? 0) - (a.marge_pct ?? 0))
+
+    // Card 1: Top 5 by margin in euros
+    const topMarginEur = [...matched]
+      .sort((a, b) => (b.marge_brute ?? 0) - (a.marge_brute ?? 0))
       .slice(0, 5);
-    const worstFoodCost = [...matched]
-      .filter((p) => (p.food_cost_pct ?? 0) > 30)
+
+    // Card 2: Food cost alerts (>35%, qty>10)
+    const foodCostAlerts = matched
+      .filter((p) => (p.food_cost_pct ?? 0) > 35 && p.qty > 10)
       .sort((a, b) => (b.food_cost_pct ?? 0) - (a.food_cost_pct ?? 0))
-      .slice(0, 5);
-    const catRanking = [...data.categories]
+      .map((p) => {
+        // Money lost vs 30% target: actual cost - (ca_ht * 0.30)
+        const targetCost = p.ca_ht * 0.30;
+        const actualCost = p.cout_total ?? 0;
+        const lostMoney = actualCost - targetCost;
+        return { product: p, lostMoney };
+      });
+
+    // Card 3: Unmatched high volume
+    const unmatchedHighVol = data.products
+      .filter((p) => !p.matched)
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 10);
+
+    // Card 4: Category summary sorted by food cost
+    const catSummary = [...data.categories]
       .filter((c) => c.cogs > 0)
-      .sort((a, b) => b.marge - a.marge);
-    return { bestMargin, worstFoodCost, catRanking };
+      .sort((a, b) => b.food_cost_pct - a.food_cost_pct);
+
+    // Card 5: Pricing impact for food cost > 35%
+    const pricingImpact = matched
+      .filter((p) => (p.food_cost_pct ?? 0) > 35 && p.qty > 0 && p.prix_revient !== null)
+      .map((p) => {
+        // Target: food_cost = 30% => prix_revient / new_price_ht = 0.30
+        // new_price_ht = prix_revient / 0.30
+        // current price_ht per unit = ca_ht / qty
+        const currentPriceHt = p.ca_ht / p.qty;
+        const newPriceHt = (p.prix_revient ?? 0) / 0.30;
+        const priceIncrease = newPriceHt - currentPriceHt;
+        return { product: p, priceIncrease };
+      })
+      .filter((x) => x.priceIncrease > 0)
+      .sort((a, b) => b.priceIncrease - a.priceIncrease);
+
+    return { topMarginEur, foodCostAlerts, unmatchedHighVol, catSummary, pricingImpact };
   };
 
   const K = data?.kpis;
   const filtered = getFilteredProducts();
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const safePage = Math.min(page, totalPages);
+  const paginatedProducts = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
   const insights = getInsights();
   const allCategories = data
     ? [...new Set(data.products.map((p) => p.categorie))].sort()
     : [];
+
+  const unmatchedCount = data ? data.products.filter((p) => !p.matched).length : 0;
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
@@ -430,6 +502,43 @@ export default function MargesPage() {
           fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
         }}
       >
+        {/* ── Unmatched products banner ── */}
+        {!loading && data && unmatchedCount > 0 && (
+          <div
+            style={{
+              background: "#fef3cd",
+              border: "1px solid #ffc107",
+              borderRadius: 10,
+              padding: "12px 18px",
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <span style={{ fontSize: 13, color: "#856404", fontWeight: 500 }}>
+              {unmatchedCount} produit{unmatchedCount > 1 ? "s" : ""} vendu{unmatchedCount > 1 ? "s" : ""} n&apos;ont pas de cout associe. Liez-les pour une analyse complete.
+            </span>
+            <Link
+              href="/ventes/articles"
+              style={{
+                padding: "6px 16px",
+                borderRadius: 8,
+                background: "#d4a03c",
+                color: "#fff",
+                fontSize: 12,
+                fontWeight: 600,
+                textDecoration: "none",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Lier les produits
+            </Link>
+          </div>
+        )}
+
         {/* ── Toolbar ── */}
         <div
           style={{
@@ -666,7 +775,7 @@ export default function MargesPage() {
                   type="text"
                   placeholder="Rechercher un produit..."
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                   style={{
                     flex: "1 1 180px",
                     padding: "7px 12px",
@@ -678,7 +787,7 @@ export default function MargesPage() {
                 />
                 <select
                   value={filterCat}
-                  onChange={(e) => setFilterCat(e.target.value)}
+                  onChange={(e) => { setFilterCat(e.target.value); setPage(1); }}
                   style={{
                     padding: "7px 12px",
                     borderRadius: 8,
@@ -696,11 +805,12 @@ export default function MargesPage() {
                 </select>
                 <select
                   value={filterMatch}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setFilterMatch(
                       e.target.value as "all" | "matched" | "unmatched",
-                    )
-                  }
+                    );
+                    setPage(1);
+                  }}
                   style={{
                     padding: "7px 12px",
                     borderRadius: 8,
@@ -776,7 +886,7 @@ export default function MargesPage() {
                         }}
                         onClick={() => handleSort("prix_revient")}
                       >
-                        P.Rev. unit.{sortArrow("prix_revient")}
+                        Cout unit.{sortArrow("prix_revient")}
                       </th>
                       <th
                         style={{
@@ -821,87 +931,90 @@ export default function MargesPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((p, i) => (
-                      <tr
-                        key={`${p.name}-${i}`}
-                        style={{
-                          background:
-                            i % 2 === 0 ? "transparent" : "rgba(0,0,0,.015)",
-                        }}
-                      >
-                        <td
+                    {paginatedProducts.map((p, i) => {
+                      const globalIdx = (safePage - 1) * PER_PAGE + i;
+                      return (
+                        <tr
+                          key={`${p.name}-${globalIdx}`}
                           style={{
-                            ...S.td,
-                            maxWidth: 200,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            fontWeight: 500,
-                          }}
-                          title={p.name}
-                        >
-                          {p.name}
-                          {!p.matched && (
-                            <span
-                              style={{
-                                fontSize: 9,
-                                color: COLORS.orange,
-                                marginLeft: 4,
-                                fontWeight: 400,
-                              }}
-                            >
-                              non matche
-                            </span>
-                          )}
-                        </td>
-                        <td
-                          style={{
-                            ...S.td,
-                            fontSize: 11,
-                            color: COLORS.muted,
+                            background:
+                              globalIdx % 2 === 0 ? "transparent" : "rgba(0,0,0,.015)",
                           }}
                         >
-                          {p.categorie}
-                        </td>
-                        <td style={S.tdNum}>{p.qty}</td>
-                        <td style={S.tdNum}>{fmtDec(p.ca_ttc)}</td>
-                        <td style={S.tdNum}>{fmtDec(p.ca_ht)}</td>
-                        <td style={S.tdNum}>
-                          {p.prix_revient !== null
-                            ? fmtDec(p.prix_revient)
-                            : "-"}
-                        </td>
-                        <td style={S.tdNum}>
-                          {p.cout_total !== null ? fmtDec(p.cout_total) : "-"}
-                        </td>
-                        <td
-                          style={{
-                            ...S.tdNum,
-                            fontWeight: 600,
-                            color:
-                              p.marge_brute !== null && p.marge_brute >= 0
-                                ? COLORS.green
-                                : p.marge_brute !== null
-                                  ? COLORS.red
-                                  : COLORS.muted,
-                          }}
-                        >
-                          {p.marge_brute !== null
-                            ? fmtDec(p.marge_brute)
-                            : "-"}
-                        </td>
-                        <td style={S.tdNum}>{fmtPct(p.marge_pct)}</td>
-                        <td
-                          style={{
-                            ...S.tdNum,
-                            fontWeight: 600,
-                            color: foodCostColor(p.food_cost_pct),
-                          }}
-                        >
-                          {fmtPct(p.food_cost_pct)}
-                        </td>
-                      </tr>
-                    ))}
+                          <td
+                            style={{
+                              ...S.td,
+                              maxWidth: 200,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              fontWeight: 500,
+                            }}
+                            title={p.name}
+                          >
+                            {p.name}
+                            {!p.matched && (
+                              <span
+                                style={{
+                                  fontSize: 9,
+                                  color: COLORS.orange,
+                                  marginLeft: 4,
+                                  fontWeight: 400,
+                                }}
+                              >
+                                non matche
+                              </span>
+                            )}
+                          </td>
+                          <td
+                            style={{
+                              ...S.td,
+                              fontSize: 11,
+                              color: COLORS.muted,
+                            }}
+                          >
+                            {p.categorie}
+                          </td>
+                          <td style={S.tdNum}>{p.qty}</td>
+                          <td style={S.tdNum}>{fmtDec(p.ca_ttc)}</td>
+                          <td style={S.tdNum}>{fmtDec(p.ca_ht)}</td>
+                          <td style={S.tdNum}>
+                            {p.prix_revient !== null
+                              ? fmtDec(p.prix_revient)
+                              : "-"}
+                          </td>
+                          <td style={S.tdNum}>
+                            {p.cout_total !== null ? fmtDec(p.cout_total) : "-"}
+                          </td>
+                          <td
+                            style={{
+                              ...S.tdNum,
+                              fontWeight: 600,
+                              color:
+                                p.marge_brute !== null && p.marge_brute >= 0
+                                  ? COLORS.green
+                                  : p.marge_brute !== null
+                                    ? COLORS.red
+                                    : COLORS.muted,
+                            }}
+                          >
+                            {p.marge_brute !== null
+                              ? fmtDec(p.marge_brute)
+                              : "-"}
+                          </td>
+                          <td style={S.tdNum}>{fmtPct(p.marge_pct)}</td>
+                          <td
+                            style={{
+                              ...S.tdNum,
+                              fontWeight: 600,
+                              color: foodCostColor(p.food_cost_pct),
+                            }}
+                          >
+                            {fmtPct(p.food_cost_pct)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {filtered.length === 0 && (
                       <tr>
                         <td
@@ -920,15 +1033,66 @@ export default function MargesPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* ── Pagination ── */}
               <div
                 style={{
-                  fontSize: 11,
-                  color: COLORS.muted,
-                  marginTop: 8,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginTop: 10,
                 }}
               >
-                {filtered.length} produit{filtered.length > 1 ? "s" : ""} affiche
-                {filtered.length > 1 ? "s" : ""}
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: COLORS.muted,
+                  }}
+                >
+                  {filtered.length} produit{filtered.length > 1 ? "s" : ""} affiche
+                  {filtered.length > 1 ? "s" : ""}
+                </div>
+                {totalPages > 1 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <button
+                      type="button"
+                      disabled={safePage <= 1}
+                      onClick={() => setPage(safePage - 1)}
+                      style={{
+                        padding: "5px 12px",
+                        borderRadius: 8,
+                        border: `1px solid ${COLORS.border}`,
+                        background: safePage <= 1 ? "#f5f5f5" : "#fff",
+                        color: safePage <= 1 ? COLORS.muted : COLORS.dark,
+                        fontSize: 12,
+                        cursor: safePage <= 1 ? "default" : "pointer",
+                        fontWeight: 500,
+                      }}
+                    >
+                      Precedent
+                    </button>
+                    <span style={{ fontSize: 12, color: COLORS.muted, minWidth: 90, textAlign: "center" }}>
+                      Page {safePage} sur {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={safePage >= totalPages}
+                      onClick={() => setPage(safePage + 1)}
+                      style={{
+                        padding: "5px 12px",
+                        borderRadius: 8,
+                        border: `1px solid ${COLORS.border}`,
+                        background: safePage >= totalPages ? "#f5f5f5" : "#fff",
+                        color: safePage >= totalPages ? COLORS.muted : COLORS.dark,
+                        fontSize: 12,
+                        cursor: safePage >= totalPages ? "default" : "pointer",
+                        fontWeight: 500,
+                      }}
+                    >
+                      Suivant
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -936,12 +1100,12 @@ export default function MargesPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr 1fr",
+                gridTemplateColumns: "1fr 1fr",
                 gap: 14,
                 marginTop: 6,
               }}
             >
-              {/* Best margin products */}
+              {/* Card 1: Produits les plus rentables */}
               <div style={S.card}>
                 <div
                   style={{
@@ -949,111 +1113,14 @@ export default function MargesPage() {
                     color: COLORS.green,
                   }}
                 >
-                  Meilleure marge % — a pousser
+                  Produits les plus rentables
                 </div>
-                {insights.bestMargin.length === 0 && (
+                {insights.topMarginEur.length === 0 && (
                   <div style={{ fontSize: 12, color: COLORS.muted }}>
                     Aucune donnee
                   </div>
                 )}
-                {insights.bestMargin.map((p, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      padding: "6px 0",
-                      borderBottom:
-                        i < insights.bestMargin.length - 1
-                          ? `1px solid ${COLORS.border}`
-                          : "none",
-                      fontSize: 12,
-                    }}
-                  >
-                    <span
-                      style={{
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        maxWidth: "65%",
-                      }}
-                      title={p.name}
-                    >
-                      {p.name}
-                    </span>
-                    <span
-                      style={{
-                        fontWeight: 600,
-                        color: COLORS.green,
-                      }}
-                    >
-                      {fmtPct(p.marge_pct)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Worst food cost */}
-              <div style={S.card}>
-                <div
-                  style={{
-                    ...S.secTitle,
-                    color: COLORS.red,
-                  }}
-                >
-                  Pire food cost % — revoir pricing
-                </div>
-                {insights.worstFoodCost.length === 0 && (
-                  <div style={{ fontSize: 12, color: COLORS.muted }}>
-                    Tout est sous 30% !
-                  </div>
-                )}
-                {insights.worstFoodCost.map((p, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      padding: "6px 0",
-                      borderBottom:
-                        i < insights.worstFoodCost.length - 1
-                          ? `1px solid ${COLORS.border}`
-                          : "none",
-                      fontSize: 12,
-                    }}
-                  >
-                    <span
-                      style={{
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        maxWidth: "65%",
-                      }}
-                      title={p.name}
-                    >
-                      {p.name}
-                    </span>
-                    <span
-                      style={{
-                        fontWeight: 600,
-                        color: foodCostColor(p.food_cost_pct),
-                      }}
-                    >
-                      {fmtPct(p.food_cost_pct)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Category ranking */}
-              <div style={S.card}>
-                <div style={S.secTitle}>Classement categories</div>
-                {insights.catRanking.length === 0 && (
-                  <div style={{ fontSize: 12, color: COLORS.muted }}>
-                    Aucune donnee
-                  </div>
-                )}
-                {insights.catRanking.map((c, i) => (
+                {insights.topMarginEur.map((p, i) => (
                   <div
                     key={i}
                     style={{
@@ -1062,30 +1129,280 @@ export default function MargesPage() {
                       alignItems: "center",
                       padding: "6px 0",
                       borderBottom:
-                        i < insights.catRanking.length - 1
+                        i < insights.topMarginEur.length - 1
                           ? `1px solid ${COLORS.border}`
                           : "none",
                       fontSize: 12,
                     }}
                   >
-                    <span style={{ fontWeight: 500 }}>{c.cat}</span>
+                    <span
+                      style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        maxWidth: "50%",
+                      }}
+                      title={p.name}
+                    >
+                      {p.name}
+                    </span>
                     <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                      <span style={{ color: COLORS.muted, fontSize: 11 }}>
-                        {fmt(c.marge)}
+                      <span style={{ fontWeight: 600, color: COLORS.green }}>
+                        {fmtDec(p.marge_brute ?? 0)}
                       </span>
-                      <span
-                        style={{
-                          fontWeight: 600,
-                          color: foodCostColor(c.food_cost_pct),
-                          minWidth: 45,
-                          textAlign: "right",
-                        }}
-                      >
-                        {c.food_cost_pct.toFixed(1)}%
+                      <span style={{ color: COLORS.muted, fontSize: 11 }}>
+                        {fmtPct(p.marge_pct)}
                       </span>
                     </span>
                   </div>
                 ))}
+              </div>
+
+              {/* Card 2: Alertes food cost */}
+              <div style={S.card}>
+                <div
+                  style={{
+                    ...S.secTitle,
+                    color: COLORS.red,
+                  }}
+                >
+                  Alertes food cost
+                </div>
+                {insights.foodCostAlerts.length === 0 && (
+                  <div style={{ fontSize: 12, color: COLORS.muted }}>
+                    Aucun produit avec food cost &gt; 35% et volume significatif
+                  </div>
+                )}
+                {insights.foodCostAlerts.map(({ product: p, lostMoney }, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      padding: "6px 0",
+                      borderBottom:
+                        i < insights.foodCostAlerts.length - 1
+                          ? `1px solid ${COLORS.border}`
+                          : "none",
+                      fontSize: 12,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span
+                        style={{
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          maxWidth: "45%",
+                          fontWeight: 500,
+                        }}
+                        title={p.name}
+                      >
+                        {p.name}
+                      </span>
+                      <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <span style={{ fontWeight: 600, color: COLORS.red }}>
+                          {fmtPct(p.food_cost_pct)}
+                        </span>
+                        <span style={{ color: COLORS.muted }}>
+                          x{p.qty}
+                        </span>
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11, color: COLORS.red, marginTop: 2 }}>
+                      Perte vs objectif 30% : {fmtDec(lostMoney)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Card 3: Opportunites de marge */}
+              <div style={S.card}>
+                <div
+                  style={{
+                    ...S.secTitle,
+                    color: COLORS.orange,
+                  }}
+                >
+                  Opportunites de marge
+                </div>
+                {insights.unmatchedHighVol.length === 0 && (
+                  <div style={{ fontSize: 12, color: COLORS.muted }}>
+                    Tous les produits sont lies !
+                  </div>
+                )}
+                {insights.unmatchedHighVol.map((p, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "6px 0",
+                      borderBottom:
+                        i < insights.unmatchedHighVol.length - 1
+                          ? `1px solid ${COLORS.border}`
+                          : "none",
+                      fontSize: 12,
+                    }}
+                  >
+                    <span
+                      style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        maxWidth: "40%",
+                        fontWeight: 500,
+                      }}
+                      title={p.name}
+                    >
+                      {p.name}
+                    </span>
+                    <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <span style={{ color: COLORS.muted }}>x{p.qty}</span>
+                      <span style={{ fontWeight: 500 }}>{fmtDec(p.ca_ttc)}</span>
+                      <Link
+                        href="/ventes/articles"
+                        style={{
+                          fontSize: 10,
+                          color: COLORS.accent,
+                          textDecoration: "underline",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Lier
+                      </Link>
+                    </span>
+                  </div>
+                ))}
+                {insights.unmatchedHighVol.length > 0 && (
+                  <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 8, fontStyle: "italic" }}>
+                    Liez ces produits pour connaitre leur marge
+                  </div>
+                )}
+              </div>
+
+              {/* Card 5: Impact pricing */}
+              <div style={S.card}>
+                <div
+                  style={{
+                    ...S.secTitle,
+                    color: COLORS.accent,
+                  }}
+                >
+                  Impact pricing
+                </div>
+                {insights.pricingImpact.length === 0 && (
+                  <div style={{ fontSize: 12, color: COLORS.muted }}>
+                    Aucun produit ne necessite d&apos;ajustement de prix
+                  </div>
+                )}
+                {insights.pricingImpact.slice(0, 8).map(({ product: p, priceIncrease }, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      padding: "6px 0",
+                      borderBottom:
+                        i < Math.min(insights.pricingImpact.length, 8) - 1
+                          ? `1px solid ${COLORS.border}`
+                          : "none",
+                      fontSize: 12,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span
+                        style={{
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          maxWidth: "50%",
+                          fontWeight: 500,
+                        }}
+                        title={p.name}
+                      >
+                        {p.name}
+                      </span>
+                      <span style={{ fontWeight: 600, color: COLORS.red }}>
+                        {fmtPct(p.food_cost_pct)}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11, color: COLORS.accent, marginTop: 2 }}>
+                      +{fmtDec(priceIncrease)} HT/unite pour atteindre 30% food cost
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Card 4: Resume par categorie — Full width */}
+            <div style={{ ...S.card, marginTop: 14 }}>
+              <div style={S.secTitle}>Resume par categorie</div>
+              <div style={{ overflowX: "auto" }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: 13,
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      <th style={S.th}>Categorie</th>
+                      <th style={{ ...S.th, textAlign: "right" }}>CA TTC</th>
+                      <th style={{ ...S.th, textAlign: "right" }}>CA HT</th>
+                      <th style={{ ...S.th, textAlign: "right" }}>Cout total</th>
+                      <th style={{ ...S.th, textAlign: "right" }}>Marge brute</th>
+                      <th style={{ ...S.th, textAlign: "right" }}>Food cost %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {insights.catSummary.map((c, i) => (
+                      <tr
+                        key={c.cat}
+                        style={{
+                          background: i % 2 === 0 ? "transparent" : "rgba(0,0,0,.015)",
+                        }}
+                      >
+                        <td style={{ ...S.td, fontWeight: 500 }}>{c.cat}</td>
+                        <td style={S.tdNum}>{fmtDec(c.ca_ttc)}</td>
+                        <td style={S.tdNum}>{fmtDec(c.ca_ht)}</td>
+                        <td style={S.tdNum}>{fmtDec(c.cogs)}</td>
+                        <td style={{ ...S.tdNum, fontWeight: 600, color: COLORS.green }}>
+                          {fmtDec(c.marge)}
+                        </td>
+                        <td
+                          style={{
+                            ...S.tdNum,
+                            fontWeight: 700,
+                            color: foodCostColor(c.food_cost_pct),
+                            background:
+                              c.food_cost_pct > 35
+                                ? "rgba(192,57,43,.08)"
+                                : c.food_cost_pct > 30
+                                  ? "rgba(212,160,60,.08)"
+                                  : "rgba(58,125,68,.06)",
+                            borderRadius: 4,
+                          }}
+                        >
+                          {c.food_cost_pct.toFixed(1)}%
+                        </td>
+                      </tr>
+                    ))}
+                    {insights.catSummary.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          style={{
+                            ...S.td,
+                            textAlign: "center",
+                            color: COLORS.muted,
+                            padding: 20,
+                          }}
+                        >
+                          Aucune donnee
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </>
