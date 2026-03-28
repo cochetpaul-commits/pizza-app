@@ -222,10 +222,11 @@ const SECTION_VENTES: TabSection = {
 
 const SECTION_ACHATS: TabSection = {
   label: "Achats",
-  href: "/achats",
-  match: ["/achats", "/ingredients", "/invoices", "/fournisseurs", "/stats-achats", "/factures-auto"],
+  href: "/commandes",
+  match: ["/achats", "/commandes", "/ingredients", "/invoices", "/fournisseurs", "/stats-achats", "/factures-auto"],
   icon: (a) => <IconShoppingBag active={a} />,
   tabs: [
+    { label: "Commandes", href: "/commandes", match: ["/commandes"], icon: (a) => <IconTruck active={a} /> },
     { label: "Factures", href: "/achats", match: ["/achats", "/invoices", "/factures-auto"], icon: (a) => <IconFileText active={a} /> },
     { label: "Produits", href: "/ingredients", match: ["/ingredients"], icon: (a) => <IconTag active={a} /> },
   ],
@@ -234,13 +235,12 @@ const SECTION_ACHATS: TabSection = {
 const SECTION_OPS: TabSection = {
   label: "Ops",
   href: "/recettes",
-  match: ["/catalogue", "/recettes", "/commandes", "/inventaire", "/epicerie", "/prep"],
+  match: ["/catalogue", "/recettes", "/inventaire", "/epicerie", "/prep"],
   icon: (a) => <IconPackage active={a} />,
   tabs: [
     { label: "Catalogue", href: "/catalogue", match: ["/catalogue"], icon: (a) => <IconGrid active={a} /> },
     { label: "Fiches", href: "/recettes", match: ["/recettes", "/prep"], icon: (a) => <IconBook active={a} /> },
     { label: "Prix vente", href: "/epicerie", match: ["/epicerie"], icon: (a) => <IconTag active={a} /> },
-    { label: "Commandes", href: "/commandes", match: ["/commandes"], icon: (a) => <IconTruck active={a} /> },
     { label: "Inventaire", href: "/inventaire", match: ["/inventaire"], icon: (a) => <IconBox active={a} /> },
   ],
 };

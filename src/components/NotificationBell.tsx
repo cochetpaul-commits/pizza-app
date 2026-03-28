@@ -113,6 +113,7 @@ export function NotificationBell() {
       {/* Bell button */}
       <button
         type="button"
+        className="notif-bell-btn"
         onClick={() => setOpen((v) => !v)}
         style={S.bellBtn}
         aria-label="Notifications"
@@ -226,9 +227,10 @@ export function NotificationBell() {
 
 const S = {
   bellBtn: {
-    position: "relative", background: "none", border: "none",
+    position: "relative", background: "transparent", border: "none",
     cursor: "pointer", padding: 6, color: "#1a1a1a",
     display: "flex", alignItems: "center", justifyContent: "center",
+    borderRadius: 0,
   } as React.CSSProperties,
   badge: {
     position: "absolute", top: 0, right: 0,

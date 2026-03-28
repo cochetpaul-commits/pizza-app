@@ -138,6 +138,15 @@ button.etab-fab {
   }
 }
 
+/* Notification bell — no glass background on desktop */
+.notif-bell-btn {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
 /* Glass mobile bars */
 .topbar-mobile {
   background: var(--glass-sidebar) !important;

@@ -78,6 +78,7 @@ export const PLANNING_ITEMS: NavItemV2[] = [
 ];
 
 export const ACHATS_ITEMS: NavItemV2[] = [
+  { label: "Commandes", href: "/commandes", icon: "shoppingBag" },
   { label: "Factures", href: "/achats", icon: "fileText" },
   { label: "Base produits", href: "/ingredients", icon: "tag" },
 ];
@@ -89,7 +90,6 @@ export const OPERATIONS_ITEMS: NavItemV2[] = [
   { label: "Catalogue", href: "/catalogue", icon: "book" },
   { label: "Fiches techniques", href: "/recettes", icon: "fileText" },
   { label: "Prix de vente", href: "/epicerie", icon: "tag" },
-  { label: "Commandes", href: "/commandes", icon: "shoppingBag" },
   { label: "Inventaire", href: "/inventaire", icon: "package" },
 ];
 
