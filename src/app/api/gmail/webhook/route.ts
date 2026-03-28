@@ -241,14 +241,23 @@ async function getServiceUserId(): Promise<string | null> {
 // ── Process a single Gmail message ───────────────────────────────────────────
 
 async function processMessage(messageId: string) {
-  // Check dedup
-  const { count } = await supabaseAdmin
+  // Check if this message was already successfully processed (has "ok" status)
+  const { data: prevImport } = await supabaseAdmin
     .from("email_imports")
-    .select("id", { count: "exact", head: true })
-    .eq("gmail_message_id", messageId);
-  if ((count ?? 0) > 0) {
+    .select("id, status")
+    .eq("gmail_message_id", messageId)
+    .eq("status", "ok")
+    .limit(1)
+    .maybeSingle();
+  if (prevImport) {
     return { messageId, status: "duplicate", detail: "already processed" };
   }
+  // Clean up any previous failed/duplicate attempts for this message
+  await supabaseAdmin
+    .from("email_imports")
+    .delete()
+    .eq("gmail_message_id", messageId)
+    .neq("status", "ok");
 
   // Fetch message
   const msg = await getGmailMessage(messageId);
@@ -327,46 +336,80 @@ async function processMessage(messageId: string) {
         continue;
       }
 
-      // Check invoice duplicate (same supplier + same invoice number)
-      if (parseResult.invoice_number && supplierId) {
-        const { count: invCount } = await supabaseAdmin
-          .from("supplier_invoices")
-          .select("id", { count: "exact", head: true })
-          .eq("invoice_number", parseResult.invoice_number)
-          .eq("supplier_id", supplierId);
-        if ((invCount ?? 0) > 0) {
-          await logImport(messageId, from, subject, emailDate, pdf.filename, fournisseur, etabId, parseResult.invoice_number, 0, "duplicate", "Facture déjà importée");
-          results.push({ file: pdf.filename, status: "duplicate", invoice: parseResult.invoice_number });
-          continue;
-        }
-      }
-
       // Resolve a user_id for DB inserts
       const userId = await getServiceUserId();
 
-      // Insert supplier_invoice
-      const invRow: Record<string, unknown> = {
-        supplier_id: supplierId,
-        etablissement_id: etabId,
-        invoice_number: parseResult.invoice_number,
-        invoice_date: parseResult.invoice_date ? ddmmyyyyToIso(parseResult.invoice_date) : null,
-        total_ht: parseResult.total_ht,
-        total_ttc: parseResult.total_ttc,
-        source_filename: pdf.filename,
-        source: "gmail_webhook",
-      };
-      if (userId) invRow.user_id = userId;
-      const { data: inv, error: invErr } = await supabaseAdmin
-        .from("supplier_invoices")
-        .insert(invRow)
-        .select("id")
-        .single();
+      // Upsert invoice: if same supplier + invoice_number exists, reuse it (delete old lines)
+      let invoiceId: string;
 
-      if (invErr || !inv) {
-        await logImport(messageId, from, subject, emailDate, pdf.filename, fournisseur, etabId, parseResult.invoice_number, 0, "error", invErr?.message ?? "Insert invoice failed");
-        results.push({ file: pdf.filename, status: "error", detail: invErr?.message });
-        continue;
+      if (parseResult.invoice_number) {
+        const { data: existing } = await supabaseAdmin
+          .from("supplier_invoices")
+          .select("id")
+          .eq("invoice_number", parseResult.invoice_number)
+          .eq("supplier_id", supplierId)
+          .maybeSingle();
+
+        if (existing?.id) {
+          // Already exists → delete old lines and reuse
+          invoiceId = existing.id;
+          await supabaseAdmin
+            .from("supplier_invoice_lines")
+            .delete()
+            .eq("invoice_id", invoiceId);
+        } else {
+          // Create new
+          const invRow: Record<string, unknown> = {
+            supplier_id: supplierId,
+            etablissement_id: etabId,
+            invoice_number: parseResult.invoice_number,
+            invoice_date: parseResult.invoice_date ? ddmmyyyyToIso(parseResult.invoice_date) : null,
+            total_ht: parseResult.total_ht,
+            total_ttc: parseResult.total_ttc,
+            source_filename: pdf.filename,
+            source: "gmail_webhook",
+          };
+          if (userId) invRow.user_id = userId;
+          const { data: inv, error: invErr } = await supabaseAdmin
+            .from("supplier_invoices")
+            .insert(invRow)
+            .select("id")
+            .single();
+
+          if (invErr || !inv) {
+            await logImport(messageId, from, subject, emailDate, pdf.filename, fournisseur, etabId, parseResult.invoice_number, 0, "error", invErr?.message ?? "Insert invoice failed");
+            results.push({ file: pdf.filename, status: "error", detail: invErr?.message });
+            continue;
+          }
+          invoiceId = inv.id;
+        }
+      } else {
+        // No invoice number — always create new
+        const invRow: Record<string, unknown> = {
+          supplier_id: supplierId,
+          etablissement_id: etabId,
+          invoice_date: parseResult.invoice_date ? ddmmyyyyToIso(parseResult.invoice_date) : null,
+          total_ht: parseResult.total_ht,
+          total_ttc: parseResult.total_ttc,
+          source_filename: pdf.filename,
+          source: "gmail_webhook",
+        };
+        if (userId) invRow.user_id = userId;
+        const { data: inv, error: invErr } = await supabaseAdmin
+          .from("supplier_invoices")
+          .insert(invRow)
+          .select("id")
+          .single();
+
+        if (invErr || !inv) {
+          await logImport(messageId, from, subject, emailDate, pdf.filename, fournisseur, etabId, null, 0, "error", invErr?.message ?? "Insert invoice failed");
+          results.push({ file: pdf.filename, status: "error", detail: invErr?.message });
+          continue;
+        }
+        invoiceId = inv.id;
       }
+
+      const inv = { id: invoiceId };
 
       // Insert invoice lines (all lines, no confidence filter — this is invoice history)
       const lines = parseResult.ingredients.map((ing) => {
