@@ -241,7 +241,7 @@ export default function PerformancesPage() {
       <div className="ventes-container" style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 16px 60px" }}>
 
         {/* ── Toolbar: tabs + import + PDF + TTC/HT ── */}
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 16 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
           <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 10, overflow: "hidden" }}>
             {(["jour", "semaine", "mois"] as ViewTab[]).map(t => (
               <button key={t} type="button" onClick={() => setViewTab(t)} style={{
@@ -291,16 +291,17 @@ export default function PerformancesPage() {
         {importMsg && <div style={{ fontSize: 12, color: accent, marginBottom: 10 }}>{importMsg}</div>}
 
         {/* ── Date navigation + title ── */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid rgba(70,101,90,.2)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid rgba(70,101,90,.15)" }}>
           <button type="button" onClick={() => navigate(-1)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>&larr;</button>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".16em", color: accent, fontWeight: 500, marginBottom: 4 }}>
-              {viewTab === "jour" ? "Rapport journalier" : viewTab === "semaine" ? "Briefing hebdomadaire" : "Rapport mensuel"}
-            </div>
-            <h1 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-.01em" }}>
-              {rangeLabel}
-            </h1>
-          </div>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={e => { if (e.target.value) setSelectedDate(e.target.value); }}
+            style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 13, padding: "5px 8px", border: "1px solid #e0d8ce", borderRadius: 8, background: "#fff", color: "#1a1a1a", cursor: "pointer" }}
+          />
+          <h1 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 26, fontWeight: 700, margin: 0, letterSpacing: "-.01em", textTransform: "uppercase" }}>
+            {rangeLabel}
+          </h1>
           <button type="button" onClick={() => navigate(1)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>&rarr;</button>
         </div>
 
@@ -476,37 +477,39 @@ export default function PerformancesPage() {
 
             {/* Zones */}
             {W.days.length > 0 && (() => {
-              // Zone capacity config (tables × max couverts)
-              const ZONE_CAPACITY: Record<string, { tables: number; maxCov: number }> = {
-                Salle: { tables: 17, maxCov: 49 },
-                Pergolas: { tables: 8, maxCov: 20 },
-                Terrasse: { tables: 16, maxCov: 48 },
-              };
               const zones = mode === "ttc" ? W.zones_ttc : W.zones_ht;
               const activeZones = Object.entries(zones).filter(([, vals]) => vals.some(v => v > 0));
               const totalCA = activeZones.reduce((s, [, vals]) => s + vals.reduce((a, b) => a + b, 0), 0);
 
               return (
-              <div className="ventes-zone-grid" style={{ display: "grid", gridTemplateColumns: `repeat(${activeZones.length}, 1fr)`, gap: 10, marginBottom: 6 }}>
+              <div className="ventes-zone-grid" style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(activeZones.length, 3)}, 1fr)`, gap: 10, marginBottom: 6 }}>
                 {activeZones.map(([zone, vals]) => {
                   const tot = vals.reduce((a, b) => a + b, 0);
                   const zKey = zone === "\u00C0 emporter" ? "emp" : zone;
                   const color = ZC[zKey] ?? "#888";
-                  const cap = ZONE_CAPACITY[zone];
                   const pctCA = totalCA > 0 ? Math.round(tot / totalCA * 100) : 0;
+                  const maxDay = Math.max(...vals, 1);
 
                   return (
-                    <div key={zone} style={{ padding: "12px 14px", background: "#f9f6f0", borderRadius: 10 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                        <span style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".1em", color }}>{zone}</span>
-                      </div>
-                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color, lineHeight: 1, marginBottom: 4 }}>{fmt(tot)}</div>
-                      <div style={{ fontSize: 10, color: "#777", marginBottom: 4 }}>{pctCA}% du CA</div>
-                      {cap && (
-                        <div style={{ fontSize: 10, color: "#999" }}>
-                          {cap.tables} tables · {cap.maxCov} cvts max
-                        </div>
-                      )}
+                    <div key={zone} style={{ background: "#fff", border: "1px solid #e0d8ce", borderRadius: 12, padding: "14px 16px" }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".1em", color, marginBottom: 8 }}>{zone}</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color, lineHeight: 1, marginBottom: 2 }}>{fmt(tot)}</div>
+                      <div style={{ fontSize: 10, color: "#777", marginBottom: 10 }}>{pctCA}% du CA</div>
+                      {vals.map((v, di) => {
+                        const dayLabel = (W.days[di] ?? "").slice(0, 3);
+                        const barPct = maxDay > 0 ? Math.round(v / maxDay * 100) : 0;
+                        return (
+                          <div key={di} style={{ marginBottom: 6 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, marginBottom: 2 }}>
+                              <span style={{ color: "#777", fontWeight: 500 }}>{dayLabel}</span>
+                              <span style={{ fontWeight: 600, color: v > 0 ? "#1a1a1a" : "#ccc" }}>{v > 0 ? fmt(v) : "\u2014"}</span>
+                            </div>
+                            <div style={{ height: 4, background: "rgba(0,0,0,.06)", borderRadius: 2, overflow: "hidden" }}>
+                              <div style={{ height: "100%", width: `${barPct}%`, background: color, borderRadius: 2, transition: "width .4s" }} />
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })}
@@ -807,9 +810,8 @@ function RecapTable({ services, mode, meteo, dates, days, viewTab }: { services:
   // Map day name → date for meteo lookup
   const dayToDate: Record<string, string> = {};
   for (let i = 0; i < days.length; i++) {
-    dayToDate[days[i]] = dates[i];
+    if (days[i] && dates[i]) dayToDate[days[i]] = dates[i];
   }
-
   // Group services by week when in monthly view
   const useWeeks = viewTab === "mois";
   type GroupEntry = { groupLabel: string; services: WeekData["services"] };
