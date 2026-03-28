@@ -68,12 +68,12 @@ function shouldSkipLine(line: string): boolean {
 // ── Parse lines ─────────────────────────────────────────────────────────────
 
 // Regex for standard Metro product line (piece — no weight column)
-// EAN(8-13) ARTICLE(7) NAME... PRIX_UNIT QTE COLIS MONTANT TVA
-const RE_PIECE = /^(\d{8,13})\s+(\d{7})\s+(.+?)\s+([\d,]+)\s+(\d+)\s+(\d+)\s+([\d,]+)\s+([ABD])\s*$/;
+// EAN(8-13) ARTICLE(7) NAME... PRIX_UNIT QTE COLIS MONTANT TVA [Promo] [Extr.]
+const RE_PIECE = /^(\d{8,13})\s+(\d{7})\s+(.+?)\s+([\d,]+)\s+(\d+)\s+(\d+)\s+([\d,]+)\s+([ABD])(?:\s+[A-Z])*\s*$/;
 
 // Regex for VAP line (weight present) — has extra columns
-// EAN ARTICLE NAME... POIDS PRIX_KG QTE COLIS MONTANT TVA
-const RE_VAP = /^(\d{8,13})\s+(\d{7})\s+(.+?)\s+([\d,]+)\s+([\d,]+)\s+(\d+)\s+(\d+)\s+([\d,]+)\s+([ABD])\s*$/;
+// EAN ARTICLE NAME... POIDS PRIX_KG QTE COLIS MONTANT TVA [Promo] [Extr.]
+const RE_VAP = /^(\d{8,13})\s+(\d{7})\s+(.+?)\s+([\d,]+)\s+([\d,]+)\s+(\d+)\s+(\d+)\s+([\d,]+)\s+([ABD])(?:\s+[A-Z])*\s*$/;
 
 // Section header
 const RE_SECTION = /^\*{3}\s+(.+?)(?:\s+Total\s*:.*)?$/;

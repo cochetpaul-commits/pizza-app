@@ -59,9 +59,9 @@ function parseLines(text: string): ParsedLine[] {
   const taxMap: Record<string, number> = { A: 2.1, B: 5.5, D: 20.0 };
 
   for (const r of rows) {
-    const lineMatch = r.match(/^\d{8,13}\s+(\d{7})\s+(.+?)\s+([\d,]+)\s+(\d+)\s+\d+\s+([\d,]+)\s+([ABD])\b/i);
+    const lineMatch = r.match(/^\d{8,13}\s+(\d{7})\s+(.+?)\s+([\d,]+)\s+(\d+)\s+\d+\s+([\d,]+)\s+([ABD])(?:\s+[A-Z])*\s*$/i);
     if (!lineMatch) {
-      const vapMatch = r.match(/^\d{8,13}\s+(\d{7})\s+(.+?)\s+([\d,]+)\s+([\d,]+)\s+(\d+)\s+\d+\s+([\d,]+)\s+([ABD])\b/i);
+      const vapMatch = r.match(/^\d{8,13}\s+(\d{7})\s+(.+?)\s+([\d,]+)\s+([\d,]+)\s+(\d+)\s+\d+\s+([\d,]+)\s+([ABD])(?:\s+[A-Z])*\s*$/i);
       if (vapMatch) {
         // VAP = vente au poids, prix réel par kg
         tmp.push({ sku: vapMatch[1], name: vapMatch[2].trim(), quantity: parseFrenchNumber(vapMatch[5]), unit: "kg", unit_price: parseFrenchNumber(vapMatch[4]), total_price: parseFrenchNumber(vapMatch[6]), tax_rate: taxMap[vapMatch[7].toUpperCase()] ?? null, notes: "VAP=" + vapMatch[3], piece_weight_g: null, piece_volume_ml: null });
