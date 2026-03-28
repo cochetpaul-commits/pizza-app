@@ -114,6 +114,14 @@ export default function PerformancesPage() {
   const [mixDDOpen, setMixDDOpen] = useState<{ label: string; color: string } | null>(null);
   const [meteo, setMeteo] = useState<Record<string, { emoji: string; desc: string; temp: number }>>({});
 
+  // Comparison state
+  type CompareMode = "none" | "prev" | "a-1" | "custom";
+  const [compareMode, setCompareMode] = useState<CompareMode>("a-1");
+  const [compareFrom, setCompareFrom] = useState("");
+  const [compareTo, setCompareTo] = useState("");
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareData, setCompareData] = useState<WeekData | null>(null);
+
   // Date navigation
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
 
@@ -162,12 +170,42 @@ export default function PerformancesPage() {
         }
         setMeteo(mMap);
       } catch { setMeteo({}); }
+
+      // Fetch comparison data
+      if (compareMode !== "none") {
+        let cFrom = "", cTo = "";
+        if (compareMode === "a-1") {
+          cFrom = (parseInt(from.slice(0, 4)) - 1) + from.slice(4);
+          cTo = (parseInt(to.slice(0, 4)) - 1) + to.slice(4);
+        } else if (compareMode === "prev") {
+          const days = Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86400000) + 1;
+          const pTo = new Date(new Date(from + "T12:00:00").getTime() - 86400000);
+          const pFrom = new Date(pTo.getTime() - (days - 1) * 86400000);
+          cFrom = pFrom.toISOString().slice(0, 10);
+          cTo = pTo.toISOString().slice(0, 10);
+        } else if (compareMode === "custom" && compareFrom && compareTo) {
+          cFrom = compareFrom;
+          cTo = compareTo;
+        }
+        if (cFrom && cTo) {
+          try {
+            const cRes = await fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${cFrom}&to=${cTo}`);
+            const cJson = await cRes.json();
+            setCompareData(cJson.stats ?? null);
+          } catch { setCompareData(null); }
+        } else {
+          setCompareData(null);
+        }
+      } else {
+        setCompareData(null);
+      }
     } catch {
       setData(null);
       setPrev(null);
     }
     setLoading(false);
-  }, [etab, getRange]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etab, getRange, compareMode, compareFrom, compareTo]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch on mount/deps change
   useEffect(() => { loadData(); }, [loadData]);
@@ -219,7 +257,7 @@ export default function PerformancesPage() {
       const res = await fetch("/api/ventes/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stats: data, prev, mode, viewTab, rangeLabel, etabName: etab.nom ?? "Etablissement" }),
+        body: JSON.stringify({ stats: data, prev: activePrev, mode, viewTab, rangeLabel, etabName: etab.nom ?? "Etablissement" }),
       });
       if (!res.ok) { setExporting(false); return; }
       const blob = await res.blob();
@@ -234,6 +272,8 @@ export default function PerformancesPage() {
   };
 
   const W = data;
+  // Use compareData if available, otherwise fall back to API's built-in prev (A-1)
+  const activePrev = compareData ?? prev;
   const ca = W ? (mode === "ttc" ? W.ca_ttc : W.ca_ht) : 0;
 
   return (
@@ -287,6 +327,64 @@ export default function PerformancesPage() {
               fontSize: 11, fontWeight: 500,
             }}>HT</button>
           </div>
+          {/* Compare dropdown */}
+          <div style={{ position: "relative" }}>
+            <button type="button" onClick={() => setCompareOpen(v => !v)} style={{
+              padding: "7px 14px", borderRadius: 8, border: "1px solid #e0d8ce",
+              background: compareMode !== "none" ? `${accent}15` : "#fff",
+              color: compareMode !== "none" ? accent : "#777",
+              fontSize: 12, fontWeight: 600, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 4,
+            }}>
+              Comparer {compareMode === "a-1" ? "(A-1)" : compareMode === "prev" ? "(Prec.)" : compareMode === "custom" ? "(Perso.)" : ""}
+              <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transform: compareOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform .2s" }}><polyline points="6 9 12 15 18 9" /></svg>
+            </button>
+            {compareOpen && (
+              <div style={{
+                position: "absolute", right: 0, top: "calc(100% + 4px)", zIndex: 200, minWidth: 280,
+                background: "#fff", border: "1px solid #e0d8ce", borderRadius: 12,
+                boxShadow: "0 8px 28px rgba(0,0,0,.12)", padding: 12,
+              }}>
+                {([
+                  { key: "none" as CompareMode, label: "Aucune comparaison" },
+                  { key: "prev" as CompareMode, label: "Periode precedente" },
+                  { key: "a-1" as CompareMode, label: "Annee precedente (A-1)" },
+                  { key: "custom" as CompareMode, label: "Personnalise..." },
+                ]).map(opt => (
+                  <button key={opt.key} type="button" onClick={() => {
+                    setCompareMode(opt.key);
+                    if (opt.key !== "custom") setCompareOpen(false);
+                  }} style={{
+                    display: "block", width: "100%", padding: "8px 10px", border: "none", cursor: "pointer",
+                    background: compareMode === opt.key ? `${accent}10` : "transparent",
+                    borderRadius: 6, fontSize: 12, fontWeight: compareMode === opt.key ? 700 : 400,
+                    color: compareMode === opt.key ? accent : "#1a1a1a", textAlign: "left",
+                    marginBottom: 2,
+                  }}>
+                    {opt.label} {compareMode === opt.key && "\u2713"}
+                  </button>
+                ))}
+                {compareMode === "custom" && (
+                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0ebe3" }}>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 10, color: "#777", marginBottom: 3 }}>Du</div>
+                        <input type="date" value={compareFrom} onChange={e => setCompareFrom(e.target.value)} style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #e0d8ce", fontSize: 12 }} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 10, color: "#777", marginBottom: 3 }}>Au</div>
+                        <input type="date" value={compareTo} onChange={e => setCompareTo(e.target.value)} style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #e0d8ce", fontSize: 12 }} />
+                      </div>
+                    </div>
+                    <button type="button" onClick={() => setCompareOpen(false)} style={{
+                      width: "100%", padding: "8px", borderRadius: 8, border: "none",
+                      background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                    }}>Appliquer</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
         {importMsg && <div style={{ fontSize: 12, color: accent, marginBottom: 10 }}>{importMsg}</div>}
 
@@ -333,8 +431,8 @@ export default function PerformancesPage() {
                     <div style={{ ...S.bigNum, textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>{fmt(ca)}</div>
                     {mode === "ttc" && <div style={{ fontSize: 13, color: "rgba(255,255,255,.85)", marginTop: 6, fontWeight: 500 }}>HT <span style={{ color: "#fff", fontWeight: 700 }}>{fmt(W.ca_ht)}</span></div>}
                   </div>
-                  {prev && (() => {
-                    const prevCA = mode === "ttc" ? prev.ca_ttc : prev.ca_ht;
+                  {activePrev && (() => {
+                    const prevCA = mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht;
                     const d = ca - prevCA;
                     const pct = prevCA > 0 ? (d / prevCA * 100) : 0;
                     return (
@@ -361,13 +459,13 @@ export default function PerformancesPage() {
                       {W.couverts > 0 ? "\u20AC" + (ca / W.couverts).toFixed(1) : "\u2014"}
                     </div>
                     {W.cov_sur > 0 && <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>CVT M SP <span style={{ color: "#fff", fontWeight: 700 }}>{"\u20AC" + ((mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur).toFixed(1)}</span></div>}
-                    {prev && prev.couverts > 0 && <DeltaBadge cur={ca / W.couverts} prev={(mode === "ttc" ? prev.ca_ttc : prev.ca_ht) / prev.couverts} decimals={1} prefix="\u20AC" />}
+                    {activePrev && activePrev.couverts > 0 && <DeltaBadge cur={ca / W.couverts} prev={(mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht) / activePrev.couverts} decimals={1} prefix="\u20AC" />}
                   </div>
                   <div style={{ width: 1, background: "rgba(255,255,255,.1)", alignSelf: "stretch" }} />
                   <div>
                     <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>vs A-1</div>
-                    {prev ? (() => {
-                      const prevCA = mode === "ttc" ? prev.ca_ttc : prev.ca_ht;
+                    {activePrev ? (() => {
+                      const prevCA = mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht;
                       const d = ca - prevCA;
                       return (
                         <>
@@ -408,7 +506,7 @@ export default function PerformancesPage() {
 
             {/* Duration & Rotation */}
             {W.duration && W.duration.totalOrders > 0 && (() => {
-              const P = prev?.duration;
+              const P = activePrev?.duration;
               return (
               <div style={S.card}>
                 <div style={S.sec}>Duree & rotation des tables</div>
@@ -535,10 +633,10 @@ export default function PerformancesPage() {
             </div>
 
             {/* Comparatif A-1 */}
-            {prev && W.days.length > 1 && (() => {
+            {activePrev && W.days.length > 1 && (() => {
               const compBuckets = viewTab === "mois" ? buildWeekBuckets(W.dates) : null;
               const curDayVals = mode === "ttc" ? W.day_ttc : W.day_ht;
-              const prevDayVals = mode === "ttc" ? prev.day_ttc : prev.day_ht;
+              const prevDayVals = mode === "ttc" ? activePrev!.day_ttc : activePrev!.day_ht;
               const compLabels = compBuckets ? compBuckets.map(b => b.label) : W.days;
               const compCur = compBuckets ? sumByBuckets(curDayVals, compBuckets) : curDayVals;
               const compPrev = compBuckets ? sumByBuckets(prevDayVals, compBuckets) : prevDayVals;
