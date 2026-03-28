@@ -147,11 +147,12 @@ button.etab-fab {
   box-shadow: none !important;
 }
 
-/* Glass mobile bars */
+/* Mobile topbar — no background, just the bell icon */
 .topbar-mobile {
-  background: var(--glass-sidebar) !important;
-  backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+  background: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
   border-bottom: 1px solid var(--glass-sidebar-border) !important;
 }
 .bottom-tab-bar {

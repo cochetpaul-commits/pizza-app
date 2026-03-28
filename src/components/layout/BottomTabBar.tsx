@@ -214,8 +214,8 @@ const SECTION_VENTES: TabSection = {
   match: ["/ventes"],
   icon: (a) => <IconWallet active={a} />,
   tabs: [
-    { label: "Indicateurs", href: "/ventes/performances", match: ["/ventes/performances"], icon: (a) => <IconBarChart active={a} /> },
     { label: "Marges", href: "/ventes/marges", match: ["/ventes/marges"], icon: (a) => <IconWallet active={a} /> },
+    { label: "Articles", href: "/ventes/articles", match: ["/ventes/articles"], icon: (a) => <IconTag active={a} /> },
     { label: "Simulation", href: "/ventes/simulation", match: ["/ventes/simulation"], icon: (a) => <IconTrendingUp active={a} /> },
   ],
 };
