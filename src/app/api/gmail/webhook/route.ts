@@ -496,22 +496,38 @@ async function processMessage(messageId: string) {
           }
         }
 
-        if (ingredientId) {
+        if (ingredientId && ing.prix_unitaire != null && ing.prix_unitaire > 0) {
+          const unit = ing.unit_commande === "kg" ? "kg" : "piece";
           const offerRow: Record<string, unknown> = {
             ingredient_id: ingredientId,
             supplier_id: supplierId,
-            unit: ing.unit_commande === "kg" ? "kg" : "piece",
+            supplier_sku: ing.reference ?? null,
+            supplier_label: ing.name,
+            price_kind: "unit",
+            unit,
             unit_price: ing.prix_unitaire,
+            price: ing.prix_unitaire,
+            currency: "EUR",
             establishment: estabValue,
             is_active: true,
-            valid_from: new Date().toISOString().slice(0, 10),
+            piece_weight_g: ing.poids_unitaire ?? null,
           };
           if (userId) offerRow.user_id = userId;
+          if (etabId) offerRow.etablissement_id = etabId;
 
-          await supabaseAdmin.from("supplier_offers").upsert(
-            offerRow,
-            { onConflict: "ingredient_id,supplier_id,unit" },
-          );
+          // Deactivate previous active offer for this ingredient+supplier
+          await supabaseAdmin
+            .from("supplier_offers")
+            .update({ is_active: false })
+            .eq("ingredient_id", ingredientId)
+            .eq("supplier_id", supplierId)
+            .eq("is_active", true);
+
+          // Insert new offer
+          const { error: offerErr } = await supabaseAdmin.from("supplier_offers").insert(offerRow);
+          if (offerErr) {
+            console.error("Insert offer error:", offerErr.message, ing.name);
+          }
         }
       }
 
