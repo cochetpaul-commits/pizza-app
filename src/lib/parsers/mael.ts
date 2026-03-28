@@ -63,7 +63,7 @@ function extractMeta(text: string) {
 // Quantity with 3 decimal places is the key anchor distinguishing it from
 // numbers in product names (100 g, 2.5 kg, etc.)
 
-const RE_PRODUCT = /(ART\d{4}|RESTO\d+(?:\.\d+)?)\s+([\s\S]*?)\s+(\d+[.,]\d{3})\s+(U|kg~)\s+(\d+[.,]\d{2})\s+(\d+[.,]\d{2})\s+(\d)(?=\s|$)/g;
+const RE_PRODUCT = /(ART\d{4}|RESTO\d+(?:\.\d+)?)\s+([\s\S]*?)\s+(\d+[.,]\d{3})\s+(U|kg~)\s+(\d+[.,]\d{2})\s+(\d+[.,]\d{2})\s+(\d)(?:\s.*?)?$/gm;
 
 // Strip DLC/DLUO prefix from name area
 // "NC ", "01/27 ", "08/06/26 ", "3*17/05/26 1*15/11/26 ", "24/01/27Olive" (no space)

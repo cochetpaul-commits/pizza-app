@@ -89,7 +89,7 @@ function extractVolumeFromName(name: string): number | null {
 // ── Product line regex ──────────────────────────────────────────────────────
 // SKU  QTY  UNIT  PRIX_BRUT  TOTAL_HT  TAXE  PRIX_NET  NAME
 const RE_LINE =
-  /([A-Z]{2,6}\d{2,6})\s+(\d+[.,]\d+)\s+(KGM?|KG|PCE?|PCS|UNI|LIT?|L)\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s+([A-Z][A-Z\s/'.()-]+?)(?=\s+[A-Z]{2,6}\d{2,6}\s|\s+Base\s|\s*$)/gi;
+  /([A-Z]{2,6}\d{2,6})\s+(\d+[.,]\d+)\s+(KGM?|KG|PCE?|PCS|UNI|LIT?|L)\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s+([A-Z][A-Z\s/'.()-]+?)(?=\s+[A-Z]{2,6}\d{2,6}\s|\s+Base\s|\s+Total\s|\s*$)/gi;
 
 // ── Parser ──────────────────────────────────────────────────────────────────
 

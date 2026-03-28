@@ -210,6 +210,32 @@ async function getAccessTokenDirect(): Promise<string> {
   return data.access_token;
 }
 
+// ── Resolve a service user_id for DB inserts ─────────────────────────────────
+
+let _serviceUserId: string | null = null;
+
+async function getServiceUserId(): Promise<string | null> {
+  if (_serviceUserId) return _serviceUserId;
+  // Pick the first admin user as the owner for webhook-created records
+  const { data } = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .eq("role", "group_admin")
+    .limit(1)
+    .maybeSingle();
+  _serviceUserId = data?.id ?? null;
+  if (!_serviceUserId) {
+    // Fallback: pick any user
+    const { data: fallback } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+    _serviceUserId = fallback?.id ?? null;
+  }
+  return _serviceUserId;
+}
+
 // ── Process a single Gmail message ───────────────────────────────────────────
 
 async function processMessage(messageId: string) {
@@ -299,12 +325,13 @@ async function processMessage(messageId: string) {
         continue;
       }
 
-      // Check invoice duplicate
-      if (parseResult.invoice_number) {
+      // Check invoice duplicate (same supplier + same invoice number)
+      if (parseResult.invoice_number && supplierId) {
         const { count: invCount } = await supabaseAdmin
           .from("supplier_invoices")
           .select("id", { count: "exact", head: true })
-          .eq("invoice_number", parseResult.invoice_number);
+          .eq("invoice_number", parseResult.invoice_number)
+          .eq("supplier_id", supplierId);
         if ((invCount ?? 0) > 0) {
           await logImport(messageId, from, subject, emailDate, pdf.filename, fournisseur, etabId, parseResult.invoice_number, 0, "duplicate", "Facture déjà importée");
           results.push({ file: pdf.filename, status: "duplicate", invoice: parseResult.invoice_number });
@@ -312,19 +339,24 @@ async function processMessage(messageId: string) {
         }
       }
 
+      // Resolve a user_id for DB inserts
+      const userId = await getServiceUserId();
+
       // Insert supplier_invoice
+      const invRow: Record<string, unknown> = {
+        supplier_id: supplierId,
+        etablissement_id: etabId,
+        invoice_number: parseResult.invoice_number,
+        invoice_date: parseResult.invoice_date ? ddmmyyyyToIso(parseResult.invoice_date) : null,
+        total_ht: parseResult.total_ht,
+        total_ttc: parseResult.total_ttc,
+        source_filename: pdf.filename,
+        source: "gmail_webhook",
+      };
+      if (userId) invRow.user_id = userId;
       const { data: inv, error: invErr } = await supabaseAdmin
         .from("supplier_invoices")
-        .insert({
-          supplier_id: supplierId,
-          etablissement_id: etabId,
-          invoice_number: parseResult.invoice_number,
-          invoice_date: parseResult.invoice_date ? ddmmyyyyToIso(parseResult.invoice_date) : null,
-          total_ht: parseResult.total_ht,
-          total_ttc: parseResult.total_ttc,
-          source_filename: pdf.filename,
-          source: "gmail_webhook",
-        })
+        .insert(invRow)
         .select("id")
         .single();
 
@@ -335,16 +367,20 @@ async function processMessage(messageId: string) {
       }
 
       // Insert invoice lines (all lines, no confidence filter — this is invoice history)
-      const lines = parseResult.ingredients.map((ing) => ({
-        invoice_id: inv.id,
-        supplier_id: supplierId,
-        sku: ing.reference ?? null,
-        name: ing.name,
-        quantity: 1,
-        unit: ing.unit_commande === "kg" ? "kg" : "pc",
-        unit_price: ing.prix_unitaire,
-        total_price: ing.prix_commande,
-      }));
+      const lines = parseResult.ingredients.map((ing) => {
+        const line: Record<string, unknown> = {
+          invoice_id: inv.id,
+          supplier_id: supplierId,
+          sku: ing.reference ?? null,
+          name: ing.name,
+          quantity: 1,
+          unit: ing.unit_commande === "kg" ? "kg" : "pc",
+          unit_price: ing.prix_unitaire,
+          total_price: ing.prix_commande,
+        };
+        if (userId) line.user_id = userId;
+        return line;
+      });
 
       if (lines.length > 0) {
         const { error: linesErr } = await supabaseAdmin.from("supplier_invoice_lines").insert(lines);

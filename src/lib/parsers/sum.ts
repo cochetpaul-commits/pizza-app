@@ -54,7 +54,7 @@ function extractMeta(text: string) {
 // REF  NAME  QTY(comma,1-3dec)  LOT  PU_HT(comma,2dec)  [REMISE]  PU_NET(comma,2dec)  TOTAL(comma,2dec)€
 // Quantities always use comma. Names may contain periods (0.2, 2.5kg) but not commas.
 
-const RE_PRODUCT = /\b([A-Z]{2,6}\d{1,3})(?!\s+RUPTURE)\s+(.*?)\s+(\d+,\d{1,3})\s+(\S+)\s+(\d+,\d{2})\s+(\d+,\d{2})\s+(\d+,\d{2})€/g;
+const RE_PRODUCT = /\b([A-Z]{2,6}\d{1,3})(?!\s+RUPTURE)\s+(.*?)\s+(\d+,\d{1,3})\s+(\S+)\s+(\d+,\d{2})\s+(\d+,\d{2})\s+(\d+,\d{2})\s*[€eæC¤]?/g;
 
 // RUPTURE: "Name REF RUPTURE" — skip these
 const RE_RUPTURE = /\b([A-Z]{2,6}\d{1,3})\s+RUPTURE\b/g;
