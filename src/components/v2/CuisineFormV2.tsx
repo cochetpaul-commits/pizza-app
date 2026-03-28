@@ -568,8 +568,6 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
   const MAIN_TABS: { key: MainTab; label: string }[] = isEdit ? [
     { key: "fc", label: "Food cost & Marges" },
     { key: "recette", label: "Recette & Procede" },
-    { key: "cmd", label: "Commandes fournisseurs" },
-    { key: "pop", label: "Pilotage CA — Popina" },
   ] : [
     { key: "recette", label: "Recette" },
   ];
