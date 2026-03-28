@@ -240,8 +240,8 @@ export default function PerformancesPage() {
     <RequireRole allowedRoles={["group_admin"]}>
       <div className="ventes-container" style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 16px 60px" }}>
 
-        {/* ── Import + View tabs ── */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
+        {/* ── Toolbar: tabs + import + PDF + TTC/HT ── */}
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 16 }}>
           <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 10, overflow: "hidden" }}>
             {(["jour", "semaine", "mois"] as ViewTab[]).map(t => (
               <button key={t} type="button" onClick={() => setViewTab(t)} style={{
@@ -251,61 +251,57 @@ export default function PerformancesPage() {
                 fontSize: 12, fontWeight: 600, cursor: "pointer",
                 fontFamily: "var(--font-oswald), Oswald, sans-serif", textTransform: "uppercase", letterSpacing: ".05em",
               }}>
-                {t === "jour" ? "Journalier" : t === "semaine" ? "Hebdomadaire" : "Mensuel"}
+                {t === "jour" ? "Journalier" : t === "semaine" ? "Hebdo" : "Mensuel"}
               </button>
             ))}
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <label style={{
-              padding: "7px 14px", borderRadius: 8, border: "none",
-              background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
+          <label style={{
+            padding: "7px 14px", borderRadius: 8, border: "none",
+            background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
+          }}>
+            {importing ? "Import..." : "Import"}
+            <input type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => {
+              const f = e.target.files?.[0];
+              if (f) handleImport(f);
+              e.target.value = "";
+            }} />
+          </label>
+          {data && (
+            <button type="button" onClick={handleExportPDF} disabled={exporting} style={{
+              padding: "7px 14px", borderRadius: 8, border: "1px solid #e0d8ce",
+              background: "#fff", color: "#1a1a1a", fontSize: 12, fontWeight: 700, cursor: "pointer",
+              opacity: exporting ? 0.5 : 1,
             }}>
-              {importing ? "Import..." : "Importer XLSX"}
-              <input type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => {
-                const f = e.target.files?.[0];
-                if (f) handleImport(f);
-                e.target.value = "";
-              }} />
-            </label>
-            {data && (
-              <button type="button" onClick={handleExportPDF} disabled={exporting} style={{
-                padding: "7px 14px", borderRadius: 8, border: "1px solid #e0d8ce",
-                background: "#fff", color: "#1a1a1a", fontSize: 12, fontWeight: 700, cursor: "pointer",
-                opacity: exporting ? 0.5 : 1,
-              }}>
-                {exporting ? "Export..." : "PDF"}
-              </button>
-            )}
-            <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
-              <button type="button" onClick={() => setMode("ttc")} style={{
-                padding: "4px 14px", borderRadius: 16, border: "none", cursor: "pointer",
-                background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#777",
-                fontSize: 11, fontWeight: 500,
-              }}>TTC</button>
-              <button type="button" onClick={() => setMode("ht")} style={{
-                padding: "4px 14px", borderRadius: 16, border: "none", cursor: "pointer",
-                background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#777",
-                fontSize: 11, fontWeight: 500,
-              }}>HT</button>
-            </div>
+              {exporting ? "Export..." : "PDF"}
+            </button>
+          )}
+          <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
+            <button type="button" onClick={() => setMode("ttc")} style={{
+              padding: "4px 14px", borderRadius: 16, border: "none", cursor: "pointer",
+              background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#777",
+              fontSize: 11, fontWeight: 500,
+            }}>TTC</button>
+            <button type="button" onClick={() => setMode("ht")} style={{
+              padding: "4px 14px", borderRadius: 16, border: "none", cursor: "pointer",
+              background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#777",
+              fontSize: 11, fontWeight: 500,
+            }}>HT</button>
           </div>
         </div>
         {importMsg && <div style={{ fontSize: 12, color: accent, marginBottom: 10 }}>{importMsg}</div>}
 
-        {/* ── Date navigation ── */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid rgba(70,101,90,.2)" }}>
-          <div>
+        {/* ── Date navigation + title ── */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid rgba(70,101,90,.2)" }}>
+          <button type="button" onClick={() => navigate(-1)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>&larr;</button>
+          <div style={{ flex: 1 }}>
             <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".16em", color: accent, fontWeight: 500, marginBottom: 4 }}>
-              {etab?.nom ?? "Etablissement"} · {viewTab === "jour" ? "Rapport journalier" : viewTab === "semaine" ? "Briefing hebdomadaire" : "Rapport mensuel"}
+              {viewTab === "jour" ? "Rapport journalier" : viewTab === "semaine" ? "Briefing hebdomadaire" : "Rapport mensuel"}
             </div>
             <h1 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-.01em" }}>
               {rangeLabel}
             </h1>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" onClick={() => navigate(-1)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16 }}>&larr;</button>
-            <button type="button" onClick={() => navigate(1)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16 }}>&rarr;</button>
-          </div>
+          <button type="button" onClick={() => navigate(1)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>&rarr;</button>
         </div>
 
         {/* ── Loading / Empty ── */}
@@ -350,14 +346,14 @@ export default function PerformancesPage() {
                     );
                   })()}
                 </div>
-                <div className="ventes-hero-kpis" style={{ display: "flex", gap: 28, marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,.12)" }}>
+                <div className="ventes-hero-kpis" style={{ display: "flex", gap: 20, marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,.12)", flexWrap: "wrap" }}>
                   <div>
                     <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>Couverts</div>
                     <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>{W.couverts}</div>
                     <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>{W.tickets} tickets</div>
                     {prev && <DeltaBadge cur={W.couverts} prev={prev.couverts} />}
                   </div>
-                  <div style={{ width: 1, background: "rgba(255,255,255,.1)" }} />
+                  <div style={{ width: 1, background: "rgba(255,255,255,.1)", alignSelf: "stretch" }} />
                   <div>
                     <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>CVT moyen</div>
                     <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>
@@ -366,8 +362,8 @@ export default function PerformancesPage() {
                     {W.cov_sur > 0 && <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>CVT M SP <span style={{ color: "#fff", fontWeight: 700 }}>{"\u20AC" + ((mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur).toFixed(1)}</span></div>}
                     {prev && prev.couverts > 0 && <DeltaBadge cur={ca / W.couverts} prev={(mode === "ttc" ? prev.ca_ttc : prev.ca_ht) / prev.couverts} decimals={1} prefix="\u20AC" />}
                   </div>
-                  <div style={{ width: 1, background: "rgba(255,255,255,.1)" }} />
-                  <div style={{ flex: 1 }}>
+                  <div style={{ width: 1, background: "rgba(255,255,255,.1)", alignSelf: "stretch" }} />
+                  <div>
                     <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>vs A-1</div>
                     {prev ? (() => {
                       const prevCA = mode === "ttc" ? prev.ca_ttc : prev.ca_ht;
@@ -482,50 +478,35 @@ export default function PerformancesPage() {
             {W.days.length > 0 && (() => {
               // Zone capacity config (tables × max couverts)
               const ZONE_CAPACITY: Record<string, { tables: number; maxCov: number }> = {
-                Salle: { tables: 17, maxCov: 8 * 2 + 4 * 4 + 3 * 5 + 2 * 4 }, // 8×2 + 4×4 + 3×5 + 2×4 = 55
-                Pergolas: { tables: 8, maxCov: 6 * 2 + 2 * 4 }, // 6×2 + 2×4 = 20
-                Terrasse: { tables: 16, maxCov: 10 * 2 + 5 * 4 + 1 * 6 }, // 10×2 + 5×4 + 1×6 = 46
+                Salle: { tables: 17, maxCov: 49 },
+                Pergolas: { tables: 8, maxCov: 20 },
+                Terrasse: { tables: 16, maxCov: 48 },
               };
               const zones = mode === "ttc" ? W.zones_ttc : W.zones_ht;
               const activeZones = Object.entries(zones).filter(([, vals]) => vals.some(v => v > 0));
               const totalCA = activeZones.reduce((s, [, vals]) => s + vals.reduce((a, b) => a + b, 0), 0);
-              const weekBuckets = viewTab === "mois" ? buildWeekBuckets(W.dates) : null;
 
               return (
               <div className="ventes-zone-grid" style={{ display: "grid", gridTemplateColumns: `repeat(${activeZones.length}, 1fr)`, gap: 10, marginBottom: 6 }}>
                 {activeZones.map(([zone, vals]) => {
                   const tot = vals.reduce((a, b) => a + b, 0);
-                  const dispLabels = weekBuckets ? weekBuckets.map(b => b.label) : W.days;
-                  const dispVals = weekBuckets ? sumByBuckets(vals, weekBuckets) : vals;
-                  const maxV = Math.max(...dispVals.filter(Boolean));
                   const zKey = zone === "\u00C0 emporter" ? "emp" : zone;
                   const color = ZC[zKey] ?? "#888";
                   const cap = ZONE_CAPACITY[zone];
                   const pctCA = totalCA > 0 ? Math.round(tot / totalCA * 100) : 0;
 
                   return (
-                    <div key={zone} style={{ ...S.card, padding: "14px 16px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                        <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".1em", color, fontWeight: 600 }}>{zone}</div>
-                        <div style={{ fontSize: 10, color: "#777" }}>{pctCA}% du CA</div>
+                    <div key={zone} style={{ padding: "12px 14px", background: "#f9f6f0", borderRadius: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                        <span style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".1em", color }}>{zone}</span>
                       </div>
-                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 26, fontWeight: 700, marginBottom: 4 }}>{fmt(tot)}</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color, lineHeight: 1, marginBottom: 4 }}>{fmt(tot)}</div>
+                      <div style={{ fontSize: 10, color: "#777", marginBottom: 4 }}>{pctCA}% du CA</div>
                       {cap && (
-                        <div style={{ fontSize: 10, color: "#777", marginBottom: 10 }}>
+                        <div style={{ fontSize: 10, color: "#999" }}>
                           {cap.tables} tables · {cap.maxCov} cvts max
                         </div>
                       )}
-                      {dispLabels.map((d, i) => (
-                        <div key={d} style={{ marginBottom: 7 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 3 }}>
-                            <span style={{ color: "#777" }}>{weekBuckets ? d : d.slice(0, 3)}</span>
-                            {dispVals[i] > 0 ? <span style={{ fontWeight: 500 }}>{fmt(dispVals[i])}</span> : <span style={{ color: "#bbb" }}>{"\u2014"}</span>}
-                          </div>
-                          <div style={{ height: 4, background: "rgba(0,0,0,.07)", borderRadius: 2, overflow: "hidden" }}>
-                            {dispVals[i] > 0 && <div style={{ height: "100%", width: `${maxV ? (dispVals[i] / maxV * 100) : 0}%`, background: color, borderRadius: 2 }} />}
-                          </div>
-                        </div>
-                      ))}
                     </div>
                   );
                 })}
@@ -813,10 +794,10 @@ function PlaceBlock({ label, color, ca, pct, couverts, tm }: { label: string; co
       <div style={{ height: 4, background: "rgba(0,0,0,.06)", borderRadius: 2, overflow: "hidden", marginBottom: 14 }}>
         <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 2 }} />
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-        <div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700 }}>{fmt(ca)}</div><div style={{ fontSize: 9, color: "#777", textTransform: "uppercase", marginTop: 2 }}>CA</div></div>
-        <div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700 }}>{couverts}</div><div style={{ fontSize: 9, color: "#777", textTransform: "uppercase", marginTop: 2 }}>Couverts</div></div>
-        <div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700, color }}>{"\u20AC" + tm}</div><div style={{ fontSize: 9, color: "#777", textTransform: "uppercase", marginTop: 2 }}>TM</div></div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <div style={{ minWidth: 0 }}><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>{fmt(ca)}</div><div style={{ fontSize: 9, color: "#777", textTransform: "uppercase", marginTop: 2 }}>CA</div></div>
+        <div style={{ minWidth: 0 }}><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>{couverts}</div><div style={{ fontSize: 9, color: "#777", textTransform: "uppercase", marginTop: 2 }}>CVT</div></div>
+        <div style={{ minWidth: 0 }}><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700, color }}>{"\u20AC" + tm}</div><div style={{ fontSize: 9, color: "#777", textTransform: "uppercase", marginTop: 2 }}>TM</div></div>
       </div>
     </div>
   );
@@ -842,6 +823,7 @@ function RecapTable({ services, mode, meteo, dates, days, viewTab }: { services:
         if (dates[idx]) dateToWeek[dates[idx]] = b.label;
       }
     }
+    // Group services by week, then aggregate into midi/soir totals
     const weekMap: Record<string, WeekData["services"]> = {};
     const weekOrder: string[] = [];
     for (const s of services) {
@@ -851,7 +833,50 @@ function RecapTable({ services, mode, meteo, dates, days, viewTab }: { services:
       weekMap[wk].push(s);
     }
     for (const wk of weekOrder) {
-      groups.push({ groupLabel: wk, services: weekMap[wk] });
+      const svcs = weekMap[wk];
+      const midiSvcs = svcs.filter(s => s.svc === "midi");
+      const soirSvcs = svcs.filter(s => s.svc !== "midi");
+      const aggregated: WeekData["services"] = [];
+      const sumZones = (arr: WeekData["services"], key: "z_ttc" | "z_ht") => {
+        const result: Record<string, number> = {};
+        for (const s of arr) {
+          for (const [zn, zv] of Object.entries(s[key] ?? {})) {
+            result[zn] = (result[zn] ?? 0) + zv;
+          }
+        }
+        return result;
+      };
+      if (midiSvcs.length > 0) {
+        const mTtc = midiSvcs.reduce((s, x) => s + x.ttc, 0);
+        const mHt = midiSvcs.reduce((s, x) => s + x.ht, 0);
+        const mCov = midiSvcs.reduce((s, x) => s + x.cov, 0);
+        const mSpTtc = midiSvcs.reduce((s, x) => s + x.sp_ttc, 0);
+        const mSpHt = midiSvcs.reduce((s, x) => s + x.sp_ht, 0);
+        const mSpCov = midiSvcs.reduce((s, x) => s + x.sp_cov, 0);
+        aggregated.push({
+          jour: "Midi", svc: "midi", ttc: mTtc, ht: mHt, cov: mCov,
+          tm_ttc: mCov > 0 ? mTtc / mCov : 0, tm_ht: mCov > 0 ? mHt / mCov : 0,
+          sp_ttc: mSpTtc, sp_ht: mSpHt, emp_ttc: midiSvcs.reduce((s, x) => s + x.emp_ttc, 0), emp_ht: midiSvcs.reduce((s, x) => s + x.emp_ht, 0),
+          sp_cov: mSpCov, tm_sp_ttc: mSpCov > 0 ? mSpTtc / mSpCov : 0, tm_sp_ht: mSpCov > 0 ? mSpHt / mSpCov : 0,
+          z_ttc: sumZones(midiSvcs, "z_ttc"), z_ht: sumZones(midiSvcs, "z_ht"),
+        });
+      }
+      if (soirSvcs.length > 0) {
+        const sTtc = soirSvcs.reduce((s, x) => s + x.ttc, 0);
+        const sHt = soirSvcs.reduce((s, x) => s + x.ht, 0);
+        const sCov = soirSvcs.reduce((s, x) => s + x.cov, 0);
+        const sSpTtc = soirSvcs.reduce((s, x) => s + x.sp_ttc, 0);
+        const sSpHt = soirSvcs.reduce((s, x) => s + x.sp_ht, 0);
+        const sSpCov = soirSvcs.reduce((s, x) => s + x.sp_cov, 0);
+        aggregated.push({
+          jour: "Soir", svc: "soir", ttc: sTtc, ht: sHt, cov: sCov,
+          tm_ttc: sCov > 0 ? sTtc / sCov : 0, tm_ht: sCov > 0 ? sHt / sCov : 0,
+          sp_ttc: sSpTtc, sp_ht: sSpHt, emp_ttc: soirSvcs.reduce((s, x) => s + x.emp_ttc, 0), emp_ht: soirSvcs.reduce((s, x) => s + x.emp_ht, 0),
+          sp_cov: sSpCov, tm_sp_ttc: sSpCov > 0 ? sSpTtc / sSpCov : 0, tm_sp_ht: sSpCov > 0 ? sSpHt / sSpCov : 0,
+          z_ttc: sumZones(soirSvcs, "z_ttc"), z_ht: sumZones(soirSvcs, "z_ht"),
+        });
+      }
+      groups.push({ groupLabel: wk, services: aggregated });
     }
   } else {
     const byDay: Record<string, WeekData["services"]> = {};
@@ -894,7 +919,7 @@ function RecapTable({ services, mode, meteo, dates, days, viewTab }: { services:
             return (
               <tr key={`${group.groupLabel}-${s.jour}-${s.svc}`} style={{ background: bg, borderTop: si === 0 && di > 0 ? "1px solid #e0d8ce" : si > 0 ? "1px solid rgba(0,0,0,.05)" : "none" }}>
                 {si === 0 && <td rowSpan={svcs.length} style={{ padding: "0 16px", fontWeight: 700, fontSize: useWeeks ? 12 : 15, verticalAlign: "middle", borderRight: "1px solid #e0d8ce" }}>{useWeeks ? group.groupLabel : s.jour}</td>}
-                <td style={tdSt}><span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: s.svc === "midi" ? ZC.Pergolas : "#1a1a1a" }}>{s.svc === "midi" ? "Midi" : "Soir"}{useWeeks ? ` ${s.jour.slice(0, 3)}` : ""}</span></td>
+                <td style={tdSt}><span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: s.svc === "midi" ? ZC.Pergolas : "#1a1a1a" }}>{s.svc === "midi" ? "Midi" : "Soir"}</span></td>
                 {zCell(z?.Salle, ZC.Salle)}
                 {zCell(z?.Pergolas, ZC.Pergolas)}
                 {zCell(z?.Terrasse, ZC.Terrasse)}
