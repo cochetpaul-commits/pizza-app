@@ -578,23 +578,27 @@ export default function PerformancesPage() {
               const zones = mode === "ttc" ? W.zones_ttc : W.zones_ht;
               const activeZones = Object.entries(zones).filter(([, vals]) => vals.some(v => v > 0));
               const totalCA = activeZones.reduce((s, [, vals]) => s + vals.reduce((a, b) => a + b, 0), 0);
+              const zoneBuckets = viewTab === "mois" ? buildWeekBuckets(W.dates) : null;
+              const cols = Math.min(activeZones.length, 4);
 
               return (
-              <div className="ventes-zone-grid" style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(activeZones.length, 3)}, 1fr)`, gap: 10, marginBottom: 6 }}>
+              <div className="ventes-zone-grid" style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 10, marginBottom: 6 }}>
                 {activeZones.map(([zone, vals]) => {
                   const tot = vals.reduce((a, b) => a + b, 0);
                   const zKey = zone === "\u00C0 emporter" ? "emp" : zone;
                   const color = ZC[zKey] ?? "#888";
                   const pctCA = totalCA > 0 ? Math.round(tot / totalCA * 100) : 0;
-                  const maxDay = Math.max(...vals, 1);
+                  const displayVals = zoneBuckets ? sumByBuckets(vals, zoneBuckets) : vals;
+                  const displayLabels = zoneBuckets ? zoneBuckets.map(b => b.label) : W.days.map(d => d.slice(0, 3));
+                  const maxDay = Math.max(...displayVals, 1);
 
                   return (
                     <div key={zone} style={{ background: "#fff", border: "1px solid #e0d8ce", borderRadius: 12, padding: "14px 16px" }}>
                       <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".1em", color, marginBottom: 8 }}>{zone}</div>
                       <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color, lineHeight: 1, marginBottom: 2 }}>{fmt(tot)}</div>
                       <div style={{ fontSize: 10, color: "#777", marginBottom: 10 }}>{pctCA}% du CA</div>
-                      {vals.map((v, di) => {
-                        const dayLabel = (W.days[di] ?? "").slice(0, 3);
+                      {displayVals.map((v, di) => {
+                        const dayLabel = displayLabels[di] ?? "";
                         const barPct = maxDay > 0 ? Math.round(v / maxDay * 100) : 0;
                         return (
                           <div key={di} style={{ marginBottom: 6 }}>
@@ -905,11 +909,35 @@ function PlaceBlock({ label, color, ca, pct, couverts, tm }: { label: string; co
 }
 
 function RecapTable({ services, mode, meteo, dates, days, viewTab }: { services: WeekData["services"]; mode: "ttc" | "ht"; meteo: Record<string, { emoji: string; desc: string; temp: number }>; dates: string[]; days: string[]; viewTab: ViewTab }) {
-  // Map day name → date for meteo lookup
+  // Map day name → date for meteo lookup (simple 1:1 for jour/semaine views)
   const dayToDate: Record<string, string> = {};
   for (let i = 0; i < days.length; i++) {
     if (days[i] && dates[i]) dayToDate[days[i]] = dates[i];
   }
+
+  // Build per-service date mapping: services are emitted in date order (midi, soir per date).
+  // For monthly view we need to know which date each service belongs to, since the same day name
+  // (e.g. "Lundi") appears multiple times. We match by consuming dates in order.
+  const serviceDateMap: string[] = []; // serviceDateMap[i] = ISO date for services[i]
+  {
+    let dateIdx = 0;
+    for (let si = 0; si < services.length; si++) {
+      const s = services[si];
+      // Advance dateIdx to find the date whose day name matches s.jour
+      // (services come in date order, so we only advance forward)
+      while (dateIdx < dates.length && days[dateIdx] !== s.jour) {
+        dateIdx++;
+      }
+      serviceDateMap[si] = dates[dateIdx] ?? "";
+      // If next service has a different jour or different svc, we may need to advance.
+      // But if next service is same jour (e.g. soir after midi), keep same dateIdx.
+      const next = services[si + 1];
+      if (next && next.jour !== s.jour) {
+        dateIdx++;
+      }
+    }
+  }
+
   // Group services by week when in monthly view
   const useWeeks = viewTab === "mois";
   type GroupEntry = { groupLabel: string; services: WeekData["services"] };
@@ -926,8 +954,9 @@ function RecapTable({ services, mode, meteo, dates, days, viewTab }: { services:
     // Group services by week, then aggregate into midi/soir totals
     const weekMap: Record<string, WeekData["services"]> = {};
     const weekOrder: string[] = [];
-    for (const s of services) {
-      const date = dayToDate[s.jour];
+    for (let si = 0; si < services.length; si++) {
+      const s = services[si];
+      const date = serviceDateMap[si];
       const wk = date ? (dateToWeek[date] ?? s.jour) : s.jour;
       if (!weekMap[wk]) { weekMap[wk] = []; weekOrder.push(wk); }
       weekMap[wk].push(s);
