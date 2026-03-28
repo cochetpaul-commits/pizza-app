@@ -114,6 +114,7 @@ export const CLIENTS_ITEMS = EVENEMENTIEL_ITEMS;
 /** Ventes section */
 const VENTES_ITEMS: NavItemV2[] = [
   { label: "Produits vendus", href: "/ventes/produits", icon: "tag" },
+  { label: "Marges", href: "/ventes/marges", icon: "wallet" },
   { label: "Simulation", href: "/ventes/simulation", icon: "calculator" },
 ];
 export const VENTES_SECTION: NavSubSection = { label: "Ventes", icon: "wallet", href: "/ventes", roles: ["group_admin"], items: VENTES_ITEMS };
@@ -283,6 +284,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/ventes/tickets": "Tickets & couverts",
   "/ventes/performances": "Indicateurs cles",
   "/ventes/produits": "Produits vendus",
+  "/ventes/marges": "Marges produits",
   "/ventes/meteo": "Analyse météo",
   "/plannings": "Planning",
   "/rh/pointage": "Pointage",
@@ -348,6 +350,7 @@ const PAGE_SECTIONS: Record<string, string> = {
   "/rh/conges": "Gestion du personnel",
   "/rh/emargement": "Gestion du personnel",
   "/ventes/simulation": "Ventes",
+  "/ventes/marges": "Ventes",
   "/rh/rapports": "Gestion du personnel",
   "/settings/planning": "Paramètres",
   "/settings/finance": "Paramètres",
