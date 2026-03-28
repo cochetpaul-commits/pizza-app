@@ -656,18 +656,17 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
         {/* ── KPI Banner ── */}
         {isEdit && (
           <div style={{
-            display: "flex", gap: 0, marginBottom: 16, borderRadius: 10,
-            border: "1px solid #ddd6c8", overflow: "hidden", background: "#fff",
+            display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 16,
           }}>
-            <KpiBannerItem label="COUT REVIENT" value={effectiveCostPerPortion ? `${fmtMoney(effectiveCostPerPortion)} €` : "-"} sub="par portion" color="#D4775A" />
+            <KpiBannerItem label="Cout revient" value={effectiveCostPerPortion ? `${fmtMoney(effectiveCostPerPortion)} €` : "-"} sub="par portion" accent="#D4775A" />
             <KpiBannerItem
-              label="FOOD COST"
+              label="Food cost"
               value={foodCostPct != null ? `${foodCostPct.toFixed(1)}%` : "-"}
               sub="objectif ≤ 32%"
-              color={foodCostPct == null ? "#999" : foodCostPct <= 28 ? "#16a34a" : foodCostPct <= 32 ? "#D97706" : "#DC2626"}
+              accent={foodCostPct == null ? "#999" : foodCostPct <= 28 ? "#16a34a" : foodCostPct <= 32 ? "#D97706" : "#DC2626"}
             />
-            <KpiBannerItem label="PRIX DE VENTE HT" value={sp ? `${fmtMoney(sp)} €` : "-"} sub={prixTTC ? `${fmtMoney(prixTTC)} € TTC` : ""} color="#1a1a1a" />
-            <KpiBannerItem label="MARGE BRUTE" value={margeBrute != null ? `${fmtMoney(margeBrute)} €` : "-"} sub="par portion" color="#16a34a" />
+            <KpiBannerItem label="Prix de vente HT" value={sp ? `${fmtMoney(sp)} €` : "-"} sub={prixTTC ? `${fmtMoney(prixTTC)} € TTC` : ""} accent="#1a1a1a" />
+            <KpiBannerItem label="Marge brute" value={margeBrute != null ? `${fmtMoney(margeBrute)} €` : "-"} sub="par portion" accent="#16a34a" />
           </div>
         )}
 
@@ -1048,20 +1047,22 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
 }
 
 // ── KPI Banner Item ──────────────────────────────────────────────
-function KpiBannerItem({ label, value, sub, color }: { label: string; value: string; sub?: string; color: string }) {
+function KpiBannerItem({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent: string }) {
   return (
     <div style={{
-      flex: 1, padding: "12px 14px",
-      borderRight: "1px solid #f0ebe2",
+      padding: "14px 16px", borderRadius: 12,
+      background: "#fff",
+      borderLeft: `3px solid ${accent}`,
+      boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
     }}>
-      <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+      <div style={{ fontSize: 10, fontWeight: 600, color: "#888", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>
         {label}
       </div>
-      <div style={{ fontSize: 18, fontWeight: 700, color, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
+      <div style={{ fontSize: 20, fontWeight: 700, color: accent, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", lineHeight: 1.1 }}>
         {value}
       </div>
       {sub && (
-        <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>
+        <div style={{ fontSize: 10, color: "#aaa", marginTop: 4 }}>
           {sub}
         </div>
       )}

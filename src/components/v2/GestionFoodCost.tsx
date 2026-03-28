@@ -123,27 +123,43 @@ export function GestionFoodCost({
     setSaving(false);
   }
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+  // Sort by cost descending for visual impact
+  const sortedLines = useMemo(() =>
+    [...lineDetails].sort((a, b) => (b.cost ?? 0) - (a.cost ?? 0)),
+  [lineDetails]);
 
-      {/* Multiplier */}
+  // Top cost ingredient percentage
+  const topCostPct = sortedLines.length > 0 && effectiveTotal > 0 && sortedLines[0].cost
+    ? (sortedLines[0].cost / effectiveTotal) * 100
+    : 0;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* ── Header + multiplier ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
-          Detail des couts
+        <div>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
+            Detail des couts
+          </span>
           {yieldGrams && yieldGrams > 0 && (
-            <span style={{ fontWeight: 400, color: "#999", marginLeft: 8 }}>
+            <span style={{ fontWeight: 400, color: "#999", marginLeft: 10, fontSize: 12 }}>
               Rendement : {(yieldGrams / 1000).toFixed(2)} kg
             </span>
           )}
-        </span>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 11, color: "#999" }}>Portions</span>
+        </div>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 6,
+          background: "#fff", padding: "4px 10px", borderRadius: 8,
+          border: "1px solid #e8e2d8",
+        }}>
+          <span style={{ fontSize: 11, color: "#888" }}>Portions</span>
           <select
             value={multiplier}
             onChange={(e) => setMultiplier(Number(e.target.value))}
             style={{
-              padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd6c8",
-              fontSize: 12, background: "#fff",
+              padding: "3px 6px", borderRadius: 6, border: "1px solid #ddd6c8",
+              fontSize: 12, background: "#fff", fontWeight: 600,
             }}
           >
             {[1, 2, 5, 10, 20, 50].map((n) => (
@@ -153,11 +169,14 @@ export function GestionFoodCost({
         </div>
       </div>
 
-      {/* Ingredient cost table */}
-      <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #ddd6c8", overflow: "hidden" }}>
+      {/* ── Ingredient cost table ── */}
+      <div style={{
+        background: "#fff", borderRadius: 14, overflow: "hidden",
+        boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
+      }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
-            <tr style={{ background: "#f9f5ef" }}>
+            <tr style={{ background: "linear-gradient(135deg, #f9f5ef 0%, #f2ede4 100%)" }}>
               <th style={thS}>Ingredient</th>
               <th style={thS}>Fournisseur</th>
               <th style={{ ...thS, textAlign: "right" }}>Qte</th>
@@ -167,43 +186,74 @@ export function GestionFoodCost({
             </tr>
           </thead>
           <tbody>
-            {lineDetails.map((l) => (
-              <tr key={l.id} style={{ borderBottom: "1px solid #f0ebe2" }}>
-                <td style={tdS}>
-                  <span style={{ fontWeight: 600, color: "#1a1a1a" }}>{l.name}</span>
-                  {l.isSubRecipe && (
-                    <span style={{
-                      marginLeft: 6, fontSize: 9, fontWeight: 800, padding: "1px 5px",
-                      borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED",
-                    }}>S/R</span>
-                  )}
-                </td>
-                <td style={{ ...tdS, color: "#666" }}>{l.supplier ?? "-"}</td>
-                <td style={{ ...tdS, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                  {round2(l.qty * multiplier)} {l.unit}
-                </td>
-                <td style={{ ...tdS, textAlign: "right" }}>
-                  {l.rendement < 1 ? (
-                    <span style={{ color: "#D97706", fontWeight: 600 }}>
-                      -{Math.round((1 - l.rendement) * 100)}%
-                    </span>
-                  ) : "-"}
-                </td>
-                <td style={{ ...tdS, textAlign: "right", color: "#666", fontVariantNumeric: "tabular-nums" }}>
-                  {l.cpuLabel ?? "-"}
-                </td>
-                <td style={{ ...tdS, textAlign: "right", fontWeight: 700, color: "#D4775A", fontVariantNumeric: "tabular-nums" }}>
-                  {l.cost != null ? fmtEur(l.cost * multiplier) : "-"}
-                </td>
-              </tr>
-            ))}
+            {sortedLines.map((l, idx) => {
+              const pctOfTotal = effectiveTotal > 0 && l.cost ? (l.cost / effectiveTotal) * 100 : 0;
+              return (
+                <tr key={l.id} style={{
+                  borderBottom: "1px solid #f0ebe2",
+                  background: idx % 2 === 0 ? "#fff" : "#fdfbf8",
+                }}>
+                  <td style={tdS}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontWeight: 600, color: "#1a1a1a" }}>{l.name}</span>
+                      {l.isSubRecipe && (
+                        <span style={{
+                          fontSize: 8, fontWeight: 800, padding: "1px 5px",
+                          borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED",
+                        }}>S/R</span>
+                      )}
+                    </div>
+                    {/* Mini cost bar */}
+                    {pctOfTotal > 0 && (
+                      <div style={{ marginTop: 3, height: 2, borderRadius: 1, background: "#f0ebe2", width: "80%" }}>
+                        <div style={{
+                          height: "100%", borderRadius: 1,
+                          width: `${Math.min(pctOfTotal, 100)}%`,
+                          background: pctOfTotal > 30 ? "#D4775A" : "#D4775A80",
+                          transition: "width 0.3s",
+                        }} />
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ ...tdS, color: "#888", fontSize: 11 }}>{l.supplier ?? "-"}</td>
+                  <td style={{ ...tdS, textAlign: "right", fontVariantNumeric: "tabular-nums", color: "#555" }}>
+                    {round2(l.qty * multiplier)} {l.unit}
+                  </td>
+                  <td style={{ ...tdS, textAlign: "right" }}>
+                    {l.rendement < 1 ? (
+                      <span style={{
+                        color: "#D97706", fontWeight: 600, fontSize: 10,
+                        background: "rgba(217,119,6,0.08)", padding: "2px 5px", borderRadius: 4,
+                      }}>
+                        -{Math.round((1 - l.rendement) * 100)}%
+                      </span>
+                    ) : <span style={{ color: "#ccc" }}>-</span>}
+                  </td>
+                  <td style={{ ...tdS, textAlign: "right", color: "#888", fontVariantNumeric: "tabular-nums", fontSize: 11 }}>
+                    {l.cpuLabel ?? "-"}
+                  </td>
+                  <td style={{ ...tdS, textAlign: "right", fontWeight: 700, color: "#D4775A", fontVariantNumeric: "tabular-nums" }}>
+                    {l.cost != null ? fmtEur(l.cost * multiplier) : "-"}
+                  </td>
+                </tr>
+              );
+            })}
 
             {/* Total row */}
-            <tr style={{ background: "#f2ede4" }}>
-              <td colSpan={5} style={{ ...tdS, fontWeight: 700, color: "#1a1a1a" }}>
+            <tr style={{ background: "linear-gradient(135deg, #f2ede4 0%, #ebe5da 100%)" }}>
+              <td colSpan={5} style={{ ...tdS, fontWeight: 700, color: "#1a1a1a", fontSize: 13 }}>
                 Total cout matiere
+                {sortedLines.length > 0 && topCostPct > 20 && (
+                  <span style={{ fontWeight: 400, fontSize: 10, color: "#999", marginLeft: 8 }}>
+                    ({sortedLines[0].name} = {topCostPct.toFixed(0)}%)
+                  </span>
+                )}
               </td>
-              <td style={{ ...tdS, textAlign: "right", fontWeight: 700, color: "#D4775A", fontSize: 14 }}>
+              <td style={{
+                ...tdS, textAlign: "right", fontWeight: 700,
+                color: "#D4775A", fontSize: 15,
+                fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+              }}>
                 {fmtEur(effectiveTotal * multiplier)}
               </td>
             </tr>
@@ -211,59 +261,99 @@ export function GestionFoodCost({
         </table>
       </div>
 
-      {/* Simulation prix */}
-      <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #ddd6c8", padding: "16px 18px" }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginBottom: 12 }}>
-          Simulation prix de vente
+      {/* ── Simulation prix de vente ── */}
+      <div style={{
+        borderRadius: 14, overflow: "hidden",
+        boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
+        background: "#fff",
+      }}>
+        {/* Header with gradient */}
+        <div style={{
+          padding: "14px 20px",
+          background: "linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)",
+          color: "#fff",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.3 }}>
+            Simulation prix de vente
+          </span>
+          {saving && <span style={{ fontSize: 10, opacity: 0.6 }}>Enregistrement...</span>}
         </div>
 
-        {/* Slider */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-            <span style={{ fontSize: 11, color: "#999" }}>Prix de vente HT</span>
-            <span style={{ fontSize: 18, fontWeight: 700, color: "#1a1a1a", fontFamily: "Oswald, sans-serif" }}>
-              {localSellPrice > 0 ? fmtEur(localSellPrice) : "-"}
-            </span>
-          </div>
-          <input
-            type="range"
-            min={2} max={50} step={0.25}
-            value={localSellPrice}
-            onChange={(e) => setLocalSellPrice(Number(e.target.value))}
-            onMouseUp={() => saveSellPrice(localSellPrice)}
-            onTouchEnd={() => saveSellPrice(localSellPrice)}
-            style={{ width: "100%", accentColor: "#D4775A" }}
-          />
-        </div>
-
-        {/* FC progress bar */}
-        {foodCostPct != null && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-              <span style={{ fontSize: 11, color: "#999" }}>Food cost</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: fcColor }}>
-                {foodCostPct.toFixed(1)}%
+        <div style={{ padding: "20px" }}>
+          {/* Price slider */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: "#888", fontWeight: 500 }}>Prix de vente HT</span>
+              <span style={{
+                fontSize: 24, fontWeight: 700, color: "#1a1a1a",
+                fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+              }}>
+                {localSellPrice > 0 ? fmtEur(localSellPrice) : "-"}
               </span>
             </div>
-            <div style={{ height: 8, background: "#f0ebe2", borderRadius: 4, overflow: "hidden" }}>
-              <div style={{
-                height: "100%", borderRadius: 4, transition: "width 0.2s",
-                width: `${Math.min(foodCostPct, 100)}%`,
-                background: fcColor,
-              }} />
-            </div>
+            <input
+              type="range"
+              min={2} max={50} step={0.25}
+              value={localSellPrice}
+              onChange={(e) => setLocalSellPrice(Number(e.target.value))}
+              onMouseUp={() => saveSellPrice(localSellPrice)}
+              onTouchEnd={() => saveSellPrice(localSellPrice)}
+              style={{ width: "100%", accentColor: "#D4775A" }}
+            />
           </div>
-        )}
 
-        {/* KPIs */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <KpiCard label="Cout revient" value={fmtEur(costPerPortion)} />
-          <KpiCard label="Marge brute" value={margeBrute != null ? fmtEur(margeBrute) : "-"} />
-          <KpiCard label="Prix TTC (10%)" value={prixTTC != null ? fmtEur(prixTTC) : "-"} />
-          <KpiCard label="Prix mini FC 32%" value={prixMiniFC32 != null ? fmtEur(prixMiniFC32) : "-"} />
+          {/* FC progress bar */}
+          {foodCostPct != null && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 12, color: "#888", fontWeight: 500 }}>Food cost</span>
+                <span style={{ fontSize: 16, fontWeight: 700, color: fcColor, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
+                  {foodCostPct.toFixed(1)}%
+                </span>
+              </div>
+              <div style={{ height: 10, background: "#f0ebe2", borderRadius: 5, overflow: "hidden", position: "relative" }}>
+                {/* 32% marker */}
+                <div style={{
+                  position: "absolute", left: "32%", top: 0, bottom: 0, width: 2,
+                  background: "rgba(0,0,0,0.15)", zIndex: 1,
+                }} />
+                <div style={{
+                  height: "100%", borderRadius: 5, transition: "width 0.3s ease",
+                  width: `${Math.min(foodCostPct, 100)}%`,
+                  background: `linear-gradient(90deg, ${fcColor}cc, ${fcColor})`,
+                }} />
+              </div>
+              <div style={{ fontSize: 9, color: "#bbb", marginTop: 3, textAlign: "right" }}>
+                objectif 32%
+              </div>
+            </div>
+          )}
+
+          {/* KPI grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <SimKpiCard
+              label="Cout revient"
+              value={fmtEur(costPerPortion)}
+              accent="#D4775A"
+            />
+            <SimKpiCard
+              label="Marge brute"
+              value={margeBrute != null ? fmtEur(margeBrute) : "-"}
+              accent="#16a34a"
+            />
+            <SimKpiCard
+              label="Prix TTC (10%)"
+              value={prixTTC != null ? fmtEur(prixTTC) : "-"}
+              accent="#1a1a1a"
+            />
+            <SimKpiCard
+              label="Prix mini FC 32%"
+              value={prixMiniFC32 != null ? fmtEur(prixMiniFC32) : "-"}
+              accent="#D97706"
+            />
+          </div>
         </div>
-
-        {saving && <div style={{ fontSize: 11, color: "#999", marginTop: 8, textAlign: "right" }}>Enregistrement...</div>}
       </div>
     </div>
   );
@@ -271,16 +361,18 @@ export function GestionFoodCost({
 
 // ── Sub-components ───────────────────────────────────────────
 
-function KpiCard({ label, value }: { label: string; value: string }) {
+function SimKpiCard({ label, value, accent }: { label: string; value: string; accent: string }) {
   return (
     <div style={{
-      padding: "10px 12px", background: "#f9f5ef", borderRadius: 8,
-      display: "flex", flexDirection: "column", gap: 2,
+      padding: "12px 14px", borderRadius: 10,
+      background: "#faf8f5",
+      borderLeft: `3px solid ${accent}`,
+      display: "flex", flexDirection: "column", gap: 3,
     }}>
-      <span style={{ fontSize: 10, color: "#999", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.3 }}>
+      <span style={{ fontSize: 10, color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.3 }}>
         {label}
       </span>
-      <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", fontFamily: "Oswald, sans-serif" }}>
+      <span style={{ fontSize: 17, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
         {value}
       </span>
     </div>
@@ -290,13 +382,13 @@ function KpiCard({ label, value }: { label: string; value: string }) {
 // ── Styles ───────────────────────────────────────────────────
 
 const thS: React.CSSProperties = {
-  padding: "8px 10px", fontSize: 10, fontWeight: 700, color: "#999",
+  padding: "10px 12px", fontSize: 10, fontWeight: 700, color: "#999",
   textTransform: "uppercase", letterSpacing: 0.5, textAlign: "left",
   borderBottom: "1.5px solid #ddd6c8", whiteSpace: "nowrap",
 };
 
 const tdS: React.CSSProperties = {
-  padding: "8px 10px", verticalAlign: "middle",
+  padding: "10px 12px", verticalAlign: "middle",
 };
 
 function formatCpu(cpu: CpuByUnit, unit: string): string {
