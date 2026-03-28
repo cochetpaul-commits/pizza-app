@@ -89,6 +89,12 @@ export const PERFORMANCES_ITEMS: NavItemV2[] = [];
 export const OPERATIONS_ITEMS: NavItemV2[] = [
   { label: "Catalogue", href: "/catalogue", icon: "book" },
   { label: "Fiches techniques", href: "/recettes", icon: "fileText" },
+  { label: "Inventaire", href: "/inventaire", icon: "package" },
+];
+
+const OPERATIONS_ITEMS_PICCOLA: NavItemV2[] = [
+  { label: "Catalogue", href: "/catalogue", icon: "book" },
+  { label: "Fiches techniques", href: "/recettes", icon: "fileText" },
   { label: "Prix de vente", href: "/epicerie", icon: "tag" },
   { label: "Inventaire", href: "/inventaire", icon: "package" },
 ];
@@ -114,6 +120,7 @@ export const VENTES_SECTION: NavSubSection = { label: "Ventes", icon: "wallet", 
 export const PERSONNEL_SECTION: NavSubSection = { label: "Personnel", icon: "users", href: "/personnel", items: PLANNING_ITEMS };
 export const ACHATS_SECTION: NavSubSection = { label: "Achats", icon: "shoppingBag", roles: ["group_admin"], items: ACHATS_ITEMS };
 export const OPERATIONS_SECTION: NavSubSection = { label: "Opérations", icon: "package", roles: ["group_admin"], items: OPERATIONS_ITEMS };
+export const OPERATIONS_SECTION_PICCOLA: NavSubSection = { label: "Opérations", icon: "package", roles: ["group_admin"], items: OPERATIONS_ITEMS_PICCOLA };
 export const EVENEMENTIEL_SECTION: NavSubSection = { label: "Événementiel", icon: "calendarEvent", roles: ["group_admin"], items: EVENEMENTIEL_ITEMS };
 
 /** Build dynamic nav entries from a list of establishments */

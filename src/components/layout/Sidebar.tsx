@@ -11,7 +11,7 @@ import {
   PERSONNEL_SECTION,
   VENTES_SECTION,
   ACHATS_SECTION,
-  OPERATIONS_SECTION,
+  OPERATIONS_SECTION, OPERATIONS_SECTION_PICCOLA,
   EVENEMENTIEL_SECTION,
   type NavSubSection,
   type NavItemV2,
@@ -412,7 +412,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 PERSONNEL_SECTION,
                 VENTES_SECTION,
                 ACHATS_SECTION,
-                OPERATIONS_SECTION,
+                isPiccolaEtab ? OPERATIONS_SECTION_PICCOLA : OPERATIONS_SECTION,
                 ...(isPiccolaEtab ? [EVENEMENTIEL_SECTION] : []),
               ];
 

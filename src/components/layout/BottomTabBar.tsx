@@ -235,6 +235,18 @@ const SECTION_ACHATS: TabSection = {
 const SECTION_OPS: TabSection = {
   label: "Ops",
   href: "/recettes",
+  match: ["/catalogue", "/recettes", "/inventaire", "/prep"],
+  icon: (a) => <IconPackage active={a} />,
+  tabs: [
+    { label: "Catalogue", href: "/catalogue", match: ["/catalogue"], icon: (a) => <IconGrid active={a} /> },
+    { label: "Fiches", href: "/recettes", match: ["/recettes", "/prep"], icon: (a) => <IconBook active={a} /> },
+    { label: "Inventaire", href: "/inventaire", match: ["/inventaire"], icon: (a) => <IconBox active={a} /> },
+  ],
+};
+
+const SECTION_OPS_PICCOLA: TabSection = {
+  label: "Ops",
+  href: "/recettes",
   match: ["/catalogue", "/recettes", "/inventaire", "/epicerie", "/prep"],
   icon: (a) => <IconPackage active={a} />,
   tabs: [
@@ -259,7 +271,7 @@ const SECTION_EVENTS: TabSection = {
 };
 
 const SECTIONS_BELLO: TabSection[] = [SECTION_HOME, SECTION_PERSONNEL, SECTION_VENTES, SECTION_ACHATS, SECTION_OPS];
-const SECTIONS_PICCOLA: TabSection[] = [SECTION_HOME, SECTION_PERSONNEL, SECTION_VENTES, SECTION_ACHATS, SECTION_OPS, SECTION_EVENTS];
+const SECTIONS_PICCOLA: TabSection[] = [SECTION_HOME, SECTION_PERSONNEL, SECTION_VENTES, SECTION_ACHATS, SECTION_OPS_PICCOLA, SECTION_EVENTS];
 
 const INACTIVE_COLOR = "#999";
 
