@@ -53,7 +53,7 @@ type ViewTab = "jour" | "semaine" | "mois";
 
 /* ── Helpers ── */
 const fmt = (v: number) => Math.round(v).toLocaleString("fr-FR") + "\u20AC";
-const fmtK = (v: number) => "\u20AC" + Math.round(v / 1000) + "k";
+const fmtK = (v: number) => Math.round(v / 1000) + "k\u20AC";
 const ZC: Record<string, string> = { Salle: "#46655a", Pergolas: "#5e8278", Terrasse: "#c4a882", emp: "#D4775A" };
 const MIX_COLORS = ["#D4775A", "#8fa8a0", "#46655a", "#7c5c3a", "#c4a882", "#e0b896", "#5e7a8a", "#a8b89c"];
 
@@ -115,12 +115,13 @@ export default function PerformancesPage() {
   const [meteo, setMeteo] = useState<Record<string, { emoji: string; desc: string; temp: number }>>({});
 
   // Comparison state
-  type CompareMode = "none" | "prev" | "a-1" | "custom";
+  type CompareMode = "none" | "prev" | "prev-sem" | "prev-mois" | "a-1" | "custom";
   const [compareMode, setCompareMode] = useState<CompareMode>("a-1");
   const [compareFrom, setCompareFrom] = useState("");
   const [compareTo, setCompareTo] = useState("");
   const [compareOpen, setCompareOpen] = useState(false);
   const [compareData, setCompareData] = useState<WeekData | null>(null);
+  const compareRef = useRef<HTMLDivElement>(null);
 
   // Date navigation
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -129,7 +130,11 @@ export default function PerformancesPage() {
   const getRange = useCallback(() => {
     const d = new Date(selectedDate + "T12:00:00");
     if (viewTab === "jour") {
-      return { from: selectedDate, to: selectedDate };
+      // If selected date is Saturday, go back to Friday; if Sunday, advance to Monday
+      if (d.getDay() === 6) { d.setDate(d.getDate() - 1); }
+      else if (d.getDay() === 0) { d.setDate(d.getDate() + 1); }
+      const iso = d.toISOString().slice(0, 10);
+      return { from: iso, to: iso };
     }
     if (viewTab === "semaine") {
       const dow = d.getDay() || 7;
@@ -183,6 +188,18 @@ export default function PerformancesPage() {
           const pFrom = new Date(pTo.getTime() - (days - 1) * 86400000);
           cFrom = pFrom.toISOString().slice(0, 10);
           cTo = pTo.toISOString().slice(0, 10);
+        } else if (compareMode === "prev-sem") {
+          const pFrom = new Date(new Date(from + "T12:00:00").getTime() - 7 * 86400000);
+          const pTo = new Date(new Date(to + "T12:00:00").getTime() - 7 * 86400000);
+          cFrom = pFrom.toISOString().slice(0, 10);
+          cTo = pTo.toISOString().slice(0, 10);
+        } else if (compareMode === "prev-mois") {
+          const fD = new Date(from + "T12:00:00");
+          const tD = new Date(to + "T12:00:00");
+          fD.setMonth(fD.getMonth() - 1);
+          tD.setMonth(tD.getMonth() - 1);
+          cFrom = fD.toISOString().slice(0, 10);
+          cTo = tD.toISOString().slice(0, 10);
         } else if (compareMode === "custom" && compareFrom && compareTo) {
           cFrom = compareFrom;
           cTo = compareTo;
@@ -233,14 +250,43 @@ export default function PerformancesPage() {
     setImporting(false);
   };
 
-  // Navigate dates
+  // Navigate dates (skip weekends in jour mode)
   const navigate = (dir: -1 | 1) => {
     const d = new Date(selectedDate + "T12:00:00");
-    if (viewTab === "jour") d.setDate(d.getDate() + dir);
-    else if (viewTab === "semaine") d.setDate(d.getDate() + dir * 7);
+    if (viewTab === "jour") {
+      d.setDate(d.getDate() + dir);
+      // Skip Saturday (6) and Sunday (0)
+      while (d.getDay() === 0 || d.getDay() === 6) {
+        d.setDate(d.getDate() + dir);
+      }
+    } else if (viewTab === "semaine") d.setDate(d.getDate() + dir * 7);
     else d.setMonth(d.getMonth() + dir);
     setSelectedDate(d.toISOString().slice(0, 10));
   };
+
+  // Keyboard shortcuts: left/right arrow keys to navigate
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === "ArrowLeft") { navigate(-1); }
+      else if (e.key === "ArrowRight") { navigate(1); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  });
+
+  // Close compare dropdown on outside click
+  useEffect(() => {
+    if (!compareOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (compareRef.current && !compareRef.current.contains(e.target as Node)) {
+        setCompareOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [compareOpen]);
 
   const { from, to } = getRange();
   const rangeLabel = viewTab === "jour"
@@ -328,7 +374,7 @@ export default function PerformancesPage() {
             }}>HT</button>
           </div>
           {/* Compare dropdown */}
-          <div style={{ position: "relative" }}>
+          <div ref={compareRef} style={{ position: "relative" }}>
             <button type="button" onClick={() => setCompareOpen(v => !v)} style={{
               padding: "7px 14px", borderRadius: 8, border: "1px solid #e0d8ce",
               background: compareMode !== "none" ? `${accent}15` : "#fff",
@@ -336,7 +382,7 @@ export default function PerformancesPage() {
               fontSize: 12, fontWeight: 600, cursor: "pointer",
               display: "flex", alignItems: "center", gap: 4,
             }}>
-              Comparer {compareMode === "a-1" ? "(A-1)" : compareMode === "prev" ? "(Prec.)" : compareMode === "custom" ? "(Perso.)" : ""}
+              Comparer {compareMode === "a-1" ? "(A-1)" : compareMode === "prev" ? "(Prec.)" : compareMode === "prev-sem" ? "(S-1)" : compareMode === "prev-mois" ? "(M-1)" : compareMode === "custom" ? "(Perso.)" : ""}
               <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transform: compareOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform .2s" }}><polyline points="6 9 12 15 18 9" /></svg>
             </button>
             {compareOpen && (
@@ -348,6 +394,8 @@ export default function PerformancesPage() {
                 {([
                   { key: "none" as CompareMode, label: "Aucune comparaison" },
                   { key: "prev" as CompareMode, label: "Periode precedente" },
+                  { key: "prev-sem" as CompareMode, label: "Semaine precedente" },
+                  { key: "prev-mois" as CompareMode, label: "Mois precedent" },
                   { key: "a-1" as CompareMode, label: "Annee precedente (A-1)" },
                   { key: "custom" as CompareMode, label: "Personnalise..." },
                 ]).map(opt => (
@@ -456,10 +504,10 @@ export default function PerformancesPage() {
                   <div>
                     <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>CVT moyen</div>
                     <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>
-                      {W.couverts > 0 ? "\u20AC" + (ca / W.couverts).toFixed(1) : "\u2014"}
+                      {W.couverts > 0 ? (ca / W.couverts).toFixed(1) + "\u20AC" : "\u2014"}
                     </div>
-                    {W.cov_sur > 0 && <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>CVT M SP <span style={{ color: "#fff", fontWeight: 700 }}>{"\u20AC" + ((mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur).toFixed(1)}</span></div>}
-                    {activePrev && activePrev.couverts > 0 && <DeltaBadge cur={ca / W.couverts} prev={(mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht) / activePrev.couverts} decimals={1} prefix="\u20AC" />}
+                    {W.cov_sur > 0 && <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>CVT M SP <span style={{ color: "#fff", fontWeight: 700 }}>{((mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur).toFixed(1) + "\u20AC"}</span></div>}
+                    {activePrev && activePrev.couverts > 0 && <DeltaBadge cur={ca / W.couverts} prev={(mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht) / activePrev.couverts} decimals={1} suffix="\u20AC" />}
                   </div>
                   <div style={{ width: 1, background: "rgba(255,255,255,.1)", alignSelf: "stretch" }} />
                   <div>
@@ -485,12 +533,7 @@ export default function PerformancesPage() {
 
             {/* Upsell ratios */}
             <div style={S.card}>
-              <div style={{ ...S.sec, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span>Upsell · performance de la periode</span>
-                <span style={{ fontSize: 10, color: "#777", textTransform: "none", letterSpacing: 0, fontWeight: 400 }}>
-                  {W.tickets} tables · {W.couverts} couverts · moy. {W.ratios.avgCovPerTable} cvt/table
-                </span>
-              </div>
+              <div style={S.sec}>Upsell · performance de la periode</div>
               <div className="ventes-upsell-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
                 <UpsellCard label="Antipasti" emoji="🥗" data={W.ratios.anti} totalTables={W.tickets} totalCov={W.couverts} color="#D4775A" targets={{ ok: 30, good: 50, avgPrice: 12 }} mode={mode} action="Suggerer en debut de service" />
                 <UpsellCard label="Desserts" emoji="🍮" data={W.ratios.dolci} totalTables={W.tickets} totalCov={W.couverts} color="#b5904a" targets={{ ok: 80, good: 100, avgPrice: 9 }} mode={mode} action="Proposer systematiquement en fin de plat" />
@@ -573,6 +616,23 @@ export default function PerformancesPage() {
               );
             })()}
 
+            {/* Sur place vs emporter */}
+            <div style={S.card}>
+              <div style={S.sec}>Sur place vs a emporter</div>
+              <div style={{ display: "flex", gap: 0 }}>
+                {(() => {
+                  const surCA = mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht;
+                  const empCA = mode === "ttc" ? W.place_emp_ttc : W.place_emp_ht;
+                  const tot = surCA + empCA;
+                  return (<>
+                    <PlaceBlock label="Sur place" color="#46655a" ca={surCA} pct={tot > 0 ? Math.round(surCA / tot * 100) : 0} couverts={W.cov_sur} tm={W.cov_sur > 0 ? (surCA / W.cov_sur).toFixed(1) : "0"} />
+                    <div style={{ width: 1, background: "rgba(0,0,0,.08)", margin: "0 20px", flexShrink: 0 }} />
+                    <PlaceBlock label="A emporter" color="#D4775A" ca={empCA} pct={tot > 0 ? Math.round(empCA / tot * 100) : 0} couverts={W.cov_emp} tm={W.cov_emp > 0 ? (empCA / W.cov_emp).toFixed(1) : "0"} />
+                  </>);
+                })()}
+              </div>
+            </div>
+
             {/* Zones */}
             {W.days.length > 0 && (() => {
               const zones = mode === "ttc" ? W.zones_ttc : W.zones_ht;
@@ -588,8 +648,14 @@ export default function PerformancesPage() {
                   const zKey = zone === "\u00C0 emporter" ? "emp" : zone;
                   const color = ZC[zKey] ?? "#888";
                   const pctCA = totalCA > 0 ? Math.round(tot / totalCA * 100) : 0;
-                  const displayVals = zoneBuckets ? sumByBuckets(vals, zoneBuckets) : vals;
-                  const displayLabels = zoneBuckets ? zoneBuckets.map(b => b.label) : W.days.map(d => d.slice(0, 3));
+                  const rawVals = zoneBuckets ? sumByBuckets(vals, zoneBuckets) : vals;
+                  const rawLabels = zoneBuckets ? zoneBuckets.map(b => b.label) : W.days.map(d => d.slice(0, 3));
+                  // Filter out days with 0 CA
+                  const displayVals: number[] = [];
+                  const displayLabels: string[] = [];
+                  for (let fi = 0; fi < rawVals.length; fi++) {
+                    if (rawVals[fi] > 0) { displayVals.push(rawVals[fi]); displayLabels.push(rawLabels[fi] ?? ""); }
+                  }
                   const maxDay = Math.max(...displayVals, 1);
 
                   return (
@@ -619,31 +685,25 @@ export default function PerformancesPage() {
               );
             })()}
 
-            {/* Sur place vs emporter */}
-            <div style={S.card}>
-              <div style={S.sec}>Sur place vs a emporter</div>
-              <div style={{ display: "flex", gap: 0 }}>
-                {(() => {
-                  const surCA = mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht;
-                  const empCA = mode === "ttc" ? W.place_emp_ttc : W.place_emp_ht;
-                  const tot = surCA + empCA;
-                  return (<>
-                    <PlaceBlock label="Sur place" color="#46655a" ca={surCA} pct={tot > 0 ? Math.round(surCA / tot * 100) : 0} couverts={W.cov_sur} tm={W.cov_sur > 0 ? (surCA / W.cov_sur).toFixed(1) : "0"} />
-                    <div style={{ width: 1, background: "rgba(0,0,0,.08)", margin: "0 20px", flexShrink: 0 }} />
-                    <PlaceBlock label="A emporter" color="#D4775A" ca={empCA} pct={tot > 0 ? Math.round(empCA / tot * 100) : 0} couverts={W.cov_emp} tm={W.cov_emp > 0 ? (empCA / W.cov_emp).toFixed(1) : "0"} />
-                  </>);
-                })()}
-              </div>
-            </div>
-
             {/* Comparatif A-1 */}
             {activePrev && W.days.length > 1 && (() => {
               const compBuckets = viewTab === "mois" ? buildWeekBuckets(W.dates) : null;
               const curDayVals = mode === "ttc" ? W.day_ttc : W.day_ht;
               const prevDayVals = mode === "ttc" ? activePrev!.day_ttc : activePrev!.day_ht;
-              const compLabels = compBuckets ? compBuckets.map(b => b.label) : W.days;
-              const compCur = compBuckets ? sumByBuckets(curDayVals, compBuckets) : curDayVals;
-              const compPrev = compBuckets ? sumByBuckets(prevDayVals, compBuckets) : prevDayVals;
+              const rawCompLabels = compBuckets ? compBuckets.map(b => b.label) : W.days;
+              const rawCompCur = compBuckets ? sumByBuckets(curDayVals, compBuckets) : curDayVals;
+              const rawCompPrev = compBuckets ? sumByBuckets(prevDayVals, compBuckets) : prevDayVals;
+              // Filter out entries where current CA is 0
+              const compLabels: string[] = [];
+              const compCur: number[] = [];
+              const compPrev: number[] = [];
+              for (let fi = 0; fi < rawCompCur.length; fi++) {
+                if (rawCompCur[fi] > 0) {
+                  compLabels.push(rawCompLabels[fi] ?? "");
+                  compCur.push(rawCompCur[fi]);
+                  compPrev.push(rawCompPrev[fi] ?? 0);
+                }
+              }
               const compMax = Math.max(...compCur, ...compPrev);
               return (
               <div style={S.card}>
@@ -708,7 +768,7 @@ export default function PerformancesPage() {
               <div style={S.card}>
                 <div style={S.sec}>Top 3 par categorie · CA {mode.toUpperCase()}</div>
                 <div className="ventes-top3-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-                  {W.top3_cats.map((cat, ci) => (
+                  {W.top3_cats.filter(c => !c.cat.toLowerCase().includes("bambini")).map((cat, ci) => (
                     <div key={ci} style={{ background: "#fff", borderRadius: 10, padding: "12px 14px", border: "1px solid rgba(0,0,0,.08)" }}>
                       <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".1em", color: MIX_COLORS[ci] ?? "#777", fontWeight: 600, marginBottom: 8 }}>{cat.cat}</div>
                       {cat.rows.map((r, ri) => (
@@ -792,14 +852,14 @@ function DeltaBadgeSmall({ cur, prev, suffix = "", inverse = false }: { cur: num
   );
 }
 
-function DeltaBadge({ cur, prev, decimals = 0, prefix = "" }: { cur: number; prev: number; decimals?: number; prefix?: string }) {
+function DeltaBadge({ cur, prev, decimals = 0, suffix = "" }: { cur: number; prev: number; decimals?: number; suffix?: string }) {
   const d = cur - prev;
   const pct = prev > 0 ? (d / prev * 100) : 0;
   const up = d >= 0;
   const val = decimals > 0 ? Math.abs(d).toFixed(decimals) : Math.round(Math.abs(d)).toLocaleString("fr-FR");
   return (
     <div style={{ fontSize: 10, color: up ? "#a5d6a7" : "#fca5a5", marginTop: 2, fontWeight: 500 }}>
-      {up ? "\u2191 +" : "\u2193 "}{prefix}{val} ({Math.abs(pct).toFixed(1)}%)
+      {up ? "\u2191 +" : "\u2193 "}{val}{suffix} ({Math.abs(pct).toFixed(1)}%)
     </div>
   );
 }
@@ -902,7 +962,7 @@ function PlaceBlock({ label, color, ca, pct, couverts, tm }: { label: string; co
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         <div style={{ minWidth: 0 }}><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>{fmt(ca)}</div><div style={{ fontSize: 9, color: "#777", textTransform: "uppercase", marginTop: 2 }}>CA</div></div>
         <div style={{ minWidth: 0 }}><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>{couverts}</div><div style={{ fontSize: 9, color: "#777", textTransform: "uppercase", marginTop: 2 }}>CVT</div></div>
-        <div style={{ minWidth: 0 }}><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700, color }}>{"\u20AC" + tm}</div><div style={{ fontSize: 9, color: "#777", textTransform: "uppercase", marginTop: 2 }}>TM</div></div>
+        <div style={{ minWidth: 0 }}><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700, color }}>{tm + "\u20AC"}</div><div style={{ fontSize: 9, color: "#777", textTransform: "uppercase", marginTop: 2 }}>TM</div></div>
       </div>
     </div>
   );
@@ -1206,9 +1266,9 @@ function ChartCanvas({ id, height, data, mode, type, onBarClick }: {
         data: { labels: data.top10_names, datasets: [{ data: mode === "ttc" ? data.top10_ca_ttc : data.top10_ca_ht, backgroundColor: colors, borderRadius: 4 }] },
         options: {
           indexAxis: "y", responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `CA : \u20AC${(ctx.raw as number).toLocaleString("fr-FR")} \u00b7 ${data.top10_qty[ctx.dataIndex]} ventes` } } },
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `CA : ${(ctx.raw as number).toLocaleString("fr-FR")}\u20AC \u00b7 ${data.top10_qty[ctx.dataIndex]} ventes` } } },
           scales: {
-            x: { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { callback: v => "\u20AC" + v, color: "#aaa", font: { size: 11 } }, border: { display: false } },
+            x: { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { callback: v => v + "\u20AC", color: "#aaa", font: { size: 11 } }, border: { display: false } },
             y: { grid: { display: false }, ticks: { color: "#444", font: { size: 11 } }, border: { display: false } },
           },
         },
@@ -1233,7 +1293,7 @@ function ChartCanvas({ id, height, data, mode, type, onBarClick }: {
             const tkt = data.serv_tickets?.[i] ?? 0;
             const cov = data.serv_cov?.[i] ?? 0;
             const cvtM = cov > 0 ? (caVal / cov).toFixed(1) : "—";
-            return [`CA : ${fmt(caVal)} (${(caVal / (mode === "ttc" ? data.ca_ttc : data.ca_ht) * 100).toFixed(1)}%)`, `${tkt} tickets · ${cov} cvts · CVT M ${"\u20AC"}${cvtM}`];
+            return [`CA : ${fmt(caVal)} (${(caVal / (mode === "ttc" ? data.ca_ttc : data.ca_ht) * 100).toFixed(1)}%)`, `${tkt} tickets · ${cov} cvts · CVT M ${cvtM}\u20AC`];
           } } } },
           scales: {
             x: { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { callback: v => fmtK(v as number), color: "#aaa", font: { size: 11 } }, border: { display: false } },
