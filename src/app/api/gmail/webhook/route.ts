@@ -434,44 +434,82 @@ async function processMessage(messageId: string) {
         }
       }
 
-      // Upsert supplier offers
+      // Upsert ingredients + supplier offers
+      const supplierNameTitle = fournisseur
+        ? fournisseur.charAt(0).toUpperCase() + fournisseur.slice(1)
+        : "Unknown";
+      const estabValue = etabSlug === "piccola-mia" ? "piccola" : etabSlug === "bello-mio" ? "bellomio" : "both";
+
       for (const ing of parseResult.ingredients.filter((i) => i.confidence !== "low")) {
+        const ingName = ing.name.trim().toUpperCase();
+        if (!ingName) continue;
+
+        // Look up existing ingredient by name (case-insensitive)
         const { data: existingIng } = await supabaseAdmin
           .from("ingredients")
           .select("id")
-          .ilike("name", ing.name)
+          .ilike("name", ingName)
           .maybeSingle();
 
         let ingredientId = existingIng?.id;
+
         if (!ingredientId) {
-          const { data: newIng } = await supabaseAdmin
+          // Create ingredient with all required fields
+          const ingRow: Record<string, unknown> = {
+            name: ingName,
+            import_name: ingName,
+            category: ing.categorie ?? "autre",
+            status: "to_check",
+            status_note: `Import auto ${supplierNameTitle}`,
+            is_active: true,
+            default_unit: ing.unit_commande === "kg" ? "kg" : "pcs",
+            supplier: supplierNameTitle,
+            supplier_id: supplierId,
+            default_supplier_id: supplierId,
+            supplier_sku: ing.reference ?? null,
+            piece_weight_g: ing.poids_unitaire ?? null,
+            piece_volume_ml: ing.volume_unitaire ?? null,
+          };
+          if (userId) ingRow.user_id = userId;
+          if (etabId) ingRow.etablissement_id = etabId;
+
+          const { data: newIng, error: ingErr } = await supabaseAdmin
             .from("ingredients")
-            .insert({
-              name: ing.name,
-              category: ing.categorie,
-              status: "actif",
-              supplier_id: supplierId,
-              supplier_sku: ing.reference ?? null,
-              piece_weight_g: ing.poids_unitaire ?? null,
-              piece_volume_ml: ing.volume_unitaire ?? null,
-              ...(etabId ? { etablissement_id: etabId } : {}),
-            })
+            .insert(ingRow)
             .select("id")
             .single();
-          ingredientId = newIng?.id;
+
+          if (ingErr) {
+            // Might be a duplicate (23505) — try to find it again
+            if ((ingErr as { code?: string }).code === "23505") {
+              const { data: retry } = await supabaseAdmin
+                .from("ingredients")
+                .select("id")
+                .ilike("name", ingName)
+                .maybeSingle();
+              ingredientId = retry?.id ?? null;
+            } else {
+              console.error("Insert ingredient error:", ingErr.message, ingName);
+            }
+          } else {
+            ingredientId = newIng?.id;
+          }
         }
 
         if (ingredientId) {
+          const offerRow: Record<string, unknown> = {
+            ingredient_id: ingredientId,
+            supplier_id: supplierId,
+            unit: ing.unit_commande === "kg" ? "kg" : "piece",
+            unit_price: ing.prix_unitaire,
+            establishment: estabValue,
+            is_active: true,
+            valid_from: new Date().toISOString().slice(0, 10),
+          };
+          if (userId) offerRow.user_id = userId;
+
           await supabaseAdmin.from("supplier_offers").upsert(
-            {
-              ingredient_id: ingredientId,
-              supplier_id: supplierId,
-              unit: ing.unit_commande === "kg" ? "kg" : "piece",
-              unit_price: ing.prix_unitaire,
-              establishment: etabSlug === "piccola-mia" ? "piccola" : etabSlug === "bello-mio" ? "bellomio" : "both",
-              is_active: true,
-              valid_from: new Date().toISOString().slice(0, 10),
-            },
+            offerRow,
             { onConflict: "ingredient_id,supplier_id,unit" },
           );
         }
