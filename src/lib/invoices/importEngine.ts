@@ -83,11 +83,10 @@ function notesWithTax(base: string | null, taxRate: number | null): string | nul
   return parts.length ? parts.join(" | ") : null;
 }
 
-function toOfferUnit(u: "pc" | "kg" | "l" | null): "pc" | "kg" | "l" | null {
-  if (u === "pc") return "pc";
+function toOfferUnit(u: "pc" | "kg" | "l" | null): "pc" | "kg" | "l" {
   if (u === "kg") return "kg";
   if (u === "l") return "l";
-  return null;
+  return "pc"; // default to piece when unit unknown
 }
 
 // ── Moteur d'import ────────────────────────────────────────────────────────────
