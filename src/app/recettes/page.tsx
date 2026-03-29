@@ -881,30 +881,32 @@ function RecettesInner() {
         )}
       </main>
 
-      {/* ── FAB mobile ── */}
+      {/* ── FAB — new recipe button ── */}
       {canWrite && (
         <div style={{ position: "fixed", bottom: "calc(140px + env(safe-area-inset-bottom, 0px))", right: 16, zIndex: 100 }}>
           {showFab && (
             <div style={{
-              position: "absolute", bottom: 60, right: 0,
-              background: "#fff", borderRadius: 14, padding: 8,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.15)", border: "1px solid #ddd6c8",
-              display: "flex", flexDirection: "column", gap: 4, minWidth: 160,
+              position: "absolute", bottom: 58, right: 0,
+              background: "rgba(255,255,255,0.97)",
+              backdropFilter: "blur(20px) saturate(180%)",
+              WebkitBackdropFilter: "blur(20px) saturate(180%)",
+              borderRadius: 14, padding: 8,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.14)", border: "1px solid rgba(0,0,0,0.08)",
+              display: "flex", flexDirection: "column", gap: 2, minWidth: 180,
             }}>
               {[
                 { label: "Pizza", href: "/recettes/new/pizza", color: PIZZA_COLOR },
                 { label: "Cuisine", href: "/recettes/new/cuisine", color: CUISINE_COLOR },
                 { label: "Cocktail", href: "/recettes/new/cocktail", color: COCKTAIL_COLOR },
-                { label: "Empâtement", href: "/recettes/new/empatement", color: EMP_COLOR },
+                { label: "Empatement", href: "/recettes/new/empatement", color: EMP_COLOR },
               ].map(item => (
                 <Link key={item.href} href={item.href} style={{
                   display: "flex", alignItems: "center", gap: 10,
                   padding: "10px 14px", borderRadius: 10, textDecoration: "none",
-                  fontSize: 13, fontWeight: 700, color: item.color,
-                  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                  textTransform: "uppercase", letterSpacing: 1,
+                  fontSize: 13, fontWeight: 600, color: item.color,
+                  borderLeft: `3px solid ${item.color}`,
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = "#f2ede4"}
+                onMouseEnter={e => e.currentTarget.style.background = `${item.color}10`}
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                 >
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: item.color }} />
@@ -915,17 +917,21 @@ function RecettesInner() {
           )}
           <button
             type="button"
+            className="etab-fab"
             onClick={() => setShowFab(f => !f)}
             style={{
-              width: 52, height: 52, borderRadius: "50%",
-              background: "#D4775A", border: "none",
-              color: "#fff", fontSize: 26, fontWeight: 300,
+              width: 50, height: 50,
+              border: "2px solid #D4775A",
+              background: "#fff",
+              color: "#D4775A", fontSize: 24, fontWeight: 300,
               cursor: "pointer",
-              boxShadow: "0 4px 14px rgba(212,119,90,0.4)",
-              transition: "transform 0.2s",
+              boxShadow: "0 4px 14px rgba(212,119,90,0.3), 0 2px 6px rgba(0,0,0,0.1)",
+              transition: "transform 0.2s, background 0.2s, color 0.2s",
               transform: showFab ? "rotate(45deg)" : "none",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}
+            onMouseEnter={e => { e.currentTarget.style.background = "#D4775A"; e.currentTarget.style.color = "#fff"; }}
+            onMouseLeave={e => { if (!showFab) { e.currentTarget.style.background = "#fff"; e.currentTarget.style.color = "#D4775A"; }}}
           >
             +
           </button>
