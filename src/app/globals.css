@@ -801,34 +801,261 @@ input[type='number'] {
   @page { size: A4; margin: 16mm; }
 }
 
-/* ── Ventes page responsive ───────────────────────── */
+/* ── Ventes pages responsive ───────────────────────── */
+
+/* --- Medium mobile (max-width: 767px) --- */
 @media (max-width: 767px) {
+
+  /* ── Global containers ── */
   .ventes-container {
     padding: 12px 10px 60px !important;
+    max-width: 100% !important;
   }
+  .ventes-marges-container {
+    padding: 12px 10px 60px !important;
+    max-width: 100% !important;
+  }
+  .ventes-articles-container {
+    padding: 12px 10px 60px !important;
+    max-width: 100% !important;
+  }
+  .ventes-sim-container {
+    padding: 12px 10px 60px !important;
+    max-width: 100% !important;
+  }
+
+  /* ── Ventes main: toolbar ── */
+  .ventes-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+  }
+  .ventes-toolbar > div,
+  .ventes-toolbar > label,
+  .ventes-toolbar > button {
+    justify-content: center;
+    text-align: center;
+  }
+
+  /* ── Ventes main: date row ── */
+  .ventes-date-row {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  .ventes-date-row h1 {
+    font-size: 18px !important;
+    text-align: center;
+    width: 100%;
+    order: -1;
+  }
+
+  /* ── Hero KPIs ── */
   .ventes-hero-kpis {
     flex-wrap: wrap !important;
-    gap: 16px !important;
+    gap: 12px !important;
   }
   .ventes-hero-kpis > div:not([style*="width: 1"]) {
-    font-size: 0.9em;
+    font-size: 0.88em;
   }
+
+  /* ── Upsell grids ── */
   .ventes-upsell-grid {
     grid-template-columns: 1fr !important;
   }
   .ventes-upsell-mini-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: 1fr 1fr !important;
   }
+
+  /* ── Zone grid ── */
   .ventes-zone-grid {
     grid-template-columns: repeat(2, 1fr) !important;
   }
+
+  /* ── Sur place vs emporter ── */
+  .ventes-place-row {
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+  .ventes-place-row > div[style*="width: 1"] {
+    display: none !important;
+  }
+
+  /* ── Comparatif bars ── */
+  .ventes-comparatif-legend {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  /* ── Duration card ── */
+  .ventes-duration-kpis {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+  .ventes-duration-zones {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+  .ventes-duration-svc {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  /* ── Top 3 grid ── */
   .ventes-top3-grid {
     grid-template-columns: repeat(2, 1fr) !important;
   }
+
+  /* ── Payment donut + list ── */
+  .ventes-payment-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* ── Recap table ── */
   .ventes-recap-wrap {
     overflow-x: auto !important;
   }
   .ventes-recap-table {
     min-width: 700px;
+  }
+
+  /* ── Generic table scroll ── */
+  .ventes-table-scroll {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Marges: KPI cards ── */
+  .ventes-marges-kpis {
+    gap: 8px !important;
+  }
+  .ventes-marges-kpis > div {
+    flex: 1 1 calc(50% - 4px) !important;
+    min-width: calc(50% - 4px) !important;
+  }
+
+  /* ── Marges: charts 2-col → 1-col ── */
+  .ventes-marges-charts {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Marges: product table min-width ── */
+  .ventes-marges-table {
+    min-width: 800px;
+  }
+
+  /* ── Marges: pagination wrap ── */
+  .ventes-pagination {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    justify-content: center !important;
+  }
+
+  /* ── Marges: insight cards 2-col → 1-col ── */
+  .ventes-marges-insights {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Marges: menu engineering 2x2 → 1-col ── */
+  .ventes-marges-engineering {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Marges: category table min-width ── */
+  .ventes-marges-cat-table {
+    min-width: 600px;
+  }
+
+  /* ── Articles: stats bar ── */
+  .ventes-articles-stats {
+    flex-wrap: wrap !important;
+  }
+  .ventes-articles-stats > div {
+    flex: 1 1 calc(50% - 6px) !important;
+    min-width: calc(50% - 6px) !important;
+  }
+
+  /* ── Articles: link mode buttons wrap ── */
+  .ventes-link-modes {
+    flex-wrap: wrap !important;
+  }
+  .ventes-link-modes > button {
+    font-size: 11px !important;
+    padding: 6px 12px !important;
+  }
+
+  /* ── Simulation: KPI grid 4-col → 2-col ── */
+  .ventes-sim-kpis {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* ── Simulation: employee table min-width ── */
+  .ventes-sim-emp-table {
+    min-width: 700px;
+  }
+
+  /* ── Simulation: TNS 2-col layout → 1-col ── */
+  .ventes-sim-tns-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Simulation: TNS 3 KPIs → stack ── */
+  .ventes-sim-tns-kpis {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+
+  /* ── Simulation: simulateur 2-col → 1-col ── */
+  .ventes-sim-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Global font size reduction ── */
+  .ventes-container,
+  .ventes-marges-container,
+  .ventes-articles-container,
+  .ventes-sim-container {
+    font-size: 13px !important;
+  }
+}
+
+/* --- Very small mobile (max-width: 400px) --- */
+@media (max-width: 400px) {
+  /* Zone grid: 1 column on very small */
+  .ventes-zone-grid {
+    grid-template-columns: 1fr !important;
+  }
+  /* Top 3 grid: 1 column on very small */
+  .ventes-top3-grid {
+    grid-template-columns: 1fr !important;
+  }
+  /* Upsell mini: 1 column on very small */
+  .ventes-upsell-mini-grid {
+    grid-template-columns: 1fr !important;
+  }
+  /* Marges KPI: 1 column on very small */
+  .ventes-marges-kpis > div {
+    flex: 1 1 100% !important;
+    min-width: 100% !important;
+  }
+  /* Articles stats: 1 column on very small */
+  .ventes-articles-stats > div {
+    flex: 1 1 100% !important;
+    min-width: 100% !important;
+  }
+  /* Simulation KPIs: 1 column on very small */
+  .ventes-sim-kpis {
+    grid-template-columns: 1fr !important;
+  }
+  /* Date row title even smaller */
+  .ventes-date-row h1 {
+    font-size: 15px !important;
+  }
+  /* Further reduce padding */
+  .ventes-container,
+  .ventes-marges-container,
+  .ventes-articles-container,
+  .ventes-sim-container {
+    padding: 8px 6px 60px !important;
   }
 }

@@ -434,7 +434,7 @@ export default function ArticlesVentePage() {
         <td colSpan={5} style={{ padding: "16px 8px", background: "#faf7f2", borderBottom: `1px solid ${COLORS.border}` }}>
           <div style={{ maxWidth: 600 }}>
             {/* Link mode selector */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            <div className="ventes-link-modes" style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
               {(["recette", "achat", "manuel"] as const).map((m) => (
                 <button
                   key={m}
@@ -624,12 +624,12 @@ export default function ArticlesVentePage() {
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <div style={S.page}>
+      <div className="ventes-articles-container" style={S.page}>
         <h1 style={S.heading}>Articles de vente</h1>
         <p style={S.subtitle}>{etab?.nom ?? "Chargement..."}</p>
 
         {/* Stats bar */}
-        <div style={S.statsBar}>
+        <div className="ventes-articles-stats" style={S.statsBar}>
           <div style={S.statCard}>
             <div style={S.statLabel}>Articles lies</div>
             <div style={S.statValue}>{nbLies}</div>
@@ -671,7 +671,8 @@ export default function ArticlesVentePage() {
                 Tous les produits vendus sont lies.
               </div>
             ) : (
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <div className="ventes-table-scroll" style={{ overflowX: "auto" }}>
+              <table className="ventes-articles-table" style={{ width: "100%", borderCollapse: "collapse", minWidth: 600 }}>
                 <thead>
                   <tr>
                     <th style={S.th}>Produit</th>
@@ -721,6 +722,7 @@ export default function ArticlesVentePage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         )}
@@ -742,7 +744,8 @@ export default function ArticlesVentePage() {
               </div>
             ) : (
               <>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <div className="ventes-table-scroll" style={{ overflowX: "auto" }}>
+                <table className="ventes-articles-linked-table" style={{ width: "100%", borderCollapse: "collapse", minWidth: 650 }}>
                   <thead>
                     <tr>
                       <th style={S.th} onClick={() => handleSort("nom_vente")}>Produit{sortArrow("nom_vente")}</th>
@@ -794,6 +797,7 @@ export default function ArticlesVentePage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
 
                 {/* Pagination */}
                 {totalPages > 1 && (
@@ -832,7 +836,7 @@ export default function ArticlesVentePage() {
               Calculez le nombre de portions et le cout par dose pour une bouteille ou un conditionnement.
             </p>
 
-            <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+            <div className="ventes-sim-inputs" style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
               <div style={{ flex: "1 1 180px" }}>
                 <label style={{ fontSize: 11, color: COLORS.muted, display: "block", marginBottom: 4 }}>Prix bouteille</label>
                 <input

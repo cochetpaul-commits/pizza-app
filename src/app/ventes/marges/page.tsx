@@ -494,6 +494,7 @@ export default function MargesPage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <div
+        className="ventes-marges-container"
         style={{
           maxWidth: 1100,
           margin: "0 auto",
@@ -682,6 +683,7 @@ export default function MargesPage() {
           <>
             {/* ── KPI Cards ── */}
             <div
+              className="ventes-marges-kpis"
               style={{
                 display: "flex",
                 flexWrap: "wrap",
@@ -738,6 +740,7 @@ export default function MargesPage() {
 
             {/* ── Charts ── */}
             <div
+              className="ventes-marges-charts"
               style={{
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
@@ -825,8 +828,9 @@ export default function MargesPage() {
               </div>
 
               {/* ── Products Table ── */}
-              <div style={{ overflowX: "auto" }}>
+              <div className="ventes-table-scroll" style={{ overflowX: "auto" }}>
                 <table
+                  className="ventes-marges-table"
                   style={{
                     width: "100%",
                     borderCollapse: "collapse",
@@ -1035,6 +1039,7 @@ export default function MargesPage() {
 
               {/* ── Pagination ── */}
               <div
+                className="ventes-pagination"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -1116,6 +1121,7 @@ export default function MargesPage() {
 
             {/* ── Upsell Insights ── */}
             <div
+              className="ventes-marges-insights"
               style={{
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
@@ -1392,6 +1398,7 @@ export default function MargesPage() {
                     Moyennes : {avgQty.toFixed(1)} unites vendues / {fmtDec(avgMarginUnit)} marge unitaire.
                   </div>
                   <div
+                    className="ventes-marges-engineering"
                     style={{
                       display: "grid",
                       gridTemplateColumns: "1fr 1fr",
@@ -1467,8 +1474,9 @@ export default function MargesPage() {
             {/* Card 4: Resume par categorie — Full width */}
             <div style={{ ...S.card, marginTop: 14 }}>
               <div style={S.secTitle}>Resume par categorie</div>
-              <div style={{ overflowX: "auto" }}>
+              <div className="ventes-table-scroll" style={{ overflowX: "auto" }}>
                 <table
+                  className="ventes-marges-cat-table"
                   style={{
                     width: "100%",
                     borderCollapse: "collapse",

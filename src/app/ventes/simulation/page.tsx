@@ -307,7 +307,7 @@ export default function SimulationPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <div style={pageStyle}>
+      <div className="ventes-sim-container" style={pageStyle}>
 
         {/* ── Header ── */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
@@ -360,7 +360,7 @@ export default function SimulationPage() {
             </div>
 
             {/* KPI cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
+            <div className="ventes-sim-kpis" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
               <div style={kpiCard}>
                 <div style={{ fontSize: 24, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmt(totalMS)} &euro;</div>
                 <div style={kpiLabel}>Masse salariale totale</div>
@@ -410,8 +410,8 @@ export default function SimulationPage() {
 
             {/* Employee table */}
             <div style={card}>
-              <div style={{ overflowX: "auto" }}>
-                <table style={tableStyle}>
+              <div className="ventes-table-scroll" style={{ overflowX: "auto" }}>
+                <table className="ventes-sim-emp-table" style={tableStyle}>
                   <thead>
                     <tr>
                       <th style={{ ...th, minWidth: 160 }}>Collaborateur</th>
@@ -503,7 +503,7 @@ export default function SimulationPage() {
                 </div>
               </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 16 }}>
+              <div className="ventes-sim-tns-layout" style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 16 }}>
                 {/* Left: TNS cards */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {tnsEmployes.map((c) => {
@@ -595,7 +595,7 @@ export default function SimulationPage() {
                         </div>
 
                         {/* 3 KPIs */}
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 20 }}>
+                        <div className="ventes-sim-tns-kpis" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 20 }}>
                           <div style={{ ...kpiCard, borderColor: "#8B7EC820" }}>
                             <div style={{ fontSize: 22, fontWeight: 700, color: "#8B7EC8", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
                               {fmt(tnsNet * TAUX_CHARGES_TNS)} &euro;
@@ -672,7 +672,7 @@ export default function SimulationPage() {
         {/* ═══ TAB 3: SIMULATEUR D'EMBAUCHE ═══ */}
         {tab === "simulateur" && (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 16 }}>
+            <div className="ventes-sim-layout" style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 16 }}>
               {/* ── Left column ── */}
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 

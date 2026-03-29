@@ -324,7 +324,7 @@ export default function PerformancesPage() {
       <div className="ventes-container" style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 16px 60px" }}>
 
         {/* ── Toolbar: tabs + import + PDF + TTC/HT ── */}
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
+        <div className="ventes-toolbar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
           <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 10, overflow: "hidden" }}>
             {(["jour", "semaine", "mois"] as ViewTab[]).map(t => (
               <button key={t} type="button" onClick={() => setViewTab(t)} style={{
@@ -434,7 +434,7 @@ export default function PerformancesPage() {
         {importMsg && <div style={{ fontSize: 12, color: accent, marginBottom: 10 }}>{importMsg}</div>}
 
         {/* ── Date navigation + title ── */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid rgba(70,101,90,.15)" }}>
+        <div className="ventes-date-row" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid rgba(70,101,90,.15)" }}>
           <button type="button" onClick={() => navigate(-1)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>&larr;</button>
           <input
             type="date"
@@ -551,7 +551,7 @@ export default function PerformancesPage() {
               <div style={S.card}>
                 <div style={S.sec}>Duree & rotation des tables</div>
                 {/* KPIs row */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
+                <div className="ventes-duration-kpis" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
                   <div style={{ background: "#f9f6f0", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
                     <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 28, fontWeight: 700, color: "#D4775A" }}>{W.duration.avgDurMin}<span style={{ fontSize: 14, fontWeight: 500, color: "#777" }}>min</span></div>
                     <div style={{ fontSize: 10, color: "#777", marginTop: 4 }}>Duree moy. / table</div>
@@ -569,7 +569,7 @@ export default function PerformancesPage() {
                   </div>
                 </div>
                 {/* By zone */}
-                <div style={{ display: "grid", gridTemplateColumns: `repeat(${W.duration.byZone.length}, 1fr)`, gap: 10, marginBottom: 10 }}>
+                <div className="ventes-duration-zones" style={{ display: "grid", gridTemplateColumns: `repeat(${W.duration.byZone.length}, 1fr)`, gap: 10, marginBottom: 10 }}>
                   {W.duration.byZone.map(z => {
                     const rot = W.duration.rotByZone.find(r => r.zone === z.zone);
                     const zKey = z.zone === "\u00C0 emporter" ? "emp" : z.zone;
@@ -598,7 +598,7 @@ export default function PerformancesPage() {
                   })}
                 </div>
                 {/* By service — Soir first, then Midi */}
-                <div style={{ display: "flex", gap: 10 }}>
+                <div className="ventes-duration-svc" style={{ display: "flex", gap: 10 }}>
                   {[...W.duration.bySvc].sort((a, _b) => a.svc === "midi" ? -1 : 1).map(sv => (
                     <div key={sv.svc} style={{ flex: 1, background: "#fff", borderRadius: 8, padding: "8px 12px", border: "1px solid #f0ebe3", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
@@ -616,7 +616,7 @@ export default function PerformancesPage() {
             {/* Sur place vs emporter */}
             <div style={S.card}>
               <div style={S.sec}>Sur place vs a emporter</div>
-              <div style={{ display: "flex", gap: 0 }}>
+              <div className="ventes-place-row" style={{ display: "flex", gap: 0 }}>
                 {(() => {
                   const surCA = mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht;
                   const empCA = mode === "ttc" ? W.place_emp_ttc : W.place_emp_ht;
@@ -705,7 +705,7 @@ export default function PerformancesPage() {
               return (
               <div style={S.card}>
                 <div style={S.sec}>Comparatif · CA {mode.toUpperCase()} {viewTab === "mois" ? "par semaine" : "par jour"} vs A-1</div>
-                <div style={{ marginBottom: 8, display: "flex", gap: 16 }}>
+                <div className="ventes-comparatif-legend" style={{ marginBottom: 8, display: "flex", gap: 16 }}>
                   <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "#777" }}>
                     <span style={{ width: 8, height: 8, borderRadius: 2, background: accent }} /> {new Date(from + "T12:00:00").getFullYear()} (courante)
                   </span>
@@ -810,7 +810,7 @@ export default function PerformancesPage() {
             {W.pay && W.pay.length > 0 && (
               <div style={S.card}>
                 <div style={S.sec}>Modes de paiement</div>
-                <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: 20, alignItems: "center" }}>
+                <div className="ventes-payment-grid" style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: 20, alignItems: "center" }}>
                   <ChartCanvas id="payChart" height={140} data={W} mode={mode} type="pay" />
                   <div>
                     {W.pay.map((p, i) => {
