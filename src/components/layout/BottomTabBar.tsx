@@ -332,6 +332,37 @@ export function BottomTabBar() {
   return (
     <>
     {/* Floating establishment button — bottom right */}
+    {/* Action button — fork & knife */}
+    <div className="etab-fab-wrap" style={{
+      position: "fixed", bottom: "calc(136px + env(safe-area-inset-bottom, 0px))", right: 16, zIndex: 110, display: "none",
+    }}>
+      <button
+        type="button"
+        onClick={() => router.push("/recettes/new/cuisine")}
+        className="etab-fab"
+        style={{
+          width: 44, height: 44,
+          border: `2px solid ${etabColor}`,
+          cursor: "pointer",
+          background: "#fff",
+          boxShadow: `0 4px 14px rgba(0,0,0,0.12), 0 2px 6px ${etabColor}30`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "transform 0.2s, box-shadow 0.2s, background 0.2s",
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background = etabColor; e.currentTarget.style.boxShadow = `0 6px 20px ${etabColor}50`; (e.currentTarget.querySelector("svg") as SVGElement).style.stroke = "#fff"; }}
+        onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.boxShadow = `0 4px 14px rgba(0,0,0,0.12), 0 2px 6px ${etabColor}30`; (e.currentTarget.querySelector("svg") as SVGElement).style.stroke = etabColor; }}
+        onTouchStart={e => { e.currentTarget.style.transform = "scale(0.9)"; e.currentTarget.style.background = etabColor; }}
+        onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.background = "#fff"; }}
+      >
+        <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={etabColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "stroke 0.2s" }}>
+          <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" />
+          <path d="M7 2v20" />
+          <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />
+        </svg>
+      </button>
+    </div>
+
+    {/* Establishment button */}
     <div ref={etabMenuRef} className="etab-fab-wrap" style={{
       position: "fixed", bottom: "calc(76px + env(safe-area-inset-bottom, 0px))", right: 16, zIndex: 110, display: "none",
     }}>
