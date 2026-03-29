@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, type CSSProperties } from "react";
+import { useRouter } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 
@@ -212,6 +213,7 @@ const PER_PAGE = 20;
    ══════════════════════════════════════════════════════ */
 
 export default function ArticlesVentePage() {
+  const router = useRouter();
   const { current: etab } = useEtablissement();
   const accent = etab?.couleur ?? COLORS.accent;
 
@@ -228,6 +230,10 @@ export default function ArticlesVentePage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [linkedPage, setLinkedPage] = useState(0);
   const [searchLinked, setSearchLinked] = useState("");
+
+  // Unmatched table state
+  const [unmatchedPage, setUnmatchedPage] = useState(1);
+  const [searchUnmatched, setSearchUnmatched] = useState("");
 
   // Linking state
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
@@ -384,7 +390,17 @@ export default function ArticlesVentePage() {
   }, [articles, searchLinked, sortCol, sortDir]);
 
   const pagedLinked = filteredLinked.slice(linkedPage * PER_PAGE, (linkedPage + 1) * PER_PAGE);
-  const totalPages = Math.ceil(filteredLinked.length / PER_PAGE);
+  const totalLinkedPages = Math.ceil(filteredLinked.length / PER_PAGE);
+
+  /* ── Unmatched filter + paginate ── */
+  const filteredUnmatched = useMemo(() => {
+    if (!searchUnmatched) return unmatched;
+    const s = searchUnmatched.toLowerCase();
+    return unmatched.filter((p) => p.nom_vente.toLowerCase().includes(s) || p.categorie.toLowerCase().includes(s));
+  }, [unmatched, searchUnmatched]);
+
+  const totalUnmatchedPages = Math.ceil(filteredUnmatched.length / PER_PAGE);
+  const pagedUnmatched = filteredUnmatched.slice((unmatchedPage - 1) * PER_PAGE, unmatchedPage * PER_PAGE);
 
   /* ── Simulateur calculations ── */
   const simPrixAchatN = Number(simPrixAchat) || 0;
@@ -719,58 +735,101 @@ export default function ArticlesVentePage() {
                 Tous les produits vendus sont lies.
               </div>
             ) : (
-              <div className="ventes-table-scroll" style={{ overflowX: "auto" }}>
-              <table className="ventes-articles-table" style={{ width: "100%", borderCollapse: "collapse", minWidth: 600 }}>
-                <thead>
-                  <tr>
-                    <th style={S.th}>Produit</th>
-                    <th style={S.th}>Categorie</th>
-                    <th style={{ ...S.thR, cursor: "default" }}>Qty vendues</th>
-                    <th style={{ ...S.thR, cursor: "default" }}>CA TTC</th>
-                    <th style={{ ...S.thR, cursor: "default" }}>Prix unit.</th>
-                    <th style={{ ...S.th, textAlign: "center", cursor: "default" }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {unmatched.map((p) => (
-                    <>
-                      <tr key={p.nom_vente} style={{ background: expandedRow === p.nom_vente ? "#faf7f2" : "transparent" }}>
-                        <td style={S.td}>{p.nom_vente}</td>
-                        <td style={S.td}>
-                          <span style={{
-                            fontSize: 11,
-                            padding: "2px 8px",
-                            borderRadius: 8,
-                            background: "#f0ece4",
-                            color: COLORS.dark,
-                          }}>{p.categorie}</span>
-                        </td>
-                        <td style={S.tdR}>{p.qty}</td>
-                        <td style={S.tdR}>{fmt(p.ca_ttc)}</td>
-                        <td style={{ ...S.tdR, color: accent, fontWeight: 600 }}>{p.prix_unit_ttc ? p.prix_unit_ttc.toFixed(2) + "\u20AC" : "\u2014"}</td>
-                        <td style={{ ...S.td, textAlign: "center" }}>
-                          {expandedRow === p.nom_vente ? (
-                            <button style={S.btnOutline} onClick={resetLinkForm}>Fermer</button>
-                          ) : (
+              <>
+                <div style={{ marginBottom: 12 }}>
+                  <input
+                    style={{ ...S.input, maxWidth: 300 }}
+                    placeholder="Rechercher un produit..."
+                    value={searchUnmatched}
+                    onChange={(e) => { setSearchUnmatched(e.target.value); setUnmatchedPage(1); }}
+                  />
+                </div>
+                <div className="ventes-table-scroll" style={{ overflowX: "auto" }}>
+                <table className="ventes-articles-table" style={{ width: "100%", borderCollapse: "collapse", minWidth: 600 }}>
+                  <thead>
+                    <tr>
+                      <th style={S.th}>Produit</th>
+                      <th style={S.th}>Categorie</th>
+                      <th className="ventes-col-hide-mobile" style={{ ...S.thR, cursor: "default" }}>Qty vendues</th>
+                      <th className="ventes-col-hide-mobile" style={{ ...S.thR, cursor: "default" }}>CA TTC</th>
+                      <th style={{ ...S.thR, cursor: "default" }}>Prix unit.</th>
+                      <th style={{ ...S.th, textAlign: "center", cursor: "default" }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedUnmatched.map((p) => (
+                      <>
+                        <tr key={p.nom_vente} style={{ background: expandedRow === p.nom_vente ? "#faf7f2" : "transparent" }}>
+                          <td style={S.td}>
                             <button
-                              style={S.btn(accent)}
-                              onClick={() => {
-                                resetLinkForm();
-                                setExpandedRow(p.nom_vente);
-                                if (p.prix_unit_ttc) setLinkPrixVente(String(p.prix_unit_ttc));
-                              }}
+                              onClick={() => router.push("/ingredients?search=" + encodeURIComponent(p.nom_vente))}
+                              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: accent, fontWeight: 600, fontSize: 13, textAlign: "left", textDecoration: "underline", fontFamily: "inherit" }}
+                              title="Rechercher dans les ingredients"
                             >
-                              Lier
+                              {p.nom_vente}
                             </button>
-                          )}
-                        </td>
-                      </tr>
-                      {renderLinkForm(p)}
-                    </>
-                  ))}
-                </tbody>
-              </table>
-              </div>
+                          </td>
+                          <td style={S.td}>
+                            <span style={{
+                              fontSize: 11,
+                              padding: "2px 8px",
+                              borderRadius: 8,
+                              background: "#f0ece4",
+                              color: COLORS.dark,
+                            }}>{p.categorie}</span>
+                          </td>
+                          <td className="ventes-col-hide-mobile" style={S.tdR}>{p.qty}</td>
+                          <td className="ventes-col-hide-mobile" style={S.tdR}>{fmt(p.ca_ttc)}</td>
+                          <td style={{ ...S.tdR, color: accent, fontWeight: 600 }}>{p.prix_unit_ttc ? p.prix_unit_ttc.toFixed(2) + "\u20AC" : "\u2014"}</td>
+                          <td style={{ ...S.td, textAlign: "center" }}>
+                            {expandedRow === p.nom_vente ? (
+                              <button style={S.btnOutline} onClick={resetLinkForm}>Fermer</button>
+                            ) : (
+                              <button
+                                style={S.btn(accent)}
+                                onClick={() => {
+                                  resetLinkForm();
+                                  setExpandedRow(p.nom_vente);
+                                  if (p.prix_unit_ttc) setLinkPrixVente(String(p.prix_unit_ttc));
+                                }}
+                              >
+                                Lier
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                        {renderLinkForm(p)}
+                      </>
+                    ))}
+                  </tbody>
+                </table>
+                </div>
+
+                {/* Pagination Non lies */}
+                {totalUnmatchedPages > 1 && (
+                  <div className="ventes-pagination" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, marginTop: 14 }}>
+                    <button
+                      className="ventes-pagination-btn"
+                      style={S.btnOutline}
+                      disabled={unmatchedPage <= 1}
+                      onClick={() => setUnmatchedPage((p) => Math.max(1, p - 1))}
+                    >
+                      Precedent
+                    </button>
+                    <span style={{ padding: "7px 12px", fontSize: 13, color: COLORS.muted }}>
+                      Page {unmatchedPage} sur {totalUnmatchedPages}
+                    </span>
+                    <button
+                      className="ventes-pagination-btn"
+                      style={S.btnOutline}
+                      disabled={unmatchedPage >= totalUnmatchedPages}
+                      onClick={() => setUnmatchedPage((p) => Math.min(totalUnmatchedPages, p + 1))}
+                    >
+                      Suivant
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -797,10 +856,10 @@ export default function ArticlesVentePage() {
                   <thead>
                     <tr>
                       <th style={S.th} onClick={() => handleSort("nom_vente")}>Produit{sortArrow("nom_vente")}</th>
-                      <th style={S.th} onClick={() => handleSort("source")}>Source{sortArrow("source")}</th>
+                      <th className="ventes-col-hide-mobile" style={S.th} onClick={() => handleSort("source")}>Source{sortArrow("source")}</th>
                       <th style={S.thR} onClick={() => handleSort("cout_unitaire")}>Cout unit.{sortArrow("cout_unitaire")}</th>
                       <th style={S.thR} onClick={() => handleSort("prix_vente_ttc")}>Prix vente{sortArrow("prix_vente_ttc")}</th>
-                      <th style={S.thR} onClick={() => handleSort("marge_pct")}>Marge{sortArrow("marge_pct")}</th>
+                      <th className="ventes-col-hide-mobile" style={S.thR} onClick={() => handleSort("marge_pct")}>Marge{sortArrow("marge_pct")}</th>
                       <th style={S.thR} onClick={() => handleSort("food_cost_pct")}>Food cost{sortArrow("food_cost_pct")}</th>
                       <th style={{ ...S.th, textAlign: "center", cursor: "default" }}></th>
                     </tr>
@@ -814,7 +873,7 @@ export default function ArticlesVentePage() {
                             <span style={{ fontSize: 11, color: COLORS.muted }}>{a.categorie_vente}</span>
                           )}
                         </td>
-                        <td style={S.td}>
+                        <td className="ventes-col-hide-mobile" style={S.td}>
                           <span style={{
                             fontSize: 11,
                             padding: "2px 8px",
@@ -827,7 +886,7 @@ export default function ArticlesVentePage() {
                         </td>
                         <td style={S.tdR}>{a.cout_unitaire !== null ? fmt(a.cout_unitaire) : "-"}</td>
                         <td style={S.tdR}>{a.prix_vente_ttc !== null ? fmt(a.prix_vente_ttc) : "-"}</td>
-                        <td style={{ ...S.tdR, color: a.marge_pct !== null ? (a.marge_pct >= 70 ? COLORS.green : a.marge_pct >= 65 ? COLORS.orange : COLORS.red) : COLORS.muted }}>
+                        <td className="ventes-col-hide-mobile" style={{ ...S.tdR, color: a.marge_pct !== null ? (a.marge_pct >= 70 ? COLORS.green : a.marge_pct >= 65 ? COLORS.orange : COLORS.red) : COLORS.muted }}>
                           {fmtPct(a.marge_pct)}
                         </td>
                         <td style={{ ...S.tdR, fontWeight: 600, color: foodCostColor(a.food_cost_pct) }}>
@@ -848,9 +907,10 @@ export default function ArticlesVentePage() {
                 </div>
 
                 {/* Pagination */}
-                {totalPages > 1 && (
-                  <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 14 }}>
+                {totalLinkedPages > 1 && (
+                  <div className="ventes-pagination" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, marginTop: 14 }}>
                     <button
+                      className="ventes-pagination-btn"
                       style={S.btnOutline}
                       disabled={linkedPage === 0}
                       onClick={() => setLinkedPage((p) => Math.max(0, p - 1))}
@@ -858,12 +918,13 @@ export default function ArticlesVentePage() {
                       Precedent
                     </button>
                     <span style={{ padding: "7px 12px", fontSize: 13, color: COLORS.muted }}>
-                      {linkedPage + 1} / {totalPages}
+                      Page {linkedPage + 1} sur {totalLinkedPages}
                     </span>
                     <button
+                      className="ventes-pagination-btn"
                       style={S.btnOutline}
-                      disabled={linkedPage >= totalPages - 1}
-                      onClick={() => setLinkedPage((p) => Math.min(totalPages - 1, p + 1))}
+                      disabled={linkedPage >= totalLinkedPages - 1}
+                      onClick={() => setLinkedPage((p) => Math.min(totalLinkedPages - 1, p + 1))}
                     >
                       Suivant
                     </button>
