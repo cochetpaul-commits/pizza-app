@@ -187,7 +187,7 @@ export default function MargesPage() {
   const [filterMatch, setFilterMatch] = useState<"all" | "matched" | "unmatched">("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const PER_PAGE = 25;
+  const [perPage, setPerPage] = useState(10);
 
   // Date navigation
   const [selectedDate, setSelectedDate] = useState(() =>
@@ -481,9 +481,9 @@ export default function MargesPage() {
 
   const K = data?.kpis;
   const filtered = getFilteredProducts();
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const safePage = Math.min(page, totalPages);
-  const paginatedProducts = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
+  const paginatedProducts = filtered.slice((safePage - 1) * perPage, safePage * perPage);
   const insights = getInsights();
   const allCategories = data
     ? [...new Set(data.products.map((p) => p.categorie))].sort()
@@ -931,7 +931,7 @@ export default function MargesPage() {
                   </thead>
                   <tbody>
                     {paginatedProducts.map((p, i) => {
-                      const globalIdx = (safePage - 1) * PER_PAGE + i;
+                      const globalIdx = (safePage - 1) * perPage + i;
                       return (
                         <tr
                           key={`${p.name}-${globalIdx}`}
@@ -1044,12 +1044,31 @@ export default function MargesPage() {
               >
                 <div
                   style={{
-                    fontSize: 11,
-                    color: COLORS.muted,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
                   }}
                 >
-                  {filtered.length} produit{filtered.length > 1 ? "s" : ""} affiche
-                  {filtered.length > 1 ? "s" : ""}
+                  <span style={{ fontSize: 11, color: COLORS.muted }}>
+                    {filtered.length} produit{filtered.length > 1 ? "s" : ""} affiche
+                    {filtered.length > 1 ? "s" : ""}
+                  </span>
+                  <select
+                    value={perPage}
+                    onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}
+                    style={{
+                      padding: "4px 8px",
+                      borderRadius: 6,
+                      border: `1px solid ${COLORS.border}`,
+                      fontSize: 11,
+                      background: "#fff",
+                      color: COLORS.dark,
+                    }}
+                  >
+                    {[10, 20, 30, 50, 100].map((n) => (
+                      <option key={n} value={n}>{n} / page</option>
+                    ))}
+                  </select>
                 </div>
                 {totalPages > 1 && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1330,6 +1349,120 @@ export default function MargesPage() {
                 ))}
               </div>
             </div>
+
+            {/* ── Menu Engineering ── */}
+            {(() => {
+              const matched = data.products.filter(
+                (p) => p.matched && p.prix_revient !== null && p.prix_revient > 0 && p.qty > 0,
+              );
+              if (matched.length === 0) return null;
+
+              const avgQty = matched.reduce((s, p) => s + p.qty, 0) / matched.length;
+              const avgMarginUnit = matched.reduce((s, p) => s + ((p.ca_ht / p.qty) - (p.prix_revient ?? 0)), 0) / matched.length;
+
+              type Quadrant = { key: string; label: string; color: string; icon: string; desc: string; products: (ProductRow & { marginUnit: number })[] };
+              const quadrants: Quadrant[] = [
+                { key: "stars", label: "Stars", color: "#2e7d32", icon: "\u2B50", desc: "Haute popularite + haute marge. A promouvoir.", products: [] },
+                { key: "puzzles", label: "Puzzles", color: "#1565c0", icon: "\uD83E\uDDE9", desc: "Basse popularite + haute marge. Augmenter la visibilite.", products: [] },
+                { key: "workhorses", label: "Workhorses", color: "#e65100", icon: "\uD83D\uDCAA", desc: "Haute popularite + basse marge. Augmenter le prix ou reduire le cout.", products: [] },
+                { key: "dogs", label: "Dogs", color: "#c62828", icon: "\u274C", desc: "Basse popularite + basse marge. Envisager de retirer.", products: [] },
+              ];
+
+              for (const p of matched) {
+                const marginUnit = (p.ca_ht / p.qty) - (p.prix_revient ?? 0);
+                const highPop = p.qty >= avgQty;
+                const highMargin = marginUnit >= avgMarginUnit;
+                const entry = { ...p, marginUnit };
+                if (highPop && highMargin) quadrants[0].products.push(entry);
+                else if (!highPop && highMargin) quadrants[1].products.push(entry);
+                else if (highPop && !highMargin) quadrants[2].products.push(entry);
+                else quadrants[3].products.push(entry);
+              }
+
+              // Sort each quadrant by margin desc
+              for (const q of quadrants) {
+                q.products.sort((a, b) => b.marginUnit - a.marginUnit);
+              }
+
+              return (
+                <div style={{ ...S.card, marginTop: 14 }}>
+                  <div style={S.secTitle}>Menu Engineering</div>
+                  <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
+                    Classification des produits selon leur popularite (quantite vendue) et leur rentabilite (marge unitaire).
+                    Moyennes : {avgQty.toFixed(1)} unites vendues / {fmtDec(avgMarginUnit)} marge unitaire.
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 12,
+                    }}
+                  >
+                    {quadrants.map((q) => (
+                      <div
+                        key={q.key}
+                        style={{
+                          border: `1px solid ${q.color}30`,
+                          borderRadius: 10,
+                          padding: "14px 16px",
+                          background: `${q.color}08`,
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                          <span style={{ fontSize: 16 }}>{q.icon}</span>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: q.color }}>
+                            {q.label}
+                          </span>
+                          <span style={{ fontSize: 11, color: COLORS.muted, marginLeft: "auto" }}>
+                            {q.products.length} produit{q.products.length > 1 ? "s" : ""}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 8, fontStyle: "italic" }}>
+                          {q.desc}
+                        </div>
+                        {q.products.length === 0 && (
+                          <div style={{ fontSize: 11, color: COLORS.muted }}>Aucun produit</div>
+                        )}
+                        {q.products.slice(0, 5).map((p, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              padding: "4px 0",
+                              borderBottom: i < Math.min(q.products.length, 5) - 1 ? `1px solid ${COLORS.border}` : "none",
+                              fontSize: 12,
+                            }}
+                          >
+                            <span
+                              style={{
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                maxWidth: "50%",
+                              }}
+                              title={p.name}
+                            >
+                              {p.name}
+                            </span>
+                            <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                              <span style={{ color: COLORS.muted, fontSize: 11 }}>x{p.qty}</span>
+                              <span style={{ fontWeight: 600, color: q.color }}>{fmtDec(p.marginUnit)}</span>
+                            </span>
+                          </div>
+                        ))}
+                        {q.products.length > 5 && (
+                          <div style={{ fontSize: 10, color: COLORS.muted, marginTop: 4 }}>
+                            +{q.products.length - 5} autre{q.products.length - 5 > 1 ? "s" : ""}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Card 4: Resume par categorie — Full width */}
             <div style={{ ...S.card, marginTop: 14 }}>

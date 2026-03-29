@@ -73,10 +73,11 @@ export async function GET(req: NextRequest) {
 
   // Find unmatched: products in ventes_lignes not in articles_vente
   const linkedNames = new Set((articles ?? []).map((a: { nom_vente: string }) => a.nom_vente));
-  const unmatched: { nom_vente: string; categorie: string; qty: number; ca_ttc: number }[] = [];
+  const unmatched: { nom_vente: string; categorie: string; qty: number; ca_ttc: number; prix_unit_ttc: number }[] = [];
   for (const [name, agg] of prodMap) {
     if (!linkedNames.has(name)) {
-      unmatched.push({ nom_vente: name, categorie: agg.categorie, qty: agg.qty, ca_ttc: agg.ca_ttc });
+      const prixUnit = agg.qty > 0 ? Math.round((agg.ca_ttc / agg.qty) * 100) / 100 : 0;
+      unmatched.push({ nom_vente: name, categorie: agg.categorie, qty: agg.qty, ca_ttc: agg.ca_ttc, prix_unit_ttc: prixUnit });
     }
   }
   unmatched.sort((a, b) => b.ca_ttc - a.ca_ttc);
@@ -220,8 +221,31 @@ export async function POST(req: NextRequest) {
       cout_unitaire = prix_achat;
     }
 
+    /* Auto-fill prix_vente_ttc from sales data if not provided */
+    let autoPrice = prix_vente_ttc ? Number(prix_vente_ttc) : null;
+    if (!autoPrice && etablissement_id && nom_vente) {
+      // Get average unit price from ventes_lignes
+      const { data: salesData } = await supabaseAdmin
+        .from("ventes_lignes")
+        .select("ttc,quantite")
+        .eq("etablissement_id", etablissement_id)
+        .eq("description", nom_vente)
+        .eq("type_ligne", "Produit")
+        .eq("annule", false)
+        .gt("ttc", 0)
+        .limit(50);
+      if (salesData && salesData.length > 0) {
+        let totalTTC = 0, totalQty = 0;
+        for (const s of salesData) {
+          totalTTC += Number(s.ttc) || 0;
+          totalQty += Number(s.quantite) || 1;
+        }
+        if (totalQty > 0) autoPrice = Math.round((totalTTC / totalQty) * 100) / 100;
+      }
+    }
+
     /* Calculate HT, marge, food cost */
-    const pvTTC = prix_vente_ttc ? Number(prix_vente_ttc) : null;
+    const pvTTC = autoPrice;
     const pvHT = pvTTC ? Math.round((pvTTC / 1.1) * 100) / 100 : null;
     const margePct =
       pvHT && cout_unitaire ? Math.round(((pvHT - cout_unitaire) / pvHT) * 1000) / 10 : null;

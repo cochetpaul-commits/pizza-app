@@ -31,6 +31,7 @@ type UnmatchedProduct = {
   categorie: string;
   qty: number;
   ca_ttc: number;
+  prix_unit_ttc: number;
 };
 
 type RecipeOption = { id: string; name: string; type: "pizza" | "kitchen" | "cocktail"; cost: number };
@@ -677,6 +678,7 @@ export default function ArticlesVentePage() {
                     <th style={S.th}>Categorie</th>
                     <th style={{ ...S.thR, cursor: "default" }}>Qty vendues</th>
                     <th style={{ ...S.thR, cursor: "default" }}>CA TTC</th>
+                    <th style={{ ...S.thR, cursor: "default" }}>Prix unit.</th>
                     <th style={{ ...S.th, textAlign: "center", cursor: "default" }}>Action</th>
                   </tr>
                 </thead>
@@ -696,6 +698,7 @@ export default function ArticlesVentePage() {
                         </td>
                         <td style={S.tdR}>{p.qty}</td>
                         <td style={S.tdR}>{fmt(p.ca_ttc)}</td>
+                        <td style={{ ...S.tdR, color: accent, fontWeight: 600 }}>{p.prix_unit_ttc ? p.prix_unit_ttc.toFixed(2) + "\u20AC" : "\u2014"}</td>
                         <td style={{ ...S.td, textAlign: "center" }}>
                           {expandedRow === p.nom_vente ? (
                             <button style={S.btnOutline} onClick={resetLinkForm}>Fermer</button>
@@ -705,6 +708,7 @@ export default function ArticlesVentePage() {
                               onClick={() => {
                                 resetLinkForm();
                                 setExpandedRow(p.nom_vente);
+                                if (p.prix_unit_ttc) setLinkPrixVente(String(p.prix_unit_ttc));
                               }}
                             >
                               Lier
