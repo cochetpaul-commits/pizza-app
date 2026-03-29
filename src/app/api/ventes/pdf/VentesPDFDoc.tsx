@@ -143,6 +143,48 @@ export function VentesPDF({ stats, prev, mode, viewTab, rangeLabel, etabName }: 
             ))}
           </View>
         )}
+
+        {/* Upsell summary */}
+        {W.ratios && (
+          <View style={{ ...s.card, flexDirection: "row", gap: 8 }}>
+            <Text style={{ ...s.sec, marginBottom: 0, width: 40 }}>Upsell</Text>
+            {[
+              { label: "Antipasti", data: W.ratios.anti, color: c.accent },
+              { label: "Desserts", data: W.ratios.dolci, color: "#b5904a" },
+              { label: "Vins", data: W.ratios.vin, color: "#7c5c3a" },
+              { label: "Alcool", data: W.ratios.alcool, color: "#c15f2e" },
+              { label: "Cafe", data: W.ratios.cafe, color: "#6f5c3a" },
+            ].map(u => {
+              const tables = u.data?.tables ?? 0;
+              const pct = W.tickets > 0 ? Math.round(tables / W.tickets * 100) : 0;
+              return (
+                <View key={u.label} style={{ flex: 1, alignItems: "center" as const }}>
+                  <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold", color: u.color }}>{pct}%</Text>
+                  <Text style={{ fontSize: 5, color: c.muted }}>{u.label}</Text>
+                  <Text style={{ fontSize: 5, color: c.faint }}>{tables}/{W.tickets}t</Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Duration & Rotation */}
+        {W.duration && W.duration.totalOrders > 0 && (
+          <View style={{ ...s.card, flexDirection: "row", gap: 12 }}>
+            <View style={{ flex: 1, alignItems: "center" as const }}>
+              <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: c.accent }}>{W.duration.avgDurMin}<Text style={{ fontSize: 8, color: c.muted }}>min</Text></Text>
+              <Text style={{ fontSize: 5, color: c.muted }}>Duree moy.</Text>
+            </View>
+            <View style={{ flex: 1, alignItems: "center" as const }}>
+              <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: c.green }}>{W.duration.avgRotation}x</Text>
+              <Text style={{ fontSize: 5, color: c.muted }}>Rotation</Text>
+            </View>
+            <View style={{ flex: 1, alignItems: "center" as const }}>
+              <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: "#7c5c3a" }}>{W.duration.totalOrders}</Text>
+              <Text style={{ fontSize: 5, color: c.muted }}>Tables servies</Text>
+            </View>
+          </View>
+        )}
       </Page>
 
       {/* PAGE 2: Produits + Categories */}
