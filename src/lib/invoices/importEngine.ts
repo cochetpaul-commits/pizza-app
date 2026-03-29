@@ -301,10 +301,22 @@ export async function runImport(options: {
       const nm = (l.name ?? "").trim().toUpperCase();
       if (!nm) continue;
 
-      const already =
+      let already =
         (sku && skuToIngId.has(sku)) ||
         nameToIngId.has(nm.toLowerCase()) ||
         normalizedToIngId.has(normalizeIngredientName(nm));
+      // Fallback: prefix match — existing ingredient name is prefix of parsed name
+      if (!already) {
+        const nmLower = nm.toLowerCase();
+        for (const [existingName, existingId] of nameToIngId) {
+          if (nmLower.startsWith(existingName + " ") || existingName.startsWith(nmLower + " ")) {
+            nameToIngId.set(nmLower, existingId);
+            normalizedToIngId.set(normalizeIngredientName(nm), existingId);
+            already = true;
+            break;
+          }
+        }
+      }
       if (already) continue;
 
       const cat = (detectCategoryFromName(nm) ?? fallbackCategory) as Category;
@@ -392,11 +404,21 @@ export async function runImport(options: {
       .map((l) => {
         const sku = (l.sku ?? "").trim();
         const nm = (l.name ?? "").trim().toUpperCase();
-        const ingId =
+        let ingId =
           (sku && skuToIngId.get(sku)) ||
           nameToIngId.get(nm.toLowerCase()) ||
           normalizedToIngId.get(normalizeIngredientName(nm)) ||
           null;
+        // Fallback: prefix match
+        if (!ingId) {
+          const nmLower = nm.toLowerCase();
+          for (const [existingName, existingId] of nameToIngId) {
+            if (nmLower.startsWith(existingName + " ") || existingName.startsWith(nmLower + " ")) {
+              ingId = existingId;
+              break;
+            }
+          }
+        }
 
         const u = toOfferUnit(l.unit);
         const p = l.unit_price;

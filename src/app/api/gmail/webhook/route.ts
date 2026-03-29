@@ -487,12 +487,22 @@ async function processMessage(messageId: string) {
 
         const sku = (ing.reference ?? "").trim();
 
-        // Match existing ingredient: SKU → exact name → normalized name
+        // Match existing ingredient: SKU → exact name → normalized name → prefix
         let ingredientId =
           (sku && skuToIngId.get(sku)) ||
           nameToIngId.get(ingName.toLowerCase()) ||
           normalizedToIngId.get(normalizeForMatch(ingName)) ||
           null;
+        // Fallback: prefix match — existing name is prefix of parsed name (or vice versa)
+        if (!ingredientId) {
+          const nmLower = ingName.toLowerCase();
+          for (const [existingName, existingId] of nameToIngId) {
+            if (nmLower.startsWith(existingName + " ") || existingName.startsWith(nmLower + " ")) {
+              ingredientId = existingId;
+              break;
+            }
+          }
+        }
 
         if (!ingredientId) {
           // Create ingredient with all required fields
