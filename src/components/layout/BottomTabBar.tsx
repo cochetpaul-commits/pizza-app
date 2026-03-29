@@ -38,7 +38,7 @@ function IconShoppingBag({ active: _active }: { active: boolean }) {
   );
 }
 
-function IconBarChart({ active }: { active: boolean }) {
+function _IconBarChart({ active }: { active: boolean }) {
   return (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.5" : "2"} strokeLinecap="round" strokeLinejoin="round">
       <line x1="12" y1="20" x2="12" y2="10" />
