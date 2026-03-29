@@ -882,7 +882,7 @@ function RecettesInner() {
 
       {/* ── FAB mobile ── */}
       {canWrite && (
-        <div style={{ position: "fixed", bottom: "calc(150px + env(safe-area-inset-bottom, 0px))", right: 16, zIndex: 100 }}>
+        <div style={{ position: "fixed", bottom: "calc(90px + env(safe-area-inset-bottom, 0px))", right: 16, zIndex: 100 }}>
           {showFab && (
             <div style={{
               position: "absolute", bottom: 60, right: 0,
