@@ -116,6 +116,7 @@ const VENTES_ITEMS: NavItemV2[] = [
   { label: "Marges", href: "/ventes/marges", icon: "wallet" },
   { label: "Articles", href: "/ventes/articles", icon: "tag" },
   { label: "Simulation", href: "/ventes/simulation", icon: "calculator" },
+  { label: "Insights IA", href: "/ventes/insights", icon: "trendingUp" },
 ];
 export const VENTES_SECTION: NavSubSection = { label: "Ventes", icon: "wallet", href: "/ventes", roles: ["group_admin"], items: VENTES_ITEMS };
 export const PERSONNEL_SECTION: NavSubSection = { label: "Personnel", icon: "users", href: "/personnel", items: PLANNING_ITEMS };
@@ -286,6 +287,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/ventes/marges": "Marges produits",
   "/ventes/articles": "Articles de vente",
   "/ventes/meteo": "Analyse météo",
+  "/ventes/insights": "Insights IA",
   "/plannings": "Planning",
   "/rh/pointage": "Pointage",
   "/rh/conges": "Congés",
