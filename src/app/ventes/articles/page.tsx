@@ -244,9 +244,14 @@ export default function ArticlesVentePage() {
   const [ingredientSearch, setIngredientSearch] = useState("");
 
   // Simulateur
-  const [simPrixBouteille, setSimPrixBouteille] = useState("");
-  const [simVolBouteille, setSimVolBouteille] = useState("");
+  const [simPrixAchat, setSimPrixAchat] = useState("");
+  const [simVolume, setSimVolume] = useState("");
+  const [simUnite, setSimUnite] = useState("cl");
   const [simVolDose, setSimVolDose] = useState("");
+  const [simTva, setSimTva] = useState("10");
+  const [simCoeff, setSimCoeff] = useState("");
+  const [simPvTtc, setSimPvTtc] = useState("");
+  const [simLastEdited, setSimLastEdited] = useState<"coeff" | "pv" | null>(null);
 
   /* ── Fetch data ── */
   const fetchData = async () => {
@@ -382,12 +387,55 @@ export default function ArticlesVentePage() {
   const totalPages = Math.ceil(filteredLinked.length / PER_PAGE);
 
   /* ── Simulateur calculations ── */
-  const simPrix = Number(simPrixBouteille) || 0;
-  const simVol = Number(simVolBouteille) || 0;
-  const simDose = Number(simVolDose) || 0;
-  const simNbDoses = simVol > 0 && simDose > 0 ? Math.floor(simVol / simDose) : 0;
-  const simCoutDose = simNbDoses > 0 ? simPrix / simNbDoses : 0;
-  const simPrixSuggere = simCoutDose > 0 ? (simCoutDose / 0.3) * 1.1 : 0; // 30% food cost, TTC
+  const simPrixAchatN = Number(simPrixAchat) || 0;
+  const simVolumeN = Number(simVolume) || 0;
+  const simDoseN = Number(simVolDose) || 0;
+  const simTvaN = Number(simTva) || 10;
+  const simNbPortions = simVolumeN > 0 && simDoseN > 0 ? Math.floor(simVolumeN / simDoseN) : 0;
+  const simCoutDose = simNbPortions > 0 ? simPrixAchatN / simNbPortions : 0;
+
+  // Derived from coeff or PV TTC (bidirectional)
+  const simCoeffN = Number(simCoeff) || 0;
+  const simPvTtcN = Number(simPvTtc) || 0;
+
+  let simCalcPvTtc = 0;
+  let simCalcCoeff = 0;
+  let simCalcPvHt = 0;
+  let simCalcMarge = 0;
+  let simCalcFoodCost: number | null = null;
+
+  if (simCoutDose > 0) {
+    if (simLastEdited === "pv" && simPvTtcN > 0) {
+      simCalcPvTtc = simPvTtcN;
+      simCalcPvHt = simPvTtcN / (1 + simTvaN / 100);
+      simCalcCoeff = simPvTtcN / simCoutDose;
+      simCalcMarge = simCalcPvHt - simCoutDose;
+      simCalcFoodCost = (simCoutDose / simCalcPvHt) * 100;
+    } else if (simLastEdited === "coeff" && simCoeffN > 0) {
+      simCalcCoeff = simCoeffN;
+      simCalcPvTtc = simCoutDose * simCoeffN;
+      simCalcPvHt = simCalcPvTtc / (1 + simTvaN / 100);
+      simCalcMarge = simCalcPvHt - simCoutDose;
+      simCalcFoodCost = (simCoutDose / simCalcPvHt) * 100;
+    }
+  }
+
+  const simSetFromPreset = (targetFc: number) => {
+    if (simCoutDose <= 0) return;
+    // FC = coutDose / pvHT * 100 => pvHT = coutDose / (targetFc/100)
+    const pvHt = simCoutDose / (targetFc / 100);
+    const pvTtc = pvHt * (1 + simTvaN / 100);
+    const coeff = pvTtc / simCoutDose;
+    setSimCoeff(coeff.toFixed(2));
+    setSimPvTtc(pvTtc.toFixed(2));
+    setSimLastEdited("coeff");
+  };
+
+  const simPresetPvTtc = (targetFc: number) => {
+    if (simCoutDose <= 0) return 0;
+    const pvHt = simCoutDose / (targetFc / 100);
+    return pvHt * (1 + simTvaN / 100);
+  };
 
   /* ── Filtered recipes/ingredients for search ── */
   const filteredRecipes = useMemo(() => {
@@ -830,44 +878,59 @@ export default function ArticlesVentePage() {
         {!loading && tab === "simulateur" && (
           <div style={S.card}>
             <h2 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700, color: COLORS.dark, margin: "0 0 16px" }}>
-              Calculateur de doses
+              Simulateur de prix
             </h2>
             <p style={{ fontSize: 13, color: COLORS.muted, marginBottom: 16 }}>
-              Calculez le nombre de portions et le cout par dose pour une bouteille ou un conditionnement.
+              Calculez le nombre de portions, le cout par dose, et simulez vos prix de vente.
             </p>
 
-            <div className="ventes-sim-inputs" style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-              <div style={{ flex: "1 1 180px" }}>
-                <label style={{ fontSize: 11, color: COLORS.muted, display: "block", marginBottom: 4 }}>Prix bouteille</label>
+            {/* Row 1: prix achat, volume, unite, dose */}
+            <div className="ventes-sim-inputs" style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 160px" }}>
+                <label style={{ fontSize: 11, color: COLORS.muted, display: "block", marginBottom: 4 }}>Prix d&apos;achat (EUR)</label>
                 <input
                   style={S.input}
                   type="number"
                   min="0"
                   step="0.01"
                   placeholder="Ex: 18.50"
-                  value={simPrixBouteille}
-                  onChange={(e) => setSimPrixBouteille(e.target.value)}
+                  value={simPrixAchat}
+                  onChange={(e) => setSimPrixAchat(e.target.value)}
                 />
               </div>
-              <div style={{ flex: "1 1 180px" }}>
-                <label style={{ fontSize: 11, color: COLORS.muted, display: "block", marginBottom: 4 }}>Volume bouteille (cL)</label>
+              <div style={{ flex: "1 1 140px" }}>
+                <label style={{ fontSize: 11, color: COLORS.muted, display: "block", marginBottom: 4 }}>Volume / Conditionnement</label>
                 <input
                   style={S.input}
                   type="number"
                   min="0"
-                  step="1"
+                  step="0.01"
                   placeholder="Ex: 75"
-                  value={simVolBouteille}
-                  onChange={(e) => setSimVolBouteille(e.target.value)}
+                  value={simVolume}
+                  onChange={(e) => setSimVolume(e.target.value)}
                 />
               </div>
-              <div style={{ flex: "1 1 180px" }}>
-                <label style={{ fontSize: 11, color: COLORS.muted, display: "block", marginBottom: 4 }}>Volume dose (cL)</label>
+              <div style={{ flex: "0 0 100px" }}>
+                <label style={{ fontSize: 11, color: COLORS.muted, display: "block", marginBottom: 4 }}>Unite</label>
+                <select
+                  style={S.select}
+                  value={simUnite}
+                  onChange={(e) => setSimUnite(e.target.value)}
+                >
+                  <option value="cl">cl</option>
+                  <option value="L">L</option>
+                  <option value="kg">kg</option>
+                  <option value="g">g</option>
+                  <option value="unit">unit</option>
+                </select>
+              </div>
+              <div style={{ flex: "1 1 140px" }}>
+                <label style={{ fontSize: 11, color: COLORS.muted, display: "block", marginBottom: 4 }}>Volume dose / portion</label>
                 <input
                   style={S.input}
                   type="number"
                   min="0"
-                  step="1"
+                  step="0.01"
                   placeholder="Ex: 12"
                   value={simVolDose}
                   onChange={(e) => setSimVolDose(e.target.value)}
@@ -875,66 +938,123 @@ export default function ArticlesVentePage() {
               </div>
             </div>
 
-            {/* Results */}
-            {simNbDoses > 0 && (
+            {/* Row 2: TVA, Coeff, PV TTC */}
+            <div className="ventes-sim-inputs" style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 120px" }}>
+                <label style={{ fontSize: 11, color: COLORS.muted, display: "block", marginBottom: 4 }}>TVA (%)</label>
+                <input
+                  style={S.input}
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={simTva}
+                  onChange={(e) => setSimTva(e.target.value)}
+                />
+              </div>
+              <div style={{ flex: "1 1 160px" }}>
+                <label style={{ fontSize: 11, color: COLORS.muted, display: "block", marginBottom: 4 }}>Coefficient multiplicateur</label>
+                <input
+                  style={S.input}
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  placeholder={simCalcCoeff > 0 && simLastEdited === "pv" ? simCalcCoeff.toFixed(2) : "Ex: 3.5"}
+                  value={simCoeff}
+                  onChange={(e) => {
+                    setSimCoeff(e.target.value);
+                    setSimLastEdited("coeff");
+                    // Sync PV TTC from coeff
+                    const c = Number(e.target.value);
+                    if (c > 0 && simCoutDose > 0) {
+                      setSimPvTtc((simCoutDose * c).toFixed(2));
+                    }
+                  }}
+                />
+              </div>
+              <div style={{ flex: "1 1 160px" }}>
+                <label style={{ fontSize: 11, color: COLORS.muted, display: "block", marginBottom: 4 }}>Prix de vente TTC (EUR)</label>
+                <input
+                  style={S.input}
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  placeholder={simCalcPvTtc > 0 && simLastEdited === "coeff" ? simCalcPvTtc.toFixed(2) : "Ex: 9.00"}
+                  value={simPvTtc}
+                  onChange={(e) => {
+                    setSimPvTtc(e.target.value);
+                    setSimLastEdited("pv");
+                    // Sync coeff from PV TTC
+                    const pv = Number(e.target.value);
+                    if (pv > 0 && simCoutDose > 0) {
+                      setSimCoeff((pv / simCoutDose).toFixed(2));
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Quick presets */}
+            {simCoutDose > 0 && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+                {[25, 30, 35].map((fc) => (
+                  <button
+                    key={fc}
+                    style={{
+                      ...S.btnOutline,
+                      borderColor: simCalcFoodCost !== null && Math.abs(simCalcFoodCost - fc) < 0.5 ? accent : COLORS.border,
+                      color: simCalcFoodCost !== null && Math.abs(simCalcFoodCost - fc) < 0.5 ? accent : COLORS.dark,
+                    }}
+                    onClick={() => simSetFromPreset(fc)}
+                  >
+                    Objectif {fc}% FC → {fmt(simPresetPvTtc(fc))}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Results card */}
+            {simCoutDose > 0 && (
               <div style={{ background: "#faf7f2", borderRadius: 12, padding: 20, border: `1px solid ${COLORS.border}` }}>
-                <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
-                  {/* Visual */}
-                  <div style={{ flex: "0 0 120px", textAlign: "center" }}>
-                    <div style={{ position: "relative", width: 60, height: 160, margin: "0 auto", borderRadius: "8px 8px 4px 4px", border: `2px solid ${COLORS.border}`, overflow: "hidden", background: "#fff" }}>
-                      {Array.from({ length: simNbDoses }).map((_, i) => {
-                        const h = 100 / simNbDoses;
-                        return (
-                          <div
-                            key={i}
-                            style={{
-                              position: "absolute",
-                              bottom: `${i * h}%`,
-                              left: 0,
-                              right: 0,
-                              height: `${h}%`,
-                              background: i % 2 === 0 ? accent : `${accent}99`,
-                              borderTop: i > 0 ? "1px solid rgba(255,255,255,0.5)" : "none",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <span style={{ fontSize: 9, color: "#fff", fontWeight: 600 }}>{i + 1}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 6 }}>
-                      {simNbDoses} dose{simNbDoses > 1 ? "s" : ""}
-                    </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+                  <div style={S.statCard}>
+                    <div style={S.statLabel}>Nb portions</div>
+                    <div style={S.statValue}>{simNbPortions}</div>
                   </div>
-
-                  {/* Numbers */}
-                  <div style={{ flex: 1 }}>
-                    <div style={S.statsBar}>
-                      <div style={S.statCard}>
-                        <div style={S.statLabel}>Nb doses</div>
-                        <div style={S.statValue}>{simNbDoses}</div>
-                      </div>
-                      <div style={S.statCard}>
-                        <div style={S.statLabel}>Cout par dose</div>
-                        <div style={S.statValue}>{fmt(simCoutDose)}</div>
-                      </div>
-                      <div style={S.statCard}>
-                        <div style={S.statLabel}>Prix vente suggere (30% FC)</div>
-                        <div style={{ ...S.statValue, color: COLORS.green }}>{fmt(simPrixSuggere)}</div>
-                      </div>
-                    </div>
-
-                    <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 8 }}>
-                      {simVolBouteille}cL / {simVolDose}cL = {simNbDoses} doses
-                      &nbsp;&middot;&nbsp;
-                      {fmt(simPrix)} / {simNbDoses} = {fmt(simCoutDose)} / dose
-                      &nbsp;&middot;&nbsp;
-                      Prix vente HT suggere: {fmt(simPrixSuggere / 1.1)} (food cost 30%)
-                    </div>
+                  <div style={S.statCard}>
+                    <div style={S.statLabel}>Cout par dose</div>
+                    <div style={S.statValue}>{fmt(simCoutDose)}</div>
                   </div>
+                  {simCalcPvHt > 0 && (
+                    <>
+                      <div style={S.statCard}>
+                        <div style={S.statLabel}>Prix de vente HT</div>
+                        <div style={S.statValue}>{fmt(simCalcPvHt)}</div>
+                      </div>
+                      <div style={S.statCard}>
+                        <div style={S.statLabel}>Prix de vente TTC</div>
+                        <div style={S.statValue}>{fmt(simCalcPvTtc)}</div>
+                      </div>
+                      <div style={S.statCard}>
+                        <div style={S.statLabel}>Coefficient</div>
+                        <div style={S.statValue}>{simCalcCoeff.toFixed(2)}x</div>
+                      </div>
+                      <div style={S.statCard}>
+                        <div style={S.statLabel}>Marge brute</div>
+                        <div style={{ ...S.statValue, color: simCalcMarge >= 0 ? COLORS.green : COLORS.red }}>{fmt(simCalcMarge)}</div>
+                      </div>
+                      <div style={S.statCard}>
+                        <div style={S.statLabel}>Food cost</div>
+                        <div style={{
+                          ...S.statValue,
+                          color: simCalcFoodCost !== null
+                            ? simCalcFoodCost < 30 ? COLORS.green : simCalcFoodCost <= 35 ? COLORS.orange : COLORS.red
+                            : COLORS.muted,
+                        }}>
+                          {simCalcFoodCost !== null ? simCalcFoodCost.toFixed(1) + "%" : "-"}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             )}
