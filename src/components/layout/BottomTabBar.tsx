@@ -203,8 +203,8 @@ const SECTION_PERSONNEL: TabSection = {
     { label: "Employes", href: "/rh/equipe", match: ["/rh/equipe", "/rh/employe"], icon: (a) => <IconUsers active={a} /> },
     { label: "Pointage", href: "/rh/pointage", match: ["/rh/pointage"], icon: (a) => <IconClock active={a} /> },
     { label: "Conges", href: "/rh/conges", match: ["/rh/conges"], icon: (a) => <IconBeach active={a} /> },
-    { label: "Emargement", href: "/rh/emargement", match: ["/rh/emargement"], icon: (a) => <IconFileText active={a} /> },
     { label: "Rapports", href: "/rh/rapports", match: ["/rh/rapports"], icon: (a) => <IconFileText active={a} /> },
+    { label: "Simulation", href: "/ventes/simulation", match: ["/ventes/simulation"], icon: (a) => <IconTrendingUp active={a} /> },
   ],
 };
 
@@ -215,8 +215,7 @@ const SECTION_VENTES: TabSection = {
   icon: (a) => <IconWallet active={a} />,
   tabs: [
     { label: "Marges", href: "/ventes/marges", match: ["/ventes/marges"], icon: (a) => <IconWallet active={a} /> },
-    { label: "Articles", href: "/ventes/articles", match: ["/ventes/articles"], icon: (a) => <IconTag active={a} /> },
-    { label: "Simulation", href: "/ventes/simulation", match: ["/ventes/simulation"], icon: (a) => <IconTrendingUp active={a} /> },
+    { label: "Insights", href: "/ventes/insights", match: ["/ventes/insights"], icon: (a) => <IconTrendingUp active={a} /> },
   ],
 };
 
@@ -235,25 +234,27 @@ const SECTION_ACHATS: TabSection = {
 const SECTION_OPS: TabSection = {
   label: "Ops",
   href: "/recettes",
-  match: ["/catalogue", "/recettes", "/inventaire", "/prep"],
+  match: ["/catalogue", "/recettes", "/inventaire", "/prep", "/ventes/articles"],
   icon: (a) => <IconPackage active={a} />,
   tabs: [
     { label: "Catalogue", href: "/catalogue", match: ["/catalogue"], icon: (a) => <IconGrid active={a} /> },
     { label: "Fiches", href: "/recettes", match: ["/recettes", "/prep"], icon: (a) => <IconBook active={a} /> },
     { label: "Inventaire", href: "/inventaire", match: ["/inventaire"], icon: (a) => <IconBox active={a} /> },
+    { label: "Sim. prix", href: "/ventes/articles", match: ["/ventes/articles"], icon: (a) => <IconTag active={a} /> },
   ],
 };
 
 const SECTION_OPS_PICCOLA: TabSection = {
   label: "Ops",
   href: "/recettes",
-  match: ["/catalogue", "/recettes", "/inventaire", "/epicerie", "/prep"],
+  match: ["/catalogue", "/recettes", "/inventaire", "/epicerie", "/prep", "/ventes/articles"],
   icon: (a) => <IconPackage active={a} />,
   tabs: [
     { label: "Catalogue", href: "/catalogue", match: ["/catalogue"], icon: (a) => <IconGrid active={a} /> },
     { label: "Fiches", href: "/recettes", match: ["/recettes", "/prep"], icon: (a) => <IconBook active={a} /> },
     { label: "Prix vente", href: "/epicerie", match: ["/epicerie"], icon: (a) => <IconTag active={a} /> },
     { label: "Inventaire", href: "/inventaire", match: ["/inventaire"], icon: (a) => <IconBox active={a} /> },
+    { label: "Sim. prix", href: "/ventes/articles", match: ["/ventes/articles"], icon: (a) => <IconTag active={a} /> },
   ],
 };
 

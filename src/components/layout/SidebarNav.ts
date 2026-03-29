@@ -75,6 +75,7 @@ export const PLANNING_ITEMS: NavItemV2[] = [
   { label: "Congés", href: "/rh/conges", icon: "beach" },
   { label: "Émargement", href: "/rh/emargement", icon: "clipboard" },
   { label: "Rapport de paie", href: "/rh/rapports", icon: "fileText" },
+  { label: "Simulation", href: "/ventes/simulation", icon: "calculator" },
 ];
 
 export const ACHATS_ITEMS: NavItemV2[] = [
@@ -90,6 +91,7 @@ export const OPERATIONS_ITEMS: NavItemV2[] = [
   { label: "Catalogue", href: "/catalogue", icon: "book" },
   { label: "Fiches techniques", href: "/recettes", icon: "fileText" },
   { label: "Inventaire", href: "/inventaire", icon: "package" },
+  { label: "Simulateur prix", href: "/ventes/articles", icon: "calculator" },
 ];
 
 const OPERATIONS_ITEMS_PICCOLA: NavItemV2[] = [
@@ -97,6 +99,7 @@ const OPERATIONS_ITEMS_PICCOLA: NavItemV2[] = [
   { label: "Fiches techniques", href: "/recettes", icon: "fileText" },
   { label: "Prix de vente", href: "/epicerie", icon: "tag" },
   { label: "Inventaire", href: "/inventaire", icon: "package" },
+  { label: "Simulateur prix", href: "/ventes/articles", icon: "calculator" },
 ];
 
 export const EVENEMENTIEL_ITEMS: NavItemV2[] = [
@@ -114,8 +117,6 @@ export const CLIENTS_ITEMS = EVENEMENTIEL_ITEMS;
 /** Ventes section */
 const VENTES_ITEMS: NavItemV2[] = [
   { label: "Marges", href: "/ventes/marges", icon: "wallet" },
-  { label: "Articles", href: "/ventes/articles", icon: "tag" },
-  { label: "Simulation", href: "/ventes/simulation", icon: "calculator" },
   { label: "Insights IA", href: "/ventes/insights", icon: "trendingUp" },
 ];
 export const VENTES_SECTION: NavSubSection = { label: "Ventes", icon: "wallet", href: "/ventes", roles: ["group_admin"], items: VENTES_ITEMS };
