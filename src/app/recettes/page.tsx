@@ -336,12 +336,13 @@ function SectionHeader({
 // ─── Tab pill ─────────────────────────────────────────────────────────────────
 
 const tabStyle = (active: boolean, color?: string): React.CSSProperties => ({
-  padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-  border: active ? "none" : `1.5px solid ${color ?? "#1a1a1a"}40`,
-  background: active ? (color ?? "#1a1a1a") : `${color ?? "#1a1a1a"}14`,
+  padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 700,
+  border: active ? `2px solid ${color ?? "#1a1a1a"}` : `1.5px solid ${color ?? "#1a1a1a"}30`,
+  background: active ? (color ?? "#1a1a1a") : "transparent",
   color: active ? "#fff" : (color ?? "#1a1a1a"),
   cursor: "pointer", whiteSpace: "nowrap",
   transition: "all 0.15s",
+  fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
 });
 
 const filterPill = (active: boolean, activeColor?: string): React.CSSProperties => ({
@@ -655,7 +656,7 @@ function RecettesInner() {
         </div>
 
         {/* ── Main tabs ── */}
-        <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 6 }}>
+        <div className="category-pills" style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 6, WebkitOverflowScrolling: "touch" }}>
           {([
             { key: "tous" as MainTab, label: "Tous", color: "#1a1a1a" },
             { key: "pizza" as MainTab, label: "Pizza", color: PIZZA_COLOR },
