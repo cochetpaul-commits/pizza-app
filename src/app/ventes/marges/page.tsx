@@ -984,7 +984,7 @@ export default function MargesPage() {
                           <td style={S.tdNum}>
                             {p.prix_revient !== null
                               ? fmtDec(p.prix_revient)
-                              : "-"}
+                              : <Link href={`/ventes/articles?search=${encodeURIComponent(p.name)}`} style={{ color: "#D4775A", fontSize: 11, fontWeight: 600, textDecoration: "none" }}>Lier</Link>}
                           </td>
                           <td style={S.tdNum}>
                             {p.cout_total !== null ? fmtDec(p.cout_total) : "-"}
