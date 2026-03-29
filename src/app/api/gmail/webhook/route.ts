@@ -19,6 +19,19 @@ export const maxDuration = 120;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Normalize name for fuzzy matching (same as importEngine's normalizeIngredientName) */
+function normalizeForMatch(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[«»""‟„‹›]/g, '"')
+    .replace(/['''‛]/g, "'")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9"'\s%/]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function ddmmyyyyToIso(s: string): string | null {
   const m = s.match(/^(\d{2})[/\-.](\d{2})[/\-.](\d{4})$/);
   if (!m) return s;
@@ -440,18 +453,46 @@ async function processMessage(messageId: string) {
         : "Unknown";
       const estabValue = etabSlug === "piccola-mia" ? "piccola" : etabSlug === "bello-mio" ? "bellomio" : "both";
 
+      // ── Build lookup maps (same strategy as importEngine) ──
+      // Load ALL existing ingredients to match by name/import_name/sku
+      const nameToIngId = new Map<string, string>();
+      const normalizedToIngId = new Map<string, string>();
+      const skuToIngId = new Map<string, string>();
+
+      const { data: allExisting } = await supabaseAdmin
+        .from("ingredients")
+        .select("id,name,import_name,supplier_sku");
+
+      for (const r of (allExisting ?? []) as Array<{ id: string; name: string; import_name: string | null; supplier_sku: string | null }>) {
+        // Primary key = import_name (stable); fallback to name
+        const primary = ((r.import_name ?? r.name) ?? "").trim();
+        nameToIngId.set(primary.toLowerCase(), r.id);
+        normalizedToIngId.set(normalizeForMatch(primary), r.id);
+        // Also index current name as fallback
+        if (r.import_name && r.name) {
+          const legacy = r.name.trim();
+          if (legacy.toLowerCase() !== primary.toLowerCase()) {
+            nameToIngId.set(legacy.toLowerCase(), r.id);
+            normalizedToIngId.set(normalizeForMatch(legacy), r.id);
+          }
+        }
+        // SKU index
+        const sku = (r.supplier_sku ?? "").trim();
+        if (sku) skuToIngId.set(sku, r.id);
+      }
+
       for (const ing of parseResult.ingredients.filter((i) => i.confidence !== "low")) {
         const ingName = ing.name.trim().toUpperCase();
         if (!ingName) continue;
 
-        // Look up existing ingredient by name (case-insensitive)
-        const { data: existingIng } = await supabaseAdmin
-          .from("ingredients")
-          .select("id")
-          .ilike("name", ingName)
-          .maybeSingle();
+        const sku = (ing.reference ?? "").trim();
 
-        let ingredientId = existingIng?.id;
+        // Match existing ingredient: SKU → exact name → normalized name
+        let ingredientId =
+          (sku && skuToIngId.get(sku)) ||
+          nameToIngId.get(ingName.toLowerCase()) ||
+          normalizedToIngId.get(normalizeForMatch(ingName)) ||
+          null;
 
         if (!ingredientId) {
           // Create ingredient with all required fields
@@ -466,7 +507,7 @@ async function processMessage(messageId: string) {
             supplier: supplierNameTitle,
             supplier_id: supplierId,
             default_supplier_id: supplierId,
-            supplier_sku: ing.reference ?? null,
+            supplier_sku: sku || null,
             piece_weight_g: ing.poids_unitaire ?? null,
             piece_volume_ml: ing.volume_unitaire ?? null,
           };
@@ -484,7 +525,6 @@ async function processMessage(messageId: string) {
             .single();
 
           if (ingErr) {
-            // Might be a duplicate (23505) — try to find it again
             if ((ingErr as { code?: string }).code === "23505") {
               const { data: retry } = await supabaseAdmin
                 .from("ingredients")
@@ -498,6 +538,13 @@ async function processMessage(messageId: string) {
           } else {
             ingredientId = newIng?.id;
           }
+
+          // Update maps for subsequent iterations
+          if (ingredientId) {
+            nameToIngId.set(ingName.toLowerCase(), ingredientId);
+            normalizedToIngId.set(normalizeForMatch(ingName), ingredientId);
+            if (sku) skuToIngId.set(sku, ingredientId);
+          }
         }
 
         if (ingredientId && ing.prix_unitaire != null && ing.prix_unitaire > 0) {
@@ -505,7 +552,7 @@ async function processMessage(messageId: string) {
           const offerRow: Record<string, unknown> = {
             ingredient_id: ingredientId,
             supplier_id: supplierId,
-            supplier_sku: ing.reference ?? null,
+            supplier_sku: sku || null,
             supplier_label: ing.name,
             price_kind: "unit",
             unit,
