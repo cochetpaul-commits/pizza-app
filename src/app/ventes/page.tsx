@@ -124,7 +124,13 @@ export default function PerformancesPage() {
   const compareRef = useRef<HTMLDivElement>(null);
 
   // Date navigation
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    const dow = today.getDay();
+    if (dow === 0) today.setDate(today.getDate() - 2); // Sunday → Friday
+    if (dow === 6) today.setDate(today.getDate() - 1); // Saturday → Friday
+    return today.toISOString().slice(0, 10);
+  });
 
   // Compute date range based on viewTab
   const getRange = useCallback(() => {
@@ -338,37 +344,39 @@ export default function PerformancesPage() {
               </button>
             ))}
           </div>
-          <label style={{
-            padding: "7px 14px", borderRadius: 8, border: "none",
-            background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
-          }}>
-            {importing ? "Import..." : "Import"}
-            <input type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => {
-              const f = e.target.files?.[0];
-              if (f) handleImport(f);
-              e.target.value = "";
-            }} />
-          </label>
-          {data && (
-            <button type="button" onClick={handleExportPDF} disabled={exporting} style={{
-              padding: "7px 14px", borderRadius: 8, border: "1px solid #e0d8ce",
-              background: "#fff", color: "#1a1a1a", fontSize: 12, fontWeight: 700, cursor: "pointer",
-              opacity: exporting ? 0.5 : 1,
+          <div className="ventes-toolbar-actions" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <label style={{
+              padding: "7px 14px", borderRadius: 8, border: "none",
+              background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
             }}>
-              {exporting ? "Export..." : "PDF"}
-            </button>
-          )}
-          <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
-            <button type="button" onClick={() => setMode("ttc")} style={{
-              padding: "4px 14px", borderRadius: 16, border: "none", cursor: "pointer",
-              background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#777",
-              fontSize: 11, fontWeight: 500,
-            }}>TTC</button>
-            <button type="button" onClick={() => setMode("ht")} style={{
-              padding: "4px 14px", borderRadius: 16, border: "none", cursor: "pointer",
-              background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#777",
-              fontSize: 11, fontWeight: 500,
-            }}>HT</button>
+              {importing ? "Import..." : "Import"}
+              <input type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => {
+                const f = e.target.files?.[0];
+                if (f) handleImport(f);
+                e.target.value = "";
+              }} />
+            </label>
+            {data && (
+              <button type="button" onClick={handleExportPDF} disabled={exporting} style={{
+                padding: "7px 14px", borderRadius: 8, border: "1px solid #e0d8ce",
+                background: "#fff", color: "#1a1a1a", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                opacity: exporting ? 0.5 : 1,
+              }}>
+                {exporting ? "Export..." : "PDF"}
+              </button>
+            )}
+            <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
+              <button type="button" onClick={() => setMode("ttc")} style={{
+                padding: "4px 14px", borderRadius: 16, border: "none", cursor: "pointer",
+                background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#777",
+                fontSize: 11, fontWeight: 500,
+              }}>TTC</button>
+              <button type="button" onClick={() => setMode("ht")} style={{
+                padding: "4px 14px", borderRadius: 16, border: "none", cursor: "pointer",
+                background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#777",
+                fontSize: 11, fontWeight: 500,
+              }}>HT</button>
+            </div>
           </div>
           {/* Compare dropdown */}
           <div ref={compareRef} style={{ position: "relative" }}>
@@ -490,15 +498,15 @@ export default function PerformancesPage() {
                     );
                   })()}
                 </div>
-                <div className="ventes-hero-kpis" style={{ display: "flex", gap: 20, marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,.12)", flexWrap: "wrap" }}>
-                  <div>
+                <div className="ventes-hero-kpis" style={{ display: "flex", gap: 20, marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,.12)", flexWrap: "wrap", alignItems: "flex-start" }}>
+                  <div style={{ minWidth: 0, flex: "1 1 0" }}>
                     <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>Couverts</div>
                     <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>{W.couverts}</div>
                     <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>{W.tickets} tickets</div>
                     {prev && <DeltaBadge cur={W.couverts} prev={prev.couverts} />}
                   </div>
                   <div style={{ width: 1, background: "rgba(255,255,255,.1)", alignSelf: "stretch" }} />
-                  <div>
+                  <div style={{ minWidth: 0, flex: "1 1 0" }}>
                     <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>CVT moyen</div>
                     <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>
                       {W.couverts > 0 ? (ca / W.couverts).toFixed(1) + "\u20AC" : "\u2014"}
@@ -507,7 +515,7 @@ export default function PerformancesPage() {
                     {activePrev && activePrev.couverts > 0 && <DeltaBadge cur={ca / W.couverts} prev={(mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht) / activePrev.couverts} decimals={1} suffix="\u20AC" />}
                   </div>
                   <div style={{ width: 1, background: "rgba(255,255,255,.1)", alignSelf: "stretch" }} />
-                  <div>
+                  <div style={{ minWidth: 0, flex: "1 1 0" }}>
                     <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>vs A-1</div>
                     {activePrev ? (() => {
                       const prevCA = mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht;

@@ -826,15 +826,24 @@ input[type='number'] {
 
   /* ── Ventes main: toolbar ── */
   .ventes-toolbar {
-    flex-direction: column !important;
-    align-items: stretch !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    justify-content: center !important;
     gap: 6px !important;
   }
-  .ventes-toolbar > div,
-  .ventes-toolbar > label,
-  .ventes-toolbar > button {
-    justify-content: center;
-    text-align: center;
+  .ventes-toolbar-actions {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+    width: auto !important;
+  }
+  .ventes-toolbar-actions > label,
+  .ventes-toolbar-actions > button {
+    width: auto !important;
+    flex-shrink: 0;
   }
 
   /* ── Ventes main: date row ── */

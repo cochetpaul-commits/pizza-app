@@ -222,7 +222,7 @@ export async function POST(req: NextRequest) {
     }
 
     /* Auto-fill prix_vente_ttc from sales data if not provided */
-    let autoPrice = prix_vente_ttc ? Number(prix_vente_ttc) : null;
+    let autoPrice = (prix_vente_ttc !== undefined && prix_vente_ttc !== null && prix_vente_ttc !== "" && Number(prix_vente_ttc) > 0) ? Number(prix_vente_ttc) : null;
     if (!autoPrice && etablissement_id && nom_vente) {
       // Get average unit price from ventes_lignes
       const { data: salesData } = await supabaseAdmin

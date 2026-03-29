@@ -1368,10 +1368,10 @@ export default function MargesPage() {
 
               type Quadrant = { key: string; label: string; color: string; icon: string; desc: string; products: (ProductRow & { marginUnit: number })[] };
               const quadrants: Quadrant[] = [
-                { key: "stars", label: "Stars", color: "#2e7d32", icon: "\u2B50", desc: "Haute popularite + haute marge. A promouvoir.", products: [] },
-                { key: "puzzles", label: "Puzzles", color: "#1565c0", icon: "\uD83E\uDDE9", desc: "Basse popularite + haute marge. Augmenter la visibilite.", products: [] },
-                { key: "workhorses", label: "Workhorses", color: "#e65100", icon: "\uD83D\uDCAA", desc: "Haute popularite + basse marge. Augmenter le prix ou reduire le cout.", products: [] },
-                { key: "dogs", label: "Dogs", color: "#c62828", icon: "\u274C", desc: "Basse popularite + basse marge. Envisager de retirer.", products: [] },
+                { key: "stars", label: "Stars", color: "#2e7d32", icon: "\u25CF", desc: "Haute popularite + haute marge. A promouvoir.", products: [] },
+                { key: "puzzles", label: "Puzzles", color: "#1565c0", icon: "\u25CF", desc: "Basse popularite + haute marge. Augmenter la visibilite.", products: [] },
+                { key: "workhorses", label: "Workhorses", color: "#e65100", icon: "\u25CF", desc: "Haute popularite + basse marge. Augmenter le prix ou reduire le cout.", products: [] },
+                { key: "dogs", label: "Dogs", color: "#c62828", icon: "\u25CF", desc: "Basse popularite + basse marge. Envisager de retirer.", products: [] },
               ];
 
               for (const p of matched) {
@@ -1416,7 +1416,7 @@ export default function MargesPage() {
                         }}
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                          <span style={{ fontSize: 16 }}>{q.icon}</span>
+                          <span style={{ fontSize: 16, color: q.color }}>{q.icon}</span>
                           <span style={{ fontWeight: 700, fontSize: 14, color: q.color }}>
                             {q.label}
                           </span>
