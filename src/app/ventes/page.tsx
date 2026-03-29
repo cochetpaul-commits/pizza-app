@@ -313,7 +313,8 @@ export default function PerformancesPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `rapport-${viewTab}-${etab.nom?.replace(/\s/g, "_")}.pdf`;
+      const dateSuffix = viewTab === "jour" ? selectedDate : `${from}_${to}`;
+      a.download = `rapport-${viewTab}-${etab.nom?.replace(/\s/g, "_")}-${dateSuffix}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch { /* ignore */ }

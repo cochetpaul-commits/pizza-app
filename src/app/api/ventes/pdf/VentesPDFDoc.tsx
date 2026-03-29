@@ -84,7 +84,7 @@ export function VentesPDF({ stats, prev, mode, viewTab, rangeLabel, etabName }: 
           </View>
           <View style={s.heroRow}>
             <View><Text style={s.heroKpiLabel}>Couverts</Text><Text style={s.heroKpiVal}>{W.couverts || W.tickets}</Text></View>
-            <View><Text style={s.heroKpiLabel}>CVT moyen</Text><Text style={s.heroKpiVal}>{"\u20AC"}{tm.toFixed(1)}</Text></View>
+            <View><Text style={s.heroKpiLabel}>CVT moyen</Text><Text style={s.heroKpiVal}>{tm.toFixed(1)}{"\u20AC"}</Text></View>
             <View><Text style={s.heroKpiLabel}>Tickets</Text><Text style={s.heroKpiVal}>{W.tickets}</Text></View>
             <View><Text style={s.heroKpiLabel}>Annulations</Text><Text style={s.heroKpiVal}>{W.ann_pct?.toFixed(1) ?? "0"}%</Text></View>
           </View>
@@ -138,7 +138,7 @@ export function VentesPDF({ stats, prev, mode, viewTab, rangeLabel, etabName }: 
                 <Text style={{ ...s.tCellMuted, width: 25 }}>{svc.svc === "midi" ? "M" : "S"}</Text>
                 <Text style={{ ...s.tCellAccent, width: 45, textAlign: "right" }}>{fmt(mode === "ttc" ? svc.ttc : svc.ht)}</Text>
                 <Text style={{ ...s.tCell, width: 20, textAlign: "right" }}>{svc.cov}</Text>
-                <Text style={{ ...s.tCell, width: 30, textAlign: "right" }}>{"\u20AC"}{(mode === "ttc" ? svc.tm_sp_ttc : svc.tm_sp_ht).toFixed(0)}</Text>
+                <Text style={{ ...s.tCell, width: 30, textAlign: "right" }}>{(mode === "ttc" ? svc.tm_sp_ttc : svc.tm_sp_ht).toFixed(0)}{"\u20AC"}</Text>
               </View>
             ))}
           </View>
