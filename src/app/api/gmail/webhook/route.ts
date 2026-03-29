@@ -472,6 +472,10 @@ async function processMessage(messageId: string) {
           };
           if (userId) ingRow.user_id = userId;
           if (etabId) ingRow.etablissement_id = etabId;
+          // Set establishments array for multi-etab filtering
+          ingRow.establishments = estabValue === "both"
+            ? ["bellomio", "piccola"]
+            : [estabValue];
 
           const { data: newIng, error: ingErr } = await supabaseAdmin
             .from("ingredients")
@@ -497,7 +501,7 @@ async function processMessage(messageId: string) {
         }
 
         if (ingredientId && ing.prix_unitaire != null && ing.prix_unitaire > 0) {
-          const unit = ing.unit_commande === "kg" ? "kg" : "piece";
+          const unit = ing.unit_commande === "kg" ? "kg" : "pc";
           const offerRow: Record<string, unknown> = {
             ingredient_id: ingredientId,
             supplier_id: supplierId,
