@@ -43,8 +43,8 @@ const s = StyleSheet.create({
 
 const fmt = (v: number) => Math.round(v).toLocaleString("fr-FR") + "\u20AC";
 
-export function VentesPDF({ stats, prev, mode, viewTab, rangeLabel, etabName }: {
-  stats: any; prev: any; mode: string; viewTab: string; rangeLabel: string; etabName: string;
+export function VentesPDF({ stats, prev, mode, viewTab, rangeLabel, etabName, briefing }: {
+  stats: any; prev: any; mode: string; viewTab: string; rangeLabel: string; etabName: string; briefing?: string[] | null;
 }) {
   const W = stats;
   const ca = mode === "ttc" ? W.ca_ttc : W.ca_ht;
@@ -307,6 +307,25 @@ export function VentesPDF({ stats, prev, mode, viewTab, rangeLabel, etabName }: 
             </View>
           )}
         </View>
+
+        {/* Briefing IA */}
+        {briefing && briefing.length > 0 && (
+          <View style={{ backgroundColor: c.white, borderRadius: 6, padding: 10, borderWidth: 0.5, borderColor: c.border, borderLeftWidth: 3, borderLeftColor: c.accent }}>
+            <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold", textTransform: "uppercase", letterSpacing: 1, color: c.accent, marginBottom: 8 }}>
+              Points briefing
+            </Text>
+            {briefing.map((point: string, i: number) => (
+              <View key={i} style={{ flexDirection: "row", gap: 8, paddingVertical: 4, borderBottomWidth: i < briefing.length - 1 ? 0.3 : 0, borderBottomColor: "#f0ebe3" }}>
+                <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold", color: c.accent, width: 14 }}>
+                  {String(i + 1).padStart(2, "0")}
+                </Text>
+                <Text style={{ fontSize: 7, flex: 1, lineHeight: 1.5, color: "#333" }}>
+                  {point.replace(/<[^>]+>/g, "")}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
       </Page>
     </Document>
   );

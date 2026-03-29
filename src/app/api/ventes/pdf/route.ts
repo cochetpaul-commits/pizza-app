@@ -9,13 +9,13 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { stats, prev, mode, viewTab, rangeLabel, etabName } = body;
+    const { stats, prev, mode, viewTab, rangeLabel, etabName, briefing } = body;
 
     if (!stats) {
       return NextResponse.json({ error: "stats manquant" }, { status: 400 });
     }
 
-    const el = VentesPDF({ stats, prev, mode, viewTab, rangeLabel, etabName }) as unknown as React.ReactElement<DocumentProps>;
+    const el = VentesPDF({ stats, prev, mode, viewTab, rangeLabel, etabName, briefing }) as unknown as React.ReactElement<DocumentProps>;
     const buffer = await renderToBuffer(el);
 
     return new NextResponse(new Uint8Array(buffer), {

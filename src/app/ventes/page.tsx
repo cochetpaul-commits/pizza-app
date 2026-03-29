@@ -111,6 +111,8 @@ export default function PerformancesPage() {
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [briefing, setBriefing] = useState<string[] | null>(null);
+  const [briefingLoading, setBriefingLoading] = useState(false);
   const [mixDDOpen, setMixDDOpen] = useState<{ label: string; color: string } | null>(null);
   const [meteo, setMeteo] = useState<Record<string, { emoji: string; desc: string; temp: number }>>({});
 
@@ -255,6 +257,19 @@ export default function PerformancesPage() {
   };
 
   // Navigate dates (skip weekends in jour mode)
+  // Generate AI briefing
+  const generateBriefing = async () => {
+    if (!etab || !data) return;
+    setBriefingLoading(true);
+    try {
+      const { from, to } = getRange();
+      const res = await fetch(`/api/claude/insights?etablissement_id=${etab.id}&from=${from}&to=${to}&type=briefing`);
+      const json = await res.json();
+      if (json.briefing?.points) setBriefing(json.briefing.points);
+    } catch { /* ignore */ }
+    setBriefingLoading(false);
+  };
+
   const navigate = (dir: -1 | 1) => {
     const d = new Date(selectedDate + "T12:00:00");
     if (viewTab === "jour") {
@@ -306,7 +321,7 @@ export default function PerformancesPage() {
       const res = await fetch("/api/ventes/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stats: data, prev: activePrev, mode, viewTab, rangeLabel, etabName: etab.nom ?? "Etablissement" }),
+        body: JSON.stringify({ stats: data, prev: activePrev, mode, viewTab, rangeLabel, etabName: etab.nom ?? "Etablissement", briefing }),
       });
       if (!res.ok) { setExporting(false); return; }
       const blob = await res.blob();
@@ -837,6 +852,63 @@ export default function PerformancesPage() {
                 </div>
               </div>
             )}
+
+            {/* Points briefing IA */}
+            <div style={{
+              background: "#fff", borderRadius: 12, padding: "18px 20px",
+              border: "1px solid #e0d8ce", borderLeft: `4px solid ${accent}`,
+              marginBottom: 14,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <div style={{
+                  fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 11, fontWeight: 700,
+                  letterSpacing: ".1em", textTransform: "uppercase", color: accent,
+                }}>
+                  Points briefing {viewTab === "jour" ? "du jour" : viewTab === "semaine" ? "lundi" : "du mois"}
+                </div>
+                <button
+                  type="button"
+                  onClick={generateBriefing}
+                  disabled={briefingLoading}
+                  style={{
+                    padding: "5px 14px", borderRadius: 8, border: "none",
+                    background: accent, color: "#fff", fontSize: 11, fontWeight: 700,
+                    cursor: "pointer", opacity: briefingLoading ? 0.5 : 1,
+                  }}
+                >
+                  {briefingLoading ? "Analyse..." : briefing ? "Regenerer" : "Generer avec l'IA"}
+                </button>
+              </div>
+              {briefingLoading && (
+                <div style={{ padding: "20px 0", textAlign: "center", color: "#999", fontSize: 12 }}>
+                  <div style={{ animation: "pulse 1.5s infinite", marginBottom: 8 }}>Analyse des donnees en cours...</div>
+                </div>
+              )}
+              {briefing && !briefingLoading && (
+                <div>
+                  {briefing.map((point, i) => (
+                    <div key={i} style={{
+                      display: "flex", gap: 12, padding: "9px 0",
+                      borderBottom: i < briefing.length - 1 ? "1px solid #f0ebe3" : "none",
+                      fontSize: 12, lineHeight: 1.65, color: "#333",
+                    }}>
+                      <span style={{
+                        fontFamily: "var(--font-oswald), Oswald, sans-serif",
+                        fontSize: 12, fontWeight: 700, color: accent, minWidth: 20,
+                      }}>
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <span dangerouslySetInnerHTML={{ __html: point }} />
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!briefing && !briefingLoading && (
+                <div style={{ padding: "12px 0", textAlign: "center", color: "#bbb", fontSize: 12 }}>
+                  Cliquez pour generer les points briefing avec l&apos;IA
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
