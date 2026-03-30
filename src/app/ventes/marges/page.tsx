@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback, type CSSProperties } from "react";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
-import Link from "next/link";
+
 import Chart from "chart.js/auto";
 
 /* ── Types ── */
@@ -48,7 +48,7 @@ type ApiData = {
   recipeCount: number;
 };
 
-type ViewTab = "semaine" | "mois";
+type ViewTab = "jour" | "semaine" | "mois";
 
 type SortKey =
   | "name"
@@ -178,7 +178,7 @@ export default function MargesPage() {
   const { current: etab } = useEtablissement();
   const accent = etab?.couleur ?? COLORS.accent;
 
-  const [viewTab, setViewTab] = useState<ViewTab>("semaine");
+  const [viewTab, setViewTab] = useState<ViewTab>("jour");
   const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("ca_ttc");
@@ -189,10 +189,13 @@ export default function MargesPage() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
 
-  // Date navigation
-  const [selectedDate, setSelectedDate] = useState(() =>
-    new Date().toISOString().slice(0, 10),
-  );
+  // Date navigation — skip weekends
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date();
+    if (d.getDay() === 6) d.setDate(d.getDate() - 1); // samedi → vendredi
+    if (d.getDay() === 0) d.setDate(d.getDate() - 2); // dimanche → vendredi
+    return d.toISOString().slice(0, 10);
+  });
 
   // Chart refs
   const barRef = useRef<HTMLCanvasElement>(null);
@@ -201,6 +204,13 @@ export default function MargesPage() {
   // Compute date range
   const getRange = useCallback(() => {
     const d = new Date(selectedDate + "T12:00:00");
+    if (viewTab === "jour") {
+      // Skip weekends
+      if (d.getDay() === 6) d.setDate(d.getDate() - 1);
+      else if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+      const iso = d.toISOString().slice(0, 10);
+      return { from: iso, to: iso };
+    }
     if (viewTab === "semaine") {
       const dow = d.getDay() || 7;
       const mon = new Date(d);
@@ -246,22 +256,32 @@ export default function MargesPage() {
     loadData(); // eslint-disable-line react-hooks/set-state-in-effect -- data fetch on mount/deps change
   }, [loadData]);
 
-  // Navigate dates
+  // Navigate dates (skip weekends in jour mode)
   const navigate = (dir: -1 | 1) => {
     const d = new Date(selectedDate + "T12:00:00");
-    if (viewTab === "semaine") d.setDate(d.getDate() + dir * 7);
-    else d.setMonth(d.getMonth() + dir);
+    if (viewTab === "jour") {
+      d.setDate(d.getDate() + dir);
+      while (d.getDay() === 0 || d.getDay() === 6) {
+        d.setDate(d.getDate() + dir);
+      }
+    } else if (viewTab === "semaine") {
+      d.setDate(d.getDate() + dir * 7);
+    } else {
+      d.setMonth(d.getMonth() + dir);
+    }
     setSelectedDate(d.toISOString().slice(0, 10));
   };
 
   const { from, to } = getRange();
   const rangeLabel =
-    viewTab === "semaine"
-      ? `Semaine du ${new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} au ${new Date(to + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`
-      : new Date(selectedDate + "T12:00:00").toLocaleDateString("fr-FR", {
-          month: "long",
-          year: "numeric",
-        });
+    viewTab === "jour"
+      ? new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+      : viewTab === "semaine"
+        ? `Semaine du ${new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} au ${new Date(to + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`
+        : new Date(selectedDate + "T12:00:00").toLocaleDateString("fr-FR", {
+            month: "long",
+            year: "numeric",
+          });
 
   // Charts
   useEffect(() => {
@@ -424,7 +444,6 @@ export default function MargesPage() {
     if (!data) return {
       topMarginEur: [] as ProductRow[],
       foodCostAlerts: [] as { product: ProductRow; lostMoney: number }[],
-      unmatchedHighVol: [] as ProductRow[],
       catSummary: [] as CategoryRow[],
       pricingImpact: [] as { product: ProductRow; priceIncrease: number }[],
     };
@@ -450,13 +469,7 @@ export default function MargesPage() {
         return { product: p, lostMoney };
       });
 
-    // Card 3: Unmatched high volume
-    const unmatchedHighVol = data.products
-      .filter((p) => !p.matched)
-      .sort((a, b) => b.qty - a.qty)
-      .slice(0, 10);
-
-    // Card 4: Category summary sorted by food cost
+    // Card 3: Category summary sorted by food cost
     const catSummary = [...data.categories]
       .filter((c) => c.cogs > 0)
       .sort((a, b) => b.food_cost_pct - a.food_cost_pct);
@@ -476,7 +489,7 @@ export default function MargesPage() {
       .filter((x) => x.priceIncrease > 0)
       .sort((a, b) => b.priceIncrease - a.priceIncrease);
 
-    return { topMarginEur, foodCostAlerts, unmatchedHighVol, catSummary, pricingImpact };
+    return { topMarginEur, foodCostAlerts, catSummary, pricingImpact };
   };
 
   const K = data?.kpis;
@@ -489,7 +502,6 @@ export default function MargesPage() {
     ? [...new Set(data.products.map((p) => p.categorie))].sort()
     : [];
 
-  const unmatchedCount = data ? data.products.filter((p) => !p.matched).length : 0;
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
@@ -502,43 +514,6 @@ export default function MargesPage() {
           fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
         }}
       >
-        {/* ── Unmatched products banner ── */}
-        {!loading && data && unmatchedCount > 0 && (
-          <div
-            style={{
-              background: "#fef3cd",
-              border: "1px solid #ffc107",
-              borderRadius: 10,
-              padding: "12px 18px",
-              marginBottom: 16,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              flexWrap: "wrap",
-            }}
-          >
-            <span style={{ fontSize: 13, color: "#856404", fontWeight: 500 }}>
-              {unmatchedCount} produit{unmatchedCount > 1 ? "s" : ""} vendu{unmatchedCount > 1 ? "s" : ""} n&apos;ont pas de cout associe. Liez-les pour une analyse complete.
-            </span>
-            <Link
-              href="/ventes/articles"
-              style={{
-                padding: "6px 16px",
-                borderRadius: 8,
-                background: "#d4a03c",
-                color: "#fff",
-                fontSize: 12,
-                fontWeight: 600,
-                textDecoration: "none",
-                whiteSpace: "nowrap",
-              }}
-            >
-              Lier les produits
-            </Link>
-          </div>
-        )}
-
         {/* ── Toolbar ── */}
         <div
           style={{
@@ -560,7 +535,7 @@ export default function MargesPage() {
               overflow: "hidden",
             }}
           >
-            {(["semaine", "mois"] as ViewTab[]).map((t) => (
+            {(["jour", "semaine", "mois"] as ViewTab[]).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -579,7 +554,7 @@ export default function MargesPage() {
                   letterSpacing: ".05em",
                 }}
               >
-                {t === "semaine" ? "Hebdo" : "Mensuel"}
+                {t === "jour" ? "Journalier" : t === "semaine" ? "Hebdo" : "Mensuel"}
               </button>
             ))}
           </div>
@@ -981,10 +956,8 @@ export default function MargesPage() {
                           <td style={S.tdNum}>{p.qty}</td>
                           <td style={S.tdNum}>{fmtDec(p.ca_ttc)}</td>
                           <td style={S.tdNum}>{fmtDec(p.ca_ht)}</td>
-                          <td style={S.tdNum}>
-                            {p.prix_revient !== null
-                              ? fmtDec(p.prix_revient)
-                              : <Link href={`/ventes/articles?search=${encodeURIComponent(p.name)}`} style={{ color: "#D4775A", fontSize: 11, fontWeight: 600, textDecoration: "none" }}>Lier</Link>}
+                          <td style={{ ...S.tdNum, color: p.prix_revient !== null ? COLORS.dark : COLORS.muted }}>
+                            {p.prix_revient !== null ? fmtDec(p.prix_revient) : "-"}
                           </td>
                           <td style={S.tdNum}>
                             {p.cout_total !== null ? fmtDec(p.cout_total) : "-"}
@@ -1238,7 +1211,7 @@ export default function MargesPage() {
                 ))}
               </div>
 
-              {/* Card 3: Opportunites de marge */}
+              {/* Card 3: Synthese par categorie */}
               <div style={S.card}>
                 <div
                   style={{
@@ -1246,14 +1219,14 @@ export default function MargesPage() {
                     color: COLORS.orange,
                   }}
                 >
-                  Opportunites de marge
+                  Synthese par categorie
                 </div>
-                {insights.unmatchedHighVol.length === 0 && (
+                {insights.catSummary.length === 0 && (
                   <div style={{ fontSize: 12, color: COLORS.muted }}>
-                    Tous les produits sont lies !
+                    Aucune donnee
                   </div>
                 )}
-                {insights.unmatchedHighVol.map((p, i) => (
+                {insights.catSummary.map((cat, i) => (
                   <div
                     key={i}
                     style={{
@@ -1262,49 +1235,28 @@ export default function MargesPage() {
                       alignItems: "center",
                       padding: "6px 0",
                       borderBottom:
-                        i < insights.unmatchedHighVol.length - 1
+                        i < insights.catSummary.length - 1
                           ? `1px solid ${COLORS.border}`
                           : "none",
                       fontSize: 12,
                     }}
                   >
-                    <span
-                      style={{
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        maxWidth: "40%",
-                        fontWeight: 500,
-                      }}
-                      title={p.name}
-                    >
-                      {p.name}
+                    <span style={{ fontWeight: 500, maxWidth: "40%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {cat.cat}
                     </span>
-                    <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <span style={{ color: COLORS.muted }}>x{p.qty}</span>
-                      <span style={{ fontWeight: 500 }}>{fmtDec(p.ca_ttc)}</span>
-                      <Link
-                        href="/ventes/articles"
-                        style={{
-                          fontSize: 10,
-                          color: COLORS.accent,
-                          textDecoration: "underline",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        Lier
-                      </Link>
+                    <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      <span style={{ color: COLORS.muted, fontSize: 11 }}>
+                        {fmtDec(cat.marge)}
+                      </span>
+                      <span style={{ fontWeight: 600, color: foodCostColor(cat.food_cost_pct) }}>
+                        {cat.food_cost_pct.toFixed(1)}%
+                      </span>
                     </span>
                   </div>
                 ))}
-                {insights.unmatchedHighVol.length > 0 && (
-                  <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 8, fontStyle: "italic" }}>
-                    Liez ces produits pour connaitre leur marge
-                  </div>
-                )}
               </div>
 
-              {/* Card 5: Impact pricing */}
+              {/* Card 4: Impact pricing */}
               <div style={S.card}>
                 <div
                   style={{

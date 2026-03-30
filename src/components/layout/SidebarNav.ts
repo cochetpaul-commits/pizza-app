@@ -85,20 +85,20 @@ export const PLANNING_ITEMS: NavItemV2[] = [
   { label: "Masse salariale", href: "/ventes/simulation", icon: "calculator" },
 ];
 
-// PRODUCTION (cuisine & articles)
+// PRODUCTION (fiches techniques, catalogue, articles de vente)
 const PRODUCTION_ITEMS: NavItemV2[] = [
-  { label: "Catalogue", href: "/catalogue", icon: "book" },
   { label: "Fiches techniques", href: "/recettes", icon: "fileText" },
+  { label: "Catalogue", href: "/catalogue", icon: "book" },
+  { label: "Articles de vente", href: "/ventes/articles", icon: "tag" },
   { label: "Inventaire", href: "/inventaire", icon: "package" },
-  { label: "Articles & Simulateur", href: "/ventes/articles", icon: "calculator" },
 ];
 
 const PRODUCTION_ITEMS_PICCOLA: NavItemV2[] = [
-  { label: "Catalogue", href: "/catalogue", icon: "book" },
   { label: "Fiches techniques", href: "/recettes", icon: "fileText" },
+  { label: "Catalogue", href: "/catalogue", icon: "book" },
+  { label: "Articles de vente", href: "/ventes/articles", icon: "tag" },
   { label: "Prix de vente", href: "/epicerie", icon: "tag" },
   { label: "Inventaire", href: "/inventaire", icon: "package" },
-  { label: "Articles & Simulateur", href: "/ventes/articles", icon: "calculator" },
 ];
 
 // ACHATS (fournisseurs & stocks)
