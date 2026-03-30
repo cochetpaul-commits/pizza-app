@@ -774,7 +774,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                 {/* Steps (read-only in production) */}
                 {steps.length > 0 && (
                   <div className="card" style={{ marginBottom: 16 }}>
-                    <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
+                    <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                       Étapes
                     </h3>
                     <ol style={{ margin: 0, paddingLeft: 20 }}>
@@ -855,7 +855,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
 
                 {/* Ingrédients */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#4a6741" }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Ingrédients
                   </h3>
                   <IngredientListDnD
@@ -878,7 +878,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
 
                 {/* Étapes */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#4a6741" }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Étapes
                   </h3>
                   <StepsList steps={steps} onChange={setSteps} />
@@ -886,7 +886,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
 
                 {/* Prix & Marges */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#4a6741" }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Prix &amp; Marges
                   </h3>
                   <PricingBlock
@@ -937,7 +937,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
 
                 {/* Allergènes */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Allergènes
                   </h3>
                   <AllergenBadges allergens={computedAllergens} />
@@ -945,7 +945,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
 
                 {/* Photo */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Photo
                   </h3>
                   {photoPreview && (

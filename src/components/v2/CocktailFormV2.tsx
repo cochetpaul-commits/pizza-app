@@ -638,7 +638,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
                 {steps.length > 0 && (
                   <div className="card" style={{ marginBottom: 16 }}>
-                    <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
+                    <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                       Étapes / Recette
                     </h3>
                     <ol style={{ margin: 0, paddingLeft: 20 }}>
@@ -712,7 +712,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
                 {/* Ingredients */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Ingrédients
                   </h3>
                   <IngredientListDnD
@@ -734,7 +734,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
                 {/* Etapes */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Étapes / Recette
                   </h3>
                   <StepsList steps={steps} onChange={setSteps} />
@@ -742,7 +742,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
                 {/* Allergenes */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Allergènes
                   </h3>
                   <AllergenBadges allergens={computedAllergens} />
@@ -750,7 +750,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
                 {/* Prix & Marges */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Prix &amp; Marges
                   </h3>
                   <PricingBlock
@@ -768,7 +768,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
                 {/* Photo */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Photo
                   </h3>
                   {photoPreview && (

@@ -670,7 +670,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
                 {steps.length > 0 && (
                   <div className="card" style={{ marginBottom: 16 }}>
-                    <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
+                    <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                       Etapes
                     </h3>
                     <ol style={{ margin: 0, paddingLeft: 20 }}>
@@ -720,7 +720,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
                 {/* Ingredients Avant four */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Ingredients — Avant four
                   </h3>
                   <IngredientListDnD
@@ -738,7 +738,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
                 {/* Ingredients Apres four */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6B3A2A" }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Ingredients — Apres four
                   </h3>
                   <IngredientListDnD
@@ -756,7 +756,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
                 {/* Etapes */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Etapes
                   </h3>
                   <StepsList steps={steps} onChange={setSteps} />
@@ -778,7 +778,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
                 {/* Allergenes */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Allergenes
                   </h3>
                   <AllergenBadges allergens={computedAllergens} />
@@ -786,7 +786,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
                 {/* Prix & Marges */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Prix &amp; Marges
                   </h3>
                   <PricingBlock
@@ -804,7 +804,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
                 {/* Photo */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Photo
                   </h3>
                   {photoPreview && (

@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { StepsList } from "./StepsList";
 import { PricingBlock } from "./PricingBlock";
+import { RecipeHero, HeroBtn, HeroDangerBtn } from "./RecipeHero";
 import { StepperInput } from "@/components/StepperInput";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -336,63 +337,22 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     <>
       <main className="container safe-bottom">
 
-        {/* ── Header ── */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {isEdit && (
-              <button type="button" onClick={() => router.push("/recettes")} style={{
-                fontSize: 18, color: "#999", cursor: "pointer", border: "none", background: "transparent",
-                padding: "4px 8px", lineHeight: 1,
-              }}>&#8592;</button>
-            )}
-            <div>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a" }}>{title}</h1>
-            {isEdit && (
-              <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
-                {etab && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 8px", borderRadius: 6, background: "#D4775A", color: "#fff" }}>{etab.nom ?? "Etablissement"}</span>}
-                <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 8px", borderRadius: 6, background: "#f2ede4", color: "#666" }}>Empatement</span>
-                <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 8px", borderRadius: 6, background: "#f2ede4", color: "#666" }}>{TYPE_OPTIONS.find(t => t.id === type)?.label ?? type}</span>
-              </div>
-            )}
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            {isEdit && (
-              <>
-              <button type="button" className="btn" onClick={handleExportPdf} disabled={pdfLoading}
-                style={{ fontSize: 12 }}>
-                {pdfLoading ? "Export…" : "Apercu PDF"}
-              </button>
-              <PublishCatalogueButton recipeType="empatement" recipeId={recipeId!} />
-              </>
-            )}
-            {userCanWrite && (
-              <button onClick={handleSave} disabled={saving} className="btn btnPrimary">
-                {saving ? "Sauvegarde…" : "Enregistrer"}
-              </button>
-            )}
-          </div>
-        </div>
+        <RecipeHero
+          title={title}
+          accent={ACCENT}
+          isEdit={isEdit}
+          etabName={etab?.nom}
+          typeLabel="Empatement"
+          onBack={() => router.push("/recettes")}
+          kpis={isEdit ? { costPerPortion: effectiveCost > 0 ? effectiveCost : null, foodCostPct: foodCostPct ?? null, sellPriceHT: sp ?? null, sellPriceTTC: prixTTC ?? null, margeBrute: margeBrute ?? null } : undefined}
+          actions={<>
+            {isEdit && <HeroBtn onClick={handleExportPdf} disabled={pdfLoading}>{pdfLoading ? "Export…" : "PDF"}</HeroBtn>}
+            {isEdit && <PublishCatalogueButton recipeType="empatement" recipeId={recipeId!} />}
+            {userCanWrite && <HeroBtn onClick={handleSave} disabled={saving} primary>{saving ? "Sauvegarde…" : "Enregistrer"}</HeroBtn>}
+          </>}
+        />
 
-        {/* ── KPI Banner ── */}
-        {isEdit && (
-          <div style={{
-            display: "flex", gap: 0, marginBottom: 16, borderRadius: 10,
-            border: "1px solid #ddd6c8", overflow: "hidden", background: "#fff",
-          }}>
-            <KpiBannerItem label="COUT REVIENT" value={effectiveCost > 0 ? `${fmtMoney(effectiveCost)} €` : "-"} sub="par paton" color="#D4775A" />
-            <KpiBannerItem
-              label="FOOD COST"
-              value={foodCostPct != null ? `${foodCostPct.toFixed(1)}%` : "-"}
-              sub="objectif ≤ 32%"
-              color={foodCostPct == null ? "#999" : foodCostPct <= 28 ? "#16a34a" : foodCostPct <= 32 ? "#D97706" : "#DC2626"}
-            />
-            <KpiBannerItem label="PRIX DE VENTE HT" value={sp ? `${fmtMoney(sp)} €` : "-"} sub={prixTTC ? `${fmtMoney(prixTTC)} € TTC` : ""} color="#1a1a1a" />
-            <KpiBannerItem label="MARGE BRUTE" value={margeBrute != null ? `${fmtMoney(margeBrute)} €` : "-"} sub="par paton" color="#16a34a" />
-          </div>
-        )}
-
-        {/* ── Tab bar ── */}
+                {/* ── Tab bar ── */}
         <div style={{ display: "flex", gap: 0, borderBottom: "1.5px solid #ddd6c8", marginBottom: 16, overflowX: "auto" }}>
           {MAIN_TABS.map((t) => (
             <button
@@ -538,7 +498,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
 
                 {steps.length > 0 && (
                   <div className="card" style={{ marginBottom: 16 }}>
-                    <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "#6f6a61" }}>
+                    <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                       Procedure / Etapes
                     </h3>
                     <ol style={{ margin: 0, paddingLeft: 20 }}>
@@ -602,7 +562,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
 
                 {/* Parametres hydratation */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Parametres
                   </h3>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
@@ -628,7 +588,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
 
                 {/* Farines */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Farines
                   </h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -702,7 +662,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                 {/* Resultats calcules -- avec etoiles pivot */}
                 {result && (
                   <div className="card" style={{ marginBottom: 16, borderLeft: `4px solid ${ACCENT}` }}>
-                    <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                    <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                       Quantites calculees -- {nbPatons} paton(s) de {poidsPaton} g
                     </h3>
                     <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
@@ -773,7 +733,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
 
                 {/* Etapes */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Procedure / Etapes
                   </h3>
                   <StepsList steps={steps} onChange={setSteps} />
@@ -781,7 +741,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
 
                 {/* Prix & Marges */}
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: ACCENT }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Prix &amp; Marges
                   </h3>
                   <PricingBlock
@@ -817,23 +777,3 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
 }
 
 // ── KPI Banner Item ──────────────────────────────────────────────
-function KpiBannerItem({ label, value, sub, color }: { label: string; value: string; sub?: string; color: string }) {
-  return (
-    <div style={{
-      flex: 1, padding: "12px 14px",
-      borderRight: "1px solid #f0ebe2",
-    }}>
-      <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 18, fontWeight: 700, color, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-        {value}
-      </div>
-      {sub && (
-        <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>
-          {sub}
-        </div>
-      )}
-    </div>
-  );
-}
