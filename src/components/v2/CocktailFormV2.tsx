@@ -15,6 +15,7 @@ import { StepsList } from "./StepsList";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { PricingBlock } from "./PricingBlock";
+import { DoseSimulator } from "./DoseSimulator";
 import { RecipeHero, HeroBtn, HeroDangerBtn } from "./RecipeHero";
 import { GestionFoodCost } from "./GestionFoodCost";
 import { GestionCommandes } from "./GestionCommandes";
@@ -746,6 +747,14 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                     Allergènes
                   </h3>
                   <AllergenBadges allergens={computedAllergens} />
+                </div>
+
+                {/* Simulateur dose */}
+                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
+                    Simulateur de prix
+                  </h3>
+                  <DoseSimulator accentColor={ACCENT} />
                 </div>
 
                 {/* Prix & Marges */}
