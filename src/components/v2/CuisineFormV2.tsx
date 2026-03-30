@@ -44,11 +44,11 @@ function n2(v: unknown) { const x = Number(v); return Number.isFinite(x) ? x : 0
 function round2(v: number) { return Math.round(v * 100) / 100; }
 function fmtMoney(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
-interface Props { recipeId?: string; initialProdMode?: boolean; }
+interface Props { recipeId?: string; initialProdMode?: boolean; initialCategory?: string; }
 
 function truncate(s: string, n: number) { return s.length > n ? s.slice(0, n) + "…" : s; }
 
-export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
+export default function CuisineFormV2({ recipeId, initialProdMode, initialCategory }: Props) {
   const router = useRouter();
   const { can } = useProfile();
   const userCanWrite = can("operations.edit_recettes");
@@ -60,7 +60,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
 
   // Form state
   const [name, setName] = useState("");
-  const [category, setCategory] = useState("plat_cuisine");
+  const [category, setCategory] = useState(initialCategory ?? "plat_cuisine");
   const [yieldGrams, setYieldGrams] = useState<number | "">("");
   const [portionsCount, setPortionsCount] = useState<number | "">("");
   const [photoUrl, setPhotoUrl] = useState("");

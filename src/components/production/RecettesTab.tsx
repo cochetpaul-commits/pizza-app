@@ -357,6 +357,7 @@ const filterPill = (active: boolean, activeColor?: string): React.CSSProperties 
 // ─── Main inner component ─────────────────────────────────────────────────────
 
 function RecettesInner() {
+  const router = useRouter();
   const { can } = useProfile();
   const canWrite = can("operations.edit_recettes");
   const { current: etabCtx } = useEtablissement();
@@ -571,18 +572,31 @@ function RecettesInner() {
                   + Nouvelle recette
                 </button>
                 {showFab && (
-                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, minWidth: 180, background: "#fff", border: "1px solid #e0d8ce", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", overflow: "hidden", zIndex: 50 }}>
+                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, minWidth: 200, background: "#fff", border: "1px solid #e0d8ce", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", overflow: "hidden", zIndex: 50 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.12em", padding: "10px 16px 4px" }}>Nouvelle recette</div>
                     {[
                       { label: "Pizza", href: "/recettes/new/pizza", color: "#8B1A1A" },
                       { label: "Cuisine", href: "/recettes/new/cuisine", color: "#4a6741" },
                       { label: "Cocktail", href: "/recettes/new/cocktail", color: "#D4775A" },
                       { label: "Empatement", href: "/recettes/new/empatement", color: "#888" },
                     ].map(item => (
-                      <Link key={item.href} href={item.href} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", textDecoration: "none", fontSize: 14, fontWeight: 500, color: "#1a1a1a", borderBottom: "1px solid #f0ebe2" }}>
+                      <Link key={item.href} href={item.href} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", textDecoration: "none", fontSize: 14, fontWeight: 500, color: "#1a1a1a", borderBottom: "1px solid #f0ebe2" }}>
                         <span style={{ width: 8, height: 8, borderRadius: "50%", background: item.color, flexShrink: 0 }} />
                         {item.label}
                       </Link>
                     ))}
+                    <div style={{ height: 1, background: "#e0d8ce", margin: "4px 0" }} />
+                    <button type="button" onClick={() => {
+                      const nom = prompt("Nom de la nouvelle categorie :");
+                      if (nom && nom.trim()) {
+                        const slug = nom.trim().toLowerCase().replace(/\s+/g, "_").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        router.push(`/recettes/new/cuisine?category=${encodeURIComponent(slug)}&categoryLabel=${encodeURIComponent(nom.trim())}`);
+                        setShowFab(false);
+                      }
+                    }} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", width: "100%", border: "none", background: "transparent", fontSize: 13, fontWeight: 600, color: "#D4775A", cursor: "pointer", textAlign: "left" }}>
+                      <span style={{ fontSize: 16, lineHeight: 1 }}>+</span>
+                      Nouvelle categorie
+                    </button>
                   </div>
                 )}
               </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { StepperInput } from "@/components/StepperInput";
 
 /* ── Helpers ── */
@@ -94,6 +94,15 @@ export function PricingModule({
   const [volume, setVolume] = useState("");
   const [unite, setUnite] = useState("cl");
   const [volDose, setVolDose] = useState("");
+  const didPrefill = useRef(false);
+
+  // Pre-fill prix d'achat with recipe ingredient cost (once)
+  useEffect(() => {
+    if (showDoseSimulator && costPerPortion && costPerPortion > 0 && !didPrefill.current && !prixAchat) {
+      setPrixAchat(costPerPortion.toFixed(2));
+      didPrefill.current = true;
+    }
+  }, [showDoseSimulator, costPerPortion, prixAchat]);
 
   const pa = parseFloat(prixAchat) || 0;
   const vol = parseFloat(volume) || 0;
