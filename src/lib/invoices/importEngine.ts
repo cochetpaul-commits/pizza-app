@@ -83,6 +83,22 @@ function notesWithTax(base: string | null, taxRate: number | null): string | nul
   return parts.length ? parts.join(" | ") : null;
 }
 
+/** Extract the base product name by stripping trailing weight/packaging info.
+ *  "BURRATA DE VACHE 8 X 200 G" → "burrata de vache"
+ *  "BLANC D'OEUF LIQUIDE 1 KG"  → "blanc d'oeuf liquide"
+ *  "CREAM CHEESE 25%"            → "cream cheese"
+ */
+function baseProductName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\d+\s*%/g, "")                    // remove percentages
+    .replace(/\d[\d\s.,xX×]*\s*(g|gr|kg|ml|cl|l|pc|pcs|pce|pces)\b/gi, "")  // remove weight/volume
+    .replace(/\d+\s*x\s*\d+/gi, "")             // remove "8 x 200" patterns
+    .replace(/\b(c\d+|fb\d+)\b/gi, "")          // remove codes like C1, FB7060
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function toOfferUnit(u: "pc" | "kg" | "l" | null): "pc" | "kg" | "l" {
   if (u === "kg") return "kg";
   if (u === "l") return "l";
@@ -250,13 +266,13 @@ export async function runImport(options: {
 
     const skuToIngId = new Map<string, string>();
     if (skus.length) {
-      let skuQ = supabase
+      // Do NOT filter by etablissement_id here — dedup must be global to avoid duplicates
+      const skuQ = supabase
         .from("ingredients")
         .select("id,supplier_sku")
         .eq("user_id", userId)
         .eq("supplier_id", supplierId)
         .in("supplier_sku", skus);
-      if (etabId) skuQ = skuQ.eq("etablissement_id", etabId);
       const { data: bySku, error: eSku } = await skuQ;
 
       if (eSku) throw new Error(eSku.message);
@@ -270,25 +286,35 @@ export async function runImport(options: {
     // Utilise import_name comme clé stable ; fallback sur name pour rétrocompatiblité.
     const nameToIngId = new Map<string, string>();
     const normalizedToIngId = new Map<string, string>();
-    let allQ = supabase
+    // Do NOT filter by etablissement_id — dedup must be global to find validated ingredients
+    const allQ = supabase
       .from("ingredients")
       .select("id,name,import_name")
       .eq("user_id", userId);
-    if (etabId) allQ = allQ.eq("etablissement_id", etabId);
     const { data: allExisting, error: eAll } = await allQ;
 
     if (eAll) throw new Error(eAll.message);
+    const baseNameToIngId = new Map<string, string>();
     for (const r of (allExisting ?? []) as Array<{ id: string; name: string; import_name: string | null }>) {
       // Clé primaire = import_name (stable) ; si absent, fallback sur name
       const primary = ((r.import_name ?? r.name) ?? "").trim();
       nameToIngId.set(primary.toLowerCase(), r.id);
       normalizedToIngId.set(normalizeIngredientName(primary), r.id);
+      // Base name index (strips weight/packaging) for fuzzy matching
+      const bn = baseProductName(primary);
+      if (bn.length >= 3 && !baseNameToIngId.has(bn)) {
+        baseNameToIngId.set(bn, r.id);
+      }
       // Indexer aussi le name courant comme fallback (rétrocompat : ancien import_name non renseigné)
       if (r.import_name && r.name) {
         const legacy = (r.name ?? "").trim();
         if (legacy.toLowerCase() !== primary.toLowerCase()) {
           nameToIngId.set(legacy.toLowerCase(), r.id);
           normalizedToIngId.set(normalizeIngredientName(legacy), r.id);
+          const bnLegacy = baseProductName(legacy);
+          if (bnLegacy.length >= 3 && !baseNameToIngId.has(bnLegacy)) {
+            baseNameToIngId.set(bnLegacy, r.id);
+          }
         }
       }
     }
@@ -304,7 +330,7 @@ export async function runImport(options: {
         (sku && skuToIngId.has(sku)) ||
         nameToIngId.has(nm.toLowerCase()) ||
         normalizedToIngId.has(normalizeIngredientName(nm));
-      // Fallback: prefix match — existing ingredient name is prefix of parsed name
+      // Fallback 1: prefix match — existing ingredient name is prefix of parsed name
       if (!already) {
         const nmLower = nm.toLowerCase();
         for (const [existingName, existingId] of nameToIngId) {
@@ -314,6 +340,16 @@ export async function runImport(options: {
             already = true;
             break;
           }
+        }
+      }
+      // Fallback 2: base name match — strips weight/packaging (e.g. "BURRATA DE VACHE")
+      if (!already) {
+        const bn = baseProductName(nm);
+        const matchId = bn.length >= 3 ? baseNameToIngId.get(bn) : undefined;
+        if (matchId) {
+          nameToIngId.set(nm.toLowerCase(), matchId);
+          normalizedToIngId.set(normalizeIngredientName(nm), matchId);
+          already = true;
         }
       }
       if (already) continue;
@@ -365,13 +401,12 @@ export async function runImport(options: {
 
     // 8. Re-fetch maps après création
     if (skus.length) {
-      let skuQ2 = supabase
+      const skuQ2 = supabase
         .from("ingredients")
         .select("id,supplier_sku")
         .eq("user_id", userId)
         .eq("supplier_id", supplierId)
         .in("supplier_sku", skus);
-      if (etabId) skuQ2 = skuQ2.eq("etablissement_id", etabId);
       const { data: bySku2, error: eSku2 } = await skuQ2;
 
       if (eSku2) throw new Error(eSku2.message);
@@ -382,12 +417,11 @@ export async function runImport(options: {
     }
 
     if (names.length) {
-      let nameQ2 = supabase
+      const nameQ2 = supabase
         .from("ingredients")
         .select("id,name,import_name")
         .eq("user_id", userId)
         .in("name", names);
-      if (etabId) nameQ2 = nameQ2.eq("etablissement_id", etabId);
       const { data: byName2, error: eName2 } = await nameQ2;
 
       if (eName2) throw new Error(eName2.message);
@@ -408,7 +442,7 @@ export async function runImport(options: {
           nameToIngId.get(nm.toLowerCase()) ||
           normalizedToIngId.get(normalizeIngredientName(nm)) ||
           null;
-        // Fallback: prefix match
+        // Fallback 1: prefix match
         if (!ingId) {
           const nmLower = nm.toLowerCase();
           for (const [existingName, existingId] of nameToIngId) {
@@ -417,6 +451,11 @@ export async function runImport(options: {
               break;
             }
           }
+        }
+        // Fallback 2: base name match (strips weight/packaging)
+        if (!ingId) {
+          const bn = baseProductName(nm);
+          ingId = (bn.length >= 3 ? baseNameToIngId.get(bn) : undefined) ?? null;
         }
 
         const u = toOfferUnit(l.unit);

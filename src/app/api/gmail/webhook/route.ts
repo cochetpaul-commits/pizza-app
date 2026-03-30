@@ -20,6 +20,18 @@ export const maxDuration = 120;
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Normalize name for fuzzy matching (same as importEngine's normalizeIngredientName) */
+/** Extract base product name by stripping trailing weight/packaging info. */
+function baseProductName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\d+\s*%/g, "")
+    .replace(/\d[\d\s.,xX×]*\s*(g|gr|kg|ml|cl|l|pc|pcs|pce|pces)\b/gi, "")
+    .replace(/\d+\s*x\s*\d+/gi, "")
+    .replace(/\b(c\d+|fb\d+)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function normalizeForMatch(name: string): string {
   return name
     .toLowerCase()
@@ -463,17 +475,27 @@ async function processMessage(messageId: string) {
         .from("ingredients")
         .select("id,name,import_name,supplier_sku");
 
+      const baseNameToIngId = new Map<string, string>();
       for (const r of (allExisting ?? []) as Array<{ id: string; name: string; import_name: string | null; supplier_sku: string | null }>) {
         // Primary key = import_name (stable); fallback to name
         const primary = ((r.import_name ?? r.name) ?? "").trim();
         nameToIngId.set(primary.toLowerCase(), r.id);
         normalizedToIngId.set(normalizeForMatch(primary), r.id);
+        // Base name index (strips weight/packaging) for fuzzy matching
+        const bn = baseProductName(primary);
+        if (bn.length >= 3 && !baseNameToIngId.has(bn)) {
+          baseNameToIngId.set(bn, r.id);
+        }
         // Also index current name as fallback
         if (r.import_name && r.name) {
           const legacy = r.name.trim();
           if (legacy.toLowerCase() !== primary.toLowerCase()) {
             nameToIngId.set(legacy.toLowerCase(), r.id);
             normalizedToIngId.set(normalizeForMatch(legacy), r.id);
+            const bnLegacy = baseProductName(legacy);
+            if (bnLegacy.length >= 3 && !baseNameToIngId.has(bnLegacy)) {
+              baseNameToIngId.set(bnLegacy, r.id);
+            }
           }
         }
         // SKU index
@@ -493,7 +515,7 @@ async function processMessage(messageId: string) {
           nameToIngId.get(ingName.toLowerCase()) ||
           normalizedToIngId.get(normalizeForMatch(ingName)) ||
           null;
-        // Fallback: prefix match — existing name is prefix of parsed name (or vice versa)
+        // Fallback 1: prefix match — existing name is prefix of parsed name (or vice versa)
         if (!ingredientId) {
           const nmLower = ingName.toLowerCase();
           for (const [existingName, existingId] of nameToIngId) {
@@ -502,6 +524,11 @@ async function processMessage(messageId: string) {
               break;
             }
           }
+        }
+        // Fallback 2: base name match — strips weight/packaging
+        if (!ingredientId) {
+          const bn = baseProductName(ingName);
+          ingredientId = (bn.length >= 3 ? baseNameToIngId.get(bn) : undefined) ?? null;
         }
 
         if (!ingredientId) {
