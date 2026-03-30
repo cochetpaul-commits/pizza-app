@@ -199,7 +199,7 @@ export default function EpiceriePage() {
       <div style={{ maxWidth: 1400, margin: "0 auto", width: "100%" }}>
 
         <div style={{ marginBottom: 20 }}>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "#1A1A1A" }}>Calcul Prix Épicerie</h1>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "#1A1A1A" }}>Production</h1>
         </div>
 
         <div className="epicerie-grid">

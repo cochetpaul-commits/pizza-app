@@ -327,7 +327,7 @@ export default function CongesPage() {
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h1 style={{ ...h1Style, marginBottom: 0 }}>Conges et absences</h1>
+          <h1 style={{ ...h1Style, marginBottom: 0 }}>Personnel</h1>
           <button
             onClick={() => setShowModal(true)}
             style={{

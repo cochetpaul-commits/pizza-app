@@ -138,7 +138,7 @@ export default function CarnetClientsPage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
-        <h1 style={h1Style}>Carnet clients</h1>
+        <h1 style={h1Style}>Evenementiel</h1>
 
         {/* Toolbar: search + new button */}
         <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>

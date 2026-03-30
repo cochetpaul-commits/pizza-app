@@ -67,7 +67,7 @@ export default function FacturesListPage() {
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "12px 16px 40px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h1 style={h1}>Factures</h1>
+          <h1 style={h1}>Evenementiel</h1>
           <Link
             href="/clients/factures/new"
             style={{

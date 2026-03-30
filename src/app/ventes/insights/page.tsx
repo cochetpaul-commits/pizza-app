@@ -110,7 +110,7 @@ export default function InsightsPage() {
 
         {/* Header */}
         <div style={S.header}>
-          <h1 style={S.title}>Insights IA</h1>
+          <h1 style={S.title}>Pilotage</h1>
         </div>
 
         <div style={{ ...S.dateRow, marginBottom: 20 }}>

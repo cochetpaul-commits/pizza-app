@@ -766,7 +766,7 @@ function IngredientsPageInner() {
             ← {backUrl ? "Retour" : "Accueil"}
           </Link>
           <span style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontSize: 22, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: 0.5 }}>
-            Ingredients
+            Achats
           </span>
         </div>
 

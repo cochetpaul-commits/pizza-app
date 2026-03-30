@@ -437,7 +437,7 @@ export default function PointagePage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
-        <h1 style={h1Style}>Pointage</h1>
+        <h1 style={h1Style}>Personnel</h1>
 
         {/* Date navigator */}
         <div

@@ -193,7 +193,7 @@ export default function EquipePage() {
         {/* ── Header ── */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
           <div>
-            <h1 style={h1Style}>Equipe</h1>
+            <h1 style={h1Style}>Personnel</h1>
             <p style={subtitleStyle}>
               {countActif} actif{countActif > 1 ? "s" : ""}
               {countInactif > 0 && (
