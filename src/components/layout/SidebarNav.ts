@@ -88,15 +88,11 @@ export const PLANNING_ITEMS: NavItemV2[] = [
 // PRODUCTION (fiches techniques, catalogue, articles de vente)
 const PRODUCTION_ITEMS: NavItemV2[] = [
   { label: "Fiches techniques", href: "/recettes", icon: "fileText" },
-  { label: "Catalogue", href: "/catalogue", icon: "book" },
-  { label: "Articles de vente", href: "/ventes/articles", icon: "tag" },
   { label: "Inventaire", href: "/inventaire", icon: "package" },
 ];
 
 const PRODUCTION_ITEMS_PICCOLA: NavItemV2[] = [
   { label: "Fiches techniques", href: "/recettes", icon: "fileText" },
-  { label: "Catalogue", href: "/catalogue", icon: "book" },
-  { label: "Articles de vente", href: "/ventes/articles", icon: "tag" },
   { label: "Prix de vente", href: "/epicerie", icon: "tag" },
   { label: "Inventaire", href: "/inventaire", icon: "package" },
 ];
@@ -323,7 +319,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/invoices": "Factures",
   "/commandes": "Commandes",
   "/inventaire": "Inventaire",
-  "/recettes": "Recettes",
+  "/recettes": "Fiches techniques",
   "/catalogue": "Catalogue",
   "/epicerie": "Articles en vente",
   "/finances": "Finances",
