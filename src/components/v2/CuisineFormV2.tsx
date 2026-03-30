@@ -16,6 +16,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
 import { PricingBlock } from "./PricingBlock";
+import { RecipeHero, HeroBtn, HeroDangerBtn } from "./RecipeHero";
 import { GestionFoodCost } from "./GestionFoodCost";
 import { PublishCatalogueButton } from "./PublishCatalogueButton";
 import { GestionCommandes } from "./GestionCommandes";
@@ -26,6 +27,7 @@ import type { CpuByUnit } from "@/lib/offerPricing";
 import ProductionModal from "@/components/ProductionModal";
 
 const CUISINE_UNITS = ["g", "cL", "pcs"];
+const ACCENT = "#4a6741";
 
 const CATEGORIES = [
   { id: "preparation",    label: "Préparation" },
@@ -587,90 +589,32 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
     <>
       <main className="container safe-bottom">
 
-        {/* ── Header ── */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {isEdit && (
-              <button type="button" onClick={() => router.push("/recettes")} style={{
-                fontSize: 18, color: "#999", cursor: "pointer", border: "none", background: "transparent",
-                padding: "4px 8px", lineHeight: 1,
-              }}>&#8592;</button>
-            )}
-            {photoPreview && (
-              <div style={{ width: 32, height: 32, borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>
-                <Image src={photoPreview} alt="" width={32} height={32} style={{ objectFit: "cover", width: 32, height: 32 }} />
-              </div>
-            )}
-            <div>
-              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a" }}>{title}</h1>
-              {isEdit && (
-                <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
-                  {etab && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 8px", borderRadius: 6, background: "#D4775A", color: "#fff" }}>{etab.nom ?? "Etablissement"}</span>}
-                  <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 8px", borderRadius: 6, background: "#f2ede4", color: "#666" }}>{categoryLabel}</span>
-                </div>
-              )}
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            {isEdit && pivotIngredientId && (
-              <button type="button" className="btn" onClick={() => setShowProdModal(true)}
-                style={{ fontSize: 12, background: "#4a6741", borderColor: "#4a6741", color: "#fff" }}>
-                Production
-              </button>
-            )}
-            {isEdit && (
-              <>
-                <button type="button" className="btn" onClick={handleExportPdf} disabled={pdfLoading}
-                  style={{ fontSize: 12 }}>
-                  {pdfLoading ? "Export…" : "Apercu PDF"}
-                </button>
-                <PublishCatalogueButton recipeType="cuisine" recipeId={recipeId!} />
-              </>
-            )}
-            {userCanWrite && (
-              <button onClick={handleSave} disabled={saving} className="btn btnPrimary">
-                {saving ? "Sauvegarde…" : "Enregistrer"}
-              </button>
-            )}
+        <RecipeHero
+          title={title}
+          accent={ACCENT}
+          isEdit={isEdit}
+          photoPreview={photoPreview}
+          etabName={etab?.nom}
+          typeLabel={categoryLabel}
+          onBack={() => router.push("/recettes")}
+          kpis={isEdit ? { costPerPortion: effectiveCostPerPortion ?? null, foodCostPct: foodCostPct ?? null, sellPriceHT: sp ?? null, sellPriceTTC: prixTTC ?? null, margeBrute: margeBrute ?? null, costPerKg: costPerKg ?? null } : undefined}
+          actions={<>
+            {isEdit && pivotIngredientId && <HeroBtn onClick={() => setShowProdModal(true)}>Production</HeroBtn>}
+            {isEdit && <HeroBtn onClick={handleExportPdf} disabled={pdfLoading}>{pdfLoading ? "Export…" : "PDF"}</HeroBtn>}
+            {isEdit && <PublishCatalogueButton recipeType="cuisine" recipeId={recipeId!} />}
+            {userCanWrite && <HeroBtn onClick={handleSave} disabled={saving} primary>{saving ? "Sauvegarde…" : "Enregistrer"}</HeroBtn>}
             {isEdit && userCanWrite && (
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!confirm("Supprimer cette recette ? Cette action est irreversible.")) return;
-                  const { error } = await supabase.from("kitchen_recipes").delete().eq("id", recipeId);
-                  if (error) { alert(error.message); return; }
-                  router.push("/recettes");
-                }}
-                style={{
-                  fontSize: 11, fontWeight: 600, padding: "6px 12px", borderRadius: 8,
-                  border: "1px solid rgba(220,38,38,0.3)", background: "rgba(220,38,38,0.06)",
-                  color: "#DC2626", cursor: "pointer",
-                }}
-              >
-                Supprimer
-              </button>
+              <HeroDangerBtn onClick={async () => {
+                if (!confirm("Supprimer cette recette ? Cette action est irreversible.")) return;
+                const { error } = await supabase.from("kitchen_recipes").delete().eq("id", recipeId);
+                if (error) { alert(error.message); return; }
+                router.push("/recettes");
+              }}>Supprimer</HeroDangerBtn>
             )}
-          </div>
-        </div>
+          </>}
+        />
 
-        {/* ── KPI Banner ── */}
-        {isEdit && (
-          <div style={{
-            display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 16,
-          }}>
-            <KpiBannerItem label="Cout revient" value={effectiveCostPerPortion ? `${fmtMoney(effectiveCostPerPortion)} €` : "-"} sub="par portion" accent="#D4775A" />
-            <KpiBannerItem
-              label="Food cost"
-              value={foodCostPct != null ? `${foodCostPct.toFixed(1)}%` : "-"}
-              sub="objectif ≤ 32%"
-              accent={foodCostPct == null ? "#999" : foodCostPct <= 28 ? "#16a34a" : foodCostPct <= 32 ? "#D97706" : "#DC2626"}
-            />
-            <KpiBannerItem label="Prix de vente HT" value={sp ? `${fmtMoney(sp)} €` : "-"} sub={prixTTC ? `${fmtMoney(prixTTC)} € TTC` : ""} accent="#1a1a1a" />
-            <KpiBannerItem label="Marge brute" value={margeBrute != null ? `${fmtMoney(margeBrute)} €` : "-"} sub="par portion" accent="#16a34a" />
-          </div>
-        )}
-
-        {/* ── Tab bar ── */}
+                {/* ── Tab bar ── */}
         <div style={{ display: "flex", gap: 0, borderBottom: "1.5px solid #ddd6c8", marginBottom: 16, overflowX: "auto" }}>
           {MAIN_TABS.map((t) => (
             <button
@@ -1047,25 +991,3 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
 }
 
 // ── KPI Banner Item ──────────────────────────────────────────────
-function KpiBannerItem({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent: string }) {
-  return (
-    <div style={{
-      padding: "14px 16px", borderRadius: 12,
-      background: "#fff",
-      borderLeft: `3px solid ${accent}`,
-      boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-    }}>
-      <div style={{ fontSize: 10, fontWeight: 600, color: "#888", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: accent, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", lineHeight: 1.1 }}>
-        {value}
-      </div>
-      {sub && (
-        <div style={{ fontSize: 10, color: "#aaa", marginTop: 4 }}>
-          {sub}
-        </div>
-      )}
-    </div>
-  );
-}
