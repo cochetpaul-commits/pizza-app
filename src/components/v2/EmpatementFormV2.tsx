@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { StepsList } from "./StepsList";
-import { PricingBlock } from "./PricingBlock";
+import { PricingModule } from "./PricingModule";
 import { RecipeHero, HeroBtn, HeroDangerBtn } from "./RecipeHero";
 import { StepperInput } from "@/components/StepperInput";
 import { useProfile } from "@/lib/ProfileContext";
@@ -742,11 +742,10 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                 {/* Prix & Marges */}
                 <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
-                    Prix &amp; Marges
+                    Prix, marges &amp; simulateur
                   </h3>
-                  <PricingBlock
-                    costPerKg={costPerKg}
-                    costPerPortion={costPerBall}
+                  <PricingModule
+                    costPerPortion={effectiveCost > 0 ? effectiveCost : null}
                     portionLabel="paton"
                     vatRate={vatRate}
                     onVatChange={setVatRate}

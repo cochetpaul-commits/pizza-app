@@ -16,7 +16,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
-import { PricingBlock } from "./PricingBlock";
+import { PricingModule } from "./PricingModule";
 import { RecipeHero, HeroBtn, HeroDangerBtn } from "./RecipeHero";
 import { GestionFoodCost } from "./GestionFoodCost";
 import { PublishCatalogueButton } from "./PublishCatalogueButton";
@@ -787,10 +787,10 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                 {/* Prix & Marges */}
                 <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
-                    Prix &amp; Marges
+                    Prix, marges &amp; simulateur
                   </h3>
-                  <PricingBlock
-                    costPerPortion={totalCost > 0 ? totalCost : null}
+                  <PricingModule
+                    costPerPortion={totalCost > 0 ? round2(totalCost) : null}
                     portionLabel="pizza"
                     vatRate={vatRate}
                     onVatChange={setVatRate}

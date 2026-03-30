@@ -15,8 +15,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
-import { PricingBlock } from "./PricingBlock";
-import { DoseSimulator } from "./DoseSimulator";
+import { PricingModule } from "./PricingModule";
 import { RecipeHero, HeroBtn, HeroDangerBtn } from "./RecipeHero";
 import { GestionFoodCost } from "./GestionFoodCost";
 import { PublishCatalogueButton } from "./PublishCatalogueButton";
@@ -885,31 +884,23 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                   <StepsList steps={steps} onChange={setSteps} />
                 </div>
 
-                {/* Simulateur dose — sauces, preparations, accompagnements */}
-                {["sauce", "preparation", "accompagnement"].includes(category) && (
-                  <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
-                    <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
-                      Simulateur de prix
-                    </h3>
-                    <DoseSimulator accentColor={ACCENT} />
-                  </div>
-                )}
-
-                {/* Prix & Marges */}
+{/* Prix & Marges */}
                 <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
-                    Prix &amp; Marges
+                    Prix, marges &amp; simulateur
                   </h3>
-                  <PricingBlock
+                  <PricingModule
+                    showDoseSimulator={["sauce", "preparation", "accompagnement"].includes(category)}
                     costPerKg={costPerKg}
-                    costPerPortion={costPerPortion}
+                    costPerPortion={totalCost > 0 ? round2(totalCost) : null}
+                    portionLabel="portion"
                     vatRate={vatRate}
                     onVatChange={setVatRate}
                     marginRate={marginRate}
                     onMarginChange={setMarginRate}
                     sellPrice={sellPrice}
                     onSellPriceChange={setSellPrice}
-                    accentColor="#D4775A"
+                    accentColor={ACCENT}
                   />
                 </div>
 
