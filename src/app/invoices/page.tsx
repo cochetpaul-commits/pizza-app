@@ -134,7 +134,7 @@ export default function InvoicesPage() {
     }
   }
 
-  function getEndpoint(mode: "preview" | "commit"): string {
+  function getEndpoint(_mode: "preview" | "commit"): string {
     if (selectedSupplier === "ai-parse") return "/api/invoices/ai-parse";
     if (isImageFile(file!)) return "/api/invoices/photo";
     return `/api/invoices/${selectedSupplier}`;
