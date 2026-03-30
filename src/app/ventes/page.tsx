@@ -26,6 +26,8 @@ type WeekData = {
   mix_labels: string[]; mix_ttc: number[]; mix_ht: number[];
   top10_names: string[]; top10_ca_ttc: number[]; top10_ca_ht: number[]; top10_qty: number[];
   cat_products: Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]>;
+  cat_products_sur: Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]>;
+  cat_products_emp: Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]>;
   top3_cats: { cat: string; rows: { n: string; ca_ttc: string; ca_ht: string }[]; flop: { n: string; ca_ttc: string; ca_ht: string; qty: number } | null }[];
   serveurs: string[]; serv_ca_ttc: number[]; serv_ca_ht: number[]; serv_tickets: number[]; serv_cov: number[];
   ratios: {
@@ -114,6 +116,7 @@ export default function PerformancesPage() {
   const [briefing, setBriefing] = useState<string[] | null>(null);
   const [briefingLoading, setBriefingLoading] = useState(false);
   const [mixDDOpen, setMixDDOpen] = useState<{ label: string; color: string } | null>(null);
+  const [placeDetail, setPlaceDetail] = useState<"sur" | "emp" | null>(null);
   const [meteo, setMeteo] = useState<Record<string, { emoji: string; desc: string; temp: number }>>({});
 
   // Comparison state
@@ -646,12 +649,44 @@ export default function PerformancesPage() {
                   const empCA = mode === "ttc" ? W.place_emp_ttc : W.place_emp_ht;
                   const tot = surCA + empCA;
                   return (<>
-                    <PlaceBlock label="Sur place" color="#46655a" ca={surCA} pct={tot > 0 ? Math.round(surCA / tot * 100) : 0} couverts={W.cov_sur} tm={W.cov_sur > 0 ? (surCA / W.cov_sur).toFixed(1) : "0"} />
+                    <PlaceBlock label="Sur place" color="#46655a" ca={surCA} pct={tot > 0 ? Math.round(surCA / tot * 100) : 0} couverts={W.cov_sur} tm={W.cov_sur > 0 ? (surCA / W.cov_sur).toFixed(1) : "0"} onClick={() => setPlaceDetail(placeDetail === "sur" ? null : "sur")} active={placeDetail === "sur"} />
                     <div style={{ width: 1, background: "rgba(0,0,0,.08)", margin: "0 20px", flexShrink: 0 }} />
-                    <PlaceBlock label="A emporter" color="#D4775A" ca={empCA} pct={tot > 0 ? Math.round(empCA / tot * 100) : 0} couverts={W.cov_emp} tm={W.cov_emp > 0 ? (empCA / W.cov_emp).toFixed(1) : "0"} />
+                    <PlaceBlock label="A emporter" color="#D4775A" ca={empCA} pct={tot > 0 ? Math.round(empCA / tot * 100) : 0} couverts={W.cov_emp} tm={W.cov_emp > 0 ? (empCA / W.cov_emp).toFixed(1) : "0"} onClick={() => setPlaceDetail(placeDetail === "emp" ? null : "emp")} active={placeDetail === "emp"} />
                   </>);
                 })()}
               </div>
+              {/* Detail produits par zone */}
+              {placeDetail && (() => {
+                const prods = placeDetail === "sur" ? W.cat_products_sur : W.cat_products_emp;
+                const color = placeDetail === "sur" ? "#46655a" : "#D4775A";
+                const label = placeDetail === "sur" ? "Sur place" : "A emporter";
+                const cats = Object.entries(prods ?? {}).filter(([, p]) => p.length > 0).sort((a, b) => {
+                  const aTotal = a[1].reduce((s, p) => s + (mode === "ttc" ? p.ca_ttc : p.ca_ht), 0);
+                  const bTotal = b[1].reduce((s, p) => s + (mode === "ttc" ? p.ca_ttc : p.ca_ht), 0);
+                  return bTotal - aTotal;
+                });
+                if (cats.length === 0) return null;
+                return (
+                  <div style={{ marginTop: 14, borderTop: `2px solid ${color}20`, paddingTop: 14 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".12em", color, marginBottom: 12 }}>
+                      Detail {label}
+                    </div>
+                    {cats.map(([cat, items]) => (
+                      <div key={cat} style={{ marginBottom: 14 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", marginBottom: 6, textTransform: "uppercase", letterSpacing: ".05em" }}>{cat}</div>
+                        {items.slice(0, 10).map((p, i) => (
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: i < Math.min(items.length, 10) - 1 ? "1px solid #f0ebe3" : "none" }}>
+                            <span style={{ fontSize: 12, color: "#333", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.n}</span>
+                            <span style={{ fontSize: 11, color: "#999", marginLeft: 8, flexShrink: 0 }}>x{p.qty}</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color, marginLeft: 12, flexShrink: 0, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{fmt(mode === "ttc" ? p.ca_ttc : p.ca_ht)}</span>
+                          </div>
+                        ))}
+                        {items.length > 10 && <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>+{items.length - 10} autres</div>}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Zones */}
@@ -1027,9 +1062,9 @@ function UpsellCardMini({ label, emoji, data, totalTables, color, mode }: {
   );
 }
 
-function PlaceBlock({ label, color, ca, pct, couverts, tm }: { label: string; color: string; ca: number; pct: number; couverts: number; tm: string }) {
+function PlaceBlock({ label, color, ca, pct, couverts, tm, onClick, active }: { label: string; color: string; ca: number; pct: number; couverts: number; tm: string; onClick?: () => void; active?: boolean }) {
   return (
-    <div style={{ flex: 1 }}>
+    <div style={{ flex: 1, cursor: onClick ? "pointer" : "default", padding: 8, margin: -8, borderRadius: 10, background: active ? `${color}08` : "transparent", border: active ? `1.5px solid ${color}30` : "1.5px solid transparent", transition: "all 0.15s" }} onClick={onClick}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color }}>{label}</div>
         <div style={{ fontSize: 10, color: "#777" }}>{pct}% du CA</div>

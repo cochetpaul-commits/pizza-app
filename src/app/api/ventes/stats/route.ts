@@ -313,6 +313,32 @@ function aggregate(rows: Row[]) {
     catProds[cat] = catProds[cat].map(p => ({ ...p, ca_ttc: Math.round(p.ca_ttc), ca_ht: Math.round(p.ca_ht) }));
   }
 
+  // Produits par catégorie — sur place vs emporter
+  function buildCatProdsForRows(rows: Row[]) {
+    const cp: Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]> = {};
+    for (const r of rows) {
+      if (!r.description) continue;
+      const cat = normCat(r.categorie);
+      if (cat === "Messages" || cat === "Autre") continue;
+      if (!cp[cat]) cp[cat] = [];
+      const existing = cp[cat].find(p => p.n === r.description);
+      if (existing) {
+        existing.ca_ttc += Number(r.ttc);
+        existing.ca_ht += Number(r.ht);
+        existing.qty += Number(r.quantite);
+      } else {
+        cp[cat].push({ n: r.description, qty: Number(r.quantite), ca_ttc: Number(r.ttc), ca_ht: Number(r.ht) });
+      }
+    }
+    for (const cat of Object.keys(cp)) {
+      cp[cat].sort((a, b) => b.ca_ttc - a.ca_ttc);
+      cp[cat] = cp[cat].map(p => ({ ...p, ca_ttc: Math.round(p.ca_ttc), ca_ht: Math.round(p.ca_ht) }));
+    }
+    return cp;
+  }
+  const cat_products_sur = buildCatProdsForRows(spRows);
+  const cat_products_emp = buildCatProdsForRows(empRows);
+
   // Top 3 par catégorie
   const top3_cats = mixEntries.slice(0, 8).map(([cat]) => {
     const prods = catProds[cat] || [];
@@ -538,6 +564,8 @@ function aggregate(rows: Row[]) {
     mix_labels, mix_ttc, mix_ht,
     top10_names, top10_ca_ttc, top10_ca_ht, top10_qty,
     cat_products: catProds,
+    cat_products_sur: cat_products_sur,
+    cat_products_emp: cat_products_emp,
     top3_cats,
     serveurs, serv_ca_ttc, serv_ca_ht, serv_tickets, serv_cov,
     ratios: {
