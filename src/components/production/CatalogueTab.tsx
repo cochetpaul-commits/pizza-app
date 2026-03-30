@@ -461,7 +461,7 @@ export function CatalogueContent() {
           fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 26,
           color: "#1a1a1a", margin: "0 0 4px", textTransform: "uppercase", letterSpacing: "0.04em",
         }}>
-          Catalogue
+          Fiches techniques
         </h1>
         <p style={{ fontSize: 13, color: "#999", margin: "0 0 20px" }}>
           {recipes.length} recette{recipes.length > 1 ? "s" : ""} — consultation \u00E9quipe

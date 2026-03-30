@@ -689,7 +689,7 @@ export function ArticlesContent() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <div className="ventes-articles-container" style={S.page}>
-        <h1 style={S.heading}>Articles de vente</h1>
+        <h1 style={S.heading}>Fiches techniques</h1>
         <p style={S.subtitle}>{etab?.nom ?? "Chargement..."}</p>
 
         {/* Stats bar */}

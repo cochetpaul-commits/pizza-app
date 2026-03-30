@@ -522,7 +522,7 @@ function RecettesInner() {
   if (authOk === null || loading) {
     return (
       <main className="container">
-        <TopNav title="Recettes" subtitle="Chargement..." />
+        <TopNav title="Fiches techniques" subtitle="Chargement..." />
         <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
           <div style={{ width: 24, height: 24, border: "3px solid #ddd6c8", borderTopColor: "#D4775A", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
         </div>
@@ -533,7 +533,7 @@ function RecettesInner() {
   if (!authOk) {
     return (
       <main className="container">
-        <TopNav title="Recettes" />
+        <TopNav title="Fiches techniques" />
         <Link className="btn btnPrimary" href="/login">Se connecter</Link>
       </main>
     );
@@ -553,7 +553,7 @@ function RecettesInner() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <div>
             <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a", textTransform: "uppercase", letterSpacing: 1 }}>
-              Recettes
+              Fiches techniques
             </h1>
             <span style={{ fontSize: 13, color: "#999" }}>{totalCount} fiche{totalCount > 1 ? "s" : ""}</span>
           </div>
@@ -979,7 +979,7 @@ export function RecettesContent() {
   return (
     <Suspense
       fallback={
-        <main className="container"><TopNav title="Recettes" subtitle="Chargement..." /></main>
+        <main className="container"><TopNav title="Fiches techniques" subtitle="Chargement..." /></main>
       }
     >
       <RecettesInner />
