@@ -9,9 +9,9 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import {
   SIDEBAR_NAV_SIMPLE,
   PERSONNEL_SECTION,
-  VENTES_SECTION,
+  PILOTAGE_SECTION,
   ACHATS_SECTION,
-  OPERATIONS_SECTION, OPERATIONS_SECTION_PICCOLA,
+  PRODUCTION_SECTION, PRODUCTION_SECTION_PICCOLA,
   EVENEMENTIEL_SECTION,
   type NavSubSection,
   type NavItemV2,
@@ -108,10 +108,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     ? isGroupView
       ? []  // Vue groupe = pas de sections, juste le dashboard
       : [   // Établissement = toutes les sections
+          PILOTAGE_SECTION,
           PERSONNEL_SECTION,
-          VENTES_SECTION,
+          PRODUCTION_SECTION,
           ACHATS_SECTION,
-          OPERATIONS_SECTION,
           ...(isPiccola ? [EVENEMENTIEL_SECTION] : []),
         ]
     : [];
@@ -409,10 +409,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               const isPiccolaEtab = etab.slug?.includes("piccola");
 
               const etabSections: NavSubSection[] = [
+                PILOTAGE_SECTION,
                 PERSONNEL_SECTION,
-                VENTES_SECTION,
+                isPiccolaEtab ? PRODUCTION_SECTION_PICCOLA : PRODUCTION_SECTION,
                 ACHATS_SECTION,
-                isPiccolaEtab ? OPERATIONS_SECTION_PICCOLA : OPERATIONS_SECTION,
                 ...(isPiccolaEtab ? [EVENEMENTIEL_SECTION] : []),
               ];
 

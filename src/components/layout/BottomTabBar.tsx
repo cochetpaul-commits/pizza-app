@@ -208,8 +208,8 @@ const SECTION_PERSONNEL: TabSection = {
   ],
 };
 
-const SECTION_VENTES: TabSection = {
-  label: "Ventes",
+const SECTION_PILOTAGE: TabSection = {
+  label: "Pilotage",
   href: "/ventes",
   match: ["/ventes"],
   icon: (a) => <IconWallet active={a} />,
@@ -231,8 +231,8 @@ const SECTION_ACHATS: TabSection = {
   ],
 };
 
-const SECTION_OPS: TabSection = {
-  label: "Ops",
+const SECTION_PRODUCTION: TabSection = {
+  label: "Prod.",
   href: "/recettes",
   match: ["/catalogue", "/recettes", "/inventaire", "/prep", "/ventes/articles"],
   icon: (a) => <IconPackage active={a} />,
@@ -244,8 +244,8 @@ const SECTION_OPS: TabSection = {
   ],
 };
 
-const SECTION_OPS_PICCOLA: TabSection = {
-  label: "Ops",
+const SECTION_PRODUCTION_PICCOLA: TabSection = {
+  label: "Prod.",
   href: "/recettes",
   match: ["/catalogue", "/recettes", "/inventaire", "/epicerie", "/prep", "/ventes/articles"],
   icon: (a) => <IconPackage active={a} />,
@@ -271,8 +271,8 @@ const SECTION_EVENTS: TabSection = {
   ],
 };
 
-const SECTIONS_BELLO: TabSection[] = [SECTION_HOME, SECTION_PERSONNEL, SECTION_VENTES, SECTION_ACHATS, SECTION_OPS];
-const SECTIONS_PICCOLA: TabSection[] = [SECTION_HOME, SECTION_PERSONNEL, SECTION_VENTES, SECTION_ACHATS, SECTION_OPS_PICCOLA, SECTION_EVENTS];
+const SECTIONS_BELLO: TabSection[] = [SECTION_HOME, SECTION_PILOTAGE, SECTION_PERSONNEL, SECTION_PRODUCTION, SECTION_ACHATS];
+const SECTIONS_PICCOLA: TabSection[] = [SECTION_HOME, SECTION_PILOTAGE, SECTION_PERSONNEL, SECTION_PRODUCTION_PICCOLA, SECTION_ACHATS, SECTION_EVENTS];
 
 const INACTIVE_COLOR = "#999";
 

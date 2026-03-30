@@ -69,62 +69,72 @@ export type SidebarEntry = NavEtabGroup | NavSettingsGroup | NavStandaloneItem |
 
 /* ── Section item templates ─────────────────────────────── */
 
+// PILOTAGE (analyse & performance)
+const PILOTAGE_ITEMS: NavItemV2[] = [
+  { label: "Rapport", href: "/ventes", icon: "barChart" },
+  { label: "Marges", href: "/ventes/marges", icon: "wallet" },
+  { label: "Insights IA", href: "/ventes/insights", icon: "trendingUp" },
+];
+
+// PERSONNEL (RH)
 export const PLANNING_ITEMS: NavItemV2[] = [
-  { label: "Employés", href: "/rh/equipe", icon: "users" },
+  { label: "Employes", href: "/rh/equipe", icon: "users" },
   { label: "Pointage", href: "/rh/pointage", icon: "clock" },
-  { label: "Congés", href: "/rh/conges", icon: "beach" },
-  { label: "Émargement", href: "/rh/emargement", icon: "clipboard" },
-  { label: "Rapport de paie", href: "/rh/rapports", icon: "fileText" },
-  { label: "Simulation", href: "/ventes/simulation", icon: "calculator" },
+  { label: "Conges", href: "/rh/conges", icon: "beach" },
+  { label: "Rapports de paie", href: "/rh/rapports", icon: "fileText" },
+  { label: "Masse salariale", href: "/ventes/simulation", icon: "calculator" },
 ];
 
-export const ACHATS_ITEMS: NavItemV2[] = [
-  { label: "Commandes", href: "/commandes", icon: "shoppingBag" },
-  { label: "Factures", href: "/achats", icon: "fileText" },
-  { label: "Base produits", href: "/ingredients", icon: "tag" },
-];
-
-// Performances removed — kept exports for legacy compat
-export const PERFORMANCES_ITEMS: NavItemV2[] = [];
-
-export const OPERATIONS_ITEMS: NavItemV2[] = [
+// PRODUCTION (cuisine & articles)
+const PRODUCTION_ITEMS: NavItemV2[] = [
   { label: "Catalogue", href: "/catalogue", icon: "book" },
   { label: "Fiches techniques", href: "/recettes", icon: "fileText" },
   { label: "Inventaire", href: "/inventaire", icon: "package" },
-  { label: "Simulateur prix", href: "/ventes/articles", icon: "calculator" },
+  { label: "Articles & Simulateur", href: "/ventes/articles", icon: "calculator" },
 ];
 
-const OPERATIONS_ITEMS_PICCOLA: NavItemV2[] = [
+const PRODUCTION_ITEMS_PICCOLA: NavItemV2[] = [
   { label: "Catalogue", href: "/catalogue", icon: "book" },
   { label: "Fiches techniques", href: "/recettes", icon: "fileText" },
   { label: "Prix de vente", href: "/epicerie", icon: "tag" },
   { label: "Inventaire", href: "/inventaire", icon: "package" },
-  { label: "Simulateur prix", href: "/ventes/articles", icon: "calculator" },
+  { label: "Articles & Simulateur", href: "/ventes/articles", icon: "calculator" },
 ];
 
+// ACHATS (fournisseurs & stocks)
+export const ACHATS_ITEMS: NavItemV2[] = [
+  { label: "Base produits", href: "/ingredients", icon: "tag" },
+  { label: "Commandes", href: "/commandes", icon: "shoppingBag" },
+  { label: "Factures", href: "/achats", icon: "fileText" },
+];
+
+// EVENEMENTIEL (Piccola uniquement)
 export const EVENEMENTIEL_ITEMS: NavItemV2[] = [
   { label: "Evenements", href: "/evenements", icon: "calendarEvent" },
   { label: "Carnet clients", href: "/clients", icon: "users" },
   { label: "Devis", href: "/devis", icon: "fileText" },
-  { label: "Factures", href: "/clients/factures", icon: "fileText" },
+  { label: "Factures clients", href: "/clients/factures", icon: "fileText" },
 ];
 
-// Keep legacy exports for compatibility
+// Legacy exports
 export const PERSONNEL_ITEMS = PLANNING_ITEMS;
 export const FINANCE_ITEMS = ACHATS_ITEMS;
 export const CLIENTS_ITEMS = EVENEMENTIEL_ITEMS;
+export const PERFORMANCES_ITEMS: NavItemV2[] = [];
+export const OPERATIONS_ITEMS = PRODUCTION_ITEMS;
 
-/** Ventes section */
-const VENTES_ITEMS: NavItemV2[] = [
-  { label: "Marges", href: "/ventes/marges", icon: "wallet" },
-  { label: "Insights IA", href: "/ventes/insights", icon: "trendingUp" },
-];
-export const VENTES_SECTION: NavSubSection = { label: "Ventes", icon: "wallet", href: "/ventes", roles: ["group_admin"], items: VENTES_ITEMS };
+// Sections
+export const PILOTAGE_SECTION: NavSubSection = { label: "Pilotage", icon: "barChart", href: "/ventes", roles: ["group_admin"], items: PILOTAGE_ITEMS };
 export const PERSONNEL_SECTION: NavSubSection = { label: "Personnel", icon: "users", href: "/personnel", items: PLANNING_ITEMS };
+export const PRODUCTION_SECTION: NavSubSection = { label: "Production", icon: "package", roles: ["group_admin"], items: PRODUCTION_ITEMS };
+export const PRODUCTION_SECTION_PICCOLA: NavSubSection = { label: "Production", icon: "package", roles: ["group_admin"], items: PRODUCTION_ITEMS_PICCOLA };
 export const ACHATS_SECTION: NavSubSection = { label: "Achats", icon: "shoppingBag", roles: ["group_admin"], items: ACHATS_ITEMS };
-export const OPERATIONS_SECTION: NavSubSection = { label: "Opérations", icon: "package", roles: ["group_admin"], items: OPERATIONS_ITEMS };
-export const OPERATIONS_SECTION_PICCOLA: NavSubSection = { label: "Opérations", icon: "package", roles: ["group_admin"], items: OPERATIONS_ITEMS_PICCOLA };
-export const EVENEMENTIEL_SECTION: NavSubSection = { label: "Événementiel", icon: "calendarEvent", roles: ["group_admin"], items: EVENEMENTIEL_ITEMS };
+export const EVENEMENTIEL_SECTION: NavSubSection = { label: "Evenementiel", icon: "calendarEvent", roles: ["group_admin"], items: EVENEMENTIEL_ITEMS };
+
+// Backward compat
+export const VENTES_SECTION = PILOTAGE_SECTION;
+export const OPERATIONS_SECTION = PRODUCTION_SECTION;
+export const OPERATIONS_SECTION_PICCOLA = PRODUCTION_SECTION_PICCOLA;
 
 /** Build dynamic nav entries from a list of establishments */
 export function buildDynamicNav(
@@ -138,10 +148,10 @@ export function buildDynamicNav(
   for (const etab of etabs) {
     const isPiccola = etab.slug?.includes("piccola");
     const sections: NavSubSection[] = [
+      PILOTAGE_SECTION,
       PERSONNEL_SECTION,
-      VENTES_SECTION,
+      isPiccola ? PRODUCTION_SECTION_PICCOLA : PRODUCTION_SECTION,
       ACHATS_SECTION,
-      OPERATIONS_SECTION,
       ...(isPiccola ? [EVENEMENTIEL_SECTION] : []),
     ];
 
@@ -215,7 +225,7 @@ export const SIDEBAR_NAV: NavSection[] = [
     ],
   },
   {
-    label: "Gestion du personnel",
+    label: "Personnel",
     icon: "users",
     roles: ["group_admin", "manager"],
     items: [
@@ -228,7 +238,7 @@ export const SIDEBAR_NAV: NavSection[] = [
     ],
   },
   {
-    label: "Gestion de la finance",
+    label: "Production",
     icon: "wallet",
     roles: ["group_admin"],
     items: [
@@ -255,7 +265,7 @@ export const SIDEBAR_NAV: NavSection[] = [
     ],
   },
   {
-    label: "Gestion des clients",
+    label: "Evenementiel",
     icon: "calendarEvent",
     roles: ["group_admin"],
     slugFilter: "piccola",
@@ -297,7 +307,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/rh/rapports": "Rapports RH",
   "/settings/planning": "Gestion du planning",
   "/settings/etablissements": "Établissements",
-  "/settings/finance": "Gestion de la finance",
+  "/settings/finance": "Production",
   "/settings/pointeuse": "Pointeuse",
   "/settings/employes/contrat": "Contrat",
   "/settings/employes/acces": "Accès application",
@@ -347,14 +357,14 @@ export const PAGE_TITLES: Record<string, string> = {
 
 /** Section name map: pathname → parent section label for TopBar subtitle */
 const PAGE_SECTIONS: Record<string, string> = {
-  "/rh/equipe": "Gestion du personnel",
-  "/plannings": "Gestion du personnel",
-  "/rh/pointage": "Gestion du personnel",
-  "/rh/conges": "Gestion du personnel",
-  "/rh/emargement": "Gestion du personnel",
-  "/ventes/simulation": "Ventes",
-  "/ventes/marges": "Ventes",
-  "/rh/rapports": "Gestion du personnel",
+  "/rh/equipe": "Personnel",
+  "/plannings": "Personnel",
+  "/rh/pointage": "Personnel",
+  "/rh/conges": "Personnel",
+  "/rh/emargement": "Personnel",
+  "/ventes/simulation": "Personnel",
+  "/ventes/marges": "Pilotage",
+  "/rh/rapports": "Personnel",
   "/settings/planning": "Paramètres",
   "/settings/finance": "Paramètres",
   "/settings/pointeuse": "Paramètres",
@@ -362,35 +372,35 @@ const PAGE_SECTIONS: Record<string, string> = {
   "/settings/employes/acces": "Paramètres",
   "/settings/employes/roles": "Paramètres",
   "/settings/account": "Paramètres",
-  "/pilotage": "Gestion de la finance",
-  "/mercuriale": "Gestion de la finance",
-  "/stats-achats": "Gestion de la finance",
-  "/variations-prix": "Gestion de la finance",
-  "/fournisseurs": "Gestion de la finance",
-  "/ingredients": "Gestion de la finance",
-  "/invoices": "Gestion de la finance",
-  "/commandes": "Gestion de la finance",
-  "/inventaire": "Gestion de la finance",
-  "/recettes": "Gestion de la finance",
-  "/epicerie": "Gestion de la finance",
-  "/finances": "Gestion de la finance",
+  "/pilotage": "Pilotage",
+  "/mercuriale": "Achats",
+  "/stats-achats": "Achats",
+  "/variations-prix": "Achats",
+  "/fournisseurs": "Achats",
+  "/ingredients": "Achats",
+  "/invoices": "Achats",
+  "/commandes": "Achats",
+  "/inventaire": "Production",
+  "/recettes": "Production",
+  "/epicerie": "Production",
+  "/finances": "Pilotage",
   "/kezia": "Performances",
-  "/clients": "Gestion des clients",
-  "/clients/factures": "Gestion des clients",
-  "/devis": "Gestion des clients",
-  "/evenements": "Gestion des clients",
-  "/recettes/new/pizza": "Gestion de la finance",
-  "/recettes/new/cuisine": "Gestion de la finance",
-  "/recettes/new/cocktail": "Gestion de la finance",
-  "/recettes/new/empatement": "Gestion de la finance",
-  "/recettes/pizza": "Gestion de la finance",
-  "/recettes/cuisine": "Gestion de la finance",
-  "/recettes/cocktail": "Gestion de la finance",
-  "/recettes/empatement": "Gestion de la finance",
-  "/achats": "Gestion de la finance",
-  "/rh/employe": "Gestion du personnel",
-  "/piccola-mia/evenements": "Gestion des clients",
-  "/devis/new": "Gestion des clients",
+  "/clients": "Evenementiel",
+  "/clients/factures": "Evenementiel",
+  "/devis": "Evenementiel",
+  "/evenements": "Evenementiel",
+  "/recettes/new/pizza": "Production",
+  "/recettes/new/cuisine": "Production",
+  "/recettes/new/cocktail": "Production",
+  "/recettes/new/empatement": "Production",
+  "/recettes/pizza": "Production",
+  "/recettes/cuisine": "Production",
+  "/recettes/cocktail": "Production",
+  "/recettes/empatement": "Production",
+  "/achats": "Achats",
+  "/rh/employe": "Personnel",
+  "/piccola-mia/evenements": "Evenementiel",
+  "/devis/new": "Evenementiel",
 };
 
 export function getPageTitle(pathname: string): string {
