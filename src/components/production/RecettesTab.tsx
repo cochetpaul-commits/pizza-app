@@ -564,6 +564,29 @@ function RecettesInner() {
                 {alertCount} alerte{alertCount > 1 ? "s" : ""}
               </button>
             )}
+            {canWrite && (
+              <div className="desktop-only" style={{ position: "relative" }}>
+                <button type="button" onClick={() => setShowFab(f => !f)}
+                  style={{ padding: "8px 16px", borderRadius: 10, border: "1.5px solid #D4775A", background: "#fff", color: "#D4775A", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  + Nouvelle recette
+                </button>
+                {showFab && (
+                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, minWidth: 180, background: "#fff", border: "1px solid #e0d8ce", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", overflow: "hidden", zIndex: 50 }}>
+                    {[
+                      { label: "Pizza", href: "/recettes/new/pizza", color: "#8B1A1A" },
+                      { label: "Cuisine", href: "/recettes/new/cuisine", color: "#4a6741" },
+                      { label: "Cocktail", href: "/recettes/new/cocktail", color: "#D4775A" },
+                      { label: "Empatement", href: "/recettes/new/empatement", color: "#888" },
+                    ].map(item => (
+                      <Link key={item.href} href={item.href} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", textDecoration: "none", fontSize: 14, fontWeight: 500, color: "#1a1a1a", borderBottom: "1px solid #f0ebe2" }}>
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: item.color, flexShrink: 0 }} />
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <button onClick={refresh} disabled={loading}
               style={{ width: 36, height: 36, borderRadius: "50%", border: "1.5px solid #ddd6c8", background: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
               {loading ? "\u2026" : "\u21BB"}
@@ -881,9 +904,9 @@ function RecettesInner() {
         )}
       </main>
 
-      {/* ── FAB — new recipe button ── */}
+      {/* ── FAB — new recipe button (mobile only) ── */}
       {canWrite && (
-        <div style={{ position: "fixed", bottom: "calc(140px + env(safe-area-inset-bottom, 0px))", right: 16, zIndex: 100 }}>
+        <div className="mobile-only" style={{ position: "fixed", bottom: "calc(140px + env(safe-area-inset-bottom, 0px))", right: 16, zIndex: 100 }}>
           {showFab && (
             <div style={{
               position: "absolute", bottom: 58, right: 0,

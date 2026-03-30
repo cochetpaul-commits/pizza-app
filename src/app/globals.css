@@ -238,6 +238,14 @@ html, body{
   }
 }
 
+/* ── Desktop/Mobile visibility helpers ── */
+.desktop-only { display: block; }
+.mobile-only { display: none; }
+@media (max-width: 767px) {
+  .desktop-only { display: none !important; }
+  .mobile-only { display: block !important; }
+}
+
 /* selects : même look que les inputs */
 select.input{
   -webkit-appearance: none;
