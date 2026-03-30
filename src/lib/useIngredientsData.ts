@@ -15,38 +15,34 @@ function slugToOfferEstab(slug: string): string | null {
 const INGREDIENT_COLS =
   "id,name,import_name,category,allergens,is_active,default_unit,purchase_price,purchase_unit,purchase_unit_label,purchase_unit_name,density_g_per_ml,piece_weight_g,piece_volume_ml,supplier_id,source_prep_recipe_name,source,recipe_id,status,status_note,validated_at,validated_by,cost_per_unit,cost_per_kg,etablissement_id,order_unit_label,order_quantity,storage_zone,parent_ingredient_id,rendement,is_derived,establishments";
 
-const VIEW_COLS =
-  "ingredient_id,supplier_id,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g";
+const OFFER_COLS =
+  "ingredient_id,supplier_id,price_kind,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g,establishment,updated_at";
 
 async function fetchOffersForIds(ids: string[]): Promise<LatestOffer[]> {
   if (ids.length === 0) return [];
 
-  const [viewRes, extraRes] = await Promise.all([
-    supabase.from("v_latest_offers").select(VIEW_COLS).in("ingredient_id", ids),
-    supabase
-      .from("supplier_offers")
-      .select("ingredient_id,price_kind,establishment,updated_at")
-      .eq("is_active", true)
-      .in("ingredient_id", ids)
-      .order("updated_at", { ascending: false }),
-  ]);
+  // Query supplier_offers directly instead of v_latest_offers view
+  // to avoid stale data from a potentially materialized view
+  const { data, error } = await supabase
+    .from("supplier_offers")
+    .select(OFFER_COLS)
+    .eq("is_active", true)
+    .in("ingredient_id", ids)
+    .order("updated_at", { ascending: false });
 
-  // Build extra map: only first row per ingredient_id (latest, due to DESC order)
-  const extraMap = new Map<string, { price_kind?: string; establishment?: string; updated_at?: string }>();
-  for (const e of extraRes.data ?? []) {
-    if (!extraMap.has(e.ingredient_id)) {
-      extraMap.set(e.ingredient_id, {
-        price_kind: e.price_kind,
-        establishment: e.establishment,
-        updated_at: e.updated_at,
-      });
+  if (error) throw new Error(error.message);
+
+  // Keep only the latest active offer per ingredient_id
+  const seen = new Set<string>();
+  const offers: LatestOffer[] = [];
+  for (const row of data ?? []) {
+    if (!seen.has(row.ingredient_id)) {
+      seen.add(row.ingredient_id);
+      offers.push(row as LatestOffer);
     }
   }
 
-  return (viewRes.data ?? []).map((row) => ({
-    ...row,
-    ...(extraMap.get(row.ingredient_id) ?? {}),
-  })) as LatestOffer[];
+  return offers;
 }
 
 async function fetchPage(page: number, etabId?: string | null, etabSlug?: string | null): Promise<{ items: Ingredient[]; offers: LatestOffer[]; hasMore: boolean }> {
