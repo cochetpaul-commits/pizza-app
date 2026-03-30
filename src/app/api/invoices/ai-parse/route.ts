@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { pdfToText } from "@/lib/pdfToText";
+import { ocrImage } from "@/lib/ocrVision";
 import { runImport } from "@/lib/invoices/importEngine";
 import { detectInvoice, supplierSlugToRoute } from "@/lib/invoices/invoiceDetector";
 import {
@@ -82,21 +83,32 @@ export async function POST(req: Request) {
 
     // ── Extract text ─────────────────────────────────────────────────────────
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const rawText = await pdfToText(bytes);
+    let rawText = await pdfToText(bytes);
+    let ocrUsed = false;
 
-    console.log(`[ai-parse] Extracted ${rawText.length} chars from "${file.name}"`);
-    if (rawText.length < 200) {
-      console.log(`[ai-parse] Full text: ${rawText}`);
-    } else {
-      console.log(`[ai-parse] Preview: ${rawText.slice(0, 300)}`);
-    }
+    console.log(`[ai-parse] pdfToText extracted ${rawText.length} chars from "${file.name}"`);
 
-    // If text too short, PDF is likely a scan
+    // If PDF has no text (scan/image), try OCR via Google Vision
     if (rawText.trim().length < 30) {
-      return NextResponse.json({
-        ok: false,
-        error: `Le PDF ne contient pas de texte extractible (${rawText.trim().length} car.). Utilisez l'import photo a la place.`,
-      }, { status: 400 });
+      console.log(`[ai-parse] PDF is a scan — trying OCR via Google Vision...`);
+      try {
+        rawText = await ocrImage(bytes);
+        ocrUsed = true;
+        console.log(`[ai-parse] OCR extracted ${rawText.length} chars`);
+      } catch (ocrErr) {
+        console.error(`[ai-parse] OCR failed:`, ocrErr);
+        return NextResponse.json({
+          ok: false,
+          error: `Le PDF est un scan et l'OCR a echoue: ${ocrErr instanceof Error ? ocrErr.message : String(ocrErr)}`,
+        }, { status: 400 });
+      }
+
+      if (rawText.trim().length < 30) {
+        return NextResponse.json({
+          ok: false,
+          error: `Aucun texte extractible du PDF, meme apres OCR (${rawText.trim().length} car.).`,
+        }, { status: 400 });
+      }
     }
 
     // ── Detect supplier ──────────────────────────────────────────────────────
@@ -226,6 +238,7 @@ export async function POST(req: Request) {
       filename: file.name,
       bytes: bytes.byteLength,
       raw_text_length: rawText.length,
+      ocr_used: ocrUsed,
       invoice: {
         id: result.invoiceId,
         already_imported: result.invoiceAlreadyImported,
