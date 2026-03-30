@@ -108,45 +108,68 @@ function extractOrderMeta(text: string) {
 }
 
 function parseOrderLines(text: string, etab: string): { ingredients: ParsedIngredient[]; logs: ParseLog[] } {
-  const rows = text.split("\n").map(x => x.trim()).filter(Boolean);
+  const normalized = text.replace(/€/g, "").replace(/\u00a0/g, " ");
+  const rows = normalized.split("\n").map(x => x.trim()).filter(Boolean);
   const ingredients: ParsedIngredient[] = [];
   const logs: ParseLog[] = [];
 
-  const RE = /^(.+?)\s+(ROUGE|BLANC|ROSE|ROSÉ)\s+(\d[,.]\d+)\s+(\d+)\s+([\d,.]+)\s*€?\s+([\d,.]+)\s*€?\s*$/i;
-  const RE_NC = /^(.+?)\s+(\d[,.]\d+)\s+(\d+)\s+([\d,.]+)\s*€?\s+([\d,.]+)\s*€?\s*$/i;
+  const SKIP = /Appellation|Designation|Millé|Couleur|Format|Remarque|montant\s+total|Qté\s+totale|Total\s*:|VINOFLO|ADRESSE|SIREN|FACTURATION|LIVRAISON|REGLEMENT|OBSERVATIONS|FRANCO|Tarif|Eq\.\s*Bout|Fermeture|livraison|PONCEL|SAINT-MALO|SASHA|COCHET|Edition|VinoVentes|Page\s+\d|BORDEREAU|COMMANDE|Exemplaire|C\.H\.R|FR\d{11}|SAMEDI|DIMANCHE|^\d{2}h\d{2}|^N[°º]/i;
+
+  const RE1 = /^(.+?)\s+(ROUGE|BLANC|ROSE|ROSÉ)\s+(\d[,.]\d+)\s+(\d+)\s+([\d,.]+)\s+([\d\s,.]+)\s*$/i;
+  const RE2 = /^(.+?)\s+(\d[,.]\d{2,3})\s+(\d+)\s+([\d,.]+)\s+([\d\s,.]+)\s*$/i;
+  const RE3 = /^(.+?)\s+(\d{1,3})\s+([\d,.]+)\s+([\d\s,.]+)\s*$/;
 
   for (const row of rows) {
-    if (/Appellation|Designation|Millé|Couleur|Format|Remarque/i.test(row)) continue;
-    if (/montant\s+total|Qté\s+totale|Total\s*:|VINOFLO|ADRESSE|SIREN|FACTURATION|LIVRAISON|REGLEMENT|OBSERVATIONS|FRANCO|Tarif|Eq\.\s*Bout|Fermeture|livraison|PONCEL|SAINT-MALO|SASHA|COCHET|Edition|VinoVentes|Page\s+\d/i.test(row)) continue;
+    if (SKIP.test(row)) continue;
+    if (row.length < 10) continue;
+    if (/^\d[\d\s/,.]*$/.test(row)) continue;
 
     let name: string | null = null;
     let qty = 0;
     let unitPrice: number | null = null;
     let total: number | null = null;
 
-    const m = RE.exec(row);
-    if (m) {
-      name = m[1].trim();
-      qty = parseInt(m[4], 10);
-      unitPrice = parseFrenchNumber(m[5]);
-      total = parseFrenchNumber(m[6]);
-    } else {
-      const m2 = RE_NC.exec(row);
+    const m1 = RE1.exec(row);
+    if (m1) {
+      name = m1[1].trim();
+      qty = parseInt(m1[4], 10);
+      unitPrice = parseFrenchNumber(m1[5]);
+      total = parseFrenchNumber(m1[6].replace(/\s/g, ""));
+    }
+    if (!name) {
+      const m2 = RE2.exec(row);
       if (m2) {
         name = m2[1].trim();
         qty = parseInt(m2[3], 10);
         unitPrice = parseFrenchNumber(m2[4]);
-        total = parseFrenchNumber(m2[5]);
+        total = parseFrenchNumber(m2[5].replace(/\s/g, ""));
+      }
+    }
+    if (!name) {
+      const m3 = RE3.exec(row);
+      if (m3 && /[a-zA-ZÀ-ÿ]{3,}/.test(m3[1])) {
+        name = m3[1].trim();
+        qty = parseInt(m3[2], 10);
+        unitPrice = parseFrenchNumber(m3[3]);
+        total = parseFrenchNumber(m3[4].replace(/\s/g, ""));
       }
     }
 
     if (!name || name.length < 3 || !qty || !unitPrice) continue;
+    if (unitPrice < 1 || unitPrice > 80) continue;
+    if (total != null && Math.abs(qty * unitPrice - total) > total * 0.05) continue;
+
+    const cleanName = name.replace(/\s+/g, " ")
+      .replace(/\s*(ROUGE|BLANC|ROSE|ROSÉ)\s*$/i, "")
+      .replace(/\s+\d[,.]\d{2,3}\s*$/, "")
+      .trim();
+    if (cleanName.length < 3) continue;
 
     let confidence: "high" | "medium" | "low" = "medium";
     if (total != null && Math.abs(qty * unitPrice - total) < 0.10) confidence = "high";
 
     ingredients.push({
-      name: name.replace(/\s+/g, " "),
+      name: cleanName,
       unit_recette: "pcs",
       unit_commande: "pcs",
       prix_unitaire: unitPrice,
@@ -160,14 +183,23 @@ function parseOrderLines(text: string, etab: string): { ingredients: ParsedIngre
 
     logs.push({
       line_number: ingredients.length,
-      raw: name.slice(0, 120),
+      raw: cleanName.slice(0, 120),
       rule: "vinoflo_order",
       result: "ok",
-      detail: `${name} ×${qty} @${unitPrice}€ = ${total ?? "?"}€`,
+      detail: cleanName + " x" + qty + " @" + unitPrice + " = " + (total ?? "?"),
     });
   }
 
-  return { ingredients, logs };
+  // Deduplicate
+  const seen = new Set<string>();
+  const dedupIngredients = ingredients.filter(i => {
+    const key = i.name + "|" + i.prix_unitaire;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return { ingredients: dedupIngredients, logs };
 }
 
 // ── Main parser ─────────────────────────────────────────────────────────────

@@ -214,54 +214,91 @@ function cleanOrderPrice(s: string): number | null {
 }
 
 function parseOrderLines(text: string): ParsedLine[] {
-  const rows = text.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+  // Normalize: strip € signs, collapse whitespace on each line
+  const normalized = text
+    .replace(/€/g, "")
+    .replace(/\u00a0/g, " ");  // non-breaking spaces
+
+  const rows = normalized.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
   const lines: ParsedLine[] = [];
 
-  // Match lines with: ... COLOR FORMAT QTY PU€ TOTAL€
-  // COLOR = ROUGE|BLANC|ROSE or absent (for spirits like Limoncello)
-  // FORMAT = 0,750 or 0,700 etc.
-  // PU/TOTAL = 8,20 € / 147,60 €
-  const RE_ORDER_LINE = /^(.+?)\s+(ROUGE|BLANC|ROSE|ROSÉ)\s+(\d[,.]\d+)\s+(\d+)\s+([\d,.]+)\s*€?\s+([\d,.]+)\s*€?\s*$/i;
-  // Spirits without color
-  const RE_ORDER_LINE_NO_COLOR = /^(.+?)\s+(\d[,.]\d+)\s+(\d+)\s+([\d,.]+)\s*€?\s+([\d,.]+)\s*€?\s*$/i;
+  // SKIP patterns
+  const SKIP = /Appellation|Designation|Millé|Couleur|Format|Remarque|montant\s+total|Qté\s+totale|Total\s*:|VINOFLO|ADRESSE|SIREN|FACTURATION|LIVRAISON|REGLEMENT|OBSERVATIONS|FRANCO|Tarif|Eq\.\s*Bout|Fermeture|livraison|PONCEL|SAINT-MALO|SASHA|COCHET|Edition|VinoVentes|Page\s+\d|BORDEREAU|COMMANDE|Exemplaire|C\.H\.R|FR\d{11}|SAMEDI|DIMANCHE|^\d{2}h\d{2}|^N[°º]/i;
+
+  // Strategy 1: Full line with color
+  // "Name stuff ROUGE 0,750 18 8,20 147,60"
+  const RE1 = /^(.+?)\s+(ROUGE|BLANC|ROSE|ROSÉ)\s+(\d[,.]\d+)\s+(\d+)\s+([\d,.]+)\s+([\d\s,.]+)\s*$/i;
+
+  // Strategy 2: Without color (spirits)
+  // "Name stuff 0,700 18 13,90 250,20"
+  const RE2 = /^(.+?)\s+(\d[,.]\d{2,3})\s+(\d+)\s+([\d,.]+)\s+([\d\s,.]+)\s*$/i;
+
+  // Strategy 3: Just numbers at end — name ... qty unitPrice total
+  // Handles cases where pdfToText drops some columns
+  // "Name stuff 18 8,20 147,60"
+  const RE3 = /^(.+?)\s+(\d{1,3})\s+([\d,.]+)\s+([\d\s,.]+)\s*$/;
 
   for (const row of rows) {
-    // Skip headers, footers, addresses
-    if (/Appellation|Designation|Millé|Couleur|Format|Remarque/i.test(row)) continue;
-    if (/montant\s+total|Qté\s+totale|Total\s*:|VINOFLO|ADRESSE|SIREN|FACTURATION|LIVRAISON|REGLEMENT|OBSERVATIONS|FRANCO|Tarif|Eq\.\s*Bout|Fermeture|livraison|PONCEL|SAINT-MALO|SASHA|COCHET|Edition|VinoVentes|Page\s+\d/i.test(row)) continue;
-    if (/^\s*$/.test(row)) continue;
+    if (SKIP.test(row)) continue;
+    if (row.length < 10) continue;
+    // Skip lines that are only numbers/dates
+    if (/^\d[\d\s/,.]*$/.test(row)) continue;
 
-    let name: string;
-    let qty: number;
-    let unitPrice: number | null;
-    let totalPrice: number | null;
-    let format: string | null = null;
+    let name: string | null = null;
+    let qty = 0;
+    let unitPrice: number | null = null;
+    let totalPrice: number | null = null;
+    let volumeMl: number | null = null;
 
-    const m = RE_ORDER_LINE.exec(row);
-    if (m) {
-      name = m[1].trim();
-      format = m[3];
-      qty = parseInt(m[4], 10);
-      unitPrice = cleanOrderPrice(m[5]);
-      totalPrice = cleanOrderPrice(m[6]);
-    } else {
-      const m2 = RE_ORDER_LINE_NO_COLOR.exec(row);
-      if (!m2) continue;
-      name = m2[1].trim();
-      format = m2[2];
-      qty = parseInt(m2[3], 10);
-      unitPrice = cleanOrderPrice(m2[4]);
-      totalPrice = cleanOrderPrice(m2[5]);
+    const m1 = RE1.exec(row);
+    if (m1) {
+      name = m1[1].trim();
+      volumeMl = Math.round((cleanOrderPrice(m1[3]) ?? 0) * 1000) || null;
+      qty = parseInt(m1[4], 10);
+      unitPrice = cleanOrderPrice(m1[5]);
+      totalPrice = cleanOrderPrice(m1[6]);
+    }
+
+    if (!name) {
+      const m2 = RE2.exec(row);
+      if (m2) {
+        name = m2[1].trim();
+        volumeMl = Math.round((cleanOrderPrice(m2[2]) ?? 0) * 1000) || null;
+        qty = parseInt(m2[3], 10);
+        unitPrice = cleanOrderPrice(m2[4]);
+        totalPrice = cleanOrderPrice(m2[5]);
+      }
+    }
+
+    if (!name) {
+      const m3 = RE3.exec(row);
+      if (m3) {
+        // Only match if name part looks like a wine (has letters)
+        const candidate = m3[1].trim();
+        if (/[a-zA-ZÀ-ÿ]{3,}/.test(candidate)) {
+          name = candidate;
+          qty = parseInt(m3[2], 10);
+          unitPrice = cleanOrderPrice(m3[3]);
+          totalPrice = cleanOrderPrice(m3[4]);
+        }
+      }
     }
 
     if (!name || name.length < 3 || !qty || !unitPrice) continue;
 
-    // Clean name: remove region prefix for shorter name, keep producer + wine
-    // "Vénétie / ITALO CESCON - CA DELLA SCALA VALPOLICELLA CLASSICO" → keep full
-    const cleanedName = name.replace(/\s+/g, " ").trim();
+    // Sanity: unit price for wine typically 3-50€
+    if (unitPrice < 1 || unitPrice > 80) continue;
+    // Sanity: qty × unitPrice should be close to total
+    if (totalPrice != null && Math.abs(qty * unitPrice - totalPrice) > totalPrice * 0.05) continue;
 
-    // Detect volume from format (0,750 = 750ml, 0,700 = 700ml)
-    const volumeMl = format ? Math.round(cleanOrderPrice(format)! * 1000) : null;
+    // Clean name
+    const cleanedName = name
+      .replace(/\s+/g, " ")
+      .replace(/\s*(ROUGE|BLANC|ROSE|ROSÉ)\s*$/i, "") // trailing color if captured in name
+      .replace(/\s+\d[,.]\d{2,3}\s*$/, "") // trailing format like "0,750"
+      .trim();
+
+    if (cleanedName.length < 3) continue;
 
     lines.push({
       sku: null,
@@ -273,11 +310,18 @@ function parseOrderLines(text: string): ParsedLine[] {
       tax_rate: 20,
       notes: null,
       piece_weight_g: null,
-      piece_volume_ml: volumeMl,
+      piece_volume_ml: volumeMl ?? 750, // default wine bottle
     });
   }
 
-  return lines;
+  // Deduplicate
+  const seen = new Set<string>();
+  return lines.filter(l => {
+    const key = l.name + "|" + l.quantity + "|" + l.unit_price;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export function parseVinofloInvoiceText(text: string): ParsedInvoice {
