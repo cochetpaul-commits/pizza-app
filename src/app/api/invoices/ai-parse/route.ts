@@ -84,6 +84,21 @@ export async function POST(req: Request) {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const rawText = await pdfToText(bytes);
 
+    console.log(`[ai-parse] Extracted ${rawText.length} chars from "${file.name}"`);
+    if (rawText.length < 200) {
+      console.log(`[ai-parse] Full text: ${rawText}`);
+    } else {
+      console.log(`[ai-parse] Preview: ${rawText.slice(0, 300)}`);
+    }
+
+    // If text too short, PDF is likely a scan
+    if (rawText.trim().length < 30) {
+      return NextResponse.json({
+        ok: false,
+        error: `Le PDF ne contient pas de texte extractible (${rawText.trim().length} car.). Utilisez l'import photo a la place.`,
+      }, { status: 400 });
+    }
+
     // ── Detect supplier ──────────────────────────────────────────────────────
     const detection = detectInvoice(rawText);
     const detectedName = detection.supplier?.name ?? supplierNameHint;
@@ -210,6 +225,7 @@ export async function POST(req: Request) {
       supplier_detected: aiSupplierName !== "INCONNU" ? aiSupplierName : detectedName,
       filename: file.name,
       bytes: bytes.byteLength,
+      raw_text_length: rawText.length,
       invoice: {
         id: result.invoiceId,
         already_imported: result.invoiceAlreadyImported,
