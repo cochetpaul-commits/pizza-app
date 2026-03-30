@@ -53,14 +53,13 @@ async function fetchPage(page: number, etabId?: string | null, etabSlug?: string
     .order("name", { ascending: true })
     .range(from, from + PAGE_SIZE - 1);
 
-  if (etabId) {
-    query = query.eq("etablissement_id", etabId);
-  }
-
-  // Filter by establishments array (contains the current establishment slug)
+  // Filter: ingredient belongs to the current establishment via `establishments` array
+  // OR via legacy `etablissement_id` (for ingredients not yet migrated to multi-etab)
   const myEstab = etabSlug ? slugToOfferEstab(etabSlug) : null;
-  if (myEstab) {
-    query = query.contains("establishments", [myEstab]);
+  if (myEstab && etabId) {
+    query = query.or(`establishments.cs.{"${myEstab}"},etablissement_id.eq.${etabId}`);
+  } else if (etabId) {
+    query = query.eq("etablissement_id", etabId);
   }
 
   const { data, error } = await query;
@@ -79,14 +78,11 @@ async function searchIngredients(q: string, etabId?: string | null, etabSlug?: s
     .ilike("name", `%${q}%`)
     .order("name", { ascending: true });
 
-  if (etabId) {
-    query = query.eq("etablissement_id", etabId);
-  }
-
-  // Filter by establishments array
   const myEstab = etabSlug ? slugToOfferEstab(etabSlug) : null;
-  if (myEstab) {
-    query = query.contains("establishments", [myEstab]);
+  if (myEstab && etabId) {
+    query = query.or(`establishments.cs.{"${myEstab}"},etablissement_id.eq.${etabId}`);
+  } else if (etabId) {
+    query = query.eq("etablissement_id", etabId);
   }
 
   const { data, error } = await query;
@@ -166,7 +162,12 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     try {
       // Fetch total count (independent of pagination/search)
       const countQuery = supabase.from("ingredients").select("id", { count: "exact", head: true });
-      if (etabRef.current) countQuery.eq("etablissement_id", etabRef.current);
+      const countEstab = etabSlugRef.current ? slugToOfferEstab(etabSlugRef.current) : null;
+      if (countEstab && etabRef.current) {
+        countQuery.or(`establishments.cs.{"${countEstab}"},etablissement_id.eq.${etabRef.current}`);
+      } else if (etabRef.current) {
+        countQuery.eq("etablissement_id", etabRef.current);
+      }
       countQuery.then(({ count }) => {
         if (fetchIdRef.current === fetchId) setTotalCount(count);
       });
