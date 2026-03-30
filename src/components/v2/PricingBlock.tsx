@@ -75,12 +75,24 @@ export function PricingBlock({
   const pvPortionHT = costPerPortion && costPerPortion > 0 && m < 1 ? costPerPortion / (1 - m) : null;
   const pvPortionTTC = pvPortionHT ? pvPortionHT * (1 + vatRate) : null;
 
+  // Coefficient multiplicateur = PV HT / cout
+  const coefficient = pvPortionHT && costPerPortion && costPerPortion > 0 ? pvPortionHT / costPerPortion : null;
+
   // Effective sell price: manual > PV conseillé
   const sp = typeof sellPrice === "number" && sellPrice > 0 ? sellPrice : null;
   const effectivePrice = sp ?? pvPortionTTC;
   const isConseille = sp == null && pvPortionTTC != null;
+  const effectivePriceHT = effectivePrice ? effectivePrice / (1 + vatRate) : null;
+  const effectiveCoeff = effectivePriceHT && costPerPortion && costPerPortion > 0 ? effectivePriceHT / costPerPortion : null;
   const margeBrute = effectivePrice != null && costPerPortion && costPerPortion > 0 ? effectivePrice - costPerPortion : null;
-  const foodCostPct = effectivePrice != null && costPerPortion && costPerPortion > 0 ? (costPerPortion / effectivePrice) * 100 : null;
+  const foodCostPct = effectivePriceHT != null && costPerPortion && costPerPortion > 0 ? (costPerPortion / effectivePriceHT) * 100 : null;
+
+  // Preset: compute PV TTC for a target food cost %
+  const pvForFoodCost = (targetPct: number) => {
+    if (!costPerPortion || costPerPortion <= 0) return null;
+    const pvHT = costPerPortion / (targetPct / 100);
+    return Math.round(pvHT * (1 + vatRate) * 100) / 100;
+  };
 
   return (
     <>
@@ -124,7 +136,14 @@ export function PricingBlock({
         </div>
       </div>
 
+      {/* Coefficient */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+        <div style={kpiCard}>
+          <div style={kpiLabel}>Coefficient</div>
+          <div style={{ ...kpiValue, color: accentColor }}>
+            {(effectiveCoeff ?? coefficient) ? "x" + (effectiveCoeff ?? coefficient)!.toFixed(2) : "—"}
+          </div>
+        </div>
         <div style={kpiCard}>
           <div style={kpiLabel}>Prix TTC / {portionLabel}</div>
           <div style={{ ...kpiValue, color: accentColor, fontStyle: isConseille ? "italic" : "normal" }}>
@@ -132,13 +151,47 @@ export function PricingBlock({
             {isConseille && <span style={{ fontSize: 11, fontWeight: 500, marginLeft: 4, color: "#6f6a61" }}>(conseillé)</span>}
           </div>
         </div>
-        <div style={kpiCard}>
-          <div style={kpiLabel}>PV conseillé / kg TTC</div>
-          <div style={{ ...kpiValue, color: accentColor }}>
-            {pvKgTTC ? fmtMoney(pvKgTTC) + " €" : "—"}
+      </div>
+
+      {/* Quick food cost presets */}
+      {onSellPriceChange && costPerPortion != null && costPerPortion > 0 && (
+        <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+          {[25, 30, 35].map(pct => {
+            const pv = pvForFoodCost(pct);
+            return (
+              <button
+                key={pct}
+                type="button"
+                onClick={() => pv && onSellPriceChange!(pv)}
+                style={{
+                  flex: 1, padding: "8px 4px", borderRadius: 8, fontSize: 11, fontWeight: 600,
+                  border: `1.5px solid ${hexToRgba(accentColor, 0.3)}`,
+                  background: hexToRgba(accentColor, 0.04),
+                  color: accentColor,
+                  cursor: pv ? "pointer" : "default",
+                  opacity: pv ? 1 : 0.4,
+                  textAlign: "center",
+                  lineHeight: 1.3,
+                }}
+              >
+                Objectif {pct}% FC
+                {pv && <div style={{ fontSize: 12, fontWeight: 800, marginTop: 2 }}>{fmtMoney(pv)} €</div>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {pvKgTTC && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, marginBottom: 14 }}>
+          <div style={kpiCard}>
+            <div style={kpiLabel}>PV conseillé / kg TTC</div>
+            <div style={{ ...kpiValue, color: accentColor }}>
+              {fmtMoney(pvKgTTC) + " €"}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {onSellPriceChange && (
         <>
