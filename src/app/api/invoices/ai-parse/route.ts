@@ -133,38 +133,67 @@ export async function POST(req: Request) {
     }
 
     // ── Fall back to AI parsing ──────────────────────────────────────────────
+    let aiSupplierName = supplierName;
+
     if (!parsedInvoice) {
-      const aiResult = await aiParseInvoice(rawText, supplierName);
+      const aiResult = await aiParseInvoice(rawText, supplierName === "INCONNU" ? null : supplierName);
       parsedInvoice = aiResult.invoice;
       parseMethod = "ai";
 
-      // Save the template for future use (fire and forget)
-      // We look up the supplier id if we can
-      let supplierId: string | null = null;
-      if (detectedName) {
-        const { data: supRow } = await supabaseAdmin
-          .from("suppliers")
-          .select("id")
-          .ilike("name", detectedName)
-          .limit(1)
-          .maybeSingle();
-        supplierId = supRow?.id ?? null;
+      // If supplier was unknown, use AI-detected name
+      if (aiResult.supplierInfo?.name && (supplierName === "INCONNU" || !detectedName)) {
+        aiSupplierName = aiResult.supplierInfo.name;
       }
 
+      // Create or find the supplier
+      let supplierId: string | null = null;
+
+      // Try to find existing supplier
+      const { data: existingSupplier } = await supabaseAdmin
+        .from("suppliers")
+        .select("id")
+        .ilike("name", aiSupplierName)
+        .limit(1)
+        .maybeSingle();
+
+      if (existingSupplier) {
+        supplierId = existingSupplier.id;
+      } else if (aiResult.supplierInfo?.name) {
+        // Create new supplier from AI-extracted info
+        const { data: newSupplier } = await supabaseAdmin
+          .from("suppliers")
+          .insert({
+            user_id: userId,
+            name: aiResult.supplierInfo.name,
+            siret: aiResult.supplierInfo.siret,
+            address: aiResult.supplierInfo.address,
+            phone: aiResult.supplierInfo.phone,
+            email: aiResult.supplierInfo.email,
+            is_active: true,
+            etablissement_id: etabId,
+          })
+          .select("id")
+          .single();
+
+        supplierId = newSupplier?.id ?? null;
+        console.log(`[ai-parse] Created new supplier: "${aiResult.supplierInfo.name}" (${supplierId})`);
+      }
+
+      // Save template for future use
       saveTemplate(
         supabaseAdmin,
         supplierId,
-        supplierName,
+        aiSupplierName,
         aiResult.hints,
         rawText.slice(0, 5000),
-      ).catch(() => null);
+      ).catch((err) => console.error("[ai-parse] saveTemplate error:", err));
     }
 
     // ── Run import engine ────────────────────────────────────────────────────
     const result = await runImport({
       supabase,
       userId,
-      supplierName,
+      supplierName: aiSupplierName,
       payload: parsedInvoice,
       sourceFileName: file.name,
       rawText,
@@ -178,7 +207,7 @@ export async function POST(req: Request) {
       ok: true,
       kind: "ai-parse",
       parse_method: parseMethod,
-      supplier_detected: detectedName,
+      supplier_detected: aiSupplierName !== "INCONNU" ? aiSupplierName : detectedName,
       filename: file.name,
       bytes: bytes.byteLength,
       invoice: {

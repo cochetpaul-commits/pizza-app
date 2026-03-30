@@ -26,6 +26,14 @@ import type { ParsedInvoice, ParsedLine } from "@/lib/invoices/importEngine";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+export interface SupplierInfo {
+  name: string;
+  siret: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
 export interface ParsingHints {
   invoice_number_pattern: string;
   date_pattern: string;
@@ -82,11 +90,18 @@ Le JSON doit suivre EXACTEMENT ce schéma :
       }
     ]
   },
+  "supplier_info": {
+    "name": "string (nom commercial du fournisseur, en Title Case)",
+    "siret": "string | null (numéro SIRET/SIREN si trouvé)",
+    "address": "string | null (adresse complète)",
+    "phone": "string | null (téléphone)",
+    "email": "string | null (email)"
+  },
   "parsing_hints": {
     "invoice_number_pattern": "description ou regex du pattern du numéro de facture",
     "date_pattern": "description ou regex du pattern de la date",
     "line_format": "description détaillée de la structure d'une ligne produit (colonnes, séparateurs, ordre)",
-    "supplier_keywords": ["mot-clé 1", "mot-clé 2"],
+    "supplier_keywords": ["mot-clé 1", "mot-clé 2", "mot-clé 3 (nom société, SIRET, etc.)"],
     "decimal_format": "french | standard",
     "sample_lines": ["ligne brute exemple 1", "ligne brute exemple 2"]
   }
@@ -98,7 +113,7 @@ Le JSON doit suivre EXACTEMENT ce schéma :
 export async function aiParseInvoice(
   rawText: string,
   supplierName: string | null,
-): Promise<{ invoice: ParsedInvoice; hints: ParsingHints }> {
+): Promise<{ invoice: ParsedInvoice; hints: ParsingHints; supplierInfo: SupplierInfo | null }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY manquante");
 
@@ -161,7 +176,17 @@ export async function aiParseInvoice(
       : [],
   };
 
-  return { invoice, hints };
+  const supplierInfo: SupplierInfo | null = parsed.supplier_info?.name
+    ? {
+        name: String(parsed.supplier_info.name).trim(),
+        siret: parsed.supplier_info.siret ? String(parsed.supplier_info.siret) : null,
+        address: parsed.supplier_info.address ? String(parsed.supplier_info.address) : null,
+        phone: parsed.supplier_info.phone ? String(parsed.supplier_info.phone) : null,
+        email: parsed.supplier_info.email ? String(parsed.supplier_info.email) : null,
+      }
+    : null;
+
+  return { invoice, hints, supplierInfo };
 }
 
 // ── Template Parse ───────────────────────────────────────────────────────────
