@@ -494,6 +494,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                             >
                               {SectionIcon && <SectionIcon size={14} color={(subOpen || hasActiveChild) ? `${color}CC` : C.textMuted} />}
                               <span style={{ flex: 1, textAlign: "left" }}>{sub.label}</span>
+                              <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={(subOpen || hasActiveChild) ? `${color}CC` : C.textMuted} strokeWidth="2.5"
+                                style={{ transform: subOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s", flexShrink: 0, opacity: 0.6 }}>
+                                <polyline points="6 9 12 15 18 9" />
+                              </svg>
                             </button>
                             {subOpen && (
                               <div style={{ marginBottom: 4 }}>
