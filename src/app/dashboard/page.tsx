@@ -47,7 +47,7 @@ function GroupContent() {
     () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(new Date()),
     [],
   );
-  const yesterday = useMemo(() => {
+  const _yesterday = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
     return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(d);

@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { StepsList } from "./StepsList";
 import { PricingModule } from "./PricingModule";
-import { RecipeHero, HeroBtn, HeroDangerBtn } from "./RecipeHero";
+import { RecipeHero, HeroBtn } from "./RecipeHero";
 import { StepperInput } from "@/components/StepperInput";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -30,7 +30,7 @@ function n2(v: unknown) { const x = Number(v); return Number.isFinite(x) ? x : 0
 function round2(v: number) { return Math.round(v * 100) / 100; }
 function roundG(v: number) { return Math.round(v); }
 function fmtG(v: number) { return roundG(v).toLocaleString("fr-FR") + " g"; }
-function fmtMoney(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function _fmtMoney(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 // Virtual ingredient IDs for empatement pivot
 type EmpItemId = "flour" | "water" | "salt" | "honey" | "oil" | "yeast";
@@ -147,7 +147,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     return acc + (prodFactor !== null ? Math.round(i.qty * prodFactor) : i.qty);
   }, 0);
 
-  const costPerKg: number | null = null;
+  const _costPerKg: number | null = null;
   const costPerBall: number | null = null;
 
   // ── KPI computations ──────────────────────────────────────────
