@@ -424,7 +424,13 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                     onClick={() => {
                       setGroupView(false);
                       setCurrent(etab);
-                      setOpenHub(prev => prev === `etab:${etab.id}` ? null : `etab:${etab.id}`);
+                      const wasOpen = openHub === `etab:${etab.id}`;
+                      setOpenHub(wasOpen ? null : `etab:${etab.id}`);
+                      // Navigate to establishment hub page
+                      if (!wasOpen) {
+                        const slug = isPiccolaEtab ? "/piccola-mia" : "/bello-mio";
+                        router.push(slug);
+                      }
                     }}
                     style={{
                       display: "flex", alignItems: "center", gap: 10,

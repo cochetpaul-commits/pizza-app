@@ -58,25 +58,44 @@ function GroupContent() {
   const [caWeek, setCaWeek] = useState(0);
   const [caMonth, setCaMonth] = useState(0);
   const [etabData, setEtabData] = useState<Record<string, EtabKpis>>({});
+  const [lastDataDay, setLastDataDay] = useState<string | null>(null);
 
   // Set group view
   useEffect(() => {
     setGroupView(true);
   }, [setGroupView]);
 
-  // Fetch per-establishment data for today + yesterday
+  // Fetch per-establishment data — today or last day with data
   useEffect(() => {
     if (etablissements.length === 0) return;
     (async () => {
       const result: Record<string, EtabKpis> = {};
 
+      // Find last day with data (in case today has no data yet)
+      const { data: lastRow } = await supabase
+        .from("ventes_lignes")
+        .select("date_service")
+        .eq("type_ligne", "Produit")
+        .order("date_service", { ascending: false })
+        .limit(1);
+      const lastDay = lastRow?.[0]?.date_service ?? today;
+      const prevDay = (() => {
+        const d = new Date(lastDay + "T12:00:00");
+        d.setDate(d.getDate() - 1);
+        // Skip weekends
+        if (d.getDay() === 0) d.setDate(d.getDate() - 2);
+        if (d.getDay() === 6) d.setDate(d.getDate() - 1);
+        return d.toISOString().slice(0, 10);
+      })();
+      setLastDataDay(lastDay);
+
       for (const etab of etablissements) {
-        // Today
+        // Last day with data (or today)
         const { data: todayData } = await supabase
           .from("ventes_lignes")
           .select("ttc, num_fiscal")
           .eq("etablissement_id", etab.id)
-          .eq("date_service", today)
+          .eq("date_service", lastDay)
           .eq("type_ligne", "Produit");
 
         const caToday = (todayData ?? []).reduce((s, r) => s + (r.ttc ?? 0), 0);
@@ -84,12 +103,12 @@ function GroupContent() {
           (todayData ?? []).map((r) => r.num_fiscal).filter(Boolean),
         ).size;
 
-        // Yesterday
+        // Previous day
         const { data: yData } = await supabase
           .from("ventes_lignes")
           .select("ttc, num_fiscal")
           .eq("etablissement_id", etab.id)
-          .eq("date_service", yesterday)
+          .eq("date_service", prevDay)
           .eq("type_ligne", "Produit");
 
         const caYest = (yData ?? []).reduce((s, r) => s + (r.ttc ?? 0), 0);
@@ -106,7 +125,7 @@ function GroupContent() {
       }
       setEtabData(result);
     })();
-  }, [etablissements, today, yesterday]);
+  }, [etablissements, today]);
 
   // CA week (all establishments)
   useEffect(() => {
@@ -204,10 +223,10 @@ function GroupContent() {
           marginBottom: 20,
         }}
       >
-        <SummaryCard label="CA Groupe aujourd'hui" value={`${fmtEur(totalCaToday)} \u20AC`} accent={GROUP_COLOR} />
+        <SummaryCard label={lastDataDay === today ? "CA Groupe aujourd'hui" : `CA Groupe ${new Date(lastDataDay + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })}`} value={`${fmtEur(totalCaToday)} \u20AC`} accent={GROUP_COLOR} />
         <SummaryCard label="CA Groupe semaine" value={`${fmtEur(caWeek)} \u20AC`} accent={GROUP_COLOR} />
         <SummaryCard label="CA Groupe mois" value={`${fmtEur(caMonth)} \u20AC`} accent={GROUP_COLOR} />
-        <SummaryCard label="Couverts aujourd'hui" value={String(totalCouverts)} accent={T.dark} />
+        <SummaryCard label={lastDataDay === today ? "Couverts aujourd'hui" : `Couverts ${new Date(lastDataDay + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" })}`} value={String(totalCouverts)} accent={T.dark} />
       </div>
 
       {/* Per-establishment comparison */}
