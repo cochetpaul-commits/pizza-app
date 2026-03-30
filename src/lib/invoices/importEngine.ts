@@ -381,6 +381,11 @@ export async function runImport(options: {
         piece_volume_ml: pieceVolumeMl,
       };
       if (etabId) ingRow.etablissement_id = etabId;
+      if (establishment === "both") {
+        ingRow.establishments = ["bellomio", "piccola"];
+      } else if (establishment) {
+        ingRow.establishments = [establishment];
+      }
       toCreate.push(ingRow);
     }
 
@@ -543,6 +548,28 @@ export async function runImport(options: {
 
         if (r.error) throw new Error(r.error.message);
         offersInserted += 1;
+      }
+    }
+
+    // 10. Mettre à jour le champ `establishments` des ingrédients matchés
+    // pour que l'établissement importé apparaisse dans le filtre
+    if (establishment && establishment !== "both") {
+      const allIngIds = Array.from(offerByIngredient.keys());
+      if (allIngIds.length) {
+        const { data: estabRows } = await supabase
+          .from("ingredients")
+          .select("id,establishments")
+          .in("id", allIngIds);
+
+        for (const row of (estabRows ?? []) as Array<{ id: string; establishments: string[] | null }>) {
+          const current: string[] = row.establishments ?? [];
+          if (!current.includes(establishment)) {
+            await supabase
+              .from("ingredients")
+              .update({ establishments: [...current, establishment] })
+              .eq("id", row.id);
+          }
+        }
       }
     }
   }
