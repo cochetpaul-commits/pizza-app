@@ -773,7 +773,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
 
                 {/* Steps (read-only in production) */}
                 {steps.length > 0 && (
-                  <div className="card" style={{ marginBottom: 16 }}>
+                  <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                     <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                       Étapes
                     </h3>
@@ -789,7 +789,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
               /* ── MODE NORMAL ── */
               <>
                 {/* Infos générales */}
-                <div className="card" style={{ marginBottom: 16 }}>
+                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                     <div>
                       <label className="label">Nom de la recette</label>
@@ -854,7 +854,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                 </div>
 
                 {/* Ingrédients */}
-                <div className="card" style={{ marginBottom: 16 }}>
+                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Ingrédients
                   </h3>
@@ -877,7 +877,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                 </div>
 
                 {/* Étapes */}
-                <div className="card" style={{ marginBottom: 16 }}>
+                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Étapes
                   </h3>
@@ -885,7 +885,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                 </div>
 
                 {/* Prix & Marges */}
-                <div className="card" style={{ marginBottom: 16 }}>
+                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Prix &amp; Marges
                   </h3>
@@ -936,7 +936,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                 )}
 
                 {/* Allergènes */}
-                <div className="card" style={{ marginBottom: 16 }}>
+                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Allergènes
                   </h3>
@@ -944,7 +944,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode }: Props) {
                 </div>
 
                 {/* Photo */}
-                <div className="card" style={{ marginBottom: 16 }}>
+                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Photo
                   </h3>

@@ -669,7 +669,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                 )}
 
                 {steps.length > 0 && (
-                  <div className="card" style={{ marginBottom: 16 }}>
+                  <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                     <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                       Etapes
                     </h3>
@@ -685,7 +685,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
               /* ── MODE NORMAL ── */
               <>
                 {/* Infos generales */}
-                <div className="card" style={{ marginBottom: 16 }}>
+                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                     <div>
                       <label className="label">Nom de la pizza</label>
@@ -719,7 +719,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                 </div>
 
                 {/* Ingredients Avant four */}
-                <div className="card" style={{ marginBottom: 16 }}>
+                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Ingredients — Avant four
                   </h3>
@@ -737,7 +737,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                 </div>
 
                 {/* Ingredients Apres four */}
-                <div className="card" style={{ marginBottom: 16 }}>
+                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Ingredients — Apres four
                   </h3>
@@ -755,7 +755,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                 </div>
 
                 {/* Etapes */}
-                <div className="card" style={{ marginBottom: 16 }}>
+                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Etapes
                   </h3>
@@ -777,7 +777,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                 </div>
 
                 {/* Allergenes */}
-                <div className="card" style={{ marginBottom: 16 }}>
+                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Allergenes
                   </h3>
@@ -785,7 +785,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                 </div>
 
                 {/* Prix & Marges */}
-                <div className="card" style={{ marginBottom: 16 }}>
+                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Prix &amp; Marges
                   </h3>
@@ -803,7 +803,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                 </div>
 
                 {/* Photo */}
-                <div className="card" style={{ marginBottom: 16 }}>
+                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Photo
                   </h3>
