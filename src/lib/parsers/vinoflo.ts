@@ -90,10 +90,110 @@ const RE_LINE_NOQTY = new RegExp(
 
 // ── Parser ──────────────────────────────────────────────────────────────────
 
+// ── Order (Bordereau de Commande) parser ─────────────────────────────────────
+
+function isOrder(text: string): boolean {
+  return /BORDEREAU\s+DE\s+COMMANDE/i.test(text);
+}
+
+function extractOrderMeta(text: string) {
+  const numMatch = text.match(/N[°º]\s*(\d{3,6})\s+du\s+(\d{2})\/(\d{2})\/(\d{4})/i);
+  const totalMatch = text.match(/(?:Montant\s+net\s+total\s+HT|Total)\s*:?\s*([\d\s,.]+)\s*€/i);
+  const cleanAmt = (s: string) => parseFrenchNumber(s.replace(/\s+/g, ""));
+  return {
+    invoice_number: numMatch?.[1] ?? null,
+    invoice_date: numMatch ? `${numMatch[2]}/${numMatch[3]}/${numMatch[4]}` : null,
+    total_ht: totalMatch ? cleanAmt(totalMatch[1]) : null,
+  };
+}
+
+function parseOrderLines(text: string, etab: string): { ingredients: ParsedIngredient[]; logs: ParseLog[] } {
+  const rows = text.split("\n").map(x => x.trim()).filter(Boolean);
+  const ingredients: ParsedIngredient[] = [];
+  const logs: ParseLog[] = [];
+
+  const RE = /^(.+?)\s+(ROUGE|BLANC|ROSE|ROSÉ)\s+(\d[,.]\d+)\s+(\d+)\s+([\d,.]+)\s*€?\s+([\d,.]+)\s*€?\s*$/i;
+  const RE_NC = /^(.+?)\s+(\d[,.]\d+)\s+(\d+)\s+([\d,.]+)\s*€?\s+([\d,.]+)\s*€?\s*$/i;
+
+  for (const row of rows) {
+    if (/Appellation|Designation|Millé|Couleur|Format|Remarque/i.test(row)) continue;
+    if (/montant\s+total|Qté\s+totale|Total\s*:|VINOFLO|ADRESSE|SIREN|FACTURATION|LIVRAISON|REGLEMENT|OBSERVATIONS|FRANCO|Tarif|Eq\.\s*Bout|Fermeture|livraison|PONCEL|SAINT-MALO|SASHA|COCHET|Edition|VinoVentes|Page\s+\d/i.test(row)) continue;
+
+    let name: string | null = null;
+    let qty = 0;
+    let unitPrice: number | null = null;
+    let total: number | null = null;
+
+    const m = RE.exec(row);
+    if (m) {
+      name = m[1].trim();
+      qty = parseInt(m[4], 10);
+      unitPrice = parseFrenchNumber(m[5]);
+      total = parseFrenchNumber(m[6]);
+    } else {
+      const m2 = RE_NC.exec(row);
+      if (m2) {
+        name = m2[1].trim();
+        qty = parseInt(m2[3], 10);
+        unitPrice = parseFrenchNumber(m2[4]);
+        total = parseFrenchNumber(m2[5]);
+      }
+    }
+
+    if (!name || name.length < 3 || !qty || !unitPrice) continue;
+
+    let confidence: "high" | "medium" | "low" = "medium";
+    if (total != null && Math.abs(qty * unitPrice - total) < 0.10) confidence = "high";
+
+    ingredients.push({
+      name: name.replace(/\s+/g, " "),
+      unit_recette: "pcs",
+      unit_commande: "pcs",
+      prix_unitaire: unitPrice,
+      prix_commande: total ?? unitPrice * qty,
+      categorie: "boissons",
+      fournisseur_slug: "vinoflo",
+      etablissement_id: etab,
+      raw_line: row.slice(0, 200),
+      confidence,
+    });
+
+    logs.push({
+      line_number: ingredients.length,
+      raw: name.slice(0, 120),
+      rule: "vinoflo_order",
+      result: "ok",
+      detail: `${name} ×${qty} @${unitPrice}€ = ${total ?? "?"}€`,
+    });
+  }
+
+  return { ingredients, logs };
+}
+
+// ── Main parser ─────────────────────────────────────────────────────────────
+
 export function parseVinoflo(text: string, etablissement: string): ParseResult {
-  const meta = extractMeta(text);
   const detectedEtab = detectEtablissement(text);
   const etab = etablissement || detectedEtab || "bello_mio";
+
+  // Order format (Bordereau de Commande) — clean digital PDF
+  if (isOrder(text)) {
+    const meta = extractOrderMeta(text);
+    const { ingredients, logs } = parseOrderLines(text, etab);
+    return {
+      fournisseur: "vinoflo",
+      etablissement: etab,
+      invoice_number: meta.invoice_number ? `CMD-${meta.invoice_number}` : null,
+      invoice_date: meta.invoice_date,
+      total_ht: meta.total_ht,
+      total_ttc: null,
+      ingredients,
+      logs,
+    };
+  }
+
+  // Invoice format (Facture) — often scanned/OCR
+  const meta = extractMeta(text);
 
   const ingredients: ParsedIngredient[] = [];
   const logs: ParseLog[] = [];

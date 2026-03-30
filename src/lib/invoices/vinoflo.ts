@@ -184,7 +184,119 @@ function makeLine(qtyStr: string, sku: string, name: string, priceStr: string, t
   };
 }
 
+// ── Vinoflo Order (Bordereau de Commande) parser ─────────────────────────────
+// Digital PDF — clean text, no OCR issues.
+// Header: "BORDEREAU DE COMMANDE - BELLO MIO N° 2729 du 03/01/2026"
+// Lines:  Region / PRODUCER - WINE   [Vintage]  COLOR  FORMAT  QTY  PU_HT€  PHT€
+
+function isVinofloOrder(text: string): boolean {
+  return /BORDEREAU\s+DE\s+COMMANDE/i.test(text);
+}
+
+function extractOrderMeta(text: string): Pick<ParsedInvoice, "invoice_number" | "invoice_date" | "total_ht" | "total_ttc"> {
+  // "N° 2729 du 03/01/2026"
+  const numMatch = text.match(/N[°º]\s*(\d{3,6})\s+du\s+(\d{2}\/\d{2}\/\d{4})/i);
+  // "Total : 2 130,90 €" or "Montant net total HT : 2 130,90 €"
+  const totalMatch = text.match(/(?:Montant\s+net\s+total\s+HT|Total)\s*:?\s*([\d\s,.]+)\s*€/i);
+
+  return {
+    invoice_number: numMatch?.[1] ?? null,
+    invoice_date: numMatch?.[2] ?? null,
+    total_ht: totalMatch ? cleanOrderPrice(totalMatch[1]) : null,
+    total_ttc: null, // Orders are HT only
+  };
+}
+
+function cleanOrderPrice(s: string): number | null {
+  const t = s.replace(/\s+/g, "").replace(",", ".").trim();
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseOrderLines(text: string): ParsedLine[] {
+  const rows = text.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+  const lines: ParsedLine[] = [];
+
+  // Match lines with: ... COLOR FORMAT QTY PU€ TOTAL€
+  // COLOR = ROUGE|BLANC|ROSE or absent (for spirits like Limoncello)
+  // FORMAT = 0,750 or 0,700 etc.
+  // PU/TOTAL = 8,20 € / 147,60 €
+  const RE_ORDER_LINE = /^(.+?)\s+(ROUGE|BLANC|ROSE|ROSÉ)\s+(\d[,.]\d+)\s+(\d+)\s+([\d,.]+)\s*€?\s+([\d,.]+)\s*€?\s*$/i;
+  // Spirits without color
+  const RE_ORDER_LINE_NO_COLOR = /^(.+?)\s+(\d[,.]\d+)\s+(\d+)\s+([\d,.]+)\s*€?\s+([\d,.]+)\s*€?\s*$/i;
+
+  for (const row of rows) {
+    // Skip headers, footers, addresses
+    if (/Appellation|Designation|Millé|Couleur|Format|Remarque/i.test(row)) continue;
+    if (/montant\s+total|Qté\s+totale|Total\s*:|VINOFLO|ADRESSE|SIREN|FACTURATION|LIVRAISON|REGLEMENT|OBSERVATIONS|FRANCO|Tarif|Eq\.\s*Bout|Fermeture|livraison|PONCEL|SAINT-MALO|SASHA|COCHET|Edition|VinoVentes|Page\s+\d/i.test(row)) continue;
+    if (/^\s*$/.test(row)) continue;
+
+    let name: string;
+    let qty: number;
+    let unitPrice: number | null;
+    let totalPrice: number | null;
+    let format: string | null = null;
+
+    const m = RE_ORDER_LINE.exec(row);
+    if (m) {
+      name = m[1].trim();
+      format = m[3];
+      qty = parseInt(m[4], 10);
+      unitPrice = cleanOrderPrice(m[5]);
+      totalPrice = cleanOrderPrice(m[6]);
+    } else {
+      const m2 = RE_ORDER_LINE_NO_COLOR.exec(row);
+      if (!m2) continue;
+      name = m2[1].trim();
+      format = m2[2];
+      qty = parseInt(m2[3], 10);
+      unitPrice = cleanOrderPrice(m2[4]);
+      totalPrice = cleanOrderPrice(m2[5]);
+    }
+
+    if (!name || name.length < 3 || !qty || !unitPrice) continue;
+
+    // Clean name: remove region prefix for shorter name, keep producer + wine
+    // "Vénétie / ITALO CESCON - CA DELLA SCALA VALPOLICELLA CLASSICO" → keep full
+    const cleanedName = name.replace(/\s+/g, " ").trim();
+
+    // Detect volume from format (0,750 = 750ml, 0,700 = 700ml)
+    const volumeMl = format ? Math.round(cleanOrderPrice(format)! * 1000) : null;
+
+    lines.push({
+      sku: null,
+      name: cleanedName,
+      quantity: qty,
+      unit: "pc",
+      unit_price: unitPrice,
+      total_price: totalPrice,
+      tax_rate: 20,
+      notes: null,
+      piece_weight_g: null,
+      piece_volume_ml: volumeMl,
+    });
+  }
+
+  return lines;
+}
+
 export function parseVinofloInvoiceText(text: string): ParsedInvoice {
+  // Auto-detect: order (bordereau) vs invoice (facture)
+  if (isVinofloOrder(text)) {
+    const meta = extractOrderMeta(text);
+    const lines = parseOrderLines(text);
+    return {
+      supplier: "VINOFLO",
+      invoice_number: meta.invoice_number ? `CMD-${meta.invoice_number}` : null,
+      invoice_date: meta.invoice_date,
+      total_ht: meta.total_ht,
+      total_ttc: meta.total_ttc,
+      lines,
+      raw_text_preview: text.slice(0, 2000),
+    };
+  }
+
+  // Fallback: original OCR invoice parser
   const meta = extractMeta(text);
   const lines = parseLines(text);
   return {
