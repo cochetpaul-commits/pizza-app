@@ -134,6 +134,12 @@ export default function InvoicesPage() {
     }
   }
 
+  function getEndpoint(mode: "preview" | "commit"): string {
+    if (selectedSupplier === "ai-parse") return "/api/invoices/ai-parse";
+    if (isImageFile(file!)) return "/api/invoices/photo";
+    return `/api/invoices/${selectedSupplier}`;
+  }
+
   async function handlePreview() {
     if (!file || !selectedSupplier) return;
     setLoading(true);
@@ -149,10 +155,15 @@ export default function InvoicesPage() {
       const etabSlug = selectedEtab === "piccola" ? "piccola_mia" : "bello_mio";
       if (isImageFile(file)) form.append("etablissement", etabSlug);
       const auth = getAuthHeader();
-      const endpoint = isImageFile(file) ? "/api/invoices/photo" : `/api/invoices/${selectedSupplier}`;
+      const endpoint = getEndpoint("preview");
       const res = await fetchApi(endpoint, {
         method: "POST",
-        headers: auth ? { Authorization: auth } : {},
+        headers: {
+          ...(auth ? { Authorization: auth } : {}),
+          "x-etablissement-id": etablissements.find(e =>
+            selectedEtab === "piccola" ? e.slug?.includes("piccola") : e.slug?.includes("bello")
+          )?.id ?? "",
+        },
         body: form,
       });
       const data: ImportResult = await res.json();
@@ -180,10 +191,15 @@ export default function InvoicesPage() {
       const etabSlug = selectedEtab === "piccola" ? "piccola_mia" : "bello_mio";
       if (isImageFile(file)) form.append("etablissement", etabSlug);
       const auth = getAuthHeader();
-      const endpoint = isImageFile(file) ? "/api/invoices/photo" : `/api/invoices/${selectedSupplier}`;
+      const endpoint = getEndpoint("commit");
       const res = await fetchApi(endpoint, {
         method: "POST",
-        headers: auth ? { Authorization: auth } : {},
+        headers: {
+          ...(auth ? { Authorization: auth } : {}),
+          "x-etablissement-id": etablissements.find(e =>
+            selectedEtab === "piccola" ? e.slug?.includes("piccola") : e.slug?.includes("bello")
+          )?.id ?? "",
+        },
         body: form,
       });
       const data: ImportResult = await res.json();
@@ -210,7 +226,9 @@ export default function InvoicesPage() {
   }
 
   const etabName = ETABS.find((e) => e.value === selectedEtab)?.name ?? selectedEtab;
-  const supplierName = SUPPLIERS.find((s) => s.slug === selectedSupplier)?.name ?? selectedSupplier;
+  const supplierName = selectedSupplier === "ai-parse"
+    ? (preview as Record<string, unknown>)?.supplier_detected as string ?? "Nouveau (IA)"
+    : SUPPLIERS.find((s) => s.slug === selectedSupplier)?.name ?? selectedSupplier;
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
@@ -352,6 +370,22 @@ export default function InvoicesPage() {
                           {s.name}
                         </button>
                       ))}
+                    </div>
+                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #f0ebe3" }}>
+                      <button type="button"
+                        onClick={() => setSelectedSupplier("ai-parse")}
+                        style={{
+                          ...pillBtn(selectedSupplier === "ai-parse"),
+                          borderColor: selectedSupplier === "ai-parse" ? "#D4775A" : "#D4775A50",
+                          color: selectedSupplier === "ai-parse" ? "#fff" : "#D4775A",
+                          background: selectedSupplier === "ai-parse" ? "#D4775A" : "#D4775A08",
+                          fontWeight: 700,
+                        }}>
+                        Nouveau fournisseur (IA)
+                      </button>
+                      <span style={{ fontSize: 11, color: "#999", marginLeft: 8 }}>
+                        L&apos;IA detecte et cree le fournisseur automatiquement
+                      </span>
                     </div>
                   </div>
                 </div>
