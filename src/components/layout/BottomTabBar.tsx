@@ -211,7 +211,7 @@ const SECTION_PERSONNEL: TabSection = {
 const SECTION_PILOTAGE: TabSection = {
   label: "Pilotage",
   href: "/ventes",
-  match: ["/ventes"],
+  match: ["/ventes", "/tresorerie"],
   icon: (a) => <IconWallet active={a} />,
   tabs: [
     { label: "Marges", href: "/ventes/marges", match: ["/ventes/marges"], icon: (a) => <IconWallet active={a} /> },
