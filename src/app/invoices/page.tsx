@@ -6,11 +6,6 @@ import { RequireRole } from "@/components/RequireRole";
 import { fetchApi } from "@/lib/fetchApi";
 import { useEtablissement } from "@/lib/EtablissementContext";
 
-type DetectionResult = {
-  supplier: { slug: string; name: string; matchedKeyword: string } | null;
-  etablissement: { slug: string; name: string; matchedKeyword: string } | null;
-};
-
 type InvoiceLine = {
   sku?: string | null;
   name?: string | null;
@@ -58,41 +53,24 @@ const SUPPLIERS = [
 ];
 
 const ETABS = [
-  { slug: "bello_mio", name: "Bello Mio", value: "bellomio" as const },
-  { slug: "piccola_mia", name: "Piccola Mia", value: "piccola" as const },
+  { name: "Bello Mio", value: "bellomio" as const },
+  { name: "Piccola Mia", value: "piccola" as const },
 ];
 
-type Step = "upload" | "confirm" | "preview" | "done" | "batch";
-
-type BatchItem = {
-  file: File;
-  status: "pending" | "processing" | "done" | "error";
-  supplier?: string;
-  result?: { ingredients_created?: number; offers_inserted?: number; already_imported?: boolean };
-  error?: string;
-};
+type Step = "select" | "preview" | "done";
 
 export default function InvoicesPage() {
   const fileRef = useRef<HTMLInputElement>(null);
-  const batchRef = useRef<HTMLInputElement>(null);
   const { etablissements } = useEtablissement();
 
-  const [step, setStep] = useState<Step>("upload");
+  const [step, setStep] = useState<Step>("select");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Batch mode
-  const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
-  const [batchRunning, setBatchRunning] = useState(false);
-  const [batchEtab, setBatchEtab] = useState<string>("bellomio");
-
-  // Detection
-  const [detection, setDetection] = useState<DetectionResult | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<string | null>(null);
   const [selectedEtab, setSelectedEtab] = useState<string>("bellomio");
 
-  // Import results
   const [preview, setPreview] = useState<ImportResult | null>(null);
   const [commitResult, setCommitResult] = useState<ImportResult | null>(null);
 
@@ -110,73 +88,34 @@ export default function InvoicesPage() {
     return "";
   }
 
-  function isImageFile(f: File): boolean {
-    return f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic)$/i.test(f.name);
+  function getEtabId(): string {
+    return etablissements.find(e =>
+      selectedEtab === "piccola" ? e.slug?.includes("piccola") : e.slug?.includes("bello")
+    )?.id ?? "";
   }
 
-  async function handleFileUpload(f: File) {
-    setFile(f);
-    setError(null);
-    setLoading(true);
-
-    try {
-      const form = new FormData();
-      form.append("file", f);
-      // Images go through Vision OCR endpoint, PDFs through standard detect
-      const endpoint = isImageFile(f) ? "/api/invoices/photo" : "/api/invoices/detect";
-      if (isImageFile(f)) form.append("mode", "detect");
-      const res = await fetchApi(endpoint, { method: "POST", body: form });
-      if (!res.ok) {
-        const text = await res.text();
-        let msg = `Erreur ${res.status}`;
-        try { const j = JSON.parse(text); msg = j.error ?? msg; } catch { /* not JSON */ }
-        throw new Error(msg);
-      }
-      const data = await res.json();
-      if (data.ok === false) throw new Error(data.error ?? "Erreur OCR");
-      setDetection(data.detection);
-      setSelectedSupplier(data.detection?.supplier?.slug ?? null);
-      if (data.detection?.etablissement?.slug === "bello_mio") setSelectedEtab("bellomio");
-      else if (data.detection?.etablissement?.slug === "piccola_mia") setSelectedEtab("piccola");
-      setStep("confirm");
-    } catch (e: unknown) {
-      console.error("[invoices] upload error:", e, "type:", typeof e);
-      if (e instanceof Error) console.error("[invoices] stack:", e.stack);
-      setError(e instanceof Error ? `${e.name}: ${e.message}` : String(e));
-    } finally {
-      setLoading(false);
+  async function handleUpload(f: File) {
+    if (!selectedSupplier) return;
+    if (!f.name.toLowerCase().endsWith(".pdf") && f.type !== "application/pdf") {
+      setError("Seuls les fichiers PDF sont acceptes.");
+      return;
     }
-  }
-
-  function getEndpoint(_mode: "preview" | "commit"): string {
-    if (selectedSupplier === "ai-parse") return "/api/invoices/ai-parse";
-    if (isImageFile(file!)) return "/api/invoices/photo";
-    return `/api/invoices/${selectedSupplier}`;
-  }
-
-  async function handlePreview() {
-    if (!file || !selectedSupplier) return;
+    setFile(f);
     setLoading(true);
     setError(null);
     setPreview(null);
 
     try {
       const form = new FormData();
-      form.append("file", file);
+      form.append("file", f);
       form.append("mode", "preview");
       form.append("establishment", selectedEtab);
-      if (isImageFile(file)) form.append("fournisseur", selectedSupplier);
-      const etabSlug = selectedEtab === "piccola" ? "piccola_mia" : "bello_mio";
-      if (isImageFile(file)) form.append("etablissement", etabSlug);
       const auth = getAuthHeader();
-      const endpoint = getEndpoint("preview");
-      const res = await fetchApi(endpoint, {
+      const res = await fetchApi(`/api/invoices/${selectedSupplier}`, {
         method: "POST",
         headers: {
           ...(auth ? { Authorization: auth } : {}),
-          "x-etablissement-id": etablissements.find(e =>
-            selectedEtab === "piccola" ? e.slug?.includes("piccola") : e.slug?.includes("bello")
-          )?.id ?? "",
+          "x-etablissement-id": getEtabId(),
         },
         body: form,
       });
@@ -201,18 +140,12 @@ export default function InvoicesPage() {
       form.append("file", file);
       form.append("mode", "commit");
       form.append("establishment", selectedEtab);
-      if (isImageFile(file)) form.append("fournisseur", selectedSupplier);
-      const etabSlug = selectedEtab === "piccola" ? "piccola_mia" : "bello_mio";
-      if (isImageFile(file)) form.append("etablissement", etabSlug);
       const auth = getAuthHeader();
-      const endpoint = getEndpoint("commit");
-      const res = await fetchApi(endpoint, {
+      const res = await fetchApi(`/api/invoices/${selectedSupplier}`, {
         method: "POST",
         headers: {
           ...(auth ? { Authorization: auth } : {}),
-          "x-etablissement-id": etablissements.find(e =>
-            selectedEtab === "piccola" ? e.slug?.includes("piccola") : e.slug?.includes("bello")
-          )?.id ?? "",
+          "x-etablissement-id": getEtabId(),
         },
         body: form,
       });
@@ -228,299 +161,96 @@ export default function InvoicesPage() {
   }
 
   function reset() {
-    setStep("upload");
+    setStep("select");
     setFile(null);
-    setDetection(null);
     setSelectedSupplier(null);
     setSelectedEtab("bellomio");
     setPreview(null);
     setCommitResult(null);
     setError(null);
-    setBatchItems([]);
     if (fileRef.current) fileRef.current.value = "";
-    if (batchRef.current) batchRef.current.value = "";
-  }
-
-  // ── Batch import ──
-  function handleBatchFiles(files: FileList) {
-    const items: BatchItem[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i];
-      if (f.name.toLowerCase().endsWith(".pdf") || f.type === "application/pdf" || f.type.startsWith("image/")) {
-        items.push({ file: f, status: "pending" });
-      }
-    }
-    if (items.length === 0) { setError("Aucun fichier PDF ou image selectionne."); return; }
-    setBatchItems(items);
-    setStep("batch");
-  }
-
-  async function runBatch() {
-    setBatchRunning(true);
-    const auth = getAuthHeader();
-    const etabId = etablissements.find(e =>
-      batchEtab === "piccola" ? e.slug?.includes("piccola") : e.slug?.includes("bello")
-    )?.id ?? "";
-
-    for (let i = 0; i < batchItems.length; i++) {
-      const item = batchItems[i];
-      setBatchItems(prev => prev.map((p, j) => j === i ? { ...p, status: "processing" } : p));
-
-      try {
-        const form = new FormData();
-        form.append("file", item.file);
-        form.append("mode", "commit");
-        form.append("establishment", batchEtab);
-
-        // Try ai-parse which handles both known and unknown suppliers
-        const res = await fetchApi("/api/invoices/ai-parse", {
-          method: "POST",
-          headers: {
-            ...(auth ? { Authorization: auth } : {}),
-            "x-etablissement-id": etabId,
-          },
-          body: form,
-        });
-        const data = await res.json();
-
-        if (!data.ok) throw new Error(data.error ?? "Erreur import");
-
-        setBatchItems(prev => prev.map((p, j) => j === i ? {
-          ...p,
-          status: "done",
-          supplier: data.supplier_detected ?? "Inconnu",
-          result: {
-            ingredients_created: data.inserted?.ingredients_created ?? 0,
-            offers_inserted: data.inserted?.offers_inserted ?? 0,
-            already_imported: data.invoice?.already_imported ?? false,
-          },
-        } : p));
-      } catch (e) {
-        setBatchItems(prev => prev.map((p, j) => j === i ? {
-          ...p,
-          status: "error",
-          error: e instanceof Error ? e.message : String(e),
-        } : p));
-      }
-    }
-    setBatchRunning(false);
   }
 
   const etabName = ETABS.find((e) => e.value === selectedEtab)?.name ?? selectedEtab;
-  const supplierName = selectedSupplier === "ai-parse"
-    ? (preview as Record<string, unknown>)?.supplier_detected as string ?? "Nouveau (IA)"
-    : SUPPLIERS.find((s) => s.slug === selectedSupplier)?.name ?? selectedSupplier;
+  const supplierName = SUPPLIERS.find((s) => s.slug === selectedSupplier)?.name ?? selectedSupplier;
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={pageStyle}>
         <h1 style={h1Style}>Import factures</h1>
 
-        {error && (
-          <div style={errorBox}>{error}</div>
-        )}
+        {error && <div style={errorBox}>{error}</div>}
 
-        {/* ════════════ STEP 1: Upload ════════════ */}
-        {step === "upload" && (
+        {/* ════════════ STEP 1: Sélection fournisseur + étab + upload ════════════ */}
+        {step === "select" && (
           <>
+            {/* Etablissement */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={sectionLabel}>Etablissement</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {ETABS.map((e) => (
+                  <button key={e.value} type="button"
+                    onClick={() => setSelectedEtab(e.value)}
+                    style={pillBtn(selectedEtab === e.value)}>
+                    {e.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Fournisseur */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={sectionLabel}>Fournisseur</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {SUPPLIERS.map((s) => (
+                  <button key={s.slug} type="button"
+                    onClick={() => setSelectedSupplier(s.slug)}
+                    style={pillBtn(selectedSupplier === s.slug)}>
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Upload zone */}
             <div
-              style={dropZone(!!file)}
-              onClick={() => fileRef.current?.click()}
+              style={{
+                ...dropZone,
+                opacity: selectedSupplier ? 1 : 0.4,
+                pointerEvents: selectedSupplier ? "auto" : "none",
+              }}
+              onClick={() => selectedSupplier && fileRef.current?.click()}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
-                const files = e.dataTransfer.files;
-                if (files.length > 1) {
-                  handleBatchFiles(files);
-                } else if (files[0]) {
-                  handleFileUpload(files[0]);
-                }
+                const f = e.dataTransfer.files[0];
+                if (f) handleUpload(f);
               }}
             >
               <input
                 ref={fileRef}
                 type="file"
                 style={{ display: "none" }}
-                accept=".pdf,.jpg,.jpeg,.png,.webp,image/*"
+                accept=".pdf,application/pdf"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (!f) return;
-                  const ext = f.name.toLowerCase();
-                  const isImage = f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic)$/i.test(ext);
-                  const isPdf = ext.endsWith(".pdf") || f.type === "application/pdf";
-                  if (!isPdf && !isImage) {
-                    setError("Formats acceptes : PDF, JPG, PNG, WebP.");
-                    return;
-                  }
-                  handleFileUpload(f);
+                  if (f) handleUpload(f);
                 }}
               />
-              <div style={{ fontSize: 32, marginBottom: 8 }}>📄 📷</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
-                {loading ? "Analyse en cours..." : "Glisser une facture ici"}
+                {loading ? "Analyse en cours..." : selectedSupplier ? "Glisser un PDF ici ou cliquer" : "Selectionnez un fournisseur"}
               </div>
               <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
-                PDF ou photo (JPG, PNG) — cliquer pour parcourir
-              </div>
-            </div>
-
-            <p style={{ fontSize: 12, color: "#999", textAlign: "center", marginTop: 12 }}>
-              Le fournisseur et l&apos;etablissement seront detectes automatiquement.
-              Les photos sont analysees par OCR (Google Vision).
-            </p>
-
-            {/* Batch upload */}
-            <div style={{ textAlign: "center", marginTop: 16 }}>
-              <input ref={batchRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,image/*" style={{ display: "none" }}
-                onChange={(e) => { if (e.target.files && e.target.files.length > 0) handleBatchFiles(e.target.files); }} />
-              <button type="button" onClick={() => batchRef.current?.click()}
-                style={{ padding: "10px 24px", borderRadius: 10, border: "1.5px solid #D4775A", background: "#fff", color: "#D4775A", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                Importer plusieurs factures
-              </button>
-            </div>
-
-            {/* Quick links to legacy pages */}
-            <div style={{ marginTop: 32, borderTop: "1px solid #f0ebe3", paddingTop: 16 }}>
-              <div style={{ fontSize: 11, color: "#999", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-                Import par fournisseur
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {SUPPLIERS.map((s) => {
-                  const available = etablissements.length > 0;
-                  return (
-                    <a key={s.slug} href={`/invoices/${s.slug}`}
-                      style={{ ...pillBtnBase, opacity: available ? 1 : 0.5, textDecoration: "none" }}>
-                      {s.name}
-                    </a>
-                  );
-                })}
+                {selectedSupplier ? `${supplierName} → ${etabName}` : ""}
               </div>
             </div>
           </>
         )}
 
-        {/* ════════════ STEP 2: Confirmation ════════════ */}
-        {step === "confirm" && detection && (
-          <div style={confirmCard}>
-            {/* Etablissement */}
-            <div style={confirmSection}>
-              {detection.etablissement ? (
-                <div style={confirmRow}>
-                  <span style={checkBadge(true)}>✓</span>
-                  <div>
-                    <div style={confirmLabel}>Etablissement</div>
-                    <div style={confirmValue}>{detection.etablissement.name}</div>
-                    <div style={confirmHint}>
-                      Detecte via &quot;{detection.etablissement.matchedKeyword}&quot;
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div style={confirmRow}>
-                  <span style={checkBadge(false)}>⚠</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={confirmLabel}>Etablissement non detecte</div>
-                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                      {ETABS.map((e) => (
-                        <button key={e.value} type="button"
-                          onClick={() => setSelectedEtab(e.value)}
-                          style={pillBtn(selectedEtab === e.value)}>
-                          {e.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Fournisseur */}
-            <div style={confirmSection}>
-              {detection.supplier ? (
-                <div style={confirmRow}>
-                  <span style={checkBadge(true)}>✓</span>
-                  <div>
-                    <div style={confirmLabel}>Fournisseur</div>
-                    <div style={confirmValue}>{detection.supplier.name}</div>
-                    <div style={confirmHint}>
-                      Detecte via &quot;{detection.supplier.matchedKeyword}&quot;
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div style={confirmRow}>
-                  <span style={checkBadge(false)}>⚠</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={confirmLabel}>Fournisseur non detecte</div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                      {SUPPLIERS.filter((s) => {
-                        if (selectedEtab === "piccola") {
-                          return ["mael", "metro", "cozigou", "carniato"].includes(s.slug);
-                        }
-                        return true;
-                      }).map((s) => (
-                        <button key={s.slug} type="button"
-                          onClick={() => setSelectedSupplier(s.slug)}
-                          style={pillBtn(selectedSupplier === s.slug)}>
-                          {s.name}
-                        </button>
-                      ))}
-                    </div>
-                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #f0ebe3" }}>
-                      <button type="button"
-                        onClick={() => setSelectedSupplier("ai-parse")}
-                        style={{
-                          ...pillBtn(selectedSupplier === "ai-parse"),
-                          borderColor: selectedSupplier === "ai-parse" ? "#D4775A" : "#D4775A50",
-                          color: selectedSupplier === "ai-parse" ? "#fff" : "#D4775A",
-                          background: selectedSupplier === "ai-parse" ? "#D4775A" : "#D4775A08",
-                          fontWeight: 700,
-                        }}>
-                        Nouveau fournisseur (IA)
-                      </button>
-                      <span style={{ fontSize: 11, color: "#999", marginLeft: 8 }}>
-                        L&apos;IA detecte et cree le fournisseur automatiquement
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Override button */}
-            {(detection.etablissement || detection.supplier) && (
-              <div style={{ borderTop: "1px solid #f0ebe3", paddingTop: 12, marginTop: 4 }}>
-                <button type="button" onClick={() => {
-                  setDetection({ supplier: null, etablissement: null });
-                }} style={{ fontSize: 12, color: "#999", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
-                  Modifier manuellement
-                </button>
-              </div>
-            )}
-
-            {/* File info */}
-            <div style={{ fontSize: 12, color: "#6f6a61", marginTop: 12 }}>
-              📄 {file?.name}
-            </div>
-
-            {/* Actions */}
-            <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
-              <button type="button" onClick={reset} style={cancelBtnStyle}>
-                Annuler
-              </button>
-              <button type="button" onClick={handlePreview}
-                disabled={loading || !selectedSupplier}
-                style={{ ...primaryBtnStyle, opacity: loading || !selectedSupplier ? 0.5 : 1 }}>
-                {loading ? "Analyse..." : "Confirmer et analyser"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ════════════ STEP 3: Preview ════════════ */}
+        {/* ════════════ STEP 2: Preview ════════════ */}
         {step === "preview" && preview?.parsed && (
           <>
-            <div style={confirmCard}>
+            <div style={card}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1 }}>
@@ -583,110 +313,9 @@ export default function InvoicesPage() {
           </>
         )}
 
-        {/* ════════════ BATCH MODE ════════════ */}
-        {step === "batch" && (
-          <div style={confirmCard}>
-            <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777", marginBottom: 16 }}>
-              Import multiple — {batchItems.length} fichier{batchItems.length > 1 ? "s" : ""}
-            </div>
-
-            {/* Etab selector */}
-            {!batchRunning && batchItems.every(b => b.status === "pending") && (
-              <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
-                <span style={{ fontSize: 12, color: "#666" }}>Etablissement :</span>
-                {ETABS.map(e => (
-                  <button key={e.value} type="button" onClick={() => setBatchEtab(e.value)}
-                    style={pillBtn(batchEtab === e.value)}>
-                    {e.name}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* File list */}
-            <div style={{ marginBottom: 16 }}>
-              {batchItems.map((item, i) => (
-                <div key={i} style={{
-                  display: "flex", alignItems: "center", gap: 12,
-                  padding: "10px 14px", borderRadius: 10,
-                  background: item.status === "done" ? "#f0fdf4" : item.status === "error" ? "#fef2f2" : item.status === "processing" ? "#fffbeb" : "#fff",
-                  border: `1px solid ${item.status === "done" ? "#bbf7d0" : item.status === "error" ? "#fecaca" : item.status === "processing" ? "#fde68a" : "#e0d8ce"}`,
-                  marginBottom: 6,
-                }}>
-                  {/* Status icon */}
-                  <span style={{ fontSize: 16, flexShrink: 0 }}>
-                    {item.status === "pending" && "📄"}
-                    {item.status === "processing" && "⏳"}
-                    {item.status === "done" && "✅"}
-                    {item.status === "error" && "❌"}
-                  </span>
-
-                  {/* File info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {item.file.name}
-                    </div>
-                    {item.status === "done" && item.supplier && (
-                      <div style={{ fontSize: 11, color: "#4a6741" }}>
-                        {item.supplier}
-                        {item.result?.already_imported ? " — deja importe" : ` — ${item.result?.ingredients_created ?? 0} ingredients, ${item.result?.offers_inserted ?? 0} offres`}
-                      </div>
-                    )}
-                    {item.status === "error" && (
-                      <div style={{ fontSize: 11, color: "#DC2626" }}>{item.error}</div>
-                    )}
-                    {item.status === "processing" && (
-                      <div style={{ fontSize: 11, color: "#D97706" }}>Analyse en cours...</div>
-                    )}
-                  </div>
-
-                  {/* Size */}
-                  <span style={{ fontSize: 11, color: "#999", flexShrink: 0 }}>
-                    {(item.file.size / 1024).toFixed(0)} Ko
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Progress */}
-            {batchRunning && (() => {
-              const done = batchItems.filter(b => b.status === "done" || b.status === "error").length;
-              const pct = Math.round((done / batchItems.length) * 100);
-              return (
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#666", marginBottom: 4 }}>
-                    <span>{done}/{batchItems.length} traites</span>
-                    <span>{pct}%</span>
-                  </div>
-                  <div style={{ height: 6, background: "#e0d8ce", borderRadius: 3, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${pct}%`, background: "#4a6741", borderRadius: 3, transition: "width 0.3s" }} />
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Actions */}
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button type="button" onClick={reset} style={cancelBtnStyle}>
-                {batchRunning ? "Fermer" : "Annuler"}
-              </button>
-              {!batchRunning && batchItems.some(b => b.status === "pending") && (
-                <button type="button" onClick={runBatch} style={primaryBtnStyle}>
-                  Lancer l&apos;import ({batchItems.filter(b => b.status === "pending").length} fichiers)
-                </button>
-              )}
-              {!batchRunning && batchItems.every(b => b.status !== "pending") && (
-                <button type="button" onClick={reset} style={primaryBtnStyle}>
-                  Terminer
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ════════════ STEP 4: Done ════════════ */}
+        {/* ════════════ STEP 3: Done ════════════ */}
         {step === "done" && commitResult && (
-          <div style={{ ...confirmCard, textAlign: "center" }}>
+          <div style={{ ...card, textAlign: "center" }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
             <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>
               Import termine
@@ -740,69 +369,30 @@ const h1Style: React.CSSProperties = {
   color: "#1a1a1a",
 };
 
-const dropZone = (hasFile: boolean): React.CSSProperties => ({
+const sectionLabel: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: 1,
+  color: "#999",
+  marginBottom: 8,
+};
+
+const dropZone: React.CSSProperties = {
   border: "2px dashed #ddd6c8",
   borderRadius: 12,
   padding: "40px 20px",
   textAlign: "center",
   cursor: "pointer",
-  background: hasFile ? "#f0fdf4" : "#faf8f4",
-  transition: "border-color 0.2s",
-});
+  background: "#faf8f4",
+  transition: "border-color 0.2s, opacity 0.2s",
+};
 
-const confirmCard: React.CSSProperties = {
+const card: React.CSSProperties = {
   background: "#fff",
   borderRadius: 12,
   border: "1px solid #ddd6c8",
   padding: "20px 22px",
-};
-
-const confirmSection: React.CSSProperties = {
-  paddingBottom: 14,
-  marginBottom: 14,
-  borderBottom: "1px solid #f0ebe3",
-};
-
-const confirmRow: React.CSSProperties = {
-  display: "flex",
-  alignItems: "flex-start",
-  gap: 12,
-};
-
-const checkBadge = (ok: boolean): React.CSSProperties => ({
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  width: 28,
-  height: 28,
-  borderRadius: "50%",
-  fontSize: 14,
-  fontWeight: 700,
-  flexShrink: 0,
-  marginTop: 2,
-  background: ok ? "#e8ede6" : "#FFF3E0",
-  color: ok ? "#4a6741" : "#E65100",
-});
-
-const confirmLabel: React.CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
-  color: "#6f6a61",
-  textTransform: "uppercase",
-  letterSpacing: 0.5,
-};
-
-const confirmValue: React.CSSProperties = {
-  fontSize: 16,
-  fontWeight: 700,
-  color: "#1a1a1a",
-  marginTop: 2,
-};
-
-const confirmHint: React.CSSProperties = {
-  fontSize: 11,
-  color: "#999",
-  marginTop: 2,
 };
 
 const errorBox: React.CSSProperties = {
@@ -825,17 +415,6 @@ const pillBtn = (active: boolean): React.CSSProperties => ({
   fontWeight: 700,
   cursor: "pointer",
 });
-
-const pillBtnBase: React.CSSProperties = {
-  padding: "5px 12px",
-  borderRadius: 8,
-  border: "1px solid #ddd6c8",
-  background: "#fff",
-  color: "#374151",
-  fontSize: 12,
-  fontWeight: 600,
-  cursor: "pointer",
-};
 
 const primaryBtnStyle: React.CSSProperties = {
   display: "inline-flex",

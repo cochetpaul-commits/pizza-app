@@ -222,11 +222,11 @@ const SECTION_PILOTAGE: TabSection = {
 const SECTION_ACHATS: TabSection = {
   label: "Achats",
   href: "/commandes",
-  match: ["/achats", "/commandes", "/ingredients", "/invoices", "/fournisseurs", "/stats-achats", "/factures-auto"],
+  match: ["/achats", "/commandes", "/ingredients", "/invoices", "/fournisseurs", "/stats-achats"],
   icon: (a) => <IconShoppingBag active={a} />,
   tabs: [
     { label: "Commandes", href: "/commandes", match: ["/commandes"], icon: (a) => <IconTruck active={a} /> },
-    { label: "Factures", href: "/achats", match: ["/achats", "/invoices", "/factures-auto"], icon: (a) => <IconFileText active={a} /> },
+    { label: "Factures", href: "/achats", match: ["/achats", "/invoices"], icon: (a) => <IconFileText active={a} /> },
     { label: "Produits", href: "/ingredients", match: ["/ingredients"], icon: (a) => <IconTag active={a} /> },
   ],
 };
