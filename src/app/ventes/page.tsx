@@ -117,6 +117,7 @@ export default function PerformancesPage() {
   const [briefingLoading, setBriefingLoading] = useState(false);
   const [mixDDOpen, setMixDDOpen] = useState<{ label: string; color: string } | null>(null);
   const [placeDetail, setPlaceDetail] = useState<"sur" | "emp" | null>(null);
+  const [expandedCat, setExpandedCat] = useState<string | null>(null);
   const [meteo, setMeteo] = useState<Record<string, { emoji: string; desc: string; temp: number }>>({});
 
   // Comparison state
@@ -559,16 +560,43 @@ export default function PerformancesPage() {
             <div style={S.card}>
               <div style={S.sec}>Upsell · performance de la periode</div>
               <div className="ventes-upsell-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
-                <UpsellCard label="Antipasti" emoji="🥗" data={W.ratios.anti} totalTables={W.tickets} totalCov={W.couverts} color="#D4775A" targets={{ ok: 30, good: 50, avgPrice: 12 }} mode={mode} action="Suggerer en debut de service" />
-                <UpsellCard label="Desserts" emoji="🍮" data={W.ratios.dolci} totalTables={W.tickets} totalCov={W.couverts} color="#b5904a" targets={{ ok: 80, good: 100, avgPrice: 9 }} mode={mode} action="Proposer systematiquement en fin de plat" />
-                <UpsellCard label="Vins" emoji="🍷" data={W.ratios.vin} totalTables={W.tickets} totalCov={W.couverts} color="#7c5c3a" targets={{ ok: 60, good: 80, avgPrice: 6 }} mode={mode} action="Suggerer un verre a l'ouverture du menu" />
+                <UpsellCard label="Antipasti" emoji="🥗" data={W.ratios.anti} totalTables={W.tickets} totalCov={W.couverts} color="#D4775A" targets={{ ok: 30, good: 50, avgPrice: 12 }} mode={mode} action="Suggerer en debut de service" onClick={() => setExpandedCat(expandedCat === "Antipasti" ? null : "Antipasti")} active={expandedCat === "Antipasti"} />
+                <UpsellCard label="Desserts" emoji="🍮" data={W.ratios.dolci} totalTables={W.tickets} totalCov={W.couverts} color="#b5904a" targets={{ ok: 80, good: 100, avgPrice: 9 }} mode={mode} action="Proposer systematiquement en fin de plat" onClick={() => setExpandedCat(expandedCat === "Dolci" ? null : "Dolci")} active={expandedCat === "Dolci"} />
+                <UpsellCard label="Vins" emoji="🍷" data={W.ratios.vin} totalTables={W.tickets} totalCov={W.couverts} color="#7c5c3a" targets={{ ok: 60, good: 80, avgPrice: 6 }} mode={mode} action="Suggerer un verre a l'ouverture du menu" onClick={() => setExpandedCat(expandedCat === "Vins" ? null : "Vins")} active={expandedCat === "Vins"} />
               </div>
               <div className="ventes-upsell-mini-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 14 }}>
-                <UpsellCardMini label="Alcool (hors vin)" emoji="🍹" data={W.ratios.alcool} totalTables={W.tickets} color="#c15f2e" mode={mode} />
-                <UpsellCardMini label="Boissons (tout)" emoji="🥤" data={W.ratios.boissons} totalTables={W.tickets} color="#5e7a8a" mode={mode} />
-                <UpsellCardMini label="Cafe / Chaud" emoji="☕" data={W.ratios.cafe} totalTables={W.tickets} color="#6f5c3a" mode={mode} />
-                <UpsellCardMini label="Digestifs" emoji="🥃" data={W.ratios.digestif} totalTables={W.tickets} color="#46655a" mode={mode} />
+                <UpsellCardMini label="Alcool (hors vin)" emoji="🍹" data={W.ratios.alcool} totalTables={W.tickets} color="#c15f2e" mode={mode} onClick={() => setExpandedCat(expandedCat === "Alcool" ? null : "Alcool")} active={expandedCat === "Alcool"} />
+                <UpsellCardMini label="Boissons (tout)" emoji="🥤" data={W.ratios.boissons} totalTables={W.tickets} color="#5e7a8a" mode={mode} onClick={() => setExpandedCat(expandedCat === "Boissons" ? null : "Boissons")} active={expandedCat === "Boissons"} />
+                <UpsellCardMini label="Cafe / Chaud" emoji="☕" data={W.ratios.cafe} totalTables={W.tickets} color="#6f5c3a" mode={mode} onClick={() => setExpandedCat(expandedCat === "Boissons chaudes" ? null : "Boissons chaudes")} active={expandedCat === "Boissons chaudes"} />
+                <UpsellCardMini label="Digestifs" emoji="🥃" data={W.ratios.digestif} totalTables={W.tickets} color="#46655a" mode={mode} onClick={() => setExpandedCat(expandedCat === "Digestifs" ? null : "Digestifs")} active={expandedCat === "Digestifs"} />
               </div>
+              {/* Expanded category detail */}
+              {expandedCat && W.cat_products[expandedCat] && (() => {
+                const products = W.cat_products[expandedCat];
+                const totalCA = products.reduce((s, p) => s + (mode === "ttc" ? p.ca_ttc : p.ca_ht), 0);
+                const totalQty = products.reduce((s, p) => s + p.qty, 0);
+                return (
+                  <div style={{ marginTop: 14, borderTop: "2px solid rgba(0,0,0,0.06)", paddingTop: 14 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                      <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
+                        Detail {expandedCat}
+                      </div>
+                      <div style={{ display: "flex", gap: 16, fontSize: 13 }}>
+                        <span style={{ color: "#777" }}>{totalQty} articles</span>
+                        <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, color: accent }}>{fmt(totalCA)}</span>
+                      </div>
+                    </div>
+                    {products.slice(0, 15).map((p, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: i < Math.min(products.length, 15) - 1 ? "1px solid #f0ebe3" : "none" }}>
+                        <span style={{ fontSize: 12, color: "#333", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.n}</span>
+                        <span style={{ fontSize: 11, color: "#999", marginLeft: 8, flexShrink: 0 }}>x{p.qty}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: accent, marginLeft: 12, flexShrink: 0, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{fmt(mode === "ttc" ? p.ca_ttc : p.ca_ht)}</span>
+                      </div>
+                    ))}
+                    {products.length > 15 && <div style={{ fontSize: 11, color: "#999", marginTop: 6 }}>+{products.length - 15} autres produits</div>}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Duration & Rotation */}
@@ -671,9 +699,18 @@ export default function PerformancesPage() {
                     <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".12em", color, marginBottom: 12 }}>
                       Detail {label}
                     </div>
-                    {cats.map(([cat, items]) => (
+                    {cats.map(([cat, items]) => {
+                      const catTotal = items.reduce((s, p) => s + (mode === "ttc" ? p.ca_ttc : p.ca_ht), 0);
+                      const catQty = items.reduce((s, p) => s + p.qty, 0);
+                      return (
                       <div key={cat} style={{ marginBottom: 14 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", marginBottom: 6, textTransform: "uppercase", letterSpacing: ".05em" }}>{cat}</div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", textTransform: "uppercase", letterSpacing: ".05em" }}>{cat}</span>
+                          <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                            <span style={{ fontSize: 10, color: "#999" }}>{catQty} art.</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{fmt(catTotal)}</span>
+                          </span>
+                        </div>
                         {items.slice(0, 10).map((p, i) => (
                           <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: i < Math.min(items.length, 10) - 1 ? "1px solid #f0ebe3" : "none" }}>
                             <span style={{ fontSize: 12, color: "#333", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.n}</span>
@@ -683,7 +720,8 @@ export default function PerformancesPage() {
                         ))}
                         {items.length > 10 && <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>+{items.length - 10} autres</div>}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 );
               })()}
@@ -979,9 +1017,10 @@ function DeltaBadge({ cur, prev, decimals = 0, suffix = "" }: { cur: number; pre
 
 type UpsellData = { tables: number; coverts: number; ca_ttc: number; ca_ht: number };
 
-function UpsellCard({ label, emoji, data, totalTables, totalCov, color, targets, mode, action }: {
+function UpsellCard({ label, emoji, data, totalTables, totalCov, color, targets, mode, action, onClick, active }: {
   label: string; emoji: string; data: UpsellData; totalTables: number; totalCov: number; color: string;
   targets: { ok: number; good: number; avgPrice: number }; mode: string; action: string;
+  onClick?: () => void; active?: boolean;
 }) {
   const pct = totalTables > 0 ? Math.round(data.tables / totalTables * 100) : 0;
   const pctCov = totalCov > 0 ? Math.round(data.coverts / totalCov * 100) : 0;
@@ -995,7 +1034,7 @@ function UpsellCard({ label, emoji, data, totalTables, totalCov, color, targets,
     : { t: "\u2191 A travailler", c: "#c62828", bg: "#ffebee" };
 
   return (
-    <div style={{ padding: "14px 16px", background: "#f9f6f0", borderRadius: 10, height: "100%" }}>
+    <div onClick={onClick} style={{ padding: "14px 16px", background: active ? `${color}10` : "#f9f6f0", borderRadius: 10, height: "100%", cursor: onClick ? "pointer" : "default", border: active ? `1.5px solid ${color}30` : "1.5px solid transparent", transition: "all 0.15s" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <span style={{ fontSize: 18 }}>{emoji}</span>
         <span style={{ fontSize: 12, fontWeight: 600 }}>{label}</span>
@@ -1041,13 +1080,14 @@ function UpsellCard({ label, emoji, data, totalTables, totalCov, color, targets,
   );
 }
 
-function UpsellCardMini({ label, emoji, data, totalTables, color, mode }: {
+function UpsellCardMini({ label, emoji, data, totalTables, color, mode, onClick, active }: {
   label: string; emoji: string; data: UpsellData; totalTables: number; color: string; mode: string;
+  onClick?: () => void; active?: boolean;
 }) {
   const pct = totalTables > 0 ? Math.round(data.tables / totalTables * 100) : 0;
   const ca = mode === "ttc" ? data.ca_ttc : data.ca_ht;
   return (
-    <div style={{ padding: "12px 14px", background: "#f9f6f0", borderRadius: 10 }}>
+    <div onClick={onClick} style={{ padding: "12px 14px", background: active ? `${color}10` : "#f9f6f0", borderRadius: 10, cursor: onClick ? "pointer" : "default", border: active ? `1.5px solid ${color}30` : "1.5px solid transparent", transition: "all 0.15s" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
         <span style={{ fontSize: 14 }}>{emoji}</span>
         <span style={{ fontSize: 10, fontWeight: 600 }}>{label}</span>
