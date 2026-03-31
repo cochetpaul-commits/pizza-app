@@ -122,9 +122,66 @@ function categorize(label: string, amount: number): string {
     return "prelevement";
   }
 
+  // Known supplier prelevements
+  if (upper.includes("METRO") || upper.includes("TERREAZUR") || upper.includes("CARNIATO") ||
+      upper.includes("COZIGOU") || upper.includes("VINOFLO") || upper.includes("MAEL") ||
+      upper.includes("BAR SPIRITS") || upper.includes("MYSPIRITS") ||
+      upper.includes("MASSE") || upper.includes("SDPF") || upper.includes("ELIEN")) {
+    return "fournisseur";
+  }
+
+  // Salaries
+  if (upper.includes("SALAIRE") || upper.includes("PAIE") ||
+      (upper.includes("VIR") && /\b(MARQUET|KERROC|REMOND|PEDRON|AFFUTAGE)\b/.test(upper))) {
+    return "salaire";
+  }
+
+  // Social charges
+  if (upper.includes("URSSAF") || upper.includes("KLESIA") || upper.includes("PREVOYANCE") ||
+      upper.includes("MUTUELLE") || upper.includes("AG2R") || upper.includes("MALAKOFF") ||
+      upper.includes("HUMANIS")) {
+    return "charges_sociales";
+  }
+
+  // Insurance
+  if (upper.includes("GENERALI") || upper.includes("ALAN") || upper.includes("ASSURANCE") ||
+      upper.includes("INSURANCE")) {
+    return "assurance";
+  }
+
+  // Rent / internal transfers
+  if (upper.includes("DA CARMELA") || upper.includes("LOYER") || upper.includes("SCI")) {
+    return "loyer";
+  }
+
+  // Leasing
+  if (upper.includes("CREDIPAR") || upper.includes("LIXXBAIL") || upper.includes("LOCAM") ||
+      upper.includes("LEASE") || upper.includes("LOA")) {
+    return "leasing";
+  }
+
+  // Accounting / consulting
+  if (upper.includes("AUDIT") || upper.includes("COMPTAB") || upper.includes("EXPERT") ||
+      upper.includes("PENNYLANE") || upper.includes("SWAN")) {
+    return "comptabilite";
+  }
+
+  // Telecom / utilities
+  if (upper.includes("ORANGE") || upper.includes("SFR") || upper.includes("BOUYGUES") ||
+      upper.includes("FREE") || upper.includes("EDF") || upper.includes("ENGIE")) {
+    return "telecom_energie";
+  }
+
   // Bank fees
-  if (upper.includes("COTIS") || upper.includes("COTISATION") || upper.includes("FRAIS BANCAIRE")) {
+  if (upper.includes("COTIS") || upper.includes("COTISATION") || upper.includes("FRAIS BANCAIRE") ||
+      upper.includes("FRAIS") && upper.includes("VIR")) {
     return "frais_bancaires";
+  }
+
+  // Ticket restaurant / meal vouchers
+  if (upper.includes("EDENRED") || upper.includes("PLUXEE") || upper.includes("UP COOP") ||
+      upper.includes("SWILE") || upper.includes("SODEXO")) {
+    return "titres_restaurant";
   }
 
   return "autre";
@@ -229,9 +286,12 @@ export function parseBankStatement(rawText: string): ParsedStatement {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Skip header/footer lines
-    if (/^(page|date|lib[ée]ll[ée]|montant|valeur|solde|total|caisse|relev|www\.|tél)/i.test(line)) continue;
+    // Skip header/footer/summary lines
+    if (/^(page|date|lib[ée]ll[ée]|montant|valeur|solde|total|caisse|relev|www\.|tél|gp\s|^\d{3,}[\s\d]*$)/i.test(line)) continue;
     if (/^\d{1,2}\/\d{1,2}$/.test(line)) continue; // bare date fragments
+    // Skip CE summary rubric lines (running totals per category)
+    if (/^(virements\s+(et|&)\s+prelevements|paiements?\s+cartes?|frais\s+bancaires?\s+divers|operations?\s+(de\s+financement|diverses)|mouvements?\s+financiers?|encaissements?\s+cartes?|remises?\s+cheques?|paiements?\s+cheques?)/i.test(line)) continue;
+    if (/^\s*(virements\s+(et|&)\s+prelevements|paiements?\s+cartes)/i.test(line)) continue;
 
     // Universal approach: if line contains [+-] amount pattern, it's an operation
     const amountMatch = line.match(amountRegex);
@@ -248,8 +308,8 @@ export function parseBankStatement(rawText: string): ParsedStatement {
         .trim();
       label = cleanLabel(label); // strip dates from label
 
-      // Skip summary/header lines
-      if (/^(solde|total|encaissements?\s+carte|paiements?\s+cheque|virements?\s+re[çc]us|remises?\s+cheque|compte\s+courant|montant|detail)/i.test(label)) {
+      // Skip summary/header/rubric lines
+      if (/^(solde|total|encaissements?\s+carte|paiements?\s+(cheque|cartes?)|virements?\s+(re[çc]us|et|&)|remises?\s+cheque|compte\s+courant|montant|detail|frais\s+bancaires?\s+divers|operations?\s+(de|diverses)|mouvements?\s+financ)/i.test(label)) {
         continue;
       }
       if (!label || label.length < 3) continue;

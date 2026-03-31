@@ -90,91 +90,55 @@ function getFiscalYearStart(): [number, number] {
   return m >= 10 ? [y, 10] : [y - 1, 10];
 }
 
-/* ── Expense category detection ── */
-const EXPENSE_CATS: { label: string; match: (label: string, category: string, supplierNames: string[]) => boolean }[] = [
-  {
-    label: "Fournisseurs",
-    match: (lbl, _cat, suppliers) =>
-      suppliers.some((s) => lbl.toUpperCase().includes(s.toUpperCase())),
-  },
-  {
-    label: "Salaires",
-    match: (lbl) => {
-      const u = lbl.toUpperCase();
-      return (
-        (u.includes("VIREMENT") && (u.includes("SALAIRE") || u.includes("PAIE"))) ||
-        u.includes("VIRT EMIS") && !u.includes("URSSAF") && !u.includes("SCI") && !u.includes("LOYER")
-      );
-    },
-  },
-  {
-    label: "Charges sociales",
-    match: (lbl) => {
-      const u = lbl.toUpperCase();
-      return ["URSSAF", "KLESIA", "PREVOYANCE", "MUTUELLE", "RETRAITE", "MALAKOFF"].some((k) => u.includes(k));
-    },
-  },
-  {
-    label: "Assurances",
-    match: (lbl) => {
-      const u = lbl.toUpperCase();
-      return ["GENERALI", "ALAN", "ASSURANCE", "MMA", "AXA", "MAIF"].some((k) => u.includes(k));
-    },
-  },
-  {
-    label: "Loyer & charges",
-    match: (lbl) => {
-      const u = lbl.toUpperCase();
-      return ["LOYER", "SCI", "CARMELA", "SYNDIC", "COPROPRIETE"].some((k) => u.includes(k));
-    },
-  },
-  {
-    label: "Commissions CB",
-    match: (_lbl, cat) => cat === "commission_cb",
-  },
-  {
-    label: "Leasing",
-    match: (lbl) => {
-      const u = lbl.toUpperCase();
-      return ["CREDIPAR", "LEASE", "LOA", "LEASING", "GRENKE", "LOCAM"].some((k) => u.includes(k));
-    },
-  },
-  {
-    label: "Expert-comptable",
-    match: (lbl) => {
-      const u = lbl.toUpperCase();
-      return ["AUDIT", "COMPTABLE", "EXPERT", "CABINET"].some((k) => u.includes(k));
-    },
-  },
-  {
-    label: "Frais bancaires",
-    match: (_lbl, cat) => cat === "frais_bancaires",
-  },
-  {
-    label: "Autres",
-    match: () => true, // catch-all
-  },
-];
+/* ── Category display config ── */
+const CAT_LABELS: Record<string, string> = {
+  encaissement_cb: "Encaissements CB",
+  commission_cb: "Commissions CB",
+  virement_sortant: "Virements sortants",
+  virement_entrant: "Virements entrants",
+  prelevement: "Prelevements",
+  fournisseur: "Fournisseurs",
+  salaire: "Salaires",
+  charges_sociales: "Charges sociales",
+  assurance: "Assurances",
+  loyer: "Loyer & charges",
+  leasing: "Leasing",
+  comptabilite: "Expert-comptable",
+  telecom_energie: "Telecom & energie",
+  frais_bancaires: "Frais bancaires",
+  titres_restaurant: "Titres restaurant",
+  depense_cb: "Depenses CB",
+  autre: "Autres",
+};
 
-function classifyExpense(label: string, category: string, supplierNames: string[]): string {
-  for (const ec of EXPENSE_CATS) {
-    if (ec.match(label, category, supplierNames)) return ec.label;
-  }
-  return "Autres";
+const CAT_COLORS: Record<string, string> = {
+  encaissement_cb: "#4a6741",
+  commission_cb: "#D97706",
+  virement_sortant: "#7c5c3a",
+  virement_entrant: "#2563EB",
+  prelevement: "#8B1A1A",
+  fournisseur: "#D4775A",
+  salaire: "#5e7a8a",
+  charges_sociales: "#DC2626",
+  assurance: "#2563EB",
+  loyer: "#6B7280",
+  leasing: "#92400e",
+  comptabilite: "#7C3AED",
+  telecom_energie: "#0284C7",
+  frais_bancaires: "#6B7280",
+  titres_restaurant: "#16A34A",
+  depense_cb: "#999",
+  autre: "#999",
+};
+
+function classifyExpense(_label: string, category: string, _supplierNames: string[]): string {
+  return CAT_LABELS[category] ?? "Autres";
 }
 
-const EXPENSE_COLORS: Record<string, string> = {
-  "Fournisseurs": "#D4775A",
-  "Salaires": "#2563EB",
-  "Charges sociales": "#7C3AED",
-  "Assurances": "#0891B2",
-  "Loyer & charges": "#92400E",
-  "Commissions CB": "#DC2626",
-  "Leasing": "#6B7280",
-  "Expert-comptable": "#059669",
-  "Frais bancaires": "#9CA3AF",
-  "Autres": "#777",
-};
+// Map display labels to colors
+const EXPENSE_COLORS: Record<string, string> = Object.fromEntries(
+  Object.entries(CAT_LABELS).map(([key, label]) => [label, CAT_COLORS[key] ?? "#777"])
+);
 
 /* ══════════════════════════════════════════════════════
    STYLES
