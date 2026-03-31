@@ -119,7 +119,8 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
       .from("suppliers")
       .select("id,name,is_active")
       .order("name", { ascending: true });
-    if (etablissementId) supQuery.eq("etablissement_id", etablissementId);
+    // Ne PAS filtrer par etablissement_id — les ingrédients peuvent référencer
+    // des fournisseurs de n'importe quel établissement (multi-etab)
     supQuery.then(({ data, error: err }) => {
         if (!err) {
           // Deduplicate suppliers by name (case+accent insensitive) — keep the first entry as canonical

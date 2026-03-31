@@ -136,9 +136,16 @@ function IngredientsPageInner() {
 
   const suppliersMap = useMemo(() => {
     const m = new Map<string, Supplier>();
-    for (const s of suppliers) m.set(s.id, s);
+    for (const s of suppliers) {
+      m.set(s.id, s);
+      // Also index alias IDs (same supplier name in different establishments)
+      const aliasSet = supplierAliases.get(s.id);
+      if (aliasSet) {
+        for (const aliasId of aliasSet) m.set(aliasId, s);
+      }
+    }
     return m;
-  }, [suppliers]);
+  }, [suppliers, supplierAliases]);
 
   const offersByIngredientId = useMemo(() => {
     const m = new Map<string, LatestOffer>();
