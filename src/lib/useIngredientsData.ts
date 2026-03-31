@@ -18,17 +18,24 @@ const INGREDIENT_COLS =
 const OFFER_COLS =
   "ingredient_id,supplier_id,price_kind,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g,establishment,updated_at";
 
-async function fetchOffersForIds(ids: string[]): Promise<LatestOffer[]> {
+async function fetchOffersForIds(ids: string[], estab?: string | null): Promise<LatestOffer[]> {
   if (ids.length === 0) return [];
 
   // Query supplier_offers directly instead of v_latest_offers view
   // to avoid stale data from a potentially materialized view
-  const { data, error } = await supabase
+  let query = supabase
     .from("supplier_offers")
     .select(OFFER_COLS)
     .eq("is_active", true)
     .in("ingredient_id", ids)
     .order("updated_at", { ascending: false });
+
+  // Filter by establishment to avoid showing cross-establishment prices
+  if (estab) {
+    query = query.in("establishment", [estab, "both"]);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(error.message);
 
@@ -66,7 +73,7 @@ async function fetchPage(page: number, etabId?: string | null, etabSlug?: string
 
   if (error) throw new Error(error.message);
   const items = (data ?? []) as Ingredient[];
-  const offers = await fetchOffersForIds(items.map((i) => i.id));
+  const offers = await fetchOffersForIds(items.map((i) => i.id), myEstab);
 
   return { items, offers, hasMore: items.length === PAGE_SIZE };
 }
@@ -89,7 +96,7 @@ async function searchIngredients(q: string, etabId?: string | null, etabSlug?: s
 
   if (error) throw new Error(error.message);
   const items = (data ?? []) as Ingredient[];
-  const offers = await fetchOffersForIds(items.map((i) => i.id));
+  const offers = await fetchOffersForIds(items.map((i) => i.id), myEstab);
 
   return { items, offers };
 }
