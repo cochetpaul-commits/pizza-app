@@ -97,9 +97,14 @@ function categorize(label: string, amount: number): string {
   )) {
     return "encaissement_cb";
   }
-  // Generic CB incoming (positive amount)
+  // Generic CB incoming (positive amount = card payment received)
   if (/^CB\s/.test(upper) && amount > 0) {
     return "encaissement_cb";
+  }
+
+  // CB expenses (negative amount = card purchases)
+  if (/^CB\s/.test(upper) && amount < 0) {
+    return "autre";
   }
 
   // Bank commissions (REM VIR SEPA, COMMISSIONS)
@@ -197,13 +202,27 @@ export function parseBankStatement(rawText: string): ParsedStatement {
     }
   }
 
-  // Main operation parsing
-  // Format 1: label [+-] amount DD/MM/YYYYDD/MM/YYYY (most common in CE)
-  const opRegexCE = /^(.+?)\s+([+-])\s*([\d\s]+,\d{2})\s+(\d{2}\/\d{2}\/\d{4})(\d{2}\/\d{2}\/\d{4})?\s*$/;
-  // Format 2: label [+-] amount (no date — for summary lines)
-  const opRegex = /^(.+?)\s+([+-])\s*([\d\s]+,\d{2})\s*$/;
-  // Format 3: DD/MM/YYYYDD/MM/YYYY label [+-] amount (date-first CE format)
-  const opRegexDateFirst = /^(\d{2}\/\d{2}\/\d{4})(\d{2}\/\d{2}\/\d{4})?\s*(.+?)\s+([+-])\s*([\d\s]+,\d{2})\s*$/;
+  // ── Clean label: strip leading/trailing dates ──
+  function cleanLabel(raw: string): string {
+    return raw
+      // Strip leading dates like "02/02/2026 02/02/2026 " or "02/02/202602/02/2026"
+      .replace(/^(?:\d{2}\/\d{2}\/\d{4})\s*(?:\d{2}\/\d{2}\/\d{4})?\s*/g, "")
+      // Strip trailing dates
+      .replace(/\s*\d{2}\/\d{2}\/\d{4}(?:\d{2}\/\d{2}\/\d{4})?\s*$/g, "")
+      .trim();
+  }
+
+  // ── Extract dates from a line ──
+  function extractDates(line: string): { date1: string | null; date2: string | null } {
+    const dates = [...line.matchAll(/(\d{2}\/\d{2}\/\d{4})/g)].map(m => m[1]);
+    return {
+      date1: dates[0] ? parseFrenchDate(dates[0]) : null,
+      date2: dates[1] ? parseFrenchDate(dates[1]) : null,
+    };
+  }
+
+  // Main regex: anything containing [+-] amount pattern
+  const amountRegex = /([+-])\s*([\d\s]+,\d{2})/;
 
   let lastOpIndex = -1;
 
@@ -214,23 +233,30 @@ export function parseBankStatement(rawText: string): ParsedStatement {
     if (/^(page|date|lib[ée]ll[ée]|montant|valeur|solde|total|caisse|relev|www\.|tél)/i.test(line)) continue;
     if (/^\d{1,2}\/\d{1,2}$/.test(line)) continue; // bare date fragments
 
-    // Format 1: label [+-] amount DD/MM/YYYYDD/MM/YYYY (most common CE format)
-    let match = line.match(opRegexCE);
-    if (match) {
-      const label = match[1].trim();
-      const sign = match[2] === "+" ? 1 : -1;
-      const amount = parseFrenchAmount(match[3]) * sign;
-      const dateStr = parseFrenchDate(match[4]);
-      const valueDateStr = match[5] ? parseFrenchDate(match[5]) : null;
+    // Universal approach: if line contains [+-] amount pattern, it's an operation
+    const amountMatch = line.match(amountRegex);
+    if (amountMatch) {
+      const sign = amountMatch[1] === "+" ? 1 : -1;
+      const amount = parseFrenchAmount(amountMatch[2]) * sign;
 
-      // Skip summary lines (Solde, Total, etc.)
-      if (/^(solde|total|encaissements?\s+carte|paiements?\s+cheque|virements?\s+re[çc]us|remises?\s+cheque|compte\s+courant)/i.test(label)) {
+      // Extract dates from anywhere in the line
+      const { date1, date2 } = extractDates(line);
+
+      // Extract label: remove the amount part and dates
+      let label = line
+        .replace(/[+-]\s*[\d\s]+,\d{2}/, "") // remove amount
+        .trim();
+      label = cleanLabel(label); // strip dates from label
+
+      // Skip summary/header lines
+      if (/^(solde|total|encaissements?\s+carte|paiements?\s+cheque|virements?\s+re[çc]us|remises?\s+cheque|compte\s+courant|montant|detail)/i.test(label)) {
         continue;
       }
+      if (!label || label.length < 3) continue;
 
       operations.push({
-        operation_date: dateStr ?? "",
-        value_date: valueDateStr,
+        operation_date: date1 ?? "",
+        value_date: date2,
         label,
         amount,
         category: categorize(label, amount),
@@ -238,59 +264,6 @@ export function parseBankStatement(rawText: string): ParsedStatement {
       lastOpIndex = operations.length - 1;
       continue;
     }
-
-    // Format 2: DD/MM/YYYYDD/MM/YYYY label [+-] amount (date-first CE format)
-    match = line.match(opRegexDateFirst);
-    if (match) {
-      const dateStr = parseFrenchDate(match[1]);
-      const valueDateStr = match[2] ? parseFrenchDate(match[2]) : null;
-      const label = match[3].trim();
-      const sign = match[4] === "+" ? 1 : -1;
-      const amount = parseFrenchAmount(match[5]) * sign;
-
-      operations.push({
-        operation_date: dateStr ?? "",
-        value_date: valueDateStr,
-        label,
-        amount,
-        category: categorize(label, amount),
-      });
-      lastOpIndex = operations.length - 1;
-      continue;
-    }
-
-    // Format 3: label [+-] amount (no date — summary lines, skip these)
-    match = line.match(opRegex);
-    if (match) {
-      const label = match[1].trim();
-      // Skip summary/total lines
-      if (/^(solde|total|encaissements?\s+carte|paiements?\s+cheque|virements?\s+re[çc]us|remises?\s+cheque|compte\s+courant)/i.test(label)) {
-        continue;
-      }
-      const sign = match[2] === "+" ? 1 : -1;
-      const amount = parseFrenchAmount(match[3]) * sign;
-
-      // Try to extract date from label (6-digit pattern like 011025 = 01/10/25)
-      let dateStr: string | null = null;
-      const vdMatch = label.match(/(\d{2})(\d{2})(\d{2})(?:\s|$)/);
-      if (vdMatch) {
-        const year = parseInt(vdMatch[3]) + 2000;
-        dateStr = `${year}-${vdMatch[2]}-${vdMatch[1]}`;
-      }
-
-      operations.push({
-        operation_date: dateStr ?? "",
-        value_date: null,
-        label,
-        amount,
-        category: categorize(label, amount),
-      });
-      lastOpIndex = operations.length - 1;
-      continue;
-    }
-
-    // No match — could be a continuation line (ref, details)
-    // Will be handled below
 
     // Continuation line — append to previous operation's label
     if (lastOpIndex >= 0 && line.length > 2 && !/^\d/.test(line)) {
