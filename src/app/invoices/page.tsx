@@ -62,16 +62,30 @@ const ETABS = [
   { slug: "piccola_mia", name: "Piccola Mia", value: "piccola" as const },
 ];
 
-type Step = "upload" | "confirm" | "preview" | "done";
+type Step = "upload" | "confirm" | "preview" | "done" | "batch";
+
+type BatchItem = {
+  file: File;
+  status: "pending" | "processing" | "done" | "error";
+  supplier?: string;
+  result?: { ingredients_created?: number; offers_inserted?: number; already_imported?: boolean };
+  error?: string;
+};
 
 export default function InvoicesPage() {
   const fileRef = useRef<HTMLInputElement>(null);
+  const batchRef = useRef<HTMLInputElement>(null);
   const { etablissements } = useEtablissement();
 
   const [step, setStep] = useState<Step>("upload");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Batch mode
+  const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchEtab, setBatchEtab] = useState<string>("bellomio");
 
   // Detection
   const [detection, setDetection] = useState<DetectionResult | null>(null);
@@ -222,7 +236,74 @@ export default function InvoicesPage() {
     setPreview(null);
     setCommitResult(null);
     setError(null);
+    setBatchItems([]);
     if (fileRef.current) fileRef.current.value = "";
+    if (batchRef.current) batchRef.current.value = "";
+  }
+
+  // ── Batch import ──
+  function handleBatchFiles(files: FileList) {
+    const items: BatchItem[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      if (f.name.toLowerCase().endsWith(".pdf") || f.type === "application/pdf" || f.type.startsWith("image/")) {
+        items.push({ file: f, status: "pending" });
+      }
+    }
+    if (items.length === 0) { setError("Aucun fichier PDF ou image selectionne."); return; }
+    setBatchItems(items);
+    setStep("batch");
+  }
+
+  async function runBatch() {
+    setBatchRunning(true);
+    const auth = getAuthHeader();
+    const etabId = etablissements.find(e =>
+      batchEtab === "piccola" ? e.slug?.includes("piccola") : e.slug?.includes("bello")
+    )?.id ?? "";
+
+    for (let i = 0; i < batchItems.length; i++) {
+      const item = batchItems[i];
+      setBatchItems(prev => prev.map((p, j) => j === i ? { ...p, status: "processing" } : p));
+
+      try {
+        const form = new FormData();
+        form.append("file", item.file);
+        form.append("mode", "commit");
+        form.append("establishment", batchEtab);
+
+        // Try ai-parse which handles both known and unknown suppliers
+        const res = await fetchApi("/api/invoices/ai-parse", {
+          method: "POST",
+          headers: {
+            ...(auth ? { Authorization: auth } : {}),
+            "x-etablissement-id": etabId,
+          },
+          body: form,
+        });
+        const data = await res.json();
+
+        if (!data.ok) throw new Error(data.error ?? "Erreur import");
+
+        setBatchItems(prev => prev.map((p, j) => j === i ? {
+          ...p,
+          status: "done",
+          supplier: data.supplier_detected ?? "Inconnu",
+          result: {
+            ingredients_created: data.inserted?.ingredients_created ?? 0,
+            offers_inserted: data.inserted?.offers_inserted ?? 0,
+            already_imported: data.invoice?.already_imported ?? false,
+          },
+        } : p));
+      } catch (e) {
+        setBatchItems(prev => prev.map((p, j) => j === i ? {
+          ...p,
+          status: "error",
+          error: e instanceof Error ? e.message : String(e),
+        } : p));
+      }
+    }
+    setBatchRunning(false);
   }
 
   const etabName = ETABS.find((e) => e.value === selectedEtab)?.name ?? selectedEtab;
@@ -248,8 +329,12 @@ export default function InvoicesPage() {
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
-                const f = e.dataTransfer.files[0];
-                if (f) handleFileUpload(f);
+                const files = e.dataTransfer.files;
+                if (files.length > 1) {
+                  handleBatchFiles(files);
+                } else if (files[0]) {
+                  handleFileUpload(files[0]);
+                }
               }}
             >
               <input
@@ -283,6 +368,16 @@ export default function InvoicesPage() {
               Le fournisseur et l&apos;etablissement seront detectes automatiquement.
               Les photos sont analysees par OCR (Google Vision).
             </p>
+
+            {/* Batch upload */}
+            <div style={{ textAlign: "center", marginTop: 16 }}>
+              <input ref={batchRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,image/*" style={{ display: "none" }}
+                onChange={(e) => { if (e.target.files && e.target.files.length > 0) handleBatchFiles(e.target.files); }} />
+              <button type="button" onClick={() => batchRef.current?.click()}
+                style={{ padding: "10px 24px", borderRadius: 10, border: "1.5px solid #D4775A", background: "#fff", color: "#D4775A", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                Importer plusieurs factures
+              </button>
+            </div>
 
             {/* Quick links to legacy pages */}
             <div style={{ marginTop: 32, borderTop: "1px solid #f0ebe3", paddingTop: 16 }}>
@@ -486,6 +581,107 @@ export default function InvoicesPage() {
               </button>
             </div>
           </>
+        )}
+
+        {/* ════════════ BATCH MODE ════════════ */}
+        {step === "batch" && (
+          <div style={confirmCard}>
+            <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777", marginBottom: 16 }}>
+              Import multiple — {batchItems.length} fichier{batchItems.length > 1 ? "s" : ""}
+            </div>
+
+            {/* Etab selector */}
+            {!batchRunning && batchItems.every(b => b.status === "pending") && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
+                <span style={{ fontSize: 12, color: "#666" }}>Etablissement :</span>
+                {ETABS.map(e => (
+                  <button key={e.value} type="button" onClick={() => setBatchEtab(e.value)}
+                    style={pillBtn(batchEtab === e.value)}>
+                    {e.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* File list */}
+            <div style={{ marginBottom: 16 }}>
+              {batchItems.map((item, i) => (
+                <div key={i} style={{
+                  display: "flex", alignItems: "center", gap: 12,
+                  padding: "10px 14px", borderRadius: 10,
+                  background: item.status === "done" ? "#f0fdf4" : item.status === "error" ? "#fef2f2" : item.status === "processing" ? "#fffbeb" : "#fff",
+                  border: `1px solid ${item.status === "done" ? "#bbf7d0" : item.status === "error" ? "#fecaca" : item.status === "processing" ? "#fde68a" : "#e0d8ce"}`,
+                  marginBottom: 6,
+                }}>
+                  {/* Status icon */}
+                  <span style={{ fontSize: 16, flexShrink: 0 }}>
+                    {item.status === "pending" && "📄"}
+                    {item.status === "processing" && "⏳"}
+                    {item.status === "done" && "✅"}
+                    {item.status === "error" && "❌"}
+                  </span>
+
+                  {/* File info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {item.file.name}
+                    </div>
+                    {item.status === "done" && item.supplier && (
+                      <div style={{ fontSize: 11, color: "#4a6741" }}>
+                        {item.supplier}
+                        {item.result?.already_imported ? " — deja importe" : ` — ${item.result?.ingredients_created ?? 0} ingredients, ${item.result?.offers_inserted ?? 0} offres`}
+                      </div>
+                    )}
+                    {item.status === "error" && (
+                      <div style={{ fontSize: 11, color: "#DC2626" }}>{item.error}</div>
+                    )}
+                    {item.status === "processing" && (
+                      <div style={{ fontSize: 11, color: "#D97706" }}>Analyse en cours...</div>
+                    )}
+                  </div>
+
+                  {/* Size */}
+                  <span style={{ fontSize: 11, color: "#999", flexShrink: 0 }}>
+                    {(item.file.size / 1024).toFixed(0)} Ko
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Progress */}
+            {batchRunning && (() => {
+              const done = batchItems.filter(b => b.status === "done" || b.status === "error").length;
+              const pct = Math.round((done / batchItems.length) * 100);
+              return (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#666", marginBottom: 4 }}>
+                    <span>{done}/{batchItems.length} traites</span>
+                    <span>{pct}%</span>
+                  </div>
+                  <div style={{ height: 6, background: "#e0d8ce", borderRadius: 3, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${pct}%`, background: "#4a6741", borderRadius: 3, transition: "width 0.3s" }} />
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Actions */}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button type="button" onClick={reset} style={cancelBtnStyle}>
+                {batchRunning ? "Fermer" : "Annuler"}
+              </button>
+              {!batchRunning && batchItems.some(b => b.status === "pending") && (
+                <button type="button" onClick={runBatch} style={primaryBtnStyle}>
+                  Lancer l&apos;import ({batchItems.filter(b => b.status === "pending").length} fichiers)
+                </button>
+              )}
+              {!batchRunning && batchItems.every(b => b.status !== "pending") && (
+                <button type="button" onClick={reset} style={primaryBtnStyle}>
+                  Terminer
+                </button>
+              )}
+            </div>
+          </div>
         )}
 
         {/* ════════════ STEP 4: Done ════════════ */}
