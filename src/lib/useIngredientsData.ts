@@ -31,8 +31,9 @@ async function fetchOffersForIds(ids: string[], estab?: string | null): Promise<
     .order("updated_at", { ascending: false });
 
   // Filter by establishment to avoid showing cross-establishment prices
+  // Include NULL for legacy offers created before multi-etab migration
   if (estab) {
-    query = query.in("establishment", [estab, "both"]);
+    query = query.or(`establishment.in.(${estab},both),establishment.is.null`);
   }
 
   const { data, error } = await query;
