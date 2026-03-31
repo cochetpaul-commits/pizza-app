@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { calculerPate, type EmpatementType, type FlourMixItem, type PateResult } from "@/lib/pateEngine";
+import { AiInsightCard } from "@/components/AiInsightCard";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -466,6 +467,14 @@ export function CatalogueContent() {
         <p style={{ fontSize: 13, color: "#999", margin: "0 0 20px" }}>
           {recipes.length} recette{recipes.length > 1 ? "s" : ""} — consultation \u00E9quipe
         </p>
+
+        {/* IA Suggestions menu */}
+        <AiInsightCard
+          type="menu"
+          label="Suggestions menu IA"
+          icon={"\uD83C\uDF74"}
+          color="#46655a"
+        />
 
         {/* Search */}
         <input

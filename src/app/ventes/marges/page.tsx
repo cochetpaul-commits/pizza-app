@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback, type CSSProperties } from "react";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { AiInsightCard } from "@/components/AiInsightCard";
 
 import Chart from "chart.js/auto";
 
@@ -1307,6 +1308,14 @@ export default function MargesPage() {
                 ))}
               </div>
             </div>
+
+            {/* ── IA Conseils marge ── */}
+            <AiInsightCard
+              type="margin"
+              label="Conseils marge IA"
+              icon={"\uD83D\uDCC8"}
+              color="#c4a882"
+            />
 
             {/* ── Menu Engineering ── */}
             {(() => {

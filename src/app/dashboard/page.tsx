@@ -6,6 +6,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { T } from "@/lib/tokens";
 import { RequireRole } from "@/components/RequireRole";
+import { AiInsightCard } from "@/components/AiInsightCard";
 
 const GROUP_COLOR = "#b45f57";
 const OSWALD = "var(--font-oswald), Oswald, sans-serif";
@@ -625,6 +626,15 @@ function GroupContent() {
           subtitle="Piccola Mia"
         />
       </div>
+
+      {/* ── IA Tendances ── */}
+      <SectionTitle>Intelligence artificielle</SectionTitle>
+      <AiInsightCard
+        type="trends"
+        label="Analyse des tendances"
+        icon={"\uD83D\uDCC9"}
+        color="#5e7a8a"
+      />
     </div>
   );
 }
