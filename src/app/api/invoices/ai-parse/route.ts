@@ -138,13 +138,19 @@ export async function POST(req: Request) {
       });
 
       const fwdJson = await fwdRes.json();
-      return NextResponse.json(fwdJson, { status: fwdRes.status });
+      // Enrich forwarded response with supplier info for batch display
+      return NextResponse.json({
+        ...fwdJson,
+        supplier_detected: detectedName ?? fwdJson.supplier_detected ?? null,
+        parse_method: "dedicated",
+      }, { status: fwdRes.status });
     }
 
     // ── Try template parsing ─────────────────────────────────────────────────
     const supplierName = detectedName ?? "INCONNU";
     let parsedInvoice: import("@/lib/invoices/importEngine").ParsedInvoice | null = null;
     let parseMethod: "template" | "ai" = "ai";
+    let resolvedSupplierName = supplierName;
 
     if (detectedName) {
       const template = await getTemplate(supabaseAdmin, detectedName);
@@ -153,14 +159,14 @@ export async function POST(req: Request) {
         if (templateResult && templateResult.lines.length > 0) {
           parsedInvoice = templateResult;
           parseMethod = "template";
-          // Bump success counter in background
+          resolvedSupplierName = template.supplier_name || detectedName;
           bumpTemplateSuccess(supabaseAdmin, template.id).catch(() => null);
         }
       }
     }
 
     // ── Fall back to AI parsing ──────────────────────────────────────────────
-    let aiSupplierName = supplierName;
+    let aiSupplierName = resolvedSupplierName;
 
     if (!parsedInvoice) {
       const aiResult = await aiParseInvoice(rawText, supplierName === "INCONNU" ? null : supplierName);
@@ -234,7 +240,7 @@ export async function POST(req: Request) {
       ok: true,
       kind: "ai-parse",
       parse_method: parseMethod,
-      supplier_detected: aiSupplierName !== "INCONNU" ? aiSupplierName : detectedName,
+      supplier_detected: aiSupplierName !== "INCONNU" ? aiSupplierName : (detectedName ?? resolvedSupplierName),
       filename: file.name,
       bytes: bytes.byteLength,
       raw_text_length: rawText.length,
