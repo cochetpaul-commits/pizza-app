@@ -102,13 +102,18 @@ function categorize(label: string, amount: number): string {
     return "encaissement_cb";
   }
 
+  // Bank commissions (REM VIR SEPA, COMMISSIONS)
+  if (upper.startsWith("COMMISSIONS") || upper.startsWith("REM VIR SEPA")) {
+    return "commission_cb";
+  }
+
   // SEPA wires
   if (upper.includes("VIR SEPA") || upper.includes("VIR INST") || upper.includes("VIREMENT")) {
     return amount >= 0 ? "virement_entrant" : "virement_sortant";
   }
 
-  // Direct debits
-  if (upper.includes("PRLV") || upper.includes("PRELEVEMENT")) {
+  // Direct debits (LCR = Lettre de Change Relevé)
+  if (upper.includes("PRLV") || upper.includes("PRELEVEMENT") || upper.startsWith("LCR ")) {
     return "prelevement";
   }
 
@@ -193,13 +198,12 @@ export function parseBankStatement(rawText: string): ParsedStatement {
   }
 
   // Main operation parsing
-  // Pattern: label ... [+-] amount [DD/MM/YYYY]
-  // Amount pattern: [+-] digits_with_spaces , 2digits
-  const opRegex = /^(.+?)\s+([+-])\s*([\d\s]+,\d{2})(?:\s+(\d{2}\/\d{2}\/\d{4}))?\s*$/;
-  // Alternative: date at the beginning
-  const opRegexDateFirst = /^(\d{2}\/\d{2}\/\d{4})\s+(.+?)\s+([+-])\s*([\d\s]+,\d{2})\s*$/;
-  // Alternative: date then label then amount (no explicit sign, inferred from column position)
-  const opRegexSimple = /^(\d{2}\/\d{2}\/\d{4})\s+(.+?)\s+([\d\s]+,\d{2})\s*$/;
+  // Format 1: label [+-] amount DD/MM/YYYYDD/MM/YYYY (most common in CE)
+  const opRegexCE = /^(.+?)\s+([+-])\s*([\d\s]+,\d{2})\s+(\d{2}\/\d{2}\/\d{4})(\d{2}\/\d{2}\/\d{4})?\s*$/;
+  // Format 2: label [+-] amount (no date — for summary lines)
+  const opRegex = /^(.+?)\s+([+-])\s*([\d\s]+,\d{2})\s*$/;
+  // Format 3: DD/MM/YYYYDD/MM/YYYY label [+-] amount (date-first CE format)
+  const opRegexDateFirst = /^(\d{2}\/\d{2}\/\d{4})(\d{2}\/\d{2}\/\d{4})?\s*(.+?)\s+([+-])\s*([\d\s]+,\d{2})\s*$/;
 
   let lastOpIndex = -1;
 
@@ -210,24 +214,23 @@ export function parseBankStatement(rawText: string): ParsedStatement {
     if (/^(page|date|lib[ée]ll[ée]|montant|valeur|solde|total|caisse|relev|www\.|tél)/i.test(line)) continue;
     if (/^\d{1,2}\/\d{1,2}$/.test(line)) continue; // bare date fragments
 
-    let match = line.match(opRegex);
+    // Format 1: label [+-] amount DD/MM/YYYYDD/MM/YYYY (most common CE format)
+    let match = line.match(opRegexCE);
     if (match) {
       const label = match[1].trim();
       const sign = match[2] === "+" ? 1 : -1;
       const amount = parseFrenchAmount(match[3]) * sign;
-      const dateStr = match[4] ? parseFrenchDate(match[4]) : null;
+      const dateStr = parseFrenchDate(match[4]);
+      const valueDateStr = match[5] ? parseFrenchDate(match[5]) : null;
 
-      // Try to extract value date from label (6-digit pattern like 011025 = 01/10/25)
-      let valueDate: string | null = null;
-      const vdMatch = label.match(/(\d{2})(\d{2})(\d{2})(?:\s|$)/);
-      if (vdMatch) {
-        const year = parseInt(vdMatch[3]) + 2000;
-        valueDate = `${year}-${vdMatch[2]}-${vdMatch[1]}`;
+      // Skip summary lines (Solde, Total, etc.)
+      if (/^(solde|total|encaissements?\s+carte|paiements?\s+cheque|virements?\s+re[çc]us|remises?\s+cheque|compte\s+courant)/i.test(label)) {
+        continue;
       }
 
       operations.push({
-        operation_date: dateStr ?? valueDate ?? "",
-        value_date: valueDate,
+        operation_date: dateStr ?? "",
+        value_date: valueDateStr,
         label,
         amount,
         category: categorize(label, amount),
@@ -236,17 +239,18 @@ export function parseBankStatement(rawText: string): ParsedStatement {
       continue;
     }
 
-    // Date-first format
+    // Format 2: DD/MM/YYYYDD/MM/YYYY label [+-] amount (date-first CE format)
     match = line.match(opRegexDateFirst);
     if (match) {
       const dateStr = parseFrenchDate(match[1]);
-      const label = match[2].trim();
-      const sign = match[3] === "+" ? 1 : -1;
-      const amount = parseFrenchAmount(match[4]) * sign;
+      const valueDateStr = match[2] ? parseFrenchDate(match[2]) : null;
+      const label = match[3].trim();
+      const sign = match[4] === "+" ? 1 : -1;
+      const amount = parseFrenchAmount(match[5]) * sign;
 
       operations.push({
         operation_date: dateStr ?? "",
-        value_date: null,
+        value_date: valueDateStr,
         label,
         amount,
         category: categorize(label, amount),
@@ -255,12 +259,24 @@ export function parseBankStatement(rawText: string): ParsedStatement {
       continue;
     }
 
-    // Simple format (no sign)
-    match = line.match(opRegexSimple);
+    // Format 3: label [+-] amount (no date — summary lines, skip these)
+    match = line.match(opRegex);
     if (match) {
-      const dateStr = parseFrenchDate(match[1]);
-      const label = match[2].trim();
-      const amount = parseFrenchAmount(match[3]);
+      const label = match[1].trim();
+      // Skip summary/total lines
+      if (/^(solde|total|encaissements?\s+carte|paiements?\s+cheque|virements?\s+re[çc]us|remises?\s+cheque|compte\s+courant)/i.test(label)) {
+        continue;
+      }
+      const sign = match[2] === "+" ? 1 : -1;
+      const amount = parseFrenchAmount(match[3]) * sign;
+
+      // Try to extract date from label (6-digit pattern like 011025 = 01/10/25)
+      let dateStr: string | null = null;
+      const vdMatch = label.match(/(\d{2})(\d{2})(\d{2})(?:\s|$)/);
+      if (vdMatch) {
+        const year = parseInt(vdMatch[3]) + 2000;
+        dateStr = `${year}-${vdMatch[2]}-${vdMatch[1]}`;
+      }
 
       operations.push({
         operation_date: dateStr ?? "",
@@ -272,6 +288,9 @@ export function parseBankStatement(rawText: string): ParsedStatement {
       lastOpIndex = operations.length - 1;
       continue;
     }
+
+    // No match — could be a continuation line (ref, details)
+    // Will be handled below
 
     // Continuation line — append to previous operation's label
     if (lastOpIndex >= 0 && line.length > 2 && !/^\d/.test(line)) {
