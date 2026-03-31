@@ -256,7 +256,7 @@ function GroupContent() {
   }, [etablissements, range, prevRange, fiscalStart, today]);
 
   useEffect(() => {
-    fetchData();
+    fetchData(); // eslint-disable-line react-hooks/set-state-in-effect
   }, [fetchData]);
 
   // Derived totals

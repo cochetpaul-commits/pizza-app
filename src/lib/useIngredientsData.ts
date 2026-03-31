@@ -57,7 +57,7 @@ async function fetchPage(page: number, etabId?: string | null, etabSlug?: string
   // OR via legacy `etablissement_id` (for ingredients not yet migrated to multi-etab)
   const myEstab = etabSlug ? slugToOfferEstab(etabSlug) : null;
   if (myEstab && etabId) {
-    query = query.or(`establishments.cs.{"${myEstab}"},etablissement_id.eq.${etabId}`);
+    query = query.or(`establishments.cs.{"${myEstab}"},etablissement_id.eq.${etabId},establishments.is.null`);
   } else if (etabId) {
     query = query.eq("etablissement_id", etabId);
   }
@@ -80,7 +80,7 @@ async function searchIngredients(q: string, etabId?: string | null, etabSlug?: s
 
   const myEstab = etabSlug ? slugToOfferEstab(etabSlug) : null;
   if (myEstab && etabId) {
-    query = query.or(`establishments.cs.{"${myEstab}"},etablissement_id.eq.${etabId}`);
+    query = query.or(`establishments.cs.{"${myEstab}"},etablissement_id.eq.${etabId},establishments.is.null`);
   } else if (etabId) {
     query = query.eq("etablissement_id", etabId);
   }
@@ -164,7 +164,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
       const countQuery = supabase.from("ingredients").select("id", { count: "exact", head: true });
       const countEstab = etabSlugRef.current ? slugToOfferEstab(etabSlugRef.current) : null;
       if (countEstab && etabRef.current) {
-        countQuery.or(`establishments.cs.{"${countEstab}"},etablissement_id.eq.${etabRef.current}`);
+        countQuery.or(`establishments.cs.{"${countEstab}"},etablissement_id.eq.${etabRef.current},establishments.is.null`);
       } else if (etabRef.current) {
         countQuery.eq("etablissement_id", etabRef.current);
       }
