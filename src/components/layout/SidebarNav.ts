@@ -73,7 +73,7 @@ export type SidebarEntry = NavEtabGroup | NavSettingsGroup | NavStandaloneItem |
 const PILOTAGE_ITEMS: NavItemV2[] = [
   { label: "Rapport", href: "/ventes", icon: "barChart" },
   { label: "Marges", href: "/ventes/marges", icon: "wallet" },
-  { label: "Insights IA", href: "/ventes/insights", icon: "trendingUp" },
+  { label: "Tresorerie", href: "/tresorerie", icon: "wallet" },
 ];
 
 // PERSONNEL (RH)
@@ -295,6 +295,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/ventes/articles": "Production",
   "/ventes/meteo": "Pilotage",
   "/ventes/insights": "Pilotage",
+  "/tresorerie": "Pilotage",
   "/plannings": "Personnel",
   "/rh/pointage": "Personnel",
   "/rh/conges": "Personnel",
