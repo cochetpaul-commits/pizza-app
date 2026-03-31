@@ -61,6 +61,31 @@ function fiscalMonths(fyStart: number): { year: number; month: number; label: st
   return months;
 }
 
+/* ── Supplier Categories ── */
+
+const SUPPLIER_CATEGORIES: Record<string, string> = {
+  // Alimentaire
+  metro: "Alimentaire", mael: "Alimentaire", cozigou: "Alimentaire",
+  carniato: "Alimentaire", masse: "Alimentaire", sdpf: "Alimentaire",
+  elien: "Alimentaire", terreazur: "Alimentaire",
+  // Boissons
+  vinoflo: "Boissons", barspirits: "Boissons", lmdw: "Boissons",
+  // Services & charges
+  elis: "Services", generali: "Services",
+};
+
+const CATEGORY_COLORS: Record<string, string> = {
+  "Alimentaire": "#4a6741",
+  "Boissons": "#D4775A",
+  "Services": "#2563EB",
+  "Autre": "#999",
+};
+
+function getSupplierCategory(supplierName: string): string {
+  const key = supplierName.toLowerCase().trim().split(/\s+/)[0];
+  return SUPPLIER_CATEGORIES[key] ?? "Autre";
+}
+
 /* ── Styles ── */
 
 const S = {
@@ -96,6 +121,7 @@ export default function AchatsPage() {
   const [archivesOpen, setArchivesOpen] = useState(false);
   const [archiveYearOpen, setArchiveYearOpen] = useState<number | null>(null);
   const [evoArchivesOpen, setEvoArchivesOpen] = useState(false);
+  const [evoView, setEvoView] = useState<"supplier" | "category">("supplier");
 
   // ── Auto-imports state ──
   type AutoImport = { id: string; created_at: string; fournisseur: string | null; invoice_number: string | null; nb_lignes: number; status: string; error_detail: string | null; invoice_id: string | null; gmail_message_id: string | null };
@@ -194,6 +220,7 @@ export default function AchatsPage() {
     month: number;
     totalHT: number;
     suppliers: { name: string; total: number; color: string }[];
+    categories: { name: string; total: number; color: string }[];
   };
 
   const monthlyBreakdown = useMemo(() => {
@@ -210,17 +237,24 @@ export default function AchatsPage() {
     for (const [key, { year, month, invoices }] of Object.entries(map)) {
       const totalHT = invoices.reduce((s, i) => s + (i.total_ht ?? 0), 0);
       const bySupp: Record<string, { name: string; total: number }> = {};
+      const byCat: Record<string, number> = {};
       for (const inv of invoices) {
         const name = inv.suppliers?.name ?? "Inconnu";
         const k = name.toLowerCase().trim();
         if (!bySupp[k]) bySupp[k] = { name, total: 0 };
         bySupp[k].total += inv.total_ht ?? 0;
+        const cat = getSupplierCategory(name);
+        byCat[cat] = (byCat[cat] ?? 0) + (inv.total_ht ?? 0);
       }
       const suppliers = Object.entries(bySupp)
         .map(([k, v]) => ({ name: v.name, total: v.total, color: getSupplierColor(k) }))
         .sort((a, b) => b.total - a.total);
 
-      result.push({ key, label: `${MONTH_NAMES[month]} ${year}`, year, month, totalHT, suppliers });
+      const categories = Object.entries(byCat)
+        .map(([cat, total]) => ({ name: cat, total, color: CATEGORY_COLORS[cat] ?? "#999" }))
+        .sort((a, b) => b.total - a.total);
+
+      result.push({ key, label: `${MONTH_NAMES[month]} ${year}`, year, month, totalHT, suppliers, categories });
     }
     result.sort((a, b) => a.key.localeCompare(b.key));
     return result;
@@ -311,6 +345,76 @@ export default function AchatsPage() {
   const maxMonthTotal = useMemo(() => {
     return Math.max(...curFYMonths.map((m) => m.totalHT), 1);
   }, [curFYMonths]);
+
+  // ── Category KPIs for current month ──
+  const categoryKpis = useMemo(() => {
+    const monthStart = new Date(curYear, curMonth, 1);
+    const monthEnd = new Date(curYear, curMonth + 1, 0, 23, 59, 59);
+    const prevMonthStart = new Date(curYear, curMonth - 1, 1);
+    const prevMonthEnd = new Date(curYear, curMonth, 0, 23, 59, 59);
+
+    const thisMonth = allInvoices.filter((inv) => {
+      if (!inv.invoice_date) return false;
+      const d = new Date(inv.invoice_date);
+      return d >= monthStart && d <= monthEnd;
+    });
+    const prevMonth = allInvoices.filter((inv) => {
+      if (!inv.invoice_date) return false;
+      const d = new Date(inv.invoice_date);
+      return d >= prevMonthStart && d <= prevMonthEnd;
+    });
+
+    const totalHT = thisMonth.reduce((s, r) => s + (r.total_ht ?? 0), 0);
+
+    const byCatCur: Record<string, number> = {};
+    for (const inv of thisMonth) {
+      const cat = getSupplierCategory(inv.suppliers?.name ?? "Inconnu");
+      byCatCur[cat] = (byCatCur[cat] ?? 0) + (inv.total_ht ?? 0);
+    }
+    const byCatPrev: Record<string, number> = {};
+    for (const inv of prevMonth) {
+      const cat = getSupplierCategory(inv.suppliers?.name ?? "Inconnu");
+      byCatPrev[cat] = (byCatPrev[cat] ?? 0) + (inv.total_ht ?? 0);
+    }
+
+    const cats = ["Alimentaire", "Boissons", "Services", "Autre"];
+    return cats
+      .map((name) => {
+        const cur = byCatCur[name] ?? 0;
+        const prev = byCatPrev[name] ?? 0;
+        const pct = totalHT > 0 ? (cur / totalHT) * 100 : 0;
+        const variation = prev > 0 ? ((cur - prev) / prev) * 100 : null;
+        return { name, total: cur, pct, variation, color: CATEGORY_COLORS[name] ?? "#999" };
+      })
+      .filter((c) => c.total > 0);
+  }, [allInvoices, curMonth, curYear]);
+
+  // ── Top 5 suppliers for current month ──
+  const top5Suppliers = useMemo(() => {
+    const monthStart = new Date(curYear, curMonth, 1);
+    const monthEnd = new Date(curYear, curMonth + 1, 0, 23, 59, 59);
+
+    const thisMonth = allInvoices.filter((inv) => {
+      if (!inv.invoice_date) return false;
+      const d = new Date(inv.invoice_date);
+      return d >= monthStart && d <= monthEnd;
+    });
+
+    const totalHT = thisMonth.reduce((s, r) => s + (r.total_ht ?? 0), 0);
+
+    const bySupp: Record<string, { name: string; total: number }> = {};
+    for (const inv of thisMonth) {
+      const name = inv.suppliers?.name ?? "Inconnu";
+      const k = name.toLowerCase().trim();
+      if (!bySupp[k]) bySupp[k] = { name, total: 0 };
+      bySupp[k].total += inv.total_ht ?? 0;
+    }
+
+    return Object.values(bySupp)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5)
+      .map((s) => ({ ...s, pct: totalHT > 0 ? (s.total / totalHT) * 100 : 0, color: getSupplierColor(s.name.toLowerCase().trim()) }));
+  }, [allInvoices, curMonth, curYear]);
 
   // ══════════════════════════════════════════════════════
   //  FACTURES TAB LOGIC (existing)
@@ -436,6 +540,36 @@ export default function AchatsPage() {
                   key={i}
                   title={`${sup.name}: ${fmt(sup.total)}`}
                   style={{ width: `${pct}%`, background: sup.color, minWidth: pct > 0 ? 2 : 0, transition: "width 0.3s" }}
+                />
+              );
+            })}
+          </div>
+        </div>
+        <div style={{ width: 80, flexShrink: 0, fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 13, color: "#1a1a1a", textAlign: "right" }}>
+          {fmt(mb.totalHT)}
+        </div>
+      </div>
+    );
+  };
+
+  // ── Render helper: stacked horizontal bar by category ──
+  const renderCategoryBar = (mb: MonthBreakdown) => {
+    if (mb.totalHT <= 0) return null;
+    const barWidth = (mb.totalHT / maxMonthTotal) * 100;
+    return (
+      <div key={mb.key} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
+        <div style={{ width: 100, flexShrink: 0, fontFamily: "DM Sans, sans-serif", fontSize: 11, color: "#999", textAlign: "right" }}>
+          {MONTH_NAMES[mb.month].slice(0, 3)} {mb.year}
+        </div>
+        <div style={{ flex: 1, position: "relative" }}>
+          <div style={{ display: "flex", height: 22, borderRadius: 4, overflow: "hidden", width: `${Math.max(barWidth, 2)}%` }}>
+            {mb.categories.map((cat, i) => {
+              const pct = (cat.total / mb.totalHT) * 100;
+              return (
+                <div
+                  key={i}
+                  title={`${cat.name}: ${fmt(cat.total)}`}
+                  style={{ width: `${pct}%`, background: cat.color, minWidth: pct > 0 ? 2 : 0, transition: "width 0.3s" }}
                 />
               );
             })}
@@ -612,19 +746,68 @@ export default function AchatsPage() {
                 </div>
               </div>
 
+              {/* ── Category KPIs ── */}
+              {categoryKpis.length > 0 && (
+                <>
+                  <div style={S.sec}>Repartition par categorie</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 28 }}>
+                    {categoryKpis.map((cat) => (
+                      <div key={cat.name} style={{ ...S.card, padding: "14px 16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: cat.color, flexShrink: 0 }} />
+                          <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", fontWeight: 600 }}>{cat.name}</span>
+                        </div>
+                        <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 18, color: "#1a1a1a" }}>
+                          {fmt(cat.total)}
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                          <span style={{ fontSize: 11, color: "#999", fontFamily: "DM Sans, sans-serif" }}>{cat.pct.toFixed(1)}% du total</span>
+                          {cat.variation !== null && (
+                            <span style={{ fontSize: 10, color: cat.variation <= 0 ? "#166534" : "#991b1b", fontFamily: "DM Sans, sans-serif", fontWeight: 600 }}>
+                              {cat.variation > 0 ? "+" : ""}{cat.variation.toFixed(1)}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
               {/* ── Monthly Evolution ── */}
-              <div style={S.sec}>Evolution mensuelle — Exercice {curFY}/{curFY + 1}</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <div style={{ ...S.sec, marginBottom: 0 }}>Evolution mensuelle — Exercice {curFY}/{curFY + 1}</div>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {(["supplier", "category"] as const).map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => setEvoView(v)}
+                      style={{
+                        fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 600,
+                        padding: "4px 12px", borderRadius: 14, cursor: "pointer",
+                        border: evoView === v ? "1.5px solid #D4775A" : "1px solid #ddd6c8",
+                        background: evoView === v ? "#D4775A" : "#fff",
+                        color: evoView === v ? "#fff" : "#777",
+                      }}
+                    >
+                      {v === "supplier" ? "Par fournisseur" : "Par categorie"}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div style={{ ...S.card, marginBottom: 14, padding: "18px 20px" }}>
                 {curFYMonths.length === 0 ? (
                   <p style={{ color: "#999", fontSize: 13, margin: 0 }}>Aucune donnee pour cet exercice.</p>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    {curFYMonths.map(renderStackedBar)}
+                    {evoView === "supplier"
+                      ? curFYMonths.map(renderStackedBar)
+                      : curFYMonths.map(renderCategoryBar)}
                   </div>
                 )}
 
-                {/* Supplier legend */}
-                {curFYMonths.length > 0 && (() => {
+                {/* Legend */}
+                {curFYMonths.length > 0 && evoView === "supplier" && (() => {
                   const allSuppliers = new Map<string, { name: string; color: string }>();
                   for (const m of curFYMonths) {
                     for (const s of m.suppliers) {
@@ -643,6 +826,16 @@ export default function AchatsPage() {
                     </div>
                   );
                 })()}
+                {curFYMonths.length > 0 && evoView === "category" && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 14, paddingTop: 10, borderTop: "1px solid #eee6d8" }}>
+                    {Object.entries(CATEGORY_COLORS).map(([name, color]) => (
+                      <div key={name} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
+                        <span style={{ fontSize: 10, color: "#999", fontFamily: "DM Sans, sans-serif" }}>{name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Archive FY evolution */}
@@ -687,6 +880,34 @@ export default function AchatsPage() {
                     </div>
                   ))}
                 </div>
+              )}
+
+              {/* ── Top 5 fournisseurs ── */}
+              {top5Suppliers.length > 0 && (
+                <>
+                  <div style={S.sec}>Top fournisseurs — {MONTH_NAMES[curMonth]} {curYear}</div>
+                  <div style={{ ...S.card, marginBottom: 28, padding: "18px 20px" }}>
+                    {top5Suppliers.map((sup, i) => (
+                      <div key={sup.name} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: i < top5Suppliers.length - 1 ? 10 : 0 }}>
+                        <div style={{ width: 20, fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 14, color: "#999", textAlign: "center", flexShrink: 0 }}>
+                          {i + 1}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
+                            <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 600, fontSize: 13, color: "#1a1a1a" }}>{sup.name}</span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <span style={{ fontSize: 11, color: "#999", fontFamily: "DM Sans, sans-serif" }}>{sup.pct.toFixed(1)}%</span>
+                              <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 13, color: "#1a1a1a" }}>{fmt(sup.total)}</span>
+                            </div>
+                          </div>
+                          <div style={{ height: 6, borderRadius: 3, background: "#f2ede4", overflow: "hidden" }}>
+                            <div style={{ height: "100%", borderRadius: 3, background: sup.color, width: `${sup.pct}%`, transition: "width 0.3s" }} />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
 
               {/* ── Invoices by month ── */}
