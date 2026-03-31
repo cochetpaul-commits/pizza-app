@@ -28,8 +28,7 @@ async function getAccessToken(): Promise<string> {
 }
 
 /**
- * OCR an image (or single-page PDF rendered as image) via Google Cloud Vision.
- * Returns the full extracted text.
+ * OCR an image via Google Cloud Vision.
  */
 export async function ocrImage(imageBytes: Uint8Array): Promise<string> {
   const token = await getAccessToken();
@@ -65,4 +64,39 @@ export async function ocrImage(imageBytes: Uint8Array): Promise<string> {
     if (errorInfo) throw new Error(`Vision API: ${errorInfo.message}`);
   }
   return text;
+}
+
+/**
+ * OCR a scanned PDF using Claude Vision (supports PDF natively).
+ * Falls back to Google Vision for images.
+ */
+export async function ocrPdf(pdfBytes: Uint8Array): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY manquante pour OCR PDF");
+
+  const { default: Anthropic } = await import("@anthropic-ai/sdk");
+  const anthropic = new Anthropic({ apiKey });
+
+  const base64 = Buffer.from(pdfBytes).toString("base64");
+
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-5",
+    max_tokens: 8192,
+    messages: [{
+      role: "user",
+      content: [
+        {
+          type: "document",
+          source: { type: "base64", media_type: "application/pdf", data: base64 },
+        },
+        {
+          type: "text",
+          text: "Extrais le texte complet de ce document PDF. Retourne uniquement le texte brut, sans mise en forme, sans commentaire. Conserve la structure (lignes, colonnes) au mieux.",
+        },
+      ],
+    }],
+  });
+
+  const textBlock = response.content.find(b => b.type === "text");
+  return textBlock?.type === "text" ? textBlock.text : "";
 }

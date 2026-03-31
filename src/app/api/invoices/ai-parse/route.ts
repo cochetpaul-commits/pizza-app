@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { pdfToText } from "@/lib/pdfToText";
-import { ocrImage } from "@/lib/ocrVision";
+import { ocrPdf } from "@/lib/ocrVision";
 import { runImport } from "@/lib/invoices/importEngine";
 import { detectInvoice, supplierSlugToRoute } from "@/lib/invoices/invoiceDetector";
 import {
@@ -90,9 +90,9 @@ export async function POST(req: Request) {
 
     // If PDF has no text (scan/image), try OCR via Google Vision
     if (rawText.trim().length < 30) {
-      console.log(`[ai-parse] PDF is a scan — trying OCR via Google Vision...`);
+      console.log(`[ai-parse] PDF is a scan — trying OCR via Claude Vision...`);
       try {
-        rawText = await ocrImage(bytes);
+        rawText = await ocrPdf(bytes);
         ocrUsed = true;
         console.log(`[ai-parse] OCR extracted ${rawText.length} chars`);
       } catch (ocrErr) {
