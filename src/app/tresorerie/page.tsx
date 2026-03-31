@@ -1600,12 +1600,12 @@ function TresoreriePage() {
               Releve Caisse d&apos;Epargne (PDF) &middot; Plusieurs fichiers acceptes
             </div>
           </div>
-          {operations.length > 0 && (
+          {ops.length > 0 && (
             <button type="button" onClick={async () => {
               if (!confirm("Supprimer toutes les operations bancaires et re-importer ? Les releves devront etre re-uploades.")) return;
               if (!etabId) return;
               await supabase.from("bank_operations").delete().eq("etablissement_id", etabId);
-              setOperations([]);
+              setOps([]);
               setImportMsg("Operations supprimees. Re-importez vos releves.");
             }} style={{ marginTop: 8, padding: "6px 14px", borderRadius: 8, border: "1px solid #DC262630", background: "#DC262608", color: "#DC2626", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
               Reinitialiser les donnees
