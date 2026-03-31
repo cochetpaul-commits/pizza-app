@@ -373,7 +373,7 @@ export function BottomTabBar() {
           borderRadius: 14, overflow: "hidden",
           boxShadow: "0 8px 32px rgba(0,0,0,0.14)",
         }}>
-          <button type="button" onClick={() => { setGroupView(true); setEtabMenuOpen(false); }} style={{
+          <button type="button" onClick={() => { setGroupView(true); setEtabMenuOpen(false); router.push("/dashboard"); }} style={{
             display: "flex", alignItems: "center", gap: 10,
             width: "100%", padding: "12px 16px",
             border: "none", cursor: "pointer",
@@ -388,7 +388,11 @@ export function BottomTabBar() {
             const isSelected = !isGroupView && current?.id === e.id;
             const clr = e.couleur ?? "#b45f57";
             return (
-              <button key={e.id} type="button" onClick={() => { setGroupView(false); setCurrent(e); setEtabMenuOpen(false); }} style={{
+              <button key={e.id} type="button" onClick={() => {
+                setGroupView(false); setCurrent(e); setEtabMenuOpen(false);
+                const slug = e.slug?.includes("piccola") ? "/piccola-mia" : "/bello-mio";
+                router.push(slug);
+              }} style={{
                 display: "flex", alignItems: "center", gap: 10,
                 width: "100%", padding: "12px 16px",
                 border: "none", cursor: "pointer",
