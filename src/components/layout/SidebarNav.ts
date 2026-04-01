@@ -125,7 +125,7 @@ export const PERSONNEL_SECTION: NavSubSection = { label: "Personnel", icon: "use
 export const PRODUCTION_SECTION: NavSubSection = { label: "Production", icon: "package", roles: ["group_admin"], items: PRODUCTION_ITEMS };
 export const PRODUCTION_SECTION_PICCOLA: NavSubSection = { label: "Production", icon: "package", roles: ["group_admin"], items: PRODUCTION_ITEMS_PICCOLA };
 export const ACHATS_SECTION: NavSubSection = { label: "Achats", icon: "shoppingBag", roles: ["group_admin"], items: ACHATS_ITEMS };
-export const EVENEMENTIEL_SECTION: NavSubSection = { label: "Evenementiel", icon: "calendarEvent", roles: ["group_admin"], items: EVENEMENTIEL_ITEMS };
+export const EVENEMENTIEL_SECTION: NavSubSection = { label: "Evenementiel", icon: "calendarEvent", items: EVENEMENTIEL_ITEMS };
 
 // Backward compat
 export const VENTES_SECTION = PILOTAGE_SECTION;
@@ -209,6 +209,7 @@ export const SIDEBAR_NAV_SIMPLE: SidebarEntry[] = [
   { kind: "item", label: "Commandes", href: "/commandes", icon: "shoppingBag" },
   { kind: "item", label: "Fournisseurs", href: "/fournisseurs", icon: "truck" },
   { kind: "item", label: "Planning", href: "/plannings", icon: "calendar" },
+  { kind: "item", label: "Événements", href: "/evenements", icon: "calendarEvent" },
   { kind: "divider" },
   { kind: "item", label: "Mon compte", href: "/settings/account", icon: "settings" },
 ];

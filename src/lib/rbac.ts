@@ -28,7 +28,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/groupe":       ["group_admin"],
   "/admin":        ["group_admin"],
   "/invoices":     ["group_admin"],
-  "/evenements":   ["group_admin"],
+  "/evenements":   ALL,
   "/pilotage":     ["group_admin"],
   "/mercuriale":   ["group_admin"],
   "/epicerie":     ["group_admin"],

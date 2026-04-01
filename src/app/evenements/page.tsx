@@ -259,7 +259,7 @@ export default function EventsPage() {
   const accentDark = etab?.slug?.includes("piccola") ? "#C49A1A" : "#b5573d";
 
   return (
-    <RequireRole allowedRoles={["group_admin"]}>
+    <RequireRole allowedRoles={["group_admin", "equipier"]}>
     <>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "12px 16px 100px" }}>
 
