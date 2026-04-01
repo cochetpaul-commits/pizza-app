@@ -251,7 +251,7 @@ function RecipeCard({
           )}
           {cost != null && cost > 0 && (
             <span style={{ fontSize: 11, color: "#999" }}>
-              {subtitle ? "· " : ""}{fmt(cost)}{" \u20AC"}{costLabel ?? ""}
+              {subtitle ? "· " : ""}{fmt(cost)}{" €"}{costLabel ?? ""}
             </span>
           )}
         </div>
@@ -267,7 +267,7 @@ function RecipeCard({
             color: isConseille ? "#b0a89e" : "#1a1a1a",
             whiteSpace: "nowrap",
           }}>
-            {fmt(effectivePrice)}{" \u20AC"}
+            {fmt(effectivePrice)}{" €"}
             {pvLabel && <span style={{ fontSize: 9, fontWeight: 500, color: "#999", marginLeft: 2 }}>{pvLabel}</span>}
             {isConseille && <span style={{ fontSize: 9, fontWeight: 500, color: "#b0a89e", marginLeft: 2 }}>(c)</span>}
           </div>
@@ -589,7 +589,7 @@ function RecettesInner() {
                     <button type="button" onClick={() => {
                       const nom = prompt("Nom de la nouvelle categorie :");
                       if (nom && nom.trim()) {
-                        const slug = nom.trim().toLowerCase().replace(/\s+/g, "_").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        const slug = nom.trim().toLowerCase().replace(/\s+/g, "_").normalize("NFD").replace(/[̀-ͯ]/g, "");
                         router.push(`/recettes/new/cuisine?category=${encodeURIComponent(slug)}&categoryLabel=${encodeURIComponent(nom.trim())}`);
                         setShowFab(false);
                       }
@@ -603,7 +603,7 @@ function RecettesInner() {
             )}
             <button onClick={refresh} disabled={loading}
               style={{ width: 36, height: 36, borderRadius: "50%", border: "1.5px solid #ddd6c8", background: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {loading ? "\u2026" : "\u21BB"}
+              {loading ? "…" : "↻"}
             </button>
           </div>
         </div>
@@ -639,7 +639,7 @@ function RecettesInner() {
               cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 18, color: hasActiveFilter ? "#D4775A" : "#999",
             }}>
-            {hasActiveFilter ? "\u2731" : "\u2630"}
+            {hasActiveFilter ? "✱" : "☰"}
           </button>
           {/* Sort dropdown custom */}
           <div style={{ position: "relative", flexShrink: 0 }}>
@@ -650,7 +650,7 @@ function RecettesInner() {
                 fontSize: 12, fontWeight: 700, color: "#1a1a1a", cursor: "pointer",
                 display: "flex", alignItems: "center", gap: 4,
               }}>
-              {sortKey === "name" ? (sortDir === "asc" ? "A-Z" : "Z-A") : sortKey === "cost" ? "Co\u00FBt" : sortKey === "fc" ? "FC" : "Prix"}
+              {sortKey === "name" ? (sortDir === "asc" ? "A-Z" : "Z-A") : sortKey === "cost" ? "Coût" : sortKey === "fc" ? "FC" : "Prix"}
               <span style={{ fontSize: 9, opacity: 0.5 }}>{"▼"}</span>
             </button>
             {showSort && (
@@ -663,14 +663,14 @@ function RecettesInner() {
                   minWidth: 130,
                 }}>
                   {([
-                    { k: "name" as SortKey, d: "asc" as SortDir, label: "A \u2192 Z" },
-                    { k: "name" as SortKey, d: "desc" as SortDir, label: "Z \u2192 A" },
-                    { k: "cost" as SortKey, d: "asc" as SortDir, label: "Co\u00FBt \u2191" },
-                    { k: "cost" as SortKey, d: "desc" as SortDir, label: "Co\u00FBt \u2193" },
-                    { k: "fc" as SortKey, d: "asc" as SortDir, label: "FC \u2191" },
-                    { k: "fc" as SortKey, d: "desc" as SortDir, label: "FC \u2193" },
-                    { k: "price" as SortKey, d: "asc" as SortDir, label: "Prix \u2191" },
-                    { k: "price" as SortKey, d: "desc" as SortDir, label: "Prix \u2193" },
+                    { k: "name" as SortKey, d: "asc" as SortDir, label: "A → Z" },
+                    { k: "name" as SortKey, d: "desc" as SortDir, label: "Z → A" },
+                    { k: "cost" as SortKey, d: "asc" as SortDir, label: "Coût ↑" },
+                    { k: "cost" as SortKey, d: "desc" as SortDir, label: "Coût ↓" },
+                    { k: "fc" as SortKey, d: "asc" as SortDir, label: "FC ↑" },
+                    { k: "fc" as SortKey, d: "desc" as SortDir, label: "FC ↓" },
+                    { k: "price" as SortKey, d: "asc" as SortDir, label: "Prix ↑" },
+                    { k: "price" as SortKey, d: "desc" as SortDir, label: "Prix ↓" },
                   ]).map(opt => {
                     const active = sortKey === opt.k && sortDir === opt.d;
                     return (
@@ -699,7 +699,7 @@ function RecettesInner() {
             { key: "pizza" as MainTab, label: "Pizza", color: PIZZA_COLOR },
             { key: "cuisine" as MainTab, label: "Cuisine", color: CUISINE_COLOR },
             { key: "cocktail" as MainTab, label: "Cocktail", color: COCKTAIL_COLOR },
-            { key: "empatement" as MainTab, label: "Emp\u00E2t.", color: EMP_COLOR },
+            { key: "empatement" as MainTab, label: "Empât.", color: EMP_COLOR },
           ]).map(t => (
             <div key={t.key} style={{ position: "relative", flexShrink: 0 }}>
               <button type="button"
@@ -732,7 +732,7 @@ function RecettesInner() {
                       </h3>
                       <button type="button" onClick={() => setShowCuisinePop(false)}
                         style={{ background: "none", border: "none", fontSize: 20, color: "#999", cursor: "pointer", padding: 4 }}>
-                        {"\u2715"}
+                        {"✕"}
                       </button>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -899,7 +899,7 @@ function RecettesInner() {
         {/* ── Empatement ── */}
         {showEmp && filteredEmps.length > 0 && (
           <div style={{ marginBottom: 24 }}>
-            <SectionHeader title="Emp\u00E2tement" color={EMP_COLOR} count={filteredEmps.length}
+            <SectionHeader title="Empâtement" color={EMP_COLOR} count={filteredEmps.length}
               newHref={canWrite ? "/recettes/new/empatement" : undefined} />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 8 }}>
               {filteredEmps.map(r => (
@@ -909,7 +909,7 @@ function RecettesInner() {
                   href={`/recettes/empatement/${r.id}`}
                   onProd={r.pivot_ingredient_id ? () => setProdModal({ type: "empatement", id: r.id, name: r.name ?? "Empatement", pivotId: r.pivot_ingredient_id! }) : undefined}
                   color={EMP_COLOR}
-                  subtitle="Emp\u00E2tement"
+                  subtitle="Empâtement"
                   subtitleColor={EMP_COLOR}
                 />
               ))}

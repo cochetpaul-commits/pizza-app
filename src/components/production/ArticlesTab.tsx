@@ -42,7 +42,7 @@ type Tab = "non-lies" | "lies" | "simulateur";
 type SortCol = "nom_vente" | "source" | "cout_unitaire" | "prix_vente_ttc" | "marge_pct" | "food_cost_pct";
 
 /* ── Helpers ── */
-const fmt = (v: number) => v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "\u20AC";
+const fmt = (v: number) => v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "€";
 const fmtPct = (v: number | null) => (v !== null ? v.toFixed(1) + "%" : "-");
 
 const COLORS = {
@@ -681,7 +681,7 @@ export function ArticlesContent() {
   /* ── Sort indicator ── */
   const sortArrow = (col: SortCol) => {
     if (sortCol !== col) return "";
-    return sortDir === "asc" ? " \u25B2" : " \u25BC";
+    return sortDir === "asc" ? " ▲" : " ▼";
   };
 
   /* ══════════════════ RENDER ══════════════════ */
@@ -780,7 +780,7 @@ export function ArticlesContent() {
                           </td>
                           <td className="ventes-col-hide-mobile" style={S.tdR}>{p.qty}</td>
                           <td className="ventes-col-hide-mobile" style={S.tdR}>{fmt(p.ca_ttc)}</td>
-                          <td style={{ ...S.tdR, color: accent, fontWeight: 600 }}>{p.prix_unit_ttc ? p.prix_unit_ttc.toFixed(2) + "\u20AC" : "\u2014"}</td>
+                          <td style={{ ...S.tdR, color: accent, fontWeight: 600 }}>{p.prix_unit_ttc ? p.prix_unit_ttc.toFixed(2) + "€" : "—"}</td>
                           <td style={{ ...S.td, textAlign: "center" }}>
                             {expandedRow === p.nom_vente ? (
                               <button style={S.btnOutline} onClick={resetLinkForm}>Fermer</button>
