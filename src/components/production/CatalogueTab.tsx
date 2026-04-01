@@ -10,6 +10,8 @@ import { AiInsightCard } from "@/components/AiInsightCard";
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type RecipeType = "pizza" | "cuisine" | "cocktail" | "production";
+type MainFilter = "tous" | "pizza" | "cuisine" | "cocktail" | "empatement";
+type CuisineCatFilter = "all" | "plat_cuisine" | "preparation" | "entree" | "sauce" | "dessert" | "accompagnement" | "autre";
 
 type RecipeLine = {
   ingredient_name: string;
@@ -69,6 +71,23 @@ const CUISINE_CAT_LABELS: Record<string, string> = {
   dessert: "Dessert",
   autre: "Autre",
 };
+
+const EMP_COLOR = "#8a7b6b";
+
+const CUISINE_CAT_COLORS: Record<string, string> = {
+  all: "#4a6741", plat_cuisine: "#B45309", preparation: "#7C3AED",
+  entree: "#0284C7", sauce: "#DC2626", dessert: "#D4775A",
+  accompagnement: "#16A34A", autre: "#6B7280",
+};
+
+const CUISINE_SUB_FILTERS: { id: CuisineCatFilter; label: string; color: string }[] = [
+  { id: "plat_cuisine",  label: "Plat",       color: CUISINE_CAT_COLORS.plat_cuisine },
+  { id: "preparation",   label: "Prep",       color: CUISINE_CAT_COLORS.preparation },
+  { id: "entree",        label: "Entrée",     color: CUISINE_CAT_COLORS.entree },
+  { id: "sauce",         label: "Sauce",      color: CUISINE_CAT_COLORS.sauce },
+  { id: "dessert",       label: "Dessert",    color: CUISINE_CAT_COLORS.dessert },
+  { id: "autre",         label: "Autre",      color: CUISINE_CAT_COLORS.autre },
+];
 
 function fmtQty(v: number): string {
   if (v === 0) return "0";
@@ -362,7 +381,9 @@ export function CatalogueContent() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
-  const [typeFilter, setTypeFilter] = useState<RecipeType | null>(null);
+  const [mainFilter, setMainFilter] = useState<MainFilter>("tous");
+  const [cuisineCatFilter, setCuisineCatFilter] = useState<CuisineCatFilter>("all");
+  const [prodFilter, setProdFilter] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
   const [showTypePop, setShowTypePop] = useState(false);
@@ -381,18 +402,35 @@ export function CatalogueContent() {
 
   const filtered = useMemo(() => {
     let arr = recipes;
-    if (typeFilter) arr = arr.filter(r => r.type === typeFilter);
+    // Main filter
+    if (mainFilter === "pizza") arr = arr.filter(r => r.type === "pizza");
+    else if (mainFilter === "cuisine") {
+      arr = arr.filter(r => r.type === "cuisine");
+      if (cuisineCatFilter !== "all") arr = arr.filter(r => r.category === cuisineCatFilter);
+    }
+    else if (mainFilter === "cocktail") arr = arr.filter(r => r.type === "cocktail");
+    else if (mainFilter === "empatement") arr = arr.filter(r => r.type === "production" && r.category === "empatement");
+    // Production toggle (preps only, not empâtement)
+    if (prodFilter) arr = arr.filter(r => r.type === "production" && r.category !== "empatement");
+    // Search
     if (q.trim()) {
       const low = q.toLowerCase();
       arr = arr.filter(r => r.name.toLowerCase().includes(low));
     }
     return arr;
-  }, [recipes, typeFilter, q]);
+  }, [recipes, mainFilter, cuisineCatFilter, prodFilter, q]);
 
-  const typeCounts = useMemo(() => {
-    const c: Record<string, number> = {};
-    for (const r of recipes) c[r.type] = (c[r.type] ?? 0) + 1;
-    return c;
+  // Counts per main filter (independent of current filter)
+  const filterCounts = useMemo(() => {
+    const prodPreps = recipes.filter(r => r.type === "production" && r.category !== "empatement").length;
+    return {
+      tous: recipes.length,
+      pizza: recipes.filter(r => r.type === "pizza").length,
+      cuisine: recipes.filter(r => r.type === "cuisine").length,
+      cocktail: recipes.filter(r => r.type === "cocktail").length,
+      empatement: recipes.filter(r => r.type === "production" && r.category === "empatement").length,
+      production: prodPreps,
+    };
   }, [recipes]);
 
   // Group by type, then by category
@@ -454,9 +492,11 @@ export function CatalogueContent() {
     display: "flex", alignItems: "center", gap: 8,
   });
 
+  const activeColor = mainFilter === "pizza" ? TYPE_COLORS.pizza : mainFilter === "cuisine" ? TYPE_COLORS.cuisine : mainFilter === "cocktail" ? TYPE_COLORS.cocktail : mainFilter === "empatement" ? EMP_COLOR : null;
+  const activeLabel = mainFilter === "tous" ? "Toutes" : mainFilter === "pizza" ? "Pizza" : mainFilter === "cuisine" ? (cuisineCatFilter !== "all" ? CUISINE_SUB_FILTERS.find(f => f.id === cuisineCatFilter)?.label ?? "Cuisine" : "Cuisine") : mainFilter === "cocktail" ? "Cocktail" : "Empât.";
+
   return (
-    <div style={{ background: "#f2ede4", minHeight: "100vh" }}>
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 60px" }}>
+    <main className="container" style={{ paddingBottom: 80 }}>
 
         {/* ── Line 1 — title + AI suggestions ── */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
@@ -474,7 +514,7 @@ export function CatalogueContent() {
           />
         </div>
 
-        {/* ── Line 2 — search + category dropdown + production ── */}
+        {/* ── Line 2 — search + category dropdown + production toggle ── */}
         <div style={{ display: "flex", gap: 6, marginBottom: 14, alignItems: "center" }}>
           <div style={{ position: "relative", flex: 1 }}>
             <input
@@ -494,13 +534,13 @@ export function CatalogueContent() {
             <button type="button" onClick={() => setShowTypePop(p => !p)}
               style={{
                 padding: "8px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                border: typeFilter ? `1.5px solid ${TYPE_COLORS[typeFilter]}` : "1.5px solid #ddd6c8",
-                background: typeFilter ? TYPE_COLORS[typeFilter] + "14" : "#fff",
-                color: typeFilter ? TYPE_COLORS[typeFilter] : "#1a1a1a",
+                border: activeColor ? `1.5px solid ${activeColor}` : "1.5px solid #ddd6c8",
+                background: activeColor ? activeColor + "14" : "#fff",
+                color: activeColor ?? "#1a1a1a",
                 cursor: "pointer", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
               }}>
-              {typeFilter ? TYPE_LABELS[typeFilter] : "Toutes"}
-              <span style={{ fontSize: 10, opacity: 0.6 }}>({typeFilter ? (typeCounts[typeFilter] ?? 0) : recipes.length})</span>
+              {activeLabel}
+              <span style={{ fontSize: 10, opacity: 0.6 }}>({filterCounts[mainFilter]})</span>
               <span style={{ fontSize: 8, opacity: 0.5 }}>{"▼"}</span>
             </button>
             {showTypePop && (
@@ -510,26 +550,68 @@ export function CatalogueContent() {
                   position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 200,
                   background: "#fff", borderRadius: 14, padding: 6,
                   boxShadow: "0 8px 30px rgba(0,0,0,0.15)", border: "1px solid #e0d8ce",
-                  minWidth: 200,
+                  minWidth: 220,
                 }}>
-                  <button type="button" onClick={() => { setTypeFilter(null); setShowTypePop(false); }}
-                    style={menuItem(!typeFilter, "#1a1a1a")}>
+                  {/* Toutes */}
+                  <button type="button" onClick={() => { setMainFilter("tous"); setCuisineCatFilter("all"); setShowTypePop(false); }}
+                    style={menuItem(mainFilter === "tous", "#1a1a1a")}>
                     Toutes les fiches
-                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{recipes.length}</span>
+                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{filterCounts.tous}</span>
                   </button>
                   <div style={{ height: 1, background: "#f0ebe2", margin: "4px 0" }} />
-                  {(["pizza", "cuisine", "cocktail", "production"] as const).map(t => (
-                    <button key={t} type="button" onClick={() => { setTypeFilter(t); setShowTypePop(false); }}
-                      style={menuItem(typeFilter === t, TYPE_COLORS[t])}>
-                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: TYPE_COLORS[t], flexShrink: 0 }} />
-                      {TYPE_LABELS[t]}
-                      <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{typeCounts[t] ?? 0}</span>
+                  {/* Pizza */}
+                  <button type="button" onClick={() => { setMainFilter("pizza"); setCuisineCatFilter("all"); setShowTypePop(false); }}
+                    style={menuItem(mainFilter === "pizza", TYPE_COLORS.pizza)}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: TYPE_COLORS.pizza, flexShrink: 0 }} />
+                    Pizza
+                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{filterCounts.pizza}</span>
+                  </button>
+                  {/* Cuisine (tous) */}
+                  <button type="button" onClick={() => { setMainFilter("cuisine"); setCuisineCatFilter("all"); setShowTypePop(false); }}
+                    style={menuItem(mainFilter === "cuisine" && cuisineCatFilter === "all", TYPE_COLORS.cuisine)}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: TYPE_COLORS.cuisine, flexShrink: 0 }} />
+                    Cuisine (tous)
+                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{filterCounts.cuisine}</span>
+                  </button>
+                  {/* Cuisine sub-categories */}
+                  {CUISINE_SUB_FILTERS.map(f => (
+                    <button key={f.id} type="button" onClick={() => { setMainFilter("cuisine"); setCuisineCatFilter(f.id); setShowTypePop(false); }}
+                      style={{ ...menuItem(mainFilter === "cuisine" && cuisineCatFilter === f.id, f.color), paddingLeft: 32 }}>
+                      {f.label}
                     </button>
                   ))}
+                  <div style={{ height: 1, background: "#f0ebe2", margin: "4px 0" }} />
+                  {/* Cocktail */}
+                  <button type="button" onClick={() => { setMainFilter("cocktail"); setCuisineCatFilter("all"); setShowTypePop(false); }}
+                    style={menuItem(mainFilter === "cocktail", TYPE_COLORS.cocktail)}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: TYPE_COLORS.cocktail, flexShrink: 0 }} />
+                    Cocktail
+                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{filterCounts.cocktail}</span>
+                  </button>
+                  {/* Empâtement */}
+                  <button type="button" onClick={() => { setMainFilter("empatement"); setCuisineCatFilter("all"); setShowTypePop(false); }}
+                    style={menuItem(mainFilter === "empatement", EMP_COLOR)}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: EMP_COLOR, flexShrink: 0 }} />
+                    Empâtement
+                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{filterCounts.empatement}</span>
+                  </button>
                 </div>
               </>
             )}
           </div>
+          {/* Production toggle (preps, not empâtement) */}
+          {filterCounts.production > 0 && (
+            <button type="button" onClick={() => setProdFilter(p => !p)}
+              style={{
+                padding: "7px 10px", borderRadius: 10, fontSize: 11, fontWeight: 700,
+                border: prodFilter ? "1.5px solid #6b5b3e" : "1.5px solid #ddd6c8",
+                background: prodFilter ? "#6b5b3e14" : "#fff",
+                color: prodFilter ? "#6b5b3e" : "#999",
+                cursor: "pointer", whiteSpace: "nowrap",
+              }}>
+              Production ({filterCounts.production})
+            </button>
+          )}
         </div>
 
         {/* Loading */}
@@ -759,7 +841,6 @@ export function CatalogueContent() {
             </div>
           );
         })}
-      </div>
 
       {/* MODALE PIVOT */}
       {modalRecipe && (() => {
@@ -1073,6 +1154,6 @@ export function CatalogueContent() {
           </div>
         );
       })()}
-    </div>
+    </main>
   );
 }
