@@ -318,6 +318,23 @@ function TresoreriePage() {
   // Search / filter for operations table
   const [search, setSearch] = useState("");
   const [expandOps, setExpandOps] = useState(false);
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+
+  const recategorize = useCallback(async (operationId: string, newCategory: string) => {
+    if (!etabId) return;
+    setEditingCatId(null);
+    // Optimistic update
+    setOps(prev => prev.map(o => o.id === operationId ? { ...o, category: newCategory } : o));
+    try {
+      await fetchApi("/api/tresorerie/categorize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operation_id: operationId, category: newCategory, etablissement_id: etabId }),
+      });
+    } catch (err) {
+      console.error("Recategorize error:", err);
+    }
+  }, [etabId]);
 
   const period = useMemo(() => getPeriodRange(periodMode, year, month), [periodMode, year, month]);
 
@@ -1460,17 +1477,40 @@ function TresoreriePage() {
                         >
                           {op.label}
                         </td>
-                        <td style={{ padding: "10px 14px", textAlign: "center" }}>
-                          <span
+                        <td style={{ padding: "10px 14px", textAlign: "center", position: "relative" }}>
+                          <button type="button"
+                            onClick={() => setEditingCatId(editingCatId === op.id ? null : op.id)}
                             style={{
                               ...S.badge,
+                              border: "none", cursor: "pointer",
                               color: EXPENSE_COLORS[classifyExpense(op.label, op.category, supplierNames)] ?? "#777",
-                              background:
-                                (EXPENSE_COLORS[classifyExpense(op.label, op.category, supplierNames)] ?? "#777") + "15",
+                              background: (EXPENSE_COLORS[classifyExpense(op.label, op.category, supplierNames)] ?? "#777") + "15",
                             }}
                           >
                             {classifyExpense(op.label, op.category, supplierNames)}
-                          </span>
+                          </button>
+                          {editingCatId === op.id && (
+                            <div style={{
+                              position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)",
+                              zIndex: 50, background: "#fff", border: "1px solid #e0d8ce", borderRadius: 10,
+                              boxShadow: "0 8px 24px rgba(0,0,0,0.12)", padding: 4, minWidth: 180, maxHeight: 300, overflowY: "auto",
+                            }}>
+                              {Object.entries(CAT_LABELS).filter(([k]) => k !== "encaissement_cb").map(([key, label]) => (
+                                <button key={key} type="button"
+                                  onClick={() => recategorize(op.id, key)}
+                                  style={{
+                                    display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "6px 10px",
+                                    border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, textAlign: "left",
+                                    background: op.category === key ? (CAT_COLORS[key] ?? "#777") + "15" : "transparent",
+                                    color: op.category === key ? CAT_COLORS[key] ?? "#777" : "#333",
+                                    fontWeight: op.category === key ? 700 : 400,
+                                  }}>
+                                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAT_COLORS[key] ?? "#777", flexShrink: 0 }} />
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td
                           style={{

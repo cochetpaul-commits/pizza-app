@@ -53,6 +53,27 @@ export async function POST(request: NextRequest) {
     }, { status: 400 });
   }
 
+  // Load custom category rules for this establishment
+  const { data: customRules } = await supabaseAdmin
+    .from("bank_category_rules")
+    .select("pattern, category")
+    .eq("etablissement_id", etabId);
+
+  const rules = (customRules ?? []) as { pattern: string; category: string }[];
+
+  // Apply custom rules to override default categories
+  for (const op of parsed.operations) {
+    if (op.category === "autre" && rules.length > 0) {
+      const upperLabel = op.label.toUpperCase();
+      for (const rule of rules) {
+        if (upperLabel.includes(rule.pattern.toUpperCase())) {
+          op.category = rule.category;
+          break;
+        }
+      }
+    }
+  }
+
   // Upsert operations — avoid duplicates via date + label + amount combo
   let imported = 0;
   let skipped = 0;
