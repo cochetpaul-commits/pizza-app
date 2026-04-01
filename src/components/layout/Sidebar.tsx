@@ -95,7 +95,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [etabDropdownOpen]);
 
-  const isAdmin = role === "group_admin" || role === "manager";
+  const isAdmin = role === "group_admin";
   const etabColor = isGroupView ? C.ifratelli : (current?.couleur ?? C.ifratelli);
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");

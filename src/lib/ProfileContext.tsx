@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import type { Role } from "@/lib/rbac";
+import { normalizeRole, type Role } from "@/lib/rbac";
 import { hasPermission } from "@/lib/permissions";
 
 type ProfileCtx = {
@@ -44,20 +44,20 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         const { data: rpcRole } = await supabase.rpc("user_role");
         if (cancelled) return;
         if (rpcRole) {
-          setRole(rpcRole as Role);
+          setRole(normalizeRole(rpcRole as string));
           setDisplayName(null);
         } else {
-          setRole("cuisine");
+          setRole("equipier");
           setDisplayName(null);
         }
         setLoading(false);
         return;
       }
       if (data) {
-        setRole(data.role as Role);
+        setRole(normalizeRole(data.role as string));
         setDisplayName(data.display_name);
       } else {
-        setRole("cuisine");
+        setRole("equipier");
         setDisplayName(null);
       }
       setLoading(false);
@@ -91,7 +91,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const isGroupAdmin = role === "group_admin";
-  const cw = role === "group_admin" || role === "manager";
+  const cw = role === "group_admin";
   const can = (permission: string) => role ? hasPermission(role, permission) : false;
 
   return (

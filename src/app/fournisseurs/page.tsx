@@ -308,7 +308,7 @@ export default function FournisseursPage() {
   const modalColor = modalSupplier ? getSupplierColor(modalSupplier.name) : "#D4775A";
 
   return (
-    <RequireRole allowedRoles={["group_admin", "cuisine", "salle"]}>
+    <RequireRole allowedRoles={["group_admin", "equipier"]}>
       <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
         <h1 style={{
           fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24,

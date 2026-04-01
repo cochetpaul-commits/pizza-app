@@ -78,7 +78,7 @@ async function fetchAllRows(
 
 export default function PiccolaMiaDashboard() {
   return (
-    <RequireRole allowedRoles={["group_admin", "manager"]}>
+    <RequireRole allowedRoles={["group_admin", "equipier"]}>
       <PiccolaMiaContent />
     </RequireRole>
   );

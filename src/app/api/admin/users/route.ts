@@ -58,7 +58,7 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json();
   const { userId, role } = body as { userId?: string; role?: string };
-  if (!userId || !role || !["group_admin", "cuisine", "salle", "plonge"].includes(role)) {
+  if (!userId || !role || !["group_admin", "equipier"].includes(role)) {
     return NextResponse.json({ error: "Invalid params" }, { status: 400 });
   }
 

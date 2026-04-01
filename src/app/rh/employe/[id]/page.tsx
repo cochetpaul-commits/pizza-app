@@ -1098,12 +1098,12 @@ export default function EmployeDetailPage() {
         {/* ═══ TAB: ACCES ═══ */}
         {/* ═══ TAB: Role et Permissions ═══ */}
         {mainTab === "roles" && (() => {
-          const empRole = mapToPermRole((emp as Record<string, unknown>)?.role as string ?? "employe");
-          const perms = DEFAULT_PERMS[empRole] ?? DEFAULT_PERMS.employe;
+          const empRole = mapToPermRole((emp as Record<string, unknown>)?.role as string ?? "equipier");
+          const perms = DEFAULT_PERMS[empRole] ?? DEFAULT_PERMS.equipier;
           const customPerms: Record<string, boolean> = ((emp as Record<string, unknown>)?.custom_permissions as Record<string, boolean>) ?? {};
 
           const changeRole = async (newRole: PermRole) => {
-            const dbRole = newRole === "admin" ? "group_admin" : newRole === "manager" ? "manager" : "employe";
+            const dbRole = newRole === "admin" ? "group_admin" : "equipier";
             await supabase.from("employes").update({ role: dbRole, custom_permissions: {} }).eq("id", emp.id);
             setEmp((prev: Record<string, unknown>) => ({ ...prev, role: dbRole, custom_permissions: {} }));
           };
@@ -1134,7 +1134,7 @@ export default function EmployeDetailPage() {
                 defaultOpen
               >
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-                  {(["employe", "manager", "admin"] as PermRole[]).map(r => {
+                  {(["equipier", "admin"] as PermRole[]).map(r => {
                     const info = ROLE_INFO[r];
                     const active = empRole === r;
                     return (

@@ -16,20 +16,17 @@ type UserRow = {
   createdAt: string;
 };
 
-const ROLE_LABELS: Record<Role, string> = {
-  group_admin: "Direction",
-  manager: "Manager",
-  cuisine: "Cuisine",
-  salle: "Salle",
-  plonge: "Plonge",
+const ROLE_LABELS: Record<string, string> = {
+  group_admin: "Administrateur",
+  equipier: "Equipier",
+  // Legacy compat
+  manager: "Equipier", cuisine: "Equipier", salle: "Equipier", plonge: "Equipier",
 };
 
-const ROLE_COLORS: Record<Role, string> = {
+const ROLE_COLORS: Record<string, string> = {
   group_admin: "#D4775A",
-  manager: "#2563eb",
-  cuisine: "#1a1a1a",
-  salle: "#4a6741",
-  plonge: "#6b7280",
+  equipier: "#2D6A4F",
+  manager: "#2D6A4F", cuisine: "#2D6A4F", salle: "#2D6A4F", plonge: "#2D6A4F",
 };
 
 function fmtDate(iso: string) {
@@ -43,7 +40,7 @@ function UsersContent() {
   const [error, setError] = useState<string | null>(null);
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<Role>("cuisine");
+  const [inviteRole, setInviteRole] = useState<Role>("equipier");
   const [inviteName, setInviteName] = useState("");
   const [inviting, setInviting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -108,7 +105,7 @@ function UsersContent() {
       setShowInvite(false);
       setInviteEmail("");
       setInviteName("");
-      setInviteRole("cuisine");
+      setInviteRole("equipier");
       setRefreshKey(k => k + 1);
     } else {
       const data = await res.json();
@@ -189,11 +186,8 @@ function UsersContent() {
                       border: "1px solid #ddd", fontSize: 14, boxSizing: "border-box",
                     }}
                   >
-                    <option value="cuisine">Cuisine</option>
-                    <option value="salle">Salle</option>
-                    <option value="plonge">Plonge</option>
-                    <option value="manager">Manager</option>
-                    <option value="group_admin">Direction</option>
+                    <option value="equipier">Equipier</option>
+                    <option value="group_admin">Administrateur</option>
                   </select>
                 </div>
               </div>

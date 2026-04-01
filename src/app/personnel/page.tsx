@@ -162,14 +162,14 @@ export default function PersonnelPage() {
 
   if (loading) {
     return (
-      <RequireRole allowedRoles={["group_admin", "manager"]}>
+      <RequireRole allowedRoles={["group_admin"]}>
         <div style={{ textAlign: "center", padding: 60, color: "#999" }}>Chargement...</div>
       </RequireRole>
     );
   }
 
   return (
-    <RequireRole allowedRoles={["group_admin", "manager"]}>
+    <RequireRole allowedRoles={["group_admin"]}>
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 16px 60px" }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>

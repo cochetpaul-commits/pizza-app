@@ -52,7 +52,7 @@ export default function SetupPasswordPage() {
       // Ensure profile exists with correct role
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const role = user.user_metadata?.role || "cuisine";
+        const role = user.user_metadata?.role || "equipier";
         const displayName = user.user_metadata?.display_name || user.email;
         await supabase.from("profiles").upsert({
           id: user.id,

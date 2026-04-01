@@ -564,7 +564,7 @@ export default function PlanningPage() {
   const isToday = (iso: string) => iso === toISO(new Date());
 
   return (
-    <RequireRole allowedRoles={["group_admin", "cuisine", "salle"]}>
+    <RequireRole allowedRoles={["group_admin", "equipier"]}>
       <div style={pageStyle}>
         {/* ── Header with establishment + actions ── */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>

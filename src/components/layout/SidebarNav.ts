@@ -156,7 +156,7 @@ export function buildDynamicNav(
       etabSlug: etab.slug,
       label: etab.nom,
       color: etab.couleur ?? "#D4775A",
-      roles: ["group_admin", "manager"],
+      roles: ["group_admin", "equipier"],
       sections,
     });
   }
@@ -202,11 +202,13 @@ export const SIDEBAR_NAV_SIMPLE: SidebarEntry[] = [
   { kind: "item", label: "Accueil", href: "/dashboard", icon: "dashboard" },
   { kind: "divider" },
   { kind: "item", label: "Mon planning", href: "/mes-shifts", icon: "calendar" },
-  { kind: "item", label: "Recettes", href: "/recettes", icon: "book", roles: ["cuisine", "salle"] },
-  { kind: "item", label: "Ingrédients", href: "/ingredients", icon: "tag", roles: ["cuisine", "salle"] },
-  { kind: "item", label: "Commandes", href: "/commandes", icon: "shoppingBag", roles: ["cuisine", "salle"] },
-  { kind: "item", label: "Fournisseurs", href: "/fournisseurs", icon: "truck", roles: ["cuisine", "salle"] },
-  { kind: "item", label: "Planning", href: "/plannings", icon: "calendar", roles: ["cuisine", "salle"] },
+  { kind: "item", label: "Recettes", href: "/recettes", icon: "book" },
+  { kind: "item", label: "Catalogue", href: "/catalogue", icon: "book" },
+  { kind: "item", label: "Ingrédients", href: "/ingredients", icon: "tag" },
+  { kind: "item", label: "Inventaire", href: "/inventaire", icon: "clipboard" },
+  { kind: "item", label: "Commandes", href: "/commandes", icon: "shoppingBag" },
+  { kind: "item", label: "Fournisseurs", href: "/fournisseurs", icon: "truck" },
+  { kind: "item", label: "Planning", href: "/plannings", icon: "calendar" },
   { kind: "divider" },
   { kind: "item", label: "Mon compte", href: "/settings/account", icon: "settings" },
 ];
@@ -223,7 +225,7 @@ export const SIDEBAR_NAV: NavSection[] = [
   {
     label: "Personnel",
     icon: "users",
-    roles: ["group_admin", "manager"],
+    roles: ["group_admin"],
     items: [
       { label: "Employés", href: "/rh/equipe" },
       { label: "Planning", href: "/plannings" },
@@ -251,7 +253,7 @@ export const SIDEBAR_NAV: NavSection[] = [
   {
     label: "Cuisine",
     icon: "chefHat",
-    roles: ["cuisine", "salle"],
+    roles: ["equipier"],
     items: [
       { label: "Recettes", href: "/recettes" },
       { label: "Ingredients", href: "/ingredients" },

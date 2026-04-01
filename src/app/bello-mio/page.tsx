@@ -77,7 +77,7 @@ async function fetchAllRows(
 
 export default function BelloMioDashboard() {
   return (
-    <RequireRole allowedRoles={["group_admin", "manager"]}>
+    <RequireRole allowedRoles={["group_admin", "equipier"]}>
       <BelloMioContent />
     </RequireRole>
   );

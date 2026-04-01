@@ -24,7 +24,7 @@ export function AddCollaborateurModal({ etablissementId, onClose, onCreated }: P
   const [codePin, setCodePin] = useState("");
   const [heuresHebdo, setHeuresHebdo] = useState<number | "">("");
   const [heuresMensuelles, setHeuresMensuelles] = useState<number | "">("");
-  const [selectedRole, setSelectedRole] = useState<PermRole>("employe");
+  const [selectedRole, setSelectedRole] = useState<PermRole>("equipier");
   const [selectedEtabs, setSelectedEtabs] = useState<Record<string, { active: boolean; planning: boolean; equipe: string }>>({});
 
   // Load etabs + equipes
@@ -79,7 +79,7 @@ export function AddCollaborateurModal({ etablissementId, onClose, onCreated }: P
     }
 
     // Map role
-    const dbRole = selectedRole === "admin" ? "group_admin" : selectedRole === "manager" ? "manager" : "employe";
+    const dbRole = selectedRole === "admin" ? "group_admin" : "equipier";
 
     const { data: emp, error } = await supabase.from("employes").insert({
       etablissement_id: mainEtabId,

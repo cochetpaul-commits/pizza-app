@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Normalize role for Supabase profile
-  const profileRole = role ?? "employe";
+  const profileRole = role ?? "equipier";
 
   // Invite user — use production URL, never localhost
   const reqOrigin = new URL(req.url).origin;
