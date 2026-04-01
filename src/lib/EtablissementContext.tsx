@@ -117,7 +117,11 @@ export function EtablissementProvider({ children }: { children: ReactNode }) {
     init();
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session?.user) {
+      if (session?.user) {
+        // User just signed in — re-fetch establishments
+        cancelled = false;
+        init();
+      } else {
         setEtablissements([]);
         setCurrentRaw(null);
         setGroupViewRaw(false);
