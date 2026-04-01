@@ -6,6 +6,11 @@ import { RequireRole } from "@/components/RequireRole";
 import { fetchApi } from "@/lib/fetchApi";
 import { useEtablissement } from "@/lib/EtablissementContext";
 
+type DetectionResult = {
+  supplier: { slug: string; name: string; matchedKeyword: string } | null;
+  etablissement: { slug: string; name: string; matchedKeyword: string } | null;
+};
+
 type InvoiceLine = {
   sku?: string | null;
   name?: string | null;
@@ -53,24 +58,43 @@ const SUPPLIERS = [
 ];
 
 const ETABS = [
-  { name: "Bello Mio", value: "bellomio" as const },
-  { name: "Piccola Mia", value: "piccola" as const },
+  { slug: "bello_mio", name: "Bello Mio", value: "bellomio" as const },
+  { slug: "piccola_mia", name: "Piccola Mia", value: "piccola" as const },
 ];
 
-type Step = "select" | "preview" | "done";
+type Step = "upload" | "confirm" | "preview" | "done" | "batch";
+
+type BatchItem = {
+  file: File;
+  status: "pending" | "detecting" | "processing" | "done" | "error";
+  supplier?: string;
+  detectedSupplier?: string;
+  detectedEtab?: string;
+  result?: { ingredients_created?: number; offers_inserted?: number; already_imported?: boolean };
+  error?: string;
+};
 
 export default function InvoicesPage() {
   const fileRef = useRef<HTMLInputElement>(null);
+  const batchRef = useRef<HTMLInputElement>(null);
   const { etablissements } = useEtablissement();
 
-  const [step, setStep] = useState<Step>("select");
+  const [step, setStep] = useState<Step>("upload");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Batch mode
+  const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchEtab, setBatchEtab] = useState<string>("bellomio");
+
+  // Detection
+  const [detection, setDetection] = useState<DetectionResult | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<string | null>(null);
   const [selectedEtab, setSelectedEtab] = useState<string>("bellomio");
 
+  // Import results
   const [preview, setPreview] = useState<ImportResult | null>(null);
   const [commitResult, setCommitResult] = useState<ImportResult | null>(null);
 
@@ -88,26 +112,49 @@ export default function InvoicesPage() {
     return "";
   }
 
-  function getEtabId(): string {
-    return etablissements.find(e =>
-      selectedEtab === "piccola" ? e.slug?.includes("piccola") : e.slug?.includes("bello")
+  function getEtabId(etab?: string): string {
+    const e = etab ?? selectedEtab;
+    return etablissements.find(et =>
+      e === "piccola" ? et.slug?.includes("piccola") : et.slug?.includes("bello")
     )?.id ?? "";
   }
 
-  async function handleUpload(f: File) {
-    if (!selectedSupplier) return;
+  async function handleFileUpload(f: File) {
     if (!f.name.toLowerCase().endsWith(".pdf") && f.type !== "application/pdf") {
       setError("Seuls les fichiers PDF sont acceptes.");
       return;
     }
     setFile(f);
+    setError(null);
+    setLoading(true);
+
+    try {
+      const form = new FormData();
+      form.append("file", f);
+      const res = await fetchApi("/api/invoices/detect", { method: "POST", body: form });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error ?? "Erreur detection");
+      setDetection(data.detection);
+      setSelectedSupplier(data.detection?.supplier?.slug ?? null);
+      if (data.detection?.etablissement?.slug === "bello_mio") setSelectedEtab("bellomio");
+      else if (data.detection?.etablissement?.slug === "piccola_mia") setSelectedEtab("piccola");
+      setStep("confirm");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handlePreview() {
+    if (!file || !selectedSupplier) return;
     setLoading(true);
     setError(null);
     setPreview(null);
 
     try {
       const form = new FormData();
-      form.append("file", f);
+      form.append("file", file);
       form.append("mode", "preview");
       form.append("establishment", selectedEtab);
       const auth = getAuthHeader();
@@ -161,14 +208,97 @@ export default function InvoicesPage() {
   }
 
   function reset() {
-    setStep("select");
+    setStep("upload");
     setFile(null);
+    setDetection(null);
     setSelectedSupplier(null);
     setSelectedEtab("bellomio");
     setPreview(null);
     setCommitResult(null);
     setError(null);
+    setBatchItems([]);
     if (fileRef.current) fileRef.current.value = "";
+    if (batchRef.current) batchRef.current.value = "";
+  }
+
+  // ── Batch import ──
+  function handleBatchFiles(files: FileList) {
+    const items: BatchItem[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      if (f.name.toLowerCase().endsWith(".pdf") || f.type === "application/pdf") {
+        items.push({ file: f, status: "pending" });
+      }
+    }
+    if (items.length === 0) { setError("Aucun fichier PDF selectionne."); return; }
+    setBatchItems(items);
+    setStep("batch");
+  }
+
+  async function runBatch() {
+    setBatchRunning(true);
+    const auth = getAuthHeader();
+
+    for (let i = 0; i < batchItems.length; i++) {
+      const item = batchItems[i];
+
+      // Step 1: detect supplier
+      setBatchItems(prev => prev.map((p, j) => j === i ? { ...p, status: "detecting" } : p));
+
+      try {
+        const detectForm = new FormData();
+        detectForm.append("file", item.file);
+        const detectRes = await fetchApi("/api/invoices/detect", { method: "POST", body: detectForm });
+        const detectData = await detectRes.json();
+
+        if (!detectData.ok || !detectData.detection?.supplier?.slug) {
+          throw new Error("Fournisseur non detecte");
+        }
+
+        const slug = detectData.detection.supplier.slug;
+        const supplierName = detectData.detection.supplier.name;
+        const etab = detectData.detection?.etablissement?.slug === "piccola_mia" ? "piccola" : batchEtab;
+
+        // Step 2: import (commit directly)
+        setBatchItems(prev => prev.map((p, j) => j === i ? { ...p, status: "processing", detectedSupplier: supplierName, detectedEtab: etab } : p));
+
+        const form = new FormData();
+        form.append("file", item.file);
+        form.append("mode", "commit");
+        form.append("establishment", etab);
+        const etabId = getEtabId(etab);
+
+        const res = await fetchApi(`/api/invoices/${slug}`, {
+          method: "POST",
+          headers: {
+            ...(auth ? { Authorization: auth } : {}),
+            "x-etablissement-id": etabId,
+          },
+          body: form,
+        });
+        const data = await res.json();
+
+        if (!data.ok) throw new Error(data.error ?? "Erreur import");
+
+        setBatchItems(prev => prev.map((p, j) => j === i ? {
+          ...p,
+          status: "done",
+          supplier: supplierName,
+          result: {
+            ingredients_created: data.inserted?.ingredients_created ?? 0,
+            offers_inserted: data.inserted?.offers_inserted ?? 0,
+            already_imported: data.invoice?.already_imported ?? false,
+          },
+        } : p));
+      } catch (e) {
+        setBatchItems(prev => prev.map((p, j) => j === i ? {
+          ...p,
+          status: "error",
+          error: e instanceof Error ? e.message : String(e),
+        } : p));
+      }
+    }
+    setBatchRunning(false);
   }
 
   const etabName = ETABS.find((e) => e.value === selectedEtab)?.name ?? selectedEtab;
@@ -181,50 +311,21 @@ export default function InvoicesPage() {
 
         {error && <div style={errorBox}>{error}</div>}
 
-        {/* ════════════ STEP 1: Sélection fournisseur + étab + upload ════════════ */}
-        {step === "select" && (
+        {/* ════════════ STEP 1: Upload ════════════ */}
+        {step === "upload" && (
           <>
-            {/* Etablissement */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={sectionLabel}>Etablissement</div>
-              <div style={{ display: "flex", gap: 8 }}>
-                {ETABS.map((e) => (
-                  <button key={e.value} type="button"
-                    onClick={() => setSelectedEtab(e.value)}
-                    style={pillBtn(selectedEtab === e.value)}>
-                    {e.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Fournisseur */}
-            <div style={{ marginBottom: 24 }}>
-              <div style={sectionLabel}>Fournisseur</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {SUPPLIERS.map((s) => (
-                  <button key={s.slug} type="button"
-                    onClick={() => setSelectedSupplier(s.slug)}
-                    style={pillBtn(selectedSupplier === s.slug)}>
-                    {s.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Upload zone */}
             <div
-              style={{
-                ...dropZone,
-                opacity: selectedSupplier ? 1 : 0.4,
-                pointerEvents: selectedSupplier ? "auto" : "none",
-              }}
-              onClick={() => selectedSupplier && fileRef.current?.click()}
+              style={dropZoneStyle}
+              onClick={() => fileRef.current?.click()}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
-                const f = e.dataTransfer.files[0];
-                if (f) handleUpload(f);
+                const files = e.dataTransfer.files;
+                if (files.length > 1) {
+                  handleBatchFiles(files);
+                } else if (files[0]) {
+                  handleFileUpload(files[0]);
+                }
               }}
             >
               <input
@@ -234,23 +335,149 @@ export default function InvoicesPage() {
                 accept=".pdf,application/pdf"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) handleUpload(f);
+                  if (f) handleFileUpload(f);
                 }}
               />
               <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
-                {loading ? "Analyse en cours..." : selectedSupplier ? "Glisser un PDF ici ou cliquer" : "Selectionnez un fournisseur"}
+                {loading ? "Analyse en cours..." : "Glisser une facture ici"}
               </div>
               <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
-                {selectedSupplier ? `${supplierName} → ${etabName}` : ""}
+                PDF — cliquer pour parcourir
+              </div>
+            </div>
+
+            <p style={{ fontSize: 12, color: "#999", textAlign: "center", marginTop: 12 }}>
+              Le fournisseur et l&apos;etablissement sont detectes automatiquement.
+            </p>
+
+            {/* Batch upload */}
+            <div style={{ textAlign: "center", marginTop: 16 }}>
+              <input ref={batchRef} type="file" multiple accept=".pdf,application/pdf" style={{ display: "none" }}
+                onChange={(e) => { if (e.target.files && e.target.files.length > 0) handleBatchFiles(e.target.files); }} />
+              <button type="button" onClick={() => batchRef.current?.click()}
+                style={{ padding: "10px 24px", borderRadius: 10, border: "1.5px solid #D4775A", background: "#fff", color: "#D4775A", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                Importer plusieurs factures
+              </button>
+            </div>
+
+            {/* Quick links to legacy pages */}
+            <div style={{ marginTop: 32, borderTop: "1px solid #f0ebe3", paddingTop: 16 }}>
+              <div style={{ fontSize: 11, color: "#999", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
+                Import par fournisseur
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {SUPPLIERS.map((s) => (
+                  <a key={s.slug} href={`/invoices/${s.slug}`}
+                    style={{ ...pillBtnBase, textDecoration: "none" }}>
+                    {s.name}
+                  </a>
+                ))}
               </div>
             </div>
           </>
         )}
 
-        {/* ════════════ STEP 2: Preview ════════════ */}
+        {/* ════════════ STEP 2: Confirmation ════════════ */}
+        {step === "confirm" && detection && (
+          <div style={cardStyle}>
+            {/* Etablissement */}
+            <div style={confirmSection}>
+              {detection.etablissement ? (
+                <div style={confirmRow}>
+                  <span style={checkBadge(true)}>✓</span>
+                  <div>
+                    <div style={confirmLabel}>Etablissement</div>
+                    <div style={confirmValue}>{detection.etablissement.name}</div>
+                    <div style={confirmHint}>
+                      Detecte via &quot;{detection.etablissement.matchedKeyword}&quot;
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={confirmRow}>
+                  <span style={checkBadge(false)}>⚠</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={confirmLabel}>Etablissement non detecte</div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                      {ETABS.map((e) => (
+                        <button key={e.value} type="button"
+                          onClick={() => setSelectedEtab(e.value)}
+                          style={pillBtn(selectedEtab === e.value)}>
+                          {e.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Fournisseur */}
+            <div style={confirmSection}>
+              {detection.supplier ? (
+                <div style={confirmRow}>
+                  <span style={checkBadge(true)}>✓</span>
+                  <div>
+                    <div style={confirmLabel}>Fournisseur</div>
+                    <div style={confirmValue}>{detection.supplier.name}</div>
+                    <div style={confirmHint}>
+                      Detecte via &quot;{detection.supplier.matchedKeyword}&quot;
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={confirmRow}>
+                  <span style={checkBadge(false)}>⚠</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={confirmLabel}>Fournisseur non detecte</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                      {SUPPLIERS.map((s) => (
+                        <button key={s.slug} type="button"
+                          onClick={() => setSelectedSupplier(s.slug)}
+                          style={pillBtn(selectedSupplier === s.slug)}>
+                          {s.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Override button */}
+            {(detection.etablissement || detection.supplier) && (
+              <div style={{ borderTop: "1px solid #f0ebe3", paddingTop: 12, marginTop: 4 }}>
+                <button type="button" onClick={() => {
+                  setDetection({ supplier: null, etablissement: null });
+                }} style={{ fontSize: 12, color: "#999", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+                  Modifier manuellement
+                </button>
+              </div>
+            )}
+
+            {/* File info */}
+            <div style={{ fontSize: 12, color: "#6f6a61", marginTop: 12 }}>
+              {file?.name}
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
+              <button type="button" onClick={reset} style={cancelBtnStyle}>
+                Annuler
+              </button>
+              <button type="button" onClick={handlePreview}
+                disabled={loading || !selectedSupplier}
+                style={{ ...primaryBtnStyle, opacity: loading || !selectedSupplier ? 0.5 : 1 }}>
+                {loading ? "Analyse..." : "Confirmer et analyser"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ════════════ STEP 3: Preview ════════════ */}
         {step === "preview" && preview?.parsed && (
           <>
-            <div style={card}>
+            <div style={cardStyle}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1 }}>
@@ -313,10 +540,111 @@ export default function InvoicesPage() {
           </>
         )}
 
-        {/* ════════════ STEP 3: Done ════════════ */}
+        {/* ════════════ BATCH MODE ════════════ */}
+        {step === "batch" && (
+          <div style={cardStyle}>
+            <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777", marginBottom: 16 }}>
+              Import multiple — {batchItems.length} fichier{batchItems.length > 1 ? "s" : ""}
+            </div>
+
+            {/* Etab selector (default for undetected) */}
+            {!batchRunning && batchItems.every(b => b.status === "pending") && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
+                <span style={{ fontSize: 12, color: "#666" }}>Etablissement par defaut :</span>
+                {ETABS.map(e => (
+                  <button key={e.value} type="button" onClick={() => setBatchEtab(e.value)}
+                    style={pillBtn(batchEtab === e.value)}>
+                    {e.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* File list */}
+            <div style={{ marginBottom: 16 }}>
+              {batchItems.map((item, i) => (
+                <div key={i} style={{
+                  display: "flex", alignItems: "center", gap: 12,
+                  padding: "10px 14px", borderRadius: 10,
+                  background: item.status === "done" ? "#f0fdf4" : item.status === "error" ? "#fef2f2" : (item.status === "detecting" || item.status === "processing") ? "#fffbeb" : "#fff",
+                  border: `1px solid ${item.status === "done" ? "#bbf7d0" : item.status === "error" ? "#fecaca" : (item.status === "detecting" || item.status === "processing") ? "#fde68a" : "#e0d8ce"}`,
+                  marginBottom: 6,
+                }}>
+                  <span style={{ fontSize: 14, flexShrink: 0, color: item.status === "done" ? "#166534" : item.status === "error" ? "#991b1b" : "#666" }}>
+                    {item.status === "pending" && "—"}
+                    {item.status === "detecting" && "..."}
+                    {item.status === "processing" && "..."}
+                    {item.status === "done" && "OK"}
+                    {item.status === "error" && "X"}
+                  </span>
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {item.file.name}
+                    </div>
+                    {item.status === "done" && item.supplier && (
+                      <div style={{ fontSize: 11, color: "#4a6741" }}>
+                        {item.supplier}
+                        {item.result?.already_imported ? " — deja importe" : ` — ${item.result?.ingredients_created ?? 0} ingredients, ${item.result?.offers_inserted ?? 0} offres`}
+                      </div>
+                    )}
+                    {item.status === "error" && (
+                      <div style={{ fontSize: 11, color: "#DC2626" }}>{item.error}</div>
+                    )}
+                    {item.status === "detecting" && (
+                      <div style={{ fontSize: 11, color: "#D97706" }}>Detection fournisseur...</div>
+                    )}
+                    {item.status === "processing" && (
+                      <div style={{ fontSize: 11, color: "#D97706" }}>Import {item.detectedSupplier ?? ""}...</div>
+                    )}
+                  </div>
+
+                  <span style={{ fontSize: 11, color: "#999", flexShrink: 0 }}>
+                    {(item.file.size / 1024).toFixed(0)} Ko
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Progress */}
+            {batchRunning && (() => {
+              const done = batchItems.filter(b => b.status === "done" || b.status === "error").length;
+              const pct = Math.round((done / batchItems.length) * 100);
+              return (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#666", marginBottom: 4 }}>
+                    <span>{done}/{batchItems.length} traites</span>
+                    <span>{pct}%</span>
+                  </div>
+                  <div style={{ height: 6, background: "#e0d8ce", borderRadius: 3, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${pct}%`, background: "#4a6741", borderRadius: 3, transition: "width 0.3s" }} />
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Actions */}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button type="button" onClick={reset} style={cancelBtnStyle}>
+                {batchRunning ? "Fermer" : "Annuler"}
+              </button>
+              {!batchRunning && batchItems.some(b => b.status === "pending") && (
+                <button type="button" onClick={runBatch} style={primaryBtnStyle}>
+                  Lancer l&apos;import ({batchItems.filter(b => b.status === "pending").length} fichiers)
+                </button>
+              )}
+              {!batchRunning && batchItems.every(b => b.status !== "pending") && (
+                <button type="button" onClick={reset} style={primaryBtnStyle}>
+                  Terminer
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ════════════ STEP 4: Done ════════════ */}
         {step === "done" && commitResult && (
-          <div style={{ ...card, textAlign: "center" }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+          <div style={{ ...cardStyle, textAlign: "center" }}>
             <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>
               Import termine
             </h2>
@@ -369,30 +697,69 @@ const h1Style: React.CSSProperties = {
   color: "#1a1a1a",
 };
 
-const sectionLabel: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  textTransform: "uppercase",
-  letterSpacing: 1,
-  color: "#999",
-  marginBottom: 8,
-};
-
-const dropZone: React.CSSProperties = {
+const dropZoneStyle: React.CSSProperties = {
   border: "2px dashed #ddd6c8",
   borderRadius: 12,
   padding: "40px 20px",
   textAlign: "center",
   cursor: "pointer",
   background: "#faf8f4",
-  transition: "border-color 0.2s, opacity 0.2s",
+  transition: "border-color 0.2s",
 };
 
-const card: React.CSSProperties = {
+const cardStyle: React.CSSProperties = {
   background: "#fff",
   borderRadius: 12,
   border: "1px solid #ddd6c8",
   padding: "20px 22px",
+};
+
+const confirmSection: React.CSSProperties = {
+  paddingBottom: 14,
+  marginBottom: 14,
+  borderBottom: "1px solid #f0ebe3",
+};
+
+const confirmRow: React.CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 12,
+};
+
+const checkBadge = (ok: boolean): React.CSSProperties => ({
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 28,
+  height: 28,
+  borderRadius: "50%",
+  fontSize: 14,
+  fontWeight: 700,
+  flexShrink: 0,
+  marginTop: 2,
+  background: ok ? "#e8ede6" : "#FFF3E0",
+  color: ok ? "#4a6741" : "#E65100",
+});
+
+const confirmLabel: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 700,
+  color: "#6f6a61",
+  textTransform: "uppercase",
+  letterSpacing: 0.5,
+};
+
+const confirmValue: React.CSSProperties = {
+  fontSize: 16,
+  fontWeight: 700,
+  color: "#1a1a1a",
+  marginTop: 2,
+};
+
+const confirmHint: React.CSSProperties = {
+  fontSize: 11,
+  color: "#999",
+  marginTop: 2,
 };
 
 const errorBox: React.CSSProperties = {
@@ -415,6 +782,17 @@ const pillBtn = (active: boolean): React.CSSProperties => ({
   fontWeight: 700,
   cursor: "pointer",
 });
+
+const pillBtnBase: React.CSSProperties = {
+  padding: "5px 12px",
+  borderRadius: 8,
+  border: "1px solid #ddd6c8",
+  background: "#fff",
+  color: "#374151",
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: "pointer",
+};
 
 const primaryBtnStyle: React.CSSProperties = {
   display: "inline-flex",
