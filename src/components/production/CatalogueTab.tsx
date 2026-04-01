@@ -365,6 +365,7 @@ export function CatalogueContent() {
   const [typeFilter, setTypeFilter] = useState<RecipeType | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
+  const [showTypePop, setShowTypePop] = useState(false);
 
   // Pivot overrides: { recipeId: qty }
   const [pivotOverrides, setPivotOverrides] = useState<Record<string, number>>({});
@@ -444,61 +445,91 @@ export function CatalogueContent() {
     return TYPE_COLORS[type] ?? "#1a1a1a";
   }
 
-  // Pill style
-  const pill = (active: boolean, color: string): CSSProperties => ({
-    padding: "7px 14px", borderRadius: 20, fontSize: 12, fontWeight: 700,
-    border: active ? "none" : `1.5px solid ${color}40`,
-    background: active ? color : "transparent",
-    color: active ? "#fff" : color,
-    cursor: "pointer", whiteSpace: "nowrap",
+  // Dropdown menu item style
+  const menuItem = (active: boolean, color: string): CSSProperties => ({
+    width: "100%", padding: "8px 12px", borderRadius: 8,
+    border: "none", background: active ? color + "14" : "transparent",
+    color: active ? color : "#1a1a1a", fontSize: 13, fontWeight: active ? 700 : 500,
+    cursor: "pointer", textAlign: "left" as const,
+    display: "flex", alignItems: "center", gap: 8,
   });
 
   return (
     <div style={{ background: "#f2ede4", minHeight: "100vh" }}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 60px" }}>
 
-        {/* Header */}
-        <h1 style={{
-          fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 26,
-          color: "#1a1a1a", margin: "0 0 4px", textTransform: "uppercase", letterSpacing: "0.04em",
-        }}>
-          Fiches techniques
-        </h1>
-        <p style={{ fontSize: 13, color: "#999", margin: "0 0 20px" }}>
-          {recipes.length} recette{recipes.length > 1 ? "s" : ""} — consultation équipe
-        </p>
+        {/* ── Line 1 — title + AI suggestions ── */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <h1 style={{
+            fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24,
+            color: "#1a1a1a", margin: 0, textTransform: "uppercase", letterSpacing: "0.04em",
+          }}>
+            Catalogue <span style={{ fontSize: 14, fontWeight: 500, color: "#999", letterSpacing: 0, textTransform: "none" }}>({recipes.length}) — consultation équipe</span>
+          </h1>
+          <AiInsightCard
+            type="menu"
+            label="Suggestions menu IA"
+            icon={"🍴"}
+            color="#46655a"
+          />
+        </div>
 
-        {/* IA Suggestions menu */}
-        <AiInsightCard
-          type="menu"
-          label="Suggestions menu IA"
-          icon={"🍴"}
-          color="#46655a"
-        />
-
-        {/* Search */}
-        <input
-          type="search"
-          placeholder="Rechercher une recette..."
-          value={q}
-          onChange={e => setQ(e.target.value)}
-          style={{
-            width: "100%", padding: "10px 14px", borderRadius: 12,
-            border: "1.5px solid #ddd6c8", background: "#fff", fontSize: 14,
-            outline: "none", boxSizing: "border-box", marginBottom: 14,
-          }}
-        />
-
-        {/* Type filter pills */}
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
-          <button onClick={() => setTypeFilter(null)} style={pill(!typeFilter, "#1a1a1a")}>
-            Tous ({recipes.length})
-          </button>
-          {(["pizza", "cuisine", "cocktail", "production"] as const).map(t => (
-            <button key={t} onClick={() => setTypeFilter(typeFilter === t ? null : t)} style={pill(typeFilter === t, TYPE_COLORS[t])}>
-              {TYPE_LABELS[t]} ({typeCounts[t] ?? 0})
+        {/* ── Line 2 — search + category dropdown + production ── */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 14, alignItems: "center" }}>
+          <div style={{ position: "relative", flex: 1 }}>
+            <input
+              type="search"
+              placeholder="Rechercher..."
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              style={{
+                width: "100%", padding: "8px 12px", borderRadius: 10,
+                border: "1.5px solid #ddd6c8", background: "#fff", fontSize: 13,
+                outline: "none", boxSizing: "border-box",
+              }}
+            />
+          </div>
+          {/* Category dropdown */}
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <button type="button" onClick={() => setShowTypePop(p => !p)}
+              style={{
+                padding: "8px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                border: typeFilter ? `1.5px solid ${TYPE_COLORS[typeFilter]}` : "1.5px solid #ddd6c8",
+                background: typeFilter ? TYPE_COLORS[typeFilter] + "14" : "#fff",
+                color: typeFilter ? TYPE_COLORS[typeFilter] : "#1a1a1a",
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
+              }}>
+              {typeFilter ? TYPE_LABELS[typeFilter] : "Toutes"}
+              <span style={{ fontSize: 10, opacity: 0.6 }}>({typeFilter ? (typeCounts[typeFilter] ?? 0) : recipes.length})</span>
+              <span style={{ fontSize: 8, opacity: 0.5 }}>{"▼"}</span>
             </button>
-          ))}
+            {showTypePop && (
+              <>
+                <div onClick={() => setShowTypePop(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
+                <div style={{
+                  position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 200,
+                  background: "#fff", borderRadius: 14, padding: 6,
+                  boxShadow: "0 8px 30px rgba(0,0,0,0.15)", border: "1px solid #e0d8ce",
+                  minWidth: 200,
+                }}>
+                  <button type="button" onClick={() => { setTypeFilter(null); setShowTypePop(false); }}
+                    style={menuItem(!typeFilter, "#1a1a1a")}>
+                    Toutes les fiches
+                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{recipes.length}</span>
+                  </button>
+                  <div style={{ height: 1, background: "#f0ebe2", margin: "4px 0" }} />
+                  {(["pizza", "cuisine", "cocktail", "production"] as const).map(t => (
+                    <button key={t} type="button" onClick={() => { setTypeFilter(t); setShowTypePop(false); }}
+                      style={menuItem(typeFilter === t, TYPE_COLORS[t])}>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: TYPE_COLORS[t], flexShrink: 0 }} />
+                      {TYPE_LABELS[t]}
+                      <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{typeCounts[t] ?? 0}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Loading */}

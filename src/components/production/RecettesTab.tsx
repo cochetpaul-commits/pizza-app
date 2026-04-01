@@ -318,17 +318,7 @@ function SectionHeader({
   );
 }
 
-// ─── Tab pill ─────────────────────────────────────────────────────────────────
-
-const tabStyle = (active: boolean, color?: string): React.CSSProperties => ({
-  padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 700,
-  border: active ? `2px solid ${color ?? "#1a1a1a"}` : `1.5px solid ${color ?? "#1a1a1a"}30`,
-  background: active ? (color ?? "#1a1a1a") : "transparent",
-  color: active ? "#fff" : (color ?? "#1a1a1a"),
-  cursor: "pointer", whiteSpace: "nowrap",
-  transition: "all 0.15s",
-  fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-});
+// ─── Styles ──────────────────────────────────────────────────────────────────
 
 const filterPill = (active: boolean, activeColor?: string): React.CSSProperties => ({
   padding: "4px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700,
@@ -543,14 +533,11 @@ function RecettesInner() {
   return (
     <>
       <main className="container" style={{ paddingBottom: 80 }}>
-        {/* ── Header ── */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a", textTransform: "uppercase", letterSpacing: 1 }}>
-              Fiches techniques
-            </h1>
-            <span style={{ fontSize: 13, color: "#999" }}>{totalCount} fiche{totalCount > 1 ? "s" : ""}</span>
-          </div>
+        {/* ── Header : line 1 — title + actions ── */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a", textTransform: "uppercase", letterSpacing: 1 }}>
+            Fiches techniques <span style={{ fontSize: 14, fontWeight: 500, color: "#999", letterSpacing: 0, textTransform: "none" }}>({totalCount})</span>
+          </h1>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {alertCount > 0 && (
               <button type="button" onClick={() => { setFoodCostFilter("alerte"); }}
@@ -561,7 +548,7 @@ function RecettesInner() {
             {canWrite && (
               <div className="desktop-only" style={{ position: "relative" }}>
                 <button type="button" onClick={() => setShowFab(f => !f)}
-                  style={{ padding: "8px 16px", borderRadius: 10, border: "1.5px solid #D4775A", background: "#fff", color: "#D4775A", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  style={{ padding: "7px 14px", borderRadius: 10, border: "1.5px solid #D4775A", background: "#fff", color: "#D4775A", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
                   + Nouvelle recette
                 </button>
                 {showFab && (
@@ -595,7 +582,7 @@ function RecettesInner() {
               </div>
             )}
             <button onClick={refresh} disabled={loading}
-              style={{ width: 36, height: 36, borderRadius: "50%", border: "1.5px solid #ddd6c8", background: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              style={{ width: 34, height: 34, borderRadius: "50%", border: "1.5px solid #ddd6c8", background: "#fff", fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
               {loading ? "…" : "↻"}
             </button>
           </div>
@@ -603,14 +590,14 @@ function RecettesInner() {
 
         {/* ── Erreurs ── */}
         {loadErrors.length > 0 && (
-          <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, background: "#FEF2F2", border: "1px solid rgba(139,26,26,0.2)", fontSize: 13 }}>
+          <div style={{ marginBottom: 10, padding: "10px 14px", borderRadius: 10, background: "#FEF2F2", border: "1px solid rgba(139,26,26,0.2)", fontSize: 13 }}>
             <strong style={{ color: "#8B1A1A" }}>Erreurs :</strong>
             {loadErrors.map(e => <div key={e} style={{ color: "#8B1A1A", marginTop: 4 }}>{e}</div>)}
           </div>
         )}
 
-        {/* ── Search + filter toggle ── */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        {/* ── Line 2 — search + category dropdown + sort + filters ── */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center" }}>
           <div style={{ position: "relative", flex: 1 }}>
             <input
               type="search"
@@ -618,39 +605,107 @@ function RecettesInner() {
               value={q}
               onChange={e => setQ(e.target.value)}
               style={{
-                width: "100%", padding: "10px 14px", borderRadius: 12,
+                width: "100%", padding: "8px 12px", borderRadius: 10,
                 border: "1.5px solid #ddd6c8", background: "#fff",
-                fontSize: 14, outline: "none", boxSizing: "border-box",
+                fontSize: 13, outline: "none", boxSizing: "border-box",
               }}
             />
           </div>
-          <button type="button" onClick={() => setShowFilters(f => !f)}
-            style={{
-              width: 42, height: 42, borderRadius: 12, flexShrink: 0,
-              border: hasActiveFilter ? "1.5px solid #D4775A" : "1.5px solid #ddd6c8",
-              background: hasActiveFilter ? "#D4775A10" : "#fff",
-              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 18, color: hasActiveFilter ? "#D4775A" : "#999",
-            }}>
-            {hasActiveFilter ? "✱" : "☰"}
-          </button>
-          {/* Sort dropdown custom */}
+          {/* Category dropdown */}
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <button type="button" onClick={() => setShowCuisinePop(p => !p)}
+              style={{
+                padding: "8px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                border: mainTab !== "tous" ? `1.5px solid ${mainTab === "pizza" ? PIZZA_COLOR : mainTab === "cuisine" ? CUISINE_COLOR : mainTab === "cocktail" ? COCKTAIL_COLOR : EMP_COLOR}` : "1.5px solid #ddd6c8",
+                background: mainTab !== "tous" ? (mainTab === "pizza" ? PIZZA_COLOR : mainTab === "cuisine" ? CUISINE_COLOR : mainTab === "cocktail" ? COCKTAIL_COLOR : EMP_COLOR) + "14" : "#fff",
+                color: mainTab !== "tous" ? (mainTab === "pizza" ? PIZZA_COLOR : mainTab === "cuisine" ? CUISINE_COLOR : mainTab === "cocktail" ? COCKTAIL_COLOR : EMP_COLOR) : "#1a1a1a",
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
+              }}>
+              {mainTab === "tous" ? "Toutes" : mainTab === "pizza" ? "Pizza" : mainTab === "cuisine" ? (cuisineCatFilter !== "all" ? CUISINE_CAT_FILTERS.find(f => f.id === cuisineCatFilter)?.label ?? "Cuisine" : "Cuisine") : mainTab === "cocktail" ? "Cocktail" : "Empât."}
+              <span style={{ fontSize: 10, opacity: 0.6 }}>({tabCounts[mainTab]})</span>
+              <span style={{ fontSize: 8, opacity: 0.5 }}>{"▼"}</span>
+            </button>
+            {showCuisinePop && (
+              <>
+                <div onClick={() => setShowCuisinePop(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
+                <div style={{
+                  position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 200,
+                  background: "#fff", borderRadius: 14, padding: 6,
+                  boxShadow: "0 8px 30px rgba(0,0,0,0.15)", border: "1px solid #e0d8ce",
+                  minWidth: 220,
+                }}>
+                  <button type="button" onClick={() => { setMainTab("tous"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
+                    style={filterMenuItemStyle(mainTab === "tous", "#1a1a1a")}>
+                    Toutes les fiches
+                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.tous}</span>
+                  </button>
+                  <div style={{ height: 1, background: "#f0ebe2", margin: "4px 0" }} />
+                  <button type="button" onClick={() => { setMainTab("pizza"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
+                    style={filterMenuItemStyle(mainTab === "pizza", PIZZA_COLOR)}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: PIZZA_COLOR, flexShrink: 0 }} />
+                    Pizza
+                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.pizza}</span>
+                  </button>
+                  <button type="button" onClick={() => { setMainTab("cuisine"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
+                    style={filterMenuItemStyle(mainTab === "cuisine" && cuisineCatFilter === "all", CUISINE_COLOR)}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: CUISINE_COLOR, flexShrink: 0 }} />
+                    Cuisine (tous)
+                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.cuisine}</span>
+                  </button>
+                  {CUISINE_CAT_FILTERS.filter(f => f.id !== "all").map(f => (
+                    <button key={f.id} type="button" onClick={() => { setMainTab("cuisine"); setCuisineCatFilter(f.id); setShowCuisinePop(false); }}
+                      style={{ ...filterMenuItemStyle(mainTab === "cuisine" && cuisineCatFilter === f.id, f.color), paddingLeft: 32 }}>
+                      {f.label}
+                    </button>
+                  ))}
+                  <div style={{ height: 1, background: "#f0ebe2", margin: "4px 0" }} />
+                  <button type="button" onClick={() => { setMainTab("cocktail"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
+                    style={filterMenuItemStyle(mainTab === "cocktail", COCKTAIL_COLOR)}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: COCKTAIL_COLOR, flexShrink: 0 }} />
+                    Cocktail
+                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.cocktail}</span>
+                  </button>
+                  <button type="button" onClick={() => { setMainTab("empatement"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
+                    style={filterMenuItemStyle(mainTab === "empatement", EMP_COLOR)}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: EMP_COLOR, flexShrink: 0 }} />
+                    Empâtement
+                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.empatement}</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+          {/* Production toggle */}
+          {prodCount > 0 && (
+            <button type="button"
+              onClick={() => { setProdFilter(p => !p); }}
+              style={{
+                padding: "7px 10px", borderRadius: 10, fontSize: 11, fontWeight: 700,
+                border: prodFilter ? "1.5px solid #4a6741" : "1.5px solid #ddd6c8",
+                background: prodFilter ? "#4a674114" : "#fff",
+                color: prodFilter ? "#4a6741" : "#999",
+                cursor: "pointer", whiteSpace: "nowrap",
+              }}>
+              Prod. ({prodCount})
+            </button>
+          )}
+          {/* Sort */}
           <div style={{ position: "relative", flexShrink: 0 }}>
             <button type="button" onClick={() => setShowSort(s => !s)}
               style={{
-                height: 42, padding: "0 12px", borderRadius: 12,
+                height: 36, padding: "0 10px", borderRadius: 10,
                 border: "1.5px solid #ddd6c8", background: "#fff",
-                fontSize: 12, fontWeight: 700, color: "#1a1a1a", cursor: "pointer",
-                display: "flex", alignItems: "center", gap: 4,
+                fontSize: 11, fontWeight: 700, color: "#1a1a1a", cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 3,
               }}>
               {sortKey === "name" ? (sortDir === "asc" ? "A-Z" : "Z-A") : sortKey === "cost" ? "Coût" : sortKey === "fc" ? "FC" : "Prix"}
-              <span style={{ fontSize: 9, opacity: 0.5 }}>{"▼"}</span>
+              <span style={{ fontSize: 8, opacity: 0.5 }}>{"▼"}</span>
             </button>
             {showSort && (
               <>
                 <div onClick={() => setShowSort(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
                 <div style={{
-                  position: "absolute", top: 46, right: 0, zIndex: 200,
+                  position: "absolute", top: 40, right: 0, zIndex: 200,
                   background: "#fff", borderRadius: 12, padding: 6,
                   boxShadow: "0 4px 20px rgba(0,0,0,0.12)", border: "1px solid #ddd6c8",
                   minWidth: 130,
@@ -683,87 +738,17 @@ function RecettesInner() {
               </>
             )}
           </div>
-        </div>
-
-        {/* ── Category filter dropdown ── */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
-          <div style={{ position: "relative", flexShrink: 0 }}>
-            <button type="button" onClick={() => setShowCuisinePop(p => !p)}
-              style={{
-                padding: "8px 14px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                border: mainTab !== "tous" ? `1.5px solid ${mainTab === "pizza" ? PIZZA_COLOR : mainTab === "cuisine" ? CUISINE_COLOR : mainTab === "cocktail" ? COCKTAIL_COLOR : EMP_COLOR}` : "1.5px solid #ddd6c8",
-                background: mainTab !== "tous" ? (mainTab === "pizza" ? PIZZA_COLOR : mainTab === "cuisine" ? CUISINE_COLOR : mainTab === "cocktail" ? COCKTAIL_COLOR : EMP_COLOR) + "14" : "#fff",
-                color: mainTab !== "tous" ? (mainTab === "pizza" ? PIZZA_COLOR : mainTab === "cuisine" ? CUISINE_COLOR : mainTab === "cocktail" ? COCKTAIL_COLOR : EMP_COLOR) : "#1a1a1a",
-                cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-              }}>
-              {mainTab === "tous" ? "Toutes les fiches" : mainTab === "pizza" ? "Pizza" : mainTab === "cuisine" ? (cuisineCatFilter !== "all" ? CUISINE_CAT_FILTERS.find(f => f.id === cuisineCatFilter)?.label ?? "Cuisine" : "Cuisine") : mainTab === "cocktail" ? "Cocktail" : "Empâtement"}
-              <span style={{ fontSize: 11, opacity: 0.6 }}>({tabCounts[mainTab]})</span>
-              <span style={{ fontSize: 9, opacity: 0.5 }}>{"▼"}</span>
-            </button>
-            {showCuisinePop && (
-              <>
-                <div onClick={() => setShowCuisinePop(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
-                <div style={{
-                  position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 200,
-                  background: "#fff", borderRadius: 14, padding: 6,
-                  boxShadow: "0 8px 30px rgba(0,0,0,0.15)", border: "1px solid #e0d8ce",
-                  minWidth: 220,
-                }}>
-                  {/* Tous */}
-                  <button type="button" onClick={() => { setMainTab("tous"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
-                    style={filterMenuItemStyle(mainTab === "tous", "#1a1a1a")}>
-                    Toutes les fiches
-                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.tous}</span>
-                  </button>
-                  <div style={{ height: 1, background: "#f0ebe2", margin: "4px 0" }} />
-                  {/* Pizza */}
-                  <button type="button" onClick={() => { setMainTab("pizza"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
-                    style={filterMenuItemStyle(mainTab === "pizza", PIZZA_COLOR)}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: PIZZA_COLOR, flexShrink: 0 }} />
-                    Pizza
-                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.pizza}</span>
-                  </button>
-                  {/* Cuisine header */}
-                  <button type="button" onClick={() => { setMainTab("cuisine"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
-                    style={filterMenuItemStyle(mainTab === "cuisine" && cuisineCatFilter === "all", CUISINE_COLOR)}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: CUISINE_COLOR, flexShrink: 0 }} />
-                    Cuisine (tous)
-                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.cuisine}</span>
-                  </button>
-                  {/* Cuisine sub-categories */}
-                  {CUISINE_CAT_FILTERS.filter(f => f.id !== "all").map(f => (
-                    <button key={f.id} type="button" onClick={() => { setMainTab("cuisine"); setCuisineCatFilter(f.id); setShowCuisinePop(false); }}
-                      style={{ ...filterMenuItemStyle(mainTab === "cuisine" && cuisineCatFilter === f.id, f.color), paddingLeft: 32 }}>
-                      {f.label}
-                    </button>
-                  ))}
-                  <div style={{ height: 1, background: "#f0ebe2", margin: "4px 0" }} />
-                  {/* Cocktail */}
-                  <button type="button" onClick={() => { setMainTab("cocktail"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
-                    style={filterMenuItemStyle(mainTab === "cocktail", COCKTAIL_COLOR)}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: COCKTAIL_COLOR, flexShrink: 0 }} />
-                    Cocktail
-                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.cocktail}</span>
-                  </button>
-                  {/* Empâtement */}
-                  <button type="button" onClick={() => { setMainTab("empatement"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
-                    style={filterMenuItemStyle(mainTab === "empatement", EMP_COLOR)}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: EMP_COLOR, flexShrink: 0 }} />
-                    Empâtement
-                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.empatement}</span>
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-          {prodCount > 0 && (
-            <button type="button"
-              onClick={() => { setProdFilter(p => !p); }}
-              style={tabStyle(prodFilter, "#4a6741")}>
-              Prod.
-              <span style={{ marginLeft: 4, fontSize: 11, opacity: 0.7 }}>({prodCount})</span>
-            </button>
-          )}
+          {/* Filters toggle */}
+          <button type="button" onClick={() => setShowFilters(f => !f)}
+            style={{
+              width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+              border: hasActiveFilter ? "1.5px solid #D4775A" : "1.5px solid #ddd6c8",
+              background: hasActiveFilter ? "#D4775A10" : "#fff",
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 16, color: hasActiveFilter ? "#D4775A" : "#999",
+            }}>
+            {hasActiveFilter ? "✱" : "☰"}
+          </button>
         </div>
 
         {/* ── Filter panel (collapsible) ── */}
