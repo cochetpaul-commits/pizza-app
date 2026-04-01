@@ -339,6 +339,14 @@ const filterPill = (active: boolean, activeColor?: string): React.CSSProperties 
   cursor: "pointer",
 });
 
+const filterMenuItemStyle = (active: boolean, color: string): React.CSSProperties => ({
+  width: "100%", padding: "8px 12px", borderRadius: 8,
+  border: "none", background: active ? color + "14" : "transparent",
+  color: active ? color : "#1a1a1a", fontSize: 13, fontWeight: active ? 700 : 500,
+  cursor: "pointer", textAlign: "left" as const,
+  display: "flex", alignItems: "center", gap: 8,
+});
+
 // ─── Main inner component ─────────────────────────────────────────────────────
 
 function RecettesInner() {
@@ -677,75 +685,77 @@ function RecettesInner() {
           </div>
         </div>
 
-        {/* ── Main tabs ── */}
-        <div className="category-pills" style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 6, WebkitOverflowScrolling: "touch" }}>
-          {([
-            { key: "tous" as MainTab, label: "Tous", color: "#1a1a1a" },
-            { key: "pizza" as MainTab, label: "Pizza", color: PIZZA_COLOR },
-            { key: "cuisine" as MainTab, label: "Cuisine", color: CUISINE_COLOR },
-            { key: "cocktail" as MainTab, label: "Cocktail", color: COCKTAIL_COLOR },
-            { key: "empatement" as MainTab, label: "Empât.", color: EMP_COLOR },
-          ]).map(t => (
-            <div key={t.key} style={{ position: "relative", flexShrink: 0 }}>
-              <button type="button"
-                onClick={() => {
-                  if (t.key === "cuisine") {
-                    if (mainTab === "cuisine") { setShowCuisinePop(p => !p); }
-                    else { setMainTab("cuisine"); setShowCuisinePop(true); }
-                  } else {
-                    setMainTab(t.key); setShowCuisinePop(false);
-                  }
-                }}
-                style={tabStyle(mainTab === t.key, t.color)}>
-                {t.label}
-                <span style={{ marginLeft: 4, fontSize: 11, opacity: 0.7 }}>({tabCounts[t.key]})</span>
-              </button>
-              {/* Cuisine sub-category modal */}
-              {t.key === "cuisine" && showCuisinePop && (
-                <div onClick={() => setShowCuisinePop(false)} style={{
-                  position: "fixed", inset: 0, zIndex: 300,
-                  background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center",
+        {/* ── Category filter dropdown ── */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <button type="button" onClick={() => setShowCuisinePop(p => !p)}
+              style={{
+                padding: "8px 14px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                border: mainTab !== "tous" ? `1.5px solid ${mainTab === "pizza" ? PIZZA_COLOR : mainTab === "cuisine" ? CUISINE_COLOR : mainTab === "cocktail" ? COCKTAIL_COLOR : EMP_COLOR}` : "1.5px solid #ddd6c8",
+                background: mainTab !== "tous" ? (mainTab === "pizza" ? PIZZA_COLOR : mainTab === "cuisine" ? CUISINE_COLOR : mainTab === "cocktail" ? COCKTAIL_COLOR : EMP_COLOR) + "14" : "#fff",
+                color: mainTab !== "tous" ? (mainTab === "pizza" ? PIZZA_COLOR : mainTab === "cuisine" ? CUISINE_COLOR : mainTab === "cocktail" ? COCKTAIL_COLOR : EMP_COLOR) : "#1a1a1a",
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+              }}>
+              {mainTab === "tous" ? "Toutes les fiches" : mainTab === "pizza" ? "Pizza" : mainTab === "cuisine" ? (cuisineCatFilter !== "all" ? CUISINE_CAT_FILTERS.find(f => f.id === cuisineCatFilter)?.label ?? "Cuisine" : "Cuisine") : mainTab === "cocktail" ? "Cocktail" : "Empâtement"}
+              <span style={{ fontSize: 11, opacity: 0.6 }}>({tabCounts[mainTab]})</span>
+              <span style={{ fontSize: 9, opacity: 0.5 }}>{"▼"}</span>
+            </button>
+            {showCuisinePop && (
+              <>
+                <div onClick={() => setShowCuisinePop(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
+                <div style={{
+                  position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 200,
+                  background: "#fff", borderRadius: 14, padding: 6,
+                  boxShadow: "0 8px 30px rgba(0,0,0,0.15)", border: "1px solid #e0d8ce",
+                  minWidth: 220,
                 }}>
-                  <div onClick={e => e.stopPropagation()} style={{
-                    background: "#fff", borderRadius: 20, padding: "24px 20px 20px",
-                    width: "90%", maxWidth: 360,
-                    boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                      <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: CUISINE_COLOR, textTransform: "uppercase", letterSpacing: 1 }}>
-                        Cuisine
-                      </h3>
-                      <button type="button" onClick={() => setShowCuisinePop(false)}
-                        style={{ background: "none", border: "none", fontSize: 20, color: "#999", cursor: "pointer", padding: 4 }}>
-                        {"✕"}
-                      </button>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                      {CUISINE_CAT_FILTERS.map(f => {
-                        const active = cuisineCatFilter === f.id;
-                        const c = f.color;
-                        return (
-                          <button key={f.id} type="button"
-                            onClick={() => { setCuisineCatFilter(f.id); setShowCuisinePop(false); }}
-                            style={{
-                              padding: "14px 12px", borderRadius: 12,
-                              border: active ? `2px solid ${c}` : `1.5px solid ${c}40`,
-                              background: active ? `${c}20` : `${c}0A`,
-                              color: c,
-                              fontSize: 14, fontWeight: active ? 700 : 600,
-                              cursor: "pointer", textAlign: "center",
-                              gridColumn: f.id === "all" ? "1 / -1" : undefined,
-                            }}>
-                            {f.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  {/* Tous */}
+                  <button type="button" onClick={() => { setMainTab("tous"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
+                    style={filterMenuItemStyle(mainTab === "tous", "#1a1a1a")}>
+                    Toutes les fiches
+                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.tous}</span>
+                  </button>
+                  <div style={{ height: 1, background: "#f0ebe2", margin: "4px 0" }} />
+                  {/* Pizza */}
+                  <button type="button" onClick={() => { setMainTab("pizza"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
+                    style={filterMenuItemStyle(mainTab === "pizza", PIZZA_COLOR)}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: PIZZA_COLOR, flexShrink: 0 }} />
+                    Pizza
+                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.pizza}</span>
+                  </button>
+                  {/* Cuisine header */}
+                  <button type="button" onClick={() => { setMainTab("cuisine"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
+                    style={filterMenuItemStyle(mainTab === "cuisine" && cuisineCatFilter === "all", CUISINE_COLOR)}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: CUISINE_COLOR, flexShrink: 0 }} />
+                    Cuisine (tous)
+                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.cuisine}</span>
+                  </button>
+                  {/* Cuisine sub-categories */}
+                  {CUISINE_CAT_FILTERS.filter(f => f.id !== "all").map(f => (
+                    <button key={f.id} type="button" onClick={() => { setMainTab("cuisine"); setCuisineCatFilter(f.id); setShowCuisinePop(false); }}
+                      style={{ ...filterMenuItemStyle(mainTab === "cuisine" && cuisineCatFilter === f.id, f.color), paddingLeft: 32 }}>
+                      {f.label}
+                    </button>
+                  ))}
+                  <div style={{ height: 1, background: "#f0ebe2", margin: "4px 0" }} />
+                  {/* Cocktail */}
+                  <button type="button" onClick={() => { setMainTab("cocktail"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
+                    style={filterMenuItemStyle(mainTab === "cocktail", COCKTAIL_COLOR)}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: COCKTAIL_COLOR, flexShrink: 0 }} />
+                    Cocktail
+                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.cocktail}</span>
+                  </button>
+                  {/* Empâtement */}
+                  <button type="button" onClick={() => { setMainTab("empatement"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
+                    style={filterMenuItemStyle(mainTab === "empatement", EMP_COLOR)}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: EMP_COLOR, flexShrink: 0 }} />
+                    Empâtement
+                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.empatement}</span>
+                  </button>
                 </div>
-              )}
-            </div>
-          ))}
+              </>
+            )}
+          </div>
           {prodCount > 0 && (
             <button type="button"
               onClick={() => { setProdFilter(p => !p); }}
