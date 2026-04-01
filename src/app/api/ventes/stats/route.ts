@@ -64,6 +64,16 @@ export async function GET(req: NextRequest) {
   }
 
   if (allData.length === 0) {
+    // Fallback: try daily_sales (Kezia / aggregated data)
+    const dailyResult = await buildFromDailySales(etabId, from, to);
+    if (dailyResult) {
+      // Also fetch comparison data
+      let dailyPrev = null;
+      const fromA1ds = (parseInt(from.slice(0, 4)) - 1) + from.slice(4);
+      const toA1ds = (parseInt(to.slice(0, 4)) - 1) + to.slice(4);
+      dailyPrev = await buildFromDailySales(etabId, fromA1ds, toA1ds);
+      return NextResponse.json({ empty: false, stats: dailyResult, prev: dailyPrev, source: "daily_sales" });
+    }
     return NextResponse.json({ empty: true, stats: null, prev: null });
   }
 
@@ -581,5 +591,290 @@ function aggregate(rows: Row[]) {
       rotByZone: zoneRotations,
       totalOrders: orderDurs.length,
     },
+  };
+}
+
+/* ── daily_sales fallback (Kezia / aggregated data) ── */
+
+type DailySalesRow = {
+  date: string;
+  ca_ttc: number;
+  ca_ht: number;
+  tickets: number;
+  couverts: number;
+  panier_moyen: number;
+  marge_total: number;
+  taux_marque: number;
+  tva_total: number;
+  rayons: unknown;
+};
+
+async function buildFromDailySales(etabId: string, from: string, to: string) {
+  const { data, error } = await supabase
+    .from("daily_sales")
+    .select("date,ca_ttc,ca_ht,tickets,couverts,panier_moyen,marge_total,taux_marque,tva_total,rayons")
+    .eq("etablissement_id", etabId)
+    .not("source", "in", '("kezia_products","kezia_article_stats")')
+    .gte("date", from)
+    .lte("date", to)
+    .order("date");
+
+  if (error || !data || data.length === 0) return null;
+
+  const rows = data as DailySalesRow[];
+
+  // Fetch product hourly summary (kezia_products)
+  const { data: prodRow } = await supabase
+    .from("daily_sales")
+    .select("rayons")
+    .eq("etablissement_id", etabId)
+    .eq("source", "kezia_products")
+    .limit(1);
+
+  let topProductsHourly: { name: string; total: number; hourly: number[] }[] = [];
+  if (prodRow && prodRow[0]?.rayons) {
+    try {
+      const parsed = typeof prodRow[0].rayons === "string" ? JSON.parse(prodRow[0].rayons) : prodRow[0].rayons;
+      topProductsHourly = parsed.top_products ?? [];
+    } catch { /* ignore */ }
+  }
+
+  // Fetch article stats (kezia_article_stats) — monthly product data with CA + marge
+  const { data: articleRows } = await supabase
+    .from("daily_sales")
+    .select("date,rayons,ca_ttc,ca_ht,marge_total")
+    .eq("etablissement_id", etabId)
+    .eq("source", "kezia_article_stats")
+    .gte("date", from.slice(0, 7) + "-01") // same month range
+    .lte("date", to)
+    .order("date");
+
+  type ArticleProduct = { name: string; ca_ht: number; ca_ttc: number; marge: number; nb_ventes: number; nb_articles: number; panier_moyen: number };
+  let articleProducts: ArticleProduct[] = [];
+  if (articleRows && articleRows.length > 0) {
+    // Merge products from all matching monthly stats
+    const allProds = new Map<string, ArticleProduct>();
+    for (const ar of articleRows) {
+      const parsed = typeof ar.rayons === "string" ? JSON.parse(ar.rayons as string) : ar.rayons;
+      const prods = (parsed?.products ?? []) as ArticleProduct[];
+      for (const p of prods) {
+        const existing = allProds.get(p.name);
+        if (existing) {
+          existing.ca_ht += p.ca_ht;
+          existing.ca_ttc += p.ca_ttc;
+          existing.marge += p.marge;
+          existing.nb_ventes += p.nb_ventes;
+          existing.nb_articles += p.nb_articles;
+        } else {
+          allProds.set(p.name, { ...p });
+        }
+      }
+    }
+    articleProducts = Array.from(allProds.values()).sort((a, b) => b.ca_ttc - a.ca_ttc);
+  }
+
+  const dates = rows.map(d => d.date);
+  const dayNames = dates.map(d => {
+    const dt = new Date(d + "T12:00:00");
+    return dt.toLocaleDateString("fr-FR", { weekday: "long" });
+  });
+
+  const ca_ttc = rows.reduce((s, d) => s + (Number(d.ca_ttc) || 0), 0);
+  const ca_ht = rows.reduce((s, d) => s + (Number(d.ca_ht) || 0), 0);
+  const totalTickets = rows.reduce((s, d) => s + (Number(d.tickets) || 0), 0);
+  const totalCouverts = rows.reduce((s, d) => s + (Number(d.couverts) || Number(d.tickets) || 0), 0);
+  const totalMarge = rows.reduce((s, d) => s + (Number(d.marge_total) || 0), 0);
+
+  const day_ttc = rows.map(d => Number(d.ca_ttc) || 0);
+  const day_ht = rows.map(d => Number(d.ca_ht) || 0);
+  const day_cov = rows.map(d => Number(d.couverts) || Number(d.tickets) || 0);
+  const tm_ttc = rows.map(d => Number(d.panier_moyen) || 0);
+  const tm_ht = rows.map(d => {
+    const ht = Number(d.ca_ht) || 0;
+    const tix = Number(d.tickets) || 1;
+    return tix > 0 ? Math.round(ht / tix * 100) / 100 : 0;
+  });
+
+  // Marge data per day
+  const day_marge = rows.map(d => Number(d.marge_total) || 0);
+  const day_taux_marque = rows.map(d => Number(d.taux_marque) || 0);
+
+  // Extract rayon (category) data from daily_sales.rayons field
+  const rayonTotals: Record<string, number> = {};
+  const rayonByDay: Record<string, number[]> = {};
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r.rayons || typeof r.rayons !== "object") continue;
+    const rayonsObj = r.rayons as Record<string, unknown>;
+    const cats = rayonsObj.categories as Record<string, number> | undefined;
+    if (!cats) continue;
+    for (const [cat, val] of Object.entries(cats)) {
+      if (!rayonTotals[cat]) { rayonTotals[cat] = 0; rayonByDay[cat] = new Array(rows.length).fill(0); }
+      rayonTotals[cat] += val;
+      rayonByDay[cat][i] = val;
+    }
+  }
+
+  // Build mix from rayons
+  const mixEntries = Object.entries(rayonTotals)
+    .filter(([k, v]) => v > 0 && k !== "Non attribué" && k !== "Rayon inconnu")
+    .sort((a, b) => b[1] - a[1]);
+  const mix_labels = mixEntries.map(([k]) => k);
+  const mix_ttc = mixEntries.map(([, v]) => Math.round(v));
+  const mix_ht = mix_ttc; // approximation — rayon data is TTC from Table 10-02
+
+  // Build zones from rayons (for daily zone charts)
+  const zones_ttc: Record<string, number[]> = {};
+  for (const [cat] of mixEntries) {
+    if (rayonByDay[cat]) {
+      zones_ttc[cat] = rayonByDay[cat];
+    }
+  }
+
+  // Build top10 from article stats (best source) or hourly products (fallback)
+  let top10_names: string[] = [];
+  let top10_ca_ttc: number[] = [];
+  let top10_ca_ht: number[] = [];
+  let top10_qty: number[] = [];
+  let catProducts: Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]> = {};
+
+  if (articleProducts.length > 0) {
+    const top10 = articleProducts.slice(0, 10);
+    top10_names = top10.map(p => p.name);
+    top10_ca_ttc = top10.map(p => Math.round(p.ca_ttc));
+    top10_ca_ht = top10.map(p => Math.round(p.ca_ht));
+    top10_qty = top10.map(p => p.nb_ventes);
+
+    // Group all products by a simple categorization (first word or grouping)
+    for (const p of articleProducts) {
+      // Use a simple heuristic: group PIZZA*, ARANCINI, TIRAMISU, etc.
+      let cat = "Autre";
+      const n = p.name.toUpperCase();
+      if (n.includes("PIZZA")) cat = "Pizze";
+      else if (n.includes("LASAGNA") || n.includes("GNUDI") || n.includes("PARM") || n.includes("POLPETTE") || n.includes("PASTA") || n.includes("RAVIOLI") || n.includes("GNOCCHI")) cat = "Cuisine";
+      else if (n.includes("TIRAMISU") || n.includes("PANNA COTTA") || n.includes("CHEESECAKE") || n.includes("PATISSERIE") || n.includes("FONDANT") || n.includes("CRUMBLE")) cat = "Dolci";
+      else if (n.includes("ARANCINI") || n.includes("BRUSCHETTA") || n.includes("BURRATA") || n.includes("CARPACCIO") || n.includes("FOCACCIA")) cat = "Antipasti";
+      else if (n.includes("PROSECCO") || n.includes("ROSSO") || n.includes("BIANCO") || n.includes("VIN") || n.includes("CHIANTI") || n.includes("ZACCAGNINI") || n.includes("MONCARRO") || n.includes("SENTIMENTO")) cat = "Vins";
+      else if (n.includes("CAFFE") || n.includes("CAFÉ") || n.includes("CAPPUCCINO") || n.includes("ESPRESSO") || n.includes("LATTE")) cat = "Boissons chaudes";
+      else if (n.includes("COCA") || n.includes("ORANGINA") || n.includes("EAU") || n.includes("LIMONADE") || n.includes("JUS") || n.includes("SCHWEPPES") || n.includes("SPRITE") || n.includes("SAN PELLEGRINO")) cat = "Boissons";
+      else if (n.includes("NEGRONI") || n.includes("SPRITZ") || n.includes("LIMONCELLO") || n.includes("GRAPPA") || n.includes("APEROL") || n.includes("COSMO") || n.includes("COCKTAIL")) cat = "Alcool";
+      else if (n.includes("CHIPS") || n.includes("SAUCE") || n.includes("OLIO") || n.includes("HUILE") || n.includes("TRUFFE") || n.includes("FILOTEA") || n.includes("POLENTA")) cat = "Epicerie";
+
+      if (!catProducts[cat]) catProducts[cat] = [];
+      catProducts[cat].push({ n: p.name, qty: p.nb_ventes, ca_ttc: Math.round(p.ca_ttc), ca_ht: Math.round(p.ca_ht) });
+    }
+    // Sort each category by CA
+    for (const cat of Object.keys(catProducts)) {
+      catProducts[cat].sort((a, b) => b.ca_ttc - a.ca_ttc);
+    }
+  } else if (topProductsHourly.length > 0) {
+    const top10 = topProductsHourly.slice(0, 10);
+    top10_names = top10.map(p => p.name);
+    top10_qty = top10.map(p => Math.round(p.total));
+    top10_ca_ttc = top10_qty;
+    top10_ca_ht = top10_qty;
+  }
+
+  // Build top3_cats from catProducts
+  const top3_cats = Object.entries(catProducts)
+    .filter(([k]) => k !== "Autre")
+    .sort((a, b) => {
+      const aCA = a[1].reduce((s, p) => s + p.ca_ttc, 0);
+      const bCA = b[1].reduce((s, p) => s + p.ca_ttc, 0);
+      return bCA - aCA;
+    })
+    .slice(0, 8)
+    .map(([cat, prods]) => ({
+      cat,
+      rows: prods.slice(0, 3).map(p => ({
+        n: p.n,
+        ca_ttc: `${p.ca_ttc.toLocaleString("fr-FR")}\u20AC`,
+        ca_ht: `${p.ca_ht.toLocaleString("fr-FR")}\u20AC`,
+      })),
+      flop: prods.length > 3 ? {
+        n: prods[prods.length - 1].n,
+        ca_ttc: `${prods[prods.length - 1].ca_ttc.toLocaleString("fr-FR")}\u20AC`,
+        ca_ht: `${prods[prods.length - 1].ca_ht.toLocaleString("fr-FR")}\u20AC`,
+        qty: prods[prods.length - 1].qty,
+      } : null,
+    }));
+
+  // Build mix from article stats if rayons empty
+  let finalMixLabels = mix_labels;
+  let finalMixTtc = mix_ttc;
+  let finalMixHt = mix_ht;
+  if (finalMixLabels.length === 0 && Object.keys(catProducts).length > 0) {
+    const catEntries = Object.entries(catProducts)
+      .filter(([k]) => k !== "Autre")
+      .map(([cat, prods]) => ({
+        cat,
+        ttc: prods.reduce((s, p) => s + p.ca_ttc, 0),
+        ht: prods.reduce((s, p) => s + p.ca_ht, 0),
+      }))
+      .sort((a, b) => b.ttc - a.ttc);
+    finalMixLabels = catEntries.map(e => e.cat);
+    finalMixTtc = catEntries.map(e => e.ttc);
+    finalMixHt = catEntries.map(e => e.ht);
+  }
+
+  // Hourly distribution from hourly products
+  const hourly_totals = Array.from({ length: 24 }, () => 0);
+  for (const p of topProductsHourly) {
+    if (p.hourly) {
+      for (let h = 0; h < 24; h++) {
+        hourly_totals[h] += p.hourly[h] || 0;
+      }
+    }
+  }
+
+  const emptyUpsell = { tables: 0, coverts: 0, ca_ttc: 0, ca_ht: 0 };
+
+  return {
+    dates,
+    days: dayNames.map(d => d.charAt(0).toUpperCase() + d.slice(1)),
+    ca_ttc: Math.round(ca_ttc * 100) / 100,
+    ca_ht: Math.round(ca_ht * 100) / 100,
+    couverts: totalCouverts,
+    tickets: totalTickets,
+    ann_pct: 0,
+    day_ttc, day_ht, day_cov, tm_ttc, tm_ht,
+    zones_ttc,
+    zones_ht: zones_ttc, // same as TTC for rayon data
+    place_sur_ttc: Math.round(ca_ttc),
+    place_sur_ht: Math.round(ca_ht),
+    place_emp_ttc: 0, place_emp_ht: 0,
+    cov_sur: totalCouverts, cov_emp: 0,
+    services: [],
+    mix_labels: finalMixLabels,
+    mix_ttc: finalMixTtc,
+    mix_ht: finalMixHt,
+    top10_names,
+    top10_ca_ttc,
+    top10_ca_ht,
+    top10_qty,
+    cat_products: catProducts as Record<string, unknown[]>,
+    cat_products_sur: {} as Record<string, unknown[]>,
+    cat_products_emp: {} as Record<string, unknown[]>,
+    top3_cats,
+    serveurs: [] as string[],
+    serv_ca_ttc: [] as number[],
+    serv_ca_ht: [] as number[],
+    serv_tickets: [] as number[],
+    serv_cov: [] as number[],
+    ratios: {
+      anti: emptyUpsell, dolci: emptyUpsell, vin: emptyUpsell,
+      alcool: emptyUpsell, boissons: emptyUpsell, digestif: emptyUpsell, cafe: emptyUpsell,
+      avgCovPerTable: 0,
+    },
+    pay: [],
+    duration: {
+      avgDurMin: 0, byZone: [], bySvc: [], avgRotation: 0, rotByZone: [], totalOrders: 0,
+    },
+    // Extra: marge data for daily_sales source
+    marge_total: Math.round(totalMarge * 100) / 100,
+    marge_pct: ca_ht > 0 ? Math.round(totalMarge / ca_ht * 10000) / 100 : 0,
+    day_marge,
+    day_taux_marque,
+    hourly_totals,
   };
 }

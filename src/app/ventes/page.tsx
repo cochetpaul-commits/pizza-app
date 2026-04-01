@@ -49,6 +49,12 @@ type WeekData = {
     rotByZone: { zone: string; avgRotation: number; maxRotation: number }[];
     totalOrders: number;
   };
+  // Extra fields from daily_sales source
+  marge_total?: number;
+  marge_pct?: number;
+  day_marge?: number[];
+  day_taux_marque?: number[];
+  hourly_totals?: number[];
 };
 
 type ViewTab = "jour" | "semaine" | "mois";
@@ -109,6 +115,7 @@ export default function PerformancesPage() {
   const [mode, setMode] = useState<"ttc" | "ht">("ttc");
   const [data, setData] = useState<WeekData | null>(null);
   const [prev, setPrev] = useState<WeekData | null>(null); // A-1
+  const [dataSource, setDataSource] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState("");
@@ -173,9 +180,11 @@ export default function PerformancesPage() {
       if (json.empty || !json.stats) {
         setData(null);
         setPrev(null);
+        setDataSource(null);
       } else {
         setData(json.stats);
         setPrev(json.prev ?? null);
+        setDataSource(json.source ?? "ventes_lignes");
       }
       // Fetch meteo
       try {
@@ -556,8 +565,91 @@ export default function PerformancesPage() {
               </div>
             </div>
 
+            {/* Marge card (daily_sales source) */}
+            {dataSource === "daily_sales" && W.day_marge && W.day_marge.length > 0 && (() => {
+              const margeTotal = W.marge_total ?? 0;
+              const margePct = W.marge_pct ?? 0;
+              const dayMarge = W.day_marge ?? [];
+              const dayTM = W.day_taux_marque ?? [];
+              const avgTM = dayTM.length > 0 ? dayTM.reduce((s, v) => s + v, 0) / dayTM.filter(v => v > 0).length : 0;
+              const labels = W.days.length > 7
+                ? W.dates.map(d => new Date(d + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" }))
+                : W.days.map(d => d.slice(0, 3));
+              const maxMarge = Math.max(...dayMarge, 1);
+
+              return (
+              <div style={S.card}>
+                <div style={S.sec}>Marge & taux de marque</div>
+                <div className="ventes-marge-kpis" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 18 }}>
+                  <div style={{ background: "#f9f6f0", borderRadius: 10, padding: "14px 16px", textAlign: "center" }}>
+                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 28, fontWeight: 700, color: "#4a6741" }}>{Math.round(margeTotal).toLocaleString("fr-FR")}{"\u20AC"}</div>
+                    <div style={{ fontSize: 10, color: "#777", marginTop: 4 }}>Marge totale</div>
+                  </div>
+                  <div style={{ background: "#f9f6f0", borderRadius: 10, padding: "14px 16px", textAlign: "center" }}>
+                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 28, fontWeight: 700, color: margePct >= 25 ? "#4a6741" : margePct >= 15 ? "#e65100" : "#c62828" }}>{margePct.toFixed(1)}%</div>
+                    <div style={{ fontSize: 10, color: "#777", marginTop: 4 }}>Marge / CA HT</div>
+                  </div>
+                  <div style={{ background: "#f9f6f0", borderRadius: 10, padding: "14px 16px", textAlign: "center" }}>
+                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 28, fontWeight: 700, color: accent }}>{(avgTM * 100).toFixed(1)}%</div>
+                    <div style={{ fontSize: 10, color: "#777", marginTop: 4 }}>Taux de marque moy.</div>
+                  </div>
+                </div>
+                {/* Marge bar chart per day */}
+                {dayMarge.length > 1 && (
+                  <>
+                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "#777", fontWeight: 500, marginBottom: 8 }}>Marge par jour</div>
+                    {dayMarge.map((m, i) => {
+                      const tm = dayTM[i] ?? 0;
+                      const barPct = maxMarge > 0 ? Math.round(m / maxMarge * 100) : 0;
+                      const tmColor = tm >= 0.25 ? "#4a6741" : tm >= 0.15 ? "#e65100" : "#c62828";
+                      return (
+                        <div key={i} style={{ marginBottom: 6 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, marginBottom: 2 }}>
+                            <span style={{ color: "#777", fontWeight: 500, width: 56 }}>{labels[i] ?? ""}</span>
+                            <span style={{ flex: 1, height: 6, background: "rgba(0,0,0,.06)", borderRadius: 3, overflow: "hidden", margin: "0 10px" }}>
+                              <span style={{ display: "block", height: "100%", width: `${barPct}%`, background: "#4a6741", borderRadius: 3, transition: "width .4s" }} />
+                            </span>
+                            <span style={{ fontWeight: 600, color: "#4a6741", width: 60, textAlign: "right", fontSize: 11 }}>{Math.round(m).toLocaleString("fr-FR")}{"\u20AC"}</span>
+                            <span style={{ width: 50, textAlign: "right", fontSize: 10, fontWeight: 600, color: tmColor }}>{(tm * 100).toFixed(1)}%</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
+              );
+            })()}
+
+            {/* Hourly distribution (daily_sales source with product data) */}
+            {dataSource === "daily_sales" && W.hourly_totals && W.hourly_totals.some(v => v > 0) && (() => {
+              const h = W.hourly_totals!;
+              const maxH = Math.max(...h, 1);
+              // Only show hours 10-24 (restaurant hours)
+              const startH = 10;
+              const endH = 24;
+              return (
+                <div style={S.card}>
+                  <div style={S.sec}>Repartition horaire des ventes (articles)</div>
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 120, padding: "0 4px" }}>
+                    {Array.from({ length: endH - startH }, (_, i) => {
+                      const hour = startH + i;
+                      const val = h[hour] || 0;
+                      const pct = maxH > 0 ? val / maxH * 100 : 0;
+                      return (
+                        <div key={hour} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
+                          <div style={{ width: "100%", maxWidth: 32, height: `${Math.max(pct, 2)}%`, background: val > 0 ? accent : "#ddd6c8", borderRadius: "3px 3px 0 0", transition: "height .4s", minHeight: 2, opacity: val > 0 ? 0.4 + 0.6 * (pct / 100) : 0.3 }} title={`${hour}h: ${Math.round(val)} articles`} />
+                          <div style={{ fontSize: 8, color: "#999", marginTop: 3 }}>{hour}h</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Upsell ratios */}
-            <div style={S.card}>
+            {W.ratios.anti.tables > 0 && <div style={S.card}>
               <div style={S.sec}>Upsell · performance de la periode</div>
               <div className="ventes-upsell-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
                 <UpsellCard label="Antipasti" emoji="🥗" data={W.ratios.anti} totalTables={W.tickets} totalCov={W.couverts} color="#D4775A" targets={{ ok: 30, good: 50, avgPrice: 12 }} mode={mode} action="Suggerer en debut de service" onClick={() => setExpandedCat(expandedCat === "Antipasti" ? null : "Antipasti")} active={expandedCat === "Antipasti"} />
@@ -597,7 +689,7 @@ export default function PerformancesPage() {
                   </div>
                 );
               })()}
-            </div>
+            </div>}
 
             {/* Duration & Rotation */}
             {W.duration && W.duration.totalOrders > 0 && (() => {
@@ -669,7 +761,7 @@ export default function PerformancesPage() {
             })()}
 
             {/* Sur place vs emporter */}
-            <div style={S.card}>
+            {(W.place_emp_ttc > 0 || W.cov_emp > 0) && <div style={S.card}>
               <div style={S.sec}>Sur place vs a emporter</div>
               <div className="ventes-place-row" style={{ display: "flex", gap: 0 }}>
                 {(() => {
@@ -725,7 +817,7 @@ export default function PerformancesPage() {
                   </div>
                 );
               })()}
-            </div>
+            </div>}
 
             {/* Zones */}
             {W.days.length > 0 && (() => {
@@ -852,10 +944,12 @@ export default function PerformancesPage() {
             )}
 
             {/* Top 10 */}
+            {W.top10_names.length > 0 && (
             <div style={S.card}>
-              <div style={S.sec}>Top 10 produits · CA {mode.toUpperCase()}</div>
+              <div style={S.sec}>Top 10 produits{dataSource === "daily_sales" ? " (articles vendus)" : ` · CA ${mode.toUpperCase()}`}</div>
               <ChartCanvas id="top10" height={380} data={W} mode={mode} type="top10" />
             </div>
+            )}
 
             {/* Top 3 par categorie */}
             {W.top3_cats.length > 0 && (
@@ -884,7 +978,7 @@ export default function PerformancesPage() {
             )}
 
             {/* Ventes par categorie */}
-            <div style={S.card}>
+            {W.mix_labels.length > 0 && <div style={S.card}>
               <div style={{ ...S.sec, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span>Ventes par categorie · CA {mode.toUpperCase()}</span>
                 <span style={{ fontSize: 10, color: "#777", fontStyle: "italic", textTransform: "none", letterSpacing: 0 }}>Cliquer une barre pour le detail</span>
@@ -893,7 +987,7 @@ export default function PerformancesPage() {
               {mixDDOpen && W.cat_products[mixDDOpen.label] && (
                 <MixDropdown label={mixDDOpen.label} color={mixDDOpen.color} products={W.cat_products[mixDDOpen.label]} onClose={() => setMixDDOpen(null)} mode={mode} />
               )}
-            </div>
+            </div>}
 
             {/* Serveurs */}
             {W.serveurs.length > 0 && (
