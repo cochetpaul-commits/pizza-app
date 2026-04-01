@@ -292,11 +292,10 @@ function RecipeCard({
 }
 
 function SectionHeader({
-  title, color, count, newHref,
+  title, color, count,
 }: {
-  title: string; color: string; count: number; newHref?: string;
+  title: string; color: string; count: number;
 }) {
-  const router = useRouter();
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 10,
@@ -315,20 +314,6 @@ function SectionHeader({
         {title}
         <span style={{ fontWeight: 500, fontSize: 12, marginLeft: 8, color: "#999", letterSpacing: 0 }}>{count} fiche{count > 1 ? "s" : ""}</span>
       </span>
-      {newHref && (
-        <button
-          type="button"
-          onClick={() => router.push(newHref)}
-          style={{
-            padding: "5px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
-            border: `1.5px solid ${color}`,
-            background: color + "10", color,
-            cursor: "pointer", whiteSpace: "nowrap",
-          }}
-        >
-          + Nouvelle
-        </button>
-      )}
     </div>
   );
 }
@@ -807,7 +792,7 @@ function RecettesInner() {
         {showPizza && filteredPizzas.length > 0 && (
           <div style={{ marginBottom: 24 }}>
             <SectionHeader title="Pizza" color={PIZZA_COLOR} count={filteredPizzas.length}
-              newHref={canWrite ? "/recettes/new/pizza" : undefined} />
+              />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 8 }}>
               {filteredPizzas.map(r => (
                 <RecipeCard
@@ -833,7 +818,7 @@ function RecettesInner() {
         {showCuisine && filteredKitchens.length > 0 && (
           <div style={{ marginBottom: 24 }}>
             <SectionHeader title="Cuisine" color={CUISINE_COLOR} count={filteredKitchens.length}
-              newHref={canWrite ? "/recettes/new/cuisine" : undefined} />
+              />
             {CUISINE_CATS.filter(cat => (kitchenByCat[cat.id]?.length ?? 0) > 0).map(cat => {
               const catColor = CUISINE_CAT_COLORS[cat.id] ?? CUISINE_COLOR;
               return (
@@ -875,7 +860,7 @@ function RecettesInner() {
         {showCocktail && filteredCocktails.length > 0 && (
           <div style={{ marginBottom: 24 }}>
             <SectionHeader title="Cocktail" color={COCKTAIL_COLOR} count={filteredCocktails.length}
-              newHref={canWrite ? "/recettes/new/cocktail" : undefined} />
+              />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 8 }}>
               {filteredCocktails.map(r => (
                 <RecipeCard
@@ -900,7 +885,7 @@ function RecettesInner() {
         {showEmp && filteredEmps.length > 0 && (
           <div style={{ marginBottom: 24 }}>
             <SectionHeader title="Empâtement" color={EMP_COLOR} count={filteredEmps.length}
-              newHref={canWrite ? "/recettes/new/empatement" : undefined} />
+              />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 8 }}>
               {filteredEmps.map(r => (
                 <RecipeCard
