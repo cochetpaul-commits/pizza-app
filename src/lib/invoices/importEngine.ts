@@ -105,6 +105,31 @@ function toOfferUnit(u: "pc" | "kg" | "l" | null): "pc" | "kg" | "l" {
   return "pc"; // default to piece when unit unknown
 }
 
+// ── Supplier category auto-detection ──────────────────────────────────────────
+
+const SUPPLIER_CATEGORY: Record<string, string> = {
+  metro: "alimentaire_general",
+  mael: "cremerie_frais",
+  maël: "cremerie_frais",
+  vinoflo: "vins",
+  cozigou: "boissons_spiritueux",
+  carniato: "viande_charcuterie",
+  "bar spirits": "spiritueux",
+  barspirits: "spiritueux",
+  sum: "alimentaire_general",
+  armor: "emballage",
+  masse: "surgeles",
+  elien: "glaces",
+  sdpf: "produits_fins",
+  progourmands: "produits_fins",
+  lmdw: "spiritueux",
+};
+
+function detectSupplierCategory(name: string): string | null {
+  const lower = name.toLowerCase().trim();
+  return SUPPLIER_CATEGORY[lower] ?? null;
+}
+
 // ── Moteur d'import ────────────────────────────────────────────────────────────
 
 export async function runImport(options: {
@@ -144,12 +169,21 @@ export async function runImport(options: {
   const { data: supRows, error: supErr } = await supabase
     .from("suppliers")
     .upsert(supplierRow, { onConflict: "etablissement_id,name" })
-    .select("id")
+    .select("id,category")
     .limit(1);
 
   if (supErr) throw new Error(supErr.message);
   const supplierId = (supRows?.[0]?.id as string | undefined) ?? null;
   if (!supplierId) throw new Error(`Supplier ${normalizedName}: id manquant`);
+
+  // Auto-fill category if not yet set
+  const existingCat = supRows?.[0]?.category as string | null;
+  if (!existingCat) {
+    const detectedCat = detectSupplierCategory(normalizedName);
+    if (detectedCat) {
+      await supabase.from("suppliers").update({ category: detectedCat }).eq("id", supplierId);
+    }
+  }
 
   // 2. Déduplication facture
   const invoiceNumber = payload.invoice_number ?? null;
