@@ -63,6 +63,16 @@ export type Supplier = {
   phone?: string | null;
   contact_name?: string | null;
   notes?: string | null;
+  franco_minimum?: number | null;
+  address?: string | null;
+  city?: string | null;
+  postal_code?: string | null;
+  siret?: string | null;
+  category?: string | null;
+  payment_terms?: string | null;
+  delivery_days?: string[] | null;
+  website?: string | null;
+  tva_intra?: string | null;
 };
 
 export type Ingredient = {
