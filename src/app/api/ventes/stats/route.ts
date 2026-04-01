@@ -736,7 +736,7 @@ async function buildFromDailySales(etabId: string, from: string, to: string) {
   let top10_ca_ttc: number[] = [];
   let top10_ca_ht: number[] = [];
   let top10_qty: number[] = [];
-  let catProducts: Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]> = {};
+  const catProducts: Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]> = {};
 
   if (articleProducts.length > 0) {
     const top10 = articleProducts.slice(0, 10);

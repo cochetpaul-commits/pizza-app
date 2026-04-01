@@ -216,9 +216,8 @@ function PiccolaMiaContent() {
     setUpcomingEvents(eventsRes.data ?? []);
   }, [etab, today]);
 
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const ticketMoyen = tickets > 0 ? caDay / tickets : 0;
   const deltaCa =

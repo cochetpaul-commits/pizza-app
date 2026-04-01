@@ -243,7 +243,7 @@ function parseKeziaDaily(rows: unknown[][], etablissementId: string): { records:
 }
 
 /** Parse Kezia product XLSX "IdArt, Designation, 0à1h, ..., Total" → product summary */
-function parseKeziaProducts(rows: unknown[][], etablissementId: string): { products: { name: string; total: number; hourly: number[] }[]; count: number } {
+function parseKeziaProducts(rows: unknown[][], _etablissementId: string): { products: { name: string; total: number; hourly: number[] }[]; count: number } {
   const products: { name: string; total: number; hourly: number[] }[] = [];
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i] as unknown[];
