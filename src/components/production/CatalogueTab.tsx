@@ -177,7 +177,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
       id: p.id, type: "pizza", name: p.name, category: null,
       photo_url: p.photo_url, lines, steps: parseJsonSteps(p.notes),
       pivot_ingredient_id: p.pivot_ingredient_id,
-      yield_info: p.ball_weight_g ? `P\u00E2ton ${p.ball_weight_g} g` : null,
+      yield_info: p.ball_weight_g ? `Pâton ${p.ball_weight_g} g` : null,
       allergens: [...allergenSet],
     });
   }
@@ -309,7 +309,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
     });
   }
 
-  // ── Emp\u00E2tement ──
+  // ── Empâtement ──
   const { data: empatements } = await supabase
     .from("recipes")
     .select("id, name, type, balls_count, ball_weight, flour_mix, hydration_total, salt_percent, honey_percent, oil_percent, yeast_percent, biga_yeast_percent, procedure, pivot_ingredient_id")
@@ -344,7 +344,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
       id: `emp-${e.id}`, type: "production", name: e.name, category: "empatement",
       photo_url: null, lines, steps: parseJsonSteps(e.procedure),
       pivot_ingredient_id: e.pivot_ingredient_id,
-      yield_info: `${bc} p\u00E2ton${bc > 1 ? "s" : ""} \u00D7 ${bw} g`,
+      yield_info: `${bc} pâton${bc > 1 ? "s" : ""} × ${bw} g`,
       allergens: ["gluten"],
       emp_data: empData,
     });
@@ -368,7 +368,7 @@ export function CatalogueContent() {
 
   // Pivot overrides: { recipeId: qty }
   const [pivotOverrides, setPivotOverrides] = useState<Record<string, number>>({});
-  // Emp\u00E2tement overrides: { recipeId: { count, weight } }
+  // Empâtement overrides: { recipeId: { count, weight } }
   const [empOverrides, setEmpOverrides] = useState<Record<string, { count?: number; weight?: number }>>({});
 
   // Pivot modal (any recipe with pivot or emp_data)
@@ -434,8 +434,8 @@ export function CatalogueContent() {
     const [type, cat] = key.split(":");
     if (!cat) return TYPE_LABELS[type as RecipeType] ?? type;
     if (type === "cuisine") return CUISINE_CAT_LABELS[cat] ?? cat;
-    if (cat === "empatement") return "Emp\u00E2tement";
-    if (cat === "prep" || cat === "preparation") return "Pr\u00E9parations";
+    if (cat === "empatement") return "Empâtement";
+    if (cat === "prep" || cat === "preparation") return "Préparations";
     return cat;
   }
 
@@ -465,14 +465,14 @@ export function CatalogueContent() {
           Fiches techniques
         </h1>
         <p style={{ fontSize: 13, color: "#999", margin: "0 0 20px" }}>
-          {recipes.length} recette{recipes.length > 1 ? "s" : ""} — consultation \u00E9quipe
+          {recipes.length} recette{recipes.length > 1 ? "s" : ""} — consultation équipe
         </p>
 
         {/* IA Suggestions menu */}
         <AiInsightCard
           type="menu"
           label="Suggestions menu IA"
-          icon={"\uD83C\uDF74"}
+          icon={"🍴"}
           color="#46655a"
         />
 
@@ -506,7 +506,7 @@ export function CatalogueContent() {
 
         {/* Empty */}
         {!loading && filtered.length === 0 && (
-          <p style={{ textAlign: "center", color: "#999", padding: 40, fontSize: 14 }}>Aucune recette trouv\u00E9e.</p>
+          <p style={{ textAlign: "center", color: "#999", padding: 40, fontSize: 14 }}>Aucune recette trouvée.</p>
         )}
 
         {/* Groups */}
@@ -594,8 +594,8 @@ export function CatalogueContent() {
                         </div>
                         <div style={{ fontSize: 11, color: "#999", marginTop: 1 }}>
                           {recipe.lines.length} ingr.
-                          {recipe.steps.length > 0 && ` \u00B7 ${recipe.steps.length} \u00E9tape${recipe.steps.length > 1 ? "s" : ""}`}
-                          {recipe.yield_info && ` \u00B7 ${recipe.yield_info}`}
+                          {recipe.steps.length > 0 && ` · ${recipe.steps.length} étape${recipe.steps.length > 1 ? "s" : ""}`}
+                          {recipe.yield_info && ` · ${recipe.yield_info}`}
                         </div>
                       </div>
 
@@ -649,7 +649,7 @@ export function CatalogueContent() {
                           color: color, textTransform: "uppercase", letterSpacing: "0.06em",
                           marginBottom: 8,
                         }}>
-                          Ingr\u00E9dients
+                          Ingrédients
                         </div>
                         <div style={{ marginBottom: 16 }}>
                           {recipe.lines.map((line, idx) => (
@@ -665,7 +665,7 @@ export function CatalogueContent() {
                                   fontWeight: 800, fontSize: 14, color: "#1a1a1a",
                                   fontVariantNumeric: "tabular-nums",
                                 }}>
-                                  {line.qty > 0 ? fmtQty(line.qty) : "\u2014"} <span style={{ fontWeight: 500, color: "#999", fontSize: 12 }}>{line.unit}</span>
+                                  {line.qty > 0 ? fmtQty(line.qty) : "—"} <span style={{ fontWeight: 500, color: "#999", fontSize: 12 }}>{line.unit}</span>
                                 </span>
                               </div>
                           ))}
@@ -679,7 +679,7 @@ export function CatalogueContent() {
                               color: color, textTransform: "uppercase", letterSpacing: "0.06em",
                               marginBottom: 8,
                             }}>
-                              Proc\u00E9d\u00E9
+                              Procédé
                             </div>
                             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
                               {recipe.steps.map((step, idx) => (
@@ -735,7 +735,7 @@ export function CatalogueContent() {
         const mColor = TYPE_COLORS[modalRecipe.type];
         const isEmp = !!modalRecipe.emp_data;
 
-        // Emp\u00E2tement: recalculate from pateEngine
+        // Empâtement: recalculate from pateEngine
         let displayLines = modalRecipe.lines;
         let hasChanged = false;
         let empYield = modalRecipe.yield_info;
@@ -749,7 +749,7 @@ export function CatalogueContent() {
           if (empResult) {
             displayLines = resultToLines(empResult);
             if (hasChanged) {
-              empYield = `${bc} p\u00E2ton${bc > 1 ? "s" : ""} \u00D7 ${bw} g = ${fmtQty(bc * bw)} g`;
+              empYield = `${bc} pâton${bc > 1 ? "s" : ""} × ${bw} g = ${fmtQty(bc * bw)} g`;
             }
           }
         }
@@ -815,11 +815,11 @@ export function CatalogueContent() {
                     flexShrink: 0,
                   }}
                 >
-                  \u2715
+                  ✕
                 </button>
               </div>
 
-              {/* Emp\u00E2tement: p\u00E2tons + grammage */}
+              {/* Empâtement: pâtons + grammage */}
               {isEmp && modalRecipe.emp_data && (
                 <div style={{ padding: "0 20px", marginBottom: 16 }}>
                   <div style={{
@@ -828,7 +828,7 @@ export function CatalogueContent() {
                     background: `${mColor}08`, border: `1.5px solid ${mColor}25`,
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: mColor }}>P\u00E2tons</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: mColor }}>Pâtons</span>
                       <input
                         type="number"
                         value={empOverrides[modalRecipe.id]?.count ?? ""}
@@ -848,7 +848,7 @@ export function CatalogueContent() {
                         }}
                       />
                     </div>
-                    <span style={{ fontSize: 16, color: "#ccc", fontWeight: 300 }}>\u00D7</span>
+                    <span style={{ fontSize: 16, color: "#ccc", fontWeight: 300 }}>×</span>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <input
                         type="number"
@@ -890,7 +890,7 @@ export function CatalogueContent() {
                     padding: "12px 16px", borderRadius: 12,
                     background: `${mColor}08`, border: `1.5px solid ${mColor}25`,
                   }}>
-                    <span style={{ fontSize: 16, fontWeight: 800, color: mColor }}>\u2605</span>
+                    <span style={{ fontSize: 16, fontWeight: 800, color: mColor }}>★</span>
                     <span style={{ fontSize: 14, fontWeight: 700, color: mColor }}>
                       {modalRecipe.lines[0].ingredient_name}
                     </span>
@@ -918,7 +918,7 @@ export function CatalogueContent() {
                         fontSize: 13, fontWeight: 800, color: mColor, marginLeft: "auto",
                         padding: "4px 10px", borderRadius: 8, background: `${mColor}12`,
                       }}>
-                        \u00D7 {mFactor.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
+                        × {mFactor.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
                       </span>
                     )}
                   </div>
@@ -953,7 +953,7 @@ export function CatalogueContent() {
                               color: hasChanged ? "#D4775A" : "#1a1a1a",
                               fontVariantNumeric: "tabular-nums",
                             }}>
-                              {line.qty > 0 ? fmtQty(line.qty) : "\u2014"}
+                              {line.qty > 0 ? fmtQty(line.qty) : "—"}
                               <span style={{ fontWeight: 500, color: "#999", fontSize: 12, marginLeft: 4 }}>g</span>
                             </span>
                           </div>
@@ -968,7 +968,7 @@ export function CatalogueContent() {
                       fontSize: 12, fontWeight: 700, color: mColor,
                       textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8,
                     }}>
-                      Ingr\u00E9dients
+                      Ingrédients
                     </div>
                     <div style={{ marginBottom: 16 }}>
                       {displayLines.map((line, idx) => (
@@ -985,7 +985,7 @@ export function CatalogueContent() {
                             color: hasChanged ? "#D4775A" : "#1a1a1a",
                             fontVariantNumeric: "tabular-nums",
                           }}>
-                            {line.qty > 0 ? fmtQty(line.qty) : "\u2014"}
+                            {line.qty > 0 ? fmtQty(line.qty) : "—"}
                             <span style={{ fontWeight: 500, color: "#999", fontSize: 12, marginLeft: 4 }}>{line.unit}</span>
                           </span>
                         </div>
@@ -1002,7 +1002,7 @@ export function CatalogueContent() {
                     fontSize: 12, fontWeight: 700, color: mColor,
                     textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8,
                   }}>
-                    Proc\u00E9d\u00E9
+                    Procédé
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
                     {modalRecipe.steps.map((step, idx) => (
