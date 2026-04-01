@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -14,11 +14,65 @@ function fmtEur(n: number) {
 }
 
 function getMonday(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00");
+  const d = new Date(dateStr + "T12:00:00");
   const day = d.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diff);
   return d.toISOString().slice(0, 10);
+}
+
+function getPrevDay(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00");
+  d.setDate(d.getDate() - 1);
+  if (d.getDay() === 0) d.setDate(d.getDate() - 2);
+  if (d.getDay() === 6) d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function formatDayLabel(dateStr: string, today: string): string {
+  if (dateStr === today) return "CA du jour";
+  const d = new Date(dateStr + "T12:00:00");
+  const label = d.toLocaleDateString("fr-FR", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  return `CA du ${label}`;
+}
+
+function formatTicketsLabel(dateStr: string, today: string): string {
+  if (dateStr === today) return "Tickets du jour";
+  const d = new Date(dateStr + "T12:00:00");
+  const label = d.toLocaleDateString("fr-FR", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  return `Tickets du ${label}`;
+}
+
+async function fetchAllRows(
+  etabId: string,
+  from: string,
+  to: string,
+): Promise<{ ttc: number; num_fiscal: string | null }[]> {
+  let all: { ttc: number; num_fiscal: string | null }[] = [];
+  let offset = 0;
+  while (true) {
+    const { data } = await supabase
+      .from("ventes_lignes")
+      .select("ttc, num_fiscal")
+      .eq("etablissement_id", etabId)
+      .gte("date_service", from)
+      .lte("date_service", to)
+      .eq("type_ligne", "Produit")
+      .range(offset, offset + 999);
+    if (!data || data.length === 0) break;
+    all = all.concat(data);
+    if (data.length < 1000) break;
+    offset += 1000;
+  }
+  return all;
 }
 
 export default function BelloMioDashboard() {
@@ -36,22 +90,19 @@ function BelloMioContent() {
     () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(new Date()),
     [],
   );
-  const yesterday = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(d);
-  }, []);
-  const monday = useMemo(() => getMonday(today), [today]);
 
   const etab = useMemo(
     () => etablissements.find((e) => e.slug?.includes("bello")),
     [etablissements],
   );
 
-  const [caToday, setCaToday] = useState(0);
-  const [caYesterday, setCaYesterday] = useState(0);
-  const [couverts, setCouverts] = useState(0);
+  const [lastDay, setLastDay] = useState<string | null>(null);
+  const [caDay, setCaDay] = useState(0);
+  const [caPrev, setCaPrev] = useState(0);
+  const [tickets, setTickets] = useState(0);
   const [caWeek, setCaWeek] = useState(0);
+  const [caMonth, setCaMonth] = useState(0);
+  const [ticketsMonth, setTicketsMonth] = useState(0);
   const [shiftsToday, setShiftsToday] = useState(0);
   const [pendingCommandes, setPendingCommandes] = useState(0);
   const [alertCount, setAlertCount] = useState<number | null>(null);
@@ -64,99 +115,109 @@ function BelloMioContent() {
     }
   }, [etab, setCurrent, setGroupView]);
 
-  // Fetch CA today + couverts from ventes_lignes
-  useEffect(() => {
+  // Single consolidated fetch
+  const fetchAll = useCallback(async () => {
     if (!etab) return;
-    (async () => {
-      const { data } = await supabase
-        .from("ventes_lignes")
-        .select("ttc, num_fiscal")
-        .eq("etablissement_id", etab.id)
-        .eq("date_service", today)
-        .eq("type_ligne", "Produit");
-      if (!data) return;
-      const ca = data.reduce((s, r) => s + (r.ttc ?? 0), 0);
-      const uniqueTickets = new Set(data.map((r) => r.num_fiscal).filter(Boolean));
-      setCaToday(ca);
-      setCouverts(uniqueTickets.size);
-    })();
-  }, [etab, today]);
 
-  // CA yesterday
-  useEffect(() => {
-    if (!etab) return;
-    (async () => {
-      const { data } = await supabase
-        .from("ventes_lignes")
-        .select("ttc")
-        .eq("etablissement_id", etab.id)
-        .eq("date_service", yesterday)
-        .eq("type_ligne", "Produit");
-      if (!data) return;
-      setCaYesterday(data.reduce((s, r) => s + (r.ttc ?? 0), 0));
-    })();
-  }, [etab, yesterday]);
+    // 1. Find last day with data
+    const { data: lastRow } = await supabase
+      .from("ventes_lignes")
+      .select("date_service")
+      .eq("etablissement_id", etab.id)
+      .eq("type_ligne", "Produit")
+      .order("date_service", { ascending: false })
+      .limit(1);
+    const ld = lastRow?.[0]?.date_service ?? today;
+    setLastDay(ld);
 
-  // CA week
-  useEffect(() => {
-    if (!etab) return;
-    (async () => {
-      const { data } = await supabase
-        .from("ventes_lignes")
-        .select("ttc")
-        .eq("etablissement_id", etab.id)
-        .gte("date_service", monday)
-        .lte("date_service", today)
-        .eq("type_ligne", "Produit");
-      if (!data) return;
-      setCaWeek(data.reduce((s, r) => s + (r.ttc ?? 0), 0));
-    })();
-  }, [etab, monday, today]);
+    const prevDay = getPrevDay(ld);
+    const monday = getMonday(ld);
+    const firstOfMonth = ld.slice(0, 8) + "01";
 
-  // Shifts today
-  useEffect(() => {
-    if (!etab) return;
-    (async () => {
-      const { data } = await supabase
-        .from("shifts")
-        .select("id")
-        .eq("date", today)
-        .eq("etablissement_id", etab.id);
-      setShiftsToday(data?.length ?? 0);
-    })();
-  }, [etab, today]);
-
-  // Pending commandes
-  useEffect(() => {
-    if (!etab) return;
-    (async () => {
-      const { data } = await supabase
-        .from("commande_sessions")
-        .select("id")
-        .in("status", ["brouillon", "en_attente"])
-        .eq("etablissement_id", etab.id);
-      setPendingCommandes(data?.length ?? 0);
-    })();
-  }, [etab]);
-
-  // Alerts (supplier_invoice_lines needs_review)
-  useEffect(() => {
-    (async () => {
-      try {
-        const { count } = await supabase
+    // 2. Fetch all data in parallel
+    const [dayData, prevData, monthData, shiftsRes, commandesRes, alertsRes] =
+      await Promise.all([
+        // Day data
+        supabase
+          .from("ventes_lignes")
+          .select("ttc, num_fiscal")
+          .eq("etablissement_id", etab.id)
+          .eq("date_service", ld)
+          .eq("type_ligne", "Produit"),
+        // Previous day data
+        supabase
+          .from("ventes_lignes")
+          .select("ttc")
+          .eq("etablissement_id", etab.id)
+          .eq("date_service", prevDay)
+          .eq("type_ligne", "Produit"),
+        // Month data (paginated)
+        fetchAllRows(etab.id, firstOfMonth, ld),
+        // Shifts today
+        supabase
+          .from("shifts")
+          .select("id")
+          .eq("date", today)
+          .eq("etablissement_id", etab.id),
+        // Pending commandes
+        supabase
+          .from("commande_sessions")
+          .select("id")
+          .in("status", ["brouillon", "en_attente"])
+          .eq("etablissement_id", etab.id),
+        // Alerts
+        supabase
           .from("supplier_invoice_lines")
           .select("id", { count: "exact", head: true })
-          .eq("needs_review", true);
-        setAlertCount(count ?? 0);
-      } catch {
-        setAlertCount(null);
-      }
-    })();
-  }, []);
+          .eq("needs_review", true),
+      ]);
 
-  const ticketMoyen = couverts > 0 ? caToday / couverts : 0;
+    // Process day
+    if (dayData.data) {
+      const ca = dayData.data.reduce((s, r) => s + (r.ttc ?? 0), 0);
+      const uniqueTickets = new Set(
+        dayData.data.map((r) => r.num_fiscal).filter(Boolean),
+      );
+      setCaDay(ca);
+      setTickets(uniqueTickets.size);
+    }
+
+    // Process previous day
+    if (prevData.data) {
+      setCaPrev(prevData.data.reduce((s, r) => s + (r.ttc ?? 0), 0));
+    }
+
+    // Process month data
+    const monthCa = monthData.reduce((s, r) => s + (r.ttc ?? 0), 0);
+    const monthTickets = new Set(monthData.map((r) => r.num_fiscal).filter(Boolean));
+    setCaMonth(monthCa);
+    setTicketsMonth(monthTickets.size);
+
+    // Week CA — need a separate fetch since monthData doesn't have date_service
+    const weekRows = await fetchAllRows(etab.id, monday, ld);
+    setCaWeek(weekRows.reduce((s, r) => s + (r.ttc ?? 0), 0));
+
+    // Shifts, commandes, alerts
+    setShiftsToday(shiftsRes.data?.length ?? 0);
+    setPendingCommandes(commandesRes.data?.length ?? 0);
+    setAlertCount(alertsRes.count ?? 0);
+  }, [etab, today]);
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  const ticketMoyen = tickets > 0 ? caDay / tickets : 0;
   const deltaCa =
-    caYesterday > 0 ? Math.round(((caToday - caYesterday) / caYesterday) * 100) : null;
+    caPrev > 0 ? Math.round(((caDay - caPrev) / caPrev) * 100) : null;
+
+  const dayLabel = lastDay ? formatDayLabel(lastDay, today) : "CA du jour";
+  const ticketsLabel = lastDay ? formatTicketsLabel(lastDay, today) : "Tickets du jour";
+  const deltaLabel = lastDay === today ? "vs hier" : `vs ${(() => {
+    const prev = getPrevDay(lastDay ?? today);
+    const d = new Date(prev + "T12:00:00");
+    return d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" });
+  })()}`;
 
   const dateDisplay = new Date().toLocaleDateString("fr-FR", {
     timeZone: "Europe/Paris",
@@ -203,24 +264,26 @@ function BelloMioContent() {
         <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>{dateDisplay}</div>
       </div>
 
-      {/* KPI cards 2x2 */}
+      {/* KPI cards 3x2 */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
         <KpiCard
-          label="CA du jour"
-          value={`${fmtEur(caToday)} \u20AC`}
+          label={dayLabel}
+          value={`${fmtEur(caDay)} \u20AC`}
           accent={COLOR}
           sub={
-            deltaCa != null ? `${deltaCa > 0 ? "+" : ""}${deltaCa}% vs hier` : undefined
+            deltaCa != null ? `${deltaCa > 0 ? "+" : ""}${deltaCa}% ${deltaLabel}` : undefined
           }
           subColor={deltaCa != null ? (deltaCa >= 0 ? T.sauge : "#DC2626") : undefined}
         />
-        <KpiCard label="Couverts du jour" value={String(couverts)} accent={T.dark} />
+        <KpiCard label={ticketsLabel} value={String(tickets)} accent={T.dark} />
         <KpiCard
           label="Ticket moyen"
           value={`${ticketMoyen.toFixed(1).replace(".", ",")} \u20AC`}
           accent={T.dark}
         />
         <KpiCard label="CA semaine" value={`${fmtEur(caWeek)} \u20AC`} accent={COLOR} />
+        <KpiCard label="CA mois" value={`${fmtEur(caMonth)} \u20AC`} accent={COLOR} />
+        <KpiCard label="Tickets mois" value={String(ticketsMonth)} accent={T.dark} />
       </div>
 
       {/* Quick stats row */}
@@ -297,7 +360,7 @@ function BelloMioContent() {
   );
 }
 
-/* ── Sub-components ── */
+/* -- Sub-components -- */
 
 function KpiCard({
   label,
