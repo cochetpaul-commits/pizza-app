@@ -122,66 +122,135 @@ function categorize(label: string, amount: number): string {
     return "prelevement";
   }
 
-  // Known supplier prelevements
+  // ── Fournisseurs alimentaires / boissons ──
   if (upper.includes("METRO") || upper.includes("TERREAZUR") || upper.includes("CARNIATO") ||
       upper.includes("COZIGOU") || upper.includes("VINOFLO") || upper.includes("MAEL") ||
-      upper.includes("BAR SPIRITS") || upper.includes("MYSPIRITS") ||
-      upper.includes("MASSE") || upper.includes("SDPF") || upper.includes("ELIEN")) {
+      upper.includes("BAR SPIRITS") || upper.includes("MYSPIRITS") || upper.includes("GOCARDLESS") ||
+      upper.includes("MASSE") || upper.includes("SDPF") || upper.includes("ELIEN") ||
+      upper.includes("PECHEURS") || upper.includes("CAFE CELTIK") || upper.includes("VINO E GUSTO") ||
+      upper.includes("VIA DEL TE") || upper.includes("JDC")) {
     return "fournisseur";
   }
 
-  // Salaries
-  if (upper.includes("SALAIRE") || upper.includes("PAIE") ||
-      (upper.includes("VIR") && /\b(MARQUET|KERROC|REMOND|PEDRON|AFFUTAGE)\b/.test(upper))) {
+  // ── Salaires employes ──
+  if (/\b(TESSIER|THEULICIDE|HERNANDEZ|BODIN|RONDEAU|GHESTIN|DIALLO)\b/.test(upper)) {
     return "salaire";
   }
 
-  // Social charges
+  // ── Remuneration gerant ──
+  if (/\bCOCHET\s+PIERRE\b/.test(upper)) {
+    return "remuneration_gerant";
+  }
+
+  // ── Prestataires externes (CM, consultants) ──
+  if (/\b(CLEMENCE\s+MARQUET|LAURINE\s+BLANDIN|LUCAS\s+CASSIE|CLICHER|MERCIER\s+ALAIN|BEEZIGN)\b/.test(upper)) {
+    return "prestataire";
+  }
+
+  // ── Impots & taxes ──
+  if (upper.includes("DGFIP") || upper.includes("SGC DOL") || upper.includes("DIRECTION GENERALE DES FINA")) {
+    return "impots";
+  }
+
+  // ── Charges sociales ──
   if (upper.includes("URSSAF") || upper.includes("KLESIA") || upper.includes("PREVOYANCE") ||
       upper.includes("MUTUELLE") || upper.includes("AG2R") || upper.includes("MALAKOFF") ||
-      upper.includes("HUMANIS")) {
+      upper.includes("HUMANIS") || upper.includes("SANTE TRAVAIL")) {
     return "charges_sociales";
   }
 
-  // Insurance
+  // ── Assurances ──
   if (upper.includes("GENERALI") || upper.includes("ALAN") || upper.includes("ASSURANCE") ||
-      upper.includes("INSURANCE")) {
+      upper.includes("INSURANCE") || upper.includes("SEDGWICK") || upper.includes("LEASCORP")) {
     return "assurance";
   }
 
-  // Rent / internal transfers
-  if (upper.includes("DA CARMELA") || upper.includes("LOYER") || upper.includes("SCI")) {
+  // ── Loyer (SCI, murs) ──
+  if (upper.includes("SCI GABY") || upper.includes("LOYER")) {
     return "loyer";
   }
 
-  // Leasing
+  // ── Transferts inter-societes ──
+  if (upper.includes("DA CARMELA") || upper.includes("FRATELLI") || upper.includes("PICCOLA")) {
+    return "transfert_interne";
+  }
+
+  // ── Prets bancaires ──
+  if (upper.includes("ECH PRET") || upper.includes("PREFILOC")) {
+    return "pret";
+  }
+
+  // ── Leasing materiel ──
   if (upper.includes("CREDIPAR") || upper.includes("LIXXBAIL") || upper.includes("LOCAM") ||
       upper.includes("LEASE") || upper.includes("LOA")) {
     return "leasing";
   }
 
-  // Accounting / consulting
+  // ── Blanchisserie ──
+  if (upper.includes("LAVANDIERE")) {
+    return "blanchisserie";
+  }
+
+  // ── Entretien & maintenance ──
+  if (upper.includes("SARP") || upper.includes("NUISIBLE") || upper.includes("AFFUTAGE") ||
+      upper.includes("THERMI FROID") || upper.includes("EFC MARQUET") || upper.includes("HYG-UP") ||
+      upper.includes("PEDRON")) {
+    return "entretien";
+  }
+
+  // ── Location (box, stockage) ──
+  if (upper.includes("DSM REMOND")) {
+    return "location";
+  }
+
+  // ── Architecte / Travaux ──
+  if (upper.includes("SULSUL") || upper.includes("SUL SUL") || upper.includes("LEQUERTIER") ||
+      upper.includes("RP OUEST")) {
+    return "travaux";
+  }
+
+  // ── Expert-comptable ──
   if (upper.includes("AUDIT") || upper.includes("COMPTAB") || upper.includes("EXPERT") ||
       upper.includes("PENNYLANE") || upper.includes("SWAN")) {
     return "comptabilite";
   }
 
-  // Telecom / utilities
+  // ── Abonnements & logiciels ──
+  if (upper.includes("SACEM") || upper.includes("SPRE") || upper.includes("YAVIN") ||
+      upper.includes("ZENCHEF") || upper.includes("OPENAI") || upper.includes("CHATGPT") ||
+      upper.includes("COPILHOST") || upper.includes("SPOTIFY") || upper.includes("APPLE.COM")) {
+    return "abonnement";
+  }
+
+  // ── Telecom & energie ──
   if (upper.includes("ORANGE") || upper.includes("SFR") || upper.includes("BOUYGUES") ||
-      upper.includes("FREE") || upper.includes("EDF") || upper.includes("ENGIE")) {
+      upper.includes("FREE") || upper.includes("ENGIE") || upper.includes("UBEFONE") ||
+      upper.includes("REGIE MALOUINE")) {
     return "telecom_energie";
   }
 
-  // Bank fees
+  // ── Epargne salariale ──
+  if (upper.includes("EPARGNE SAL") || upper.includes("ABONDEMENT")) {
+    return "epargne_salariale";
+  }
+
+  // ── Frais bancaires ──
   if (upper.includes("COTIS") || upper.includes("COTISATION") || upper.includes("FRAIS BANCAIRE") ||
-      upper.includes("FRAIS") && upper.includes("VIR")) {
+      upper.includes("COMMISSION INTERVENTION") || upper.includes("TICKET D\'AGIOS") ||
+      upper.includes("AGIOS") || upper.includes("MVT(S) VIR") ||
+      (upper.includes("FRAIS") && upper.includes("VIR"))) {
     return "frais_bancaires";
   }
 
-  // Ticket restaurant / meal vouchers
+  // ── Titres restaurant ──
   if (upper.includes("EDENRED") || upper.includes("PLUXEE") || upper.includes("UP COOP") ||
       upper.includes("SWILE") || upper.includes("SODEXO")) {
     return "titres_restaurant";
+  }
+
+  // ── American Express (encaissements) ──
+  if (upper.includes("AMERICAN EXPRESS") && amount > 0) {
+    return "encaissement_cb";
   }
 
   return "autre";
