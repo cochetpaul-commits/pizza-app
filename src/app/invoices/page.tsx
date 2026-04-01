@@ -585,7 +585,7 @@ export default function InvoicesPage() {
                     {item.status === "done" && item.supplier && (
                       <div style={{ fontSize: 11, color: "#4a6741" }}>
                         {item.supplier}
-                        {item.result?.already_imported ? " — deja importe" : ` — ${item.result?.ingredients_created ?? 0} ingredients, ${item.result?.offers_inserted ?? 0} offres`}
+                        {`${item.result?.ingredients_created ?? 0} ingredients, ${item.result?.offers_inserted ?? 0} offres`}{item.result?.already_imported ? " (facture deja connue)" : ""}
                       </div>
                     )}
                     {item.status === "error" && (
