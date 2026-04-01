@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { normalizeRole } from "@/lib/rbac";
 import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -12,46 +13,38 @@ type Profile = {
 };
 
 const ROLES = [
-  { key: "group_admin", label: "Proprietaire", desc: "Titulaire du compte, peut modifier les droits d'un admin", color: "#1a1a1a" },
-  { key: "admin", label: "Administrateur", desc: "Peut acceder a l'ensemble de l'application", color: "#7B1FA2" },
-  { key: "manager", label: "Directeur", desc: "Gere un etablissement de la configuration a la pre-paie", color: "#2D6A4F" },
-  { key: "cuisine", label: "Manager Cuisine", desc: "Supervise une equipe par la creation de planning ou la gestion des absences", color: "#D4775A" },
-  { key: "salle", label: "Manager Salle", desc: "Supervise l'equipe de salle", color: "#2563eb" },
-  { key: "plonge", label: "Employe", desc: "Role par defaut qui permet d'acceder a la plateforme en tant qu'employe", color: "#999" },
+  { key: "group_admin", label: "Administrateur", desc: "Acces complet : configuration, RH, finances, pilotage, tous les modules", color: "#D4775A" },
+  { key: "equipier", label: "Equipier", desc: "Acces production : fiches techniques, recettes, catalogue, inventaire, commandes, fournisseurs", color: "#2D6A4F" },
 ];
 
-const PERMISSIONS = {
+const PERMISSIONS: Record<string, { label: string; admin: boolean; equipier: boolean }[]> = {
+  production: [
+    { label: "Fiches techniques et recettes", admin: true, equipier: true },
+    { label: "Catalogue ingredients", admin: true, equipier: true },
+    { label: "Commandes fournisseurs", admin: true, equipier: true },
+    { label: "Fiches fournisseurs", admin: true, equipier: true },
+    { label: "Inventaire", admin: true, equipier: true },
+  ],
   planning: [
-    "Acces au planning publie de ses equipes/etablissements",
-    "Acces au planning non-publie (brouillon)",
-    "Acces au planning publie des autres equipes/etablissements",
-    "Visualisation des alertes et compteurs",
-    "Creation, modification et publication de planning",
-    "Peut modifier les plannings publies et valider les shifts de son etablissement",
-    "Visualisation des ratios",
+    { label: "Consulter le planning", admin: true, equipier: true },
+    { label: "Creer et modifier les plannings", admin: true, equipier: false },
+    { label: "Valider les shifts", admin: true, equipier: false },
   ],
-  heures: [
-    "Enregistrer ses propres heures de travail",
-    "Saisir les heures reelles de son equipe/etablissement",
-    "Peut valider ses propres heures reelles",
-    "Saisir les heures reelles de toutes les equipes/etablissements",
-    "Peut devalider les heures reelles",
-    "Peut revaloriser des absences",
+  rh: [
+    { label: "Consulter son profil", admin: true, equipier: true },
+    { label: "Gestion des employes et contrats", admin: true, equipier: false },
+    { label: "Absences et compteurs", admin: true, equipier: false },
+    { label: "Rapports et export paie", admin: true, equipier: false },
   ],
-  profil: [
-    "Peut acceder a son profil utilisateur",
-    "Peut modifier son etat civil et ses informations de contact",
-    "Peut consulter ses propres feuilles de presence",
-    "Acces au profil des employes de mon equipe ou etablissement",
-    "Acces au profil des managers de mon equipe ou etablissement",
-    "Acces au profil de tous les salaries de tous les etablissements",
-    "Peut supprimer un profil employe ou manager",
+  finances: [
+    { label: "Pilotage et KPIs", admin: true, equipier: false },
+    { label: "P&L et food cost", admin: true, equipier: false },
+    { label: "Import factures", admin: true, equipier: false },
   ],
-  absences: [
-    "Peut modifier manuellement les compteurs de conges payes",
-  ],
-  paie: [
-    "Peut distribuer, consulter et supprimer les bulletins de paie de tous les employes",
+  admin: [
+    { label: "Gestion des utilisateurs et invitations", admin: true, equipier: false },
+    { label: "Roles et permissions", admin: true, equipier: false },
+    { label: "Configuration etablissements", admin: true, equipier: false },
   ],
 };
 
@@ -70,7 +63,7 @@ export default function SettingsRolesPage() {
       .order("role")
       .order("full_name")
       .then(({ data }) => {
-        setProfiles((data ?? []) as Profile[]);
+        setProfiles((data ?? []).map(p => ({ ...p, role: normalizeRole(p.role) })) as Profile[]);
         setLoading(false);
       });
   }, []);
@@ -117,41 +110,43 @@ export default function SettingsRolesPage() {
             Permissions : {roleInfo.label}
           </h2>
 
-          {Object.entries(PERMISSIONS).map(([section, perms]) => (
-            <div key={section} style={{ marginBottom: 16 }}>
-              <div style={{
-                ...LABEL, padding: "8px 12px", background: "#faf7f2",
-                borderRadius: 6, marginBottom: 4,
-              }}>
-                {section === "heures" ? "Gestion des heures" :
-                 section === "profil" ? "Profil utilisateur" :
-                 section === "absences" ? "Gestion des absences" :
-                 section === "paie" ? "Gestion de la paie" :
-                 "Planning"}
-              </div>
-              {perms.map((perm, i) => (
-                <div key={i} style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "10px 12px",
-                  borderBottom: i < perms.length - 1 ? "1px solid #f0ebe3" : "none",
+          {Object.entries(PERMISSIONS).map(([section, perms]) => {
+            const sectionLabel =
+              section === "production" ? "Production" :
+              section === "planning" ? "Planning" :
+              section === "rh" ? "Ressources humaines" :
+              section === "finances" ? "Finances & Pilotage" :
+              "Administration";
+            return (
+              <div key={section} style={{ marginBottom: 16 }}>
+                <div style={{
+                  ...LABEL, padding: "8px 12px", background: "#faf7f2",
+                  borderRadius: 6, marginBottom: 4,
                 }}>
-                  <span style={{ fontSize: 13, color: "#1a1a1a" }}>{perm}</span>
-                  <span style={{ flexShrink: 0, marginLeft: 12 }}>
-                    {/* For now show a static check based on role hierarchy */}
-                    {selectedRole === "group_admin" || selectedRole === "admin" ? (
-                      <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" opacity="0.2" /><polyline points="9 12 11.5 14.5 15 9.5" /></svg>
-                    ) : selectedRole === "manager" && (section === "planning" || section === "heures" || section === "profil") ? (
-                      <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" opacity="0.2" /><polyline points="9 12 11.5 14.5 15 9.5" /></svg>
-                    ) : (section === "profil" && i < 3) || (section === "heures" && i === 0) || (section === "planning" && i === 0) ? (
-                      <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" opacity="0.2" /><polyline points="9 12 11.5 14.5 15 9.5" /></svg>
-                    ) : (
-                      <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.5"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
-                    )}
-                  </span>
+                  {sectionLabel}
                 </div>
-              ))}
-            </div>
-          ))}
+                {perms.map((perm, i) => {
+                  const allowed = selectedRole === "group_admin" ? perm.admin : perm.equipier;
+                  return (
+                    <div key={i} style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "10px 12px",
+                      borderBottom: i < perms.length - 1 ? "1px solid #f0ebe3" : "none",
+                    }}>
+                      <span style={{ fontSize: 13, color: "#1a1a1a" }}>{perm.label}</span>
+                      <span style={{ flexShrink: 0, marginLeft: 12 }}>
+                        {allowed ? (
+                          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" opacity="0.2" /><polyline points="9 12 11.5 14.5 15 9.5" /></svg>
+                        ) : (
+                          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.5"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
 
         {/* Users with this role */}
