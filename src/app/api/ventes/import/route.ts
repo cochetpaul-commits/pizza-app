@@ -416,23 +416,31 @@ export async function POST(req: NextRequest) {
       // Store product summary as a special daily_sales entry
       const productData = { top_products: products.slice(0, 50), total_products: count };
 
-      // Delete existing product summary
-      await supabase
+      // Check if exists, then update or insert
+      const { data: existing } = await supabase
         .from("daily_sales")
-        .delete()
+        .select("id")
         .eq("etablissement_id", etablissementId)
-        .eq("source", "kezia_products");
+        .eq("source", "kezia_products")
+        .limit(1);
 
-      const { error } = await supabase.from("daily_sales").insert({
-        etablissement_id: etablissementId,
-        date: "2000-01-01", // sentinel date for product data
-        source: "kezia_products",
-        ca_ttc: 0, ca_ht: 0,
-        rayons: productData,
-      });
+      let error;
+      if (existing && existing.length > 0) {
+        ({ error } = await supabase.from("daily_sales")
+          .update({ rayons: productData, ca_ttc: 0, ca_ht: 0 })
+          .eq("id", existing[0].id));
+      } else {
+        ({ error } = await supabase.from("daily_sales").insert({
+          etablissement_id: etablissementId,
+          date: "2000-01-01",
+          source: "kezia_products",
+          ca_ttc: 0, ca_ht: 0,
+          rayons: productData,
+        }));
+      }
 
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: `kezia_products: ${error.message}` }, { status: 500 });
       }
 
       return NextResponse.json({

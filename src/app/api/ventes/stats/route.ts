@@ -594,6 +594,82 @@ function aggregate(rows: Row[]) {
   };
 }
 
+/* ── Product categorization for Piccola Mia ── */
+
+function categorizePiccolaProduct(name: string): string {
+  const n = name.toUpperCase();
+
+  // Traiteur — plats vendus au poids
+  if (n.includes("(POIDS)") || n.includes("AU POIDS")) return "Traiteur";
+
+  // Epicerie — must be checked BEFORE Pizze to catch "SAUCE PIZZA", "FARINE PIZZA"
+  if (n.includes("SAUCE ") || n.includes("FARINE") || n.includes("CASILLO")
+    || n.includes("CHIPS") || n.includes("OLIO ") || n.includes("HUILE")
+    || n.includes("FILOTEA") || n.includes("POLENTA") || n.includes("CANTUCCINI") || n.includes("FREGOLA")
+    || n.includes("TARTUFLANGHE") || n.includes("CREMA BALSAMICO") || n.includes("DON ANTONIO")
+    || n.includes("PORTOGHESE") || n.includes("CONFITURE") || n.includes("MIEL ") || n.includes("LUCENGELI")
+    || n.includes("PESTO") || n.includes("OIGNONS CONFITS") || n.includes("AILS CONFITS")
+    || n.includes("TARALLINI") || n.includes("GRISSINI") || n.includes("GRESSINS")
+    || n.includes("ORECCHIETTE") || n.includes("PENNE ") || n.includes("RIGATONI") || n.includes("FETTUCIN")
+    || n.includes("TROFIE") || n.includes("RISO ") || n.includes("RISOTTO")
+    || n.includes("AMARETTI") || n.includes("FALCONE") || n.includes("AUGUSTA")
+    || n.includes("SAPURILLI") || n.includes("GIULIANO") || n.includes("PERLAGE")
+    || n.includes("FRUIT DE") || n.includes("POMODORO") || n.includes("CRÈME PISTACHE")
+    || n.includes("FAGOTTINI") || n.includes("SALTUFO") || n.includes("KIT APERITIVO")
+    || (n.includes("TRUFFE") && !n.includes("ARANCINI") && !n.includes("PIZZA"))) return "Epicerie";
+
+  // Pizze — real pizzas only
+  if (n.startsWith("PIZZA ") || n.startsWith("MENÙ PIZZA") || n.startsWith("MENU PIZZA")) return "Pizze";
+
+  // Dolci / Desserts
+  if (n.includes("TIRAMISU") || n.includes("PANNA COTTA") || n.includes("CHEESECAKE") || n.includes("PATISSERIE")
+    || n.includes("FONDANT") || n.includes("CRUMBLE") || n.includes("AMARENA") || n.includes("PANETTONE")
+    || n.includes("CANNOLI") || n.includes("PANDORO") || n.includes("COLOMBA")) return "Dolci";
+
+  // Antipasti / Entrees
+  if (n.includes("ARANCINI") || n.includes("BRUSCHETTA") || n.includes("BURRATA") || n.includes("CARPACCIO")
+    || n.includes("FOCACCIA") || n.includes("ARTICHAUTS") || n.includes("PICCADOLCE") || n.includes("POULPES")
+    || n.includes("POIVRONS") || n.includes("INVOLTINI") || n.includes("CAPONATA")) return "Antipasti";
+
+  // Charcuterie & Fromage
+  if (n.includes("JAMBON") || n.includes("PROSCIUTTO") || n.includes("PARMIGGIANO") || n.includes("PECORINO")
+    || n.includes("SALAMI") || n.includes("SALAME") || n.includes("MORTADELLE") || n.includes("COPPA")
+    || n.includes("GUANCIALE") || n.includes("SPECK") || n.includes("NDUJA") || n.includes("BRESAOLA")
+    || n.includes("PLATEAU SALAMI") || n.includes("PLATEAU FROMAGE") || n.includes("GORGONZOLA")
+    || n.includes("MOZZAR") || n.includes("PROVOLONE") || n.includes("SCAMORZ") || n.includes("MASCARPONE")
+    || n.includes("PANCETTA") || n.includes("SPIANATA") || n.includes("BERGAMINO") || n.includes("TALEGGIO")
+    || n.includes("PLATEAU ")) return "Charcuterie & Fromage";
+
+  // Plats (portions, pas au poids)
+  if (n.includes("LASAGNA") || n.includes("GNUDI") || n.includes("POLPETTE") || n.includes("PARMIGIANA")
+    || n.includes("GAMBAS") || n.includes("STINCO") || n.includes("CALAMARI") || n.includes("POULET")
+    || n.includes("BOCONCCINI") || n.includes("MENU PRANZO") || n.includes("VEAU") || n.includes("VERDE BIANCA")
+    || n.includes("RAGU") || n.includes("OSSO BUC") || n.includes("GRATIN") || n.includes("PASTA ")
+    || n.includes("PASTA\t")) return "Plats";
+
+  // Cave & Spiritueux
+  if (n.includes("PROSECCO") || n.includes("CHIANTI") || n.includes("ZACCAGNINI") || n.includes("MONCARRO")
+    || n.includes("SENTIMENTO") || n.includes("DELL'ESTATE") || n.includes("PUNI ") || n.includes("AMARONE")
+    || n.includes("BAROLO") || n.includes("BRUNELLO") || n.includes("PRIMITIVO") || n.includes("NERO D'AVOLA")
+    || n.includes("LIMONCELLO") || n.includes("LIMONELLO") || n.includes("GRAPPA") || n.includes("NEGRONI")
+    || n.includes("SPRITZ") || n.includes("APEROL") || n.includes("AMARO") || n.includes("NARDINI")
+    || n.includes("ALCHIMISTA") || n.includes("COSMO") || n.includes("FRANGELICO") || n.includes("GIN ")
+    || n.includes("VERRE ") || n.includes("LIQUEUR") || n.includes("ADRIATIC") || n.includes("MAMMA MIA")
+    || n.includes("VILLAMASSA") || n.includes("RUBICONE") || n.includes("ROSATO") || n.includes("MERLOT")) return "Cave & Spiritueux";
+
+  // Boissons (soft)
+  if (n.includes("COCA") || n.includes("ORANGINA") || n.includes("EAU ") || n.includes("LIMONADE")
+    || n.includes("JUS ") || n.includes("SCHWEPPES") || n.includes("SPRITE") || n.includes("SAN PELLEGRINO")
+    || n.includes("POLARA") || n.includes("CHINOTTO") || n.includes("GAZZOSA") || n.includes("ARANCIATA")
+    || n.includes("SANBITTER") || n.includes("MOLE COLA") || n.includes("LIMONATA")) return "Boissons";
+
+  // Cafe / Boissons chaudes
+  if (n.includes("CAFF") || n.includes("CAFÉ") || n.includes("CAPPUCCINO") || n.includes("ESPRESSO")
+    || n.includes("LATTE") || n.includes("MAROCCHINO") || n.includes("THE ") || n.includes("CHOCOLAT CHAUD")) return "Boissons chaudes";
+
+  return "Autre";
+}
+
 /* ── daily_sales fallback (Kezia / aggregated data) ── */
 
 type DailySalesRow = {
@@ -745,21 +821,9 @@ async function buildFromDailySales(etabId: string, from: string, to: string) {
     top10_ca_ht = top10.map(p => Math.round(p.ca_ht));
     top10_qty = top10.map(p => p.nb_ventes);
 
-    // Group all products by a simple categorization (first word or grouping)
+    // Categorize products for Piccola Mia (epicerie / traiteur)
     for (const p of articleProducts) {
-      // Use a simple heuristic: group PIZZA*, ARANCINI, TIRAMISU, etc.
-      let cat = "Autre";
-      const n = p.name.toUpperCase();
-      if (n.includes("PIZZA")) cat = "Pizze";
-      else if (n.includes("LASAGNA") || n.includes("GNUDI") || n.includes("PARM") || n.includes("POLPETTE") || n.includes("PASTA") || n.includes("RAVIOLI") || n.includes("GNOCCHI")) cat = "Cuisine";
-      else if (n.includes("TIRAMISU") || n.includes("PANNA COTTA") || n.includes("CHEESECAKE") || n.includes("PATISSERIE") || n.includes("FONDANT") || n.includes("CRUMBLE")) cat = "Dolci";
-      else if (n.includes("ARANCINI") || n.includes("BRUSCHETTA") || n.includes("BURRATA") || n.includes("CARPACCIO") || n.includes("FOCACCIA")) cat = "Antipasti";
-      else if (n.includes("PROSECCO") || n.includes("ROSSO") || n.includes("BIANCO") || n.includes("VIN") || n.includes("CHIANTI") || n.includes("ZACCAGNINI") || n.includes("MONCARRO") || n.includes("SENTIMENTO")) cat = "Vins";
-      else if (n.includes("CAFFE") || n.includes("CAFÉ") || n.includes("CAPPUCCINO") || n.includes("ESPRESSO") || n.includes("LATTE")) cat = "Boissons chaudes";
-      else if (n.includes("COCA") || n.includes("ORANGINA") || n.includes("EAU") || n.includes("LIMONADE") || n.includes("JUS") || n.includes("SCHWEPPES") || n.includes("SPRITE") || n.includes("SAN PELLEGRINO")) cat = "Boissons";
-      else if (n.includes("NEGRONI") || n.includes("SPRITZ") || n.includes("LIMONCELLO") || n.includes("GRAPPA") || n.includes("APEROL") || n.includes("COSMO") || n.includes("COCKTAIL")) cat = "Alcool";
-      else if (n.includes("CHIPS") || n.includes("SAUCE") || n.includes("OLIO") || n.includes("HUILE") || n.includes("TRUFFE") || n.includes("FILOTEA") || n.includes("POLENTA")) cat = "Epicerie";
-
+      const cat = categorizePiccolaProduct(p.name);
       if (!catProducts[cat]) catProducts[cat] = [];
       catProducts[cat].push({ n: p.name, qty: p.nb_ventes, ca_ttc: Math.round(p.ca_ttc), ca_ht: Math.round(p.ca_ht) });
     }

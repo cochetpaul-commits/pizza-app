@@ -528,39 +528,73 @@ export default function PerformancesPage() {
                   })()}
                 </div>
                 <div className="ventes-hero-kpis" style={{ display: "flex", gap: 20, marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,.12)", flexWrap: "wrap", alignItems: "flex-start" }}>
-                  <div style={{ minWidth: 0, flex: "1 1 0" }}>
-                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>Couverts</div>
-                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>{W.couverts}</div>
-                    <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>{W.tickets} tickets</div>
-                    {prev && <DeltaBadge cur={W.couverts} prev={prev.couverts} />}
-                  </div>
-                  <div style={{ width: 1, background: "rgba(255,255,255,.1)", alignSelf: "stretch" }} />
-                  <div style={{ minWidth: 0, flex: "1 1 0" }}>
-                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>CVT moyen</div>
-                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>
-                      {W.couverts > 0 ? (ca / W.couverts).toFixed(1) + "\u20AC" : "\u2014"}
+                  {dataSource === "daily_sales" ? (<>
+                    {/* Piccola / daily_sales KPIs */}
+                    <div style={{ minWidth: 0, flex: "1 1 0" }}>
+                      <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>Tickets</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>{W.tickets}</div>
+                      {prev && prev.tickets > 0 && <DeltaBadge cur={W.tickets} prev={prev.tickets} />}
                     </div>
-                    {W.cov_sur > 0 && <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>CVT M SP <span style={{ color: "#fff", fontWeight: 700 }}>{((mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur).toFixed(1) + "\u20AC"}</span></div>}
-                    {activePrev && activePrev.couverts > 0 && <DeltaBadge cur={ca / W.couverts} prev={(mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht) / activePrev.couverts} decimals={1} suffix="\u20AC" />}
-                  </div>
-                  <div style={{ width: 1, background: "rgba(255,255,255,.1)", alignSelf: "stretch" }} />
-                  <div style={{ minWidth: 0, flex: "1 1 0" }}>
-                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>vs A-1</div>
-                    {activePrev ? (() => {
-                      const prevCA = mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht;
-                      const d = ca - prevCA;
-                      return (
-                        <>
-                          <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: d >= 0 ? "#a5d6a7" : "#fca5a5", lineHeight: 1, textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>
-                            {d >= 0 ? "+" : ""}{fmt(Math.abs(d))}
-                          </div>
-                          <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 3 }}>A-1 : {fmt(prevCA)}</div>
-                        </>
-                      );
-                    })() : (
-                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "rgba(255,255,255,.3)", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>{"\u2014"}</div>
-                    )}
-                  </div>
+                    <div style={{ width: 1, background: "rgba(255,255,255,.1)", alignSelf: "stretch" }} />
+                    <div style={{ minWidth: 0, flex: "1 1 0" }}>
+                      <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>Panier moyen</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>
+                        {W.tickets > 0 ? (ca / W.tickets).toFixed(1) + "\u20AC" : "\u2014"}
+                      </div>
+                      {activePrev && activePrev.tickets > 0 && <DeltaBadge cur={ca / W.tickets} prev={(mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht) / activePrev.tickets} decimals={1} suffix="\u20AC" />}
+                    </div>
+                    <div style={{ width: 1, background: "rgba(255,255,255,.1)", alignSelf: "stretch" }} />
+                    <div style={{ minWidth: 0, flex: "1 1 0" }}>
+                      <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>Marge</div>
+                      {(() => {
+                        const marge = W.marge_total ?? 0;
+                        const margePct = W.marge_pct ?? 0;
+                        return (
+                          <>
+                            <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: margePct >= 20 ? "#a5d6a7" : "#fca5a5", lineHeight: 1, textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>
+                              {fmt(marge)}
+                            </div>
+                            <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 3 }}>{margePct.toFixed(1)}% du CA HT</div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </>) : (<>
+                    {/* Bello Mio / ventes_lignes KPIs */}
+                    <div style={{ minWidth: 0, flex: "1 1 0" }}>
+                      <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>Couverts</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>{W.couverts}</div>
+                      <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>{W.tickets} tickets</div>
+                      {prev && <DeltaBadge cur={W.couverts} prev={prev.couverts} />}
+                    </div>
+                    <div style={{ width: 1, background: "rgba(255,255,255,.1)", alignSelf: "stretch" }} />
+                    <div style={{ minWidth: 0, flex: "1 1 0" }}>
+                      <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>CVT moyen</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>
+                        {W.couverts > 0 ? (ca / W.couverts).toFixed(1) + "\u20AC" : "\u2014"}
+                      </div>
+                      {W.cov_sur > 0 && <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>CVT M SP <span style={{ color: "#fff", fontWeight: 700 }}>{((mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur).toFixed(1) + "\u20AC"}</span></div>}
+                      {activePrev && activePrev.couverts > 0 && <DeltaBadge cur={ca / W.couverts} prev={(mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht) / activePrev.couverts} decimals={1} suffix="\u20AC" />}
+                    </div>
+                    <div style={{ width: 1, background: "rgba(255,255,255,.1)", alignSelf: "stretch" }} />
+                    <div style={{ minWidth: 0, flex: "1 1 0" }}>
+                      <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>vs A-1</div>
+                      {activePrev ? (() => {
+                        const prevCA = mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht;
+                        const d = ca - prevCA;
+                        return (
+                          <>
+                            <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: d >= 0 ? "#a5d6a7" : "#fca5a5", lineHeight: 1, textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>
+                              {d >= 0 ? "+" : ""}{fmt(Math.abs(d))}
+                            </div>
+                            <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 3 }}>A-1 : {fmt(prevCA)}</div>
+                          </>
+                        );
+                      })() : (
+                        <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "rgba(255,255,255,.3)", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>{"\u2014"}</div>
+                      )}
+                    </div>
+                  </>)}
                 </div>
               </div>
             </div>
@@ -625,9 +659,12 @@ export default function PerformancesPage() {
             {dataSource === "daily_sales" && W.hourly_totals && W.hourly_totals.some(v => v > 0) && (() => {
               const h = W.hourly_totals!;
               const maxH = Math.max(...h, 1);
-              // Only show hours 10-24 (restaurant hours)
-              const startH = 10;
-              const endH = 24;
+              // Show hours with activity — find first/last non-zero, with padding
+              let startH = h.findIndex(v => v > 0);
+              let endH = h.length - 1 - [...h].reverse().findIndex(v => v > 0) + 1;
+              if (startH < 0) { startH = 10; endH = 22; }
+              startH = Math.max(0, startH - 1);
+              endH = Math.min(24, endH + 1);
               return (
                 <div style={S.card}>
                   <div style={S.sec}>Repartition horaire des ventes (articles)</div>
