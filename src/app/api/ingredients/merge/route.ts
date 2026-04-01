@@ -35,9 +35,8 @@ export async function POST(req: Request) {
     if (!auth?.user?.id) return NextResponse.json({ ok: false, error: "Non authentifié." }, { status: 401 });
 
     // Resolve etablissement
-    let etabId: string;
     try {
-      ({ etabId } = await resolveEtabId(auth.user.id, req.headers));
+      await resolveEtabId(auth.user.id, req.headers);
     } catch (e) {
       if (e instanceof EtabError) return NextResponse.json({ ok: false, error: e.message }, { status: e.status });
       throw e;
@@ -53,19 +52,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "keepId et deleteId identiques." }, { status: 400 });
     }
 
-    // Verify both ingredients belong to this etablissement
+    // Verify both ingredients exist
     const { data: ings } = await supabaseAdmin
       .from("ingredients")
-      .select("id, etablissement_id")
+      .select("id")
       .in("id", [keepId, deleteId]);
 
-    const foreign = (ings ?? []).filter(
-      (i) => i.etablissement_id && i.etablissement_id !== etabId
-    );
-    if (foreign.length > 0) {
+    if (!ings || ings.length < 2) {
       return NextResponse.json(
-        { ok: false, error: "Un ou plusieurs ingrédients n'appartiennent pas à cet établissement." },
-        { status: 403 }
+        { ok: false, error: "Un ou plusieurs ingrédients introuvables." },
+        { status: 404 }
       );
     }
 

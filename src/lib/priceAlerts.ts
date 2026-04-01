@@ -33,7 +33,7 @@ export async function fetchPriceAlerts(
   userId: string,
   threshold = ALERT_THRESHOLD,
   since?: string, // ISO date string — only alerts where the active offer was created after this date
-  etabId?: string, // optional etablissement filter
+  _etabId?: string, // kept for API compat, no longer used (unified catalog)
 ): Promise<PriceAlert[]> {
   let q = supabase
     .from("supplier_offers")
@@ -42,7 +42,7 @@ export async function fetchPriceAlerts(
     .eq("is_active", true)
     .not("unit_price", "is", null);
   if (since) q = q.gte("created_at", since);
-  if (etabId) q = q.eq("etablissement_id", etabId);
+  // No establishment filter on offers — unified catalog
   const { data: active, error: e1 } = await q;
 
   if (e1) throw new Error(e1.message);
@@ -50,7 +50,7 @@ export async function fetchPriceAlerts(
 
   const ingredientIds = [...new Set((active as RawOffer[]).map(r => r.ingredient_id))];
 
-  let q2 = supabase
+  const q2 = supabase
     .from("supplier_offers")
     .select("ingredient_id, supplier_id, unit, unit_price, supplier_label, created_at")
     .eq("user_id", userId)
@@ -58,7 +58,7 @@ export async function fetchPriceAlerts(
     .in("ingredient_id", ingredientIds)
     .not("unit_price", "is", null)
     .order("created_at", { ascending: false });
-  if (etabId) q2 = q2.eq("etablissement_id", etabId);
+  // No establishment filter on offers — unified catalog
   const { data: previous, error: e2 } = await q2;
 
   if (e2) throw new Error(e2.message);
@@ -69,12 +69,12 @@ export async function fetchPriceAlerts(
     if (!prevMap.has(key)) prevMap.set(key, r);
   }
 
-  let q3 = supabase
+  const q3 = supabase
     .from("ingredients")
     .select("id, name, supplier_id, category")
     .eq("user_id", userId)
     .in("id", ingredientIds);
-  if (etabId) q3 = q3.eq("etablissement_id", etabId);
+  // No establishment filter on ingredients — unified catalog
   const { data: ingredients, error: e3 } = await q3;
 
   if (e3) throw new Error(e3.message);
@@ -85,11 +85,11 @@ export async function fetchPriceAlerts(
   }
 
   const supplierIds = [...new Set((active as RawOffer[]).map(r => r.supplier_id))];
-  let q4 = supabase
+  const q4 = supabase
     .from("suppliers")
     .select("id, name")
     .in("id", supplierIds);
-  if (etabId) q4 = q4.eq("etablissement_id", etabId);
+  // No establishment filter on suppliers — unified catalog
   const { data: suppliers } = await q4;
 
   const supMap = new Map<string, string>();

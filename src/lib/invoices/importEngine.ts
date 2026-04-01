@@ -130,7 +130,6 @@ export async function runImport(options: {
     rawText,
     mode,
     defaultUnit = "g",
-    establishment = "both",
     etabId,
     filterLine,
   } = options;
@@ -381,11 +380,8 @@ export async function runImport(options: {
         piece_volume_ml: pieceVolumeMl,
       };
       if (etabId) ingRow.etablissement_id = etabId;
-      if (establishment === "both") {
-        ingRow.establishments = ["bellomio", "piccola"];
-      } else if (establishment) {
-        ingRow.establishments = [establishment];
-      }
+      // Always assign both establishments — user refines at validation
+      ingRow.establishments = ["bellomio", "piccola"];
       toCreate.push(ingRow);
     }
 
@@ -482,7 +478,7 @@ export async function runImport(options: {
           is_active: true,
           piece_weight_g: l.unit === "pc" ? (l.piece_weight_g ?? null) : null,
           density_kg_per_l: null,
-          establishment,
+          establishment: "both",
         };
         if (etabId) offerRow.etablissement_id = etabId;
         return offerRow;
@@ -534,9 +530,8 @@ export async function runImport(options: {
       }
     }
 
-    // 10. Mettre à jour le champ `establishments` des ingrédients matchés
-    // pour que l'établissement importé apparaisse dans le filtre
-    if (establishment && establishment !== "both") {
+    // 10. Ensure all matched ingredients have both establishments set
+    {
       const allIngIds = Array.from(offerByIngredient.keys());
       if (allIngIds.length) {
         const { data: estabRows } = await supabase
@@ -546,10 +541,12 @@ export async function runImport(options: {
 
         for (const row of (estabRows ?? []) as Array<{ id: string; establishments: string[] | null }>) {
           const current: string[] = row.establishments ?? [];
-          if (!current.includes(establishment)) {
+          const target = ["bellomio", "piccola"];
+          const missing = target.filter((e) => !current.includes(e));
+          if (missing.length > 0) {
             await supabase
               .from("ingredients")
-              .update({ establishments: [...current, establishment] })
+              .update({ establishments: [...current, ...missing] })
               .eq("id", row.id);
           }
         }

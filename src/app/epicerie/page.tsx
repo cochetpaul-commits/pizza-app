@@ -92,8 +92,12 @@ export default function EpiceriePage() {
       setLoading(true);
       let ingQ = supabase.from("ingredients").select("id,name,category,cost_per_unit,piece_weight_g,piece_volume_ml,default_unit").eq("is_active", true);
       let supQ = supabase.from("suppliers").select("id,name").eq("is_active", true);
+      // Filter ingredients by establishments array
+      const myEstab = etab?.slug?.includes("bello") ? "bellomio" : etab?.slug?.includes("piccola") ? "piccola" : null;
+      if (myEstab) {
+        ingQ = ingQ.or(`establishments.cs.{"${myEstab}"},establishments.is.null`);
+      }
       if (etab) {
-        ingQ = ingQ.eq("etablissement_id", etab.id);
         supQ = supQ.eq("etablissement_id", etab.id);
       }
       const [{ data: ings }, { data: sups }] = await Promise.all([

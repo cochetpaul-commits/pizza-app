@@ -354,12 +354,11 @@ function CommandesPage() {
 
     // Load catalog: ingredients linked to this supplier (via offers or supplier_id)
     const etabKey = etab?.slug?.includes("bello") ? "bellomio" : etab?.slug?.includes("piccola") ? "piccola" : null;
-    let offerQ = supabase
+    const offerQ = supabase
       .from("supplier_offers")
       .select("ingredient_id, price_kind, unit, unit_price, pack_price, pack_unit, pack_count, pack_each_qty, pack_each_unit, pack_total_qty, establishment")
       .eq("supplier_id", supplierId)
       .eq("is_active", true);
-    if (etabKey) offerQ = offerQ.or(`establishment.eq.${etabKey},establishment.eq.both,establishment.is.null`);
     const { data: offerData } = await offerQ;
 
     const offerMap = new Map<string, typeof offerData extends (infer T)[] | null ? T : never>();
@@ -375,7 +374,8 @@ function CommandesPage() {
       .from("ingredients")
       .select("id")
       .eq("supplier_id", supplierId);
-    if (etab) directIngQ = directIngQ.eq("etablissement_id", etab.id);
+    // Filter by establishments array instead of etablissement_id
+    if (etabKey) directIngQ = directIngQ.or(`establishments.cs.{"${etabKey}"},establishments.is.null`);
     const { data: directIngs } = await directIngQ;
     const directIds = (directIngs ?? []).map((i: { id: string }) => i.id);
 
@@ -389,7 +389,7 @@ function CommandesPage() {
         .in("id", allIds)
         .order("category")
         .order("name");
-      if (etab) ingDataQ = ingDataQ.eq("etablissement_id", etab.id);
+      if (etabKey) ingDataQ = ingDataQ.or(`establishments.cs.{"${etabKey}"},establishments.is.null`);
       const { data: ingData } = await ingDataQ;
 
       items = (ingData ?? []).map((ing: { id: string; name: string; category: string | null; default_unit: string | null; favori_commande?: boolean; order_unit_label?: string | null; order_quantity?: number | null }) => {

@@ -63,7 +63,6 @@ export async function POST(req: Request) {
       .from("ingredients")
       .select("id,name,category,is_active")
       .eq("is_active", true)
-      .eq("etablissement_id", etabId)
       .order("name", { ascending: true });
     if (ingErr) return NextResponse.json({ message: ingErr.message }, { status: 500 });
 

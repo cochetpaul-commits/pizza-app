@@ -18,23 +18,18 @@ const INGREDIENT_COLS =
 const OFFER_COLS =
   "ingredient_id,supplier_id,price_kind,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g,establishment,updated_at";
 
-async function fetchOffersForIds(ids: string[], estab?: string | null): Promise<LatestOffer[]> {
+async function fetchOffersForIds(ids: string[]): Promise<LatestOffer[]> {
   if (ids.length === 0) return [];
 
   // Query supplier_offers directly instead of v_latest_offers view
   // to avoid stale data from a potentially materialized view
-  let query = supabase
+  // Do NOT filter by establishment — if the ingredient is visible, its price should be too
+  const query = supabase
     .from("supplier_offers")
     .select(OFFER_COLS)
     .eq("is_active", true)
     .in("ingredient_id", ids)
     .order("updated_at", { ascending: false });
-
-  // Filter by establishment to avoid showing cross-establishment prices
-  // Include NULL for legacy offers created before multi-etab migration
-  if (estab) {
-    query = query.or(`establishment.in.(${estab},both),establishment.is.null`);
-  }
 
   const { data, error } = await query;
 
@@ -61,20 +56,17 @@ async function fetchPage(page: number, etabId?: string | null, etabSlug?: string
     .order("name", { ascending: true })
     .range(from, from + PAGE_SIZE - 1);
 
-  // Filter: ingredient belongs to the current establishment via `establishments` array
-  // OR via legacy `etablissement_id` (for ingredients not yet migrated to multi-etab)
+  // Filter: ingredient belongs to the current establishment via `establishments` array only
   const myEstab = etabSlug ? slugToOfferEstab(etabSlug) : null;
-  if (myEstab && etabId) {
-    query = query.or(`establishments.cs.{"${myEstab}"},etablissement_id.eq.${etabId},establishments.is.null`);
-  } else if (etabId) {
-    query = query.eq("etablissement_id", etabId);
+  if (myEstab) {
+    query = query.or(`establishments.cs.{"${myEstab}"},establishments.is.null`);
   }
 
   const { data, error } = await query;
 
   if (error) throw new Error(error.message);
   const items = (data ?? []) as Ingredient[];
-  const offers = await fetchOffersForIds(items.map((i) => i.id), myEstab);
+  const offers = await fetchOffersForIds(items.map((i) => i.id));
 
   return { items, offers, hasMore: items.length === PAGE_SIZE };
 }
@@ -87,17 +79,15 @@ async function searchIngredients(q: string, etabId?: string | null, etabSlug?: s
     .order("name", { ascending: true });
 
   const myEstab = etabSlug ? slugToOfferEstab(etabSlug) : null;
-  if (myEstab && etabId) {
-    query = query.or(`establishments.cs.{"${myEstab}"},etablissement_id.eq.${etabId},establishments.is.null`);
-  } else if (etabId) {
-    query = query.eq("etablissement_id", etabId);
+  if (myEstab) {
+    query = query.or(`establishments.cs.{"${myEstab}"},establishments.is.null`);
   }
 
   const { data, error } = await query;
 
   if (error) throw new Error(error.message);
   const items = (data ?? []) as Ingredient[];
-  const offers = await fetchOffersForIds(items.map((i) => i.id), myEstab);
+  const offers = await fetchOffersForIds(items.map((i) => i.id));
 
   return { items, offers };
 }
