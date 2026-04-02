@@ -251,16 +251,13 @@ export default function InvoicesPage() {
         const detectRes = await fetchApi("/api/invoices/detect", { method: "POST", body: detectForm });
         const detectData = await detectRes.json();
 
-        if (!detectData.ok || !detectData.detection?.supplier?.slug) {
-          throw new Error("Fournisseur non detecte");
-        }
-
-        const slug = detectData.detection.supplier.slug;
-        const supplierName = detectData.detection.supplier.name;
+        const detected = detectData.ok && detectData.detection?.supplier?.slug;
+        const slug = detected ? detectData.detection.supplier.slug : null;
+        const supplierName = detected ? detectData.detection.supplier.name : null;
         const etab = detectData.detection?.etablissement?.slug === "piccola_mia" ? "piccola" : batchEtab;
 
         // Step 2: import (commit directly)
-        setBatchItems(prev => prev.map((p, j) => j === i ? { ...p, status: "processing", detectedSupplier: supplierName, detectedEtab: etab } : p));
+        setBatchItems(prev => prev.map((p, j) => j === i ? { ...p, status: "processing", detectedSupplier: supplierName ?? "IA...", detectedEtab: etab } : p));
 
         const form = new FormData();
         form.append("file", item.file);
@@ -268,7 +265,10 @@ export default function InvoicesPage() {
         form.append("establishment", etab);
         const etabId = getEtabId(etab);
 
-        const res = await fetchApi(`/api/invoices/${slug}`, {
+        // Use dedicated parser if known, ai-parse if unknown
+        const endpoint = slug ? `/api/invoices/${slug}` : "/api/invoices/ai-parse";
+
+        const res = await fetchApi(endpoint, {
           method: "POST",
           headers: {
             ...(auth ? { Authorization: auth } : {}),
@@ -283,7 +283,7 @@ export default function InvoicesPage() {
         setBatchItems(prev => prev.map((p, j) => j === i ? {
           ...p,
           status: "done",
-          supplier: supplierName,
+          supplier: data.supplier_detected ?? supplierName ?? "Importe",
           result: {
             ingredients_created: data.inserted?.ingredients_created ?? 0,
             offers_inserted: data.inserted?.offers_inserted ?? 0,
