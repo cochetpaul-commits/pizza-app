@@ -31,17 +31,19 @@ export async function POST(req: Request) {
     }
 
     const bytes = new Uint8Array(await file.arrayBuffer());
-    let text = await pdfToText(bytes);
+    let text: string;
 
-    // If pdfToText produces garbled text (spaced chars), use Claude Vision
-    const hasSpacedChars = /[A-Z]\s[A-Z]\s[A-Z]\s[A-Z]/.test(text) || text.trim().length < 100;
-    if (hasSpacedChars && process.env.ANTHROPIC_API_KEY) {
-      console.log("[vinoflo] pdfToText garbled — falling back to Claude Vision");
+    // Vinoflo PDFs always have garbled text with pdfjs — use Claude Vision directly
+    if (process.env.ANTHROPIC_API_KEY) {
+      console.log("[vinoflo] Using Claude Vision for clean text extraction");
       try {
         text = await ocrPdf(bytes);
       } catch (err) {
-        console.error("[vinoflo] Claude Vision fallback failed:", err);
+        console.error("[vinoflo] Claude Vision failed, falling back to pdfToText:", err);
+        text = await pdfToText(bytes);
       }
+    } else {
+      text = await pdfToText(bytes);
     }
 
     let payload = parseVinofloInvoiceText(text);
