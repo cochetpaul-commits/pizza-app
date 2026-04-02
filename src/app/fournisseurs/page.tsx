@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { getSupplierColor } from "@/lib/supplierColors";
@@ -29,6 +29,8 @@ type SupplierRow = {
   delivery_days: string[] | null;
   website: string | null;
   tva_intra: string | null;
+  etablissement_id: string | null;
+  client_code: string | null;
 };
 
 type Contact = {
@@ -48,6 +50,7 @@ type SupplierStats = {
 };
 
 type ModalForm = {
+  name: string;
   contact_name: string;
   phone: string;
   email: string;
@@ -64,6 +67,8 @@ type ModalForm = {
   delivery_days: string;
   website: string;
   tva_intra: string;
+  etablissement_id: string | null;
+  client_code: string;
 };
 
 function fmtDate(iso: string) {
@@ -71,24 +76,45 @@ function fmtDate(iso: string) {
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
-  alimentaire_general: "Alimentaire général",
-  cremerie_frais: "Crémerie / Frais",
+  alimentaire_general: "Alimentaire general",
+  cremerie_frais: "Cremerie / Frais",
   vins: "Vins",
   boissons_spiritueux: "Boissons / Spiritueux",
   spiritueux: "Spiritueux",
   viande_charcuterie: "Viande / Charcuterie",
   emballage: "Emballage",
-  surgeles: "Surgelés",
+  surgeles: "Surgeles",
   glaces: "Glaces",
   produits_fins: "Produits fins",
 };
 
-const JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
 const JOURS_FULL = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 
 function makeEmptyContact(): Contact {
   return { id: crypto.randomUUID(), name: "", email: "", phone: "", role: "", send_orders: false, _isNew: true };
 }
+
+const EMPTY_FORM: ModalForm = {
+  name: "",
+  contact_name: "",
+  phone: "",
+  email: "",
+  franco_minimum: "",
+  franco_obligatoire: false,
+  mercuriale_only: false,
+  notes: "",
+  address: "",
+  city: "",
+  postal_code: "",
+  siret: "",
+  category: "",
+  payment_terms: "",
+  delivery_days: "",
+  website: "",
+  tva_intra: "",
+  etablissement_id: null,
+  client_code: "",
+};
 
 const labelStyle: React.CSSProperties = {
   fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginBottom: 4,
@@ -103,17 +129,23 @@ const readonlyBadge: React.CSSProperties = {
   padding: "2px 8px", borderRadius: 6, display: "inline-block",
 };
 
+const SELECT_FIELDS = "id,name,is_active,email,phone,contact_name,notes,franco_minimum,franco_obligatoire,mercuriale_only,delivery_schedule,address,city,postal_code,siret,category,payment_terms,delivery_days,website,tva_intra,etablissement_id,client_code";
+
 export default function FournisseursPage() {
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [stats, setStats] = useState<Map<string, SupplierStats>>(new Map());
   const [loading, setLoading] = useState(true);
-  const { current: etab } = useEtablissement();
+  const { current: etab, etablissements } = useEtablissement();
+
+  // Filter state
+  const [etabFilter, setEtabFilter] = useState<string | null>(null); // null = "Tous"
+  const [search, setSearch] = useState("");
 
   // Modal state
   const [modalSupplier, setModalSupplier] = useState<SupplierRow | null>(null);
-  const [form, setForm] = useState<ModalForm>({ contact_name: "", phone: "", email: "", franco_minimum: "", franco_obligatoire: false, mercuriale_only: false, notes: "", address: "", city: "", postal_code: "", siret: "", category: "", payment_terms: "", delivery_days: "", website: "", tva_intra: "" });
+  const [modalMode, setModalMode] = useState<"edit" | "create">("edit");
+  const [form, setForm] = useState<ModalForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [schedule, setSchedule] = useState<{day:string;cutoff:string;delivery_day:string}[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [deletedContactIds, setDeletedContactIds] = useState<string[]>([]);
@@ -122,7 +154,7 @@ export default function FournisseursPage() {
   const load = useCallback(async () => {
     setLoading(true);
 
-    const supQuery = supabase.from("suppliers").select("id,name,is_active,email,phone,contact_name,notes,franco_minimum,franco_obligatoire,mercuriale_only,delivery_schedule,address,city,postal_code,siret,category,payment_terms,delivery_days,website,tva_intra").order("name");
+    const supQuery = supabase.from("suppliers").select(SELECT_FIELDS).order("name");
     if (etab) supQuery.eq("etablissement_id", etab.id);
 
     const invQuery = supabase.from("supplier_invoices")
@@ -189,9 +221,41 @@ export default function FournisseursPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Filtered suppliers
+  const filtered = useMemo(() => {
+    let list = suppliers;
+
+    // Filter by establishment
+    if (etabFilter) {
+      list = list.filter(s => s.etablissement_id === etabFilter || s.etablissement_id === null);
+    }
+
+    // Filter by search
+    if (search.trim()) {
+      const q = search.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      list = list.filter(s =>
+        s.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(q)
+      );
+    }
+
+    return list;
+  }, [suppliers, etabFilter, search]);
+
+  const active = filtered.filter((s) => s.is_active);
+  const inactive = filtered.filter((s) => !s.is_active);
+
+  // Helpers: etab name lookup
+  function getEtabSlug(id: string | null): string | null {
+    if (!id) return null;
+    const e = etablissements.find(et => et.id === id);
+    return e?.slug ?? null;
+  }
+
   async function openModal(s: SupplierRow) {
     setModalSupplier(s);
+    setModalMode("edit");
     setForm({
+      name: s.name,
       contact_name: s.contact_name ?? "",
       phone: s.phone ?? "",
       email: s.email ?? "",
@@ -208,9 +272,10 @@ export default function FournisseursPage() {
       delivery_days: (s.delivery_days ?? []).join(", "),
       website: s.website ?? "",
       tva_intra: s.tva_intra ?? "",
+      etablissement_id: s.etablissement_id,
+      client_code: s.client_code ?? "",
     });
     setSchedule(Array.isArray(s.delivery_schedule) ? s.delivery_schedule : []);
-    setSaved(false);
     setDeletedContactIds([]);
 
     // Load contacts
@@ -232,8 +297,19 @@ export default function FournisseursPage() {
     setOriginalContactIds(new Set(dbContacts.map((c: Contact) => c.id)));
   }
 
+  function openCreateModal() {
+    setModalSupplier(null);
+    setModalMode("create");
+    setForm({ ...EMPTY_FORM, etablissement_id: etab?.id ?? null });
+    setSchedule([]);
+    setContacts([]);
+    setDeletedContactIds([]);
+    setOriginalContactIds(new Set());
+  }
+
   function closeModal() {
     setModalSupplier(null);
+    setModalMode("edit");
   }
 
   function updateContact(idx: number, field: keyof Contact, value: string | boolean) {
@@ -253,13 +329,18 @@ export default function FournisseursPage() {
   }
 
   async function saveModal() {
-    if (!modalSupplier) return;
+    // Validate name for create mode
+    if (modalMode === "create" && !form.name.trim()) {
+      alert("Le nom du fournisseur est obligatoire.");
+      return;
+    }
+
     setSaving(true);
     const francoVal = form.franco_minimum.trim();
     const deliveryArr = form.delivery_days.trim()
       ? form.delivery_days.split(",").map(d => d.trim().toLowerCase()).filter(Boolean)
       : null;
-    const updates = {
+    const fields = {
       email: form.email.trim() || null,
       phone: form.phone.trim() || null,
       contact_name: form.contact_name.trim() || null,
@@ -277,64 +358,119 @@ export default function FournisseursPage() {
       delivery_days: deliveryArr,
       website: form.website.trim() || null,
       tva_intra: form.tva_intra.trim() || null,
+      etablissement_id: form.etablissement_id,
+      client_code: form.client_code.trim() || null,
     };
 
-    // 1) Save supplier
-    const { error } = await supabase.from("suppliers").update(updates).eq("id", modalSupplier.id);
-    if (error) { setSaving(false); alert(error.message); return; }
+    if (modalMode === "create") {
+      // INSERT
+      const insertData = { ...fields, name: form.name.trim(), is_active: true };
+      const { data: newRow, error } = await supabase
+        .from("suppliers")
+        .insert(insertData)
+        .select(SELECT_FIELDS)
+        .single();
+      if (error) { setSaving(false); alert(error.message); return; }
 
-    // 2) Delete removed contacts
-    if (deletedContactIds.length > 0) {
-      const { error: delErr } = await supabase
-        .from("supplier_contacts")
-        .delete()
-        .in("id", deletedContactIds);
-      if (delErr) { setSaving(false); alert(delErr.message); return; }
-    }
+      const created = newRow as SupplierRow;
 
-    // 3) Upsert contacts (only those with a name)
-    const validContacts = contacts.filter((c) => c.name.trim());
-    if (validContacts.length > 0) {
-      const toUpsert = validContacts.map((c) => ({
-        id: c._isNew ? undefined : c.id,
-        supplier_id: modalSupplier.id,
-        name: c.name.trim(),
-        email: c.email.trim() || null,
-        phone: c.phone.trim() || null,
-        role: c.role.trim() || null,
-        send_orders: c.send_orders,
-      }));
-
-      const toInsert = toUpsert.filter((c) => !c.id);
-      const toUpdate = toUpsert.filter((c) => c.id);
-
-      if (toInsert.length > 0) {
-        const inserts = toInsert.map(({ id: _id, ...rest }) => rest);
+      // Save contacts for new supplier
+      const validContacts = contacts.filter((c) => c.name.trim());
+      if (validContacts.length > 0) {
+        const inserts = validContacts.map((c) => ({
+          supplier_id: created.id,
+          name: c.name.trim(),
+          email: c.email.trim() || null,
+          phone: c.phone.trim() || null,
+          role: c.role.trim() || null,
+          send_orders: c.send_orders,
+        }));
         const { error: insErr } = await supabase.from("supplier_contacts").insert(inserts);
         if (insErr) { setSaving(false); alert(insErr.message); return; }
       }
 
-      for (const row of toUpdate) {
-        const { id: contactId, ...rest } = row;
-        const { error: updErr } = await supabase
-          .from("supplier_contacts")
-          .update(rest)
-          .eq("id", contactId!);
-        if (updErr) { setSaving(false); alert(updErr.message); return; }
-      }
-    }
+      setSaving(false);
+      // Reload full list to get stats etc.
+      closeModal();
+      load();
+    } else {
+      // UPDATE (edit mode)
+      if (!modalSupplier) { setSaving(false); return; }
 
-    setSaving(false);
-    setSuppliers((prev) => prev.map((s) =>
-      s.id === modalSupplier.id
-        ? { ...s, ...updates }
-        : s
-    ));
-    closeModal();
+      const { error } = await supabase.from("suppliers").update(fields).eq("id", modalSupplier.id);
+      if (error) { setSaving(false); alert(error.message); return; }
+
+      // Delete removed contacts
+      if (deletedContactIds.length > 0) {
+        const { error: delErr } = await supabase
+          .from("supplier_contacts")
+          .delete()
+          .in("id", deletedContactIds);
+        if (delErr) { setSaving(false); alert(delErr.message); return; }
+      }
+
+      // Upsert contacts (only those with a name)
+      const validContacts = contacts.filter((c) => c.name.trim());
+      if (validContacts.length > 0) {
+        const toUpsert = validContacts.map((c) => ({
+          id: c._isNew ? undefined : c.id,
+          supplier_id: modalSupplier.id,
+          name: c.name.trim(),
+          email: c.email.trim() || null,
+          phone: c.phone.trim() || null,
+          role: c.role.trim() || null,
+          send_orders: c.send_orders,
+        }));
+
+        const toInsert = toUpsert.filter((c) => !c.id);
+        const toUpdate = toUpsert.filter((c) => c.id);
+
+        if (toInsert.length > 0) {
+          const inserts = toInsert.map(({ id: _id, ...rest }) => rest);
+          const { error: insErr } = await supabase.from("supplier_contacts").insert(inserts);
+          if (insErr) { setSaving(false); alert(insErr.message); return; }
+        }
+
+        for (const row of toUpdate) {
+          const { id: contactId, ...rest } = row;
+          const { error: updErr } = await supabase
+            .from("supplier_contacts")
+            .update(rest)
+            .eq("id", contactId!);
+          if (updErr) { setSaving(false); alert(updErr.message); return; }
+        }
+      }
+
+      setSaving(false);
+      setSuppliers((prev) => prev.map((s) =>
+        s.id === modalSupplier.id
+          ? { ...s, ...fields }
+          : s
+      ));
+      closeModal();
+    }
   }
 
-  const active = suppliers.filter((s) => s.is_active);
-  const inactive = suppliers.filter((s) => !s.is_active);
+  // Etab badge component
+  function EtabBadge({ etablissementId }: { etablissementId: string | null }) {
+    const slug = getEtabSlug(etablissementId);
+    if (etablissementId === null) {
+      // Shared: show both
+      return (
+        <span style={{ display: "inline-flex", gap: 3 }}>
+          <span style={{ ...readonlyBadge, background: "rgba(212,119,90,0.15)", color: "#D4775A", fontSize: 9, padding: "1px 5px" }}>BM</span>
+          <span style={{ ...readonlyBadge, background: "rgba(196,164,80,0.15)", color: "#C4A450", fontSize: 9, padding: "1px 5px" }}>PM</span>
+        </span>
+      );
+    }
+    if (slug === "bello-mio") {
+      return <span style={{ ...readonlyBadge, background: "rgba(212,119,90,0.15)", color: "#D4775A", fontSize: 9, padding: "1px 5px" }}>BM</span>;
+    }
+    if (slug === "piccola-mia") {
+      return <span style={{ ...readonlyBadge, background: "rgba(196,164,80,0.15)", color: "#C4A450", fontSize: 9, padding: "1px 5px" }}>PM</span>;
+    }
+    return null;
+  }
 
   function renderCard(s: SupplierRow) {
     const st = stats.get(s.id);
@@ -354,6 +490,7 @@ export default function FournisseursPage() {
               >
                 {s.name}
               </button>
+              <EtabBadge etablissementId={s.etablissement_id} />
               {!s.is_active && (
                 <span style={{
                   fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 6,
@@ -413,17 +550,79 @@ export default function FournisseursPage() {
     );
   }
 
+  const isModalOpen = modalMode === "create" || modalSupplier !== null;
   const modalColor = modalSupplier ? getSupplierColor(modalSupplier.name) : "#D4775A";
+
+  // Etab filter pills
+  const bmEtab = etablissements.find(e => e.slug === "bello-mio");
+  const pmEtab = etablissements.find(e => e.slug === "piccola-mia");
 
   return (
     <RequireRole allowedRoles={["group_admin", "equipier"]}>
       <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
-        <h1 style={{
-          fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24,
-          color: "#1a1a1a", margin: "0 0 20px", textTransform: "uppercase", letterSpacing: "0.04em",
-        }}>
-          Fournisseurs
-        </h1>
+        {/* Header row */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
+          <h1 style={{
+            fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24,
+            color: "#1a1a1a", margin: 0, textTransform: "uppercase", letterSpacing: "0.04em",
+          }}>
+            Achats
+          </h1>
+          <button
+            onClick={openCreateModal}
+            style={{
+              fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600,
+              background: "#D4775A", color: "#fff", borderRadius: 20, border: "none",
+              padding: "8px 18px", cursor: "pointer", whiteSpace: "nowrap",
+            }}
+          >
+            + Nouveau fournisseur
+          </button>
+        </div>
+
+        {/* Etab filter pills */}
+        {etablissements.length > 1 && (
+          <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+            {[
+              { id: null, label: "Tous" },
+              ...(bmEtab ? [{ id: bmEtab.id, label: "Bello Mio" }] : []),
+              ...(pmEtab ? [{ id: pmEtab.id, label: "Piccola Mia" }] : []),
+            ].map((pill) => {
+              const isActive = etabFilter === pill.id;
+              return (
+                <button
+                  key={pill.label}
+                  onClick={() => setEtabFilter(pill.id)}
+                  style={{
+                    fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 600,
+                    padding: "6px 14px", borderRadius: 20, cursor: "pointer",
+                    border: isActive ? "1.5px solid #D4775A" : "1.5px solid #ddd6c8",
+                    background: isActive ? "rgba(212,119,90,0.1)" : "#fff",
+                    color: isActive ? "#D4775A" : "#666",
+                  }}
+                >
+                  {pill.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Search */}
+        <div style={{ marginBottom: 16 }}>
+          <input
+            style={{
+              ...inputStyle,
+              maxWidth: 360,
+              padding: "9px 14px",
+              fontSize: 13,
+              background: "#faf8f4",
+            }}
+            placeholder="Rechercher un fournisseur..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
 
         {loading && <p style={{ color: "#999", fontSize: 14, textAlign: "center", marginTop: 40 }}>Chargement...</p>}
 
@@ -444,15 +643,17 @@ export default function FournisseursPage() {
               </>
             )}
 
-            {suppliers.length === 0 && (
-              <p style={{ color: "#999", fontSize: 14, textAlign: "center" }}>Aucun fournisseur en base.</p>
+            {filtered.length === 0 && (
+              <p style={{ color: "#999", fontSize: 14, textAlign: "center" }}>
+                {search.trim() ? "Aucun fournisseur ne correspond a la recherche." : "Aucun fournisseur en base."}
+              </p>
             )}
           </div>
         )}
       </main>
 
-      {/* ═══ MODALE FICHE FOURNISSEUR ═══ */}
-      {modalSupplier && (
+      {/* ══ MODALE FICHE FOURNISSEUR (create + edit) ══ */}
+      {isModalOpen && (
         <div
           onClick={closeModal}
           style={{
@@ -479,7 +680,7 @@ export default function FournisseursPage() {
                 fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700,
                 fontSize: 20, color: modalColor, textTransform: "uppercase",
               }}>
-                {modalSupplier.name}
+                {modalMode === "create" ? "Nouveau fournisseur" : modalSupplier!.name}
               </span>
               <button
                 onClick={closeModal}
@@ -489,23 +690,80 @@ export default function FournisseursPage() {
                   cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                 }}
               >
-                ✕
+                X
               </button>
             </div>
 
             {/* Form */}
             <div style={{ padding: "0 20px 20px" }}>
-              {/* Section: Coordonnées */}
+              {/* Name (only in create mode) */}
+              {modalMode === "create" && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={labelStyle}>Nom du fournisseur *</div>
+                  <input
+                    style={{ ...inputStyle, borderColor: "#D4775A" }}
+                    value={form.name}
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="Nom du fournisseur"
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              {/* Etablissement selector */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                  Etablissement
+                </div>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontFamily: "DM Sans, sans-serif", fontSize: 13 }}>
+                    <input
+                      type="radio"
+                      name="modal_etab"
+                      checked={form.etablissement_id === null}
+                      onChange={() => setForm(f => ({ ...f, etablissement_id: null }))}
+                      style={{ accentColor: "#D4775A" }}
+                    />
+                    Les deux
+                  </label>
+                  {bmEtab && (
+                    <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontFamily: "DM Sans, sans-serif", fontSize: 13 }}>
+                      <input
+                        type="radio"
+                        name="modal_etab"
+                        checked={form.etablissement_id === bmEtab.id}
+                        onChange={() => setForm(f => ({ ...f, etablissement_id: bmEtab.id }))}
+                        style={{ accentColor: "#D4775A" }}
+                      />
+                      Bello Mio
+                    </label>
+                  )}
+                  {pmEtab && (
+                    <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontFamily: "DM Sans, sans-serif", fontSize: 13 }}>
+                      <input
+                        type="radio"
+                        name="modal_etab"
+                        checked={form.etablissement_id === pmEtab.id}
+                        onChange={() => setForm(f => ({ ...f, etablissement_id: pmEtab.id }))}
+                        style={{ accentColor: "#D4775A" }}
+                      />
+                      Piccola Mia
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Section: Coordonnees */}
               <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-                Coordonnées
+                Coordonnees
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                 <div>
                   <div style={labelStyle}>Contact</div>
-                  <input style={inputStyle} value={form.contact_name} onChange={(e) => setForm((f) => ({ ...f, contact_name: e.target.value }))} placeholder="Prénom Nom" />
+                  <input style={inputStyle} value={form.contact_name} onChange={(e) => setForm((f) => ({ ...f, contact_name: e.target.value }))} placeholder="Prenom Nom" />
                 </div>
                 <div>
-                  <div style={labelStyle}>Téléphone</div>
+                  <div style={labelStyle}>Telephone</div>
                   <input style={inputStyle} value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="06 xx xx xx xx" type="tel" />
                 </div>
               </div>
@@ -526,7 +784,7 @@ export default function FournisseursPage() {
               </div>
               <div style={{ marginBottom: 12 }}>
                 <div style={labelStyle}>Adresse</div>
-                <input style={inputStyle} value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} placeholder="Rue, numéro" />
+                <input style={inputStyle} value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} placeholder="Rue, numero" />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                 <div>
@@ -551,7 +809,7 @@ export default function FournisseursPage() {
                     value={form.category}
                     onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
                   >
-                    <option value="">—</option>
+                    <option value="">--</option>
                     {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
                       <option key={k} value={k}>{v}</option>
                     ))}
@@ -561,6 +819,13 @@ export default function FournisseursPage() {
                   <div style={labelStyle}>Conditions paiement</div>
                   <input style={inputStyle} value={form.payment_terms} onChange={(e) => setForm((f) => ({ ...f, payment_terms: e.target.value }))} placeholder="30 jours fin de mois" />
                 </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                <div>
+                  <div style={labelStyle}>Code client</div>
+                  <input style={inputStyle} value={form.client_code} onChange={(e) => setForm((f) => ({ ...f, client_code: e.target.value }))} placeholder="CL-12345" />
+                </div>
+                <div />
               </div>
 
               {/* Section: Franco & Livraison */}
@@ -627,7 +892,7 @@ export default function FournisseursPage() {
                           });
                         }}
                       >
-                        <option value="">—</option>
+                        <option value="">--</option>
                         {JOURS_FULL.map(j => (
                           <option key={j} value={j}>{j.charAt(0).toUpperCase() + j.slice(1)}</option>
                         ))}
@@ -647,7 +912,7 @@ export default function FournisseursPage() {
                   <input style={inputStyle} value={form.siret} onChange={(e) => setForm((f) => ({ ...f, siret: e.target.value }))} placeholder="123 456 789 00012" />
                 </div>
                 <div>
-                  <div style={labelStyle}>N° TVA intra.</div>
+                  <div style={labelStyle}>N TVA intra.</div>
                   <input style={inputStyle} value={form.tva_intra} onChange={(e) => setForm((f) => ({ ...f, tva_intra: e.target.value }))} placeholder="FR12345678901" />
                 </div>
               </div>
@@ -748,18 +1013,20 @@ export default function FournisseursPage() {
                     padding: "8px 20px", cursor: "pointer", opacity: saving ? 0.6 : 1,
                   }}
                 >
-                  {saving ? "..." : "Enregistrer"}
+                  {saving ? "..." : modalMode === "create" ? "Creer" : "Enregistrer"}
                 </button>
 
-                <Link
-                  href={`/ingredients?supplier=${modalSupplier.id}`}
-                  style={{
-                    fontFamily: "DM Sans, sans-serif", fontSize: 12, color: modalColor,
-                    textDecoration: "none", fontWeight: 600,
-                  }}
-                >
-                  Voir les articles →
-                </Link>
+                {modalMode === "edit" && modalSupplier && (
+                  <Link
+                    href={`/ingredients?supplier=${modalSupplier.id}`}
+                    style={{
+                      fontFamily: "DM Sans, sans-serif", fontSize: 12, color: modalColor,
+                      textDecoration: "none", fontWeight: 600,
+                    }}
+                  >
+                    Voir les articles →
+                  </Link>
+                )}
               </div>
             </div>
           </div>
