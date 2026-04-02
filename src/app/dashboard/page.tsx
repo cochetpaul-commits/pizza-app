@@ -43,47 +43,45 @@ function getFiscalYearStart(dateStr: string): string {
   return `${fiscalYear}-10-01`;
 }
 
+/** Navigate a date by period offset (+1 or -1) */
+function shiftDate(ref: string, period: Period, delta: number): string {
+  const d = new Date(ref + "T00:00:00");
+  if (period === "semaine") {
+    d.setDate(d.getDate() + delta * 7);
+  } else if (period === "mois") {
+    d.setMonth(d.getMonth() + delta);
+  } else {
+    d.setFullYear(d.getFullYear() + delta);
+  }
+  return d.toISOString().slice(0, 10);
+}
+
 /** Previous period boundaries based on period type */
 function getPreviousPeriodRange(
   period: Period,
-  today: string,
+  ref: string,
 ): { start: string; end: string } {
-  if (period === "semaine") {
-    const monday = getMonday(today);
-    const d = new Date(monday + "T00:00:00");
-    d.setDate(d.getDate() - 7);
-    const prevMonday = d.toISOString().slice(0, 10);
-    d.setDate(d.getDate() + 6);
-    const prevSunday = d.toISOString().slice(0, 10);
-    return { start: prevMonday, end: prevSunday };
-  }
-  if (period === "mois") {
-    const y = parseInt(today.slice(0, 4));
-    const m = parseInt(today.slice(5, 7));
-    const prevM = m === 1 ? 12 : m - 1;
-    const prevY = m === 1 ? y - 1 : y;
-    const day = parseInt(today.slice(8, 10));
-    // Same day in previous month (capped)
-    const lastDayPrev = new Date(prevY, prevM, 0).getDate();
-    const endDay = Math.min(day, lastDayPrev);
-    const start = `${prevY}-${String(prevM).padStart(2, "0")}-01`;
-    const end = `${prevY}-${String(prevM).padStart(2, "0")}-${String(endDay).padStart(2, "0")}`;
-    return { start, end };
-  }
-  // exercice: previous fiscal year same period
-  const fyStart = getFiscalYearStart(today);
-  const prevFyY = parseInt(fyStart.slice(0, 4)) - 1;
-  const prevFyStart = `${prevFyY}-10-01`;
-  // Offset today by -1 year
-  const y = parseInt(today.slice(0, 4));
-  const endDate = `${y - 1}-${today.slice(5)}`;
-  return { start: prevFyStart, end: endDate };
+  const prevRef = shiftDate(ref, period, -1);
+  return getPeriodRange(period, prevRef);
 }
 
-function getPeriodRange(period: Period, today: string): { start: string; end: string } {
-  if (period === "semaine") return { start: getMonday(today), end: today };
-  if (period === "mois") return { start: getFirstOfMonth(today), end: today };
-  return { start: getFiscalYearStart(today), end: today };
+function getPeriodRange(period: Period, ref: string): { start: string; end: string } {
+  if (period === "semaine") {
+    const mon = getMonday(ref);
+    const d = new Date(mon + "T00:00:00");
+    d.setDate(d.getDate() + 6);
+    return { start: mon, end: d.toISOString().slice(0, 10) };
+  }
+  if (period === "mois") {
+    const start = getFirstOfMonth(ref);
+    const y = parseInt(ref.slice(0, 4));
+    const m = parseInt(ref.slice(5, 7));
+    const last = new Date(y, m, 0).getDate();
+    return { start, end: `${ref.slice(0, 8)}${String(last).padStart(2, "0")}` };
+  }
+  const fyStart = getFiscalYearStart(ref);
+  const fyY = parseInt(fyStart.slice(0, 4));
+  return { start: fyStart, end: `${fyY + 1}-09-30` };
 }
 
 /* ── Types ── */
@@ -105,18 +103,73 @@ export default function GroupDashboard() {
   );
 }
 
+/** Human-readable period label */
+function periodDisplayLabel(period: Period, ref: string): string {
+  const MONTHS = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+  if (period === "semaine") {
+    const mon = getMonday(ref);
+    const d1 = new Date(mon + "T00:00:00");
+    const d2 = new Date(mon + "T00:00:00");
+    d2.setDate(d2.getDate() + 6);
+    const day1 = d1.getDate();
+    const month1 = MONTHS[d1.getMonth()];
+    const day2 = d2.getDate();
+    const month2 = MONTHS[d2.getMonth()];
+    const year2 = d2.getFullYear();
+    if (d1.getMonth() === d2.getMonth()) {
+      return `Sem. du ${day1} au ${day2} ${month1} ${year2}`;
+    }
+    return `Sem. du ${day1} ${month1} au ${day2} ${month2} ${year2}`;
+  }
+  if (period === "mois") {
+    const m = parseInt(ref.slice(5, 7));
+    const y = parseInt(ref.slice(0, 4));
+    return `${MONTHS[m - 1].charAt(0).toUpperCase() + MONTHS[m - 1].slice(1)} ${y}`;
+  }
+  // exercice
+  const fyStart = getFiscalYearStart(ref);
+  const fyY = parseInt(fyStart.slice(0, 4));
+  return `Oct ${fyY} — Sep ${fyY + 1}`;
+}
+
 function GroupContent() {
   const { etablissements, setGroupView } = useEtablissement();
   const [period, setPeriod] = useState<Period>("mois");
 
-  const today = useMemo(
+  const todayStr = useMemo(
     () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(new Date()),
     [],
   );
 
+  // Reference date: default will be set to last day with data
+  const [referenceDate, setReferenceDate] = useState<string | null>(null);
+
+  // Fetch last day with data
+  useEffect(() => {
+    (async () => {
+      const { data: lastRow } = await supabase
+        .from("ventes_lignes")
+        .select("date_service")
+        .eq("type_ligne", "Produit")
+        .order("date_service", { ascending: false })
+        .limit(1);
+      if (lastRow && lastRow.length > 0 && lastRow[0].date_service) {
+        setReferenceDate(lastRow[0].date_service);
+      } else {
+        setReferenceDate(todayStr);
+      }
+    })();
+  }, [todayStr]);
+
+  const today = referenceDate ?? todayStr;
+
   const range = useMemo(() => getPeriodRange(period, today), [period, today]);
   const prevRange = useMemo(() => getPreviousPeriodRange(period, today), [period, today]);
   const fiscalStart = useMemo(() => getFiscalYearStart(today), [today]);
+
+  const isCurrentPeriod = useMemo(() => {
+    return getPeriodRange(period, todayStr).start === getPeriodRange(period, today).start;
+  }, [period, todayStr, today]);
 
   const [etabData, setEtabData] = useState<Record<string, EtabKpis>>({});
   const [caExercice, setCaExercice] = useState(0);
@@ -277,11 +330,11 @@ function GroupContent() {
         ? "mois prec."
         : "exercice prec.";
 
-  const dateDisplay = new Date().toLocaleDateString("fr-FR", {
-    timeZone: "Europe/Paris",
+  const dateDisplay = new Date(today + "T12:00:00").toLocaleDateString("fr-FR", {
     weekday: "long",
     day: "numeric",
     month: "long",
+    year: "numeric",
   });
 
   return (
@@ -319,7 +372,9 @@ function GroupContent() {
         >
           iFratelli Group
         </div>
-        <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>{dateDisplay}</div>
+        <div style={{ fontSize: 13, opacity: 0.9, marginTop: 6, fontWeight: 600 }}>
+          {periodDisplayLabel(period, today)}
+        </div>
       </div>
 
       {/* ── Period selector ── */}
@@ -327,7 +382,7 @@ function GroupContent() {
         style={{
           display: "flex",
           gap: 0,
-          marginBottom: 18,
+          marginBottom: 10,
           borderRadius: 10,
           overflow: "hidden",
           border: `1px solid ${T.border}`,
@@ -355,6 +410,86 @@ function GroupContent() {
             {p === "exercice" ? "Exercice" : p === "semaine" ? "Semaine" : "Mois"}
           </button>
         ))}
+      </div>
+
+      {/* ── Date navigation ── */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 12,
+          marginBottom: 18,
+        }}
+      >
+        <button
+          onClick={() => setReferenceDate(shiftDate(today, period, -1))}
+          style={{
+            background: "none",
+            border: `1px solid ${T.border}`,
+            borderRadius: 8,
+            width: 34,
+            height: 34,
+            cursor: "pointer",
+            fontSize: 16,
+            color: T.dark,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          aria-label="Période précédente"
+        >
+          &#8592;
+        </button>
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: T.dark,
+            textAlign: "center",
+            minWidth: 180,
+          }}
+        >
+          {periodDisplayLabel(period, today)}
+        </span>
+        <button
+          onClick={() => setReferenceDate(shiftDate(today, period, 1))}
+          style={{
+            background: "none",
+            border: `1px solid ${T.border}`,
+            borderRadius: 8,
+            width: 34,
+            height: 34,
+            cursor: "pointer",
+            fontSize: 16,
+            color: T.dark,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          aria-label="Période suivante"
+        >
+          &#8594;
+        </button>
+        {!isCurrentPeriod && (
+          <button
+            onClick={() => setReferenceDate(todayStr)}
+            style={{
+              background: GROUP_COLOR,
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              padding: "6px 12px",
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: "pointer",
+              fontFamily: OSWALD,
+              letterSpacing: "0.04em",
+            }}
+          >
+            Aujourd&apos;hui
+          </button>
+        )}
       </div>
 
       {/* ── KPIs 2x2 ── */}

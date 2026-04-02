@@ -14,7 +14,8 @@ import type { Category } from "@/types/ingredients";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type Supplier = { id: string; name: string; franco_minimum: number | null };
+type DeliveryRule = { day: string; cutoff: string; delivery_day: string };
+type Supplier = { id: string; name: string; franco_minimum: number | null; delivery_schedule: DeliveryRule[] | null };
 
 type Ligne = {
   id: string;
@@ -47,6 +48,8 @@ type CatalogItem = {
   order_quantity: number | null;
   prix_commande: number | null;
   favori_commande?: boolean;
+  pack_count: number | null;
+  pack_each_qty: number | null;
 };
 
 type HistItem = {
@@ -285,6 +288,9 @@ function CommandesPage() {
   const [quantities, setQuantities] = useState<Record<string, number | "">>({});
   const [openCats, setOpenCats] = useState<Record<string, boolean>>({});
 
+  // Unit mode: carton vs individual (per ingredient)
+  const [unitModes, setUnitModes] = useState<Record<string, "individual" | "carton">>({});
+
   // Confirmation banner
   const [confirmation, setConfirmation] = useState<string | null>(null);
 
@@ -304,7 +310,7 @@ function CommandesPage() {
     async function init() {
       const q = supabase
         .from("suppliers")
-        .select("id, name, franco_minimum")
+        .select("id, name, franco_minimum, delivery_schedule")
         .eq("is_active", true)
         .order("name");
       if (etab?.id) q.eq("etablissement_id", etab.id);
@@ -401,6 +407,8 @@ function CommandesPage() {
           order_quantity: oq,
           order_unit: ing.order_unit_label ?? deriveOrderUnit(offer) ?? ing.default_unit,
           prix_commande: computeOrderUnitPrice(offer, oq),
+          pack_count: offer?.pack_count ?? null,
+          pack_each_qty: offer?.pack_each_qty ?? null,
         };
       });
     }
@@ -464,10 +472,59 @@ function CommandesPage() {
 
   function handleQtyChange(ingredientId: string, val: number | "") {
     const qty = val === "" ? "" : Math.floor(val as number);
-    setQuantities((prev) => ({ ...prev, [ingredientId]: qty }));
+    // If in carton mode, multiply by pack_count for storage
+    const item = catalog.find((c) => c.id === ingredientId);
+    const mode = unitModes[ingredientId] ?? "individual";
+    const packCount = item?.pack_count ?? 0;
+    const actualQty = (mode === "carton" && packCount > 0 && qty !== "")
+      ? qty * packCount
+      : qty;
+    setQuantities((prev) => ({ ...prev, [ingredientId]: actualQty }));
     if (session) {
-      const item = catalog.find((c) => c.id === ingredientId);
-      saveLigne(session.id, ingredientId, qty, item?.order_unit ?? item?.default_unit ?? null, item?.prix_commande ?? null);
+      saveLigne(session.id, ingredientId, actualQty, item?.order_unit ?? item?.default_unit ?? null, item?.prix_commande ?? null);
+    }
+  }
+
+  /** Get displayed quantity (reverse of carton multiplication) */
+  function getDisplayQty(ingredientId: string): number | "" {
+    const raw = quantities[ingredientId] ?? "";
+    if (raw === "") return "";
+    const mode = unitModes[ingredientId] ?? "individual";
+    const item = catalog.find((c) => c.id === ingredientId);
+    const packCount = item?.pack_count ?? 0;
+    if (mode === "carton" && packCount > 0) {
+      return Math.round(Number(raw) / packCount);
+    }
+    return Number(raw);
+  }
+
+  /** Toggle unit mode for an item */
+  function toggleUnitMode(ingredientId: string) {
+    const item = catalog.find((c) => c.id === ingredientId);
+    const packCount = item?.pack_count ?? 0;
+    if (packCount <= 0) return;
+
+    const currentMode = unitModes[ingredientId] ?? "individual";
+    const newMode = currentMode === "individual" ? "carton" : "individual";
+    const currentRawQty = Number(quantities[ingredientId] ?? 0);
+
+    setUnitModes((prev) => ({ ...prev, [ingredientId]: newMode }));
+
+    // Recalculate stored quantity
+    if (currentRawQty > 0) {
+      let newRaw: number;
+      if (newMode === "carton") {
+        // Was individual -> now carton: stored qty stays the same (already in individual units)
+        // But we need to round to nearest carton
+        newRaw = Math.round(currentRawQty / packCount) * packCount;
+      } else {
+        // Was carton -> now individual: stored qty stays the same
+        newRaw = currentRawQty;
+      }
+      setQuantities((prev) => ({ ...prev, [ingredientId]: newRaw }));
+      if (session) {
+        saveLigne(session.id, ingredientId, newRaw, item?.order_unit ?? item?.default_unit ?? null, item?.prix_commande ?? null);
+      }
     }
   }
 
@@ -616,8 +673,45 @@ function CommandesPage() {
 
   // ── Computed ──────────────────────────────────────────────────────────
 
-  const activeCount = Object.values(quantities).filter((v) => v !== "" && Number(v) > 0).length;
+  // ── Computed (early, needed by delivery estimate) ───────────────────
+
   const currentSupplier = suppliers.find((s) => s.id === selectedSupplierId);
+
+  // ── Delivery estimate ───────────────────────────────────────────────
+
+  function getDeliveryEstimate(): string | null {
+    const schedule = currentSupplier?.delivery_schedule;
+    if (!schedule || schedule.length === 0) return null;
+
+    const DAY_NAMES = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+    const DAY_LABELS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+    const now = new Date();
+    const todayName = DAY_NAMES[now.getDay()];
+    const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+
+    // Find the next matching rule
+    for (let offset = 0; offset < 7; offset++) {
+      const checkDate = new Date(now);
+      checkDate.setDate(checkDate.getDate() + offset);
+      const dayName = DAY_NAMES[checkDate.getDay()];
+
+      const rule = schedule.find((r) => r.day.toLowerCase() === dayName);
+      if (!rule) continue;
+
+      // If today, check cutoff
+      if (offset === 0 && currentTime >= rule.cutoff) continue;
+
+      // Find delivery day
+      const deliveryDayIdx = DAY_NAMES.indexOf(rule.delivery_day.toLowerCase());
+      if (deliveryDayIdx === -1) continue;
+
+      const cutoffLabel = offset === 0 ? `avant ${rule.cutoff}` : `${DAY_LABELS[checkDate.getDay()]} avant ${rule.cutoff}`;
+      return `Commande ${cutoffLabel} → livraison ${rule.delivery_day}`;
+    }
+    return null;
+  }
+
+  const activeCount = Object.values(quantities).filter((v) => v !== "" && Number(v) > 0).length;
   const supplierLabel = currentSupplier?.name ?? "";
   const readOnly = session?.status === "en_attente" || session?.status === "validee" || session?.status === "recue";
 
@@ -643,6 +737,61 @@ function CommandesPage() {
     return new Date(iso).toLocaleDateString("fr-FR", {
       day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
     });
+  }
+
+  // ── Render: unit toggle (carton/bouteille) ───────────────────────────
+
+  function unitToggle(item: CatalogItem) {
+    const packCount = item.pack_count ?? 0;
+    if (packCount <= 0) return null;
+    const mode = unitModes[item.id] ?? "individual";
+    const rawQty = Number(quantities[item.id] ?? 0);
+    const packEachQty = item.pack_each_qty ?? 1;
+    const unitLabel = packEachQty > 1 ? `${packCount}x${packEachQty}` : `${packCount}`;
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2 }}>
+        <div style={{ display: "flex", gap: 4 }}>
+          <button
+            type="button"
+            onClick={() => toggleUnitMode(item.id)}
+            style={{
+              fontSize: 10,
+              fontWeight: mode === "individual" ? 700 : 500,
+              color: mode === "individual" ? "#D4775A" : "#999",
+              background: mode === "individual" ? "#FFF0EB" : "#f5f0e8",
+              border: mode === "individual" ? "1.5px solid #D4775A" : "1px solid #ddd6c8",
+              borderRadius: 6,
+              padding: "3px 8px",
+              cursor: "pointer",
+            }}
+          >
+            bouteille
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleUnitMode(item.id)}
+            style={{
+              fontSize: 10,
+              fontWeight: mode === "carton" ? 700 : 500,
+              color: mode === "carton" ? "#D4775A" : "#999",
+              background: mode === "carton" ? "#FFF0EB" : "#f5f0e8",
+              border: mode === "carton" ? "1.5px solid #D4775A" : "1px solid #ddd6c8",
+              borderRadius: 6,
+              padding: "3px 8px",
+              cursor: "pointer",
+            }}
+          >
+            carton de {unitLabel}
+          </button>
+        </div>
+        {mode === "carton" && rawQty > 0 && item.prix_commande != null && (
+          <span style={{ fontSize: 10, color: "#666" }}>
+            {getDisplayQty(item.id)} carton{(getDisplayQty(item.id) as number) > 1 ? "s" : ""} = {rawQty} bouteille{rawQty > 1 ? "s" : ""} = {(rawQty * item.prix_commande).toFixed(2).replace(".", ",")}&#8239;&#8364;
+          </span>
+        )}
+      </div>
+    );
   }
 
   // ── Render: unit badge ────────────────────────────────────────────────
@@ -930,8 +1079,9 @@ function CommandesPage() {
                         </div>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: 28 }}>
                           {unitPriceBadge(item)}
-                          <StepperInput value={quantities[item.id] ?? ""} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
+                          <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
                         </div>
+                        {(item.pack_count ?? 0) > 0 && <div style={{ paddingLeft: 28 }}>{unitToggle(item)}</div>}
                       </div>
                     ))}
                   </div>
@@ -950,8 +1100,9 @@ function CommandesPage() {
                     </div>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: 28 }}>
                       {unitPriceBadge(item)}
-                      <StepperInput value={quantities[item.id] ?? ""} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
+                      <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
                     </div>
+                    {(item.pack_count ?? 0) > 0 && <div style={{ paddingLeft: 28 }}>{unitToggle(item)}</div>}
                   </div>
                 ))}
               </div>
@@ -1029,9 +1180,13 @@ function CommandesPage() {
                   : "linear-gradient(90deg, #D4775A, #E8956F)",
               }} />
             </div>
-            {orderTotal < francoMin && (
+            {orderTotal < francoMin ? (
               <div style={{ fontSize: 10, color: "#999", marginTop: 4, textAlign: "right" }}>
                 Encore {(francoMin - orderTotal).toFixed(0)} € pour atteindre le franco
+              </div>
+            ) : (
+              <div style={{ fontSize: 10, color: "#16a34a", fontWeight: 600, marginTop: 4, textAlign: "right" }}>
+                Franco atteint
               </div>
             )}
           </div>
@@ -1133,6 +1288,34 @@ function CommandesPage() {
             )}
           </div>
         )}
+
+        {/* Delivery estimate */}
+        {session && session.status === "brouillon" && (() => {
+          const estimate = getDeliveryEstimate();
+          if (!estimate) return null;
+          return (
+            <div style={{
+              position: "fixed",
+              bottom: activeCount > 0 ? "calc(120px + env(safe-area-inset-bottom, 0px))" : "calc(70px + env(safe-area-inset-bottom, 0px))",
+              left: "50%",
+              transform: "translateX(-50%)",
+              background: "#fff",
+              border: "1.5px solid #ddd6c8",
+              borderRadius: 10,
+              padding: "8px 16px",
+              fontSize: 11,
+              fontWeight: 600,
+              color: "#666",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+              zIndex: 109,
+              whiteSpace: "nowrap",
+              maxWidth: "90vw",
+              textAlign: "center",
+            }}>
+              {estimate}
+            </div>
+          );
+        })()}
 
         {/* Bouton flottant — brouillon → envoyer */}
         {session && session.status === "brouillon" && activeCount > 0 && (
