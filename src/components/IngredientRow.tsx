@@ -349,18 +349,20 @@ export const IngredientRow = React.memo(function IngredientRow({
           : (edit.pricingPkg && PACKAGINGS.includes(edit.pricingPkg as typeof PACKAGINGS[number]) ? edit.pricingPkg : "pack");
 
         // Handle packaging change — preserve price, do NOT touch orderUnitLabel
+        // "bouteille" = unit piece (not a pack), "carton/pack/sac/etc" = pack
+        const PIECE_PACKAGINGS = new Set(["piece", "bouteille", "barquette", "brick", "poche", "sachet"]);
         const onPkgChange = (pkg: string) => {
           const currentPrice = isBaseUnit ? edit.unitPrice : edit.packPrice;
-          if (pkg === "kg") onEditChange({ ...edit, priceKind: "unit", unit: "kg", unitPrice: currentPrice || edit.unitPrice });
-          else if (pkg === "litre") onEditChange({ ...edit, priceKind: "unit", unit: "l", unitPrice: currentPrice || edit.unitPrice });
-          else if (pkg === "piece") onEditChange({ ...edit, priceKind: "unit", unit: "pc", unitPrice: currentPrice || edit.unitPrice });
+          if (pkg === "kg") onEditChange({ ...edit, priceKind: "unit", unit: "kg", unitPrice: currentPrice || edit.unitPrice, pricingPkg: pkg });
+          else if (pkg === "litre") onEditChange({ ...edit, priceKind: "unit", unit: "l", unitPrice: currentPrice || edit.unitPrice, pricingPkg: pkg });
+          else if (PIECE_PACKAGINGS.has(pkg)) onEditChange({ ...edit, priceKind: "unit", unit: "pc", unitPrice: currentPrice || edit.unitPrice, pricingPkg: pkg });
           else onEditChange({ ...edit, priceKind: "pack_simple", packUnit: isLiquidCat ? "l" : "kg", pricingPkg: pkg, packPrice: currentPrice || edit.packPrice });
         };
 
         // Normalize comma to dot for numeric inputs
         const numVal = (v: string) => v.replace(",", ".");
 
-        const isBaseUnit = currentPkg === "kg" || currentPkg === "litre" || currentPkg === "piece";
+        const isBaseUnit = currentPkg === "kg" || currentPkg === "litre" || PIECE_PACKAGINGS.has(currentPkg);
 
         const fieldLabel: CSSProperties = { fontSize: 11, fontWeight: 700, color: "#888", marginBottom: 4 };
 
@@ -540,20 +542,18 @@ export const IngredientRow = React.memo(function IngredientRow({
             )}
 
             {/* Ligne 3 : Champs conditionnels pour conversion → €/kg */}
-            {(currentPkg === "piece" || (!isBaseUnit && edit.packUnit === "l") || currentPkg === "litre") && (
+            {(PIECE_PACKAGINGS.has(currentPkg) || (!isBaseUnit && edit.packUnit === "l") || currentPkg === "litre") && (
               <div style={{ display: "flex", gap: 8, alignItems: "end", flexWrap: "wrap", marginBottom: 10 }}>
-                {(currentPkg === "piece") && (
+                {PIECE_PACKAGINGS.has(currentPkg) && (
                   <>
                     <div>
                       <div style={fieldLabel}>Poids pièce (g)</div>
                       <input style={{ ...inputStyle, width: 130 }} value={edit.pieceWeightG} onChange={(e) => onEditChange({ ...edit, pieceWeightG: numVal(e.target.value) })} />
                     </div>
-                    {isLiquidCat && (
-                      <div>
-                        <div style={fieldLabel}>Volume pièce (mL)</div>
-                        <input style={{ ...inputStyle, width: 130 }} value={edit.pieceVolumeMl} onChange={(e) => onEditChange({ ...edit, pieceVolumeMl: numVal(e.target.value) })} />
-                      </div>
-                    )}
+                    <div>
+                      <div style={fieldLabel}>Volume pièce (mL)</div>
+                      <input style={{ ...inputStyle, width: 130 }} value={edit.pieceVolumeMl} onChange={(e) => onEditChange({ ...edit, pieceVolumeMl: numVal(e.target.value) })} placeholder={currentPkg === "bouteille" ? "ex: 750" : ""} />
+                    </div>
                   </>
                 )}
                 {(currentPkg === "litre" || (!isBaseUnit && edit.packUnit === "l")) && (
