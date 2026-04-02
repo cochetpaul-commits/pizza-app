@@ -452,12 +452,15 @@ export async function runImport(options: {
       }
     }
 
-    if (names.length) {
+    // Re-fetch by name — use UPPERCASE names to match what was created in step 7
+    const upperNames = names.map(n => n.toUpperCase());
+    const allNames = [...new Set([...names, ...upperNames])];
+    if (allNames.length) {
       const nameQ2 = supabase
         .from("ingredients")
         .select("id,name,import_name")
         .eq("user_id", userId)
-        .in("name", names);
+        .in("name", allNames);
       const { data: byName2, error: eName2 } = await nameQ2;
 
       if (eName2) throw new Error(eName2.message);
