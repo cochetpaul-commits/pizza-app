@@ -725,7 +725,7 @@ function CommandesPage() {
     const DAY_NAMES = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
     const DAY_LABELS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
     const now = new Date();
-    const todayName = DAY_NAMES[now.getDay()];
+    const _todayName = DAY_NAMES[now.getDay()];
     const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
     // Find the next matching rule

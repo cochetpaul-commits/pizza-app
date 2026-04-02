@@ -301,7 +301,6 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
     viande_charcuterie: "Viande / Charcuterie", emballage: "Emballage", surgeles: "Surgelés",
     glaces: "Glaces", produits_fins: "Produits fins",
   };
-  const JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
   const JOURS_FULL = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 
   const labelStyle: React.CSSProperties = { fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginBottom: 4 };

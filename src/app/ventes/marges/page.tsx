@@ -7,6 +7,8 @@ import { AiInsightCard } from "@/components/AiInsightCard";
 
 import Chart from "chart.js/auto";
 
+const JOURS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+
 /* ── Types ── */
 type ProductRow = {
   name: string;
@@ -267,7 +269,7 @@ export default function MargesPage() {
   }, [etab, getRange]);
 
   useEffect(() => {
-    loadData(); // eslint-disable-line react-hooks/set-state-in-effect -- data fetch on mount/deps change
+    loadData();
   }, [loadData]);
 
   // Navigate dates (skip weekends in jour mode)
@@ -507,7 +509,6 @@ export default function MargesPage() {
   };
 
   // ── Trend drawer logic ──
-  const JOURS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 
   const openTrend = (productName: string) => {
     const today = new Date();
