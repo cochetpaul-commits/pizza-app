@@ -69,6 +69,9 @@ export default function InventairePage() {
   const [addingZone, setAddingZone] = useState(false);
   const [showManageZones, setShowManageZones] = useState(false);
 
+  const [packInfo, setPackInfo] = useState<Record<string, { pack_count: number; pack_each_qty: number | null; pack_each_unit: string | null }>>({}); // ingredient_id -> pack info
+  const [invUnitModes, setInvUnitModes] = useState<Record<string, "individual" | "carton">>({});
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
@@ -114,12 +117,25 @@ export default function InventairePage() {
       }
       let zq = supabase.from("storage_zones").select("*").order("display_order").order("name");
       if (etabId) zq = zq.eq("etablissement_id", etabId);
-      const [{ data, error }, { data: zData }] = await Promise.all([q, zq]);
+      const packQ = supabase
+        .from("supplier_offers")
+        .select("ingredient_id, pack_count, pack_each_qty, pack_each_unit")
+        .eq("is_active", true)
+        .not("pack_count", "is", null);
+      const [{ data, error }, { data: zData }, { data: packData }] = await Promise.all([q, zq, packQ]);
       if (error) { console.error("ingredients query:", error); }
       setIngredients((data ?? []) as Ingredient[]);
       const zList = (zData ?? []) as StorageZone[];
       setZones(zList);
       if (zList.length > 0) setActiveZone(zList[0].name);
+      // Build pack info map
+      const pMap: Record<string, { pack_count: number; pack_each_qty: number | null; pack_each_unit: string | null }> = {};
+      for (const p of packData ?? []) {
+        if (p.ingredient_id && p.pack_count) {
+          pMap[p.ingredient_id] = { pack_count: p.pack_count, pack_each_qty: p.pack_each_qty, pack_each_unit: p.pack_each_unit };
+        }
+      }
+      setPackInfo(pMap);
     })();
   }, [etabId]);
 
@@ -841,12 +857,27 @@ export default function InventairePage() {
                   {!isCollapsed && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 2 }}>
                       {items.map((ing) => {
-                        const qty = quantities[ing.id];
-                        const qtyNum = typeof qty === "number" ? qty : 0;
-                        const hasQty = qtyNum > 0;
+                        const pack = packInfo[ing.id];
+                        const invMode = invUnitModes[ing.id] ?? "individual";
+                        const rawQty = quantities[ing.id];
+                        const rawQtyNum = typeof rawQty === "number" ? rawQty : 0;
+
+                        // Display qty: if in carton mode, show cartons
+                        const displayQty = (invMode === "carton" && pack)
+                          ? (rawQtyNum > 0 ? Math.round(rawQtyNum / pack.pack_count) : rawQty)
+                          : rawQty;
+                        const displayQtyNum = typeof displayQty === "number" ? displayQty : 0;
+                        const hasQty = rawQtyNum > 0;
                         const isZeroConfirmed = quantities[ing.id] === 0;
                         const valeur = hasQty && ing.cost_per_unit != null
-                          ? qtyNum * ing.cost_per_unit : null;
+                          ? rawQtyNum * ing.cost_per_unit : null;
+
+                        // Carton info line
+                        const cartonInfo = (pack && hasQty)
+                          ? (rawQtyNum % pack.pack_count === 0
+                            ? `${rawQtyNum / pack.pack_count} carton(s)`
+                            : `${Math.floor(rawQtyNum / pack.pack_count)} carton(s) + ${rawQtyNum % pack.pack_count}`)
+                          : null;
 
                         return (
                           <div
@@ -860,6 +891,7 @@ export default function InventairePage() {
                               borderLeft: `3px solid ${hasQty ? color : isZeroConfirmed ? "#ccc" : "#ddd6c8"}`,
                               marginBottom: 4,
                               transition: "all 0.15s",
+                              flexWrap: "wrap",
                             }}
                           >
                             {/* Name + unit */}
@@ -873,9 +905,35 @@ export default function InventairePage() {
                                 {ing.name}
                               </div>
                               <div style={{ fontSize: 10, color: "#999", marginTop: 1 }}>
-                                {ing.default_unit ?? "pcs"}
+                                {invMode === "carton" && pack
+                                  ? `carton de ${pack.pack_count}`
+                                  : (ing.default_unit ?? "pcs")}
+                                {cartonInfo && invMode === "individual" && (
+                                  <span style={{ marginLeft: 6, color: "#7C3AED" }}>({cartonInfo})</span>
+                                )}
                               </div>
                             </div>
+
+                            {/* Pack toggle */}
+                            {pack && !readOnly && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setInvUnitModes(prev => ({
+                                    ...prev,
+                                    [ing.id]: invMode === "individual" ? "carton" : "individual",
+                                  }));
+                                }}
+                                style={{
+                                  fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
+                                  border: "1px solid #7C3AED", background: invMode === "carton" ? "#7C3AED" : "transparent",
+                                  color: invMode === "carton" ? "#fff" : "#7C3AED", cursor: "pointer",
+                                  flexShrink: 0, fontFamily: "DM Sans, sans-serif",
+                                }}
+                              >
+                                {invMode === "carton" ? "cartons" : "crt"}
+                              </button>
+                            )}
 
                             {/* Value */}
                             {valeur != null && (
@@ -890,15 +948,28 @@ export default function InventairePage() {
                                 fontSize: 15, fontWeight: 700, color: hasQty ? "#D4775A" : "#ccc",
                                 minWidth: 50, textAlign: "right", flexShrink: 0,
                               }}>
-                                {hasQty ? qtyNum : "-"}
+                                {hasQty ? (invMode === "carton" && pack ? `${displayQtyNum}` : `${rawQtyNum}`) : "-"}
                               </span>
                             ) : (
                               <input
                                 type="number"
-                                step="0.5"
+                                step={invMode === "carton" && pack ? "1" : "0.5"}
                                 min="0"
-                                value={qty ?? ""}
-                                onChange={(e) => handleQtyChange(ing.id, e.target.value)}
+                                value={displayQty ?? ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === "") {
+                                    handleQtyChange(ing.id, "");
+                                  } else {
+                                    const num = Number(val);
+                                    if (invMode === "carton" && pack) {
+                                      // Convert cartons to individual units for storage
+                                      handleQtyChange(ing.id, String(Math.round(num * pack.pack_count)));
+                                    } else {
+                                      handleQtyChange(ing.id, val);
+                                    }
+                                  }
+                                }}
                                 placeholder="0"
                                 style={{
                                   width: 70, height: 36, borderRadius: 8,

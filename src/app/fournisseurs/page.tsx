@@ -151,6 +151,16 @@ export default function FournisseursPage() {
   const [deletedContactIds, setDeletedContactIds] = useState<string[]>([]);
   const [originalContactIds, setOriginalContactIds] = useState<Set<string>>(new Set());
 
+  // Carton config state
+  const [showCartonConfig, setShowCartonConfig] = useState(false);
+  const [cartonPackCount, setCartonPackCount] = useState(6);
+  const [cartonEachQty, setCartonEachQty] = useState(0.75);
+  const [cartonEachUnit, setCartonEachUnit] = useState("l");
+  const [cartonPreview, setCartonPreview] = useState<{ total: number; without_pack: number; with_pack: number } | null>(null);
+  const [cartonLoading, setCartonLoading] = useState(false);
+  const [cartonApplying, setCartonApplying] = useState(false);
+  const [cartonResult, setCartonResult] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
 
@@ -310,6 +320,51 @@ export default function FournisseursPage() {
   function closeModal() {
     setModalSupplier(null);
     setModalMode("edit");
+    setShowCartonConfig(false);
+    setCartonPreview(null);
+    setCartonResult(null);
+  }
+
+  async function loadCartonPreview(supplierId: string) {
+    setCartonLoading(true);
+    setCartonResult(null);
+    try {
+      const res = await fetch(`/api/ingredients/bulk-pack?supplier_id=${supplierId}`);
+      const data = await res.json();
+      if (res.ok) {
+        setCartonPreview(data);
+      }
+    } finally {
+      setCartonLoading(false);
+    }
+  }
+
+  async function applyCartonConfig() {
+    if (!modalSupplier) return;
+    setCartonApplying(true);
+    setCartonResult(null);
+    try {
+      const res = await fetch("/api/ingredients/bulk-pack", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          supplier_id: modalSupplier.id,
+          pack_count: cartonPackCount,
+          pack_each_qty: cartonEachQty,
+          pack_each_unit: cartonEachUnit,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCartonResult(`${data.updated} offre(s) mise(s) a jour sur ${data.total}`);
+        // Refresh preview
+        await loadCartonPreview(modalSupplier.id);
+      } else {
+        setCartonResult(`Erreur: ${data.error}`);
+      }
+    } finally {
+      setCartonApplying(false);
+    }
   }
 
   function updateContact(idx: number, field: keyof Contact, value: string | boolean) {
@@ -991,6 +1046,106 @@ export default function FournisseursPage() {
               >
                 + Ajouter un contact
               </button>
+
+              {/* Carton config (edit mode only) */}
+              {modalMode === "edit" && modalSupplier && (
+                <div style={{ marginBottom: 16, marginTop: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !showCartonConfig;
+                      setShowCartonConfig(next);
+                      if (next && !cartonPreview) loadCartonPreview(modalSupplier.id);
+                    }}
+                    style={{
+                      fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700,
+                      color: "#7C3AED", background: "none", border: "1.5px solid #7C3AED",
+                      borderRadius: 20, padding: "5px 14px", cursor: "pointer",
+                    }}
+                  >
+                    {showCartonConfig ? "Masquer config cartons" : "Configurer les cartons"}
+                  </button>
+
+                  {showCartonConfig && (
+                    <div style={{
+                      marginTop: 10, padding: 14, border: "1.5px solid #e5ddd0",
+                      borderRadius: 12, background: "#faf8f4",
+                    }}>
+                      <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
+                        Configuration cartons
+                      </div>
+
+                      {/* Preview stats */}
+                      {cartonLoading && (
+                        <div style={{ fontSize: 12, color: "#999", marginBottom: 8 }}>Chargement...</div>
+                      )}
+                      {cartonPreview && !cartonLoading && (
+                        <div style={{ fontSize: 12, color: "#666", marginBottom: 10, lineHeight: 1.5 }}>
+                          {cartonPreview.total} offre(s) au total — {cartonPreview.without_pack} sans config carton, {cartonPreview.with_pack} deja configuree(s)
+                        </div>
+                      )}
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
+                        <div>
+                          <div style={labelStyle}>Bouteilles / carton</div>
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={cartonPackCount}
+                            onChange={(e) => setCartonPackCount(Number(e.target.value) || 1)}
+                            style={{ ...inputStyle, padding: "8px 10px" }}
+                          />
+                        </div>
+                        <div>
+                          <div style={labelStyle}>Volume unitaire</div>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.05"
+                            value={cartonEachQty}
+                            onChange={(e) => setCartonEachQty(Number(e.target.value) || 0)}
+                            style={{ ...inputStyle, padding: "8px 10px" }}
+                          />
+                        </div>
+                        <div>
+                          <div style={labelStyle}>Unite</div>
+                          <select
+                            value={cartonEachUnit}
+                            onChange={(e) => setCartonEachUnit(e.target.value)}
+                            style={{ ...inputStyle, padding: "8px 10px" }}
+                          >
+                            <option value="l">litres (l)</option>
+                            <option value="pc">pieces (pc)</option>
+                            <option value="kg">kilos (kg)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <button
+                          type="button"
+                          onClick={applyCartonConfig}
+                          disabled={cartonApplying || (cartonPreview?.without_pack === 0)}
+                          style={{
+                            fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 600,
+                            background: "#7C3AED", color: "#fff", border: "none", borderRadius: 20,
+                            padding: "7px 16px", cursor: "pointer",
+                            opacity: (cartonApplying || cartonPreview?.without_pack === 0) ? 0.5 : 1,
+                          }}
+                        >
+                          {cartonApplying ? "..." : `Appliquer a ${cartonPreview?.without_pack ?? "?"} offre(s)`}
+                        </button>
+                        {cartonResult && (
+                          <span style={{ fontSize: 11, color: cartonResult.startsWith("Erreur") ? "#c44" : "#16A34A", fontWeight: 600 }}>
+                            {cartonResult}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Actions */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
