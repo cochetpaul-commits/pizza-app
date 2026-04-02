@@ -5,6 +5,7 @@ import { pdfToText } from "@/lib/pdfToText";
 import { runImport } from "@/lib/invoices/importEngine";
 import { parseVinofloInvoiceText } from "@/lib/invoices/vinoflo";
 import { parseVinofloCommande } from "@/lib/invoices/vinofloCommande";
+import { ocrPdf } from "@/lib/ocrVision";
 import { resolveEtabId, EtabError } from "@/lib/getEtablissement";
 
 export const runtime = "nodejs";
@@ -30,7 +31,19 @@ export async function POST(req: Request) {
     }
 
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const text = await pdfToText(bytes);
+    let text = await pdfToText(bytes);
+
+    // If pdfToText produces garbled text (spaced chars), use Claude Vision
+    const hasSpacedChars = /[A-Z]\s[A-Z]\s[A-Z]\s[A-Z]/.test(text) || text.trim().length < 100;
+    if (hasSpacedChars && process.env.ANTHROPIC_API_KEY) {
+      console.log("[vinoflo] pdfToText garbled — falling back to Claude Vision");
+      try {
+        text = await ocrPdf(bytes);
+      } catch (err) {
+        console.error("[vinoflo] Claude Vision fallback failed:", err);
+      }
+    }
+
     let payload = parseVinofloInvoiceText(text);
     // Fallback to commande parser if no lines found
     if (payload.lines.length === 0) {
