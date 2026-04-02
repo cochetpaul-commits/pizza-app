@@ -19,10 +19,22 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
 
+/**
+ * SQL to add new columns:
+ * ALTER TABLE suppliers
+ *   ADD COLUMN IF NOT EXISTS franco_obligatoire BOOLEAN DEFAULT false,
+ *   ADD COLUMN IF NOT EXISTS mercuriale_only BOOLEAN DEFAULT false,
+ *   ADD COLUMN IF NOT EXISTS delivery_schedule JSONB;
+ */
+
+type DeliveryRule = { day: string; cutoff: string; delivery_day: string };
+
 type SupplierFull = {
   id: string; name: string; is_active: boolean;
   email: string | null; phone: string | null; contact_name: string | null;
   notes: string | null; franco_minimum: number | null;
+  franco_obligatoire: boolean | null; mercuriale_only: boolean | null;
+  delivery_schedule: DeliveryRule[] | null;
   address: string | null; city: string | null; postal_code: string | null;
   siret: string | null; category: string | null; payment_terms: string | null;
   delivery_days: string[] | null; website: string | null; tva_intra: string | null;
@@ -62,7 +74,13 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const [form, setForm] = useState({ email: "", phone: "", contact_name: "", notes: "", franco_minimum: "", address: "", city: "", postal_code: "", siret: "", category: "", payment_terms: "", delivery_days: "", website: "", tva_intra: "" });
+  const [form, setForm] = useState({
+    email: "", phone: "", contact_name: "", notes: "", franco_minimum: "",
+    franco_obligatoire: false, mercuriale_only: false,
+    address: "", city: "", postal_code: "", siret: "", category: "",
+    payment_terms: "", delivery_days: "", website: "", tva_intra: "",
+  });
+  const [schedule, setSchedule] = useState<DeliveryRule[]>([]);
 
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [deletedContactIds, setDeletedContactIds] = useState<string[]>([]);
@@ -150,10 +168,13 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
           email: s.email ?? "", phone: s.phone ?? "",
           contact_name: s.contact_name ?? "", notes: s.notes ?? "",
           franco_minimum: s.franco_minimum != null ? String(s.franco_minimum) : "",
+          franco_obligatoire: s.franco_obligatoire ?? false,
+          mercuriale_only: s.mercuriale_only ?? false,
           address: s.address ?? "", city: s.city ?? "", postal_code: s.postal_code ?? "",
           siret: s.siret ?? "", category: s.category ?? "", payment_terms: s.payment_terms ?? "",
           delivery_days: (s.delivery_days ?? []).join(", "), website: s.website ?? "", tva_intra: s.tva_intra ?? "",
         });
+        setSchedule(Array.isArray(s.delivery_schedule) ? s.delivery_schedule : []);
 
         // Load contacts
         const dbContacts = (contactsRes.data ?? []).map((c: Record<string, unknown>) => ({
@@ -209,6 +230,9 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
       contact_name: form.contact_name.trim() || null,
       notes: form.notes.trim() || null,
       franco_minimum: francoVal ? parseFloat(francoVal) : null,
+      franco_obligatoire: form.franco_obligatoire,
+      mercuriale_only: form.mercuriale_only,
+      delivery_schedule: schedule.length > 0 ? schedule : null,
       address: form.address.trim() || null,
       city: form.city.trim() || null,
       postal_code: form.postal_code.trim() || null,
@@ -278,6 +302,7 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
     glaces: "Glaces", produits_fins: "Produits fins",
   };
   const JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+  const JOURS_FULL = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 
   const labelStyle: React.CSSProperties = { fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginBottom: 4 };
   const inputStyle: React.CSSProperties = {
@@ -377,44 +402,81 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
             </select>
           </div>
           <div>
-            <div style={labelStyle}>Franco minimum (EUR HT)</div>
-            <input style={inputStyle} value={form.franco_minimum} onChange={(e) => setForm((f) => ({ ...f, franco_minimum: e.target.value }))} placeholder="ex: 800" type="number" min="0" step="50" />
-          </div>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-          <div>
             <div style={labelStyle}>Conditions paiement</div>
             <input style={inputStyle} value={form.payment_terms} onChange={(e) => setForm((f) => ({ ...f, payment_terms: e.target.value }))} placeholder="30 jours fin de mois" />
           </div>
-          <div>
-            <div style={labelStyle}>Jours de livraison</div>
-            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4 }}>
-              {JOURS.map((j) => {
-                const selected = form.delivery_days.toLowerCase().includes(j);
-                return (
-                  <button
-                    key={j}
-                    type="button"
-                    onClick={() => {
-                      const current = form.delivery_days.split(",").map(d => d.trim().toLowerCase()).filter(Boolean);
-                      const next = selected ? current.filter(d => d !== j) : [...current, j];
-                      const ordered = JOURS.filter(d => next.includes(d));
-                      setForm((f) => ({ ...f, delivery_days: ordered.join(", ") }));
-                    }}
-                    style={{
-                      fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 600,
-                      padding: "4px 8px", borderRadius: 6, cursor: "pointer",
-                      border: selected ? "1.5px solid #D4775A" : "1.5px solid #ddd6c8",
-                      background: selected ? "#D4775A18" : "#fff",
-                      color: selected ? "#D4775A" : "#999",
-                    }}
-                  >
-                    {j.slice(0, 3)}
-                  </button>
-                );
-              })}
+        </div>
+
+        {/* ─── FRANCO & LIVRAISON ─── */}
+        <div style={sectionTitle}>Franco & Livraison</div>
+        <div style={{ background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+          {/* Franco row */}
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
+            <div>
+              <div style={labelStyle}>Franco de port (EUR HT)</div>
+              <input style={{ ...inputStyle, width: 120 }} value={form.franco_minimum} onChange={(e) => setForm((f) => ({ ...f, franco_minimum: e.target.value }))} placeholder="ex: 200" type="number" min="0" step="10" />
             </div>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", paddingTop: 16 }}>
+              <input type="checkbox" checked={form.mercuriale_only} onChange={(e) => setForm((f) => ({ ...f, mercuriale_only: e.target.checked }))} />
+              <span style={{ fontSize: 12, color: "#666" }}>Produits en mercuriale uniquement</span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", paddingTop: 16 }}>
+              <input type="checkbox" checked={form.franco_obligatoire} onChange={(e) => setForm((f) => ({ ...f, franco_obligatoire: e.target.checked }))} />
+              <span style={{ fontSize: 12, color: "#666" }}>Franco obligatoire</span>
+            </label>
           </div>
+
+          {/* Schedule table */}
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+            Planning commande → livraison
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4, marginBottom: 4 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", padding: "4px 8px" }}>Jour de commande</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", padding: "4px 8px" }}>Heure limite</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", padding: "4px 8px" }}>Jour de livraison</div>
+          </div>
+          {JOURS_FULL.map((jour) => {
+            const rule = schedule.find(r => r.day === jour);
+            return (
+              <div key={jour} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4, marginBottom: 2 }}>
+                <div style={{ padding: "8px", fontSize: 13, color: rule ? "#1a1a1a" : "#ccc", fontWeight: rule ? 600 : 400, background: rule ? "#faf8f4" : "transparent", borderRadius: 6 }}>
+                  {jour.charAt(0).toUpperCase() + jour.slice(1)}
+                </div>
+                <input
+                  style={{ ...inputStyle, padding: "6px 8px", fontSize: 13, background: rule ? "#faf8f4" : "#fff" }}
+                  value={rule?.cutoff ?? ""}
+                  placeholder="hh:mm"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSchedule(prev => {
+                      const existing = prev.find(r => r.day === jour);
+                      if (existing) return prev.map(r => r.day === jour ? { ...r, cutoff: val } : r);
+                      if (val) return [...prev, { day: jour, cutoff: val, delivery_day: "" }];
+                      return prev;
+                    });
+                  }}
+                />
+                <select
+                  style={{ ...inputStyle, padding: "6px 8px", fontSize: 13, cursor: "pointer", background: rule ? "#faf8f4" : "#fff" }}
+                  value={rule?.delivery_day ?? ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSchedule(prev => {
+                      const existing = prev.find(r => r.day === jour);
+                      if (existing) return prev.map(r => r.day === jour ? { ...r, delivery_day: val } : r);
+                      if (val) return [...prev, { day: jour, cutoff: "", delivery_day: val }];
+                      return prev;
+                    });
+                  }}
+                >
+                  <option value="">—</option>
+                  {JOURS_FULL.map(j => (
+                    <option key={j} value={j}>{j.charAt(0).toUpperCase() + j.slice(1)}</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })}
         </div>
 
         {/* Administratif */}
