@@ -8,7 +8,9 @@
  * Header: "BORDEREAU DE COMMANDE BELLO MIO N° 1640 du 28/01/2025"
  */
 
-import type { ParsedInvoice, ParsedLine } from "@/lib/invoices/importEngine";
+import type { ParsedInvoice } from "@/lib/invoices/vinoflo";
+
+type ParsedLine = ParsedInvoice["lines"][number];
 
 function parseFr(s: string): number {
   return parseFloat(s.replace(/\s/g, "").replace(",", ".").replace("€", "")) || 0;
@@ -81,10 +83,12 @@ export function parseVinofloCommande(rawText: string): ParsedInvoice {
   }
 
   return {
+    supplier: "VINOFLO" as const,
     invoice_number: invoiceNumber,
     invoice_date: invoiceDate,
     total_ht: totalHt,
     total_ttc: null,
     lines,
+    raw_text_preview: rawText.slice(0, 2000),
   };
 }
