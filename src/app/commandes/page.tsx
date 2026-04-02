@@ -558,15 +558,54 @@ function CommandesPage() {
 
   async function envoyerSession(sessionId: string) {
     setSaving(true);
-    await fetchApi("/api/commandes/session", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: sessionId, status: "en_attente" }),
-    });
-    await reloadSession();
+    try {
+      // Send email with PDF attachment to supplier contacts
+      const auth = localStorage.getItem(Object.keys(localStorage).find(k => k.includes("auth-token")) ?? "");
+      let token = "";
+      if (auth) { try { const p = JSON.parse(auth); token = p?.access_token ?? p?.currentSession?.access_token ?? ""; } catch {} }
+      const etabId = etab?.id ?? "";
+
+      const res = await fetchApi("/api/commandes/send-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          "x-etablissement-id": etabId,
+        },
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+      const data = await res.json();
+
+      if (!data.ok) {
+        // Fallback: just change status without email
+        if (data.error?.includes("Aucun destinataire")) {
+          if (confirm(`${data.error}\n\nValider la commande sans envoyer de mail ?`)) {
+            await fetchApi("/api/commandes/session", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ id: sessionId, status: "en_attente" }),
+            });
+          }
+        } else {
+          alert(data.error ?? "Erreur envoi");
+        }
+      }
+
+      await reloadSession();
+      setConfirmation(data.ok ? `Commande envoyee a ${data.recipients?.join(", ")}` : "Commande validee (sans mail)");
+    } catch (err) {
+      console.error("[commandes] send error:", err);
+      // Fallback: change status only
+      await fetchApi("/api/commandes/session", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: sessionId, status: "en_attente" }),
+      });
+      await reloadSession();
+      setConfirmation("Commande validee (erreur envoi mail)");
+    }
     setSaving(false);
-    setConfirmation("Commande envoyée pour validation");
-    setTimeout(() => setConfirmation(null), 4000);
+    setTimeout(() => setConfirmation(null), 6000);
   }
 
   async function validerSession(sessionId: string) {
