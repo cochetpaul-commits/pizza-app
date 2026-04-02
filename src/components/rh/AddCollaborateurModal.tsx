@@ -119,7 +119,12 @@ export function AddCollaborateurModal({ etablissementId, onClose, onCreated }: P
           "Content-Type": "application/json",
           ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },
-        body: JSON.stringify({ email: email.trim(), displayName: `${prenom.trim()} ${nom.trim()}`, role: dbRole }),
+        body: JSON.stringify({
+          email: email.trim(),
+          displayName: `${prenom.trim()} ${nom.trim()}`,
+          role: dbRole,
+          etablissementsAccess: activeEntries.map(([id]) => id),
+        }),
       });
     }
 

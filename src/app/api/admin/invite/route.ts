@@ -61,7 +61,9 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { email, role, displayName } = body as { email?: string; role?: string; displayName?: string };
+  const { email, role, displayName, etablissementsAccess } = body as {
+    email?: string; role?: string; displayName?: string; etablissementsAccess?: string[];
+  };
 
   if (!email) {
     return NextResponse.json({ error: "Email requis" }, { status: 400 });
@@ -82,11 +84,19 @@ export async function POST(req: NextRequest) {
 
   if (inviteErr) return NextResponse.json({ error: inviteErr.message }, { status: 500 });
 
-  // Update profile role
+  // Update profile role + establishment access
   if (inviteData.user) {
+    const profileUpdate: Record<string, unknown> = {
+      role: profileRole,
+      display_name: displayName || email,
+      updated_at: new Date().toISOString(),
+    };
+    if (etablissementsAccess && etablissementsAccess.length > 0) {
+      profileUpdate.etablissements_access = etablissementsAccess;
+    }
     await supabaseAdmin
       .from("profiles")
-      .update({ role: profileRole, display_name: displayName || email, updated_at: new Date().toISOString() })
+      .update(profileUpdate)
       .eq("id", inviteData.user.id);
   }
 

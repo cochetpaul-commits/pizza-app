@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { AddCollaborateurModal } from "@/components/rh/AddCollaborateurModal";
+import { fetchApi } from "@/lib/fetchApi";
 
 type Employe = {
   id: string;
@@ -51,17 +52,22 @@ export default function SettingsEmployesPage() {
   const [contratFilter, setContratFilter] = useState("all");
   const [statutFilter, setStatutFilter] = useState("actif");
   const [sortBy, setSortBy] = useState("nom");
+  const [authEmails, setAuthEmails] = useState<Set<string>>(new Set());
+  const [invitingId, setInvitingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [empRes, etabRes] = await Promise.all([
+      const [empRes, etabRes, profileRes] = await Promise.all([
         supabase.from("employes").select("id, prenom, nom, initiales, email, tel_mobile, role, equipes_access, etablissement_id, actif, avatar_url").order("nom"),
         supabase.from("etablissements").select("id, nom, slug").eq("actif", true).order("nom"),
+        supabase.from("profiles").select("email"),
       ]);
       if (!cancelled) {
         setEmployes((empRes.data ?? []) as Employe[]);
         setEtabs((etabRes.data ?? []) as Etab[]);
+        const emails = new Set((profileRes.data ?? []).map((p: { email: string }) => p.email?.toLowerCase()).filter(Boolean));
+        setAuthEmails(emails);
         setLoading(false);
       }
     })();
@@ -114,6 +120,29 @@ export default function SettingsEmployesPage() {
     employes.forEach(e => (e.equipes_access ?? []).forEach(eq => set.add(`${e.etablissement_id}:${eq}`)));
     return set.size;
   }, [employes]);
+
+  const handleInvite = useCallback(async (emp: Employe) => {
+    if (!emp.email) return;
+    setInvitingId(emp.id);
+    const dbRole = emp.role === "group_admin" ? "group_admin" : "equipier";
+    const res = await fetchApi("/api/admin/invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: emp.email,
+        displayName: `${emp.prenom} ${emp.nom}`,
+        role: dbRole,
+        etablissementsAccess: [emp.etablissement_id],
+      }),
+    });
+    setInvitingId(null);
+    if (res.ok) {
+      setAuthEmails(prev => new Set([...prev, emp.email!.toLowerCase()]));
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "Erreur lors de l'invitation");
+    }
+  }, []);
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
@@ -194,7 +223,7 @@ export default function SettingsEmployesPage() {
                   <th style={{ ...LABEL, textAlign: "left", padding: "12px 8px" }}>Email</th>
                   <th style={{ ...LABEL, textAlign: "left", padding: "12px 8px" }}>Mobile</th>
                   <th style={{ ...LABEL, textAlign: "left", padding: "12px 8px" }}>Rattachement</th>
-                  <th style={{ ...LABEL, textAlign: "left", padding: "12px 8px" }}>Invitation</th>
+                  <th style={{ ...LABEL, textAlign: "left", padding: "12px 8px" }}>Acces app</th>
                 </tr>
               </thead>
               <tbody>
@@ -225,10 +254,23 @@ export default function SettingsEmployesPage() {
                     <td style={{ padding: "12px 8px", fontSize: 12, color: "#1a1a1a" }}>{emp.tel_mobile ?? "Non renseigne"}</td>
                     <td style={{ padding: "12px 8px", fontSize: 12, color: "#666" }}>{getRattachement(emp)}</td>
                     <td style={{ padding: "12px 8px" }}>
-                      {emp.email ? (
-                        <span style={{ fontSize: 11, fontWeight: 600, color: "#2D6A4F" }}>Acceptee</span>
+                      {emp.email && authEmails.has(emp.email.toLowerCase()) ? (
+                        <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(45,106,79,0.1)", fontSize: 11, fontWeight: 600, color: "#2D6A4F" }}>Acces actif</span>
+                      ) : emp.email ? (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleInvite(emp); }}
+                          disabled={invitingId === emp.id}
+                          style={{
+                            padding: "4px 12px", borderRadius: 6, border: "none",
+                            background: "#D4775A", color: "#fff", fontSize: 11, fontWeight: 700,
+                            cursor: "pointer", opacity: invitingId === emp.id ? 0.5 : 1,
+                          }}
+                        >
+                          {invitingId === emp.id ? "Envoi..." : "Inviter"}
+                        </button>
                       ) : (
-                        <span style={{ fontSize: 11, fontWeight: 600, color: "#999" }}>Non invitee</span>
+                        <span style={{ fontSize: 11, color: "#999" }}>Pas d&apos;email</span>
                       )}
                     </td>
                   </tr>

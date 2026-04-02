@@ -280,7 +280,6 @@ export const SIDEBAR_NAV: NavSection[] = [
     icon: "settings",
     roles: ["group_admin"],
     items: [
-      { label: "Utilisateurs", href: "/admin/utilisateurs" },
       { label: "Mon compte", href: "/settings/account" },
     ],
   },
