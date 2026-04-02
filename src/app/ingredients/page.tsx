@@ -505,6 +505,7 @@ function IngredientsPageInner() {
       packEachQty: off?.pack_each_qty != null ? String(off.pack_each_qty) : "",
       packEachUnit: (off?.pack_each_unit ?? "l") as "kg" | "l" | "pc",
       packPieceWeightG: off?.piece_weight_g != null ? String(off.piece_weight_g) : "",
+      packEachVolumeUnit: "cl",
       allergens: parseAllergens(x.allergens),
       pricingPkg: (off?.price_kind === "pack_simple" || off?.price_kind === "pack_composed") ? (x.order_unit_label || guessOrderUnit(off) || "pack") : "",
       orderUnitLabel: x.order_unit_label || guessOrderUnit(off),

@@ -94,7 +94,7 @@ export type EditState = {
   useOffer: boolean; priceKind: PriceKind; unit: "kg" | "l" | "pc"; unitPrice: string;
   density: string; pieceWeightG: string; packTotalQty: string; packPrice: string;
   packUnit: "kg" | "l"; packCount: string; packEachQty: string; packEachUnit: "kg" | "l" | "pc";
-  packPieceWeightG: string; pieceVolumeMl: string; allergens: string[];
+  packPieceWeightG: string; pieceVolumeMl: string; packEachVolumeUnit: string; allergens: string[];
   pricingPkg: string; // conditionnement prix (bouteille, sac, carton…) — independent from orderUnitLabel
   orderUnitLabel: string;
   orderQuantity: string;
@@ -476,22 +476,66 @@ export const IngredientRow = React.memo(function IngredientRow({
 
             {/* Ligne 2 : Conversion conditionnement → base (si packaging) */}
             {!isBaseUnit && (
-              <div style={{ display: "flex", gap: 8, alignItems: "end", flexWrap: "wrap", marginBottom: 10, padding: "10px 12px", background: "#fff", borderRadius: 10, border: "1.5px solid #e5ddd0" }}>
-                <span style={{ fontSize: 13, color: "#666", paddingBottom: 8 }}>1 {currentPkg} contient</span>
-                <div>
-                  <input
-                    style={{ ...inputStyle, width: 90 }}
-                    value={edit.packTotalQty}
-                    onChange={(e) => onEditChange({ ...edit, packTotalQty: numVal(e.target.value) })}
-                    placeholder="qté"
-                  />
+              <div style={{ padding: "10px 12px", background: "#fff", borderRadius: 10, border: "1.5px solid #e5ddd0", marginBottom: 10 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "end", flexWrap: "wrap", marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, color: "#666", paddingBottom: 8 }}>1 {currentPkg} contient</span>
+                  <div>
+                    <input
+                      style={{ ...inputStyle, width: 70 }}
+                      value={edit.packCount || edit.packTotalQty}
+                      onChange={(e) => onEditChange({ ...edit, packCount: numVal(e.target.value), packTotalQty: numVal(e.target.value) })}
+                      placeholder="nb"
+                    />
+                  </div>
+                  <span style={{ fontSize: 13, color: "#666", paddingBottom: 8 }}>×</span>
+                  <div>
+                    <select style={{ ...selectStyle, width: 120 }} value={edit.packEachUnit || edit.packUnit || "pc"} onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "pc") onEditChange({ ...edit, priceKind: "pack_composed", packEachUnit: "pc", packUnit: "l" });
+                      else onEditChange({ ...edit, priceKind: "pack_simple", packUnit: v as "kg" | "l", packEachUnit: "kg" as "kg" | "l" | "pc" });
+                    }}>
+                      <option value="pc">bouteille/piece</option>
+                      <option value="kg">kg</option>
+                      <option value="l">litre</option>
+                    </select>
+                  </div>
+                  {(edit.packEachUnit === "pc" || (!edit.packEachUnit && edit.priceKind === "pack_composed")) && (
+                    <>
+                      <span style={{ fontSize: 13, color: "#666", paddingBottom: 8 }}>de</span>
+                      <div>
+                        <input
+                          style={{ ...inputStyle, width: 70 }}
+                          value={edit.packEachQty || ""}
+                          onChange={(e) => onEditChange({ ...edit, packEachQty: numVal(e.target.value) })}
+                          placeholder="vol."
+                        />
+                      </div>
+                      <div>
+                        <select style={{ ...selectStyle, width: 60 }} value={edit.packEachVolumeUnit || "cl"} onChange={(e) => onEditChange({ ...edit, packEachVolumeUnit: e.target.value })}>
+                          <option value="cl">cl</option>
+                          <option value="ml">ml</option>
+                          <option value="L">L</option>
+                          <option value="g">g</option>
+                          <option value="kg">kg</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div>
-                  <select style={{ ...selectStyle, width: 90 }} value={edit.packUnit} onChange={(e) => onEditChange({ ...edit, packUnit: e.target.value as "kg" | "l" })}>
-                    <option value="kg">kg</option>
-                    <option value="l">litre</option>
-                  </select>
-                </div>
+                {/* Auto-calculated unit price */}
+                {(() => {
+                  const packPrice = parseFloat(String(edit.packPrice)) || 0;
+                  const count = parseFloat(String(edit.packCount || edit.packTotalQty)) || 0;
+                  if (packPrice > 0 && count > 0) {
+                    const unitPrice = packPrice / count;
+                    return (
+                      <div style={{ fontSize: 12, color: "#4a6741", fontWeight: 600, marginTop: 4 }}>
+                        = {unitPrice.toFixed(2)}€ / unite ({count} × {unitPrice.toFixed(2)}€ = {packPrice.toFixed(2)}€)
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             )}
 
