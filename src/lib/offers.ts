@@ -160,14 +160,24 @@ export function fmtOfferPriceLine(
     }
 
     if (o.pack_each_unit === "pc") {
-      const pw = n2(o.piece_weight_g);
-      if (pw <= 0) return { main: "—", sub: "poids pièce manquant" };
       const perPc = o.pack_price / o.pack_count;
-      const eurPerKg = (perPc / pw) * 1000;
-      return {
-        main: `${fmtMoney(eurPerKg)} € /kg`,
-        sub: `pack: ${fmtMoney(o.pack_price)} € / ${fmtQty(o.pack_count)} pcs • offre: ${fmtMoney(perPc)} €/pc • ${fmtQty(pw)} g/pc`,
-      };
+      const pw = n2(o.piece_weight_g);
+      if (pw > 0) {
+        const eurPerKg = (perPc / pw) * 1000;
+        return {
+          main: `${fmtMoney(eurPerKg)} € /kg`,
+          sub: `pack: ${fmtMoney(o.pack_price)} € / ${fmtQty(o.pack_count)} pcs • offre: ${fmtMoney(perPc)} €/pc • ${fmtQty(pw)} g/pc`,
+        };
+      }
+      const volMl = extras?.piece_volume_ml;
+      if (volMl != null && volMl > 0) {
+        const eurPerL = (perPc / volMl) * 1000;
+        return {
+          main: `${fmtMoney(eurPerL)} € /L`,
+          sub: `pack: ${fmtMoney(o.pack_price)} € / ${fmtQty(o.pack_count)} pcs • ${fmtMoney(perPc)} €/pc · ${fmtQty(volMl)} mL/pc`,
+        };
+      }
+      return { main: `${fmtMoney(perPc)} €/pc`, sub: `pack: ${fmtMoney(o.pack_price)} € / ${fmtQty(o.pack_count)} pcs` };
     }
 
     if (o.pack_each_qty == null || o.pack_each_qty <= 0) return { main: "—", sub: "quantité par élément manquante" };
@@ -184,7 +194,10 @@ export function fmtOfferPriceLine(
   return { main: "—", sub: "offre inconnue" };
 }
 
-export function offerHasPrice(o: LatestOffer | undefined): boolean {
+export function offerHasPrice(
+  o: LatestOffer | undefined,
+  extras?: { piece_volume_ml?: number | null },
+): boolean {
   if (!o) return false;
 
   if (o.price_kind === "unit") {
@@ -209,7 +222,10 @@ export function offerHasPrice(o: LatestOffer | undefined): boolean {
     if (o.pack_each_unit == null) return false;
 
     if (o.pack_each_unit === "pc") {
-      return o.piece_weight_g != null && Number.isFinite(o.piece_weight_g) && o.piece_weight_g > 0;
+      if (o.piece_weight_g != null && Number.isFinite(o.piece_weight_g) && o.piece_weight_g > 0) return true;
+      const vol = extras?.piece_volume_ml;
+      if (vol != null && Number.isFinite(vol) && vol > 0) return true;
+      return false;
     }
 
     return o.pack_each_qty != null && Number.isFinite(o.pack_each_qty) && o.pack_each_qty > 0;

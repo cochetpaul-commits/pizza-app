@@ -51,6 +51,9 @@ type ApiData = {
 
 type ViewTab = "jour" | "semaine" | "mois";
 
+type TrendDaily = { date: string; qty: number; ca_ttc: number; ca_ht: number };
+type TrendMode = "par_jour_semaine" | "par_mois" | "tendance";
+
 type SortKey =
   | "name"
   | "categorie"
@@ -197,6 +200,16 @@ export default function MargesPage() {
     if (d.getDay() === 0) d.setDate(d.getDate() - 2); // dimanche → vendredi
     return d.toISOString().slice(0, 10);
   });
+
+  // Trend drawer state
+  const [trendProduct, setTrendProduct] = useState<string | null>(null);
+  const [trendMode, setTrendMode] = useState<TrendMode>("tendance");
+  const [trendMetric, setTrendMetric] = useState<"qty" | "ca_ht">("qty");
+  const [trendFrom, setTrendFrom] = useState("");
+  const [trendTo, setTrendTo] = useState("");
+  const [trendData, setTrendData] = useState<TrendDaily[] | null>(null);
+  const [trendLoading, setTrendLoading] = useState(false);
+  const trendChartRef = useRef<HTMLCanvasElement>(null);
 
   // Chart refs
   const barRef = useRef<HTMLCanvasElement>(null);
@@ -492,6 +505,120 @@ export default function MargesPage() {
 
     return { topMarginEur, foodCostAlerts, catSummary, pricingImpact };
   };
+
+  // ── Trend drawer logic ──
+  const JOURS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+
+  const openTrend = (productName: string) => {
+    const today = new Date();
+    const from3m = new Date(today);
+    from3m.setMonth(from3m.getMonth() - 3);
+    setTrendProduct(productName);
+    setTrendFrom(from3m.toISOString().slice(0, 10));
+    setTrendTo(today.toISOString().slice(0, 10));
+    setTrendData(null);
+    setTrendMode("tendance");
+    setTrendMetric("qty");
+  };
+
+  // Fetch trend data
+  useEffect(() => {
+    if (!trendProduct || !etab || !trendFrom || !trendTo) return;
+    let cancelled = false;
+    setTrendLoading(true);
+    fetch(`/api/ventes/marges/trend?etablissement_id=${etab.id}&product=${encodeURIComponent(trendProduct)}&from=${trendFrom}&to=${trendTo}`)
+      .then((r) => r.json())
+      .then((j) => { if (!cancelled) setTrendData(j.daily ?? []); })
+      .catch(() => { if (!cancelled) setTrendData([]); })
+      .finally(() => { if (!cancelled) setTrendLoading(false); });
+    return () => { cancelled = true; };
+  }, [trendProduct, etab, trendFrom, trendTo]);
+
+  // Aggregate trend data for chart
+  const aggregateTrend = useCallback((daily: TrendDaily[], mode: TrendMode, metric: "qty" | "ca_ht") => {
+    if (mode === "par_jour_semaine") {
+      const buckets = Array.from({ length: 7 }, () => 0);
+      for (const d of daily) {
+        const dow = new Date(d.date + "T12:00:00").getDay();
+        const idx = dow === 0 ? 6 : dow - 1; // Mon=0 ... Sun=6
+        buckets[idx] += metric === "qty" ? d.qty : d.ca_ht;
+      }
+      return { labels: JOURS, values: buckets };
+    }
+    if (mode === "par_mois") {
+      const buckets: Record<number, number> = {};
+      for (const d of daily) {
+        const day = new Date(d.date + "T12:00:00").getDate();
+        buckets[day] = (buckets[day] ?? 0) + (metric === "qty" ? d.qty : d.ca_ht);
+      }
+      const maxDay = Math.max(...Object.keys(buckets).map(Number), 31);
+      const labels: string[] = [];
+      const values: number[] = [];
+      for (let i = 1; i <= maxDay; i++) {
+        labels.push(String(i));
+        values.push(buckets[i] ?? 0);
+      }
+      return { labels, values };
+    }
+    // tendance — group by week or month
+    const fromD = new Date(trendFrom + "T12:00:00");
+    const toD = new Date(trendTo + "T12:00:00");
+    const rangeMonths = (toD.getFullYear() - fromD.getFullYear()) * 12 + toD.getMonth() - fromD.getMonth();
+    if (rangeMonths > 3) {
+      // group by month
+      const buckets: Record<string, number> = {};
+      for (const d of daily) {
+        const key = d.date.slice(0, 7); // YYYY-MM
+        buckets[key] = (buckets[key] ?? 0) + (metric === "qty" ? d.qty : d.ca_ht);
+      }
+      const sorted = Object.keys(buckets).sort();
+      return { labels: sorted.map((k) => { const [,m] = k.split("-"); return ["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Août","Sep","Oct","Nov","Déc"][parseInt(m) - 1]; }), values: sorted.map((k) => buckets[k]) };
+    }
+    // group by week (ISO)
+    const buckets: Record<string, number> = {};
+    for (const d of daily) {
+      const dt = new Date(d.date + "T12:00:00");
+      const jan4 = new Date(dt.getFullYear(), 0, 4);
+      const startOfYear = new Date(jan4);
+      startOfYear.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+      const weekNum = Math.ceil(((dt.getTime() - startOfYear.getTime()) / 86400000 + 1) / 7);
+      const key = `${dt.getFullYear()}-S${String(weekNum).padStart(2, "0")}`;
+      buckets[key] = (buckets[key] ?? 0) + (metric === "qty" ? d.qty : d.ca_ht);
+    }
+    const sorted = Object.keys(buckets).sort();
+    return { labels: sorted.map((k) => k.split("-")[1]), values: sorted.map((k) => buckets[k]) };
+  }, [trendFrom, trendTo]);
+
+  // Render trend chart
+  useEffect(() => {
+    if (!trendData || !trendChartRef.current) return;
+    destroyChart("trendBar");
+    const { labels, values } = aggregateTrend(trendData, trendMode, trendMetric);
+    if (labels.length === 0) return;
+    charts["trendBar"] = new Chart(trendChartRef.current, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          backgroundColor: accent + "CC",
+          borderRadius: 4,
+          borderSkipped: false,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => trendMetric === "qty" ? `${ctx.parsed.y}` : fmtDec(ctx.parsed.y ?? 0) } } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+          y: { beginAtZero: true, grid: { color: COLORS.border }, ticks: { font: { size: 10 }, callback: (v) => trendMetric === "qty" ? v : fmt(v as number) } },
+        },
+      },
+    });
+    return () => destroyChart("trendBar");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trendData, trendMode, trendMetric, accent]);
 
   const K = data?.kpis;
   const filtered = getFilteredProducts();
@@ -918,7 +1045,9 @@ export default function MargesPage() {
                           style={{
                             background:
                               globalIdx % 2 === 0 ? "transparent" : "rgba(0,0,0,.015)",
+                            cursor: "pointer",
                           }}
+                          onClick={() => openTrend(p.name)}
                         >
                           <td
                             style={{
@@ -1509,6 +1638,93 @@ export default function MargesPage() {
           </>
         )}
       </div>
+
+      {/* ── Trend Drawer ── */}
+      {trendProduct && (
+        <>
+          <div
+            onClick={() => { setTrendProduct(null); destroyChart("trendBar"); }}
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 999 }}
+          />
+          <div style={{
+            position: "fixed", bottom: 0, left: 0, right: 0,
+            maxHeight: "75vh", background: "#fff",
+            borderRadius: "20px 20px 0 0", zIndex: 1000,
+            padding: "20px 24px 30px", overflowY: "auto",
+            boxShadow: "0 -4px 24px rgba(0,0,0,0.12)",
+          }}>
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700, color: COLORS.dark, maxWidth: "80%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={trendProduct}>
+                {trendProduct}
+              </div>
+              <button onClick={() => { setTrendProduct(null); destroyChart("trendBar"); }} style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "#fff", cursor: "pointer", fontSize: 16 }}>✕</button>
+            </div>
+
+            {/* Date range */}
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+              <input type="date" value={trendFrom} onChange={(e) => setTrendFrom(e.target.value)} style={{ height: 32, borderRadius: 8, border: `1px solid ${COLORS.border}`, padding: "0 8px", fontSize: 12 }} />
+              <span style={{ fontSize: 12, color: COLORS.muted }}>→</span>
+              <input type="date" value={trendTo} onChange={(e) => setTrendTo(e.target.value)} style={{ height: 32, borderRadius: 8, border: `1px solid ${COLORS.border}`, padding: "0 8px", fontSize: 12 }} />
+              {[{ label: "3 mois", m: 3 }, { label: "6 mois", m: 6 }, { label: "12 mois", m: 12 }].map(({ label, m }) => (
+                <button key={m} onClick={() => { const t = new Date(); const f = new Date(t); f.setMonth(f.getMonth() - m); setTrendFrom(f.toISOString().slice(0, 10)); setTrendTo(t.toISOString().slice(0, 10)); }}
+                  style={{ height: 28, padding: "0 10px", borderRadius: 14, border: `1px solid ${COLORS.border}`, background: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", color: COLORS.dark }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Mode + Metric toggles */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+              {([["par_jour_semaine", "Jours semaine"], ["par_mois", "Jours du mois"], ["tendance", "Tendance"]] as const).map(([mode, label]) => (
+                <button key={mode} onClick={() => setTrendMode(mode)}
+                  style={{
+                    height: 30, padding: "0 14px", borderRadius: 15,
+                    border: trendMode === mode ? "none" : `1px solid ${COLORS.border}`,
+                    background: trendMode === mode ? accent : "#fff",
+                    color: trendMode === mode ? "#fff" : COLORS.dark,
+                    fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  }}>
+                  {label}
+                </button>
+              ))}
+              <div style={{ width: 1, height: 24, background: COLORS.border, margin: "3px 4px" }} />
+              {([["qty", "Quantité"], ["ca_ht", "CA HT"]] as const).map(([m, label]) => (
+                <button key={m} onClick={() => setTrendMetric(m)}
+                  style={{
+                    height: 30, padding: "0 14px", borderRadius: 15,
+                    border: trendMetric === m ? "none" : `1px solid ${COLORS.border}`,
+                    background: trendMetric === m ? COLORS.dark : "#fff",
+                    color: trendMetric === m ? "#fff" : COLORS.dark,
+                    fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Chart */}
+            {trendLoading && <div style={{ textAlign: "center", padding: 40, color: COLORS.muted }}>Chargement...</div>}
+            {!trendLoading && trendData && trendData.length === 0 && (
+              <div style={{ textAlign: "center", padding: 40, color: COLORS.muted }}>Aucune donnée sur cette période</div>
+            )}
+            {!trendLoading && trendData && trendData.length > 0 && (
+              <div style={{ height: 300 }}>
+                <canvas ref={trendChartRef} />
+              </div>
+            )}
+
+            {/* Summary */}
+            {trendData && trendData.length > 0 && (
+              <div style={{ marginTop: 12, display: "flex", gap: 20, fontSize: 12, color: COLORS.muted }}>
+                <span>Total: <strong style={{ color: COLORS.dark }}>{trendData.reduce((s, d) => s + d.qty, 0)} vendus</strong></span>
+                <span>CA HT: <strong style={{ color: COLORS.dark }}>{fmtDec(trendData.reduce((s, d) => s + d.ca_ht, 0))}</strong></span>
+                <span>CA TTC: <strong style={{ color: COLORS.dark }}>{fmtDec(trendData.reduce((s, d) => s + d.ca_ttc, 0))}</strong></span>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </RequireRole>
   );
 }

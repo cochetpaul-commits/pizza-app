@@ -138,7 +138,7 @@ export const IngredientRow = React.memo(function IngredientRow({
   const price = formatIngredientPrice(x, offer ?? null);
   const estab = offer?.establishment ?? "both";
   const st = (x.status ?? "to_check") as IngredientStatus;
-  const hasPrice = offerHasPrice(offer) || legacyHasPrice(x);
+  const hasPrice = offerHasPrice(offer, { piece_volume_ml: x.piece_volume_ml }) || legacyHasPrice(x);
   const canValidate = hasPrice;
   const alg = parseAllergens(x.allergens);
   const sb = stBadge(st);
@@ -335,7 +335,23 @@ export const IngredientRow = React.memo(function IngredientRow({
           pricePerPc = packPrice / packCount;
           if (edit.packEachUnit === "kg" && packEachQty > 0) pricePerKg = packPrice / (packCount * packEachQty);
           else if (edit.packEachUnit === "l" && packEachQty > 0) { pricePerL = packPrice / (packCount * packEachQty); if (density > 0) pricePerKg = pricePerL / density; }
-          else if (edit.packEachUnit === "pc" && packPieceW > 0) pricePerKg = packPrice / (packCount * packPieceW / 1000);
+          else if (edit.packEachUnit === "pc") {
+            const vu = edit.packEachVolumeUnit || "cl";
+            if (packEachQty > 0) {
+              if (vu === "cl" || vu === "ml" || vu === "L") {
+                const ml = vu === "cl" ? packEachQty * 10 : vu === "L" ? packEachQty * 1000 : packEachQty;
+                pricePerL = (pricePerPc / ml) * 1000;
+                if (density > 0) pricePerKg = pricePerL / density;
+              } else if (vu === "g" || vu === "kg") {
+                const g = vu === "kg" ? packEachQty * 1000 : packEachQty;
+                pricePerKg = (pricePerPc / g) * 1000;
+                if (density > 0) pricePerL = pricePerKg * density;
+              }
+            }
+            if (pricePerKg == null && pricePerL == null && packPieceW > 0) {
+              pricePerKg = packPrice / (packCount * packPieceW / 1000);
+            }
+          }
         }
 
         const refPrice = isLiquidCat ? pricePerL : pricePerKg;
@@ -566,33 +582,48 @@ export const IngredientRow = React.memo(function IngredientRow({
             )}
 
             {/* ── CONVERSION LIVE ── */}
-            <div style={{
-              marginTop: 4, padding: "10px 14px", borderRadius: 10,
-              background: refPrice ? "rgba(74,103,65,0.06)" : "rgba(220,38,38,0.04)",
-              border: `1.5px solid ${refPrice ? "rgba(74,103,65,0.20)" : "rgba(220,38,38,0.15)"}`,
-              display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
-            }}>
-              <span style={{ fontSize: 14, fontWeight: 800, color: refPrice ? "#4a6741" : "#DC2626" }}>
-                {refPrice ? `= ${refPrice.toFixed(2)} €/${refUnit}` : `€/${refUnit} — donnée manquante`}
-              </span>
-              {/* Show secondary conversions */}
-              {refPrice && pricePerPc != null && pricePerPc > 0 && (
-                <span style={{ fontSize: 12, color: "#888" }}>{pricePerPc.toFixed(2)} €/pc</span>
-              )}
-              {refPrice && isLiquidCat && pricePerKg != null && pricePerKg > 0 && (
-                <span style={{ fontSize: 12, color: "#888" }}>{pricePerKg.toFixed(2)} €/kg</span>
-              )}
-              {refPrice && !isLiquidCat && pricePerL != null && pricePerL > 0 && (
-                <span style={{ fontSize: 12, color: "#888" }}>{pricePerL.toFixed(2)} €/L</span>
-              )}
-            </div>
+            {(() => {
+              const hasAnyPrice = refPrice != null || (pricePerPc != null && pricePerPc > 0);
+              const mainLabel = refPrice
+                ? `= ${refPrice.toFixed(2)} €/${refUnit}`
+                : pricePerPc != null && pricePerPc > 0
+                  ? `= ${pricePerPc.toFixed(2)} €/pc`
+                  : `€/${refUnit} — donnée manquante`;
+              return (
+              <div style={{
+                marginTop: 4, padding: "10px 14px", borderRadius: 10,
+                background: hasAnyPrice ? "rgba(74,103,65,0.06)" : "rgba(220,38,38,0.04)",
+                border: `1.5px solid ${hasAnyPrice ? "rgba(74,103,65,0.20)" : "rgba(220,38,38,0.15)"}`,
+                display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+              }}>
+                <span style={{ fontSize: 14, fontWeight: 800, color: hasAnyPrice ? "#4a6741" : "#DC2626" }}>
+                  {mainLabel}
+                </span>
+                {!refPrice && pricePerPc != null && pricePerPc > 0 && (
+                  <span style={{ fontSize: 12, color: "#999" }}>poids/volume manquant pour €/{refUnit}</span>
+                )}
+                {/* Show secondary conversions */}
+                {refPrice && pricePerPc != null && pricePerPc > 0 && (
+                  <span style={{ fontSize: 12, color: "#888" }}>{pricePerPc.toFixed(2)} €/pc</span>
+                )}
+                {refPrice && isLiquidCat && pricePerKg != null && pricePerKg > 0 && (
+                  <span style={{ fontSize: 12, color: "#888" }}>{pricePerKg.toFixed(2)} €/kg</span>
+                )}
+                {refPrice && !isLiquidCat && pricePerL != null && pricePerL > 0 && (
+                  <span style={{ fontSize: 12, color: "#888" }}>{pricePerL.toFixed(2)} €/L</span>
+                )}
+              </div>
+              );
+            })()}
             </>)}
 
             {/* Conversion live always visible even when section collapsed */}
-            {!openSections.prix && refPrice != null && (
+            {!openSections.prix && (refPrice != null || (pricePerPc != null && pricePerPc > 0)) && (
               <div style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(74,103,65,0.06)", display: "inline-flex", gap: 8, alignItems: "center" }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "#4a6741" }}>= {refPrice.toFixed(2)} €/{refUnit}</span>
-                {pricePerPc != null && pricePerPc > 0 && <span style={{ fontSize: 11, color: "#888" }}>{pricePerPc.toFixed(2)} €/pc</span>}
+                <span style={{ fontSize: 13, fontWeight: 800, color: "#4a6741" }}>
+                  {refPrice != null ? `= ${refPrice.toFixed(2)} €/${refUnit}` : `= ${pricePerPc!.toFixed(2)} €/pc`}
+                </span>
+                {refPrice != null && pricePerPc != null && pricePerPc > 0 && <span style={{ fontSize: 11, color: "#888" }}>{pricePerPc.toFixed(2)} €/pc</span>}
               </div>
             )}
           </div>

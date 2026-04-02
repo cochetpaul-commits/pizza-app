@@ -260,7 +260,7 @@ function IngredientsPageInner() {
     const ing = items.find((x) => x.id === id);
     const off = offersByIngredientId.get(id);
     if (next === "validated") {
-      const hasPrice = offerHasPrice(off) || (ing ? legacyHasPrice(ing) : false);
+      const hasPrice = offerHasPrice(off, { piece_volume_ml: ing?.piece_volume_ml }) || (ing ? legacyHasPrice(ing) : false);
       if (!hasPrice) { alert("Impossible de valider : ajoute un prix (offre fournisseur ou legacy) avant."); return; }
     }
     const patch: IngredientPatch = { status: next };
@@ -541,7 +541,28 @@ function IngredientsPageInner() {
       const pp = parseNum(edit.packPrice); const c = parseNum(edit.packCount);
       if (pp == null || pp <= 0) { alert("Prix du pack invalide."); return null; }
       if (c == null || c <= 0) { alert("Nombre d'unités invalide."); return null; }
-      if (edit.packEachUnit === "pc") { const pw = parseNum(edit.packPieceWeightG); if (pw == null || pw <= 0) { alert("Poids pièce obligatoire (g)."); return null; } return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_unit: "pc", piece_weight_g: pw, density_kg_per_l: null, is_active: true, ...etabExtra }; }
+      if (edit.packEachUnit === "pc") {
+        const pw = parseNum(edit.packPieceWeightG);
+        const eachQty = parseNum(edit.packEachQty);
+        const vu = edit.packEachVolumeUnit || "cl";
+        const d = parseNum(edit.density);
+        // Compute piece_weight_g from per-piece weight fields if available
+        let pieceWG = pw ?? null;
+        if (!pieceWG && eachQty != null && eachQty > 0 && (vu === "g" || vu === "kg")) {
+          pieceWG = vu === "kg" ? eachQty * 1000 : eachQty;
+        }
+        // Check we have at least weight or volume info
+        const hasVolume = eachQty != null && eachQty > 0 && (vu === "cl" || vu === "ml" || vu === "L");
+        if (!pieceWG && !hasVolume) { alert("Indiquez le volume ou le poids par pièce."); return null; }
+        return {
+          user_id: uid, ingredient_id, supplier_id,
+          price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c,
+          pack_each_unit: "pc", pack_each_qty: null,
+          piece_weight_g: pieceWG ?? null,
+          density_kg_per_l: (d != null && d > 0) ? d : null,
+          is_active: true, ...etabExtra,
+        };
+      }
       const each = parseNum(edit.packEachQty);
       if (each == null || each <= 0) { alert("Quantité par élément invalide."); return null; }
       if (edit.packEachUnit === "l") { const d = parseNum(edit.density); if (d == null || d <= 0) { alert("Densité obligatoire (kg/L)."); return null; } return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: pp, price: pp, pack_count: c, pack_each_qty: each, pack_each_unit: "l", density_kg_per_l: d, piece_weight_g: null, is_active: true, ...etabExtra }; }
@@ -566,7 +587,21 @@ function IngredientsPageInner() {
       density_kg_per_l: edit.unit === "l" || edit.packUnit === "l" || edit.packEachUnit === "l" ? parseNum(edit.density) : null,
       piece_weight_g: (edit.unit === "pc" ? parseNum(edit.pieceWeightG) : null) ?? (edit.packEachUnit === "pc" ? parseNum(edit.packPieceWeightG) : null),
     };
-    const line = fmtOfferPriceLine(d, { piece_volume_ml: parseNum(edit.pieceVolumeMl) });
+    const effectiveVolumeMl = (() => {
+      const fromField = parseNum(edit.pieceVolumeMl);
+      if (fromField != null && fromField > 0) return fromField;
+      if (edit.priceKind === "pack_composed" && edit.packEachUnit === "pc") {
+        const eq = parseNum(edit.packEachQty);
+        const vu = edit.packEachVolumeUnit || "cl";
+        if (eq != null && eq > 0) {
+          if (vu === "cl") return eq * 10;
+          if (vu === "ml") return eq;
+          if (vu === "L") return eq * 1000;
+        }
+      }
+      return null;
+    })();
+    const line = fmtOfferPriceLine(d, { piece_volume_ml: effectiveVolumeMl });
     return `${line.main} • ${line.sub}`;
   }, [edit]);
 
@@ -584,7 +619,21 @@ function IngredientsPageInner() {
     }
     const up: Partial<IngredientUpsert> = {
       name, category: edit.category, is_active: edit.is_active, supplier_id,
-      piece_volume_ml: parseNum(edit.pieceVolumeMl) ?? null,
+      piece_volume_ml: (() => {
+        const fromForm = parseNum(edit.pieceVolumeMl);
+        if (fromForm != null && fromForm > 0) return fromForm;
+        // Auto-derive from pack per-piece volume fields
+        if (edit.priceKind === "pack_composed" && edit.packEachUnit === "pc") {
+          const eq = parseNum(edit.packEachQty);
+          const vu = edit.packEachVolumeUnit || "cl";
+          if (eq != null && eq > 0) {
+            if (vu === "cl") return eq * 10;
+            if (vu === "ml") return eq;
+            if (vu === "L") return eq * 1000;
+          }
+        }
+        return null;
+      })(),
       allergens: edit.allergens.length ? edit.allergens : null,
       order_unit_label: orderLabel || null,
       order_quantity: orderQuantity,

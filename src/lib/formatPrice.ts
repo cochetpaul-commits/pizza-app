@@ -36,9 +36,15 @@ function fromOffer(ingredient: Pick<Ingredient, "piece_volume_ml">, o: LatestOff
   if (pk === "pack_composed") {
     if (o.pack_price == null || !o.pack_count || !o.pack_each_unit) return null;
     if (o.pack_each_unit === "pc") {
+      const perPc = o.pack_price / o.pack_count;
       const pw = n2(o.piece_weight_g);
-      if (pw <= 0) return null;
-      return `${fmtMoney(((o.pack_price / o.pack_count) / pw) * 1000)} €/kg`;
+      if (pw > 0) return `${fmtMoney((perPc / pw) * 1000)} €/kg`;
+      const volMl = ingredient.piece_volume_ml;
+      if (volMl != null && volMl > 0) {
+        const eurPerL = (perPc / volMl) * 1000;
+        return `${fmtMoney(perPc)} €/pc · ${fmtMoney(eurPerL)} €/L`;
+      }
+      return `${fmtMoney(perPc)} €/pc`;
     }
     if (!o.pack_each_qty || o.pack_each_qty <= 0) return null;
     const per = o.pack_price / (o.pack_count * o.pack_each_qty);

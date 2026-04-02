@@ -214,7 +214,7 @@ const SECTION_PILOTAGE: TabSection = {
   match: ["/ventes", "/tresorerie"],
   icon: (a) => <IconWallet active={a} />,
   tabs: [
-    { label: "Marges", href: "/ventes/marges", match: ["/ventes/marges"], icon: (a) => <IconWallet active={a} /> },
+    { label: "Produits", href: "/ventes/marges", match: ["/ventes/marges"], icon: (a) => <IconWallet active={a} /> },
     { label: "Tresorerie", href: "/tresorerie", match: ["/tresorerie"], icon: (a) => <IconTrendingUp active={a} /> },
   ],
 };

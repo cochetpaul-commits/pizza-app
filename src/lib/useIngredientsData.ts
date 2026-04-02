@@ -220,9 +220,9 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     }
   }, [loadingMore, hasMore]);
 
-  const mutate = useCallback(() => {
+  const mutate = useCallback(async () => {
     const id = ++fetchIdRef.current;
-    doLoad(searchQuery, id);
+    await doLoad(searchQuery, id);
   }, [searchQuery, doLoad]);
 
   return {
