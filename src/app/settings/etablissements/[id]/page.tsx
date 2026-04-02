@@ -35,7 +35,6 @@ type Settings = {
   cp_periode_jour: number;
   cp_periode_mois: number;
   repos_compensateurs_actif: boolean;
-  popina_location_id: string | null;
   actif: boolean;
 };
 
@@ -1260,7 +1259,6 @@ export default function EtablissementDetailPage() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
                 {[
-                  { name: "Popina", desc: "Caisse enregistreuse iPad", status: settings.popina_location_id ? "connected" : "disconnected", logo: "🟠" },
                   { name: "Kezia", desc: "Logiciel de gestion", status: "disconnected", logo: "🔵" },
                   { name: "Autre", desc: "Import CSV / API personnalisée", status: "disconnected", logo: "⚙️" },
                 ].map(sys => (
@@ -1279,16 +1277,6 @@ export default function EtablissementDetailPage() {
                 ))}
               </div>
             </div>
-
-            {settings.popina_location_id && (
-              <div style={{ ...CARD, marginTop: 16 }}>
-                <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: "#1a1a1a" }}>Configuration Popina</h2>
-                <div style={ROW}>
-                  <span style={{ fontSize: 14, color: "#1a1a1a" }}>Location ID</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "#2D6A4F" }}>{String(settings.popina_location_id ?? "")}</span>
-                </div>
-              </div>
-            )}
 
             <div style={{ ...CARD, marginTop: 16 }}>
               <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: "#1a1a1a" }}>Logiciel de paie</h2>

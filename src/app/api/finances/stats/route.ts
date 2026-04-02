@@ -163,7 +163,7 @@ export async function GET(request: NextRequest) {
   const trendFromStr = fmtDateUTC(trendFrom);
 
   // ── Parallel fetch ──
-  // Fetch sales from ventes_lignes (replaces Popina API)
+  // Fetch sales from ventes_lignes
   const PAGE = 1000;
   const allVentes: { date_service: string; description: string; categorie: string; quantite: number; ttc: number }[] = [];
   let vOff = 0;

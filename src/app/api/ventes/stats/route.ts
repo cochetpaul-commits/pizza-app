@@ -106,7 +106,7 @@ export async function GET(req: NextRequest) {
 }
 
 /** Get couverts for a unique order (dedup by num_fiscal+date).
- *  Falls back to ticket count if all couverts are 0 (Popina products format). */
+ *  Falls back to ticket count if all couverts are 0 (products format). */
 function getCouverts(rows: Row[]): number {
   const seen = new Map<string, number>();
   for (const r of rows) {
@@ -418,7 +418,7 @@ function aggregate(rows: Row[]) {
     }
   }
 
-  // If couverts are all 0 (Popina format), estimate 1 per order
+  // If couverts are all 0 (products format), estimate 1 per order
   let allCovZero = true;
   for (const od of orderData.values()) { if (od.cov > 0) { allCovZero = false; break; } }
   if (allCovZero) { for (const od of orderData.values()) od.cov = 1; }

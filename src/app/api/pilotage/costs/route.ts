@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/pilotage/costs?week=YYYY-WW
  *
- * Returns cost metrics by crossing Popina sales with Supabase recipe costs.
+ * Returns cost metrics by crossing sales data with Supabase recipe costs.
  * - foodCostPct: global food cost %
  * - margeBrute: CA - COGS
  * - totalCOGS: total estimated cost of goods sold

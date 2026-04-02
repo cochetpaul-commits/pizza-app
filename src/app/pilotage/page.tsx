@@ -526,37 +526,25 @@ export default function PilotagePage() {
   // Day drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
-  const [dayLoading, setDayLoading] = useState(false);
+  const [dayLoading, _setDayLoading] = useState(false);
 
   const isPiccola = etab.current?.slug?.includes("piccola");
   const currentEtabId = etab.current?.id;
 
   const loadStats = useCallback(async (week: string) => {
+    if (!currentEtabId) return;
     setLoading(true);
-    if (isPiccola && currentEtabId) {
-      // Piccola Mia: fetch from daily_sales (Kezia imports)
-      const [s, m, c] = await Promise.all([
-        loadDailySalesStats(currentEtabId, week),
-        fetchApi("/api/meteo").then((r) => r.ok ? r.json() : null),
-        fetchApi(`/api/pilotage/costs?week=${week}`).then((r) => r.ok ? r.json() : null),
-      ]);
-      if (s) setStats(s);
-      if (m) setMeteo(m);
-      if (c) setCosts(c);
-    } else {
-      // Bello Mio: fetch from Popina API
-      const [s, m, c] = await Promise.all([
-        fetchApi(`/api/popina/stats?week=${week}`).then((r) => r.ok ? r.json() : null),
-        fetchApi("/api/meteo").then((r) => r.ok ? r.json() : null),
-        fetchApi(`/api/pilotage/costs?week=${week}`).then((r) => r.ok ? r.json() : null),
-      ]);
-      if (s) setStats(s);
-      if (m) setMeteo(m);
-      if (c) setCosts(c);
-    }
+    const [s, m, c] = await Promise.all([
+      loadDailySalesStats(currentEtabId, week),
+      fetchApi("/api/meteo").then((r) => r.ok ? r.json() : null),
+      fetchApi(`/api/pilotage/costs?week=${week}`).then((r) => r.ok ? r.json() : null),
+    ]);
+    if (s) setStats(s);
+    if (m) setMeteo(m);
+    if (c) setCosts(c);
     setLastUpdate(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
     setLoading(false);
-  }, [isPiccola, currentEtabId]);
+  }, [currentEtabId]);
 
   // Service-hours auto-refresh (15 min during midi 10-15h / soir 18-23h30)
   const [isService, setIsService] = useState(() => {
@@ -565,7 +553,7 @@ export default function PilotagePage() {
   });
 
   useEffect(() => {
-    void loadStats(weekStr);
+    void loadStats(weekStr); // eslint-disable-line react-hooks/set-state-in-effect
 
     if (weekStr !== currentWeek) return;
 
@@ -596,19 +584,9 @@ export default function PilotagePage() {
     });
   }
 
-  async function handleBarClick(day: DayData) {
-    if (day.totalSales === 0) return;
-    // Day detail drawer only available for Popina (Bello Mio)
-    if (isPiccola) return;
-    setDrawerOpen(true);
-    setDayDetail(null);
-    setDayLoading(true);
-    try {
-      const res = await fetchApi(`/api/popina/ca-jour?date=${day.date}`);
-      if (res.ok) setDayDetail(await res.json());
-    } finally {
-      setDayLoading(false);
-    }
+  async function handleBarClick(_day: DayData) {
+    // Day detail drawer not available (no data source)
+    return;
   }
 
   function closeDrawer() {
@@ -821,7 +799,6 @@ export default function PilotagePage() {
                 {/* Graphe — cliquable */}
                 <div style={{ ...card, padding: "16px 8px 12px" }}>
                   <p style={{ ...sectionLabel, margin: "0 0 4px 12px" }}>CA SEMAINE</p>
-                  {!isPiccola && <p style={{ margin: "0 0 12px 12px", fontSize: 10, color: "#bbb" }}>Clique sur une barre pour le détail</p>}
                   <ResponsiveContainer width="100%" height={180}>
                     <BarChart data={s.semaine.days} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0ebe3" vertical={false} />

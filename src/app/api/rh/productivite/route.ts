@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
     shiftsByDate.set(s.date, existing);
   }
 
-  // Fetch CA from ventes_lignes (replaces Popina API)
+  // Fetch CA from ventes_lignes
   const { data: ventes } = await supabaseAdmin
     .from("ventes_lignes")
     .select("date_service, ttc, couverts, num_fiscal, type_ligne")
@@ -77,8 +77,8 @@ export async function GET(req: NextRequest) {
       date,
       nb_shifts: s.count,
       heures_planifiees: Math.round(s.hours * 10) / 10,
-      ca_popina: ca,
-      couverts_popina: couverts,
+      ca: ca,
+      couverts: couverts,
       ca_par_heure: s.hours > 0 ? Math.round(ca / s.hours) : 0,
     };
   });

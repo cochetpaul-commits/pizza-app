@@ -19,7 +19,6 @@ export type Settings = {
   valeur_avantage_nature: number;
   taux_accident_travail: number;
   taux_horaire_moyen: number;
-  popina_location_id: string | null;
 };
 
 const DEFAULTS: Omit<Settings, "id"> = {
@@ -39,7 +38,6 @@ const DEFAULTS: Omit<Settings, "id"> = {
   valeur_avantage_nature: 3.57,
   taux_accident_travail: 2.5,
   taux_horaire_moyen: 12.5,
-  popina_location_id: null,
 };
 
 // ── useSettings ──────────────────────────────────────────────────────────
@@ -59,7 +57,7 @@ export function useSettings(etablissementId: string | null) {
     (async () => {
       const { data, error: err } = await supabase
         .from("etablissements")
-        .select("id, convention, code_ape, siret, medecin_travail, adresse, pause_defaut_minutes, objectif_cout_ventes, objectif_productivite, cotisations_patronales, ajouter_cp_taux_horaire, base_calcul_cp, acquisition_mensuelle_cp, type_indemnisation_repas, valeur_avantage_nature, taux_accident_travail, taux_horaire_moyen, popina_location_id")
+        .select("id, convention, code_ape, siret, medecin_travail, adresse, pause_defaut_minutes, objectif_cout_ventes, objectif_productivite, cotisations_patronales, ajouter_cp_taux_horaire, base_calcul_cp, acquisition_mensuelle_cp, type_indemnisation_repas, valeur_avantage_nature, taux_accident_travail, taux_horaire_moyen")
         .eq("id", etablissementId)
         .single();
       if (cancelled) return;

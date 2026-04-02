@@ -19,7 +19,7 @@ function parseNum(v: unknown): number {
   return isNaN(n) ? 0 : n;
 }
 
-/** Parse Popina datetime "02/03/2026 23:09:05" → ISO string */
+/** Parse datetime "02/03/2026 23:09:05" → ISO string */
 function parseDate(v: unknown): string | null {
   if (!v) return null;
   const s = String(v);
@@ -144,7 +144,7 @@ function parseCommandes(rows: unknown[][], etablissementId: string, fileName: st
   }).filter(Boolean) as Record<string, unknown>[];
 }
 
-// ── Format "products" (popina_export_products_*.xlsx) ──
+// ── Format "products" (export_products_*.xlsx) ──
 function parseProducts(rows: unknown[][], etablissementId: string, fileName: string) {
   // Header at row 0: jour, caisse, ticket, ticket, fiscal, salle, table, serveur, date, parent, cat, name, unit, tier, tax, quantity, cancelled, transferred, brut
   const dataRows = rows.slice(1).filter(r => {
@@ -547,7 +547,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ── Popina formats → ventes_lignes (existing logic) ──
+    // ── POS formats → ventes_lignes (existing logic) ──
     let insertRows: Record<string, unknown>[];
 
     if (format === "products") {

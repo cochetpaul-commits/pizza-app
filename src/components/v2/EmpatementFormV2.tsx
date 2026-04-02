@@ -162,7 +162,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     { key: "fc", label: "Food cost & Marges" },
     { key: "recette", label: "Recette & Procede" },
     { key: "cmd", label: "Commandes fournisseurs" },
-    { key: "pop", label: "Pilotage CA — Popina" },
+    { key: "pop", label: "Pilotage CA" },
   ] : [
     { key: "recette", label: "Recette" },
   ];

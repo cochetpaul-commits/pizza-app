@@ -36,7 +36,6 @@ Activer : `git config core.hooksPath .githooks`
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
-POPINA_API_KEY
 OPENWEATHER_API_KEY
 ```
 
@@ -52,7 +51,7 @@ OPENWEATHER_API_KEY
 | `/invoices/{supplier}` | Import factures (9 fournisseurs) |
 | `/commandes` | Commandes fournisseurs |
 | `/evenements` | Evenements (mariage, seminaire...) |
-| `/pilotage` | KPIs, CA Popina, marges |
+| `/pilotage` | KPIs, CA, marges |
 | `/finances` | P&L, food cost |
 | `/rh/equipe` | Liste employes |
 | `/rh/employe/[id]` | Fiche employe (identite, contrat, absences, admin) |
