@@ -17,6 +17,9 @@ type SupplierRow = {
   contact_name: string | null;
   notes: string | null;
   franco_minimum: number | null;
+  franco_obligatoire: boolean | null;
+  mercuriale_only: boolean | null;
+  delivery_schedule: { day: string; cutoff: string; delivery_day: string }[] | null;
   address: string | null;
   city: string | null;
   postal_code: string | null;
@@ -26,6 +29,16 @@ type SupplierRow = {
   delivery_days: string[] | null;
   website: string | null;
   tva_intra: string | null;
+};
+
+type Contact = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  send_orders: boolean;
+  _isNew?: boolean;
 };
 
 type SupplierStats = {
@@ -39,6 +52,8 @@ type ModalForm = {
   phone: string;
   email: string;
   franco_minimum: string;
+  franco_obligatoire: boolean;
+  mercuriale_only: boolean;
   notes: string;
   address: string;
   city: string;
@@ -69,6 +84,11 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+const JOURS_FULL = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
+
+function makeEmptyContact(): Contact {
+  return { id: crypto.randomUUID(), name: "", email: "", phone: "", role: "", send_orders: false, _isNew: true };
+}
 
 const labelStyle: React.CSSProperties = {
   fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginBottom: 4,
@@ -91,14 +111,18 @@ export default function FournisseursPage() {
 
   // Modal state
   const [modalSupplier, setModalSupplier] = useState<SupplierRow | null>(null);
-  const [form, setForm] = useState<ModalForm>({ contact_name: "", phone: "", email: "", franco_minimum: "", notes: "", address: "", city: "", postal_code: "", siret: "", category: "", payment_terms: "", delivery_days: "", website: "", tva_intra: "" });
+  const [form, setForm] = useState<ModalForm>({ contact_name: "", phone: "", email: "", franco_minimum: "", franco_obligatoire: false, mercuriale_only: false, notes: "", address: "", city: "", postal_code: "", siret: "", category: "", payment_terms: "", delivery_days: "", website: "", tva_intra: "" });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [schedule, setSchedule] = useState<{day:string;cutoff:string;delivery_day:string}[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [deletedContactIds, setDeletedContactIds] = useState<string[]>([]);
+  const [originalContactIds, setOriginalContactIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
 
-    const supQuery = supabase.from("suppliers").select("id,name,is_active,email,phone,contact_name,notes,franco_minimum,address,city,postal_code,siret,category,payment_terms,delivery_days,website,tva_intra").order("name");
+    const supQuery = supabase.from("suppliers").select("id,name,is_active,email,phone,contact_name,notes,franco_minimum,franco_obligatoire,mercuriale_only,delivery_schedule,address,city,postal_code,siret,category,payment_terms,delivery_days,website,tva_intra").order("name");
     if (etab) supQuery.eq("etablissement_id", etab.id);
 
     const invQuery = supabase.from("supplier_invoices")
@@ -165,13 +189,15 @@ export default function FournisseursPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  function openModal(s: SupplierRow) {
+  async function openModal(s: SupplierRow) {
     setModalSupplier(s);
     setForm({
       contact_name: s.contact_name ?? "",
       phone: s.phone ?? "",
       email: s.email ?? "",
       franco_minimum: s.franco_minimum != null ? String(s.franco_minimum) : "",
+      franco_obligatoire: s.franco_obligatoire ?? false,
+      mercuriale_only: s.mercuriale_only ?? false,
       notes: s.notes ?? "",
       address: s.address ?? "",
       city: s.city ?? "",
@@ -183,11 +209,47 @@ export default function FournisseursPage() {
       website: s.website ?? "",
       tva_intra: s.tva_intra ?? "",
     });
+    setSchedule(Array.isArray(s.delivery_schedule) ? s.delivery_schedule : []);
     setSaved(false);
+    setDeletedContactIds([]);
+
+    // Load contacts
+    const { data: contactsData } = await supabase
+      .from("supplier_contacts")
+      .select("*")
+      .eq("supplier_id", s.id)
+      .order("created_at", { ascending: true });
+
+    const dbContacts = (contactsData ?? []).map((c: Record<string, unknown>) => ({
+      id: c.id as string,
+      name: (c.name as string) ?? "",
+      email: (c.email as string) ?? "",
+      phone: (c.phone as string) ?? "",
+      role: (c.role as string) ?? "",
+      send_orders: (c.send_orders as boolean) ?? false,
+    }));
+    setContacts(dbContacts);
+    setOriginalContactIds(new Set(dbContacts.map((c: Contact) => c.id)));
   }
 
   function closeModal() {
     setModalSupplier(null);
+  }
+
+  function updateContact(idx: number, field: keyof Contact, value: string | boolean) {
+    setContacts((prev) => prev.map((c, i) => i === idx ? { ...c, [field]: value } : c));
+  }
+
+  function addContact() {
+    setContacts((prev) => [...prev, makeEmptyContact()]);
+  }
+
+  function removeContact(idx: number) {
+    const c = contacts[idx];
+    if (originalContactIds.has(c.id)) {
+      setDeletedContactIds((prev) => [...prev, c.id]);
+    }
+    setContacts((prev) => prev.filter((_, i) => i !== idx));
   }
 
   async function saveModal() {
@@ -203,6 +265,9 @@ export default function FournisseursPage() {
       contact_name: form.contact_name.trim() || null,
       notes: form.notes.trim() || null,
       franco_minimum: francoVal ? parseFloat(francoVal) : null,
+      franco_obligatoire: form.franco_obligatoire,
+      mercuriale_only: form.mercuriale_only,
+      delivery_schedule: schedule.length > 0 ? schedule : null,
       address: form.address.trim() || null,
       city: form.city.trim() || null,
       postal_code: form.postal_code.trim() || null,
@@ -213,16 +278,59 @@ export default function FournisseursPage() {
       website: form.website.trim() || null,
       tva_intra: form.tva_intra.trim() || null,
     };
+
+    // 1) Save supplier
     const { error } = await supabase.from("suppliers").update(updates).eq("id", modalSupplier.id);
+    if (error) { setSaving(false); alert(error.message); return; }
+
+    // 2) Delete removed contacts
+    if (deletedContactIds.length > 0) {
+      const { error: delErr } = await supabase
+        .from("supplier_contacts")
+        .delete()
+        .in("id", deletedContactIds);
+      if (delErr) { setSaving(false); alert(delErr.message); return; }
+    }
+
+    // 3) Upsert contacts (only those with a name)
+    const validContacts = contacts.filter((c) => c.name.trim());
+    if (validContacts.length > 0) {
+      const toUpsert = validContacts.map((c) => ({
+        id: c._isNew ? undefined : c.id,
+        supplier_id: modalSupplier.id,
+        name: c.name.trim(),
+        email: c.email.trim() || null,
+        phone: c.phone.trim() || null,
+        role: c.role.trim() || null,
+        send_orders: c.send_orders,
+      }));
+
+      const toInsert = toUpsert.filter((c) => !c.id);
+      const toUpdate = toUpsert.filter((c) => c.id);
+
+      if (toInsert.length > 0) {
+        const inserts = toInsert.map(({ id: _id, ...rest }) => rest);
+        const { error: insErr } = await supabase.from("supplier_contacts").insert(inserts);
+        if (insErr) { setSaving(false); alert(insErr.message); return; }
+      }
+
+      for (const row of toUpdate) {
+        const { id: contactId, ...rest } = row;
+        const { error: updErr } = await supabase
+          .from("supplier_contacts")
+          .update(rest)
+          .eq("id", contactId!);
+        if (updErr) { setSaving(false); alert(updErr.message); return; }
+      }
+    }
+
     setSaving(false);
-    if (error) { alert(error.message); return; }
-    setSaved(true);
     setSuppliers((prev) => prev.map((s) =>
       s.id === modalSupplier.id
         ? { ...s, ...updates }
         : s
     ));
-    setTimeout(() => setSaved(false), 2000);
+    closeModal();
   }
 
   const active = suppliers.filter((s) => s.is_active);
@@ -437,7 +545,7 @@ export default function FournisseursPage() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                 <div>
-                  <div style={labelStyle}>Catégorie</div>
+                  <div style={labelStyle}>Categorie</div>
                   <select
                     style={{ ...inputStyle, cursor: "pointer" }}
                     value={form.category}
@@ -450,44 +558,83 @@ export default function FournisseursPage() {
                   </select>
                 </div>
                 <div>
-                  <div style={labelStyle}>Franco minimum (EUR HT)</div>
-                  <input style={inputStyle} value={form.franco_minimum} onChange={(e) => setForm((f) => ({ ...f, franco_minimum: e.target.value }))} placeholder="ex: 800" />
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                <div>
                   <div style={labelStyle}>Conditions paiement</div>
                   <input style={inputStyle} value={form.payment_terms} onChange={(e) => setForm((f) => ({ ...f, payment_terms: e.target.value }))} placeholder="30 jours fin de mois" />
                 </div>
-                <div>
-                  <div style={labelStyle}>Jours de livraison</div>
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                    {JOURS.map((j) => {
-                      const selected = form.delivery_days.toLowerCase().includes(j);
-                      return (
-                        <button
-                          key={j}
-                          type="button"
-                          onClick={() => {
-                            const current = form.delivery_days.split(",").map(d => d.trim().toLowerCase()).filter(Boolean);
-                            const next = selected ? current.filter(d => d !== j) : [...current, j];
-                            const ordered = JOURS.filter(d => next.includes(d));
-                            setForm((f) => ({ ...f, delivery_days: ordered.join(", ") }));
-                          }}
-                          style={{
-                            fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 600,
-                            padding: "4px 8px", borderRadius: 6, cursor: "pointer",
-                            border: selected ? `1.5px solid ${modalColor}` : "1.5px solid #e5ddd0",
-                            background: selected ? `${modalColor}18` : "#fff",
-                            color: selected ? modalColor : "#999",
-                          }}
-                        >
-                          {j.slice(0, 3)}
-                        </button>
-                      );
-                    })}
+              </div>
+
+              {/* Section: Franco & Livraison */}
+              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8, marginTop: 16 }}>
+                Franco & Livraison
+              </div>
+              <div style={{ background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 12, padding: 14, marginBottom: 16 }}>
+                {/* Franco row */}
+                <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+                  <div>
+                    <div style={labelStyle}>Franco de port (EUR HT)</div>
+                    <input style={{ ...inputStyle, width: 110 }} value={form.franco_minimum} onChange={(e) => setForm((f) => ({ ...f, franco_minimum: e.target.value }))} placeholder="ex: 200" type="number" min="0" step="10" />
                   </div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", paddingTop: 14 }}>
+                    <input type="checkbox" checked={form.mercuriale_only} onChange={(e) => setForm((f) => ({ ...f, mercuriale_only: e.target.checked }))} style={{ accentColor: modalColor }} />
+                    <span style={{ fontSize: 11, color: "#666" }}>Mercuriale uniquement</span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", paddingTop: 14 }}>
+                    <input type="checkbox" checked={form.franco_obligatoire} onChange={(e) => setForm((f) => ({ ...f, franco_obligatoire: e.target.checked }))} style={{ accentColor: modalColor }} />
+                    <span style={{ fontSize: 11, color: "#666" }}>Franco obligatoire</span>
+                  </label>
                 </div>
+
+                {/* Schedule table */}
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                  Planning commande → livraison
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 3, marginBottom: 3 }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", padding: "3px 6px" }}>Jour cde</div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", padding: "3px 6px" }}>Heure lim.</div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", padding: "3px 6px" }}>Jour livr.</div>
+                </div>
+                {JOURS_FULL.map((jour) => {
+                  const rule = schedule.find(r => r.day === jour);
+                  return (
+                    <div key={jour} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 3, marginBottom: 1 }}>
+                      <div style={{ padding: "6px", fontSize: 12, color: rule ? "#1a1a1a" : "#ccc", fontWeight: rule ? 600 : 400, background: rule ? "#faf8f4" : "transparent", borderRadius: 5 }}>
+                        {jour.charAt(0).toUpperCase() + jour.slice(1)}
+                      </div>
+                      <input
+                        style={{ ...inputStyle, padding: "5px 6px", fontSize: 12, background: rule ? "#faf8f4" : "#fff" }}
+                        value={rule?.cutoff ?? ""}
+                        placeholder="hh:mm"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSchedule(prev => {
+                            const existing = prev.find(r => r.day === jour);
+                            if (existing) return prev.map(r => r.day === jour ? { ...r, cutoff: val } : r);
+                            if (val) return [...prev, { day: jour, cutoff: val, delivery_day: "" }];
+                            return prev;
+                          });
+                        }}
+                      />
+                      <select
+                        style={{ ...inputStyle, padding: "5px 6px", fontSize: 12, cursor: "pointer", background: rule ? "#faf8f4" : "#fff" }}
+                        value={rule?.delivery_day ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSchedule(prev => {
+                            const existing = prev.find(r => r.day === jour);
+                            if (existing) return prev.map(r => r.day === jour ? { ...r, delivery_day: val } : r);
+                            if (val) return [...prev, { day: jour, cutoff: "", delivery_day: val }];
+                            return prev;
+                          });
+                        }}
+                      >
+                        <option value="">—</option>
+                        {JOURS_FULL.map(j => (
+                          <option key={j} value={j}>{j.charAt(0).toUpperCase() + j.slice(1)}</option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Section: Admin */}
@@ -511,10 +658,84 @@ export default function FournisseursPage() {
                   style={{ ...inputStyle, resize: "vertical" }}
                   value={form.notes}
                   onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                  placeholder="Informations complémentaires..."
+                  placeholder="Informations complementaires..."
                   rows={2}
                 />
               </div>
+
+              {/* Section: Contacts / Destinataires */}
+              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8, marginTop: 16 }}>
+                Contacts / Destinataires
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+                {contacts.map((c, idx) => (
+                  <div
+                    key={c.id}
+                    style={{
+                      border: "1px solid #ddd6c8", borderRadius: 8, padding: "8px 10px",
+                      background: "#faf8f4", position: "relative",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => removeContact(idx)}
+                      title="Supprimer"
+                      style={{
+                        position: "absolute", top: 4, right: 6,
+                        fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700,
+                        color: "#c44", background: "none", border: "none", cursor: "pointer",
+                        padding: "0 4px", lineHeight: 1,
+                      }}
+                    >
+                      X
+                    </button>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
+                      <div>
+                        <div style={{ ...labelStyle, marginBottom: 2 }}>Nom</div>
+                        <input style={{ ...inputStyle, padding: "6px 8px", fontSize: 12 }} value={c.name} onChange={(e) => updateContact(idx, "name", e.target.value)} placeholder="Prenom Nom" />
+                      </div>
+                      <div>
+                        <div style={{ ...labelStyle, marginBottom: 2 }}>Role</div>
+                        <input style={{ ...inputStyle, padding: "6px 8px", fontSize: 12 }} value={c.role} onChange={(e) => updateContact(idx, "role", e.target.value)} placeholder="Commercial..." />
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 6, alignItems: "end" }}>
+                      <div>
+                        <div style={{ ...labelStyle, marginBottom: 2 }}>Email</div>
+                        <input style={{ ...inputStyle, padding: "6px 8px", fontSize: 12 }} value={c.email} onChange={(e) => updateContact(idx, "email", e.target.value)} placeholder="email@fournisseur.fr" type="email" />
+                      </div>
+                      <div>
+                        <div style={{ ...labelStyle, marginBottom: 2 }}>Tel</div>
+                        <input style={{ ...inputStyle, padding: "6px 8px", fontSize: 12 }} value={c.phone} onChange={(e) => updateContact(idx, "phone", e.target.value)} placeholder="06 xx xx xx xx" type="tel" />
+                      </div>
+                      <label style={{
+                        display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap",
+                        fontFamily: "DM Sans, sans-serif", fontSize: 11, color: "#666",
+                        paddingBottom: 8, cursor: "pointer",
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={c.send_orders}
+                          onChange={(e) => updateContact(idx, "send_orders", e.target.checked)}
+                          style={{ accentColor: modalColor }}
+                        />
+                        Cdes
+                      </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={addContact}
+                style={{
+                  fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 600,
+                  color: modalColor, background: "none", border: `1.5px solid ${modalColor}`,
+                  borderRadius: 20, padding: "5px 12px", cursor: "pointer", marginBottom: 16,
+                }}
+              >
+                + Ajouter un contact
+              </button>
 
               {/* Actions */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -527,7 +748,7 @@ export default function FournisseursPage() {
                     padding: "8px 20px", cursor: "pointer", opacity: saving ? 0.6 : 1,
                   }}
                 >
-                  {saving ? "..." : saved ? "Enregistré !" : "Enregistrer"}
+                  {saving ? "..." : "Enregistrer"}
                 </button>
 
                 <Link
