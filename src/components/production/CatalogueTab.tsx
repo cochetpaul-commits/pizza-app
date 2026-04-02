@@ -14,6 +14,7 @@ type MainFilter = "tous" | "pizza" | "cuisine" | "cocktail" | "empatement";
 type CuisineCatFilter = "all" | "plat_cuisine" | "preparation" | "entree" | "sauce" | "dessert" | "accompagnement" | "autre";
 
 type RecipeLine = {
+  ingredient_id: string | null;
   ingredient_name: string;
   qty: number;
   unit: string;
@@ -42,6 +43,7 @@ type Recipe = {
   steps: string[];
   pivot_ingredient_id: string | null;
   yield_info: string | null; // "8 portions" or "1200 g"
+  portions_count: number | null;
   allergens: string[];
   emp_data?: EmpData;
 };
@@ -136,26 +138,26 @@ function computeEmpResult(d: EmpData, countOverride?: number, weightOverride?: n
 
 function phaseToLines(phase: PateResult["phases"][0]): RecipeLine[] {
   const lines: RecipeLine[] = [
-    { ingredient_name: "Farine", qty: phase.flour_g, unit: "g" },
-    { ingredient_name: "Eau", qty: phase.water_g, unit: "g" },
+    { ingredient_id: null, ingredient_name: "Farine", qty: phase.flour_g, unit: "g" },
+    { ingredient_id: null, ingredient_name: "Eau", qty: phase.water_g, unit: "g" },
   ];
-  if (phase.salt_g > 0) lines.push({ ingredient_name: "Sel", qty: phase.salt_g, unit: "g" });
-  if (phase.honey_g > 0) lines.push({ ingredient_name: "Miel", qty: phase.honey_g, unit: "g" });
-  if (phase.oil_g > 0) lines.push({ ingredient_name: "Huile", qty: phase.oil_g, unit: "g" });
-  if (phase.yeast_g > 0) lines.push({ ingredient_name: "Levure", qty: phase.yeast_g, unit: "g" });
+  if (phase.salt_g > 0) lines.push({ ingredient_id: null, ingredient_name: "Sel", qty: phase.salt_g, unit: "g" });
+  if (phase.honey_g > 0) lines.push({ ingredient_id: null, ingredient_name: "Miel", qty: phase.honey_g, unit: "g" });
+  if (phase.oil_g > 0) lines.push({ ingredient_id: null, ingredient_name: "Huile", qty: phase.oil_g, unit: "g" });
+  if (phase.yeast_g > 0) lines.push({ ingredient_id: null, ingredient_name: "Levure", qty: phase.yeast_g, unit: "g" });
   return lines;
 }
 
 function resultToLines(r: PateResult): RecipeLine[] {
   const t = r.totals;
   const lines: RecipeLine[] = [
-    { ingredient_name: "Farine", qty: t.flour_total_g, unit: "g" },
-    { ingredient_name: "Eau", qty: t.water_g, unit: "g" },
+    { ingredient_id: null, ingredient_name: "Farine", qty: t.flour_total_g, unit: "g" },
+    { ingredient_id: null, ingredient_name: "Eau", qty: t.water_g, unit: "g" },
   ];
-  if (t.salt_g > 0) lines.push({ ingredient_name: "Sel", qty: t.salt_g, unit: "g" });
-  if (t.honey_g > 0) lines.push({ ingredient_name: "Miel", qty: t.honey_g, unit: "g" });
-  if (t.oil_g > 0) lines.push({ ingredient_name: "Huile", qty: t.oil_g, unit: "g" });
-  if (t.yeast_g > 0) lines.push({ ingredient_name: "Levure", qty: t.yeast_g, unit: "g" });
+  if (t.salt_g > 0) lines.push({ ingredient_id: null, ingredient_name: "Sel", qty: t.salt_g, unit: "g" });
+  if (t.honey_g > 0) lines.push({ ingredient_id: null, ingredient_name: "Miel", qty: t.honey_g, unit: "g" });
+  if (t.oil_g > 0) lines.push({ ingredient_id: null, ingredient_name: "Huile", qty: t.oil_g, unit: "g" });
+  if (t.yeast_g > 0) lines.push({ ingredient_id: null, ingredient_name: "Levure", qty: t.yeast_g, unit: "g" });
   return lines;
 }
 
@@ -190,13 +192,14 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
     const lines: RecipeLine[] = pIngs.map((i: Record<string, unknown>) => {
       const ing = i.ingredients as Record<string, unknown> | null;
       for (const a of parseAllergenArray(ing?.allergens)) allergenSet.add(a);
-      return { ingredient_name: (ing?.name as string) ?? "?", qty: Number(i.qty) || 0, unit: String(i.unit ?? "g") };
+      return { ingredient_id: (i.ingredient_id as string) ?? null, ingredient_name: (ing?.name as string) ?? "?", qty: Number(i.qty) || 0, unit: String(i.unit ?? "g") };
     });
     recipes.push({
       id: p.id, type: "pizza", name: p.name, category: null,
       photo_url: p.photo_url, lines, steps: parseJsonSteps(p.notes),
       pivot_ingredient_id: p.pivot_ingredient_id,
       yield_info: p.ball_weight_g ? `Pâton ${p.ball_weight_g} g` : null,
+      portions_count: 1,
       allergens: [...allergenSet],
     });
   }
@@ -227,7 +230,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
       let qty = Number(i.qty) || 0;
       let unit = rawUnit;
       if (rawUnit === "ml") { qty = qty / 10; unit = "cL"; }
-      return { ingredient_name: (ing?.name as string) ?? "?", qty, unit };
+      return { ingredient_id: (i.ingredient_id as string) ?? null, ingredient_name: (ing?.name as string) ?? "?", qty, unit };
     });
     let yieldInfo: string | null = null;
     if (k.portions_count) yieldInfo = `${k.portions_count} portion${k.portions_count > 1 ? "s" : ""}`;
@@ -236,6 +239,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
       id: k.id, type: "cuisine", name: k.name, category: k.category,
       photo_url: k.photo_url, lines, steps: parseJsonSteps(k.procedure),
       pivot_ingredient_id: k.pivot_ingredient_id, yield_info: yieldInfo,
+      portions_count: k.portions_count ?? null,
       allergens: [...allergenSet],
     });
   }
@@ -259,13 +263,14 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
     const lines: RecipeLine[] = cIngs.map((i: Record<string, unknown>) => {
       const ing = i.ingredients as Record<string, unknown> | null;
       for (const a of parseAllergenArray(ing?.allergens)) allergenSet.add(a);
-      return { ingredient_name: (ing?.name as string) ?? "?", qty: Number(i.qty) || 0, unit: String(i.unit ?? "cL") };
+      return { ingredient_id: (i.ingredient_id as string) ?? null, ingredient_name: (ing?.name as string) ?? "?", qty: Number(i.qty) || 0, unit: String(i.unit ?? "cL") };
     });
     recipes.push({
       id: c.id, type: "cocktail", name: c.name, category: null,
       photo_url: c.image_url, lines, steps: parseJsonSteps(c.steps),
       pivot_ingredient_id: c.pivot_ingredient_id,
       yield_info: c.glass ? `Verre : ${c.glass}` : null,
+      portions_count: null,
       allergens: [...allergenSet],
     });
   }
@@ -293,13 +298,14 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
       let qty = Number(i.qty) || 0;
       let unit = rawUnit;
       if (rawUnit === "ml") { qty = qty / 10; unit = "cL"; }
-      return { ingredient_name: (ing?.name as string) ?? "?", qty, unit };
+      return { ingredient_id: (i.ingredient_id as string) ?? null, ingredient_name: (ing?.name as string) ?? "?", qty, unit };
     });
     recipes.push({
       id: `prep-${p.id}`, type: "production", name: p.name, category: "prep",
       photo_url: p.photo_url, lines, steps: parseJsonSteps(p.procedure),
       pivot_ingredient_id: p.pivot_ingredient_id,
       yield_info: p.yield_grams ? `${p.yield_grams} g` : null,
+      portions_count: null,
       allergens: [...allergenSet],
     });
   }
@@ -317,13 +323,14 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
       let qty = Number(i.qty) || 0;
       let unit = rawUnit;
       if (rawUnit === "ml") { qty = qty / 10; unit = "cL"; }
-      return { ingredient_name: (ing?.name as string) ?? "?", qty, unit };
+      return { ingredient_id: (i.ingredient_id as string) ?? null, ingredient_name: (ing?.name as string) ?? "?", qty, unit };
     });
     recipes.push({
       id: k.id, type: "production", name: k.name, category: "preparation",
       photo_url: k.photo_url, lines, steps: parseJsonSteps(k.procedure),
       pivot_ingredient_id: k.pivot_ingredient_id,
       yield_info: k.yield_grams ? `${k.yield_grams} g` : null,
+      portions_count: null,
       allergens: [...allergenSet],
     });
   }
@@ -364,6 +371,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
       photo_url: null, lines, steps: parseJsonSteps(e.procedure),
       pivot_ingredient_id: e.pivot_ingredient_id,
       yield_info: `${bc} pâton${bc > 1 ? "s" : ""} × ${bw} g`,
+      portions_count: null,
       allergens: ["gluten"],
       emp_data: empData,
     });
@@ -392,6 +400,8 @@ export function CatalogueContent() {
   const [pivotOverrides, setPivotOverrides] = useState<Record<string, number>>({});
   // Empâtement overrides: { recipeId: { count, weight } }
   const [empOverrides, setEmpOverrides] = useState<Record<string, { count?: number; weight?: number }>>({});
+  // Portion overrides: { recipeId: count }
+  const [portionOverrides, setPortionOverrides] = useState<Record<string, number>>({});
 
   // Pivot modal (any recipe with pivot or emp_data)
   const [modalRecipe, setModalRecipe] = useState<Recipe | null>(null);
@@ -664,13 +674,15 @@ export function CatalogueContent() {
               {/* Recipe rows */}
               {!isCollapsed && items.map(recipe => {
                 const isOpen = openId === recipe.id;
-                const hasPivot = !!recipe.pivot_ingredient_id || !!recipe.emp_data;
+                const canProduce = !!recipe.emp_data
+                  || (recipe.type === "pizza" || (recipe.type === "cuisine" && recipe.category !== "preparation"))
+                  || !!recipe.pivot_ingredient_id;
 
                 return (
                   <div key={recipe.id} style={{ marginBottom: 2 }}>
                     {/* Row */}
                     <div
-                      onClick={() => hasPivot ? setModalRecipe(recipe) : toggleOpen(recipe.id)}
+                      onClick={() => toggleOpen(recipe.id)}
                       style={{
                         display: "flex", alignItems: "center", gap: 12,
                         padding: "10px 16px", background: isOpen ? "#fff" : "rgba(255,255,255,0.7)",
@@ -711,6 +723,22 @@ export function CatalogueContent() {
                           {recipe.yield_info && ` · ${recipe.yield_info}`}
                         </div>
                       </div>
+
+                      {/* Production pill */}
+                      {canProduce && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setModalRecipe(recipe); }}
+                          style={{
+                            padding: "3px 10px", borderRadius: 20, border: "none",
+                            background: "rgba(45,106,79,0.1)", color: "#2D6A4F",
+                            fontSize: 10, fontWeight: 700, cursor: "pointer",
+                            flexShrink: 0, letterSpacing: "0.02em",
+                          }}
+                        >
+                          Production
+                        </button>
+                      )}
 
                       {/* Allergen dots */}
                       {recipe.allergens.length > 0 && (
@@ -866,12 +894,27 @@ export function CatalogueContent() {
           }
         }
 
-        // Standard pivot: factor
+        // Determine mode: pivot or portions
+        const pivotLine = !isEmp && modalRecipe.pivot_ingredient_id
+          ? modalRecipe.lines.find(l => l.ingredient_id === modalRecipe.pivot_ingredient_id) ?? null
+          : null;
+        const usePortionMode = !isEmp && !pivotLine && (modalRecipe.type === "pizza" || modalRecipe.type === "cuisine");
+        const basePortions = modalRecipe.portions_count ?? 1;
+
+        // Pivot mode
         const mPivotOverride = pivotOverrides[modalRecipe.id];
-        const mBasePivot = modalRecipe.lines[0]?.qty || 1;
-        const mFactor = !isEmp && mPivotOverride != null && mPivotOverride > 0 ? mPivotOverride / mBasePivot : 1;
-        if (!isEmp && mFactor !== 1) {
-          displayLines = modalRecipe.lines.map(l => ({ ...l, qty: l.qty * mFactor }));
+        const mBasePivot = pivotLine?.qty || 1;
+        const pivotFactor = !isEmp && pivotLine && mPivotOverride != null && mPivotOverride > 0 ? mPivotOverride / mBasePivot : 1;
+        if (!isEmp && pivotLine && pivotFactor !== 1) {
+          displayLines = modalRecipe.lines.map(l => ({ ...l, qty: l.qty * pivotFactor }));
+          hasChanged = true;
+        }
+
+        // Portion mode
+        const mPortionOverride = portionOverrides[modalRecipe.id];
+        const portionFactor = usePortionMode && mPortionOverride != null && mPortionOverride > 0 ? mPortionOverride / basePortions : 1;
+        if (usePortionMode && portionFactor !== 1) {
+          displayLines = modalRecipe.lines.map(l => ({ ...l, qty: l.qty * portionFactor }));
           hasChanged = true;
         }
 
@@ -994,22 +1037,22 @@ export function CatalogueContent() {
                 </div>
               )}
 
-              {/* Standard pivot: ingredient input */}
-              {!isEmp && modalRecipe.lines.length > 0 && (
+              {/* Pivot mode: ingredient input */}
+              {!isEmp && pivotLine && (
                 <div style={{ padding: "0 20px", marginBottom: 16 }}>
                   <div style={{
                     display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
                     padding: "12px 16px", borderRadius: 12,
-                    background: `${mColor}08`, border: `1.5px solid ${mColor}25`,
+                    background: "rgba(45,106,79,0.06)", border: "1.5px solid rgba(45,106,79,0.2)",
                   }}>
-                    <span style={{ fontSize: 16, fontWeight: 800, color: mColor }}>★</span>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: mColor }}>
-                      {modalRecipe.lines[0].ingredient_name}
+                    <span style={{ fontSize: 16, fontWeight: 800, color: "#D97706" }}>★</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#2D6A4F" }}>
+                      {pivotLine.ingredient_name}
                     </span>
                     <input
                       type="number"
                       value={pivotOverrides[modalRecipe.id] ?? ""}
-                      placeholder={String(modalRecipe.lines[0].qty)}
+                      placeholder={String(pivotLine.qty)}
                       onChange={e => {
                         const v = e.target.value;
                         setPivotOverrides(prev => ({
@@ -1019,18 +1062,59 @@ export function CatalogueContent() {
                       }}
                       style={{
                         width: 100, height: 38, borderRadius: 10,
-                        border: `2px solid ${mColor}40`, padding: "0 12px",
+                        border: "2px solid rgba(45,106,79,0.3)", padding: "0 12px",
                         fontSize: 16, fontWeight: 800, textAlign: "center",
                         background: "#fff", color: "#1a1a1a", outline: "none",
                       }}
                     />
-                    <span style={{ fontSize: 13, color: "#999", fontWeight: 600 }}>{modalRecipe.lines[0].unit}</span>
-                    {mFactor !== 1 && (
+                    <span style={{ fontSize: 13, color: "#999", fontWeight: 600 }}>{pivotLine.unit}</span>
+                    {pivotFactor !== 1 && (
                       <span style={{
-                        fontSize: 13, fontWeight: 800, color: mColor, marginLeft: "auto",
-                        padding: "4px 10px", borderRadius: 8, background: `${mColor}12`,
+                        fontSize: 13, fontWeight: 800, color: "#2D6A4F", marginLeft: "auto",
+                        padding: "4px 10px", borderRadius: 8, background: "rgba(45,106,79,0.1)",
                       }}>
-                        × {mFactor.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
+                        × {pivotFactor.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Portion mode: pizza/cuisine without pivot */}
+              {!isEmp && usePortionMode && (
+                <div style={{ padding: "0 20px", marginBottom: 16 }}>
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+                    padding: "12px 16px", borderRadius: 12,
+                    background: "rgba(45,106,79,0.06)", border: "1.5px solid rgba(45,106,79,0.2)",
+                  }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#2D6A4F" }}>
+                      {modalRecipe.type === "pizza" ? "Pizzas" : "Portions"}
+                    </span>
+                    <input
+                      type="number"
+                      value={portionOverrides[modalRecipe.id] ?? ""}
+                      placeholder={String(basePortions)}
+                      onChange={e => {
+                        const v = e.target.value;
+                        setPortionOverrides(prev => ({
+                          ...prev,
+                          [modalRecipe.id]: v === "" ? undefined as unknown as number : parseFloat(v),
+                        }));
+                      }}
+                      style={{
+                        width: 80, height: 38, borderRadius: 10,
+                        border: "2px solid rgba(45,106,79,0.3)", padding: "0 12px",
+                        fontSize: 16, fontWeight: 800, textAlign: "center",
+                        background: "#fff", color: "#1a1a1a", outline: "none",
+                      }}
+                    />
+                    {portionFactor !== 1 && (
+                      <span style={{
+                        fontSize: 13, fontWeight: 800, color: "#2D6A4F", marginLeft: "auto",
+                        padding: "4px 10px", borderRadius: 8, background: "rgba(45,106,79,0.1)",
+                      }}>
+                        × {portionFactor.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
                       </span>
                     )}
                   </div>
@@ -1089,12 +1173,15 @@ export function CatalogueContent() {
                           padding: "10px 14px", borderRadius: 8,
                           background: idx % 2 === 0 ? "#faf7f2" : "transparent",
                         }}>
-                          <span style={{ color: "#1a1a1a", fontWeight: 500, fontSize: 15 }}>
+                          <span style={{ color: "#1a1a1a", fontWeight: 500, fontSize: 15, display: "flex", alignItems: "center", gap: 4 }}>
+                            {pivotLine && line.ingredient_id === modalRecipe.pivot_ingredient_id && (
+                              <span style={{ color: "#D97706", fontWeight: 800 }}>★</span>
+                            )}
                             {line.ingredient_name}
                           </span>
                           <span style={{
                             fontWeight: 800, fontSize: 16,
-                            color: hasChanged ? "#D4775A" : "#1a1a1a",
+                            color: hasChanged ? "#2D6A4F" : "#1a1a1a",
                             fontVariantNumeric: "tabular-nums",
                           }}>
                             {line.qty > 0 ? fmtQty(line.qty) : "—"}
