@@ -6,6 +6,7 @@ import * as fs from "node:fs/promises";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { detectCategoryFromName, normalizeIngredientName } from "@/lib/invoices/categoryDetector";
 import { detectAllergensFromName } from "@/lib/invoices/allergenDetector";
+import { extractPackFromName, extractVolumeFromName } from "@/lib/invoices/utils";
 import type { Category } from "@/types/ingredients";
 
 const execFileAsync = promisify(execFile);
@@ -498,22 +499,49 @@ export async function runImport(options: {
 
         if (!ingId || !u || !(p != null && Number.isFinite(p) && p > 0)) return null;
 
+        // Detect pack from product name (e.g., "LAIT 1L X6", "BIERE 33CL X24")
+        const packInfo = l.name ? extractPackFromName(l.name) : null;
+        const volumeFromName = l.name ? extractVolumeFromName(l.name) : null;
+
         const offerRow: Record<string, unknown> = {
           user_id: userId,
           ingredient_id: ingId,
           supplier_id: supplierId,
           supplier_sku: l.sku,
           supplier_label: l.name,
-          price_kind: "unit",
-          unit: u,
-          unit_price: p,
-          price: p,
           currency: "EUR",
           is_active: true,
-          piece_weight_g: l.unit === "pc" ? (l.piece_weight_g ?? null) : null,
           density_kg_per_l: null,
           establishment: "both",
         };
+
+        if (packInfo && packInfo.count > 1 && l.total_price && l.total_price > 0) {
+          // Pack detected — use pack_composed or pack_simple
+          offerRow.price_kind = "pack_composed";
+          offerRow.pack_price = p * (l.quantity ?? 1) > l.total_price ? l.total_price / (l.quantity ?? 1) : p;
+          offerRow.price = offerRow.pack_price;
+          offerRow.pack_count = packInfo.count;
+          offerRow.unit_price = (offerRow.pack_price as number) / packInfo.count;
+          if (packInfo.eachQty != null && packInfo.eachUnit) {
+            offerRow.pack_each_qty = packInfo.eachQty;
+            offerRow.pack_each_unit = packInfo.eachUnit === "cl" || packInfo.eachUnit === "ml" || packInfo.eachUnit === "l" ? "l" : "kg";
+          } else {
+            offerRow.pack_each_unit = "pc";
+          }
+          offerRow.piece_weight_g = l.piece_weight_g ?? null;
+        } else {
+          // Standard unit pricing
+          offerRow.price_kind = "unit";
+          offerRow.unit = u;
+          offerRow.unit_price = p;
+          offerRow.price = p;
+          offerRow.piece_weight_g = l.unit === "pc" ? (l.piece_weight_g ?? null) : null;
+        }
+
+        // Set piece_volume_ml from name if not already set
+        if (volumeFromName && !offerRow.piece_volume_ml) {
+          offerRow.piece_volume_ml = volumeFromName;
+        }
         if (etabId) offerRow.etablissement_id = etabId;
         return offerRow;
       })
