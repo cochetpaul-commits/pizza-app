@@ -716,16 +716,6 @@ export default function FournisseursPage() {
                   Etablissement
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontFamily: "DM Sans, sans-serif", fontSize: 13 }}>
-                    <input
-                      type="radio"
-                      name="modal_etab"
-                      checked={form.etablissement_id === null}
-                      onChange={() => setForm(f => ({ ...f, etablissement_id: null }))}
-                      style={{ accentColor: "#D4775A" }}
-                    />
-                    Les deux
-                  </label>
                   {bmEtab && (
                     <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontFamily: "DM Sans, sans-serif", fontSize: 13 }}>
                       <input
