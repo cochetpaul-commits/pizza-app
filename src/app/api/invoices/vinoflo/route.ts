@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { pdfToText } from "@/lib/pdfToText";
 import { runImport } from "@/lib/invoices/importEngine";
 import { parseVinofloInvoiceText } from "@/lib/invoices/vinoflo";
+import { parseVinofloCommande } from "@/lib/invoices/vinofloCommande";
 import { resolveEtabId, EtabError } from "@/lib/getEtablissement";
 
 export const runtime = "nodejs";
@@ -30,7 +31,11 @@ export async function POST(req: Request) {
 
     const bytes = new Uint8Array(await file.arrayBuffer());
     const text = await pdfToText(bytes);
-    const payload = parseVinofloInvoiceText(text);
+    let payload = parseVinofloInvoiceText(text);
+    // Fallback to commande parser if no lines found
+    if (payload.lines.length === 0) {
+      payload = parseVinofloCommande(text);
+    }
 
     const supabase = createClient(getEnv("NEXT_PUBLIC_SUPABASE_URL"), getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"), {
       global: { headers: { Authorization: req.headers.get("authorization") ?? "" } },
