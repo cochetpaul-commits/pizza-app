@@ -150,6 +150,18 @@ function parseLines(text: string): ParsedLine[] {
     }
   }
 
+  // Post-fix: calculate missing unit_price from total/qty
+  for (const l of tmp) {
+    if ((!l.unit_price || l.unit_price === 0) && l.total_price && l.quantity && l.quantity > 0) {
+      l.unit_price = Math.round((l.total_price / l.quantity) * 100) / 100;
+    }
+  }
+
+  // Post-fix: clean up spaced-out characters in names from pdfToText
+  for (const l of tmp) {
+    l.name = cleanSpacedChars(l.name);
+  }
+
   // Deduplicate
   const seen = new Set<string>();
   const out: ParsedLine[] = [];
@@ -160,6 +172,24 @@ function parseLines(text: string): ParsedLine[] {
     out.push(l);
   }
   return out;
+}
+
+/** Fix spaced-out characters from pdfToText: "R O U G E" → "ROUGE", "2 0 2 2" → "2022" */
+function cleanSpacedChars(name: string): string {
+  // Remove trailing spaced format/color: ", 7 5 0 6 1 1 ," etc.
+  let cleaned = name.replace(/,\s*[\d\s,]+\s*,?\s*$/, "").trim();
+  // Fix spaced-out words (single chars separated by spaces): "R O U G E" → "ROUGE"
+  cleaned = cleaned.replace(/\b([A-ZÀ-Ü])\s(?=[A-ZÀ-Ü]\s[A-ZÀ-Ü])/g, "$1");
+  // Fix remaining sequences: "B L A N C O" → "BLANCO"
+  cleaned = cleaned.replace(/(?:^|\s)([A-ZÀ-Ü](?:\s[A-ZÀ-Ü]){2,})\b/g, (_, m) => " " + m.replace(/\s/g, ""));
+  // Fix spaced numbers: "2 0 2 2" → "2022"
+  cleaned = cleaned.replace(/(\d)\s(\d)\s(\d)\s(\d)/g, "$1$2$3$4");
+  cleaned = cleaned.replace(/(\d)\s(\d)\s(\d)/g, "$1$2$3");
+  // Clean multiple spaces
+  cleaned = cleaned.replace(/\s+/g, " ").trim();
+  // Remove trailing comma
+  cleaned = cleaned.replace(/,\s*$/, "").trim();
+  return cleaned;
 }
 
 function cleanName(raw: string): string {
