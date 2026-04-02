@@ -1,6 +1,19 @@
+/*
+-- SQL: table supplier_contacts
+CREATE TABLE IF NOT EXISTS supplier_contacts (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  supplier_id UUID NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  role TEXT,
+  send_orders BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+*/
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, useCallback, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -20,8 +33,22 @@ type Invoice = {
   total_ht: number | null; created_at: string;
 };
 
+type Contact = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  send_orders: boolean;
+  _isNew?: boolean;
+};
+
 const fmtMoney = (n: number | null) =>
   n == null ? "—" : n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+
+function makeEmptyContact(): Contact {
+  return { id: crypto.randomUUID(), name: "", email: "", phone: "", role: "", send_orders: false, _isNew: true };
+}
 
 export default function FournisseurDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -37,6 +64,69 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
 
   const [form, setForm] = useState({ email: "", phone: "", contact_name: "", notes: "", franco_minimum: "", address: "", city: "", postal_code: "", siret: "", category: "", payment_terms: "", delivery_days: "", website: "", tva_intra: "" });
 
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [deletedContactIds, setDeletedContactIds] = useState<string[]>([]);
+  // Track original DB contact ids so we know which are truly new
+  const [originalContactIds, setOriginalContactIds] = useState<Set<string>>(new Set());
+
+  const prefillContactsFromInvoices = useCallback(async (supplierId: string, sup: SupplierFull) => {
+    const suggestions: Contact[] = [];
+
+    // 1) Check supplier table fields first
+    if (sup.contact_name || sup.email || sup.phone) {
+      suggestions.push({
+        id: crypto.randomUUID(),
+        name: sup.contact_name ?? "",
+        email: sup.email ?? "",
+        phone: sup.phone ?? "",
+        role: "Principal",
+        send_orders: true,
+        _isNew: true,
+      });
+    }
+
+    // 2) Try to extract from parsed_json in supplier_invoices
+    const { data: invData } = await supabase
+      .from("supplier_invoices")
+      .select("parsed_json")
+      .eq("supplier_id", supplierId)
+      .not("parsed_json", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    if (invData) {
+      for (const row of invData) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const pj = row.parsed_json as any;
+        const info = pj?.supplier_info || pj?.fournisseur || pj?.supplier;
+        if (!info) continue;
+        const cName = info.name || info.nom || "";
+        const cEmail = info.email || "";
+        const cPhone = info.phone || info.telephone || "";
+        if (!cName && !cEmail && !cPhone) continue;
+        // Avoid duplicating what we already suggested from supplier fields
+        const isDupe = suggestions.some(
+          (s) => (s.email && s.email === cEmail) || (s.name && s.name === cName)
+        );
+        if (!isDupe) {
+          suggestions.push({
+            id: crypto.randomUUID(),
+            name: cName,
+            email: cEmail,
+            phone: cPhone,
+            role: "",
+            send_orders: false,
+            _isNew: true,
+          });
+        }
+      }
+    }
+
+    if (suggestions.length > 0) {
+      setContacts(suggestions);
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -47,9 +137,10 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
       if (etabId) invQuery = invQuery.eq("etablissement_id", etabId);
       invQuery = invQuery.order("created_at", { ascending: false }).limit(5);
 
-      const [supRes, invRes] = await Promise.all([
+      const [supRes, invRes, contactsRes] = await Promise.all([
         supabase.from("suppliers").select("*").eq("id", id).single(),
         invQuery,
+        supabase.from("supplier_contacts").select("*").eq("supplier_id", id).order("created_at", { ascending: true }),
       ]);
 
       if (supRes.data) {
@@ -63,11 +154,45 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
           siret: s.siret ?? "", category: s.category ?? "", payment_terms: s.payment_terms ?? "",
           delivery_days: (s.delivery_days ?? []).join(", "), website: s.website ?? "", tva_intra: s.tva_intra ?? "",
         });
+
+        // Load contacts
+        const dbContacts = (contactsRes.data ?? []).map((c: Record<string, unknown>) => ({
+          id: c.id as string,
+          name: (c.name as string) ?? "",
+          email: (c.email as string) ?? "",
+          phone: (c.phone as string) ?? "",
+          role: (c.role as string) ?? "",
+          send_orders: (c.send_orders as boolean) ?? false,
+        }));
+
+        if (dbContacts.length > 0) {
+          setContacts(dbContacts);
+          setOriginalContactIds(new Set(dbContacts.map((c: Contact) => c.id)));
+        } else {
+          // No contacts yet: try to pre-fill
+          await prefillContactsFromInvoices(id, s);
+        }
       }
       setInvoices((invRes.data ?? []) as Invoice[]);
       setLoading(false);
     })();
-  }, [id, etabId]);
+  }, [id, etabId, prefillContactsFromInvoices]);
+
+  function updateContact(idx: number, field: keyof Contact, value: string | boolean) {
+    setContacts((prev) => prev.map((c, i) => i === idx ? { ...c, [field]: value } : c));
+  }
+
+  function addContact() {
+    setContacts((prev) => [...prev, makeEmptyContact()]);
+  }
+
+  function removeContact(idx: number) {
+    const c = contacts[idx];
+    if (originalContactIds.has(c.id)) {
+      setDeletedContactIds((prev) => [...prev, c.id]);
+    }
+    setContacts((prev) => prev.filter((_, i) => i !== idx));
+  }
 
   async function save() {
     if (!supplier) return;
@@ -76,6 +201,8 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
     const deliveryArr = form.delivery_days.trim()
       ? form.delivery_days.split(",").map(d => d.trim().toLowerCase()).filter(Boolean)
       : null;
+
+    // 1) Save supplier
     const { error } = await supabase.from("suppliers").update({
       email: form.email.trim() || null,
       phone: form.phone.trim() || null,
@@ -92,10 +219,56 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
       website: form.website.trim() || null,
       tva_intra: form.tva_intra.trim() || null,
     }).eq("id", id);
+
+    if (error) { setSaving(false); alert(error.message); return; }
+
+    // 2) Delete removed contacts
+    if (deletedContactIds.length > 0) {
+      const { error: delErr } = await supabase
+        .from("supplier_contacts")
+        .delete()
+        .in("id", deletedContactIds);
+      if (delErr) { setSaving(false); alert(delErr.message); return; }
+    }
+
+    // 3) Upsert contacts (only those with a name)
+    const validContacts = contacts.filter((c) => c.name.trim());
+    if (validContacts.length > 0) {
+      const toUpsert = validContacts.map((c) => ({
+        id: c._isNew ? undefined : c.id,
+        supplier_id: id,
+        name: c.name.trim(),
+        email: c.email.trim() || null,
+        phone: c.phone.trim() || null,
+        role: c.role.trim() || null,
+        send_orders: c.send_orders,
+      }));
+
+      // Split into inserts and updates
+      const toInsert = toUpsert.filter((c) => !c.id);
+      const toUpdate = toUpsert.filter((c) => c.id);
+
+      if (toInsert.length > 0) {
+        const inserts = toInsert.map(({ id: _id, ...rest }) => rest);
+        const { error: insErr } = await supabase.from("supplier_contacts").insert(inserts);
+        if (insErr) { setSaving(false); alert(insErr.message); return; }
+      }
+
+      for (const row of toUpdate) {
+        const { id: contactId, ...rest } = row;
+        const { error: updErr } = await supabase
+          .from("supplier_contacts")
+          .update(rest)
+          .eq("id", contactId!);
+        if (updErr) { setSaving(false); alert(updErr.message); return; }
+      }
+    }
+
     setSaving(false);
-    if (error) { alert(error.message); return; }
     setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    setTimeout(() => {
+      router.back();
+    }, 400);
   }
 
   const CATEGORY_LABELS: Record<string, string> = {
@@ -268,17 +441,115 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
           />
         </div>
 
+        {/* Contacts / Destinataires */}
+        <div style={sectionTitle}>Contacts / Destinataires</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+          {contacts.map((c, idx) => (
+            <div
+              key={c.id}
+              style={{
+                display: "flex", gap: 8, alignItems: "flex-start",
+                border: "1px solid #ddd6c8", borderRadius: 10, padding: "10px 12px",
+                background: "#faf8f4",
+              }}
+            >
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={labelStyle}>Nom</div>
+                    <input
+                      style={inputStyle}
+                      value={c.name}
+                      onChange={(e) => updateContact(idx, "name", e.target.value)}
+                      placeholder="Prenom Nom"
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={labelStyle}>Role</div>
+                    <input
+                      style={inputStyle}
+                      value={c.role}
+                      onChange={(e) => updateContact(idx, "role", e.target.value)}
+                      placeholder="Commercial, comptable..."
+                    />
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={labelStyle}>Email</div>
+                    <input
+                      style={inputStyle}
+                      value={c.email}
+                      onChange={(e) => updateContact(idx, "email", e.target.value)}
+                      placeholder="email@fournisseur.fr"
+                      type="email"
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={labelStyle}>Telephone</div>
+                    <input
+                      style={inputStyle}
+                      value={c.phone}
+                      onChange={(e) => updateContact(idx, "phone", e.target.value)}
+                      placeholder="06 xx xx xx xx"
+                      type="tel"
+                    />
+                  </div>
+                  <label style={{
+                    display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap",
+                    fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#666",
+                    paddingBottom: 10, cursor: "pointer",
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={c.send_orders}
+                      onChange={(e) => updateContact(idx, "send_orders", e.target.checked)}
+                      style={{ accentColor: "#D4775A" }}
+                    />
+                    Commandes
+                  </label>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeContact(idx)}
+                title="Supprimer ce contact"
+                style={{
+                  fontFamily: "DM Sans, sans-serif", fontSize: 14, fontWeight: 700,
+                  color: "#c44", background: "none", border: "none", cursor: "pointer",
+                  padding: "2px 6px", lineHeight: 1, marginTop: 2, borderRadius: 4,
+                }}
+              >
+                X
+              </button>
+            </div>
+          ))}
+        </div>
         <button
-          onClick={save}
-          disabled={saving}
+          type="button"
+          onClick={addContact}
           style={{
-            fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600,
-            background: "#D4775A", color: "#fff", border: "none", borderRadius: 20,
-            padding: "8px 18px", cursor: "pointer", opacity: saving ? 0.6 : 1,
+            fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 600,
+            color: "#D4775A", background: "none", border: "1.5px solid #D4775A",
+            borderRadius: 20, padding: "6px 14px", cursor: "pointer", marginBottom: 16,
           }}
         >
-          {saving ? "Enregistrement..." : saved ? "Enregistré" : "Enregistrer"}
+          + Ajouter un contact
         </button>
+
+        <div>
+          <button
+            onClick={save}
+            disabled={saving}
+            style={{
+              fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600,
+              background: "#D4775A", color: "#fff", border: "none", borderRadius: 20,
+              padding: "8px 18px", cursor: "pointer", opacity: saving ? 0.6 : 1,
+            }}
+          >
+            {saving ? "Enregistrement..." : saved ? "Enregistre" : "Enregistrer"}
+          </button>
+        </div>
       </div>
 
       {/* Derniers imports */}
