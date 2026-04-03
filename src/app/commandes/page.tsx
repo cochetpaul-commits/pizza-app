@@ -1093,23 +1093,30 @@ function CommandesPage() {
               const color = CAT_COLORS[cat] ?? "#6B7280";
               return (
                 <div key={cat} style={{ marginBottom: 8 }}>
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: "10px 16px", background: `${color}14`, border: `1px solid ${color}30`,
-                    borderRadius: "12px 12px 0 0",
-                  }}>
+                  <div
+                    onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; e.currentTarget.style.borderColor = color; }}
+                    onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor = "#ddd6c8"; e.currentTarget.style.borderLeftColor = color; }}
+                    style={{
+                      width: "100%", display: "flex", alignItems: "center", gap: 10,
+                      padding: "12px 16px", background: "#fff",
+                      border: "1.5px solid #ddd6c8", borderLeft: `3px solid ${color}`,
+                      borderRadius: 12, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                      marginTop: 16, marginBottom: 6,
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                      transition: "box-shadow 0.2s, border-color 0.2s",
+                    }}>
                     <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0 }} />
                     <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color }}>
                       {catLabel(cat)}
                     </span>
-                    <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${color}30`, color }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${color}18`, color }}>
                       {items.length}
                     </span>
                   </div>
                   {items.map((item, i) => {
                     const lineTotal = item.prixUnitaire != null ? item.prixUnitaire * item.qty : null;
                     return (
-                      <div key={i} style={{ ...tile, borderRadius: i === items.length - 1 ? "0 0 12px 12px" : 0 }}>
+                      <div key={i} style={{ ...tile }}>
                         <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", flex: 1 }}>{item.name}</span>
                         {item.prixUnitaire != null && (
                           <span style={{ fontSize: 11, color: "#999", flexShrink: 0 }}>{item.prixUnitaire.toFixed(2)}€</span>
@@ -1201,19 +1208,22 @@ function CommandesPage() {
             <div key={cat} style={{ marginBottom: 6 }}>
               <button type="button"
                 onClick={() => setOpenCats((prev) => ({ ...prev, [cat]: !isOpen }))}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; e.currentTarget.style.borderColor = color; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor = "#ddd6c8"; e.currentTarget.style.borderLeftColor = color; }}
                 style={{
-                  width: "100%", display: "flex", alignItems: "center",
-                  gap: 10, padding: "10px 16px",
-                  background: `${color}14`, border: `1px solid ${color}30`,
-                  borderRadius: isOpen ? "12px 12px 0 0" : 12,
-                  cursor: "pointer", fontFamily: "inherit", textAlign: "left",
-                  transition: "border-radius 0.2s",
+                  width: "100%", display: "flex", alignItems: "center", gap: 10,
+                  padding: "12px 16px", background: "#fff",
+                  border: "1.5px solid #ddd6c8", borderLeft: `3px solid ${color}`,
+                  borderRadius: 12, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                  marginTop: 16, marginBottom: 6,
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                  transition: "box-shadow 0.2s, border-color 0.2s",
                 }}>
                 <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0 }} />
                 <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color }}>
                   {catLabel(cat)}
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${color}30`, color }}>
+                <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${color}18`, color }}>
                   {allItems.length}
                 </span>
                 {selectedCount > 0 && (
@@ -1227,8 +1237,7 @@ function CommandesPage() {
               <div style={{
                 maxHeight: isOpen ? 5000 : 0, overflow: "hidden",
                 transition: "max-height 0.3s ease",
-                border: isOpen ? `1px solid ${color}30` : "none",
-                borderTop: "none", borderRadius: "0 0 12px 12px",
+                background: "#fff", borderRadius: "0 0 12px 12px",
               }}>
                 {favoris.length > 0 && (
                   <div style={{ background: "#FFFBF0", borderLeft: "3px solid #F59E0B", padding: "6px 0 2px 0" }}>
