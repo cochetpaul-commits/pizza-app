@@ -94,24 +94,24 @@ export function FloatingActions({ actions }: FloatingActionsProps) {
   const secondary = actions.filter((a) => !a.primary);
   const primary = actions.find((a) => a.primary);
 
-  const btnBase: React.CSSProperties = {
-    width: 44,
-    height: 44,
+  const btnStyle: React.CSSProperties = {
+    width: 46,
+    height: 46,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     border: "none",
     background: "transparent",
     cursor: "pointer",
-    borderRadius: 12,
-    transition: "transform 0.12s, background 0.12s",
+    borderRadius: 14,
+    transition: "transform 0.12s",
     padding: 0,
     flexShrink: 0,
+    color: "#555",
   };
 
   return (
     <>
-      {/* CSS media query: only show on mobile */}
       <style>{`
         .floating-actions-bar { display: none !important; }
         @media (max-width: 768px) {
@@ -123,27 +123,31 @@ export function FloatingActions({ actions }: FloatingActionsProps) {
         className="floating-actions-bar"
         style={{
           position: "fixed",
-          bottom: "calc(64px + env(safe-area-inset-bottom, 0px))",
-          left: "50%",
-          transform: "translateX(-50%)",
+          bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
+          left: 0,
+          right: 0,
           zIndex: 105,
           display: "flex",
           alignItems: "center",
-          gap: 8,
-          maxWidth: 280,
+          justifyContent: "space-between",
+          padding: "0 16px",
+          pointerEvents: "none",
         }}
       >
-        {/* Secondary actions grouped pill */}
-        {secondary.length > 0 && (
+        {/* Left: secondary actions grouped in a pill bar */}
+        {secondary.length > 0 ? (
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 2,
-              background: "#fff",
-              borderRadius: 20,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
-              padding: "4px 6px",
+              gap: 0,
+              background: "rgba(255,255,255,0.92)",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+              borderRadius: 22,
+              boxShadow: "0 2px 16px rgba(0,0,0,0.10)",
+              padding: "3px 4px",
+              pointerEvents: "auto",
             }}
           >
             {secondary.map((action, i) => (
@@ -153,47 +157,54 @@ export function FloatingActions({ actions }: FloatingActionsProps) {
                 title={action.label}
                 disabled={action.disabled}
                 onClick={action.onClick}
-                onMouseDown={(e) => { e.currentTarget.style.transform = "scale(0.9)"; }}
-                onMouseUp={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
-                onTouchStart={(e) => { e.currentTarget.style.transform = "scale(0.9)"; }}
+                onTouchStart={(e) => { e.currentTarget.style.transform = "scale(0.85)"; }}
                 onTouchEnd={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+                onMouseDown={(e) => { e.currentTarget.style.transform = "scale(0.85)"; }}
+                onMouseUp={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
                 style={{
-                  ...btnBase,
-                  color: "#666",
-                  opacity: action.disabled ? 0.4 : 1,
+                  ...btnStyle,
+                  opacity: action.disabled ? 0.35 : 1,
                 }}
               >
                 {action.icon}
               </button>
             ))}
           </div>
-        )}
+        ) : <div />}
 
-        {/* Primary action pill */}
-        {primary && (
+        {/* Right: primary action as separate circle */}
+        {primary ? (
           <button
             type="button"
             title={primary.label}
             disabled={primary.disabled}
             onClick={primary.onClick}
-            onMouseDown={(e) => { e.currentTarget.style.transform = "scale(0.9)"; }}
-            onMouseUp={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
-            onTouchStart={(e) => { e.currentTarget.style.transform = "scale(0.9)"; }}
+            onTouchStart={(e) => { e.currentTarget.style.transform = "scale(0.85)"; }}
             onTouchEnd={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+            onMouseDown={(e) => { e.currentTarget.style.transform = "scale(0.85)"; }}
+            onMouseUp={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
             style={{
-              ...btnBase,
               width: 52,
               height: 52,
+              borderRadius: 18,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "none",
+              cursor: primary.disabled ? "default" : "pointer",
+              padding: 0,
+              flexShrink: 0,
+              pointerEvents: "auto",
+              transition: "transform 0.12s",
               background: "#D4775A",
               color: "#fff",
-              borderRadius: 20,
-              boxShadow: "0 4px 20px rgba(212,119,90,0.35)",
+              boxShadow: "0 4px 16px rgba(212,119,90,0.35)",
               opacity: primary.disabled ? 0.5 : 1,
             }}
           >
             {primary.icon}
           </button>
-        )}
+        ) : <div />}
       </div>
     </>
   );
