@@ -6,7 +6,7 @@ import * as fs from "node:fs/promises";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { detectCategoryFromName, normalizeIngredientName } from "@/lib/invoices/categoryDetector";
 import { detectAllergensFromName } from "@/lib/invoices/allergenDetector";
-import { extractPackFromName, extractVolumeFromName } from "@/lib/invoices/utils";
+import { extractPackFromName, extractVolumeFromName, extractWeightGFromName } from "@/lib/invoices/utils";
 import type { Category } from "@/types/ingredients";
 
 const execFileAsync = promisify(execFile);
@@ -398,6 +398,22 @@ export async function runImport(options: {
 
       const allergens = detectAllergensFromName(nm);
 
+      // piece_weight_g : valeur parsée si unité pièce et pas de volume détecté
+      let pieceWeightG: number | null = null;
+      if (l.unit === "pc" && pieceVolumeMl == null) {
+        pieceWeightG = l.piece_weight_g ?? extractWeightGFromName(nm);
+      }
+
+      // storage_zone : auto-détection basée sur la catégorie
+      let storageZone: string | null = null;
+      if (cat === "cremerie_fromage" || cat === "maree" || cat === "charcuterie_viande" || cat === "legumes_herbes" || cat === "fruit") {
+        storageZone = "FRIGO";
+      } else if (cat === "alcool_spiritueux") {
+        storageZone = "CAVE A VIN";
+      } else if (cat === "boisson") {
+        storageZone = "BAR";
+      }
+
       const ingRow: Record<string, unknown> = {
         user_id: userId,
         name: nm,
@@ -413,6 +429,8 @@ export async function runImport(options: {
         status: "to_check",
         status_note: statusNote,
         piece_volume_ml: pieceVolumeMl,
+        piece_weight_g: pieceWeightG,
+        storage_zone: storageZone,
       };
       if (etabId) ingRow.etablissement_id = etabId;
       // Always assign both establishments — user refines at validation

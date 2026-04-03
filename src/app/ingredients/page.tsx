@@ -651,8 +651,8 @@ function IngredientsPageInner() {
     if (!edit) return null;
     if (!edit.useOffer) return null;
     const supplier_id = edit.category === "preparation" ? null : (normalizeSupplierId(edit.supplierId) || null);
-    if (!supplier_id) { alert("Fournisseur obligatoire pour l'offre."); return null; }
-    if (!uid) { alert("Utilisateur non connecté. Impossible d'enregistrer l'offre."); return null; }
+    if (!supplier_id) return null;
+    if (!uid) return null;
     const resolvedEtabId = etab?.id ?? ingEtabId;
     const etabExtra = resolvedEtabId ? { etablissement_id: resolvedEtabId } : {};
 
@@ -674,30 +674,30 @@ function IngredientsPageInner() {
 
     if (edit.baseUnit === "kg") {
       if (!edit.hasConditionnement) {
-        if (basePrice == null || basePrice <= 0) { alert("Prix unitaire invalide."); return null; }
+        if (basePrice == null || basePrice <= 0) return null;
         return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "kg", unit_price: basePrice, price: basePrice, density_kg_per_l: null, piece_weight_g: null, is_active: true, ...etabExtra };
       } else {
-        if (condPrice == null || condPrice <= 0) { alert("Prix du conditionnement invalide."); return null; }
-        if (condQty == null || condQty <= 0) { alert("Quantité par conditionnement invalide."); return null; }
+        if (condPrice == null || condPrice <= 0) return null;
+        if (condQty == null || condQty <= 0) return null;
         return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_simple", pack_price: condPrice, price: condPrice, pack_total_qty: condQty, pack_unit: "kg", density_kg_per_l: null, piece_weight_g: null, is_active: true, ...etabExtra };
       }
     } else if (edit.baseUnit === "litre") {
       if (!edit.hasConditionnement) {
-        if (basePrice == null || basePrice <= 0) { alert("Prix unitaire invalide."); return null; }
+        if (basePrice == null || basePrice <= 0) return null;
         return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "l", unit_price: basePrice, price: basePrice, density_kg_per_l: null, piece_weight_g: null, is_active: true, ...etabExtra };
       } else {
-        if (condPrice == null || condPrice <= 0) { alert("Prix du conditionnement invalide."); return null; }
-        if (condQty == null || condQty <= 0) { alert("Quantité par conditionnement invalide."); return null; }
+        if (condPrice == null || condPrice <= 0) return null;
+        if (condQty == null || condQty <= 0) return null;
         return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_simple", pack_price: condPrice, price: condPrice, pack_total_qty: condQty, pack_unit: "l", density_kg_per_l: null, piece_weight_g: null, is_active: true, ...etabExtra };
       }
     } else {
       // piece
       if (!edit.hasConditionnement) {
-        if (basePrice == null || basePrice <= 0) { alert("Prix unitaire invalide."); return null; }
+        if (basePrice == null || basePrice <= 0) return null;
         return { user_id: uid, ingredient_id, supplier_id, price_kind: "unit", unit: "pc", unit_price: basePrice, price: basePrice, density_kg_per_l: null, piece_weight_g: pieceWeightG, is_active: true, ...etabExtra };
       } else {
-        if (condPrice == null || condPrice <= 0) { alert("Prix du conditionnement invalide."); return null; }
-        if (condQty == null || condQty <= 0) { alert("Quantité par conditionnement invalide."); return null; }
+        if (condPrice == null || condPrice <= 0) return null;
+        if (condQty == null || condQty <= 0) return null;
         return { user_id: uid, ingredient_id, supplier_id, price_kind: "pack_composed", pack_price: condPrice, price: condPrice, pack_count: condQty, pack_each_unit: "pc", pack_each_qty: null, piece_weight_g: pieceWeightG, density_kg_per_l: null, is_active: true, ...etabExtra };
       }
     }
@@ -766,22 +766,22 @@ function IngredientsPageInner() {
       }
       return;
     }
-    if (edit.useOffer && supplier_id) {
-      if (!userId) { alert("Utilisateur non connecté. Impossible d'enregistrer l'offre."); return; }
+    if (edit.useOffer && supplier_id && userId) {
       const editedIng = items.find((i) => i.id === editingId);
       const offerPayload = buildOfferFromEdit(editingId, userId, editedIng?.etablissement_id);
-      if (!offerPayload) return;
-      // Désactiver TOUTES les offres actives de cet ingrédient (tous fournisseurs)
-      const dPrev = await supabase.from("supplier_offers").update({ is_active: false }).eq("ingredient_id", editingId).eq("is_active", true);
-      if (dPrev.error) { alert(dPrev.error.message); return; }
-      const off = await supabase.from("supplier_offers").insert(offerPayload);
-      if (off.error) { alert(off.error.message); return; }
+      if (offerPayload) {
+        // Désactiver TOUTES les offres actives de cet ingrédient (tous fournisseurs)
+        const dPrev = await supabase.from("supplier_offers").update({ is_active: false }).eq("ingredient_id", editingId).eq("is_active", true);
+        if (dPrev.error) { alert(dPrev.error.message); return; }
+        const off = await supabase.from("supplier_offers").insert(offerPayload);
+        if (off.error) { alert(off.error.message); return; }
 
-      // Mettre à jour les ingrédients dérivés si le prix unitaire a changé
-      if (edit.pricePerBaseUnit) {
-        const newPrice = parseNum(edit.pricePerBaseUnit);
-        if (newPrice) {
-          await updateDerivedIngredients(supabase, editingId, newPrice);
+        // Mettre à jour les ingrédients dérivés si le prix unitaire a changé
+        if (edit.pricePerBaseUnit) {
+          const newPrice = parseNum(edit.pricePerBaseUnit);
+          if (newPrice) {
+            await updateDerivedIngredients(supabase, editingId, newPrice);
+          }
         }
       }
     }
