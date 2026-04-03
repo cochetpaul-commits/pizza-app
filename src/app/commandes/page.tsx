@@ -303,6 +303,18 @@ function CommandesPage() {
   const [histOpen, setHistOpen] = useState(false);
   const [historique, setHistorique] = useState<HistItem[]>([]);
 
+  // Pending receptions (validated orders awaiting reception)
+  const [pendingReceptions, setPendingReceptions] = useState<{
+    id: string; supplier_id: string; supplier_name: string;
+    created_at: string; nb_articles: number; total_ht: number;
+  }[]>([]);
+
+  // Active sessions across all suppliers (brouillon + en_attente)
+  const [activeSessions, setActiveSessions] = useState<{
+    id: string; supplier_id: string; supplier_name: string;
+    status: string; created_at: string; nb_articles: number; total_ht: number;
+  }[]>([]);
+
   // Loading
   const [loading, setLoading] = useState(true);
   const [loadingSupplier, setLoadingSupplier] = useState(false);
@@ -373,6 +385,51 @@ function CommandesPage() {
           if (aHas !== bHas) return aHas - bHas;
           return a.name.localeCompare(b.name, "fr");
         });
+
+        // Load pending receptions (validated orders)
+        const { data: validees } = await supabase
+          .from("commande_sessions")
+          .select("id, supplier_id, created_at, total_ht, commande_lignes(count)")
+          .eq("etablissement_id", etab.id)
+          .eq("status", "validee")
+          .order("created_at", { ascending: false });
+        const supplierMap = new Map(list.map((s) => [s.id, s.name]));
+        // Also map alias IDs to canonical names
+        for (const [canonical, aliasSet] of aliases.entries()) {
+          const name = supplierMap.get(canonical);
+          if (name) for (const aid of aliasSet) supplierMap.set(aid, name);
+        }
+        setPendingReceptions(
+          (validees ?? []).map((v: { id: string; supplier_id: string; created_at: string; total_ht: number; commande_lignes: { count: number }[] }) => ({
+            id: v.id,
+            supplier_id: v.supplier_id,
+            supplier_name: supplierMap.get(v.supplier_id) ?? "Fournisseur",
+            created_at: v.created_at,
+            nb_articles: v.commande_lignes?.[0]?.count ?? 0,
+            total_ht: v.total_ht ?? 0,
+          }))
+        );
+
+        // Load active sessions (brouillon + en_attente) across all suppliers
+        const { data: actives } = await supabase
+          .from("commande_sessions")
+          .select("id, supplier_id, status, created_at, total_ht, commande_lignes(count)")
+          .eq("etablissement_id", etab.id)
+          .in("status", ["brouillon", "en_attente"])
+          .order("created_at", { ascending: false });
+        setActiveSessions(
+          (actives ?? [])
+            .filter((a: { commande_lignes: { count: number }[] }) => a.commande_lignes?.[0]?.count > 0)
+            .map((a: { id: string; supplier_id: string; status: string; created_at: string; total_ht: number; commande_lignes: { count: number }[] }) => ({
+              id: a.id,
+              supplier_id: a.supplier_id,
+              supplier_name: supplierMap.get(a.supplier_id) ?? "Fournisseur",
+              status: a.status,
+              created_at: a.created_at,
+              nb_articles: a.commande_lignes?.[0]?.count ?? 0,
+              total_ht: a.total_ht ?? 0,
+            }))
+        );
       }
 
       setSuppliers(list);
@@ -701,6 +758,92 @@ function CommandesPage() {
     setSaving(false);
     setConfirmation("Commande marquée comme reçue");
     setTimeout(() => setConfirmation(null), 4000);
+  }
+
+  async function recevoirPending(sessionId: string) {
+    setSaving(true);
+    await fetchApi("/api/commandes/session", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: sessionId, status: "recue" }),
+    });
+    setPendingReceptions((prev) => prev.filter((r) => r.id !== sessionId));
+    // If this was the currently viewed session, reload it
+    if (session?.id === sessionId) await reloadSession();
+    setSaving(false);
+    setConfirmation("Commande marquee comme recue");
+    setTimeout(() => setConfirmation(null), 4000);
+  }
+
+  async function downloadPdfById(sessionId: string, supplierName: string) {
+    const res = await fetchApi(`/api/commandes/pdf?session_id=${sessionId}`);
+    if (!res.ok) { alert("Erreur lors de la generation du PDF"); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `commande-${supplierName.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function validerActiveSession(sessionId: string) {
+    setSaving(true);
+    await fetchApi("/api/commandes/session", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: sessionId, status: "validee" }),
+    });
+    // Move from activeSessions to pendingReceptions
+    const sess = activeSessions.find((s) => s.id === sessionId);
+    if (sess) {
+      setActiveSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      setPendingReceptions((prev) => [{ ...sess, status: "validee" }, ...prev]);
+    }
+    // Remove from draft supplier ids
+    if (sess) {
+      setDraftSupplierIds((prev) => {
+        const next = new Set(prev);
+        // Only remove if no other active session for this supplier
+        const otherDraft = activeSessions.some((s) => s.id !== sessionId && s.supplier_id === sess.supplier_id && s.status === "brouillon");
+        if (!otherDraft) next.delete(sess.supplier_id);
+        return next;
+      });
+    }
+    if (session?.id === sessionId) await reloadSession();
+    setSaving(false);
+    setConfirmation("Commande validee");
+    setTimeout(() => setConfirmation(null), 4000);
+  }
+
+  async function sendEmailForSession(sessionId: string) {
+    setSendingEmail(true);
+    try {
+      const auth = localStorage.getItem(Object.keys(localStorage).find(k => k.includes("auth-token")) ?? "");
+      let token = "";
+      if (auth) { try { const p = JSON.parse(auth); token = p?.access_token ?? p?.currentSession?.access_token ?? ""; } catch { /* ignore */ } }
+      const etabId = etab?.id ?? "";
+      const res = await fetchApi("/api/commandes/send-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          "x-etablissement-id": etabId,
+        },
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setConfirmation(`Mail envoye a ${data.recipients?.join(", ")}`);
+      } else {
+        alert(data.error ?? "Erreur envoi mail");
+      }
+    } catch (err) {
+      console.error("[commandes] send email error:", err);
+      alert("Erreur lors de l'envoi du mail");
+    }
+    setSendingEmail(false);
+    setTimeout(() => setConfirmation(null), 6000);
   }
 
   // ── PDF download ──────────────────────────────────────────────────────
@@ -1437,6 +1580,157 @@ function CommandesPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Réceptions en attente */}
+        {!loading && pendingReceptions.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{
+              fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
+              color: "#4a6741", marginBottom: 8,
+              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+            }}>
+              Receptions en attente
+            </div>
+            {pendingReceptions.map((r) => (
+              <div key={r.id} style={{
+                background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce",
+                borderLeft: "4px solid #4a6741", padding: "14px 16px", marginBottom: 8,
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{r.supplier_name}</span>
+                    <span style={{ fontSize: 11, color: "#999" }}>{fmtDate(r.created_at)}</span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                    <span style={{ fontSize: 12, color: "#666" }}>{r.nb_articles} article{r.nb_articles > 1 ? "s" : ""}</span>
+                    {r.total_ht > 0 && (
+                      <span style={{
+                        fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                        fontWeight: 700, fontSize: 16, color: "#1a1a1a",
+                      }}>
+                        {r.total_ht.toFixed(2)} €
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button type="button" onClick={() => downloadPdfById(r.id, r.supplier_name)}
+                    style={{
+                      fontSize: 11, fontWeight: 600, color: "#4a6741", background: "#fff",
+                      border: "1px solid #ddd6c8", borderRadius: 6, cursor: "pointer", padding: "5px 12px",
+                      fontFamily: "inherit",
+                    }}>
+                    PDF
+                  </button>
+                  <button type="button" onClick={() => recevoirPending(r.id)} disabled={saving}
+                    style={{
+                      fontSize: 11, fontWeight: 700, color: "#fff", background: "#16a34a",
+                      border: "none", borderRadius: 6, cursor: "pointer", padding: "5px 14px",
+                      fontFamily: "inherit",
+                    }}>
+                    Receptionner
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Commandes en cours */}
+        {!loading && activeSessions.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{
+              fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
+              color: "#A0845C", marginBottom: 8,
+              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+            }}>
+              Commandes en cours
+            </div>
+            {activeSessions.map((s) => {
+              const isBrouillon = s.status === "brouillon";
+              const badgeColor = isBrouillon ? "#A0845C" : "#2563EB";
+              const badgeBg = isBrouillon ? "#FFF8F0" : "#EFF6FF";
+              const isCurrentSupplier = s.supplier_id === selectedSupplierId;
+              return (
+                <div key={s.id} style={{
+                  background: isCurrentSupplier ? "#fdf5f2" : "#fff",
+                  borderRadius: 10, border: isCurrentSupplier ? "1.5px solid #D4775A" : "1px solid #e0d8ce",
+                  padding: "10px 14px", marginBottom: 6,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", flex: 1 }}>{s.supplier_name}</span>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
+                      background: badgeBg, color: badgeColor, whiteSpace: "nowrap",
+                    }}>
+                      {statusLabel[s.status] ?? s.status}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 11, color: "#666" }}>{s.nb_articles} article{s.nb_articles > 1 ? "s" : ""}</span>
+                      {s.total_ht > 0 && (
+                        <span style={{
+                          fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                          fontWeight: 700, fontSize: 13, color: "#1a1a1a",
+                        }}>
+                          {s.total_ht.toFixed(2)} €
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button type="button" onClick={() => downloadPdfById(s.id, s.supplier_name)}
+                        style={{
+                          fontSize: 10, fontWeight: 600, color: "#4a6741", background: "#fff",
+                          border: "1px solid #ddd6c8", borderRadius: 6, cursor: "pointer", padding: "4px 8px",
+                          fontFamily: "inherit",
+                        }}>
+                        PDF
+                      </button>
+                      {isBrouillon && (
+                        <button type="button" onClick={() => sendEmailForSession(s.id)} disabled={sendingEmail}
+                          style={{
+                            fontSize: 10, fontWeight: 600, color: "#2563EB", background: "#fff",
+                            border: "1px solid #ddd6c8", borderRadius: 6, cursor: "pointer", padding: "4px 8px",
+                            fontFamily: "inherit", opacity: sendingEmail ? 0.6 : 1,
+                          }}>
+                          Envoyer
+                        </button>
+                      )}
+                      {isBrouillon && (
+                        <button type="button" onClick={() => validerActiveSession(s.id)} disabled={saving}
+                          style={{
+                            fontSize: 10, fontWeight: 700, color: "#fff", background: "#4a6741",
+                            border: "none", borderRadius: 6, cursor: "pointer", padding: "4px 10px",
+                            fontFamily: "inherit",
+                          }}>
+                          Valider
+                        </button>
+                      )}
+                      {!isCurrentSupplier && (
+                        <button type="button" onClick={() => {
+                          // Find canonical supplier id for this session
+                          let canonicalId = s.supplier_id;
+                          for (const [cid, aliasSet] of supplierAliases.entries()) {
+                            if (aliasSet.has(s.supplier_id)) { canonicalId = cid; break; }
+                          }
+                          setSelectedSupplierId(canonicalId);
+                        }}
+                          style={{
+                            fontSize: 10, fontWeight: 700, color: "#D4775A", background: "#FFF0EB",
+                            border: "1px solid #D4775A", borderRadius: 6, cursor: "pointer", padding: "4px 10px",
+                            fontFamily: "inherit",
+                          }}>
+                          Reprendre
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
