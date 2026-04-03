@@ -24,21 +24,28 @@ export type ParsedInvoice = {
 function extractMeta(
   text: string
 ): Pick<ParsedInvoice, "invoice_number" | "invoice_date" | "total_ht" | "total_ttc"> {
-  // "Facture n°A01-F-2025-00924"
-  const invMatch = text.match(/Facture\s+n°([\w-]+)/i);
-  const invoice_number = invMatch ? invMatch[1] : null;
+  // New format: "Facture n°A01-F-2025-00924"
+  // Old format: "Facture N° 2500000157 du 05/09/2025"
+  const invMatch = text.match(/Facture\s+[Nn]°?\s*([\w-]+)/i);
+  const invoice_number = invMatch ? invMatch[1].trim() : null;
 
-  // "Date d'émission : 02/10/2025"
-  const dateMatch = text.match(/Date\s+d.émission\s*:\s*(\d{2}\/\d{2}\/\d{4})/i);
+  // New format: "Date d'émission : 02/10/2025"
+  // Old format: "Facture N° 2500000157 du 05/09/2025"
+  const dateMatch = text.match(/Date\s+d.émission\s*:\s*(\d{2}\/\d{2}\/\d{4})/i)
+    ?? text.match(/Facture\s+N°\s*[\w-]+\s+du\s+(\d{2}\/\d{2}\/\d{4})/i);
   const invoice_date = dateMatch ? dateMatch[1] : null;
 
-  // "Montant Total HT 46.90€"
-  const htMatch = text.match(/Montant\s+Total\s+HT\s+([\d.]+)€/i);
-  const total_ht = htMatch ? parseFloat(htMatch[1]) : null;
+  // New format: "Montant total HT 165.26€"
+  // Old format: "Total H.T. 110,46 €" or "Net H.T. 110,46 €"
+  const htMatch = text.match(/Montant\s+[Tt]otal\s+H\.?T\.?\s+([\d.,]+)\s*€/i)
+    ?? text.match(/(?:Total|Net)\s+H\.T\.\s+([\d.,\s]+)\s*€/i);
+  const total_ht = htMatch ? parseFloat(htMatch[1].replace(/\s/g, "").replace(",", ".")) : null;
 
-  // "Montant Total TTC 56.28€" (the one followed by a number, not the table header)
-  const ttcMatch = text.match(/Montant\s+Total\s+TTC\s+([\d.]+)€/i);
-  const total_ttc = ttcMatch ? parseFloat(ttcMatch[1]) : null;
+  // New format: "Montant total TTC 191.15€"
+  // Old format: "Total T.T.C. 132,55 €"
+  const ttcMatch = text.match(/Montant\s+[Tt]otal\s+TTC\s+([\d.,]+)\s*€/i)
+    ?? text.match(/Total\s+T\.T\.C\.\s+([\d.,\s]+)\s*€/i);
+  const total_ttc = ttcMatch ? parseFloat(ttcMatch[1].replace(/\s/g, "").replace(",", ".")) : null;
 
   return { invoice_number, invoice_date, total_ht, total_ttc };
 }
@@ -51,58 +58,78 @@ function toUnit(raw: string): "pc" | "kg" | "l" | null {
   return "pc"; // fallback for unknown units
 }
 
-function parseLines(text: string): ParsedLine[] {
-  const rows = text.split(/\r?\n/).map((r) => r.trim()).filter(Boolean);
+/** Detect which format: "new" (Winopos) or "old" (classic) */
+function detectFormat(text: string): "new" | "old" {
+  if (/^Nom\s+Quantité/m.test(text)) return "new";
+  if (/Désignations\s+Quantité/i.test(text)) return "old";
+  if (/P\.u\.\s*HT/i.test(text)) return "old";
+  return "new";
+}
 
-  // Products sit between the column header and the summary total line
+/** New format (Winopos): "Nom | Quantité | Unité | Prix unitaire HT | TVA | Montant total TTC" */
+function parseLinesNew(text: string): ParsedLine[] {
+  const rows = text.split(/\r?\n/).map((r) => r.trim()).filter(Boolean);
   const HEADER_RE = /^Nom\s+Quantité/;
-  // Data line: "1 Pièce 29.00€ 20% 34.80€"
-  const DATA_RE = /^(\d+(?:[,.]\d+)?)\s+(\S+)\s+([\d.]+)€\s+(\d+)%\s+([\d.]+)€$/;
-  // End of product section
-  const END_RE = /^Montant\s+Total\s+TTC\s+[\d.]+€/i;
+  const DATA_RE = /^(\d+(?:[,.]\d+)?)\s+(\S+)\s+([\d.]+)€\s+(\d+(?:[.,]\d+)?)%\s+([\d.]+)€$/;
+  const END_RE = /^Montant\s+[Tt]otal\s+TTC\s+[\d.]+€/i;
 
   let inProducts = false;
   const result: ParsedLine[] = [];
   let nameLines: string[] = [];
 
   for (const row of rows) {
-    if (!inProducts) {
-      if (HEADER_RE.test(row)) inProducts = true;
-      continue;
-    }
+    if (!inProducts) { if (HEADER_RE.test(row)) inProducts = true; continue; }
     if (END_RE.test(row)) break;
-
     const m = DATA_RE.exec(row);
     if (m) {
       const qty = parseFloat(m[1].replace(",", "."));
-      const unitRaw = m[2];
       const unitPrice = parseFloat(m[3]);
-      const taxRate = parseInt(m[4], 10);
-
-      const unit = toUnit(unitRaw);
       const name = nameLines.join(" - ").trim();
-
       if (name) {
-        result.push({
-          sku: null,
-          name,
-          quantity: qty,
-          unit,
-          unit_price: unitPrice,
-          total_price: Math.round(unitPrice * qty * 100) / 100,
-          tax_rate: taxRate,
-          notes: null,
-          piece_weight_g: null,
-          piece_volume_ml: null,
-        });
+        result.push({ sku: null, name, quantity: qty, unit: toUnit(m[2]), unit_price: unitPrice, total_price: Math.round(unitPrice * qty * 100) / 100, tax_rate: parseInt(m[4], 10), notes: null, piece_weight_g: null, piece_volume_ml: null });
       }
       nameLines = [];
-    } else {
-      nameLines.push(row);
+    } else { nameLines.push(row); }
+  }
+  return result;
+}
+
+/** Old format (classic): "Désignations | Quantité | P.u. HT | Montant HT | Tva" */
+function parseLinesOld(text: string): ParsedLine[] {
+  const rows = text.split(/\r?\n/).map((r) => r.trim()).filter(Boolean);
+  // Match lines like: "NUAGE GIN 70CL 2,00 17,55 € 35,10 € V5"
+  // Or: "BERTO APERITIVO 1L 1,00 15,60 € 15,60 € V5"
+  const LINE_RE = /^(.+?)\s+(\d+[,.]\d+)\s+([\d.,\s]+)\s*€\s+([\d.,\s]+)\s*€\s+(V\d+)$/;
+  const END_RE = /^Total\s*:/i;
+
+  // Find where product lines start (after "Désignations" header or "Tva" header)
+  let started = false;
+  const result: ParsedLine[] = [];
+
+  for (const row of rows) {
+    if (/Désignations\s+Quantité/i.test(row) || /Montant HT\s+Tva/i.test(row)) { started = true; continue; }
+    if (!started) continue;
+    if (END_RE.test(row)) break;
+
+    const m = LINE_RE.exec(row);
+    if (m) {
+      const name = m[1].trim();
+      const qty = parseFloat(m[2].replace(",", "."));
+      const unitPrice = parseFloat(m[3].replace(/\s/g, "").replace(",", "."));
+      const totalPrice = parseFloat(m[4].replace(/\s/g, "").replace(",", "."));
+      // V5 = 20%, V1 = 5.5%
+      const taxCode = m[5];
+      const taxRate = taxCode === "V5" ? 20 : taxCode === "V1" ? 5.5 : 20;
+
+      result.push({ sku: null, name, quantity: qty, unit: "pc", unit_price: unitPrice, total_price: totalPrice, tax_rate: taxRate, notes: null, piece_weight_g: null, piece_volume_ml: null });
     }
   }
-
   return result;
+}
+
+function parseLines(text: string): ParsedLine[] {
+  const fmt = detectFormat(text);
+  return fmt === "old" ? parseLinesOld(text) : parseLinesNew(text);
 }
 
 export function parseBarSpiritsInvoiceText(text: string): ParsedInvoice {
