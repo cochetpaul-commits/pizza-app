@@ -218,11 +218,13 @@ export async function POST(request: NextRequest) {
       },
     );
 
-    // 7. Update session status
-    await supabaseAdmin
-      .from("commande_sessions")
-      .update({ status: "en_attente" })
-      .eq("id", session_id);
+    // 7. Update session status only if currently brouillon
+    if (session.status === "brouillon") {
+      await supabaseAdmin
+        .from("commande_sessions")
+        .update({ status: "en_attente" })
+        .eq("id", session_id);
+    }
 
     return NextResponse.json({
       ok: true,

@@ -295,6 +295,9 @@ function CommandesPage() {
   // Confirmation banner
   const [confirmation, setConfirmation] = useState<string | null>(null);
 
+  // Email sending state
+  const [sendingEmail, setSendingEmail] = useState(false);
+
   // Historique
   const [histOpen, setHistOpen] = useState(false);
   const [historique, setHistorique] = useState<HistItem[]>([]);
@@ -678,6 +681,41 @@ function CommandesPage() {
     URL.revokeObjectURL(url);
   }
 
+  // ── Send email only (no status change) ──────────────────────────────
+
+  async function sendEmailOnly(sessionId: string) {
+    setSendingEmail(true);
+    try {
+      const auth = localStorage.getItem(Object.keys(localStorage).find(k => k.includes("auth-token")) ?? "");
+      let token = "";
+      if (auth) { try { const p = JSON.parse(auth); token = p?.access_token ?? p?.currentSession?.access_token ?? ""; } catch { /* ignore */ } }
+      const etabId = etab?.id ?? "";
+
+      const res = await fetchApi("/api/commandes/send-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          "x-etablissement-id": etabId,
+        },
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+      const data = await res.json();
+
+      if (data.ok) {
+        setConfirmation(`Mail envoye a ${data.recipients?.join(", ")}`);
+        await reloadSession();
+      } else {
+        alert(data.error ?? "Erreur envoi mail");
+      }
+    } catch (err) {
+      console.error("[commandes] send email error:", err);
+      alert("Erreur lors de l'envoi du mail");
+    }
+    setSendingEmail(false);
+    setTimeout(() => setConfirmation(null), 6000);
+  }
+
   // ── Historique ────────────────────────────────────────────────────────
 
   async function loadHistorique() {
@@ -958,29 +996,45 @@ function CommandesPage() {
           {session.status === "validee" && "Commande validée"}
           {session.status === "recue" && "Commande reçue"}
 
-          {session.status === "en_attente" && canValidate && (
-            <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "center" }}>
-              <button onClick={() => rejeterSession(session.id)} disabled={saving}
-                style={{ padding: "8px 20px", borderRadius: 8, border: "1.5px solid #8B1A1A", background: "#fff", color: "#8B1A1A", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                Refuser / Corriger
+          {session.status === "en_attente" && (
+            <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "center", flexWrap: "wrap" }}>
+              <button onClick={() => downloadPdf(session.id)}
+                style={{ padding: "8px 20px", borderRadius: 8, border: "1.5px solid #ddd6c8", background: "#fff", color: "#1a1a1a", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                Telecharger PDF
               </button>
-              <button onClick={() => validerSession(session.id)} disabled={saving}
-                style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#4a6741", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                Valider la commande
+              <button onClick={() => sendEmailOnly(session.id)} disabled={sendingEmail}
+                style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#D4775A", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: sendingEmail ? 0.6 : 1 }}>
+                {sendingEmail ? "Envoi..." : "Envoyer par mail"}
               </button>
+              {canValidate && (
+                <>
+                  <button onClick={() => rejeterSession(session.id)} disabled={saving}
+                    style={{ padding: "8px 20px", borderRadius: 8, border: "1.5px solid #8B1A1A", background: "#fff", color: "#8B1A1A", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                    Refuser / Corriger
+                  </button>
+                  <button onClick={() => validerSession(session.id)} disabled={saving}
+                    style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#4a6741", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                    Valider la commande
+                  </button>
+                </>
+              )}
             </div>
           )}
 
           {session.status === "validee" && (
             <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "center", flexWrap: "wrap" }}>
               <button onClick={() => downloadPdf(session.id)}
-                style={{ padding: "8px 20px", borderRadius: 8, border: "1.5px solid #4a6741", background: "#fff", color: "#4a6741", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                Télécharger PDF
+                style={{ padding: "8px 20px", borderRadius: 8, border: "1.5px solid #ddd6c8", background: "#fff", color: "#1a1a1a", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                Telecharger PDF
+              </button>
+              <button onClick={() => sendEmailOnly(session.id)} disabled={sendingEmail}
+                style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#D4775A", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: sendingEmail ? 0.6 : 1 }}>
+                {sendingEmail ? "Envoi..." : "Envoyer par mail"}
               </button>
               {canValidate && (
                 <button onClick={() => recevoirSession(session.id)} disabled={saving}
                   style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                  Marquer comme reçue
+                  Marquer comme recue
                 </button>
               )}
             </div>
@@ -1062,12 +1116,21 @@ function CommandesPage() {
           background: statusBannerBg.brouillon, border: `1.5px solid ${statusColor.brouillon}`,
           color: statusColor.brouillon, padding: "10px 16px", borderRadius: 10,
           fontSize: 13, fontWeight: 600, marginBottom: 12,
-          display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span>Brouillon</span>
-          <span style={{ fontWeight: 700, color: "#D4775A" }}>
-            {activeCount} article{activeCount > 1 ? "s" : ""}
-          </span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>Brouillon</span>
+            <span style={{ fontWeight: 700, color: "#D4775A" }}>
+              {activeCount} article{activeCount > 1 ? "s" : ""}
+            </span>
+          </div>
+          {activeCount > 0 && (
+            <div style={{ display: "flex", gap: 8, marginTop: 8, justifyContent: "flex-start" }}>
+              <button onClick={() => downloadPdf(session.id)}
+                style={{ padding: "6px 14px", borderRadius: 8, border: "1.5px solid #ddd6c8", background: "#fff", color: "#1a1a1a", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
+                Telecharger PDF
+              </button>
+            </div>
+          )}
         </div>
 
         {catalog.length === 0 && (
@@ -1381,24 +1444,28 @@ function CommandesPage() {
 
         {/* Bouton flottant — en_attente → valider */}
         {session && session.status === "en_attente" && canValidate && (
-          <div style={{ position: "fixed", bottom: "calc(70px + env(safe-area-inset-bottom, 0px))", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 10, zIndex: 110 }}>
+          <div style={{ position: "fixed", bottom: "calc(70px + env(safe-area-inset-bottom, 0px))", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 10, zIndex: 110, flexWrap: "wrap", justifyContent: "center", maxWidth: "95vw" }}>
             <button type="button" onClick={() => rejeterSession(session.id)} disabled={saving}
               style={{ ...floatingBtn, position: "static", bottom: "auto", left: "auto", transform: "none", background: "#fff", color: "#8B1A1A", border: "1.5px solid #8B1A1A", boxShadow: "0 6px 24px rgba(0,0,0,0.15)" }}>
               Refuser
             </button>
             <button type="button" onClick={() => validerSession(session.id)} disabled={saving}
               style={{ ...floatingBtn, position: "static", bottom: "auto", left: "auto", transform: "none", background: "#4a6741", boxShadow: "0 6px 24px rgba(74,103,65,0.4)" }}>
-              {saving ? "..." : "Valider la commande"}
+              {saving ? "..." : "Valider"}
             </button>
           </div>
         )}
 
-        {/* Bouton flottant — validée → recevoir + PDF */}
+        {/* Bouton flottant — validée → recevoir + PDF + Email */}
         {session && session.status === "validee" && (
-          <div style={{ position: "fixed", bottom: "calc(70px + env(safe-area-inset-bottom, 0px))", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 10, zIndex: 110 }}>
+          <div style={{ position: "fixed", bottom: "calc(70px + env(safe-area-inset-bottom, 0px))", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 10, zIndex: 110, flexWrap: "wrap", justifyContent: "center", maxWidth: "95vw" }}>
             <button type="button" onClick={() => downloadPdf(session.id)}
               style={{ ...floatingBtn, position: "static", bottom: "auto", left: "auto", transform: "none", background: "#fff", color: "#4a6741", border: "1.5px solid #4a6741", boxShadow: "0 6px 24px rgba(0,0,0,0.15)" }}>
               PDF
+            </button>
+            <button type="button" onClick={() => sendEmailOnly(session.id)} disabled={sendingEmail}
+              style={{ ...floatingBtn, position: "static", bottom: "auto", left: "auto", transform: "none", background: "#D4775A", boxShadow: "0 6px 24px rgba(212,119,90,0.4)", opacity: sendingEmail ? 0.6 : 1 }}>
+              {sendingEmail ? "Envoi..." : "Envoyer par mail"}
             </button>
             {canValidate && (
               <button type="button" onClick={() => recevoirSession(session.id)} disabled={saving}
