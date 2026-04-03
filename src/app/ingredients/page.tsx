@@ -517,7 +517,7 @@ function IngredientsPageInner() {
         } else {
           // pc
           baseUnit = "piece";
-          baseUnitLabel = x.order_unit_label || "piece";
+          baseUnitLabel = x.purchase_unit_label || x.order_unit_label || "piece";
           // Piece-type labels that correspond to base unit piece
           const PIECE_LABELS = new Set(["bouteille", "barquette", "brick", "poche", "sachet", "piece", "pièce"]);
           if (!PIECE_LABELS.has(baseUnitLabel.toLowerCase())) baseUnitLabel = "piece";
@@ -567,7 +567,7 @@ function IngredientsPageInner() {
         baseUnitLabel = "piece";
         // Try to guess from pack_each_unit
         if (off.pack_each_unit === "pc") {
-          baseUnitLabel = x.order_unit_label || "bouteille";
+          baseUnitLabel = x.purchase_unit_label || x.order_unit_label || "bouteille";
           const PIECE_LABELS = new Set(["bouteille", "barquette", "brick", "poche", "sachet", "piece", "pièce"]);
           if (!PIECE_LABELS.has(baseUnitLabel.toLowerCase())) baseUnitLabel = "bouteille";
           else baseUnitLabel = baseUnitLabel.toLowerCase() === "pièce" ? "piece" : baseUnitLabel.toLowerCase();
@@ -745,9 +745,13 @@ function IngredientsPageInner() {
       }
     }
 
+    // Persist piece type label (barquette, bouteille, etc.) in purchase_unit_label
+    const purchaseUnitLabel = edit.baseUnit === "piece" ? (edit.baseUnitLabel || "piece") : edit.baseUnit === "litre" ? "L" : "kg";
+
     const up: Partial<IngredientUpsert> = {
       name, category: edit.category, is_active: edit.is_active, supplier_id,
       piece_volume_ml: pieceVolumeMl,
+      purchase_unit_label: purchaseUnitLabel,
       allergens: edit.allergens.length ? edit.allergens : null,
       order_unit_label: orderLabel || null,
       order_quantity: orderQuantity,
