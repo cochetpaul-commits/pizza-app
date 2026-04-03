@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback, type CSSProperties } from "react";
+import { useEffect, useState, useRef, useCallback, Suspense, type CSSProperties } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import Chart from "chart.js/auto";
@@ -108,12 +109,30 @@ const S = {
    COMPONENT
    ══════════════════════════════════════════════════════ */
 
-export default function PerformancesPage() {
+export default function PerformancesPageWrapper() {
+  return (
+    <Suspense fallback={null}>
+      <PerformancesPage />
+    </Suspense>
+  );
+}
+
+function PerformancesPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const { current: etab } = useEtablissement();
   const accent = etab?.couleur ?? "#D4775A";
 
-  const [viewTab, setViewTab] = useState<ViewTab>("jour");
-  const [mode, setMode] = useState<"ttc" | "ht">("ttc");
+  const [viewTab, setViewTab] = useState<ViewTab>(() => {
+    const v = searchParams.get("view");
+    if (v === "jour" || v === "semaine" || v === "mois") return v;
+    return "jour";
+  });
+  const [mode, setMode] = useState<"ttc" | "ht">(() => {
+    const m = searchParams.get("mode");
+    if (m === "ttc" || m === "ht") return m;
+    return "ttc";
+  });
   const [data, setData] = useState<WeekData | null>(null);
   const [prev, setPrev] = useState<WeekData | null>(null); // A-1
   const [dataSource, setDataSource] = useState<string | null>(null);
@@ -151,6 +170,8 @@ export default function PerformancesPage() {
 
   // Date navigation
   const [selectedDate, setSelectedDate] = useState(() => {
+    const qd = searchParams.get("date");
+    if (qd && /^\d{4}-\d{2}-\d{2}$/.test(qd)) return qd;
     const today = new Date();
     const dow = today.getDay();
     if (dow === 0) today.setDate(today.getDate() - 2); // Sunday → Friday
@@ -621,6 +642,22 @@ export default function PerformancesPage() {
           </div>
         </div>
         {importMsg && <div style={{ fontSize: 12, color: accent, marginBottom: 10 }}>{importMsg}</div>}
+
+        {/* ── Page nav pills: Rapport / Produits ── */}
+        <div style={{ display: "flex", justifyContent: "center", gap: 0, marginBottom: 14 }}>
+          <div style={{ display: "inline-flex", background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
+            <span style={{
+              padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "default",
+              background: accent, color: "#fff",
+              fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+            }}>Rapport</span>
+            <button type="button" onClick={() => router.push(`/ventes/marges?date=${selectedDate}&view=${viewTab}`)} style={{
+              padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "pointer",
+              background: "transparent", color: "#777", border: "none",
+              fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+            }}>Produits</button>
+          </div>
+        </div>
 
         {/* ── Date navigation ── */}
         <div className="ventes-date-row" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
