@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { pdfToText } from "@/lib/pdfToText";
+import { ocrPdf } from "@/lib/ocrVision";
 import { createClient } from "@supabase/supabase-js";
 import { runImport } from "@/lib/invoices/importEngine";
 import { parseBarSpiritsInvoiceText } from "@/lib/invoices/barspirits";
@@ -28,7 +29,14 @@ export async function POST(req: Request) {
     }
 
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const text = await pdfToText(bytes);
+    let text = await pdfToText(bytes);
+
+    // Fallback to OCR if pdfToText returns garbled text (encoded fonts)
+    const hasReadableText = /[a-zA-Z]{3,}/.test(text);
+    if (!hasReadableText) {
+      text = await ocrPdf(Buffer.from(bytes));
+    }
+
     const payload = parseBarSpiritsInvoiceText(text);
 
     const supabase = createClient(getEnv("NEXT_PUBLIC_SUPABASE_URL"), getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"), {
