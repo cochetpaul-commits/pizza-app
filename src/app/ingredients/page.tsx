@@ -49,6 +49,73 @@ type IngredientPatch = Partial<
   Pick<Ingredient, "status" | "status_note" | "validated_at" | "validated_by">
 >;
 
+// ─── Custom dropdown (replaces native <select> for styled options) ─────────
+function Dropdown({ value, onChange, options, style }: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  style?: CSSProperties;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = options.find(o => o.value === value);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} style={{ position: "relative", ...style }}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          width: "100%", textAlign: "left",
+          borderRadius: 12, border: "1.5px solid #ddd6c8",
+          padding: "8px 32px 8px 14px", fontSize: 13,
+          background: "white", color: "#1a1a1a", cursor: "pointer",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+          position: "relative", fontFamily: "inherit",
+        }}
+      >
+        {selected?.label ?? "—"}
+        <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 10, color: "#999", pointerEvents: "none" }}>▼</span>
+      </button>
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+          background: "#fff", border: "1.5px solid #ddd6c8", borderRadius: 12,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 100,
+          maxHeight: 280, overflowY: "auto",
+          padding: "4px 0",
+        }}>
+          {options.map(o => (
+            <div
+              key={o.value}
+              onClick={() => { onChange(o.value); setOpen(false); }}
+              style={{
+                padding: "8px 14px", fontSize: 13, cursor: "pointer",
+                color: o.value === value ? "#D4775A" : "#1a1a1a",
+                fontWeight: o.value === value ? 700 : 400,
+                background: o.value === value ? "rgba(212,119,90,0.06)" : "transparent",
+              }}
+              onMouseOver={e => { if (o.value !== value) e.currentTarget.style.background = "#f5f0e8"; }}
+              onMouseOut={e => { if (o.value !== value) e.currentTarget.style.background = "transparent"; }}
+            >
+              {o.value === value && "✓ "}{o.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── shared input style helpers ────────────────────────────────────────────
 const iCls = "w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text-base bg-white/65 outline-none";
 const sCls = "w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65";
@@ -920,14 +987,6 @@ function IngredientsPageInner() {
     boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
   };
 
-  // Shared select style — appearance:none is required for Chrome/Safari to respect border/radius
-  const selStyle: CSSProperties = {
-    appearance: "none", WebkitAppearance: "none",
-    borderRadius: 12, border: "1.5px solid #ddd6c8",
-    padding: "8px 14px", fontSize: 13,
-    background: "white", color: "#1a1a1a", cursor: "pointer",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-  };
 
   return (
     <div style={{ background: "#f2ede4", minHeight: "100vh" }}>
@@ -1010,14 +1069,16 @@ function IngredientsPageInner() {
           <>
             {/* Desktop filter row */}
             <div className="hidden md:grid" style={{ gridTemplateColumns: "1fr 1fr auto auto auto", gap: 8, padding: "10px 20px" }}>
-              <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value as "all" | Category)} style={selStyle}>
-                <option value="all">Toutes categories</option>
-                {CATEGORIES.map((c) => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
-              </select>
-              <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)} style={selStyle}>
-                <option value="all">Tous fournisseurs</option>
-                {suppliers.filter((s) => s.is_active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              <Dropdown
+                value={filterCategory}
+                onChange={(v) => setFilterCategory(v as "all" | Category)}
+                options={[{ value: "all", label: "Toutes categories" }, ...CATEGORIES.map(c => ({ value: c, label: CAT_LABELS[c] }))]}
+              />
+              <Dropdown
+                value={filterSupplier}
+                onChange={setFilterSupplier}
+                options={[{ value: "all", label: "Tous fournisseurs" }, ...suppliers.filter(s => s.is_active).map(s => ({ value: s.id, label: s.name }))]}
+              />
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} style={{ accentColor: "#D4775A" }} />
                 Sans offre
@@ -1396,16 +1457,18 @@ function IngredientsPageInner() {
             </div>
             <div style={{ display: "grid", gap: 12 }}>
               <div><div style={{ fontSize: 12, color: "#999", marginBottom: 6 }}>Catégorie</div>
-                <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value as "all" | Category)} style={{ ...selStyle, width: "100%", padding: "12px 14px", fontSize: 14 }}>
-                  <option value="all">Tous</option>
-                  {CATEGORIES.map((c) => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
-                </select>
+                <Dropdown
+                  value={filterCategory}
+                  onChange={(v) => setFilterCategory(v as "all" | Category)}
+                  options={[{ value: "all", label: "Tous" }, ...CATEGORIES.map(c => ({ value: c, label: CAT_LABELS[c] }))]}
+                />
               </div>
               <div><div style={{ fontSize: 12, color: "#999", marginBottom: 6 }}>Fournisseur</div>
-                <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)} style={{ ...selStyle, width: "100%", padding: "12px 14px", fontSize: 14 }}>
-                  <option value="all">Tous</option>
-                  {suppliers.filter((s) => s.is_active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
+                <Dropdown
+                  value={filterSupplier}
+                  onChange={setFilterSupplier}
+                  options={[{ value: "all", label: "Tous" }, ...suppliers.filter(s => s.is_active).map(s => ({ value: s.id, label: s.name }))]}
+                />
               </div>
               <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                 <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} style={{ accentColor: "#D4775A" }} />
