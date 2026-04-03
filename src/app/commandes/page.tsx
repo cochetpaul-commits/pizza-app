@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 
 import { RequireRole } from "@/components/RequireRole";
 import { StepperInput } from "@/components/StepperInput";
-import { useProfile } from "@/lib/ProfileContext";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -273,8 +272,6 @@ export default function CommandesPageWrapper() {
 }
 
 function CommandesPage() {
-  const { can } = useProfile();
-  const canValidate = can("commandes.valider");
   const { current: etab } = useEtablissement();
   const searchParams = useSearchParams();
 
@@ -282,12 +279,14 @@ function CommandesPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [supplierAliases, setSupplierAliases] = useState<Map<string, Set<string>>>(new Map());
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
+  const [draftSupplierIds, setDraftSupplierIds] = useState<Set<string>>(new Set());
 
   // Current supplier state
   const [session, setSession] = useState<Session | null>(null);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number | "">>({});
   const [openCats, setOpenCats] = useState<Record<string, boolean>>({});
+  const [notes, setNotes] = useState("");
 
   // Unit mode: carton vs individual (per ingredient)
   const [unitModes, setUnitModes] = useState<Record<string, "individual" | "carton">>({});
@@ -306,7 +305,7 @@ function CommandesPage() {
   const [loading, setLoading] = useState(true);
   const [loadingSupplier, setLoadingSupplier] = useState(false);
   const [saving, setSaving] = useState(false);
-
+  const [creatingSession, setCreatingSession] = useState(false);
 
   // ── Load all suppliers ──────────────────────────────────────────────────
 
@@ -332,6 +331,32 @@ function CommandesPage() {
         }
       }
       const list = Array.from(seen.values());
+
+      // Load draft sessions to show pastilles on supplier pills
+      if (etab?.id) {
+        const { data: drafts } = await supabase
+          .from("commande_sessions")
+          .select("supplier_id")
+          .eq("etablissement_id", etab.id)
+          .eq("status", "brouillon");
+        const draftIds = new Set((drafts ?? []).map((d: { supplier_id: string }) => d.supplier_id));
+        const canonicalDraftIds = new Set<string>();
+        for (const did of draftIds) {
+          let found = false;
+          for (const [canonical, aliasSet] of aliases.entries()) {
+            if (aliasSet.has(did)) { canonicalDraftIds.add(canonical); found = true; break; }
+          }
+          if (!found) canonicalDraftIds.add(did);
+        }
+        setDraftSupplierIds(canonicalDraftIds);
+        list.sort((a, b) => {
+          const aHas = canonicalDraftIds.has(a.id) ? 0 : 1;
+          const bHas = canonicalDraftIds.has(b.id) ? 0 : 1;
+          if (aHas !== bHas) return aHas - bHas;
+          return a.name.localeCompare(b.name, "fr");
+        });
+      }
+
       setSuppliers(list);
       setSupplierAliases(aliases);
       // Pre-select from URL param or default to first
@@ -358,7 +383,8 @@ function CommandesPage() {
     const sess = data.session as Session | null;
     setSession(sess);
 
-    // Apply quantities from session
+    // Apply quantities + notes from session
+    setNotes(sess?.notes ?? "");
     if (sess?.lignes) {
       const q: Record<string, number | ""> = {};
       for (const l of sess.lignes) {
@@ -458,21 +484,6 @@ function CommandesPage() {
 
   // ── Create session ────────────────────────────────────────────────────
 
-  async function createSession() {
-    if (!selectedSupplierId) return;
-    setSaving(true);
-    const res = await fetchApi("/api/commandes/session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ supplier_id: selectedSupplierId }),
-    });
-    const data = await res.json();
-    if (data.session) {
-      setSession({ ...data.session, lignes: [] });
-    }
-    setSaving(false);
-  }
-
   // ── Save ligne ────────────────────────────────────────────────────────
 
   async function saveLigne(sessionId: string, ingredientId: string, qty: number | "", unite: string | null, prixUnitaire: number | null) {
@@ -489,9 +500,8 @@ function CommandesPage() {
     });
   }
 
-  function handleQtyChange(ingredientId: string, val: number | "") {
+  async function handleQtyChange(ingredientId: string, val: number | "") {
     const qty = val === "" ? "" : Math.floor(val as number);
-    // If in carton mode, multiply by pack_count for storage
     const item = catalog.find((c) => c.id === ingredientId);
     const mode = unitModes[ingredientId] ?? "individual";
     const packCount = item?.pack_count ?? 0;
@@ -499,8 +509,31 @@ function CommandesPage() {
       ? qty * packCount
       : qty;
     setQuantities((prev) => ({ ...prev, [ingredientId]: actualQty }));
-    if (session) {
-      saveLigne(session.id, ingredientId, actualQty, item?.order_unit ?? item?.default_unit ?? null, item?.prix_commande ?? null);
+
+    // Auto-create session on first qty > 0
+    let sid = session?.id;
+    if (!sid && actualQty !== "" && Number(actualQty) > 0 && selectedSupplierId && !creatingSession) {
+      setCreatingSession(true);
+      try {
+        const res = await fetchApi("/api/commandes/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ supplier_id: selectedSupplierId }),
+        });
+        const data = await res.json();
+        if (data.session) {
+          const newSess = { ...data.session, lignes: [] } as Session;
+          setSession(newSess);
+          sid = newSess.id;
+          setDraftSupplierIds((prev) => new Set([...prev, selectedSupplierId!]));
+        }
+      } finally {
+        setCreatingSession(false);
+      }
+    }
+
+    if (sid) {
+      saveLigne(sid, ingredientId, actualQty, item?.order_unit ?? item?.default_unit ?? null, item?.prix_commande ?? null);
     }
   }
 
@@ -575,72 +608,22 @@ function CommandesPage() {
     await loadForSupplier(selectedSupplierId);
   }
 
-  async function envoyerSession(sessionId: string) {
-    setSaving(true);
-    try {
-      // Send email with PDF attachment to supplier contacts
-      const auth = localStorage.getItem(Object.keys(localStorage).find(k => k.includes("auth-token")) ?? "");
-      let token = "";
-      if (auth) { try { const p = JSON.parse(auth); token = p?.access_token ?? p?.currentSession?.access_token ?? ""; } catch {} }
-      const etabId = etab?.id ?? "";
-
-      const res = await fetchApi("/api/commandes/send-email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          "x-etablissement-id": etabId,
-        },
-        body: JSON.stringify({ session_id: sessionId }),
-      });
-      const data = await res.json();
-
-      if (!data.ok) {
-        // Fallback: just change status without email
-        if (data.error?.includes("Aucun destinataire")) {
-          if (confirm(`${data.error}\n\nValider la commande sans envoyer de mail ?`)) {
-            await fetchApi("/api/commandes/session", {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ id: sessionId, status: "en_attente" }),
-            });
-          }
-        } else {
-          alert(data.error ?? "Erreur envoi");
-        }
-      }
-
-      await reloadSession();
-      setConfirmation(data.ok ? `Commande envoyee a ${data.recipients?.join(", ")}` : "Commande validee (sans mail)");
-    } catch (err) {
-      console.error("[commandes] send error:", err);
-      // Fallback: change status only
-      await fetchApi("/api/commandes/session", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: sessionId, status: "en_attente" }),
-      });
-      await reloadSession();
-      setConfirmation("Commande validee (erreur envoi mail)");
-    }
-    setSaving(false);
-    setTimeout(() => setConfirmation(null), 6000);
-  }
-
   async function validerSession(sessionId: string) {
     setSaving(true);
+    // Save notes before validating
     await fetchApi("/api/commandes/session", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: sessionId, status: "validee" }),
+      body: JSON.stringify({ id: sessionId, status: "validee", notes: notes.trim() || undefined }),
     });
     await reloadSession();
     setSaving(false);
-    setConfirmation("Commande validée");
+    setDraftSupplierIds((prev) => { const next = new Set(prev); if (selectedSupplierId) next.delete(selectedSupplierId); return next; });
+    setConfirmation("Commande validee");
     setTimeout(() => setConfirmation(null), 4000);
   }
 
-  async function rejeterSession(sessionId: string) {
+  async function retourBrouillon(sessionId: string) {
     setSaving(true);
     await fetchApi("/api/commandes/session", {
       method: "PATCH",
@@ -649,7 +632,8 @@ function CommandesPage() {
     });
     await reloadSession();
     setSaving(false);
-    setConfirmation("Commande renvoyée en brouillon");
+    if (selectedSupplierId) setDraftSupplierIds((prev) => new Set([...prev, selectedSupplierId]));
+    setConfirmation("Commande renvoyee en brouillon");
     setTimeout(() => setConfirmation(null), 4000);
   }
 
@@ -720,9 +704,16 @@ function CommandesPage() {
 
   async function loadHistorique() {
     if (!selectedSupplierId) return;
-    const res = await fetchApi(`/api/commandes/historique?supplier_id=${selectedSupplierId}&limit=5`);
-    const data = await res.json();
-    setHistorique(data.historique ?? []);
+    const aliasIds = supplierAliases.get(selectedSupplierId);
+    const ids = aliasIds ? Array.from(aliasIds) : [selectedSupplierId];
+    const allHist: HistItem[] = [];
+    for (const sid of ids) {
+      const res = await fetchApi(`/api/commandes/historique?supplier_id=${sid}&limit=5`);
+      const data = await res.json();
+      allHist.push(...(data.historique ?? []));
+    }
+    allHist.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    setHistorique(allHist.slice(0, 5));
     setHistOpen(true);
   }
 
@@ -992,52 +983,32 @@ function CommandesPage() {
           padding: "12px 16px", borderRadius: 10,
           fontSize: 14, fontWeight: 600, marginBottom: 16, textAlign: "center",
         }}>
-          {session.status === "en_attente" && "En attente de validation"}
-          {session.status === "validee" && "Commande validée"}
-          {session.status === "recue" && "Commande reçue"}
-
-          {session.status === "en_attente" && (
-            <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "center", flexWrap: "wrap" }}>
-              <button onClick={() => downloadPdf(session.id)}
-                style={{ padding: "8px 20px", borderRadius: 8, border: "1.5px solid #ddd6c8", background: "#fff", color: "#1a1a1a", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                Telecharger PDF
-              </button>
-              <button onClick={() => sendEmailOnly(session.id)} disabled={sendingEmail}
-                style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#D4775A", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: sendingEmail ? 0.6 : 1 }}>
-                {sendingEmail ? "Envoi..." : "Envoyer par mail"}
-              </button>
-              {canValidate && (
-                <>
-                  <button onClick={() => rejeterSession(session.id)} disabled={saving}
-                    style={{ padding: "8px 20px", borderRadius: 8, border: "1.5px solid #8B1A1A", background: "#fff", color: "#8B1A1A", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                    Refuser / Corriger
-                  </button>
-                  <button onClick={() => validerSession(session.id)} disabled={saving}
-                    style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#4a6741", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                    Valider la commande
-                  </button>
-                </>
-              )}
-            </div>
-          )}
+          {session.status === "validee" && "Commande validee"}
+          {session.status === "recue" && "Commande recue"}
+          {session.status === "en_attente" && "En attente (legacy)"}
 
           {session.status === "validee" && (
             <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "center", flexWrap: "wrap" }}>
               <button onClick={() => downloadPdf(session.id)}
-                style={{ padding: "8px 20px", borderRadius: 8, border: "1.5px solid #ddd6c8", background: "#fff", color: "#1a1a1a", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                style={{ padding: "8px 20px", borderRadius: 8, border: "1.5px solid #4a6741", background: "#fff", color: "#4a6741", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
                 Telecharger PDF
               </button>
               <button onClick={() => sendEmailOnly(session.id)} disabled={sendingEmail}
-                style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#D4775A", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: sendingEmail ? 0.6 : 1 }}>
+                style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#2563EB", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: sendingEmail ? 0.6 : 1 }}>
                 {sendingEmail ? "Envoi..." : "Envoyer par mail"}
               </button>
-              {canValidate && (
-                <button onClick={() => recevoirSession(session.id)} disabled={saving}
-                  style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                  Marquer comme recue
-                </button>
-              )}
+              <button onClick={() => recevoirSession(session.id)} disabled={saving}
+                style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                Marquer recue
+              </button>
             </div>
+          )}
+
+          {session.status === "validee" && (
+            <button onClick={() => retourBrouillon(session.id)} disabled={saving}
+              style={{ marginTop: 8, background: "none", border: "none", color: "#999", fontSize: 11, cursor: "pointer", textDecoration: "underline" }}>
+              Modifier la commande
+            </button>
           )}
         </div>
 
@@ -1105,33 +1076,24 @@ function CommandesPage() {
   // ── Render: catalog (brouillon) ───────────────────────────────────────
 
   function renderCatalog() {
-    if (!session) return null;
-
     const grouped = groupCatalog(catalog);
     const sortedCats = Object.keys(grouped).sort((a, b) => catIndex(a) - catIndex(b));
 
     return (
       <>
-        <div style={{
-          background: statusBannerBg.brouillon, border: `1.5px solid ${statusColor.brouillon}`,
-          color: statusColor.brouillon, padding: "10px 16px", borderRadius: 10,
-          fontSize: 13, fontWeight: 600, marginBottom: 12,
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        {session && (
+          <div style={{
+            background: statusBannerBg.brouillon, border: `1.5px solid ${statusColor.brouillon}`,
+            color: statusColor.brouillon, padding: "10px 16px", borderRadius: 10,
+            fontSize: 13, fontWeight: 600, marginBottom: 12,
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+          }}>
             <span>Brouillon</span>
             <span style={{ fontWeight: 700, color: "#D4775A" }}>
               {activeCount} article{activeCount > 1 ? "s" : ""}
             </span>
           </div>
-          {activeCount > 0 && (
-            <div style={{ display: "flex", gap: 8, marginTop: 8, justifyContent: "flex-start" }}>
-              <button onClick={() => downloadPdf(session.id)}
-                style={{ padding: "6px 14px", borderRadius: 8, border: "1.5px solid #ddd6c8", background: "#fff", color: "#1a1a1a", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
-                Telecharger PDF
-              </button>
-            </div>
-          )}
-        </div>
+        )}
 
         {catalog.length === 0 && (
           <p style={{ color: "#999", fontSize: 13, textAlign: "center", padding: 24 }}>
@@ -1269,6 +1231,12 @@ function CommandesPage() {
                     transition: "all 0.15s",
                   }}>
                   {s.name}
+                  {draftSupplierIds.has(s.id) && (
+                    <span style={{
+                      display: "inline-block", width: 8, height: 8, borderRadius: "50%",
+                      background: "#D4775A", marginLeft: 6, verticalAlign: "middle",
+                    }} />
+                  )}
                 </button>
               );
             })}
@@ -1314,37 +1282,67 @@ function CommandesPage() {
           <p style={{ textAlign: "center", color: "#999", marginTop: 40 }}>Chargement...</p>
         )}
 
+        {/* Reprendre la derniere */}
+        {!loading && !loadingSupplier && selectedSupplierId && !session && (
+          <button type="button"
+            onClick={async () => {
+              if (!selectedSupplierId) return;
+              const aliasIds = supplierAliases.get(selectedSupplierId);
+              const ids = aliasIds ? Array.from(aliasIds) : [selectedSupplierId];
+              for (const sid of ids) {
+                const res = await fetchApi(`/api/commandes/historique?supplier_id=${sid}&limit=1`);
+                const data = await res.json();
+                const last = data.historique?.[0];
+                if (last) { dupliquerSession(last.id); return; }
+              }
+              alert("Aucune commande precedente a reprendre");
+            }}
+            disabled={saving}
+            style={{
+              marginTop: 12, width: "100%", padding: "10px 16px",
+              background: "#fff", border: "1.5px dashed #D4775A",
+              borderRadius: 10, fontSize: 13, fontWeight: 600,
+              color: "#D4775A", cursor: "pointer", fontFamily: "inherit",
+            }}>
+            Reprendre la derniere commande
+          </button>
+        )}
+
         {/* Content */}
         {!loading && !loadingSupplier && selectedSupplierId && (
           <div style={{ marginTop: 16 }}>
-            {!session && (
-              <div style={{
-                background: "#fff", borderRadius: 16, border: "1.5px solid #ddd6c8",
-                padding: "48px 24px", textAlign: "center",
-              }}>
-                <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.8 }}>&#x1F4E6;</div>
-                <div style={{
-                  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                  fontSize: 18, fontWeight: 700, color: "#1a1a1a", marginBottom: 6,
-                }}>
-                  Commander chez {supplierLabel}
-                </div>
-                <p style={{ color: "#999", fontSize: 13, marginBottom: 20, maxWidth: 300, margin: "0 auto 20px" }}>
-                  Sélectionnez les articles et quantités, puis envoyez pour validation.
-                </p>
-                <button onClick={() => createSession()} disabled={saving}
+            {session && readOnly ? renderSummary() : renderCatalog()}
+
+            {/* Notes (brouillon) */}
+            {session?.status === "brouillon" && (
+              <div style={{ marginTop: 12 }}>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  onBlur={() => {
+                    if (session) {
+                      fetchApi("/api/commandes/session", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ id: session.id, status: "brouillon", notes: notes.trim() || null }),
+                      });
+                    }
+                  }}
+                  placeholder="Notes pour le fournisseur (optionnel)..."
                   style={{
-                    background: "#D4775A", color: "#fff", border: "none", borderRadius: 12,
-                    padding: "14px 32px", fontSize: 15, fontWeight: 700, cursor: "pointer",
-                    fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                    boxShadow: "0 4px 16px rgba(212,119,90,0.25)",
-                  }}>
-                  Nouvelle commande
-                </button>
+                    width: "100%", minHeight: 60, padding: "10px 14px",
+                    border: "1px solid #ddd6c8", borderRadius: 10,
+                    fontSize: 13, fontFamily: "inherit", color: "#1a1a1a",
+                    background: "#fff", resize: "vertical", outline: "none",
+                  }}
+                />
               </div>
             )}
-
-            {session && (readOnly ? renderSummary() : renderCatalog())}
+            {session && session.status !== "brouillon" && session.notes && (
+              <div style={{ marginTop: 12, padding: "10px 14px", background: "#f5f0e8", borderRadius: 10, fontSize: 12, color: "#666" }}>
+                <strong>Notes :</strong> {session.notes}
+              </div>
+            )}
           </div>
         )}
 
@@ -1386,9 +1384,16 @@ function CommandesPage() {
                           {statusLabel[h.status] ?? h.status}
                         </span>
                       </div>
-                      <span style={{ fontSize: 11, color: "#999" }}>{h.nb_articles} article{h.nb_articles > 1 ? "s" : ""}</span>
+                      <span style={{ fontSize: 11, color: "#999" }}>
+                        {h.nb_articles} article{h.nb_articles > 1 ? "s" : ""}
+                        {h.total_ht > 0 && <span style={{ marginLeft: 6, fontWeight: 600, color: "#1a1a1a" }}>{h.total_ht.toFixed(0)}€</span>}
+                      </span>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+                      <button type="button" onClick={() => downloadPdf(h.id)}
+                        style={{ fontSize: 11, fontWeight: 600, color: "#4a6741", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                        PDF
+                      </button>
                       <button type="button" onClick={() => dupliquerSession(h.id)}
                         disabled={saving || !!session}
                         style={{
@@ -1397,7 +1402,7 @@ function CommandesPage() {
                           background: "none", border: "none",
                           cursor: session ? "not-allowed" : "pointer", padding: 0,
                         }}>
-                        Dupliquer &rarr;
+                        Dupliquer
                       </button>
                     </div>
                   </div>
@@ -1435,45 +1440,11 @@ function CommandesPage() {
           );
         })()}
 
-        {/* Bouton flottant — brouillon → envoyer */}
+        {/* Bouton flottant — brouillon → valider */}
         {session && session.status === "brouillon" && activeCount > 0 && (
-          <button type="button" onClick={() => envoyerSession(session.id)} disabled={saving} style={floatingBtn}>
-            {saving ? "Envoi..." : `Envoyer pour validation (${activeCount} article${activeCount > 1 ? "s" : ""})`}
+          <button type="button" onClick={() => validerSession(session.id)} disabled={saving} style={floatingBtn}>
+            {saving ? "Validation..." : `Valider la commande (${activeCount} article${activeCount > 1 ? "s" : ""})`}
           </button>
-        )}
-
-        {/* Bouton flottant — en_attente → valider */}
-        {session && session.status === "en_attente" && canValidate && (
-          <div style={{ position: "fixed", bottom: "calc(70px + env(safe-area-inset-bottom, 0px))", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 10, zIndex: 110, flexWrap: "wrap", justifyContent: "center", maxWidth: "95vw" }}>
-            <button type="button" onClick={() => rejeterSession(session.id)} disabled={saving}
-              style={{ ...floatingBtn, position: "static", bottom: "auto", left: "auto", transform: "none", background: "#fff", color: "#8B1A1A", border: "1.5px solid #8B1A1A", boxShadow: "0 6px 24px rgba(0,0,0,0.15)" }}>
-              Refuser
-            </button>
-            <button type="button" onClick={() => validerSession(session.id)} disabled={saving}
-              style={{ ...floatingBtn, position: "static", bottom: "auto", left: "auto", transform: "none", background: "#4a6741", boxShadow: "0 6px 24px rgba(74,103,65,0.4)" }}>
-              {saving ? "..." : "Valider"}
-            </button>
-          </div>
-        )}
-
-        {/* Bouton flottant — validée → recevoir + PDF + Email */}
-        {session && session.status === "validee" && (
-          <div style={{ position: "fixed", bottom: "calc(70px + env(safe-area-inset-bottom, 0px))", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 10, zIndex: 110, flexWrap: "wrap", justifyContent: "center", maxWidth: "95vw" }}>
-            <button type="button" onClick={() => downloadPdf(session.id)}
-              style={{ ...floatingBtn, position: "static", bottom: "auto", left: "auto", transform: "none", background: "#fff", color: "#4a6741", border: "1.5px solid #4a6741", boxShadow: "0 6px 24px rgba(0,0,0,0.15)" }}>
-              PDF
-            </button>
-            <button type="button" onClick={() => sendEmailOnly(session.id)} disabled={sendingEmail}
-              style={{ ...floatingBtn, position: "static", bottom: "auto", left: "auto", transform: "none", background: "#D4775A", boxShadow: "0 6px 24px rgba(212,119,90,0.4)", opacity: sendingEmail ? 0.6 : 1 }}>
-              {sendingEmail ? "Envoi..." : "Envoyer par mail"}
-            </button>
-            {canValidate && (
-              <button type="button" onClick={() => recevoirSession(session.id)} disabled={saving}
-                style={{ ...floatingBtn, position: "static", bottom: "auto", left: "auto", transform: "none", background: "#16a34a", boxShadow: "0 6px 24px rgba(22,163,74,0.4)" }}>
-                {saving ? "..." : "Marquer recue"}
-              </button>
-            )}
-          </div>
         )}
       </div>
     </RequireRole>

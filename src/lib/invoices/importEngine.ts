@@ -522,7 +522,7 @@ export async function runImport(options: {
 
         // Detect pack from product name (e.g., "LAIT 1L X6", "BIERE 33CL X24")
         const packInfo = l.name ? extractPackFromName(l.name) : null;
-        const volumeFromName = l.name ? extractVolumeFromName(l.name) : null;
+        const _volumeFromName = l.name ? extractVolumeFromName(l.name) : null;
 
         const offerRow: Record<string, unknown> = {
           user_id: userId,

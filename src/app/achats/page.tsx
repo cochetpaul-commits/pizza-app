@@ -271,7 +271,6 @@ export default function AchatsPage() {
       setTopProducts(sorted);
       setTopProductsLoading(false);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rangeInvoices, etabId, loading]);
 
   // ── Unique supplier names for filter dropdown ──

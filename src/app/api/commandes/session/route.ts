@@ -130,8 +130,8 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Notification quand une commande passe en "en_attente"
-  if (status === "en_attente" && session) {
+  // Notification quand une commande passe en "validee"
+  if (status === "validee" && session) {
     const { data: supplier } = await supabaseAdmin
       .from("suppliers")
       .select("name")

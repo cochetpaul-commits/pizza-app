@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
     .select("*")
     .eq("supplier_id", supplierId)
     .eq("etablissement_id", etabId)
-    .in("status", ["brouillon", "en_attente", "validee"])
+    .in("status", ["brouillon", "validee"])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
