@@ -504,8 +504,21 @@ function CommandesPage() {
   useEffect(() => {
     if (selectedSupplierId) {
       void loadForSupplier(selectedSupplierId);
+      // Pre-load historique for KPI card
+      void (async () => {
+        const aliasIds = supplierAliases.get(selectedSupplierId);
+        const ids = aliasIds ? Array.from(aliasIds) : [selectedSupplierId];
+        const allHist: HistItem[] = [];
+        for (const sid of ids) {
+          const res = await fetchApi(`/api/commandes/historique?supplier_id=${sid}&limit=10`);
+          const data = await res.json();
+          allHist.push(...(data.historique ?? []));
+        }
+        allHist.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        setHistorique(allHist.slice(0, 10));
+      })();
     }
-  }, [selectedSupplierId, loadForSupplier]);
+  }, [selectedSupplierId, loadForSupplier, supplierAliases]);
 
   // ── Set accordion defaults ────────────────────────────────────────────
 
@@ -740,6 +753,25 @@ function CommandesPage() {
     setTimeout(() => setConfirmation(null), 6000);
   }
 
+  // ── Delete session ──────────────────────────────────────────────────
+
+  async function deleteSession() {
+    if (!session) return;
+    if (!confirm("Supprimer cette commande ? Cette action est irréversible.")) return;
+    setSaving(true);
+    await supabase.from("commande_lignes").delete().eq("session_id", session.id);
+    await supabase.from("commande_sessions").delete().eq("id", session.id);
+    setSession(null);
+    setQuantities({});
+    setNotes("");
+    if (selectedSupplierId) {
+      setDraftSupplierIds((prev) => { const next = new Set(prev); next.delete(selectedSupplierId); return next; });
+    }
+    setSaving(false);
+    setConfirmation("Commande supprimée");
+    setTimeout(() => setConfirmation(null), 4000);
+  }
+
   // ── Historique ────────────────────────────────────────────────────────
 
   async function loadHistorique() {
@@ -748,12 +780,12 @@ function CommandesPage() {
     const ids = aliasIds ? Array.from(aliasIds) : [selectedSupplierId];
     const allHist: HistItem[] = [];
     for (const sid of ids) {
-      const res = await fetchApi(`/api/commandes/historique?supplier_id=${sid}&limit=5`);
+      const res = await fetchApi(`/api/commandes/historique?supplier_id=${sid}&limit=10`);
       const data = await res.json();
       allHist.push(...(data.historique ?? []));
     }
     allHist.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    setHistorique(allHist.slice(0, 5));
+    setHistorique(allHist.slice(0, 10));
     setHistOpen(true);
   }
 
@@ -1123,15 +1155,32 @@ function CommandesPage() {
       <>
         {session && (
           <div style={{
-            background: statusBannerBg.brouillon, border: `1.5px solid ${statusColor.brouillon}`,
+            background: statusBannerBg.brouillon,
+            borderLeft: `4px solid #D4775A`,
+            border: `1.5px solid ${statusColor.brouillon}`,
+            borderLeftWidth: 4,
+            borderLeftColor: "#D4775A",
             color: statusColor.brouillon, padding: "10px 16px", borderRadius: 10,
             fontSize: 13, fontWeight: 600, marginBottom: 12,
-            display: "flex", justifyContent: "space-between", alignItems: "center",
           }}>
-            <span>Brouillon</span>
-            <span style={{ fontWeight: 700, color: "#D4775A" }}>
-              {activeCount} article{activeCount > 1 ? "s" : ""}
-            </span>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <span>Brouillon — {supplierLabel}</span>
+                <span style={{ fontSize: 11, fontWeight: 400, color: "#999" }}>
+                  {fmtDate(session.created_at)}
+                </span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                <span style={{ fontWeight: 700, color: "#D4775A" }}>
+                  {activeCount} article{activeCount > 1 ? "s" : ""}
+                </span>
+                {orderTotal > 0 && (
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a" }}>
+                    {orderTotal.toFixed(2)} € HT
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -1326,38 +1375,91 @@ function CommandesPage() {
           </div>
         )}
 
-        {/* Franco progress bar */}
-        {francoMin != null && session?.status === "brouillon" && (
-          <div style={{ marginTop: 12, background: "#fff", borderRadius: 10, padding: "10px 14px", border: "1px solid #e5ddd0" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: "#666" }}>
-                Franco {supplierLabel}
-              </span>
-              <span style={{
-                fontSize: 12, fontWeight: 700,
-                color: orderTotal >= francoMin ? "#16a34a" : "#D4775A",
-              }}>
-                {orderTotal.toFixed(0)} € / {francoMin} €
-              </span>
-            </div>
-            <div style={{ height: 6, background: "#f0ebe2", borderRadius: 3, overflow: "hidden" }}>
-              <div style={{
-                height: "100%", borderRadius: 3, transition: "width 0.3s ease",
-                width: `${francoPercent ?? 0}%`,
-                background: orderTotal >= francoMin
-                  ? "linear-gradient(90deg, #16a34a, #22c55e)"
-                  : "linear-gradient(90deg, #D4775A, #E8956F)",
-              }} />
-            </div>
-            {orderTotal < francoMin ? (
-              <div style={{ fontSize: 10, color: "#999", marginTop: 4, textAlign: "right" }}>
-                Encore {(francoMin - orderTotal).toFixed(0)} € pour atteindre le franco
+        {/* KPI Cards */}
+        {!loading && !loadingSupplier && selectedSupplierId && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
+            {/* Articles en commande */}
+            <div style={{ flex: "1 1 calc(50% - 5px)", minWidth: 140, background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "16px 18px" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999", marginBottom: 6 }}>
+                Articles en commande
               </div>
-            ) : (
-              <div style={{ fontSize: 10, color: "#16a34a", fontWeight: 600, marginTop: 4, textAlign: "right" }}>
-                Franco atteint
+              <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 24, color: "#1a1a1a" }}>
+                {activeCount}
+              </div>
+            </div>
+
+            {/* Total HT estimé */}
+            <div style={{ flex: "1 1 calc(50% - 5px)", minWidth: 140, background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "16px 18px" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999", marginBottom: 6 }}>
+                Total HT estimé
+              </div>
+              <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 24, color: "#1a1a1a" }}>
+                {orderTotal > 0 ? `${orderTotal.toFixed(2)} €` : "—"}
+              </div>
+            </div>
+
+            {/* Dernière commande */}
+            <div style={{ flex: "1 1 calc(50% - 5px)", minWidth: 140, background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "16px 18px" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999", marginBottom: 6 }}>
+                Dernière commande
+              </div>
+              <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 24, color: "#1a1a1a" }}>
+                {historique.length > 0 ? fmtDate(historique[0].created_at) : "—"}
+              </div>
+            </div>
+
+            {/* Franco */}
+            {francoMin != null && francoMin > 0 && (
+              <div style={{ flex: "1 1 calc(50% - 5px)", minWidth: 140, background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "16px 18px" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999", marginBottom: 6 }}>
+                  Franco
+                </div>
+                <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 24, color: orderTotal >= francoMin ? "#16a34a" : "#D4775A" }}>
+                  {orderTotal.toFixed(0)} € / {francoMin} €
+                </div>
+                <div style={{ height: 4, background: "#f0ebe2", borderRadius: 2, overflow: "hidden", marginTop: 6 }}>
+                  <div style={{
+                    height: "100%", borderRadius: 2, transition: "width 0.3s ease",
+                    width: `${francoPercent ?? 0}%`,
+                    background: orderTotal >= francoMin
+                      ? "linear-gradient(90deg, #16a34a, #22c55e)"
+                      : "linear-gradient(90deg, #D4775A, #E8956F)",
+                  }} />
+                </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Action bar (brouillon) */}
+        {!loading && !loadingSupplier && session?.status === "brouillon" && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>
+            <button type="button" onClick={() => deleteSession()}
+              disabled={saving}
+              style={{
+                padding: "8px 16px", borderRadius: 8, border: "none",
+                background: "none", color: "#DC2626", fontSize: 12, fontWeight: 600,
+                cursor: "pointer", fontFamily: "inherit",
+              }}>
+              Supprimer
+            </button>
+            <button type="button" onClick={() => downloadPdf(session.id)}
+              style={{
+                padding: "8px 16px", borderRadius: 8, border: "1.5px solid #ddd6c8",
+                background: "#fff", color: "#1a1a1a", fontSize: 12, fontWeight: 600,
+                cursor: "pointer", fontFamily: "inherit",
+              }}>
+              Télécharger PDF
+            </button>
+            <button type="button" onClick={() => sendEmailOnly(session.id)}
+              disabled={sendingEmail}
+              style={{
+                padding: "8px 16px", borderRadius: 8, border: "none",
+                background: "#D4775A", color: "#fff", fontSize: 12, fontWeight: 600,
+                cursor: "pointer", fontFamily: "inherit", opacity: sendingEmail ? 0.6 : 1,
+              }}>
+              {sendingEmail ? "Envoi..." : "Envoyer par mail"}
+            </button>
           </div>
         )}
 
@@ -1432,54 +1534,82 @@ function CommandesPage() {
               onClick={() => histOpen ? setHistOpen(false) : loadHistorique()}
               style={{
                 width: "100%", background: "#fff", border: "1px solid #ddd6c8",
-                borderRadius: 12, padding: "12px 16px",
+                borderRadius: histOpen ? "12px 12px 0 0" : 12, padding: "14px 18px",
                 display: "flex", justifyContent: "space-between", alignItems: "center",
-                cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#666",
+                cursor: "pointer", fontSize: 14, fontWeight: 700, color: "#1a1a1a",
+                fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                letterSpacing: "0.04em", textTransform: "uppercase",
+                transition: "border-radius 0.2s",
               }}>
               <span>Commandes précédentes</span>
-              <span style={{ fontSize: 16, transition: "transform .2s", transform: histOpen ? "rotate(180deg)" : "none" }}>▾</span>
+              <span style={{ fontSize: 14, transition: "transform .2s", transform: histOpen ? "rotate(180deg)" : "none", color: "#999" }}>▾</span>
             </button>
 
             {histOpen && (
-              <div style={{ marginTop: 8 }}>
+              <div style={{
+                background: "#fff", border: "1px solid #ddd6c8", borderTop: "none",
+                borderRadius: "0 0 12px 12px", padding: "8px 10px 10px",
+              }}>
                 {historique.length === 0 && (
                   <p style={{ color: "#ccc", fontSize: 12, textAlign: "center", padding: 16 }}>Aucune commande passée</p>
                 )}
                 {historique.map((h) => (
                   <div key={h.id} style={{
-                    background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12,
-                    padding: "10px 14px", marginBottom: 6,
-                    display: "flex", flexDirection: "column", gap: 6,
+                    background: "#faf8f4", border: "1px solid #e8e2d6", borderRadius: 10,
+                    padding: "12px 14px", marginBottom: 6,
                   }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a" }}>{fmtDate(h.created_at)}</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{fmtDate(h.created_at)}</span>
                         <span style={{
-                          marginLeft: 8, fontSize: 10, fontWeight: 700,
-                          padding: "2px 7px", borderRadius: 6,
-                          background: `${statusColor[h.status] ?? "#999"}14`,
+                          display: "inline-block", width: "fit-content",
+                          fontSize: 10, fontWeight: 700,
+                          padding: "2px 8px", borderRadius: 6,
+                          background: `${statusColor[h.status] ?? "#999"}18`,
                           color: statusColor[h.status] ?? "#999",
                         }}>
                           {statusLabel[h.status] ?? h.status}
                         </span>
                       </div>
-                      <span style={{ fontSize: 11, color: "#999" }}>
-                        {h.nb_articles} article{h.nb_articles > 1 ? "s" : ""}
-                        {h.total_ht > 0 && <span style={{ marginLeft: 6, fontWeight: 600, color: "#1a1a1a" }}>{h.total_ht.toFixed(0)}€</span>}
-                      </span>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "#666" }}>
+                          {h.nb_articles} article{h.nb_articles > 1 ? "s" : ""}
+                        </span>
+                        {h.total_ht > 0 && (
+                          <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
+                            {h.total_ht.toFixed(2)} €
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, borderTop: "1px solid #e8e2d6", paddingTop: 8 }}>
                       <button type="button" onClick={() => downloadPdf(h.id)}
-                        style={{ fontSize: 11, fontWeight: 600, color: "#4a6741", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                        style={{
+                          fontSize: 11, fontWeight: 600, color: "#4a6741", background: "#fff",
+                          border: "1px solid #ddd6c8", borderRadius: 6, cursor: "pointer",
+                          padding: "4px 10px",
+                        }}>
                         PDF
+                      </button>
+                      <button type="button" onClick={() => sendEmailOnly(h.id)}
+                        disabled={sendingEmail}
+                        style={{
+                          fontSize: 11, fontWeight: 600, color: "#2563EB", background: "#fff",
+                          border: "1px solid #ddd6c8", borderRadius: 6, cursor: "pointer",
+                          padding: "4px 10px", opacity: sendingEmail ? 0.6 : 1,
+                        }}>
+                        Envoyer
                       </button>
                       <button type="button" onClick={() => dupliquerSession(h.id)}
                         disabled={saving || !!session}
                         style={{
                           fontSize: 11, fontWeight: 600,
                           color: session ? "#ccc" : "#D4775A",
-                          background: "none", border: "none",
-                          cursor: session ? "not-allowed" : "pointer", padding: 0,
+                          background: session ? "#f5f0e8" : "#FFF0EB",
+                          border: session ? "1px solid #e8e2d6" : "1px solid #D4775A",
+                          borderRadius: 6,
+                          cursor: session ? "not-allowed" : "pointer",
+                          padding: "4px 10px",
                         }}>
                         Dupliquer
                       </button>
