@@ -99,6 +99,9 @@ export type EditState = {
   orderUnitLabel: string;
   orderQuantity: string;
   storageZone: string;
+  stockMin: string;
+  stockObjectif: string;
+  stockMax: string;
   establishments: string[];
 };
 
@@ -561,6 +564,22 @@ export const IngredientRow = React.memo(function IngredientRow({
                 <select style={selectStyle} value={edit.is_active ? "1" : "0"} onChange={(e) => onEditChange({ ...edit, is_active: e.target.value === "1" })}>
                   <option value="1">Actif</option><option value="0">Inactif</option>
                 </select>
+              </div>
+            </div>
+
+            <div style={fieldLabel}>Niveaux de stock</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
+              <div>
+                <div style={fieldLabel}>Stock minimum</div>
+                <input style={{ ...inputStyle, width: 100 }} type="number" value={edit.stockMin} onChange={(e) => onEditChange({ ...edit, stockMin: numVal(e.target.value) })} placeholder="0" />
+              </div>
+              <div>
+                <div style={fieldLabel}>Stock objectif</div>
+                <input style={{ ...inputStyle, width: 100 }} type="number" value={edit.stockObjectif} onChange={(e) => onEditChange({ ...edit, stockObjectif: numVal(e.target.value) })} placeholder="0" />
+              </div>
+              <div>
+                <div style={fieldLabel}>Stock maximum</div>
+                <input style={{ ...inputStyle, width: 100 }} type="number" value={edit.stockMax} onChange={(e) => onEditChange({ ...edit, stockMax: numVal(e.target.value) })} placeholder="0" />
               </div>
             </div>
 

@@ -119,6 +119,11 @@ export type Ingredient = {
   // Lieu de stockage (inventaire)
   storage_zone?: string | null;
 
+  // Niveaux de stock
+  stock_min?: number | null;
+  stock_objectif?: number | null;
+  stock_max?: number | null;
+
   // Ingrédients dérivés (rendement)
   parent_ingredient_id?: string | null;
   rendement?: number | null;

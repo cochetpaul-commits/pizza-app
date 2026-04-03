@@ -511,6 +511,9 @@ function IngredientsPageInner() {
       orderUnitLabel: x.order_unit_label || guessOrderUnit(off),
       orderQuantity: x.order_quantity != null ? String(x.order_quantity) : "",
       storageZone: x.storage_zone ?? "",
+      stockMin: x.stock_min != null ? String(x.stock_min) : "",
+      stockObjectif: x.stock_objectif != null ? String(x.stock_objectif) : "",
+      stockMax: x.stock_max != null ? String(x.stock_max) : "",
       establishments: x.establishments ?? ["bellomio", "piccola"],
     });
   }, [offersByIngredientId, guessOrderUnit]);
@@ -621,6 +624,9 @@ function IngredientsPageInner() {
       order_unit_label: orderLabel || null,
       order_quantity: orderQuantity,
       storage_zone: edit.storageZone || null,
+      stock_min: parseNum(edit.stockMin) ?? null,
+      stock_objectif: parseNum(edit.stockObjectif) ?? null,
+      stock_max: parseNum(edit.stockMax) ?? null,
       establishments: edit.establishments.length ? edit.establishments : ["bellomio", "piccola"],
     } as Record<string, unknown>;
     const u1 = await supabase.from("ingredients").update(up).eq("id", editingId);
