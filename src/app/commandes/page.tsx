@@ -280,6 +280,7 @@ function CommandesPage() {
 
   // All suppliers
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierAliases, setSupplierAliases] = useState<Map<string, Set<string>>>(new Map());
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
 
   // Current supplier state
@@ -308,21 +309,28 @@ function CommandesPage() {
 
   useEffect(() => {
     async function init() {
-      const q = supabase
+      // Load ALL suppliers (not filtered by etablissement) so we can build aliases
+      const { data } = await supabase
         .from("suppliers")
         .select("id, name, franco_minimum, delivery_schedule")
         .eq("is_active", true)
         .order("name");
-      if (etab?.id) q.eq("etablissement_id", etab.id);
-      const { data } = await q;
-      // Deduplicate by name (accent+case insensitive)
+      // Deduplicate by name (accent+case insensitive) with alias tracking
       const seen = new Map<string, Supplier>();
+      const aliases = new Map<string, Set<string>>();
       for (const s of (data ?? []) as Supplier[]) {
         const key = s.name.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-        if (!seen.has(key)) seen.set(key, s);
+        if (!seen.has(key)) {
+          seen.set(key, s);
+          aliases.set(s.id, new Set([s.id]));
+        } else {
+          const canonical = seen.get(key)!;
+          aliases.get(canonical.id)!.add(s.id);
+        }
       }
       const list = Array.from(seen.values());
       setSuppliers(list);
+      setSupplierAliases(aliases);
       // Pre-select from URL param or default to first
       const urlSupplierId = searchParams.get("supplier_id");
       if (urlSupplierId && list.some((s) => s.id === urlSupplierId)) {
@@ -359,31 +367,39 @@ function CommandesPage() {
     }
 
     // Load catalog: ingredients linked to this supplier (via offers or supplier_id)
+    // Use all alias IDs for this supplier (handles duplicates across establishments)
+    const aliasIds = supplierAliases.get(supplierId);
+    const supplierIds = aliasIds ? Array.from(aliasIds) : [supplierId];
     const etabKey = etab?.slug?.includes("bello") ? "bellomio" : etab?.slug?.includes("piccola") ? "piccola" : null;
-    const offerQ = supabase
-      .from("supplier_offers")
-      .select("ingredient_id, price_kind, unit, unit_price, pack_price, pack_unit, pack_count, pack_each_qty, pack_each_unit, pack_total_qty, establishment")
-      .eq("supplier_id", supplierId)
-      .eq("is_active", true);
-    const { data: offerData } = await offerQ;
 
-    const offerMap = new Map<string, typeof offerData extends (infer T)[] | null ? T : never>();
+    // Fetch offers for ALL alias IDs of this supplier
+    const offerMap = new Map<string, { ingredient_id: string; price_kind: string | null; unit: string | null; unit_price: number | null; pack_price: number | null; pack_unit: string | null; pack_count: number | null; pack_each_qty: number | null; pack_each_unit: string | null; pack_total_qty: number | null; establishment: string | null }>();
     const offerIngIds: string[] = [];
-    for (const o of offerData ?? []) {
-      if (o.ingredient_id) {
-        offerIngIds.push(o.ingredient_id);
-        offerMap.set(o.ingredient_id, o);
+    for (const sid of supplierIds) {
+      const { data: offerData } = await supabase
+        .from("supplier_offers")
+        .select("ingredient_id, price_kind, unit, unit_price, pack_price, pack_unit, pack_count, pack_each_qty, pack_each_unit, pack_total_qty, establishment")
+        .eq("supplier_id", sid)
+        .eq("is_active", true);
+      for (const o of offerData ?? []) {
+        if (o.ingredient_id && !offerMap.has(o.ingredient_id)) {
+          offerIngIds.push(o.ingredient_id);
+          offerMap.set(o.ingredient_id, o);
+        }
       }
     }
 
-    let directIngQ = supabase
-      .from("ingredients")
-      .select("id")
-      .eq("supplier_id", supplierId);
-    // Filter by establishments array instead of etablissement_id
-    if (etabKey) directIngQ = directIngQ.or(`establishments.cs.{"${etabKey}"},establishments.is.null`);
-    const { data: directIngs } = await directIngQ;
-    const directIds = (directIngs ?? []).map((i: { id: string }) => i.id);
+    // Fetch ingredients directly linked to any alias supplier_id
+    const directIds: string[] = [];
+    for (const sid of supplierIds) {
+      let directIngQ = supabase
+        .from("ingredients")
+        .select("id")
+        .eq("supplier_id", sid);
+      if (etabKey) directIngQ = directIngQ.or(`establishments.cs.{"${etabKey}"},establishments.is.null`);
+      const { data: directIngs } = await directIngQ;
+      for (const i of directIngs ?? []) directIds.push((i as { id: string }).id);
+    }
 
     const allIds = [...new Set([...offerIngIds, ...directIds])];
 
@@ -414,7 +430,7 @@ function CommandesPage() {
     }
     setCatalog(items);
     setLoadingSupplier(false);
-  }, [etab]);
+  }, [etab, supplierAliases]);
 
   useEffect(() => {
     if (selectedSupplierId) {
