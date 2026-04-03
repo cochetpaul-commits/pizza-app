@@ -264,22 +264,7 @@ export default function AchatsPage() {
     const prevTotalHT = prevRange.reduce((s, r) => s + (r.total_ht ?? 0), 0);
     const nbFactures = thisRange.length;
 
-    const bySupplier: Record<string, { name: string; total: number }> = {};
-    for (const r of thisRange) {
-      const sid = r.supplier_id ?? "?";
-      const name = r.suppliers?.name ?? "Inconnu";
-      if (!bySupplier[sid]) bySupplier[sid] = { name, total: 0 };
-      bySupplier[sid].total += r.total_ht ?? 0;
-    }
-    const sorted = Object.values(bySupplier).sort((a, b) => b.total - a.total);
-    const topSupplier = sorted[0] ?? null;
-    const topSupplierName = topSupplier?.name ?? "\u2014";
-    const topSupplierTotal = topSupplier?.total ?? 0;
-
     const variationPct = prevTotalHT > 0 ? ((totalHT - prevTotalHT) / prevTotalHT) * 100 : null;
-
-    // Active suppliers
-    const activeSuppliers = new Set(thisRange.map((inv) => inv.supplier_id).filter(Boolean)).size;
 
     // Monthly average across fiscal year
     const fyStart = new Date(curFY, 9, 1); // Oct 1
@@ -293,7 +278,7 @@ export default function AchatsPage() {
     const elapsedMonths = Math.max(1, (curYear - curFY) * 12 + curMonth - 9 + 1);
     const monthlyAvg = fyTotal / Math.max(1, Math.min(elapsedMonths, 12));
 
-    return { totalHT, nbFactures, topSupplierName, topSupplierTotal, variationPct, prevTotalHT, activeSuppliers, monthlyAvg };
+    return { totalHT, nbFactures, variationPct, monthlyAvg };
   }, [allInvoices, rangeInvoices, viewMode, selectedDate, range, curMonth, curYear, curFY]);
 
   // ── Monthly breakdown for evolution chart ──
@@ -436,24 +421,6 @@ export default function AchatsPage() {
     return cats
       .map((name) => ({ name, total: byCat[name] ?? 0, color: CATEGORY_COLORS[name] ?? "#999" }))
       .filter((c) => c.total > 0);
-  }, [rangeInvoices]);
-
-  // ── Top 5 suppliers for selected range ──
-  const top5Suppliers = useMemo(() => {
-    const totalHT = rangeInvoices.reduce((s, r) => s + (r.total_ht ?? 0), 0);
-
-    const bySupp: Record<string, { name: string; total: number }> = {};
-    for (const inv of rangeInvoices) {
-      const name = inv.suppliers?.name ?? "Inconnu";
-      const k = name.toLowerCase().trim();
-      if (!bySupp[k]) bySupp[k] = { name, total: 0 };
-      bySupp[k].total += inv.total_ht ?? 0;
-    }
-
-    return Object.values(bySupp)
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 5)
-      .map((s) => ({ ...s, pct: totalHT > 0 ? (s.total / totalHT) * 100 : 0, color: getSupplierColor(s.name.toLowerCase().trim()) }));
   }, [rangeInvoices]);
 
   // ── Invoices grouped for accordion (selected range) ──
@@ -774,12 +741,24 @@ export default function AchatsPage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
-        <h1 style={{
-          fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24,
-          color: "#1a1a1a", margin: "0 0 20px", textTransform: "uppercase", letterSpacing: "0.04em",
-        }}>
-          Achats
-        </h1>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <h1 style={{
+            fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24,
+            color: "#1a1a1a", margin: 0, textTransform: "uppercase", letterSpacing: "0.04em",
+          }}>
+            Achats
+          </h1>
+          <button
+            onClick={() => router.push("/invoices")}
+            style={{
+              fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 600,
+              background: "#D4775A", color: "#fff", border: "none", borderRadius: 20,
+              padding: "8px 18px", cursor: "pointer",
+            }}
+          >
+            Importer une facture
+          </button>
+        </div>
 
         {/* ══════════════════════════════════════════════════ */}
         {/*  VIEW TABS + DATE NAVIGATION                     */}
@@ -847,25 +826,10 @@ export default function AchatsPage() {
                 <div style={S.kpiValue}>{dashKpis.nbFactures}</div>
               </div>
 
-              {/* Top fournisseur */}
-              <div style={{ ...S.card, flex: "1 1 160px", minWidth: 140 }}>
-                <div style={S.kpiLabel}>Top fournisseur</div>
-                <div style={{ ...S.kpiValue, fontSize: 18 }}>{dashKpis.topSupplierName}</div>
-                {dashKpis.topSupplierTotal > 0 && (
-                  <div style={{ fontSize: 11, color: "#999", marginTop: 4, fontFamily: "DM Sans, sans-serif" }}>{fmt(dashKpis.topSupplierTotal)}</div>
-                )}
-              </div>
-
               {/* Moyenne mensuelle */}
               <div style={{ ...S.card, flex: "1 1 160px", minWidth: 140 }}>
                 <div style={S.kpiLabel}>Moy. mensuelle (exercice)</div>
                 <div style={S.kpiValue}>{fmt(dashKpis.monthlyAvg)}</div>
-              </div>
-
-              {/* Fournisseurs actifs */}
-              <div style={{ ...S.card, flex: "1 1 140px", minWidth: 120 }}>
-                <div style={S.kpiLabel}>Fournisseurs actifs</div>
-                <div style={S.kpiValue}>{dashKpis.activeSuppliers}</div>
               </div>
             </div>
 
@@ -998,127 +962,91 @@ export default function AchatsPage() {
             )}
 
             {/* ══════════════════════════════════════════════════ */}
-            {/*  C) TOP 5 FOURNISSEURS (filtered by range)       */}
-            {/* ══════════════════════════════════════════════════ */}
-            {top5Suppliers.length > 0 && (
-              <>
-                <div style={S.sec}>Top fournisseurs — {periodLabel}</div>
-                <div style={{ ...S.card, marginBottom: 32, padding: "18px 20px" }}>
-                  {top5Suppliers.map((sup, i) => (
-                    <div key={sup.name} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: i < top5Suppliers.length - 1 ? 10 : 0 }}>
-                      <div style={{ width: 20, fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 14, color: "#999", textAlign: "center", flexShrink: 0 }}>
-                        {i + 1}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
-                          <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 600, fontSize: 13, color: "#1a1a1a" }}>{sup.name}</span>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ fontSize: 11, color: "#999", fontFamily: "DM Sans, sans-serif" }}>{sup.pct.toFixed(1)}%</span>
-                            <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 13, color: "#1a1a1a" }}>{fmt(sup.total)}</span>
-                          </div>
-                        </div>
-                        <div style={{ height: 6, borderRadius: 3, background: "#f2ede4", overflow: "hidden" }}>
-                          <div style={{ height: "100%", borderRadius: 3, background: sup.color, width: `${sup.pct}%`, transition: "width 0.3s" }} />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {/* ══════════════════════════════════════════════════ */}
             {/*  D) FACTURES — filtered by range, by supplier     */}
             {/* ══════════════════════════════════════════════════ */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <div style={{ ...S.sec, marginBottom: 0 }}>Factures — {periodLabel}</div>
-              <button
-                onClick={() => router.push("/invoices")}
-                style={{
-                  fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 600,
-                  background: "#D4775A", color: "#fff", border: "none", borderRadius: 20,
-                  padding: "7px 16px", cursor: "pointer",
-                }}
-              >
-                Importer une facture
-              </button>
-            </div>
-
-            {rangeInvoiceGroups.length === 0 ? (
-              <p style={{ color: "#999", fontSize: 13, marginBottom: 20 }}>Aucune facture pour cette periode.</p>
-            ) : (
-              <div style={{ border: "1px solid #ddd6c8", borderRadius: 10, overflow: "hidden", marginBottom: 20 }}>
-                {rangeInvoiceGroups.map((sup) => {
-                  const suppKey = sup.name.toLowerCase().trim();
-                  const isSuppOpen = dashOpenSupplier === suppKey;
-                  const suppTotal = sup.invoices.reduce((s, i) => s + (i.total_ht ?? 0), 0);
-                  return (
-                    <div key={suppKey}>
-                      <div
-                        onClick={() => { setDashOpenSupplier(isSuppOpen ? null : suppKey); setDashSelectedInvoice(null); setDashLines([]); }}
-                        style={{
-                          display: "flex", alignItems: "center", justifyContent: "space-between",
-                          padding: "10px 16px", cursor: "pointer", borderBottom: "1px solid #eee6d8",
-                          background: isSuppOpen ? "#faf6ef" : "transparent",
-                        }}
-                        onMouseEnter={(e) => { if (!isSuppOpen) e.currentTarget.style.background = "#faf6ef"; }}
-                        onMouseLeave={(e) => { if (!isSuppOpen) e.currentTarget.style.background = isSuppOpen ? "#faf6ef" : "transparent"; }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: sup.color, flexShrink: 0 }} />
-                          <span style={{ fontSize: 12, color: "#999", transition: "transform 0.2s", transform: isSuppOpen ? "rotate(90deg)" : "rotate(0deg)" }}>&#9654;</span>
-                          <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 600, fontSize: 13, color: "#1a1a1a" }}>{sup.name}</span>
-                          <span style={{ fontSize: 10, color: "#999" }}>{sup.invoices.length} fact.</span>
-                        </div>
-                        <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 600, color: "#1a1a1a" }}>{fmt(suppTotal)} HT</span>
-                      </div>
-
-                      {isSuppOpen && (
-                        <div style={{ borderTop: "1px solid #eee6d8" }}>
-                          <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "DM Sans, sans-serif" }}>
-                            <thead>
-                              <tr style={{ borderBottom: "1px solid #eee6d8" }}>
-                                <th style={{ ...thStyle, paddingLeft: 32 }}>Date</th>
-                                <th style={thStyle}>N facture</th>
-                                <th style={{ ...thStyle, textAlign: "right" }}>Total HT</th>
-                                <th style={{ ...thStyle, textAlign: "right" }}>Total TTC</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {sup.invoices.map((inv) => {
-                                const isSelected = dashSelectedInvoice === inv.id;
-                                return (
-                                  <React.Fragment key={inv.id}>
-                                    <tr
-                                      onClick={() => loadDashLines(inv.id)}
-                                      style={{ borderBottom: "1px solid #eee6d8", cursor: "pointer", background: isSelected ? "#f5f0e8" : "transparent" }}
-                                      onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "#faf6ef"; }}
-                                      onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = isSelected ? "#f5f0e8" : "transparent"; }}
-                                    >
-                                      <td style={{ ...tdStyle, paddingLeft: 32 }}>{fmtDate(inv.invoice_date)}</td>
-                                      <td style={{ ...tdStyle, color: "#666" }}>{inv.invoice_number ?? "\u2014"}</td>
-                                      <td style={tdR}>{fmt(inv.total_ht)}</td>
-                                      <td style={tdR}>{fmt(inv.total_ttc)}</td>
-                                    </tr>
-                                    {isSelected && (
-                                      <tr>
-                                        <td colSpan={4} style={{ padding: 0 }}>
-                                          {renderLinesTable(dashLines, dashLinesLoading)}
-                                        </td>
-                                      </tr>
-                                    )}
-                                  </React.Fragment>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "18px 20px", marginBottom: 20 }}>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ ...S.sec, marginBottom: 0 }}>Factures — {periodLabel}</div>
               </div>
-            )}
+
+              {rangeInvoiceGroups.length === 0 ? (
+                <p style={{ color: "#999", fontSize: 13, margin: 0 }}>Aucune facture pour cette periode.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                  {rangeInvoiceGroups.map((sup, idx) => {
+                    const suppKey = sup.name.toLowerCase().trim();
+                    const isSuppOpen = dashOpenSupplier === suppKey;
+                    const suppTotal = sup.invoices.reduce((s, i) => s + (i.total_ht ?? 0), 0);
+                    const isLast = idx === rangeInvoiceGroups.length - 1;
+                    return (
+                      <div key={suppKey} style={{ borderBottom: isLast ? "none" : "1px solid #eee6d8" }}>
+                        <div
+                          onClick={() => { setDashOpenSupplier(isSuppOpen ? null : suppKey); setDashSelectedInvoice(null); setDashLines([]); }}
+                          style={{
+                            display: "flex", alignItems: "center", justifyContent: "space-between",
+                            padding: "11px 8px", cursor: "pointer", borderRadius: 8,
+                            background: isSuppOpen ? "#f5f0e8" : "transparent",
+                            transition: "background 0.15s",
+                          }}
+                          onMouseEnter={(e) => { if (!isSuppOpen) e.currentTarget.style.background = "#faf6ef"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = isSuppOpen ? "#f5f0e8" : "transparent"; }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: "50%", background: sup.color, flexShrink: 0 }} />
+                            <span style={{ fontSize: 11, color: "#bbb", transition: "transform 0.2s", transform: isSuppOpen ? "rotate(90deg)" : "rotate(0deg)" }}>&#9654;</span>
+                            <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 600, fontSize: 13, color: "#1a1a1a" }}>{sup.name}</span>
+                            <span style={{ fontSize: 10, color: "#999", background: "#f2ede4", borderRadius: 8, padding: "2px 8px" }}>{sup.invoices.length} facture{sup.invoices.length > 1 ? "s" : ""}</span>
+                          </div>
+                          <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{fmt(suppTotal)} HT</span>
+                        </div>
+
+                        {isSuppOpen && (
+                          <div style={{ padding: "0 0 8px 26px" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "DM Sans, sans-serif" }}>
+                              <thead>
+                                <tr style={{ borderBottom: "1px solid #eee6d8" }}>
+                                  <th style={{ ...thStyle, paddingLeft: 12 }}>Date</th>
+                                  <th style={thStyle}>N facture</th>
+                                  <th style={{ ...thStyle, textAlign: "right" }}>Total HT</th>
+                                  <th style={{ ...thStyle, textAlign: "right" }}>Total TTC</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {sup.invoices.map((inv) => {
+                                  const isSelected = dashSelectedInvoice === inv.id;
+                                  return (
+                                    <React.Fragment key={inv.id}>
+                                      <tr
+                                        onClick={() => loadDashLines(inv.id)}
+                                        style={{ borderBottom: "1px solid #f2ede4", cursor: "pointer", background: isSelected ? "#f5f0e8" : "transparent", borderRadius: 6 }}
+                                        onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "#faf6ef"; }}
+                                        onMouseLeave={(e) => { e.currentTarget.style.background = isSelected ? "#f5f0e8" : "transparent"; }}
+                                      >
+                                        <td style={{ ...tdStyle, paddingLeft: 12 }}>{fmtDate(inv.invoice_date)}</td>
+                                        <td style={{ ...tdStyle, color: "#666" }}>{inv.invoice_number ?? "\u2014"}</td>
+                                        <td style={tdR}>{fmt(inv.total_ht)}</td>
+                                        <td style={tdR}>{fmt(inv.total_ttc)}</td>
+                                      </tr>
+                                      {isSelected && (
+                                        <tr>
+                                          <td colSpan={4} style={{ padding: 0 }}>
+                                            {renderLinesTable(dashLines, dashLinesLoading)}
+                                          </td>
+                                        </tr>
+                                      )}
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             {/* ══════════════════════════════════════════════════ */}
             {/*  E) FACTURES PAR MOIS — accordion (all data)     */}
