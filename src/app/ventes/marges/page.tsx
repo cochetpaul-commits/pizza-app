@@ -6,6 +6,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { AiInsightCard } from "@/components/AiInsightCard";
 
 import Chart from "chart.js/auto";
+import { getCategoryColor, getCategoryColors } from "@/lib/categoryColors";
 
 const JOURS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 
@@ -87,11 +88,6 @@ const COLORS = {
   dark: "#1a1a1a",
   muted: "#999",
 };
-
-const CHART_COLORS = [
-  "#D4775A", "#46655a", "#c4a882", "#8fa8a0", "#7c5c3a",
-  "#e0b896", "#5e7a8a", "#a8b89c", "#d4a03c", "#3a7d44",
-];
 
 function foodCostColor(fc: number | null): string {
   if (fc === null) return COLORS.muted;
@@ -330,7 +326,7 @@ export default function MargesPage() {
               label: "Marge brute",
               data: top10.map((p) => p.marge_brute ?? 0),
               backgroundColor: top10.map((p) =>
-                foodCostColor(p.food_cost_pct),
+                getCategoryColor(p.categorie),
               ),
               borderRadius: 6,
             },
@@ -374,7 +370,7 @@ export default function MargesPage() {
           datasets: [
             {
               data: cats.map((c) => c.cogs),
-              backgroundColor: CHART_COLORS.slice(0, cats.length),
+              backgroundColor: getCategoryColors(cats.map(c => c.cat)),
               borderWidth: 2,
               borderColor: "#fff",
             },
@@ -609,7 +605,7 @@ export default function MargesPage() {
         labels,
         datasets: [{
           data: values,
-          backgroundColor: accent + "CC",
+          backgroundColor: (trendFilter === "category" && trendCategory ? getCategoryColor(trendCategory) : accent) + "CC",
           borderRadius: 4,
           borderSkipped: false,
         }],
@@ -626,7 +622,7 @@ export default function MargesPage() {
     });
     return () => destroyChart("trendBar");
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trendData, trendMode, trendMetric, accent]);
+  }, [trendData, trendMode, trendMetric, accent, trendFilter, trendCategory]);
 
   const K = data?.kpis;
   const filtered = getFilteredProducts();
@@ -990,31 +986,8 @@ export default function MargesPage() {
                 </select>
               </div>
 
-              {/* Period pills + date range */}
+              {/* Date range */}
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
-                {[{ label: "3 mois", m: 3 }, { label: "6 mois", m: 6 }, { label: "12 mois", m: 12 }].map(({ label, m }) => {
-                  const t = new Date();
-                  const f = new Date(t); f.setMonth(f.getMonth() - m);
-                  const fIso = f.toISOString().slice(0, 10);
-                  const tIso = t.toISOString().slice(0, 10);
-                  const isActive = trendFrom === fIso && trendTo === tIso;
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => { setTrendFrom(fIso); setTrendTo(tIso); }}
-                      style={{
-                        height: 28, padding: "0 12px", borderRadius: 14,
-                        border: isActive ? "none" : `1px solid ${COLORS.border}`,
-                        background: isActive ? accent : "#fff",
-                        color: isActive ? "#fff" : COLORS.dark,
-                        fontSize: 11, fontWeight: 600, cursor: "pointer",
-                      }}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
                 <input
                   type="date"
                   value={trendFrom}
@@ -1095,6 +1068,53 @@ export default function MargesPage() {
                   <span>CA TTC: <strong style={{ color: COLORS.dark }}>{fmtDec(trendData.reduce((s, d) => s + d.ca_ttc, 0))}</strong></span>
                 </div>
               )}
+
+              {/* Drill-down: products in selected category */}
+              {trendFilter === "category" && trendCategory && data && (() => {
+                const catProducts = data.products
+                  .filter(p => p.categorie === trendCategory)
+                  .sort((a, b) => b.ca_ht - a.ca_ht)
+                  .slice(0, 10);
+                if (catProducts.length === 0) return null;
+                const maxCA = catProducts[0]?.ca_ht ?? 1;
+                const catColor = getCategoryColor(trendCategory);
+                return (
+                  <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${COLORS.border}` }}>
+                    <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: COLORS.muted, fontWeight: 600, marginBottom: 12 }}>
+                      Produits de cette categorie ({trendCategory})
+                    </div>
+                    {catProducts.map((p, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                        <div style={{ width: 160, fontSize: 12, color: COLORS.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 0 }}>
+                          {p.name}
+                        </div>
+                        <div style={{ flex: 1, height: 18, background: "#f5f0e8", borderRadius: 4, overflow: "hidden" }}>
+                          <div style={{
+                            width: `${Math.max(2, (p.ca_ht / maxCA) * 100)}%`,
+                            height: "100%",
+                            background: catColor + "CC",
+                            borderRadius: 4,
+                          }} />
+                        </div>
+                        <div style={{ width: 70, textAlign: "right", fontSize: 11, fontVariantNumeric: "tabular-nums", color: COLORS.dark }}>
+                          {fmtDec(p.ca_ht)}
+                        </div>
+                        <div style={{ width: 40, textAlign: "right", fontSize: 10, color: COLORS.muted }}>
+                          {p.qty}x
+                        </div>
+                        {p.food_cost_pct !== null && (
+                          <div style={{
+                            width: 44, textAlign: "right", fontSize: 10, fontWeight: 600,
+                            color: foodCostColor(p.food_cost_pct),
+                          }}>
+                            {p.food_cost_pct.toFixed(0)}%
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* ── Filters ── */}

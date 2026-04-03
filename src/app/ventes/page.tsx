@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback, type CSSProperties } from "re
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import Chart from "chart.js/auto";
+import { getCategoryColor, getCategoryColors } from "@/lib/categoryColors";
 
 /* ── Types ── */
 type WeekData = {
@@ -64,7 +65,6 @@ type ViewTab = "jour" | "semaine" | "mois";
 const fmt = (v: number) => Math.round(v).toLocaleString("fr-FR") + "\u20AC";
 const fmtK = (v: number) => Math.round(v / 1000) + "k\u20AC";
 const ZC: Record<string, string> = { Salle: "#46655a", Pergolas: "#5e8278", Terrasse: "#c4a882", emp: "#D4775A" };
-const MIX_COLORS = ["#D4775A", "#8fa8a0", "#46655a", "#7c5c3a", "#c4a882", "#e0b896", "#5e7a8a", "#a8b89c"];
 
 /* ── Week aggregation helpers (for monthly view) ── */
 type WeekBucket = { label: string; indices: number[] };
@@ -131,7 +131,6 @@ export default function PerformancesPage() {
 
   // Category trend state
   type CatTrendDaily = { date: string; qty: number; ca_ttc: number; ca_ht: number };
-  const [catTrendPeriod, setCatTrendPeriod] = useState<3 | 6 | 12>(3);
   const [catTrendFrom, setCatTrendFrom] = useState(() => {
     const d = new Date(); d.setMonth(d.getMonth() - 3); return d.toISOString().slice(0, 10);
   });
@@ -341,9 +340,7 @@ export default function PerformancesPage() {
       return totalB - totalA;
     });
 
-    const catColors = ["#D4775A", "#46655a", "#8fa8a0", "#7c5c3a", "#c4a882", "#e0b896", "#5e7a8a", "#a8b89c", "#c8960a", "#e0b020", "#6a4c93", "#1982c4"];
-
-    const datasets = catNames.map((cat, ci) => {
+    const datasets = catNames.map((cat) => {
       const dailyMap = new Map<string, CatTrendDaily>();
       for (const d of catTrendData[cat]) dailyMap.set(d.date, d);
 
@@ -359,7 +356,7 @@ export default function PerformancesPage() {
       return {
         label: cat,
         data: values,
-        backgroundColor: catColors[ci % catColors.length],
+        backgroundColor: getCategoryColor(cat),
         borderRadius: 4,
       };
     });
@@ -1195,7 +1192,7 @@ export default function PerformancesPage() {
                 <div className="ventes-top3-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
                   {W.top3_cats.filter(c => !c.cat.toLowerCase().includes("bambini")).map((cat, ci) => (
                     <div key={ci} style={{ background: "#fff", borderRadius: 10, padding: "12px 14px", border: "1px solid rgba(0,0,0,.08)" }}>
-                      <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".1em", color: MIX_COLORS[ci] ?? "#777", fontWeight: 600, marginBottom: 8 }}>{cat.cat}</div>
+                      <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".1em", color: getCategoryColor(cat.cat, ci), fontWeight: 600, marginBottom: 8 }}>{cat.cat}</div>
                       {cat.rows.map((r, ri) => (
                         <div key={ri} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", borderBottom: "1px solid rgba(0,0,0,.04)", fontSize: 11 }}>
                           <span><span style={{ fontSize: 9, color: "#bbb", marginRight: 4 }}>{ri + 1}</span>{r.n}</span>
@@ -1231,29 +1228,11 @@ export default function PerformancesPage() {
               <div style={S.sec}>Tendances par categorie</div>
               {/* Filters row */}
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                {/* Period quick-select pills */}
-                <div style={{ display: "flex", gap: 0, background: "#f5f0e8", borderRadius: 20, padding: 3 }}>
-                  {([3, 6, 12] as const).map(m => (
-                    <button key={m} type="button" onClick={() => {
-                      setCatTrendPeriod(m);
-                      const d = new Date(); d.setMonth(d.getMonth() - m);
-                      setCatTrendFrom(d.toISOString().slice(0, 10));
-                      setCatTrendTo(new Date().toISOString().slice(0, 10));
-                    }} style={{
-                      padding: "4px 12px", borderRadius: 16, border: "none", cursor: "pointer",
-                      background: catTrendPeriod === m ? accent : "transparent",
-                      color: catTrendPeriod === m ? "#fff" : "#777",
-                      fontSize: 11, fontWeight: 500,
-                    }}>
-                      {m} mois
-                    </button>
-                  ))}
-                </div>
                 {/* Date range */}
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <input type="date" value={catTrendFrom} onChange={e => { setCatTrendFrom(e.target.value); setCatTrendPeriod(3); }} style={{ fontSize: 11, border: "1px solid #e0d8ce", borderRadius: 6, padding: "3px 6px", color: "#555" }} />
+                  <input type="date" value={catTrendFrom} onChange={e => setCatTrendFrom(e.target.value)} style={{ fontSize: 11, border: "1px solid #e0d8ce", borderRadius: 6, padding: "3px 6px", color: "#555" }} />
                   <span style={{ fontSize: 10, color: "#999" }}>-</span>
-                  <input type="date" value={catTrendTo} onChange={e => { setCatTrendTo(e.target.value); setCatTrendPeriod(3); }} style={{ fontSize: 11, border: "1px solid #e0d8ce", borderRadius: 6, padding: "3px 6px", color: "#555" }} />
+                  <input type="date" value={catTrendTo} onChange={e => setCatTrendTo(e.target.value)} style={{ fontSize: 11, border: "1px solid #e0d8ce", borderRadius: 6, padding: "3px 6px", color: "#555" }} />
                 </div>
                 {/* Metric toggle */}
                 <div style={{ display: "flex", gap: 0, background: "#f5f0e8", borderRadius: 20, padding: 3, marginLeft: "auto" }}>
@@ -1768,7 +1747,7 @@ function ChartCanvas({ id, height, data, mode, type, onBarClick }: {
       const total = vals.reduce((a, b) => a + b, 0);
       charts[id] = new Chart(canvasRef.current, {
         type: "bar",
-        data: { labels: data.mix_labels, datasets: [{ data: vals, backgroundColor: MIX_COLORS.slice(0, vals.length), borderRadius: 4, borderSkipped: false }] },
+        data: { labels: data.mix_labels, datasets: [{ data: vals, backgroundColor: getCategoryColors(data.mix_labels), borderRadius: 4, borderSkipped: false }] },
         options: {
           indexAxis: "y", responsive: true, maintainAspectRatio: false,
           layout: { padding: { right: 80 } },
@@ -1780,7 +1759,7 @@ function ChartCanvas({ id, height, data, mode, type, onBarClick }: {
           onClick: (_evt, elements) => {
             if (elements.length && onBarClick) {
               const i = elements[0].index;
-              onBarClick(data.mix_labels[i], MIX_COLORS[i % MIX_COLORS.length]);
+              onBarClick(data.mix_labels[i], getCategoryColor(data.mix_labels[i], i));
             }
           },
         },
