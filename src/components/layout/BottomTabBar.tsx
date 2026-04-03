@@ -271,8 +271,30 @@ const SECTION_EVENTS: TabSection = {
   ],
 };
 
-const SECTIONS_BELLO: TabSection[] = [SECTION_HOME, SECTION_PILOTAGE, SECTION_PERSONNEL, SECTION_PRODUCTION, SECTION_ACHATS];
-const SECTIONS_PICCOLA: TabSection[] = [SECTION_HOME, SECTION_PILOTAGE, SECTION_PERSONNEL, SECTION_PRODUCTION_PICCOLA, SECTION_ACHATS, SECTION_EVENTS];
+function IconSettings({ active: _active }: { active: boolean }) {
+  return (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+
+const SECTION_SETTINGS: TabSection = {
+  label: "Param.",
+  href: "/settings/employes",
+  match: ["/settings", "/admin"],
+  icon: (a) => <IconSettings active={a} />,
+  tabs: [
+    { label: "Employes", href: "/settings/employes", match: ["/settings/employes"], icon: (a) => <IconUsers active={a} /> },
+    { label: "Etab.", href: "/settings/etablissements", match: ["/settings/etablissements"], icon: (a) => <IconGrid active={a} /> },
+    { label: "Planning", href: "/settings/planning", match: ["/settings/planning"], icon: (a) => <IconCalendar active={a} /> },
+    { label: "Finance", href: "/settings/finance", match: ["/settings/finance"], icon: (a) => <IconWallet active={a} /> },
+  ],
+};
+
+const SECTIONS_BELLO: TabSection[] = [SECTION_HOME, SECTION_PILOTAGE, SECTION_PERSONNEL, SECTION_PRODUCTION, SECTION_ACHATS, SECTION_SETTINGS];
+const SECTIONS_PICCOLA: TabSection[] = [SECTION_HOME, SECTION_PILOTAGE, SECTION_PERSONNEL, SECTION_PRODUCTION_PICCOLA, SECTION_ACHATS, SECTION_EVENTS, SECTION_SETTINGS];
 
 const INACTIVE_COLOR = "#999";
 
