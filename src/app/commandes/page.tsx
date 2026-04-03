@@ -434,12 +434,10 @@ function CommandesPage() {
 
       setSuppliers(list);
       setSupplierAliases(aliases);
-      // Pre-select from URL param or default to first
+      // Pre-select from URL param only — otherwise show placeholder "Fournisseur"
       const urlSupplierId = searchParams.get("supplier_id");
       if (urlSupplierId && list.some((s) => s.id === urlSupplierId)) {
         setSelectedSupplierId(urlSupplierId);
-      } else if (list.length > 0) {
-        setSelectedSupplierId(list[0].id);
       }
       setLoading(false);
     }
@@ -1605,6 +1603,22 @@ function CommandesPage() {
                           Valider
                         </button>
                       )}
+                      <button type="button" onClick={async () => {
+                        if (!confirm(`Supprimer la commande ${s.supplier_name} ?`)) return;
+                        await supabase.from("commande_lignes").delete().eq("session_id", s.id);
+                        await supabase.from("commande_sessions").delete().eq("id", s.id);
+                        setActiveSessions((prev) => prev.filter((x) => x.id !== s.id));
+                        if (session?.id === s.id) { setSession(null); setQuantities({}); }
+                        setConfirmation("Commande supprimée");
+                        setTimeout(() => setConfirmation(null), 3000);
+                      }}
+                        style={{
+                          fontSize: 10, fontWeight: 600, color: "#DC2626", background: "#fff",
+                          border: "1px solid #fca5a5", borderRadius: 6, cursor: "pointer", padding: "4px 8px",
+                          fontFamily: "inherit",
+                        }}>
+                        Suppr.
+                      </button>
                       {!isCurrentSupplier && (
                         <button type="button" onClick={() => {
                           // Find canonical supplier id for this session
