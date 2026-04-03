@@ -418,7 +418,7 @@ export default function PerformancesPage() {
               fontSize: 12, fontWeight: 600, cursor: "pointer",
               display: "flex", alignItems: "center", gap: 4,
             }}>
-              Comparer {compareMode === "a-1" ? "(A-1)" : compareMode === "prev" ? "(Prec.)" : compareMode === "prev-sem" ? "(S-1)" : compareMode === "prev-mois" ? "(M-1)" : compareMode === "custom" ? "(Perso.)" : ""}
+              {compareMode === "none" ? "vs..." : compareMode === "a-1" ? "vs A-1" : compareMode === "prev" ? "vs Prec." : compareMode === "prev-sem" ? "vs S-1" : compareMode === "prev-mois" ? "vs M-1" : "vs Perso."}
               <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transform: compareOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform .2s" }}><polyline points="6 9 12 15 18 9" /></svg>
             </button>
             {compareOpen && (
@@ -472,19 +472,16 @@ export default function PerformancesPage() {
         </div>
         {importMsg && <div style={{ fontSize: 12, color: accent, marginBottom: 10 }}>{importMsg}</div>}
 
-        {/* ── Date navigation + title ── */}
-        <div className="ventes-date-row" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid rgba(70,101,90,.15)" }}>
-          <button type="button" onClick={() => navigate(-1)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>&larr;</button>
+        {/* ── Date navigation ── */}
+        <div className="ventes-date-row" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
+          <button type="button" onClick={() => navigate(-1)} style={{ width: 36, height: 36, borderRadius: 10, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>&larr;</button>
           <input
             type="date"
             value={selectedDate}
             onChange={e => { if (e.target.value) setSelectedDate(e.target.value); }}
-            style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 13, padding: "5px 8px", border: "1px solid #e0d8ce", borderRadius: 8, background: "#fff", color: "#1a1a1a", cursor: "pointer" }}
+            style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 12, padding: "5px 8px", border: "1px solid #e0d8ce", borderRadius: 8, background: "#fff", color: "#1a1a1a", cursor: "pointer", width: 120 }}
           />
-          <h1 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 26, fontWeight: 700, margin: 0, letterSpacing: "-.01em", textTransform: "uppercase" }}>
-            {rangeLabel}
-          </h1>
-          <button type="button" onClick={() => navigate(1)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>&rarr;</button>
+          <button type="button" onClick={() => navigate(1)} style={{ width: 36, height: 36, borderRadius: 10, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>&rarr;</button>
         </div>
 
         {/* ── Loading / Empty ── */}
@@ -509,8 +506,11 @@ export default function PerformancesPage() {
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
-                    <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".16em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 8 }}>
-                      CA {mode.toUpperCase()} — {viewTab === "jour" ? "Journee" : viewTab === "semaine" ? "Semaine courante" : "Mois"}
+                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 16, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: ".02em", marginBottom: 4, textShadow: "0 1px 4px rgba(0,0,0,.15)" }}>
+                      {rangeLabel}
+                    </div>
+                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".16em", color: "rgba(255,255,255,.7)", fontWeight: 600, marginBottom: 8 }}>
+                      CA {mode.toUpperCase()}
                     </div>
                     <div style={{ ...S.bigNum, textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>{fmt(ca)}</div>
                     {mode === "ttc" && <div style={{ fontSize: 13, color: "rgba(255,255,255,.85)", marginTop: 6, fontWeight: 500 }}>HT <span style={{ color: "#fff", fontWeight: 700 }}>{fmt(W.ca_ht)}</span></div>}

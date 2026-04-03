@@ -31,11 +31,19 @@ function parseDate(v: unknown): string | null {
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-/** Extract just YYYY-MM-DD */
+/** Extract business date (YYYY-MM-DD). A business day runs 10:00→06:00 next day.
+ *  Tickets between 00:00 and 05:59 belong to the previous calendar day. */
 function extractDate(dateStr: string | null): string | null {
   if (!dateStr) return null;
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return null;
+  // Get hour in Paris timezone
+  const parisHour = parseInt(d.toLocaleString("en-US", { timeZone: "Europe/Paris", hour: "numeric", hour12: false }));
+  if (parisHour < 6) {
+    // Before 6 AM → belongs to previous day's service
+    const prev = new Date(d.getTime() - 6 * 3600 * 1000);
+    return prev.toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
+  }
   return d.toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
 }
 
