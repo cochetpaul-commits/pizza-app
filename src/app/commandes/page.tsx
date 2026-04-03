@@ -1348,7 +1348,7 @@ function CommandesPage() {
           const color = CAT_COLORS[cat] ?? "#6B7280";
 
           return (
-            <div key={cat} style={{ marginBottom: 6 }}>
+            <div key={cat} style={{ marginTop: 16, marginBottom: 6 }}>
               <button type="button"
                 onClick={() => setOpenCats((prev) => ({ ...prev, [cat]: !isOpen }))}
                 onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; e.currentTarget.style.borderColor = color; }}
@@ -1357,8 +1357,9 @@ function CommandesPage() {
                   width: "100%", display: "flex", alignItems: "center", gap: 10,
                   padding: "12px 16px", background: "#fff",
                   border: "1.5px solid #ddd6c8", borderLeft: `3px solid ${color}`,
-                  borderRadius: 12, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                  marginTop: 16, marginBottom: 6,
+                  borderRadius: isOpen ? "12px 12px 0 0" : 12,
+                  cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                  marginBottom: 0,
                   boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
                   transition: "box-shadow 0.2s, border-color 0.2s",
                 }}>
@@ -1380,7 +1381,13 @@ function CommandesPage() {
               <div style={{
                 maxHeight: isOpen ? 5000 : 0, overflow: "hidden",
                 transition: "max-height 0.3s ease",
-                background: "#fff", borderRadius: "0 0 12px 12px",
+                ...(isOpen ? {
+                  borderLeft: `3px solid ${color}`,
+                  borderRight: "1.5px solid #ddd6c8",
+                  borderBottom: "1.5px solid #ddd6c8",
+                  borderRadius: "0 0 12px 12px",
+                } : {}),
+                background: "#fff",
               }}>
                 {favoris.length > 0 && (
                   <div style={{ background: "#FFFBF0", borderLeft: "3px solid #F59E0B", padding: "6px 0 2px 0" }}>
@@ -1467,7 +1474,7 @@ function CommandesPage() {
                 boxShadow: dropdownOpen ? "0 2px 12px rgba(212,119,90,0.12)" : "none",
                 transition: "border 0.15s, box-shadow 0.15s",
               }}>
-              {currentSupplier?.name ?? "Choisir un fournisseur"}
+              {currentSupplier?.name ?? "Fournisseur"}
               {currentSupplier && draftSupplierIds.has(currentSupplier.id) && (
                 <span style={{
                   display: "inline-block", width: 8, height: 8, borderRadius: "50%",
@@ -1524,117 +1531,6 @@ function CommandesPage() {
                 })}
               </div>
             )}
-          </div>
-        )}
-
-        {/* KPI Cards */}
-        {!loading && !loadingSupplier && selectedSupplierId && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
-            {/* Articles en commande */}
-            <div style={{ flex: "1 1 calc(50% - 5px)", minWidth: 140, background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "16px 18px" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999", marginBottom: 6 }}>
-                Articles en commande
-              </div>
-              <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 24, color: "#1a1a1a" }}>
-                {activeCount}
-              </div>
-            </div>
-
-            {/* Total HT estimé */}
-            <div style={{ flex: "1 1 calc(50% - 5px)", minWidth: 140, background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "16px 18px" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999", marginBottom: 6 }}>
-                Total HT estimé
-              </div>
-              <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 24, color: "#1a1a1a" }}>
-                {orderTotal > 0 ? `${orderTotal.toFixed(2)} €` : "—"}
-              </div>
-            </div>
-
-            {/* Dernière commande */}
-            <div style={{ flex: "1 1 calc(50% - 5px)", minWidth: 140, background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "16px 18px" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999", marginBottom: 6 }}>
-                Dernière commande
-              </div>
-              <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 24, color: "#1a1a1a" }}>
-                {historique.length > 0 ? fmtDate(historique[0].created_at) : "—"}
-              </div>
-            </div>
-
-            {/* Franco */}
-            {francoMin != null && francoMin > 0 && (
-              <div style={{ flex: "1 1 calc(50% - 5px)", minWidth: 140, background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "16px 18px" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999", marginBottom: 6 }}>
-                  Franco
-                </div>
-                <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 24, color: orderTotal >= francoMin ? "#16a34a" : "#D4775A" }}>
-                  {orderTotal.toFixed(0)} € / {francoMin} €
-                </div>
-                <div style={{ height: 4, background: "#f0ebe2", borderRadius: 2, overflow: "hidden", marginTop: 6 }}>
-                  <div style={{
-                    height: "100%", borderRadius: 2, transition: "width 0.3s ease",
-                    width: `${francoPercent ?? 0}%`,
-                    background: orderTotal >= francoMin
-                      ? "linear-gradient(90deg, #16a34a, #22c55e)"
-                      : "linear-gradient(90deg, #D4775A, #E8956F)",
-                  }} />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Réceptions en attente */}
-        {!loading && pendingReceptions.length > 0 && (
-          <div style={{ marginTop: 16 }}>
-            <div style={{
-              fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
-              color: "#4a6741", marginBottom: 8,
-              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-            }}>
-              Receptions en attente
-            </div>
-            {pendingReceptions.map((r) => (
-              <div key={r.id} style={{
-                background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce",
-                borderLeft: "4px solid #4a6741", padding: "14px 16px", marginBottom: 8,
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{r.supplier_name}</span>
-                    <span style={{ fontSize: 11, color: "#999" }}>{fmtDate(r.created_at)}</span>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-                    <span style={{ fontSize: 12, color: "#666" }}>{r.nb_articles} article{r.nb_articles > 1 ? "s" : ""}</span>
-                    {r.total_ht > 0 && (
-                      <span style={{
-                        fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                        fontWeight: 700, fontSize: 16, color: "#1a1a1a",
-                      }}>
-                        {r.total_ht.toFixed(2)} €
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                  <button type="button" onClick={() => downloadPdfById(r.id, r.supplier_name)}
-                    style={{
-                      fontSize: 11, fontWeight: 600, color: "#4a6741", background: "#fff",
-                      border: "1px solid #ddd6c8", borderRadius: 6, cursor: "pointer", padding: "5px 12px",
-                      fontFamily: "inherit",
-                    }}>
-                    PDF
-                  </button>
-                  <button type="button" onClick={() => recevoirPending(r.id)} disabled={saving}
-                    style={{
-                      fontSize: 11, fontWeight: 700, color: "#fff", background: "#16a34a",
-                      border: "none", borderRadius: 6, cursor: "pointer", padding: "5px 14px",
-                      fontFamily: "inherit",
-                    }}>
-                    Receptionner
-                  </button>
-                </div>
-              </div>
-            ))}
           </div>
         )}
 
@@ -1731,6 +1627,117 @@ function CommandesPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Réceptions en attente */}
+        {!loading && pendingReceptions.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{
+              fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
+              color: "#4a6741", marginBottom: 8,
+              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+            }}>
+              Receptions en attente
+            </div>
+            {pendingReceptions.map((r) => (
+              <div key={r.id} style={{
+                background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce",
+                borderLeft: "4px solid #4a6741", padding: "14px 16px", marginBottom: 8,
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{r.supplier_name}</span>
+                    <span style={{ fontSize: 11, color: "#999" }}>{fmtDate(r.created_at)}</span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                    <span style={{ fontSize: 12, color: "#666" }}>{r.nb_articles} article{r.nb_articles > 1 ? "s" : ""}</span>
+                    {r.total_ht > 0 && (
+                      <span style={{
+                        fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                        fontWeight: 700, fontSize: 16, color: "#1a1a1a",
+                      }}>
+                        {r.total_ht.toFixed(2)} €
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button type="button" onClick={() => downloadPdfById(r.id, r.supplier_name)}
+                    style={{
+                      fontSize: 11, fontWeight: 600, color: "#4a6741", background: "#fff",
+                      border: "1px solid #ddd6c8", borderRadius: 6, cursor: "pointer", padding: "5px 12px",
+                      fontFamily: "inherit",
+                    }}>
+                    PDF
+                  </button>
+                  <button type="button" onClick={() => recevoirPending(r.id)} disabled={saving}
+                    style={{
+                      fontSize: 11, fontWeight: 700, color: "#fff", background: "#16a34a",
+                      border: "none", borderRadius: 6, cursor: "pointer", padding: "5px 14px",
+                      fontFamily: "inherit",
+                    }}>
+                    Receptionner
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* KPI Cards */}
+        {!loading && !loadingSupplier && selectedSupplierId && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
+            {/* Articles en commande */}
+            <div style={{ flex: "1 1 calc(50% - 5px)", minWidth: 140, background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "16px 18px" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999", marginBottom: 6 }}>
+                Articles en commande
+              </div>
+              <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 24, color: "#1a1a1a" }}>
+                {activeCount}
+              </div>
+            </div>
+
+            {/* Total HT estimé */}
+            <div style={{ flex: "1 1 calc(50% - 5px)", minWidth: 140, background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "16px 18px" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999", marginBottom: 6 }}>
+                Total HT estimé
+              </div>
+              <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 24, color: "#1a1a1a" }}>
+                {orderTotal > 0 ? `${orderTotal.toFixed(2)} €` : "—"}
+              </div>
+            </div>
+
+            {/* Dernière commande */}
+            <div style={{ flex: "1 1 calc(50% - 5px)", minWidth: 140, background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "16px 18px" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999", marginBottom: 6 }}>
+                Dernière commande
+              </div>
+              <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 24, color: "#1a1a1a" }}>
+                {historique.length > 0 ? fmtDate(historique[0].created_at) : "—"}
+              </div>
+            </div>
+
+            {/* Franco */}
+            {francoMin != null && francoMin > 0 && (
+              <div style={{ flex: "1 1 calc(50% - 5px)", minWidth: 140, background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "16px 18px" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999", marginBottom: 6 }}>
+                  Franco
+                </div>
+                <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 24, color: orderTotal >= francoMin ? "#16a34a" : "#D4775A" }}>
+                  {orderTotal.toFixed(0)} € / {francoMin} €
+                </div>
+                <div style={{ height: 4, background: "#f0ebe2", borderRadius: 2, overflow: "hidden", marginTop: 6 }}>
+                  <div style={{
+                    height: "100%", borderRadius: 2, transition: "width 0.3s ease",
+                    width: `${francoPercent ?? 0}%`,
+                    background: orderTotal >= francoMin
+                      ? "linear-gradient(90deg, #16a34a, #22c55e)"
+                      : "linear-gradient(90deg, #D4775A, #E8956F)",
+                  }} />
+                </div>
+              </div>
+            )}
           </div>
         )}
 
