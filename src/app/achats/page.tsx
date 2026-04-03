@@ -7,6 +7,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { getSupplierColor } from "@/lib/supplierColors";
 import Chart from "chart.js/auto";
+import { FloatingActions, FAIconUpload } from "@/components/layout/FloatingActions";
 
 /* ── Types ── */
 
@@ -1301,6 +1302,9 @@ export default function AchatsPage() {
           </>
         )}
 
+        <FloatingActions actions={[
+          { icon: <FAIconUpload size={22} color="#fff" />, label: "Importer facture", onClick: () => router.push("/invoices"), primary: true },
+        ]} />
       </div>
     </RequireRole>
   );

@@ -10,6 +10,8 @@ import { fetchApi } from "@/lib/fetchApi";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { IngredientAvatar } from "@/components/IngredientAvatar";
 import type { Category } from "@/types/ingredients";
+import { FloatingActions, FAIconPdf, FAIconMail, FAIconTrash, FAIconCheck } from "@/components/layout/FloatingActions";
+import type { FloatingAction } from "@/components/layout/FloatingActions";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1978,6 +1980,21 @@ function CommandesPage() {
           <button type="button" onClick={() => validerSession(session.id)} disabled={saving} style={floatingBtn}>
             {saving ? "Validation..." : `Valider la commande (${activeCount} article${activeCount > 1 ? "s" : ""})`}
           </button>
+        )}
+
+        {/* Floating mobile actions for brouillon */}
+        {session && session.status === "brouillon" && (
+          <FloatingActions actions={(() => {
+            const acts: FloatingAction[] = [
+              { icon: <FAIconTrash size={20} color="#DC2626" />, label: "Supprimer", onClick: () => deleteSession(), disabled: saving },
+              { icon: <FAIconPdf size={20} color="#666" />, label: "PDF", onClick: () => downloadPdf(session.id) },
+              { icon: <FAIconMail size={20} color="#666" />, label: "Envoyer", onClick: () => sendEmailOnly(session.id), disabled: sendingEmail },
+            ];
+            if (activeCount > 0) {
+              acts.push({ icon: <FAIconCheck size={22} color="#fff" />, label: "Valider", onClick: () => validerSession(session.id), primary: true, disabled: saving });
+            }
+            return acts;
+          })()} />
         )}
       </div>
     </RequireRole>

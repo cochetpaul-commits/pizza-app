@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
+import { FloatingActions, FAIconPlus } from "@/components/layout/FloatingActions";
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
@@ -193,6 +194,7 @@ export default function CongesPage() {
   const [formNote, setFormNote] = useState("");
   const [formEmployeId, setFormEmployeId] = useState("");
   const [saving, setSaving] = useState(false);
+  const calendarRef = useRef<HTMLDivElement>(null);
 
   // Refuse reason
   const [refuseId, setRefuseId] = useState<string | null>(null);
@@ -491,6 +493,7 @@ export default function CongesPage() {
           <>
             {/* ── Calendar ────────────────────────────────────── */}
             <div
+              ref={calendarRef}
               style={{
                 background: "#fff",
                 border: "1px solid #ddd6c8",
@@ -1359,6 +1362,9 @@ export default function CongesPage() {
             </div>
           </>
         )}
+        <FloatingActions actions={[
+          { icon: <FAIconPlus size={22} color="#fff" />, label: "Nouvelle demande", onClick: () => calendarRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), primary: true },
+        ]} />
       </div>
     </RequireRole>
   );
