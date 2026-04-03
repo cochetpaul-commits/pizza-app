@@ -300,61 +300,7 @@ export const IngredientRow = React.memo(function IngredientRow({
 
       {/* ── EDIT FORM ── */}
       {isEditing && edit && (() => {
-        // Determine if liquid category → reference = €/L, else €/kg
         const isLiquidCat = edit.category === "alcool_spiritueux" || edit.category === "boisson";
-        const refUnit = isLiquidCat ? "L" : "kg";
-
-        // Compute live reference price (€/kg or €/L)
-        const unitPrice = parseFloat(edit.unitPrice) || 0;
-        const pieceW = parseFloat(edit.pieceWeightG) || 0;
-        const density = parseFloat(edit.density) || 0;
-        const packPrice = parseFloat(edit.packPrice) || 0;
-        const packQty = parseFloat(edit.packTotalQty) || 0;
-        const packCount = parseFloat(edit.packCount) || 0;
-        const packEachQty = parseFloat(edit.packEachQty) || 0;
-        const packPieceW = parseFloat(edit.packPieceWeightG) || 0;
-        const volMl = parseFloat(edit.pieceVolumeMl) || 0;
-
-        let pricePerKg: number | null = null;
-        let pricePerL: number | null = null;
-        let pricePerPc: number | null = null;
-
-        if (edit.priceKind === "unit") {
-          if (edit.unit === "kg" && unitPrice > 0) { pricePerKg = unitPrice; if (density > 0) pricePerL = unitPrice * density; }
-          else if (edit.unit === "l" && unitPrice > 0) { pricePerL = unitPrice; if (density > 0) pricePerKg = unitPrice / density; }
-          else if (edit.unit === "pc" && unitPrice > 0) {
-            pricePerPc = unitPrice;
-            if (pieceW > 0) pricePerKg = unitPrice / (pieceW / 1000);
-            if (volMl > 0) pricePerL = (unitPrice / volMl) * 1000;
-          }
-        } else if (edit.priceKind === "pack_simple" && packPrice > 0) {
-          pricePerPc = packPrice;
-          if (packQty > 0 && edit.packUnit === "kg") { pricePerKg = packPrice / packQty; }
-          else if (packQty > 0 && edit.packUnit === "l") { pricePerL = packPrice / packQty; if (density > 0) pricePerKg = packPrice / (packQty * density); }
-        } else if (edit.priceKind === "pack_composed" && packPrice > 0 && packCount > 0) {
-          pricePerPc = packPrice / packCount;
-          if (edit.packEachUnit === "kg" && packEachQty > 0) pricePerKg = packPrice / (packCount * packEachQty);
-          else if (edit.packEachUnit === "l" && packEachQty > 0) { pricePerL = packPrice / (packCount * packEachQty); if (density > 0) pricePerKg = pricePerL / density; }
-          else if (edit.packEachUnit === "pc") {
-            const vu = edit.packEachVolumeUnit || "cl";
-            if (packEachQty > 0) {
-              if (vu === "cl" || vu === "ml" || vu === "L") {
-                const ml = vu === "cl" ? packEachQty * 10 : vu === "L" ? packEachQty * 1000 : packEachQty;
-                pricePerL = (pricePerPc / ml) * 1000;
-                if (density > 0) pricePerKg = pricePerL / density;
-              } else if (vu === "g" || vu === "kg") {
-                const g = vu === "kg" ? packEachQty * 1000 : packEachQty;
-                pricePerKg = (pricePerPc / g) * 1000;
-                if (density > 0) pricePerL = pricePerKg * density;
-              }
-            }
-            if (pricePerKg == null && pricePerL == null && packPieceW > 0) {
-              pricePerKg = packPrice / (packCount * packPieceW / 1000);
-            }
-          }
-        }
-
-        const refPrice = isLiquidCat ? pricePerL : pricePerKg;
 
         // Packaging options
         const PACKAGINGS = ["kg", "litre", "piece", "---", "bac", "barquette", "bidon", "boite", "bouteille", "brick", "carton", "cagette", "fut", "pack", "paquet", "plateau", "poche", "sac", "sachet", "seau"] as const;
@@ -557,75 +503,7 @@ export const IngredientRow = React.memo(function IngredientRow({
               </div>
             )}
 
-            {/* Ligne 3 : Champs conditionnels pour conversion → €/kg */}
-            {(PIECE_PACKAGINGS.has(currentPkg) || (!isBaseUnit && edit.packUnit === "l") || currentPkg === "litre") && (
-              <div style={{ display: "flex", gap: 8, alignItems: "end", flexWrap: "wrap", marginBottom: 10 }}>
-                {PIECE_PACKAGINGS.has(currentPkg) && (
-                  <>
-                    <div>
-                      <div style={fieldLabel}>Poids pièce (g)</div>
-                      <input style={{ ...inputStyle, width: 130 }} value={edit.pieceWeightG} onChange={(e) => onEditChange({ ...edit, pieceWeightG: numVal(e.target.value) })} />
-                    </div>
-                    <div>
-                      <div style={fieldLabel}>Volume pièce (mL)</div>
-                      <input style={{ ...inputStyle, width: 130 }} value={edit.pieceVolumeMl} onChange={(e) => onEditChange({ ...edit, pieceVolumeMl: numVal(e.target.value) })} placeholder={currentPkg === "bouteille" ? "ex: 750" : ""} />
-                    </div>
-                  </>
-                )}
-                {(currentPkg === "litre" || (!isBaseUnit && edit.packUnit === "l")) && (
-                  <div>
-                    <div style={fieldLabel}>Densité (kg/L)</div>
-                    <input style={{ ...inputStyle, width: 130 }} value={edit.density} onChange={(e) => onEditChange({ ...edit, density: numVal(e.target.value) })} />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── CONVERSION LIVE ── */}
-            {(() => {
-              const hasAnyPrice = refPrice != null || (pricePerPc != null && pricePerPc > 0);
-              const mainLabel = refPrice
-                ? `= ${refPrice.toFixed(2)} €/${refUnit}`
-                : pricePerPc != null && pricePerPc > 0
-                  ? `= ${pricePerPc.toFixed(2)} €/pc`
-                  : `€/${refUnit} — donnée manquante`;
-              return (
-              <div style={{
-                marginTop: 4, padding: "10px 14px", borderRadius: 10,
-                background: hasAnyPrice ? "rgba(74,103,65,0.06)" : "rgba(220,38,38,0.04)",
-                border: `1.5px solid ${hasAnyPrice ? "rgba(74,103,65,0.20)" : "rgba(220,38,38,0.15)"}`,
-                display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
-              }}>
-                <span style={{ fontSize: 14, fontWeight: 800, color: hasAnyPrice ? "#4a6741" : "#DC2626" }}>
-                  {mainLabel}
-                </span>
-                {!refPrice && pricePerPc != null && pricePerPc > 0 && (
-                  <span style={{ fontSize: 12, color: "#999" }}>poids/volume manquant pour €/{refUnit}</span>
-                )}
-                {/* Show secondary conversions */}
-                {refPrice && pricePerPc != null && pricePerPc > 0 && (
-                  <span style={{ fontSize: 12, color: "#888" }}>{pricePerPc.toFixed(2)} €/pc</span>
-                )}
-                {refPrice && isLiquidCat && pricePerKg != null && pricePerKg > 0 && (
-                  <span style={{ fontSize: 12, color: "#888" }}>{pricePerKg.toFixed(2)} €/kg</span>
-                )}
-                {refPrice && !isLiquidCat && pricePerL != null && pricePerL > 0 && (
-                  <span style={{ fontSize: 12, color: "#888" }}>{pricePerL.toFixed(2)} €/L</span>
-                )}
-              </div>
-              );
-            })()}
             </>)}
-
-            {/* Conversion live always visible even when section collapsed */}
-            {!openSections.prix && (refPrice != null || (pricePerPc != null && pricePerPc > 0)) && (
-              <div style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(74,103,65,0.06)", display: "inline-flex", gap: 8, alignItems: "center" }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "#4a6741" }}>
-                  {refPrice != null ? `= ${refPrice.toFixed(2)} €/${refUnit}` : `= ${pricePerPc!.toFixed(2)} €/pc`}
-                </span>
-                {refPrice != null && pricePerPc != null && pricePerPc > 0 && <span style={{ fontSize: 11, color: "#888" }}>{pricePerPc.toFixed(2)} €/pc</span>}
-              </div>
-            )}
           </div>
 
           {/* ─── BLOC 3: COMPLÉMENTS ─── */}
