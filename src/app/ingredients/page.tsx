@@ -730,7 +730,10 @@ function IngredientsPageInner() {
     if (!name) { alert("Nom obligatoire."); return; }
     const supplier_id = normalizeSupplierId(edit.supplierId);
     const orderQuantity = parseNum(edit.orderQuantity) ?? null;
-    const orderLabel = edit.orderUnitLabel.trim();
+    // When conditionnement is active, persist its label in order_unit_label (used to reload it)
+    const orderLabel = edit.hasConditionnement
+      ? (edit.conditionnementLabel || edit.orderUnitLabel.trim())
+      : edit.orderUnitLabel.trim();
 
     // Compute piece_volume_ml from pieceContentQty + pieceContentUnit
     let pieceVolumeMl: number | null = null;
