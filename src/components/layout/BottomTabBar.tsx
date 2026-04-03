@@ -296,10 +296,16 @@ function pathMatches(pathname: string, patterns: string[]): boolean {
 }
 
 function getActiveSection(pathname: string, sections: TabSection[]): TabSection | null {
+  // Find all matching sections, then pick the one with the longest (most specific) match
+  let best: TabSection | null = null;
+  let bestLen = 0;
   for (const section of sections) {
-    if (pathMatches(pathname, section.match)) return section;
+    if (pathMatches(pathname, section.match)) {
+      const maxMatch = Math.max(...section.match.map(m => (pathname === m || pathname.startsWith(m + "/") || pathname.startsWith(m)) ? m.length : 0));
+      if (maxMatch > bestLen) { best = section; bestLen = maxMatch; }
+    }
   }
-  return null;
+  return best;
 }
 
 /* ── Component ────────────────────────────────────── */
