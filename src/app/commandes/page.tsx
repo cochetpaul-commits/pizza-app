@@ -332,14 +332,19 @@ function CommandesPage() {
       }
       const list = Array.from(seen.values());
 
-      // Load draft sessions to show pastilles on supplier pills
+      // Load draft sessions with at least 1 ligne to show pastilles
       if (etab?.id) {
         const { data: drafts } = await supabase
           .from("commande_sessions")
-          .select("supplier_id")
+          .select("supplier_id, commande_lignes(count)")
           .eq("etablissement_id", etab.id)
           .eq("status", "brouillon");
-        const draftIds = new Set((drafts ?? []).map((d: { supplier_id: string }) => d.supplier_id));
+        const draftIds = new Set(
+          (drafts ?? [])
+            .filter((d: { supplier_id: string; commande_lignes: { count: number }[] }) =>
+              d.commande_lignes?.[0]?.count > 0)
+            .map((d: { supplier_id: string }) => d.supplier_id),
+        );
         const canonicalDraftIds = new Set<string>();
         for (const did of draftIds) {
           let found = false;
@@ -405,11 +410,12 @@ function CommandesPage() {
     const offerMap = new Map<string, { ingredient_id: string; price_kind: string | null; unit: string | null; unit_price: number | null; pack_price: number | null; pack_unit: string | null; pack_count: number | null; pack_each_qty: number | null; pack_each_unit: string | null; pack_total_qty: number | null; establishment: string | null }>();
     const offerIngIds: string[] = [];
     for (const sid of supplierIds) {
-      const { data: offerData } = await supabase
+      const { data: offerData, error: offerErr } = await supabase
         .from("supplier_offers")
         .select("ingredient_id, price_kind, unit, unit_price, pack_price, pack_unit, pack_count, pack_each_qty, pack_each_unit, pack_total_qty, establishment")
         .eq("supplier_id", sid)
         .eq("is_active", true);
+      if (offerErr) console.error("[commandes] offers query error:", offerErr.message);
       for (const o of offerData ?? []) {
         if (o.ingredient_id && !offerMap.has(o.ingredient_id)) {
           offerIngIds.push(o.ingredient_id);
@@ -426,7 +432,8 @@ function CommandesPage() {
         .select("id")
         .eq("supplier_id", sid);
       if (etabKey) directIngQ = directIngQ.or(`establishments.cs.{"${etabKey}"},establishments.is.null`);
-      const { data: directIngs } = await directIngQ;
+      const { data: directIngs, error: directErr } = await directIngQ;
+      if (directErr) console.error("[commandes] direct ingredients query error:", directErr.message);
       for (const i of directIngs ?? []) directIds.push((i as { id: string }).id);
     }
 
@@ -434,20 +441,40 @@ function CommandesPage() {
 
     let items: CatalogItem[] = [];
     if (allIds.length > 0) {
+      // Try with favori_commande, fallback without if column doesn't exist
+      const selectCols = "id, name, category, default_unit, favori_commande, order_unit_label, order_quantity";
       let ingDataQ = supabase
         .from("ingredients")
-        .select("id, name, category, default_unit, favori_commande, order_unit_label, order_quantity")
+        .select(selectCols)
         .in("id", allIds)
         .order("category")
         .order("name");
       if (etabKey) ingDataQ = ingDataQ.or(`establishments.cs.{"${etabKey}"},establishments.is.null`);
-      const { data: ingData } = await ingDataQ;
+      let { data: ingData, error: ingErr } = await ingDataQ;
+
+      // Fallback: retry without favori_commande if the column doesn't exist yet
+      if (ingErr) {
+        console.warn("[commandes] ingredient query error, retrying without favori_commande:", ingErr.message);
+        let fallbackQ = supabase
+          .from("ingredients")
+          .select("id, name, category, default_unit, order_unit_label, order_quantity")
+          .in("id", allIds)
+          .order("category")
+          .order("name");
+        if (etabKey) fallbackQ = fallbackQ.or(`establishments.cs.{"${etabKey}"},establishments.is.null`);
+        const fallback = await fallbackQ;
+        ingData = (fallback.data ?? []).map((r) => ({ ...r, favori_commande: false })) as typeof ingData;
+        ingErr = fallback.error;
+      }
+
+      if (ingErr) console.error("[commandes] ingredient query error:", ingErr.message);
 
       items = (ingData ?? []).map((ing: { id: string; name: string; category: string | null; default_unit: string | null; favori_commande?: boolean; order_unit_label?: string | null; order_quantity?: number | null }) => {
         const offer = (offerMap.get(ing.id) ?? null) as OfferRow | null;
         const oq = ing.order_quantity ?? null;
         return {
           ...ing,
+          favori_commande: ing.favori_commande ?? false,
           order_unit_label: ing.order_unit_label ?? null,
           order_quantity: oq,
           order_unit: ing.order_unit_label ?? deriveOrderUnit(offer) ?? ing.default_unit,
@@ -797,7 +824,7 @@ function CommandesPage() {
 
   const activeCount = Object.values(quantities).filter((v) => v !== "" && Number(v) > 0).length;
   const supplierLabel = currentSupplier?.name ?? "";
-  const readOnly = session?.status === "en_attente" || session?.status === "validee" || session?.status === "recue";
+  const readOnly = session?.status === "validee" || session?.status === "recue";
 
   // Franco calculation
   const francoMin = currentSupplier?.franco_minimum ?? null;
