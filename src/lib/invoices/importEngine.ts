@@ -541,10 +541,8 @@ export async function runImport(options: {
           offerRow.piece_weight_g = l.unit === "pc" ? (l.piece_weight_g ?? null) : null;
         }
 
-        // Set piece_volume_ml from name if not already set
-        if (volumeFromName && !offerRow.piece_volume_ml) {
-          offerRow.piece_volume_ml = volumeFromName;
-        }
+        // piece_volume_ml belongs on ingredients table, not supplier_offers
+        delete offerRow.piece_volume_ml;
         if (etabId) offerRow.etablissement_id = etabId;
         return offerRow;
       })
