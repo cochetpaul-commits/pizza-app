@@ -829,6 +829,7 @@ export default function AchatsPage() {
             Achats
           </h1>
           <button
+            className="achats-import-btn-desktop"
             onClick={() => router.push("/invoices")}
             style={{
               fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 600,
@@ -838,6 +839,7 @@ export default function AchatsPage() {
           >
             Importer une facture
           </button>
+          <style>{`.achats-import-btn-desktop { display: inline-block; } @media (max-width: 768px) { .achats-import-btn-desktop { display: none !important; } }`}</style>
         </div>
 
         {/* ══════════════════════════════════════════════════ */}
