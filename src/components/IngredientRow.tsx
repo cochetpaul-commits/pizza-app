@@ -146,7 +146,10 @@ export const IngredientRow = React.memo(function IngredientRow({
   const toggleSection = (key: string) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
 
   const price = formatIngredientPrice(x, offer ?? null);
-  const estab = offer?.establishment ?? "both";
+  // Use ingredient's establishments array (not offer.establishment)
+  const ingEstabs = x.establishments ?? ["bellomio", "piccola"];
+  const hasBM = ingEstabs.includes("bellomio");
+  const hasPM = ingEstabs.includes("piccola");
   const st = (x.status ?? "to_check") as IngredientStatus;
   const hasPrice = offerHasPrice(offer, { piece_volume_ml: x.piece_volume_ml }) || legacyHasPrice(x);
   const canValidate = hasPrice;
@@ -236,8 +239,8 @@ export const IngredientRow = React.memo(function IngredientRow({
           {supplierName && supplierIdForDisplay ? (
             <button onClick={(e) => { e.stopPropagation(); onOpenSupplier?.(supplierIdForDisplay); }} style={{ color: "inherit", textDecoration: "underline dotted", textUnderlineOffset: 2, background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit", fontSize: "inherit" }}>{supplierName}</button>
           ) : "—"}
-          {(estab === "bellomio" || estab === "both") && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: "rgba(212,119,90,0.1)", color: "#D4775A" }}>BM</span>}
-          {(estab === "piccola" || estab === "both") && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: "rgba(212,160,60,0.1)", color: "#D4A03C" }}>PM</span>}
+          <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: hasBM ? "rgba(212,119,90,0.1)" : "rgba(0,0,0,0.04)", color: hasBM ? "#D4775A" : "#ccc" }}>BM</span>
+          <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: hasPM ? "rgba(212,160,60,0.1)" : "rgba(0,0,0,0.04)", color: hasPM ? "#D4A03C" : "#ccc" }}>PM</span>
         </div>
 
         {/* Actions */}
