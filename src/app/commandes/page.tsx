@@ -1236,37 +1236,31 @@ function CommandesPage() {
           </div>
         )}
 
-        {/* Supplier pills */}
+        {/* Supplier dropdown */}
         {!loading && suppliers.length > 0 && (
-          <div style={{
-            display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4,
-            WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
-          }}>
-            {suppliers.map((s) => {
-              const isSelected = s.id === selectedSupplierId;
-              return (
-                <button key={s.id} type="button"
-                  onClick={() => setSelectedSupplierId(s.id)}
-                  style={{
-                    flexShrink: 0, padding: "10px 18px", borderRadius: 12,
-                    border: isSelected ? "2px solid #D4775A" : "1.5px solid #ddd6c8",
-                    background: isSelected ? "#fff" : "#f9f5ef",
-                    fontSize: 14, fontWeight: isSelected ? 700 : 500,
-                    color: isSelected ? "#D4775A" : "#666",
-                    cursor: "pointer", fontFamily: "inherit",
-                    boxShadow: isSelected ? "0 2px 8px rgba(212,119,90,0.15)" : "none",
-                    transition: "all 0.15s",
-                  }}>
-                  {s.name}
-                  {draftSupplierIds.has(s.id) && (
-                    <span style={{
-                      display: "inline-block", width: 8, height: 8, borderRadius: "50%",
-                      background: "#D4775A", marginLeft: 6, verticalAlign: "middle",
-                    }} />
-                  )}
-                </button>
-              );
-            })}
+          <div style={{ position: "relative" }}>
+            <select
+              value={selectedSupplierId ?? ""}
+              onChange={(e) => setSelectedSupplierId(e.target.value || null)}
+              style={{
+                width: "100%", height: 48, padding: "0 36px 0 14px",
+                borderRadius: 12, border: "1.5px solid #ddd6c8",
+                background: "#fff", fontSize: 15, fontWeight: 600,
+                color: "#1a1a1a", fontFamily: "inherit",
+                appearance: "none", WebkitAppearance: "none",
+                cursor: "pointer", outline: "none",
+              }}>
+              <option value="">— Choisir un fournisseur —</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}{draftSupplierIds.has(s.id) ? " ●" : ""}
+                </option>
+              ))}
+            </select>
+            <span style={{
+              position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)",
+              pointerEvents: "none", fontSize: 12, color: "#999",
+            }}>&#9662;</span>
           </div>
         )}
 
@@ -1335,41 +1329,37 @@ function CommandesPage() {
           </button>
         )}
 
+        {/* Notes (above catalog) */}
+        {!loading && !loadingSupplier && selectedSupplierId && (
+          <div style={{ marginTop: 12 }}>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              onBlur={() => {
+                if (session) {
+                  fetchApi("/api/commandes/session", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id: session.id, status: "brouillon", notes: notes.trim() || null }),
+                  });
+                }
+              }}
+              placeholder="Notes pour le fournisseur (optionnel)..."
+              readOnly={readOnly}
+              style={{
+                width: "100%", minHeight: 50, padding: "10px 14px",
+                border: "1px solid #ddd6c8", borderRadius: 10,
+                fontSize: 13, fontFamily: "inherit", color: "#1a1a1a",
+                background: readOnly ? "#f5f0e8" : "#fff", resize: "vertical", outline: "none",
+              }}
+            />
+          </div>
+        )}
+
         {/* Content */}
         {!loading && !loadingSupplier && selectedSupplierId && (
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 12 }}>
             {session && readOnly ? renderSummary() : renderCatalog()}
-
-            {/* Notes (brouillon) */}
-            {session?.status === "brouillon" && (
-              <div style={{ marginTop: 12 }}>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  onBlur={() => {
-                    if (session) {
-                      fetchApi("/api/commandes/session", {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ id: session.id, status: "brouillon", notes: notes.trim() || null }),
-                      });
-                    }
-                  }}
-                  placeholder="Notes pour le fournisseur (optionnel)..."
-                  style={{
-                    width: "100%", minHeight: 60, padding: "10px 14px",
-                    border: "1px solid #ddd6c8", borderRadius: 10,
-                    fontSize: 13, fontFamily: "inherit", color: "#1a1a1a",
-                    background: "#fff", resize: "vertical", outline: "none",
-                  }}
-                />
-              </div>
-            )}
-            {session && session.status !== "brouillon" && session.notes && (
-              <div style={{ marginTop: 12, padding: "10px 14px", background: "#f5f0e8", borderRadius: 10, fontSize: 12, color: "#666" }}>
-                <strong>Notes :</strong> {session.notes}
-              </div>
-            )}
           </div>
         )}
 
