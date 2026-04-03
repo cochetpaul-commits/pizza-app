@@ -638,26 +638,8 @@ function MargesPage() {
         }}
       >
         {/* ── Toolbar ── */}
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            marginBottom: 16,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              gap: 0,
-              background: "#fff",
-              border: "1px solid rgba(0,0,0,.08)",
-              borderRadius: 10,
-              overflow: "hidden",
-            }}
-          >
+        <div className="ventes-toolbar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 10, overflow: "hidden" }}>
             {(["jour", "semaine", "mois"] as ViewTab[]).map((t) => (
               <button
                 key={t}
@@ -681,16 +663,13 @@ function MargesPage() {
               </button>
             ))}
           </div>
-        </div>
-
-        {/* ── Page nav pills: Rapport / Produits ── */}
-        <div style={{ display: "flex", justifyContent: "center", gap: 0, marginBottom: 14 }}>
+          {/* ── Page nav pills: Ventes / Produits ── */}
           <div style={{ display: "inline-flex", background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
             <button type="button" onClick={() => router.push(`/ventes?date=${selectedDate}&view=${viewTab}`)} style={{
               padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "pointer",
               background: "transparent", color: "#777", border: "none",
               fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-            }}>Rapport</button>
+            }}>Ventes</button>
             <span style={{
               padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "default",
               background: accent, color: "#fff",
