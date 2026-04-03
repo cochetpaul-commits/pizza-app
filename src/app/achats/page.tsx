@@ -191,6 +191,7 @@ export default function AchatsPage() {
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [topProductsLoading, setTopProductsLoading] = useState(false);
   const [topProductsLimit, setTopProductsLimit] = useState(20);
+  const [topSupplierFilter, setTopSupplierFilter] = useState("");
 
   // ── Chart refs ──
   const evoChartRef = useRef<HTMLCanvasElement>(null);
@@ -272,6 +273,19 @@ export default function AchatsPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rangeInvoices, etabId, loading]);
+
+  // ── Unique supplier names for filter dropdown ──
+  const topProductSuppliers = useMemo(() => {
+    const set = new Set(topProducts.map((p) => p.supplier));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "fr"));
+  }, [topProducts]);
+
+  // ── Filtered top products ──
+  const filteredTopProducts = useMemo(() => {
+    let result = topProducts;
+    if (topSupplierFilter) result = result.filter((p) => p.supplier === topSupplierFilter);
+    return result;
+  }, [topProducts, topSupplierFilter]);
 
   // ══════════════════════════════════════════════════════
   //  COMPUTED DATA
@@ -830,17 +844,32 @@ export default function AchatsPage() {
         {/*  VIEW TABS + DATE NAVIGATION                     */}
         {/* ══════════════════════════════════════════════════ */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
-          {/* View mode pills */}
-          <div style={{ display: "flex", gap: 6 }}>
-            {(["mois", "semaine"] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                style={pillStyle(viewMode === mode)}
-              >
-                {mode === "mois" ? "Mensuel" : "Hebdo"}
-              </button>
-            ))}
+          {/* View mode pills + page nav pills */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ display: "flex", gap: 6 }}>
+              {(["mois", "semaine"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  style={pillStyle(viewMode === mode)}
+                >
+                  {mode === "mois" ? "Mensuel" : "Hebdo"}
+                </button>
+              ))}
+            </div>
+            {/* Page nav pills: Factures / Commandes */}
+            <div style={{ display: "inline-flex", background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
+              <span style={{
+                padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "default",
+                background: "#D4775A", color: "#fff",
+                fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+              }}>Factures</span>
+              <button type="button" onClick={() => router.push("/commandes")} style={{
+                padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                background: "transparent", color: "#777", border: "none",
+                fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+              }}>Commandes</button>
+            </div>
           </div>
 
           {/* Date navigation */}
@@ -1067,6 +1096,23 @@ export default function AchatsPage() {
                 <p style={{ color: "#999", fontSize: 13, margin: 0 }}>Aucune ligne de facture pour cette periode.</p>
               ) : (
                 <>
+                  {/* Filter row */}
+                  <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+                    <select
+                      value={topSupplierFilter}
+                      onChange={(e) => { setTopSupplierFilter(e.target.value); setTopProductsLimit(20); }}
+                      style={{
+                        fontFamily: "DM Sans, sans-serif", fontSize: 12, padding: "6px 10px",
+                        border: "1px solid #ddd6c8", borderRadius: 8, background: "#fff", color: "#1a1a1a",
+                        cursor: "pointer", minWidth: 160,
+                      }}
+                    >
+                      <option value="">Tous les fournisseurs</option>
+                      {topProductSuppliers.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "DM Sans, sans-serif" }}>
                     <thead>
                       <tr style={{ borderBottom: "1px solid #ddd6c8" }}>
@@ -1078,7 +1124,7 @@ export default function AchatsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {topProducts.slice(0, topProductsLimit).map((p, idx) => (
+                      {filteredTopProducts.slice(0, topProductsLimit).map((p, idx) => (
                         <tr key={idx} style={{ borderBottom: "1px solid #f2ede4" }}>
                           <td style={{ ...tdStyle, fontWeight: 600, color: "#1a1a1a" }}>{p.name}</td>
                           <td style={{ ...tdStyle, color: "#777" }}>{p.supplier}</td>
@@ -1089,7 +1135,7 @@ export default function AchatsPage() {
                       ))}
                     </tbody>
                   </table>
-                  {topProducts.length > topProductsLimit && (
+                  {filteredTopProducts.length > topProductsLimit && (
                     <div style={{ textAlign: "center", marginTop: 12 }}>
                       <button
                         onClick={() => setTopProductsLimit((prev) => prev + 20)}
@@ -1099,7 +1145,7 @@ export default function AchatsPage() {
                           borderRadius: 20, padding: "6px 20px", cursor: "pointer",
                         }}
                       >
-                        Voir plus ({topProducts.length - topProductsLimit} restants)
+                        Voir plus ({filteredTopProducts.length - topProductsLimit} restants)
                       </button>
                     </div>
                   )}
