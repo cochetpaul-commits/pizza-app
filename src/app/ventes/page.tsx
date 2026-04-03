@@ -129,6 +129,18 @@ export default function PerformancesPage() {
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
   const [meteo, setMeteo] = useState<Record<string, { emoji: string; desc: string; temp: number }>>({});
 
+  // Category trend state
+  type CatTrendDaily = { date: string; qty: number; ca_ttc: number; ca_ht: number };
+  const [catTrendPeriod, setCatTrendPeriod] = useState<3 | 6 | 12>(3);
+  const [catTrendFrom, setCatTrendFrom] = useState(() => {
+    const d = new Date(); d.setMonth(d.getMonth() - 3); return d.toISOString().slice(0, 10);
+  });
+  const [catTrendTo, setCatTrendTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [catTrendMetric, setCatTrendMetric] = useState<"qty" | "ca_ttc">("ca_ttc");
+  const [catTrendData, setCatTrendData] = useState<Record<string, CatTrendDaily[]> | null>(null);
+  const [catTrendLoading, setCatTrendLoading] = useState(false);
+  const catTrendChartRef = useRef<HTMLCanvasElement>(null);
+
   // Comparison state
   type CompareMode = "none" | "prev" | "prev-sem" | "prev-mois" | "a-1" | "custom";
   const [compareMode, setCompareMode] = useState<CompareMode>("a-1");
@@ -247,6 +259,147 @@ export default function PerformancesPage() {
   }, [etab, getRange, compareMode, compareFrom, compareTo]);
 
   useEffect(() => { loadData(); }, [loadData]); // eslint-disable-line react-hooks/set-state-in-effect -- async data fetch
+
+  // Fetch category trend data
+  const loadCatTrend = useCallback(async () => {
+    if (!etab) return;
+    setCatTrendLoading(true);
+    try {
+      const res = await fetch(
+        `/api/ventes/marges/trend?etablissement_id=${etab.id}&from=${catTrendFrom}&to=${catTrendTo}&group_by=category`,
+      );
+      const json = await res.json();
+      setCatTrendData(json.categories ?? null);
+    } catch {
+      setCatTrendData(null);
+    }
+    setCatTrendLoading(false);
+  }, [etab, catTrendFrom, catTrendTo]);
+
+  useEffect(() => { loadCatTrend(); }, [loadCatTrend]); // eslint-disable-line react-hooks/set-state-in-effect -- async data fetch
+
+  // Draw category trend chart
+  useEffect(() => {
+    if (!catTrendChartRef.current || !catTrendData) return;
+    const id = "catTrend";
+    destroyChart(id);
+
+    // Determine time grouping: <= 3 months → weeks, > 3 months → months
+    const fromD = new Date(catTrendFrom + "T12:00:00");
+    const toD = new Date(catTrendTo + "T12:00:00");
+    const diffMonths = (toD.getFullYear() - fromD.getFullYear()) * 12 + toD.getMonth() - fromD.getMonth();
+    const useWeeks = diffMonths <= 3;
+
+    // Collect all dates across all categories
+    const allDates = new Set<string>();
+    for (const daily of Object.values(catTrendData)) {
+      for (const d of daily) allDates.add(d.date);
+    }
+    const sortedDates = Array.from(allDates).sort();
+
+    // Build time buckets
+    type Bucket = { label: string; dates: Set<string> };
+    const buckets: Bucket[] = [];
+
+    if (useWeeks) {
+      const bucketMap = new Map<string, Bucket>();
+      for (const ds of sortedDates) {
+        const d = new Date(ds + "T12:00:00");
+        const dow = d.getDay() || 7;
+        const mon = new Date(d);
+        mon.setDate(d.getDate() - dow + 1);
+        const wk = Math.ceil((mon.getDate() + new Date(mon.getFullYear(), mon.getMonth(), 1).getDay()) / 7);
+        const key = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, "0")}-W${wk}`;
+        const label = `S${String(wk).padStart(2, "0")} ${["Jan", "Fev", "Mar", "Avr", "Mai", "Jun", "Jul", "Aou", "Sep", "Oct", "Nov", "Dec"][mon.getMonth()]}`;
+        if (!bucketMap.has(key)) {
+          const b = { label, dates: new Set<string>() };
+          bucketMap.set(key, b);
+          buckets.push(b);
+        }
+        bucketMap.get(key)!.dates.add(ds);
+      }
+    } else {
+      const bucketMap = new Map<string, Bucket>();
+      const mNames = ["Jan", "Fev", "Mar", "Avr", "Mai", "Jun", "Jul", "Aou", "Sep", "Oct", "Nov", "Dec"];
+      for (const ds of sortedDates) {
+        const d = new Date(ds + "T12:00:00");
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        const label = `${mNames[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+        if (!bucketMap.has(key)) {
+          const b = { label, dates: new Set<string>() };
+          bucketMap.set(key, b);
+          buckets.push(b);
+        }
+        bucketMap.get(key)!.dates.add(ds);
+      }
+    }
+
+    const labels = buckets.map(b => b.label);
+    const catNames = Object.keys(catTrendData).sort((a, b) => {
+      const totalA = catTrendData[a].reduce((s, d) => s + d.ca_ttc, 0);
+      const totalB = catTrendData[b].reduce((s, d) => s + d.ca_ttc, 0);
+      return totalB - totalA;
+    });
+
+    const catColors = ["#D4775A", "#46655a", "#8fa8a0", "#7c5c3a", "#c4a882", "#e0b896", "#5e7a8a", "#a8b89c", "#c8960a", "#e0b020", "#6a4c93", "#1982c4"];
+
+    const datasets = catNames.map((cat, ci) => {
+      const dailyMap = new Map<string, CatTrendDaily>();
+      for (const d of catTrendData[cat]) dailyMap.set(d.date, d);
+
+      const values = buckets.map(b => {
+        let sum = 0;
+        for (const ds of b.dates) {
+          const row = dailyMap.get(ds);
+          if (row) sum += catTrendMetric === "ca_ttc" ? row.ca_ttc : row.qty;
+        }
+        return Math.round(sum * 100) / 100;
+      });
+
+      return {
+        label: cat,
+        data: values,
+        backgroundColor: catColors[ci % catColors.length],
+        borderRadius: 4,
+      };
+    });
+
+    charts[id] = new Chart(catTrendChartRef.current, {
+      type: "bar" as const,
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "top" as const, labels: { font: { size: 10 }, boxWidth: 12, padding: 10 } },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const v = ctx.raw as number;
+                return catTrendMetric === "ca_ttc"
+                  ? `${ctx.dataset.label} : ${Math.round(v).toLocaleString("fr-FR")}\u20AC`
+                  : `${ctx.dataset.label} : ${v}`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: "#777", font: { size: 10 } } },
+          y: {
+            beginAtZero: true,
+            grid: { color: "rgba(0,0,0,0.05)" },
+            ticks: {
+              color: "#aaa",
+              font: { size: 10 },
+              callback: v => catTrendMetric === "ca_ttc" ? fmtK(v as number) : String(v),
+            },
+          },
+        },
+      },
+    });
+
+    return () => { destroyChart(id); };
+  }, [catTrendData, catTrendMetric, catTrendFrom, catTrendTo]);
 
   // Import handler
   const handleImport = async (file: File) => {
@@ -1072,6 +1225,74 @@ export default function PerformancesPage() {
                 <MixDropdown label={mixDDOpen.label} color={mixDDOpen.color} products={W.cat_products[mixDDOpen.label]} onClose={() => setMixDDOpen(null)} mode={mode} />
               )}
             </div>}
+
+            {/* Tendances par categorie */}
+            <div style={S.card}>
+              <div style={S.sec}>Tendances par categorie</div>
+              {/* Filters row */}
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                {/* Period quick-select pills */}
+                <div style={{ display: "flex", gap: 0, background: "#f5f0e8", borderRadius: 20, padding: 3 }}>
+                  {([3, 6, 12] as const).map(m => (
+                    <button key={m} type="button" onClick={() => {
+                      setCatTrendPeriod(m);
+                      const d = new Date(); d.setMonth(d.getMonth() - m);
+                      setCatTrendFrom(d.toISOString().slice(0, 10));
+                      setCatTrendTo(new Date().toISOString().slice(0, 10));
+                    }} style={{
+                      padding: "4px 12px", borderRadius: 16, border: "none", cursor: "pointer",
+                      background: catTrendPeriod === m ? accent : "transparent",
+                      color: catTrendPeriod === m ? "#fff" : "#777",
+                      fontSize: 11, fontWeight: 500,
+                    }}>
+                      {m} mois
+                    </button>
+                  ))}
+                </div>
+                {/* Date range */}
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <input type="date" value={catTrendFrom} onChange={e => { setCatTrendFrom(e.target.value); setCatTrendPeriod(3); }} style={{ fontSize: 11, border: "1px solid #e0d8ce", borderRadius: 6, padding: "3px 6px", color: "#555" }} />
+                  <span style={{ fontSize: 10, color: "#999" }}>-</span>
+                  <input type="date" value={catTrendTo} onChange={e => { setCatTrendTo(e.target.value); setCatTrendPeriod(3); }} style={{ fontSize: 11, border: "1px solid #e0d8ce", borderRadius: 6, padding: "3px 6px", color: "#555" }} />
+                </div>
+                {/* Metric toggle */}
+                <div style={{ display: "flex", gap: 0, background: "#f5f0e8", borderRadius: 20, padding: 3, marginLeft: "auto" }}>
+                  <button type="button" onClick={() => setCatTrendMetric("ca_ttc")} style={{
+                    padding: "4px 12px", borderRadius: 16, border: "none", cursor: "pointer",
+                    background: catTrendMetric === "ca_ttc" ? accent : "transparent",
+                    color: catTrendMetric === "ca_ttc" ? "#fff" : "#777",
+                    fontSize: 11, fontWeight: 500,
+                  }}>CA TTC</button>
+                  <button type="button" onClick={() => setCatTrendMetric("qty")} style={{
+                    padding: "4px 12px", borderRadius: 16, border: "none", cursor: "pointer",
+                    background: catTrendMetric === "qty" ? accent : "transparent",
+                    color: catTrendMetric === "qty" ? "#fff" : "#777",
+                    fontSize: 11, fontWeight: 500,
+                  }}>Quantite</button>
+                </div>
+              </div>
+              {/* Chart or loading */}
+              {catTrendLoading && (
+                <div style={{ padding: "40px 0", textAlign: "center", color: "#999", fontSize: 12 }}>Chargement...</div>
+              )}
+              {!catTrendLoading && catTrendData && Object.keys(catTrendData).length > 0 && (
+                <>
+                  <div style={{ position: "relative", height: 320 }}><canvas ref={catTrendChartRef} /></div>
+                  {/* Summary line */}
+                  <div style={{ marginTop: 10, fontSize: 12, color: "#777", textAlign: "right" }}>
+                    Total periode : <strong style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", color: "#1a1a1a" }}>
+                      {catTrendMetric === "ca_ttc"
+                        ? fmt(Object.values(catTrendData).reduce((s, daily) => s + daily.reduce((ss, d) => ss + d.ca_ttc, 0), 0))
+                        : Math.round(Object.values(catTrendData).reduce((s, daily) => s + daily.reduce((ss, d) => ss + d.qty, 0), 0)).toLocaleString("fr-FR")
+                      }
+                    </strong>
+                  </div>
+                </>
+              )}
+              {!catTrendLoading && (!catTrendData || Object.keys(catTrendData).length === 0) && (
+                <div style={{ padding: "40px 0", textAlign: "center", color: "#bbb", fontSize: 12 }}>Aucune donnee sur cette periode</div>
+              )}
+            </div>
 
             {/* Serveurs */}
             {W.serveurs.length > 0 && (
