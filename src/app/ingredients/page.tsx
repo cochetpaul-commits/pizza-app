@@ -573,7 +573,7 @@ function IngredientsPageInner() {
           else baseUnitLabel = baseUnitLabel.toLowerCase() === "pièce" ? "piece" : baseUnitLabel.toLowerCase();
         }
         hasConditionnement = true;
-        conditionnementLabel = "carton";
+        conditionnementLabel = x.order_unit_label || "carton";
         qtyPerConditionnement = off.pack_count != null ? String(off.pack_count) : "";
         pricePerConditionnement = off.pack_price != null ? String(off.pack_price) : "";
         priceSource = pricePerConditionnement ? "cond" : null;
