@@ -80,6 +80,7 @@ const PILOTAGE_ITEMS: NavItemV2[] = [
 export const PLANNING_ITEMS: NavItemV2[] = [
   { label: "Employes", href: "/rh/equipe", icon: "users" },
   { label: "Conges", href: "/rh/conges", icon: "beach" },
+  { label: "Masse salariale", href: "/ventes/simulation", icon: "calculator" },
 ];
 
 // PRODUCTION (fiches techniques, catalogue, articles de vente)
