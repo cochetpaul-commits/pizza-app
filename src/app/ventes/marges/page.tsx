@@ -55,7 +55,7 @@ type ApiData = {
 type ViewTab = "jour" | "semaine" | "mois";
 
 type TrendDaily = { date: string; qty: number; ca_ttc: number; ca_ht: number };
-type TrendMode = "par_jour_semaine" | "par_mois" | "tendance";
+type TrendMode = "par_jour_semaine" | "par_mois";
 
 type SortKey =
   | "name"
@@ -203,7 +203,7 @@ export default function MargesPage() {
   const [trendFilter, setTrendFilter] = useState<"all" | "product" | "category">("all");
   const [trendProduct, setTrendProduct] = useState<string | null>(null);
   const [trendCategory, setTrendCategory] = useState<string | null>(null);
-  const [trendMode, setTrendMode] = useState<TrendMode>("tendance");
+  const [trendMode, setTrendMode] = useState<TrendMode>("par_jour_semaine");
   const [trendMetric, setTrendMetric] = useState<"qty" | "ca_ht">("qty");
   const [trendFrom, setTrendFrom] = useState(() => {
     const d = new Date(); d.setMonth(d.getMonth() - 3);
@@ -213,7 +213,6 @@ export default function MargesPage() {
   const [trendData, setTrendData] = useState<TrendDaily[] | null>(null);
   const [trendLoading, setTrendLoading] = useState(false);
   const trendChartRef = useRef<HTMLCanvasElement>(null);
-  const [trendSearch, setTrendSearch] = useState("");
 
   // Chart refs
   const barRef = useRef<HTMLCanvasElement>(null);
@@ -564,34 +563,9 @@ export default function MargesPage() {
       }
       return { labels, values };
     }
-    // tendance — group by week or month
-    const fromD = new Date(trendFrom + "T12:00:00");
-    const toD = new Date(trendTo + "T12:00:00");
-    const rangeMonths = (toD.getFullYear() - fromD.getFullYear()) * 12 + toD.getMonth() - fromD.getMonth();
-    if (rangeMonths > 3) {
-      // group by month
-      const buckets: Record<string, number> = {};
-      for (const d of daily) {
-        const key = d.date.slice(0, 7); // YYYY-MM
-        buckets[key] = (buckets[key] ?? 0) + (metric === "qty" ? d.qty : d.ca_ht);
-      }
-      const sorted = Object.keys(buckets).sort();
-      return { labels: sorted.map((k) => { const [,m] = k.split("-"); return ["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Août","Sep","Oct","Nov","Déc"][parseInt(m) - 1]; }), values: sorted.map((k) => buckets[k]) };
-    }
-    // group by week (ISO)
-    const buckets: Record<string, number> = {};
-    for (const d of daily) {
-      const dt = new Date(d.date + "T12:00:00");
-      const jan4 = new Date(dt.getFullYear(), 0, 4);
-      const startOfYear = new Date(jan4);
-      startOfYear.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
-      const weekNum = Math.ceil(((dt.getTime() - startOfYear.getTime()) / 86400000 + 1) / 7);
-      const key = `${dt.getFullYear()}-S${String(weekNum).padStart(2, "0")}`;
-      buckets[key] = (buckets[key] ?? 0) + (metric === "qty" ? d.qty : d.ca_ht);
-    }
-    const sorted = Object.keys(buckets).sort();
-    return { labels: sorted.map((k) => k.split("-")[1]), values: sorted.map((k) => buckets[k]) };
-  }, [trendFrom, trendTo]);
+    // fallback (should not happen)
+    return { labels: [], values: [] };
+  }, []);
 
   // Render trend chart
   useEffect(() => {
@@ -874,109 +848,27 @@ export default function MargesPage() {
               <div style={S.secTitle}>Tendances</div>
 
               {/* Filters row */}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 12 }}>
-                {/* Product search input */}
-                <div style={{ position: "relative", flex: "1 1 200px" }}>
-                  <input
-                    type="text"
-                    placeholder="Rechercher un produit..."
-                    value={trendSearch}
-                    onChange={(e) => {
-                      setTrendSearch(e.target.value);
-                      if (!e.target.value.trim()) {
-                        if (trendFilter === "product") {
-                          setTrendFilter(trendCategory ? "category" : "all");
-                          setTrendProduct(null);
-                        }
-                      }
-                    }}
-                    style={{
-                      width: "100%",
-                      padding: "7px 12px",
-                      borderRadius: 8,
-                      border: `1px solid ${trendFilter === "product" ? accent : COLORS.border}`,
-                      fontSize: 13,
-                      background: "#fff",
-                    }}
-                  />
-                  {trendSearch.trim() && trendFilter !== "product" && (() => {
-                    const q = trendSearch.toLowerCase();
-                    const matches = (data?.products ?? [])
-                      .filter((p) => p.name.toLowerCase().includes(q))
-                      .slice(0, 8);
-                    if (matches.length === 0) return null;
-                    return (
-                      <div style={{
-                        position: "absolute", top: "100%", left: 0, right: 0,
-                        background: "#fff", border: `1px solid ${COLORS.border}`,
-                        borderRadius: 8, zIndex: 10, maxHeight: 200, overflowY: "auto",
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                      }}>
-                        {matches.map((p) => (
-                          <div
-                            key={p.name}
-                            onClick={() => {
-                              setTrendFilter("product");
-                              setTrendProduct(p.name);
-                              setTrendSearch(p.name);
-                            }}
-                            style={{
-                              padding: "8px 12px", fontSize: 12, cursor: "pointer",
-                              borderBottom: `1px solid ${COLORS.border}`,
-                            }}
-                            onMouseEnter={(e) => { (e.target as HTMLElement).style.background = "#f5f0e8"; }}
-                            onMouseLeave={(e) => { (e.target as HTMLElement).style.background = "transparent"; }}
-                          >
-                            {p.name}
-                            <span style={{ fontSize: 10, color: COLORS.muted, marginLeft: 6 }}>{p.categorie}</span>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                  {trendFilter === "product" && trendProduct && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTrendFilter(trendCategory ? "category" : "all");
-                        setTrendProduct(null);
-                        setTrendSearch("");
-                      }}
-                      style={{
-                        position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
-                        width: 20, height: 20, borderRadius: 10,
-                        border: "none", background: COLORS.border, cursor: "pointer",
-                        fontSize: 11, lineHeight: "20px", textAlign: "center", color: COLORS.dark,
-                      }}
-                    >
-                      x
-                    </button>
-                  )}
-                </div>
-
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
                 {/* Category dropdown */}
                 <select
-                  value={trendFilter === "category" && trendCategory ? trendCategory : ""}
+                  value={trendCategory ?? ""}
                   onChange={(e) => {
                     const v = e.target.value;
                     if (v) {
                       setTrendFilter("category");
                       setTrendCategory(v);
-                      if (trendFilter === "product") {
-                        setTrendProduct(null);
-                        setTrendSearch("");
-                      }
+                      setTrendProduct(null);
                     } else {
+                      setTrendFilter("all");
                       setTrendCategory(null);
-                      if (trendFilter === "category") {
-                        setTrendFilter(trendProduct ? "product" : "all");
-                      }
+                      setTrendProduct(null);
                     }
                   }}
                   style={{
-                    padding: "7px 12px", borderRadius: 8,
-                    border: `1px solid ${trendFilter === "category" ? accent : COLORS.border}`,
-                    fontSize: 13, background: "#fff",
+                    height: 40, borderRadius: 10, border: "1px solid #e0d8ce",
+                    padding: "0 12px", fontSize: 13, background: "#fff",
+                    color: "#1a1a1a", cursor: "pointer", flex: 1, minWidth: 0,
+                    appearance: "auto" as CSSProperties["appearance"],
                   }}
                 >
                   <option value="">Toutes categories</option>
@@ -984,6 +876,37 @@ export default function MargesPage() {
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
+
+                {/* Product dropdown (only when a category is selected) */}
+                {trendCategory && (
+                  <select
+                    value={trendProduct ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v) {
+                        setTrendFilter("product");
+                        setTrendProduct(v);
+                      } else {
+                        setTrendFilter("category");
+                        setTrendProduct(null);
+                      }
+                    }}
+                    style={{
+                      height: 40, borderRadius: 10, border: "1px solid #e0d8ce",
+                      padding: "0 12px", fontSize: 13, background: "#fff",
+                      color: "#1a1a1a", cursor: "pointer", flex: 1, minWidth: 0,
+                      appearance: "auto" as CSSProperties["appearance"],
+                    }}
+                  >
+                    <option value="">Tous les produits</option>
+                    {(data?.products ?? [])
+                      .filter((p) => p.categorie === trendCategory)
+                      .sort((a, b) => b.ca_ttc - a.ca_ttc)
+                      .map((p) => (
+                        <option key={p.name} value={p.name}>{p.name}</option>
+                      ))}
+                  </select>
+                )}
               </div>
 
               {/* Date range */}
@@ -1005,7 +928,7 @@ export default function MargesPage() {
 
               {/* Mode + Metric toggles */}
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
-                {([["par_jour_semaine", "Jours semaine"], ["par_mois", "Jours du mois"], ["tendance", "Tendance"]] as const).map(([mode, label]) => (
+                {([["par_jour_semaine", "Jours semaine"], ["par_mois", "Jours du mois"]] as const).map(([mode, label]) => (
                   <button
                     key={mode}
                     type="button"
