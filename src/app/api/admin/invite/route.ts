@@ -85,25 +85,30 @@ export async function POST(req: NextRequest) {
   });
 
   if (inviteErr) {
-    // If user already exists, generate a new magic link to resend the invitation
-    const isAlreadyRegistered = inviteErr.message.toLowerCase().includes("already") ||
-      inviteErr.message.toLowerCase().includes("already been registered");
+    // If user already exists, delete the unconfirmed auth user and re-invite
+    const isAlreadyRegistered = inviteErr.message.toLowerCase().includes("already");
     if (isAlreadyRegistered) {
-      // Find existing user
       const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
       const existingUser = existingUsers?.users?.find(u => u.email === email);
       if (existingUser) {
-        // Generate a new invite link and send it
-        const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
-          type: "invite",
-          email,
-          options: {
+        // Only delete if user never confirmed (never completed invitation)
+        if (!existingUser.email_confirmed_at) {
+          await supabaseAdmin.auth.admin.deleteUser(existingUser.id);
+          // Re-invite
+          const { data: retryData, error: retryErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
             data: { display_name: displayName || email, role: profileRole },
             redirectTo: `${origin}/auth/setup-password`,
-          },
-        });
-        if (linkErr) return NextResponse.json({ error: linkErr.message }, { status: 500 });
-        inviteData = { user: linkData?.user ? { id: linkData.user.id } : null };
+          });
+          if (retryErr) return NextResponse.json({ error: retryErr.message }, { status: 500 });
+          inviteData = retryData as { user: { id: string } | null };
+        } else {
+          // User already confirmed — send a password reset instead
+          const { error: resetErr } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+            redirectTo: `${origin}/auth/setup-password`,
+          });
+          if (resetErr) return NextResponse.json({ error: resetErr.message }, { status: 500 });
+          inviteData = { user: { id: existingUser.id } };
+        }
       } else {
         return NextResponse.json({ error: inviteErr.message }, { status: 500 });
       }
