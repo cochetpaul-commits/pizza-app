@@ -386,17 +386,6 @@ export function BottomTabBar() {
           borderRadius: 14, overflow: "hidden",
           boxShadow: "0 8px 32px rgba(0,0,0,0.14)",
         }}>
-          <button type="button" onClick={() => { setGroupView(true); setEtabMenuOpen(false); router.push("/dashboard"); }} style={{
-            display: "flex", alignItems: "center", gap: 10,
-            width: "100%", padding: "12px 16px",
-            border: "none", cursor: "pointer",
-            background: isGroupView ? "rgba(180,95,87,0.08)" : "transparent",
-            borderLeft: isGroupView ? "3px solid #b45f57" : "3px solid transparent",
-          }}>
-            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#b45f57" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M9 22V12h6v10" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M8 10h.01" /><path d="M16 10h.01" /></svg>
-            <span style={{ fontSize: 14, fontWeight: isGroupView ? 700 : 500, color: "#2c2c2c" }}>iFratelli Group</span>
-          </button>
-          <div style={{ height: 1, background: "rgba(0,0,0,0.06)", margin: "0 12px" }} />
           {etablissements.map(e => {
             const isSelected = !isGroupView && current?.id === e.id;
             const clr = e.couleur ?? "#b45f57";
