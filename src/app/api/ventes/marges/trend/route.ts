@@ -19,17 +19,21 @@ type DailyRow = {
   ca_ht: number;
 };
 
-/* ── GET /api/ventes/marges/trend?etablissement_id=X&product=Y&from=YYYY-MM-DD&to=YYYY-MM-DD ── */
+/* ── GET /api/ventes/marges/trend?etablissement_id=X&product=Y&category=Z&from=YYYY-MM-DD&to=YYYY-MM-DD ── */
+/* product — filter by exact product name (description)                                                     */
+/* category — filter by categorie column (aggregated)                                                        */
+/* neither — aggregate ALL products                                                                          */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const etabId = searchParams.get("etablissement_id");
   const product = searchParams.get("product");
+  const category = searchParams.get("category");
   const from = searchParams.get("from");
   const to = searchParams.get("to");
 
-  if (!etabId || !product || !from || !to) {
+  if (!etabId || !from || !to) {
     return NextResponse.json(
-      { error: "etablissement_id, product, from, to requis" },
+      { error: "etablissement_id, from, to requis" },
       { status: 400 },
     );
   }
@@ -40,16 +44,23 @@ export async function GET(req: NextRequest) {
   let offset = 0;
   let hasMore = true;
   while (hasMore) {
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("ventes_lignes")
       .select("date_service,quantite,ttc,ht")
       .eq("etablissement_id", etabId)
-      .eq("description", product)
       .eq("type_ligne", "Produit")
       .eq("annule", false)
       .gt("ttc", 0)
       .gte("date_service", from)
-      .lte("date_service", to)
+      .lte("date_service", to);
+
+    if (product) {
+      query = query.eq("description", product);
+    } else if (category) {
+      query = query.eq("categorie", category);
+    }
+
+    const { data, error } = await query
       .order("date_service", { ascending: true })
       .range(offset, offset + PAGE - 1);
 
@@ -89,5 +100,6 @@ export async function GET(req: NextRequest) {
       ca_ht: Math.round(v.ca_ht * 100) / 100,
     }));
 
-  return NextResponse.json({ product, daily });
+  const label = product ?? category ?? "all";
+  return NextResponse.json({ product: label, daily });
 }

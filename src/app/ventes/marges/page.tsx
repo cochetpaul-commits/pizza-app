@@ -203,15 +203,21 @@ export default function MargesPage() {
     return d.toISOString().slice(0, 10);
   });
 
-  // Trend drawer state
+  // Trend card state
+  const [trendFilter, setTrendFilter] = useState<"all" | "product" | "category">("all");
   const [trendProduct, setTrendProduct] = useState<string | null>(null);
+  const [trendCategory, setTrendCategory] = useState<string | null>(null);
   const [trendMode, setTrendMode] = useState<TrendMode>("tendance");
   const [trendMetric, setTrendMetric] = useState<"qty" | "ca_ht">("qty");
-  const [trendFrom, setTrendFrom] = useState("");
-  const [trendTo, setTrendTo] = useState("");
+  const [trendFrom, setTrendFrom] = useState(() => {
+    const d = new Date(); d.setMonth(d.getMonth() - 3);
+    return d.toISOString().slice(0, 10);
+  });
+  const [trendTo, setTrendTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [trendData, setTrendData] = useState<TrendDaily[] | null>(null);
   const [trendLoading, setTrendLoading] = useState(false);
   const trendChartRef = useRef<HTMLCanvasElement>(null);
+  const [trendSearch, setTrendSearch] = useState("");
 
   // Chart refs
   const barRef = useRef<HTMLCanvasElement>(null);
@@ -508,32 +514,33 @@ export default function MargesPage() {
     return { topMarginEur, foodCostAlerts, catSummary, pricingImpact };
   };
 
-  // ── Trend drawer logic ──
+  // ── Trend card logic ──
 
-  const openTrend = (productName: string) => {
-    const today = new Date();
-    const from3m = new Date(today);
-    from3m.setMonth(from3m.getMonth() - 3);
-    setTrendProduct(productName);
-    setTrendFrom(from3m.toISOString().slice(0, 10));
-    setTrendTo(today.toISOString().slice(0, 10));
-    setTrendData(null);
-    setTrendMode("tendance");
-    setTrendMetric("qty");
-  };
-
-  // Fetch trend data
+  // Fetch trend data automatically when filters change
   useEffect(() => {
-    if (!trendProduct || !etab || !trendFrom || !trendTo) return;
+    if (!etab || !trendFrom || !trendTo) return;
     let cancelled = false;
     setTrendLoading(true);
-    fetch(`/api/ventes/marges/trend?etablissement_id=${etab.id}&product=${encodeURIComponent(trendProduct)}&from=${trendFrom}&to=${trendTo}`)
+
+    const params = new URLSearchParams({
+      etablissement_id: etab.id,
+      from: trendFrom,
+      to: trendTo,
+    });
+    if (trendFilter === "product" && trendProduct) {
+      params.set("product", trendProduct);
+    } else if (trendFilter === "category" && trendCategory) {
+      params.set("category", trendCategory);
+    }
+    // When trendFilter === "all", no product/category param → API returns all
+
+    fetch(`/api/ventes/marges/trend?${params.toString()}`)
       .then((r) => r.json())
       .then((j) => { if (!cancelled) setTrendData(j.daily ?? []); })
       .catch(() => { if (!cancelled) setTrendData([]); })
       .finally(() => { if (!cancelled) setTrendLoading(false); });
     return () => { cancelled = true; };
-  }, [trendProduct, etab, trendFrom, trendTo]);
+  }, [trendFilter, trendProduct, trendCategory, etab, trendFrom, trendTo]);
 
   // Aggregate trend data for chart
   const aggregateTrend = useCallback((daily: TrendDaily[], mode: TrendMode, metric: "qty" | "ca_ht") => {
@@ -866,6 +873,230 @@ export default function MargesPage() {
               </div>
             </div>
 
+            {/* ── Tendances Card ── */}
+            <div style={S.card}>
+              <div style={S.secTitle}>Tendances</div>
+
+              {/* Filters row */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 12 }}>
+                {/* Product search input */}
+                <div style={{ position: "relative", flex: "1 1 200px" }}>
+                  <input
+                    type="text"
+                    placeholder="Rechercher un produit..."
+                    value={trendSearch}
+                    onChange={(e) => {
+                      setTrendSearch(e.target.value);
+                      if (!e.target.value.trim()) {
+                        if (trendFilter === "product") {
+                          setTrendFilter(trendCategory ? "category" : "all");
+                          setTrendProduct(null);
+                        }
+                      }
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "7px 12px",
+                      borderRadius: 8,
+                      border: `1px solid ${trendFilter === "product" ? accent : COLORS.border}`,
+                      fontSize: 13,
+                      background: "#fff",
+                    }}
+                  />
+                  {trendSearch.trim() && trendFilter !== "product" && (() => {
+                    const q = trendSearch.toLowerCase();
+                    const matches = (data?.products ?? [])
+                      .filter((p) => p.name.toLowerCase().includes(q))
+                      .slice(0, 8);
+                    if (matches.length === 0) return null;
+                    return (
+                      <div style={{
+                        position: "absolute", top: "100%", left: 0, right: 0,
+                        background: "#fff", border: `1px solid ${COLORS.border}`,
+                        borderRadius: 8, zIndex: 10, maxHeight: 200, overflowY: "auto",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                      }}>
+                        {matches.map((p) => (
+                          <div
+                            key={p.name}
+                            onClick={() => {
+                              setTrendFilter("product");
+                              setTrendProduct(p.name);
+                              setTrendSearch(p.name);
+                            }}
+                            style={{
+                              padding: "8px 12px", fontSize: 12, cursor: "pointer",
+                              borderBottom: `1px solid ${COLORS.border}`,
+                            }}
+                            onMouseEnter={(e) => { (e.target as HTMLElement).style.background = "#f5f0e8"; }}
+                            onMouseLeave={(e) => { (e.target as HTMLElement).style.background = "transparent"; }}
+                          >
+                            {p.name}
+                            <span style={{ fontSize: 10, color: COLORS.muted, marginLeft: 6 }}>{p.categorie}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                  {trendFilter === "product" && trendProduct && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTrendFilter(trendCategory ? "category" : "all");
+                        setTrendProduct(null);
+                        setTrendSearch("");
+                      }}
+                      style={{
+                        position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
+                        width: 20, height: 20, borderRadius: 10,
+                        border: "none", background: COLORS.border, cursor: "pointer",
+                        fontSize: 11, lineHeight: "20px", textAlign: "center", color: COLORS.dark,
+                      }}
+                    >
+                      x
+                    </button>
+                  )}
+                </div>
+
+                {/* Category dropdown */}
+                <select
+                  value={trendFilter === "category" && trendCategory ? trendCategory : ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v) {
+                      setTrendFilter("category");
+                      setTrendCategory(v);
+                      if (trendFilter === "product") {
+                        setTrendProduct(null);
+                        setTrendSearch("");
+                      }
+                    } else {
+                      setTrendCategory(null);
+                      if (trendFilter === "category") {
+                        setTrendFilter(trendProduct ? "product" : "all");
+                      }
+                    }
+                  }}
+                  style={{
+                    padding: "7px 12px", borderRadius: 8,
+                    border: `1px solid ${trendFilter === "category" ? accent : COLORS.border}`,
+                    fontSize: 13, background: "#fff",
+                  }}
+                >
+                  <option value="">Toutes categories</option>
+                  {allCategories.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Period pills + date range */}
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+                {[{ label: "3 mois", m: 3 }, { label: "6 mois", m: 6 }, { label: "12 mois", m: 12 }].map(({ label, m }) => {
+                  const t = new Date();
+                  const f = new Date(t); f.setMonth(f.getMonth() - m);
+                  const fIso = f.toISOString().slice(0, 10);
+                  const tIso = t.toISOString().slice(0, 10);
+                  const isActive = trendFrom === fIso && trendTo === tIso;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => { setTrendFrom(fIso); setTrendTo(tIso); }}
+                      style={{
+                        height: 28, padding: "0 12px", borderRadius: 14,
+                        border: isActive ? "none" : `1px solid ${COLORS.border}`,
+                        background: isActive ? accent : "#fff",
+                        color: isActive ? "#fff" : COLORS.dark,
+                        fontSize: 11, fontWeight: 600, cursor: "pointer",
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+                <input
+                  type="date"
+                  value={trendFrom}
+                  onChange={(e) => setTrendFrom(e.target.value)}
+                  style={{ height: 32, borderRadius: 8, border: `1px solid ${COLORS.border}`, padding: "0 8px", fontSize: 12 }}
+                />
+                <span style={{ fontSize: 12, color: COLORS.muted }}>&rarr;</span>
+                <input
+                  type="date"
+                  value={trendTo}
+                  onChange={(e) => setTrendTo(e.target.value)}
+                  style={{ height: 32, borderRadius: 8, border: `1px solid ${COLORS.border}`, padding: "0 8px", fontSize: 12 }}
+                />
+              </div>
+
+              {/* Mode + Metric toggles */}
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+                {([["par_jour_semaine", "Jours semaine"], ["par_mois", "Jours du mois"], ["tendance", "Tendance"]] as const).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setTrendMode(mode)}
+                    style={{
+                      height: 30, padding: "0 14px", borderRadius: 15,
+                      border: trendMode === mode ? "none" : `1px solid ${COLORS.border}`,
+                      background: trendMode === mode ? accent : "#fff",
+                      color: trendMode === mode ? "#fff" : COLORS.dark,
+                      fontSize: 12, fontWeight: 600, cursor: "pointer",
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <div style={{ width: 1, height: 24, background: COLORS.border, margin: "3px 4px" }} />
+                {([["qty", "Quantite"], ["ca_ht", "CA HT"]] as const).map(([m, label]) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setTrendMetric(m)}
+                    style={{
+                      height: 30, padding: "0 14px", borderRadius: 15,
+                      border: trendMetric === m ? "none" : `1px solid ${COLORS.border}`,
+                      background: trendMetric === m ? COLORS.dark : "#fff",
+                      color: trendMetric === m ? "#fff" : COLORS.dark,
+                      fontSize: 12, fontWeight: 600, cursor: "pointer",
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Trend label */}
+              <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 8 }}>
+                {trendFilter === "product" && trendProduct
+                  ? `Produit : ${trendProduct}`
+                  : trendFilter === "category" && trendCategory
+                    ? `Categorie : ${trendCategory}`
+                    : "Tous les produits"}
+              </div>
+
+              {/* Chart */}
+              {trendLoading && <div style={{ textAlign: "center", padding: 40, color: COLORS.muted, fontSize: 13 }}>Chargement...</div>}
+              {!trendLoading && trendData && trendData.length === 0 && (
+                <div style={{ textAlign: "center", padding: 40, color: COLORS.muted, fontSize: 13 }}>Aucune donnee sur cette periode</div>
+              )}
+              {!trendLoading && trendData && trendData.length > 0 && (
+                <div style={{ height: 300 }}>
+                  <canvas ref={trendChartRef} />
+                </div>
+              )}
+
+              {/* Summary line */}
+              {trendData && trendData.length > 0 && (
+                <div style={{ marginTop: 12, display: "flex", gap: 20, fontSize: 12, color: COLORS.muted }}>
+                  <span>Total: <strong style={{ color: COLORS.dark }}>{Math.round(trendData.reduce((s, d) => s + d.qty, 0))} vendus</strong></span>
+                  <span>CA HT: <strong style={{ color: COLORS.dark }}>{fmtDec(trendData.reduce((s, d) => s + d.ca_ht, 0))}</strong></span>
+                  <span>CA TTC: <strong style={{ color: COLORS.dark }}>{fmtDec(trendData.reduce((s, d) => s + d.ca_ttc, 0))}</strong></span>
+                </div>
+              )}
+            </div>
+
             {/* ── Filters ── */}
             <div style={S.card}>
               <div
@@ -1046,9 +1277,7 @@ export default function MargesPage() {
                           style={{
                             background:
                               globalIdx % 2 === 0 ? "transparent" : "rgba(0,0,0,.015)",
-                            cursor: "pointer",
                           }}
-                          onClick={() => openTrend(p.name)}
                         >
                           <td
                             style={{
@@ -1640,92 +1869,6 @@ export default function MargesPage() {
         )}
       </div>
 
-      {/* ── Trend Drawer ── */}
-      {trendProduct && (
-        <>
-          <div
-            onClick={() => { setTrendProduct(null); destroyChart("trendBar"); }}
-            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 999 }}
-          />
-          <div style={{
-            position: "fixed", bottom: 0, left: 0, right: 0,
-            maxHeight: "75vh", background: "#fff",
-            borderRadius: "20px 20px 0 0", zIndex: 1000,
-            padding: "20px 24px 30px", overflowY: "auto",
-            boxShadow: "0 -4px 24px rgba(0,0,0,0.12)",
-          }}>
-            {/* Header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700, color: COLORS.dark, maxWidth: "80%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={trendProduct}>
-                {trendProduct}
-              </div>
-              <button onClick={() => { setTrendProduct(null); destroyChart("trendBar"); }} style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "#fff", cursor: "pointer", fontSize: 16 }}>✕</button>
-            </div>
-
-            {/* Date range */}
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
-              <input type="date" value={trendFrom} onChange={(e) => setTrendFrom(e.target.value)} style={{ height: 32, borderRadius: 8, border: `1px solid ${COLORS.border}`, padding: "0 8px", fontSize: 12 }} />
-              <span style={{ fontSize: 12, color: COLORS.muted }}>→</span>
-              <input type="date" value={trendTo} onChange={(e) => setTrendTo(e.target.value)} style={{ height: 32, borderRadius: 8, border: `1px solid ${COLORS.border}`, padding: "0 8px", fontSize: 12 }} />
-              {[{ label: "3 mois", m: 3 }, { label: "6 mois", m: 6 }, { label: "12 mois", m: 12 }].map(({ label, m }) => (
-                <button key={m} onClick={() => { const t = new Date(); const f = new Date(t); f.setMonth(f.getMonth() - m); setTrendFrom(f.toISOString().slice(0, 10)); setTrendTo(t.toISOString().slice(0, 10)); }}
-                  style={{ height: 28, padding: "0 10px", borderRadius: 14, border: `1px solid ${COLORS.border}`, background: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", color: COLORS.dark }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {/* Mode + Metric toggles */}
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
-              {([["par_jour_semaine", "Jours semaine"], ["par_mois", "Jours du mois"], ["tendance", "Tendance"]] as const).map(([mode, label]) => (
-                <button key={mode} onClick={() => setTrendMode(mode)}
-                  style={{
-                    height: 30, padding: "0 14px", borderRadius: 15,
-                    border: trendMode === mode ? "none" : `1px solid ${COLORS.border}`,
-                    background: trendMode === mode ? accent : "#fff",
-                    color: trendMode === mode ? "#fff" : COLORS.dark,
-                    fontSize: 12, fontWeight: 600, cursor: "pointer",
-                  }}>
-                  {label}
-                </button>
-              ))}
-              <div style={{ width: 1, height: 24, background: COLORS.border, margin: "3px 4px" }} />
-              {([["qty", "Quantité"], ["ca_ht", "CA HT"]] as const).map(([m, label]) => (
-                <button key={m} onClick={() => setTrendMetric(m)}
-                  style={{
-                    height: 30, padding: "0 14px", borderRadius: 15,
-                    border: trendMetric === m ? "none" : `1px solid ${COLORS.border}`,
-                    background: trendMetric === m ? COLORS.dark : "#fff",
-                    color: trendMetric === m ? "#fff" : COLORS.dark,
-                    fontSize: 12, fontWeight: 600, cursor: "pointer",
-                  }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {/* Chart */}
-            {trendLoading && <div style={{ textAlign: "center", padding: 40, color: COLORS.muted }}>Chargement...</div>}
-            {!trendLoading && trendData && trendData.length === 0 && (
-              <div style={{ textAlign: "center", padding: 40, color: COLORS.muted }}>Aucune donnée sur cette période</div>
-            )}
-            {!trendLoading && trendData && trendData.length > 0 && (
-              <div style={{ height: 300 }}>
-                <canvas ref={trendChartRef} />
-              </div>
-            )}
-
-            {/* Summary */}
-            {trendData && trendData.length > 0 && (
-              <div style={{ marginTop: 12, display: "flex", gap: 20, fontSize: 12, color: COLORS.muted }}>
-                <span>Total: <strong style={{ color: COLORS.dark }}>{trendData.reduce((s, d) => s + d.qty, 0)} vendus</strong></span>
-                <span>CA HT: <strong style={{ color: COLORS.dark }}>{fmtDec(trendData.reduce((s, d) => s + d.ca_ht, 0))}</strong></span>
-                <span>CA TTC: <strong style={{ color: COLORS.dark }}>{fmtDec(trendData.reduce((s, d) => s + d.ca_ttc, 0))}</strong></span>
-              </div>
-            )}
-          </div>
-        </>
-      )}
     </RequireRole>
   );
 }
