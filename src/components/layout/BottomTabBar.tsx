@@ -69,14 +69,7 @@ function IconUsers({ active }: { active: boolean }) {
   );
 }
 
-function IconClock({ active }: { active: boolean }) {
-  return (
-    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  );
-}
+// IconClock removed — no longer used after navigation purge
 
 function IconBeach({ active }: { active: boolean }) {
   return (
@@ -201,10 +194,7 @@ const SECTION_PERSONNEL: TabSection = {
   icon: (a) => <IconUsers active={a} />,
   tabs: [
     { label: "Employes", href: "/rh/equipe", match: ["/rh/equipe", "/rh/employe"], icon: (a) => <IconUsers active={a} /> },
-    { label: "Pointage", href: "/rh/pointage", match: ["/rh/pointage"], icon: (a) => <IconClock active={a} /> },
     { label: "Conges", href: "/rh/conges", match: ["/rh/conges"], icon: (a) => <IconBeach active={a} /> },
-    { label: "Rapports", href: "/rh/rapports", match: ["/rh/rapports"], icon: (a) => <IconFileText active={a} /> },
-    { label: "Simulation", href: "/ventes/simulation", match: ["/ventes/simulation"], icon: (a) => <IconTrendingUp active={a} /> },
   ],
 };
 

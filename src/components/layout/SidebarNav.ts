@@ -79,10 +79,7 @@ const PILOTAGE_ITEMS: NavItemV2[] = [
 // PERSONNEL (RH)
 export const PLANNING_ITEMS: NavItemV2[] = [
   { label: "Employes", href: "/rh/equipe", icon: "users" },
-  { label: "Pointage", href: "/rh/pointage", icon: "clock" },
   { label: "Conges", href: "/rh/conges", icon: "beach" },
-  { label: "Rapports de paie", href: "/rh/rapports", icon: "fileText" },
-  { label: "Masse salariale", href: "/ventes/simulation", icon: "calculator" },
 ];
 
 // PRODUCTION (fiches techniques, catalogue, articles de vente)
@@ -208,7 +205,6 @@ export const SIDEBAR_NAV_SIMPLE: SidebarEntry[] = [
   { kind: "item", label: "Inventaire", href: "/inventaire", icon: "clipboard" },
   { kind: "item", label: "Commandes", href: "/commandes", icon: "shoppingBag" },
   { kind: "item", label: "Fournisseurs", href: "/fournisseurs", icon: "truck" },
-  { kind: "item", label: "Planning", href: "/plannings", icon: "calendar" },
   { kind: "item", label: "Événements", href: "/evenements", icon: "calendarEvent" },
   { kind: "divider" },
   { kind: "item", label: "Mon compte", href: "/settings/account", icon: "settings" },
@@ -229,11 +225,7 @@ export const SIDEBAR_NAV: NavSection[] = [
     roles: ["group_admin"],
     items: [
       { label: "Employés", href: "/rh/equipe" },
-      { label: "Planning", href: "/plannings" },
-      { label: "Pointage", href: "/rh/pointage" },
       { label: "Congés", href: "/rh/conges" },
-      { label: "Feuille d'émargement", href: "/rh/emargement" },
-      { label: "Simulation", href: "/ventes/simulation", roles: ["group_admin"] },
     ],
   },
   {
@@ -260,7 +252,6 @@ export const SIDEBAR_NAV: NavSection[] = [
       { label: "Ingredients", href: "/ingredients" },
       { label: "Commandes", href: "/commandes" },
       { label: "Fournisseurs", href: "/fournisseurs" },
-      { label: "Planning", href: "/plannings" },
     ],
   },
   {

@@ -676,10 +676,7 @@ export default function EmployeDetailPage() {
         <div style={{ ...tabsRow, marginBottom: 16 }}>
           {([
             ["infos", "Informations personnelles"],
-            ["dossier", "Contrats"],
-            ["acces", "Temps et planification"],
             ["conges", "Conges et Absences"],
-            ["documents", "Documents"],
             ["roles", "Role et permissions"],
           ] as [MainTab, string][]).map(([key, label]) => (
             <button
