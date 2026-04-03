@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, type CSSProperties } from "react";
+import React, { useEffect, useState, useMemo, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { getSupplierColor } from "@/lib/supplierColors";
+import Chart from "chart.js/auto";
 
 /* ── Types ── */
 
@@ -28,15 +29,13 @@ type InvoiceLine = {
   total_price: number | null;
 };
 
-type Tab = "dashboard" | "factures";
-
 /* ── Helpers ── */
 
 const fmt = (n: number | null) =>
-  n == null ? "—" : n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+  n == null ? "\u2014" : n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 
 const fmtDate = (d: string | null) =>
-  d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+  d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "\u2014";
 
 const MONTH_NAMES = ["Janvier", "Fevrier", "Mars", "Avril", "Mai", "Juin", "Juillet", "Aout", "Septembre", "Octobre", "Novembre", "Decembre"];
 
@@ -91,6 +90,8 @@ function getSupplierCategory(supplierName: string): string {
 const S = {
   card: { background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce" } as CSSProperties,
   sec: { fontSize: 9, textTransform: "uppercase" as const, letterSpacing: ".12em", color: "#777", fontWeight: 500, marginBottom: 12 } as CSSProperties,
+  kpiValue: { fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 26, color: "#1a1a1a" } as CSSProperties,
+  kpiLabel: { fontFamily: "DM Sans, sans-serif", fontSize: 10, textTransform: "uppercase" as const, letterSpacing: ".08em", color: "#999", marginBottom: 8 } as CSSProperties,
 };
 
 /* ── Component ── */
@@ -100,19 +101,11 @@ export default function AchatsPage() {
   const etab = useEtablissement();
   const etabId = etab.current?.id ?? null;
 
-  const [tab, setTab] = useState<Tab>("dashboard");
-
-  // ── All invoices (shared between dashboard & factures) ──
+  // ── All invoices ──
   const [allInvoices, setAllInvoices] = useState<InvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ── Factures state ──
-  const [openFolder, setOpenFolder] = useState<string | null>(null);
-  const [selectedInvoice, setSelectedInvoice] = useState<string | null>(null);
-  const [lines, setLines] = useState<InvoiceLine[]>([]);
-  const [linesLoading, setLinesLoading] = useState(false);
-
-  // ── Dashboard state ──
+  // ── Accordion state ──
   const [openDashMonth, setOpenDashMonth] = useState<string | null>(null);
   const [dashOpenSupplier, setDashOpenSupplier] = useState<string | null>(null);
   const [dashSelectedInvoice, setDashSelectedInvoice] = useState<string | null>(null);
@@ -122,6 +115,12 @@ export default function AchatsPage() {
   const [archiveYearOpen, setArchiveYearOpen] = useState<number | null>(null);
   const [evoArchivesOpen, setEvoArchivesOpen] = useState(false);
   const [evoView, setEvoView] = useState<"supplier" | "category">("supplier");
+
+  // ── Chart refs ──
+  const evoChartRef = useRef<HTMLCanvasElement>(null);
+  const evoChartInstance = useRef<Chart | null>(null);
+  const doughnutRef = useRef<HTMLCanvasElement>(null);
+  const doughnutInstance = useRef<Chart | null>(null);
 
   // ── Load ALL invoices ──
   useEffect(() => {
@@ -139,7 +138,7 @@ export default function AchatsPage() {
   }, [etabId]);
 
   // ══════════════════════════════════════════════════════
-  //  DASHBOARD COMPUTED DATA
+  //  COMPUTED DATA
   // ══════════════════════════════════════════════════════
 
   const now = new Date();
@@ -178,12 +177,29 @@ export default function AchatsPage() {
       bySupplier[sid].total += r.total_ht ?? 0;
     }
     const sorted = Object.values(bySupplier).sort((a, b) => b.total - a.total);
-    const topSupplier = sorted[0]?.name ?? "—";
+    const topSupplier = sorted[0] ?? null;
+    const topSupplierName = topSupplier?.name ?? "\u2014";
+    const topSupplierTotal = topSupplier?.total ?? 0;
 
     const variationPct = prevTotalHT > 0 ? ((totalHT - prevTotalHT) / prevTotalHT) * 100 : null;
 
-    return { totalHT, nbFactures, ticketMoyen, topSupplier, variationPct, prevTotalHT };
-  }, [allInvoices, curMonth, curYear]);
+    // Active suppliers this month
+    const activeSuppliers = new Set(thisMonth.map((inv) => inv.supplier_id).filter(Boolean)).size;
+
+    // Monthly average across fiscal year
+    const fyStart = new Date(curFY, 9, 1); // Oct 1
+    const fyInvoices = allInvoices.filter((inv) => {
+      if (!inv.invoice_date) return false;
+      const d = new Date(inv.invoice_date);
+      return d >= fyStart && d <= monthEnd;
+    });
+    const fyTotal = fyInvoices.reduce((s, r) => s + (r.total_ht ?? 0), 0);
+    // Number of months elapsed in fiscal year
+    const elapsedMonths = Math.max(1, (curYear - curFY) * 12 + curMonth - 9 + 1);
+    const monthlyAvg = fyTotal / Math.max(1, Math.min(elapsedMonths, 12));
+
+    return { totalHT, nbFactures, ticketMoyen, topSupplierName, topSupplierTotal, variationPct, prevTotalHT, activeSuppliers, monthlyAvg };
+  }, [allInvoices, curMonth, curYear, curFY]);
 
   // ── Monthly breakdown for evolution chart ──
   type MonthBreakdown = {
@@ -314,53 +330,23 @@ export default function AchatsPage() {
       .sort((a, b) => b.fyStart - a.fyStart);
   }, [invoicesByMonth, curFY]);
 
-  // ── Max total for bar scaling ──
-  const maxMonthTotal = useMemo(() => {
-    return Math.max(...curFYMonths.map((m) => m.totalHT), 1);
-  }, [curFYMonths]);
-
-  // ── Category KPIs for current month ──
-  const categoryKpis = useMemo(() => {
-    const monthStart = new Date(curYear, curMonth, 1);
-    const monthEnd = new Date(curYear, curMonth + 1, 0, 23, 59, 59);
-    const prevMonthStart = new Date(curYear, curMonth - 1, 1);
-    const prevMonthEnd = new Date(curYear, curMonth, 0, 23, 59, 59);
-
-    const thisMonth = allInvoices.filter((inv) => {
-      if (!inv.invoice_date) return false;
+  // ── Category totals for doughnut (current FY) ──
+  const categoryTotalsFY = useMemo(() => {
+    const byCat: Record<string, number> = {};
+    const fyMonthKeys = new Set(fiscalMonths(curFY).map((m) => `${m.year}-${String(m.month).padStart(2, "0")}`));
+    for (const inv of allInvoices) {
+      if (!inv.invoice_date) continue;
       const d = new Date(inv.invoice_date);
-      return d >= monthStart && d <= monthEnd;
-    });
-    const prevMonth = allInvoices.filter((inv) => {
-      if (!inv.invoice_date) return false;
-      const d = new Date(inv.invoice_date);
-      return d >= prevMonthStart && d <= prevMonthEnd;
-    });
-
-    const totalHT = thisMonth.reduce((s, r) => s + (r.total_ht ?? 0), 0);
-
-    const byCatCur: Record<string, number> = {};
-    for (const inv of thisMonth) {
+      const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
+      if (!fyMonthKeys.has(key)) continue;
       const cat = getSupplierCategory(inv.suppliers?.name ?? "Inconnu");
-      byCatCur[cat] = (byCatCur[cat] ?? 0) + (inv.total_ht ?? 0);
+      byCat[cat] = (byCat[cat] ?? 0) + (inv.total_ht ?? 0);
     }
-    const byCatPrev: Record<string, number> = {};
-    for (const inv of prevMonth) {
-      const cat = getSupplierCategory(inv.suppliers?.name ?? "Inconnu");
-      byCatPrev[cat] = (byCatPrev[cat] ?? 0) + (inv.total_ht ?? 0);
-    }
-
     const cats = ["Alimentaire", "Boissons", "Services", "Autre"];
     return cats
-      .map((name) => {
-        const cur = byCatCur[name] ?? 0;
-        const prev = byCatPrev[name] ?? 0;
-        const pct = totalHT > 0 ? (cur / totalHT) * 100 : 0;
-        const variation = prev > 0 ? ((cur - prev) / prev) * 100 : null;
-        return { name, total: cur, pct, variation, color: CATEGORY_COLORS[name] ?? "#999" };
-      })
+      .map((name) => ({ name, total: byCat[name] ?? 0, color: CATEGORY_COLORS[name] ?? "#999" }))
       .filter((c) => c.total > 0);
-  }, [allInvoices, curMonth, curYear]);
+  }, [allInvoices, curFY]);
 
   // ── Top 5 suppliers for current month ──
   const top5Suppliers = useMemo(() => {
@@ -390,42 +376,135 @@ export default function AchatsPage() {
   }, [allInvoices, curMonth, curYear]);
 
   // ══════════════════════════════════════════════════════
-  //  FACTURES TAB LOGIC (existing)
+  //  CHART.JS — Evolution mensuelle (stacked bar)
   // ══════════════════════════════════════════════════════
 
-  const folders = useMemo(() => {
-    const grouped: Record<string, { name: string; invoices: InvoiceRow[] }> = {};
-    for (const inv of allInvoices) {
-      const rawName = inv.suppliers?.name ?? "Inconnu";
-      const key = rawName.toLowerCase().trim();
-      if (!grouped[key]) grouped[key] = { name: rawName, invoices: [] };
-      grouped[key].invoices.push(inv);
+  const evoChartData = useMemo(() => {
+    const months = curFYMonths;
+    const labels = months.map((m) => MONTH_NAMES[m.month].slice(0, 3));
+
+    if (evoView === "category") {
+      const cats = ["Alimentaire", "Boissons", "Services", "Autre"];
+      const datasets = cats.map((cat) => ({
+        label: cat,
+        data: months.map((m) => {
+          const found = m.categories.find((c) => c.name === cat);
+          return found ? found.total : 0;
+        }),
+        backgroundColor: CATEGORY_COLORS[cat] ?? "#999",
+        borderRadius: 3,
+      }));
+      return { labels, datasets };
+    } else {
+      // Collect all unique suppliers across months
+      const allSuppliers = new Map<string, { name: string; color: string }>();
+      for (const m of months) {
+        for (const s of m.suppliers) {
+          const k = s.name.toLowerCase().trim();
+          if (!allSuppliers.has(k)) allSuppliers.set(k, { name: s.name, color: s.color });
+        }
+      }
+      const datasets = Array.from(allSuppliers.entries()).map(([k, { name, color }]) => ({
+        label: name,
+        data: months.map((m) => {
+          const found = m.suppliers.find((s) => s.name.toLowerCase().trim() === k);
+          return found ? found.total : 0;
+        }),
+        backgroundColor: color,
+        borderRadius: 3,
+      }));
+      return { labels, datasets };
     }
-    return Object.entries(grouped).sort((a, b) => {
-      const totalA = a[1].invoices.reduce((s, i) => s + (i.total_ht ?? 0), 0);
-      const totalB = b[1].invoices.reduce((s, i) => s + (i.total_ht ?? 0), 0);
-      return totalB - totalA;
+  }, [curFYMonths, evoView]);
+
+  useEffect(() => {
+    if (!evoChartRef.current || loading || curFYMonths.length === 0) return;
+    if (evoChartInstance.current) evoChartInstance.current.destroy();
+    evoChartInstance.current = new Chart(evoChartRef.current, {
+      type: "bar",
+      data: evoChartData,
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `${ctx.dataset.label}: ${fmt(ctx.parsed.x)}`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            stacked: true,
+            ticks: {
+              callback: (v) => {
+                const n = typeof v === "number" ? v : parseFloat(String(v));
+                return n >= 1000 ? Math.round(n / 1000) + "k" : String(Math.round(n));
+              },
+              font: { size: 10 },
+              color: "#999",
+            },
+            grid: { color: "#f2ede4" },
+          },
+          y: {
+            stacked: true,
+            ticks: { font: { size: 11 }, color: "#999" },
+            grid: { display: false },
+          },
+        },
+      },
     });
-  }, [allInvoices]);
+    return () => { evoChartInstance.current?.destroy(); evoChartInstance.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evoChartData, loading]);
 
-  const folderColorMap = useMemo(() => {
-    const m = new Map<string, string>();
-    folders.forEach(([key]) => { m.set(key, getSupplierColor(key)); });
-    return m;
-  }, [folders]);
+  // ══════════════════════════════════════════════════════
+  //  CHART.JS — Doughnut (category)
+  // ══════════════════════════════════════════════════════
 
-  const loadLines = async (invoiceId: string) => {
-    if (selectedInvoice === invoiceId) { setSelectedInvoice(null); setLines([]); return; }
-    setSelectedInvoice(invoiceId);
-    setLinesLoading(true);
-    const { data } = await supabase
-      .from("supplier_invoice_lines")
-      .select("id, name, quantity, unit, unit_price, total_price")
-      .eq("invoice_id", invoiceId)
-      .order("name");
-    setLines((data ?? []) as InvoiceLine[]);
-    setLinesLoading(false);
-  };
+  useEffect(() => {
+    if (!doughnutRef.current || loading || categoryTotalsFY.length === 0) return;
+    if (doughnutInstance.current) doughnutInstance.current.destroy();
+    doughnutInstance.current = new Chart(doughnutRef.current, {
+      type: "doughnut",
+      data: {
+        labels: categoryTotalsFY.map((c) => c.name),
+        datasets: [{
+          data: categoryTotalsFY.map((c) => c.total),
+          backgroundColor: categoryTotalsFY.map((c) => c.color),
+          borderWidth: 2,
+          borderColor: "#fff",
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: "60%",
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: { font: { size: 11, family: "DM Sans, sans-serif" }, color: "#777", padding: 14, usePointStyle: true, pointStyleWidth: 10 },
+          },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const total = categoryTotalsFY.reduce((s, c) => s + c.total, 0);
+                const pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : "0";
+                return `${ctx.label}: ${fmt(ctx.parsed)} (${pct}%)`;
+              },
+            },
+          },
+        },
+      },
+    });
+    return () => { doughnutInstance.current?.destroy(); doughnutInstance.current = null; };
+  }, [categoryTotalsFY, loading]);
+
+  // ══════════════════════════════════════════════════════
+  //  ACTIONS
+  // ══════════════════════════════════════════════════════
 
   const loadDashLines = async (invoiceId: string) => {
     if (dashSelectedInvoice === invoiceId) { setDashSelectedInvoice(null); setDashLines([]); return; }
@@ -443,23 +522,6 @@ export default function AchatsPage() {
   const thStyle: React.CSSProperties = { padding: "8px 10px", fontWeight: 600, color: "#999", fontSize: 11, textAlign: "left" };
   const tdStyle: React.CSSProperties = { padding: "8px 10px", fontSize: 13 };
   const tdR: React.CSSProperties = { ...tdStyle, textAlign: "right" };
-
-  const tabBtn = (key: Tab, label: string) => (
-    <button
-      key={key}
-      onClick={() => setTab(key)}
-      style={{
-        fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600,
-        padding: "7px 18px", borderRadius: 20, cursor: "pointer",
-        border: tab === key ? "2px solid #D4775A" : "1px solid #ddd6c8",
-        background: tab === key ? "#D4775A" : "#fff",
-        color: tab === key ? "#fff" : "#1a1a1a",
-        transition: "all 0.15s",
-      }}
-    >
-      {label}
-    </button>
-  );
 
   // ── Render helper: invoice lines table ──
   const renderLinesTable = (lns: InvoiceLine[], isLoading: boolean) => (
@@ -482,8 +544,8 @@ export default function AchatsPage() {
           <tbody>
             {lns.map((l) => (
               <tr key={l.id} style={{ borderBottom: "1px solid #eee6d8" }}>
-                <td style={{ padding: "6px 10px", fontSize: 12 }}>{l.name ?? "—"}</td>
-                <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "right" }}>{l.quantity ?? "—"}</td>
+                <td style={{ padding: "6px 10px", fontSize: 12 }}>{l.name ?? "\u2014"}</td>
+                <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "right" }}>{l.quantity ?? "\u2014"}</td>
                 <td style={{ padding: "6px 10px", fontSize: 12, color: "#999" }}>{l.unit ?? ""}</td>
                 <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "right" }}>{fmt(l.unit_price)}</td>
                 <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "right" }}>{fmt(l.total_price)}</td>
@@ -494,66 +556,6 @@ export default function AchatsPage() {
       )}
     </div>
   );
-
-  // ── Render helper: stacked horizontal bar ──
-  const renderStackedBar = (mb: MonthBreakdown) => {
-    if (mb.totalHT <= 0) return null;
-    const barWidth = (mb.totalHT / maxMonthTotal) * 100;
-    return (
-      <div key={mb.key} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-        <div style={{ width: 100, flexShrink: 0, fontFamily: "DM Sans, sans-serif", fontSize: 11, color: "#999", textAlign: "right" }}>
-          {MONTH_NAMES[mb.month].slice(0, 3)} {mb.year}
-        </div>
-        <div style={{ flex: 1, position: "relative" }}>
-          <div style={{ display: "flex", height: 22, borderRadius: 4, overflow: "hidden", width: `${Math.max(barWidth, 2)}%` }}>
-            {mb.suppliers.map((sup, i) => {
-              const pct = (sup.total / mb.totalHT) * 100;
-              return (
-                <div
-                  key={i}
-                  title={`${sup.name}: ${fmt(sup.total)}`}
-                  style={{ width: `${pct}%`, background: sup.color, minWidth: pct > 0 ? 2 : 0, transition: "width 0.3s" }}
-                />
-              );
-            })}
-          </div>
-        </div>
-        <div style={{ width: 80, flexShrink: 0, fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 13, color: "#1a1a1a", textAlign: "right" }}>
-          {fmt(mb.totalHT)}
-        </div>
-      </div>
-    );
-  };
-
-  // ── Render helper: stacked horizontal bar by category ──
-  const renderCategoryBar = (mb: MonthBreakdown) => {
-    if (mb.totalHT <= 0) return null;
-    const barWidth = (mb.totalHT / maxMonthTotal) * 100;
-    return (
-      <div key={mb.key} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-        <div style={{ width: 100, flexShrink: 0, fontFamily: "DM Sans, sans-serif", fontSize: 11, color: "#999", textAlign: "right" }}>
-          {MONTH_NAMES[mb.month].slice(0, 3)} {mb.year}
-        </div>
-        <div style={{ flex: 1, position: "relative" }}>
-          <div style={{ display: "flex", height: 22, borderRadius: 4, overflow: "hidden", width: `${Math.max(barWidth, 2)}%` }}>
-            {mb.categories.map((cat, i) => {
-              const pct = (cat.total / mb.totalHT) * 100;
-              return (
-                <div
-                  key={i}
-                  title={`${cat.name}: ${fmt(cat.total)}`}
-                  style={{ width: `${pct}%`, background: cat.color, minWidth: pct > 0 ? 2 : 0, transition: "width 0.3s" }}
-                />
-              );
-            })}
-          </div>
-        </div>
-        <div style={{ width: 80, flexShrink: 0, fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 13, color: "#1a1a1a", textAlign: "right" }}>
-          {fmt(mb.totalHT)}
-        </div>
-      </div>
-    );
-  };
 
   // ── Render helper: month accordion for invoices ──
   const renderMonthAccordion = (mg: MonthGroup) => {
@@ -631,7 +633,7 @@ export default function AchatsPage() {
                                   onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = isSelected ? "#f5f0e8" : "transparent"; }}
                                 >
                                   <td style={{ ...tdStyle, paddingLeft: 48 }}>{fmtDate(inv.invoice_date)}</td>
-                                  <td style={{ ...tdStyle, color: "#666" }}>{inv.invoice_number ?? "—"}</td>
+                                  <td style={{ ...tdStyle, color: "#666" }}>{inv.invoice_number ?? "\u2014"}</td>
                                   <td style={tdStyle}>{inv.suppliers?.name ?? "Inconnu"}</td>
                                   <td style={tdR}>{fmt(inv.total_ht)}</td>
                                   <td style={tdR}>{fmt(inv.total_ttc)}</td>
@@ -664,120 +666,102 @@ export default function AchatsPage() {
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
         <h1 style={{
           fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24,
-          color: "#1a1a1a", margin: "0 0 20px", textTransform: "uppercase", letterSpacing: "0.04em",
+          color: "#1a1a1a", margin: "0 0 24px", textTransform: "uppercase", letterSpacing: "0.04em",
         }}>
           Achats
         </h1>
 
-        {/* Tabs */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
-          {tabBtn("dashboard", "Tableau de bord")}
-          {tabBtn("factures", "Factures")}
-        </div>
-
-        {/* ═══ TAB: DASHBOARD ═══ */}
-        {tab === "dashboard" && (
-          loading ? (
-            <p style={{ color: "#999", fontSize: 14, textAlign: "center", marginTop: 40 }}>Chargement...</p>
-          ) : (
-            <>
-              {/* ── Hero KPIs ── */}
-              <div style={S.sec}>Synthese du mois</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 28 }}>
-                <div style={S.card}>
-                  <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginBottom: 8 }}>Total achats du mois (HT)</div>
-                  <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 22, color: "#1a1a1a" }}>
-                    {fmt(dashKpis.totalHT)}
+        {loading ? (
+          <p style={{ color: "#999", fontSize: 14, textAlign: "center", marginTop: 40 }}>Chargement...</p>
+        ) : (
+          <>
+            {/* ══════════════════════════════════════════════════ */}
+            {/*  A) HERO — 6 KPI CARDS                           */}
+            {/* ══════════════════════════════════════════════════ */}
+            <div style={S.sec}>Synthese du mois</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 32 }}>
+              {/* Total achats HT */}
+              <div style={S.card}>
+                <div style={S.kpiLabel}>Total achats (HT)</div>
+                <div style={S.kpiValue}>{fmt(dashKpis.totalHT)}</div>
+                {dashKpis.variationPct !== null && (
+                  <div style={{ fontSize: 11, color: dashKpis.variationPct <= 0 ? "#166534" : "#991b1b", marginTop: 4, fontFamily: "DM Sans, sans-serif", fontWeight: 600 }}>
+                    {dashKpis.variationPct > 0 ? "+" : ""}{dashKpis.variationPct.toFixed(1)}% vs mois prec.
                   </div>
-                  {dashKpis.variationPct !== null && (
-                    <div style={{ fontSize: 11, color: dashKpis.variationPct <= 0 ? "#166534" : "#991b1b", marginTop: 4, fontFamily: "DM Sans, sans-serif" }}>
-                      {dashKpis.variationPct > 0 ? "+" : ""}{dashKpis.variationPct.toFixed(1)}% vs mois precedent
-                    </div>
-                  )}
-                </div>
-
-                <div style={S.card}>
-                  <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginBottom: 8 }}>Factures ce mois</div>
-                  <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 22, color: "#1a1a1a" }}>
-                    {dashKpis.nbFactures}
-                  </div>
-                </div>
-
-                <div style={S.card}>
-                  <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginBottom: 8 }}>Ticket moyen par facture</div>
-                  <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 22, color: "#1a1a1a" }}>
-                    {fmt(dashKpis.ticketMoyen)}
-                  </div>
-                </div>
-
-                <div style={S.card}>
-                  <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginBottom: 8 }}>Top fournisseur</div>
-                  <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 18, color: "#1a1a1a" }}>
-                    {dashKpis.topSupplier}
-                  </div>
-                </div>
+                )}
               </div>
 
-              {/* ── Category KPIs ── */}
-              {categoryKpis.length > 0 && (
-                <>
-                  <div style={S.sec}>Repartition par categorie</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 28 }}>
-                    {categoryKpis.map((cat) => (
-                      <div key={cat.name} style={{ ...S.card, padding: "14px 16px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: cat.color, flexShrink: 0 }} />
-                          <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", fontWeight: 600 }}>{cat.name}</span>
-                        </div>
-                        <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 18, color: "#1a1a1a" }}>
-                          {fmt(cat.total)}
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-                          <span style={{ fontSize: 11, color: "#999", fontFamily: "DM Sans, sans-serif" }}>{cat.pct.toFixed(1)}% du total</span>
-                          {cat.variation !== null && (
-                            <span style={{ fontSize: 10, color: cat.variation <= 0 ? "#166534" : "#991b1b", fontFamily: "DM Sans, sans-serif", fontWeight: 600 }}>
-                              {cat.variation > 0 ? "+" : ""}{cat.variation.toFixed(1)}%
-                            </span>
-                          )}
-                        </div>
-                      </div>
+              {/* Nb factures */}
+              <div style={S.card}>
+                <div style={S.kpiLabel}>Factures ce mois</div>
+                <div style={S.kpiValue}>{dashKpis.nbFactures}</div>
+              </div>
+
+              {/* Ticket moyen */}
+              <div style={S.card}>
+                <div style={S.kpiLabel}>Ticket moyen</div>
+                <div style={S.kpiValue}>{fmt(dashKpis.ticketMoyen)}</div>
+              </div>
+
+              {/* Top fournisseur */}
+              <div style={S.card}>
+                <div style={S.kpiLabel}>Top fournisseur</div>
+                <div style={{ ...S.kpiValue, fontSize: 18 }}>{dashKpis.topSupplierName}</div>
+                {dashKpis.topSupplierTotal > 0 && (
+                  <div style={{ fontSize: 11, color: "#999", marginTop: 4, fontFamily: "DM Sans, sans-serif" }}>{fmt(dashKpis.topSupplierTotal)}</div>
+                )}
+              </div>
+
+              {/* Moyenne mensuelle */}
+              <div style={S.card}>
+                <div style={S.kpiLabel}>Moy. mensuelle (exercice)</div>
+                <div style={S.kpiValue}>{fmt(dashKpis.monthlyAvg)}</div>
+              </div>
+
+              {/* Fournisseurs actifs */}
+              <div style={S.card}>
+                <div style={S.kpiLabel}>Fournisseurs actifs</div>
+                <div style={S.kpiValue}>{dashKpis.activeSuppliers}</div>
+              </div>
+            </div>
+
+            {/* ══════════════════════════════════════════════════ */}
+            {/*  B) CHARTS — Evolution + Doughnut side by side   */}
+            {/* ══════════════════════════════════════════════════ */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <div style={{ ...S.sec, marginBottom: 0 }}>Analyse — Exercice {curFY}/{curFY + 1}</div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 14, marginBottom: 14 }}>
+              {/* Left: stacked bar chart */}
+              <div style={S.card}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                  <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 600, color: "#777" }}>Evolution mensuelle</span>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {(["supplier", "category"] as const).map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => setEvoView(v)}
+                        style={{
+                          fontFamily: "DM Sans, sans-serif", fontSize: 10, fontWeight: 600,
+                          padding: "3px 10px", borderRadius: 14, cursor: "pointer",
+                          border: evoView === v ? "1.5px solid #D4775A" : "1px solid #ddd6c8",
+                          background: evoView === v ? "#D4775A" : "#fff",
+                          color: evoView === v ? "#fff" : "#777",
+                        }}
+                      >
+                        {v === "supplier" ? "Par fournisseur" : "Par categorie"}
+                      </button>
                     ))}
                   </div>
-                </>
-              )}
-
-              {/* ── Monthly Evolution ── */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <div style={{ ...S.sec, marginBottom: 0 }}>Evolution mensuelle — Exercice {curFY}/{curFY + 1}</div>
-                <div style={{ display: "flex", gap: 4 }}>
-                  {(["supplier", "category"] as const).map((v) => (
-                    <button
-                      key={v}
-                      onClick={() => setEvoView(v)}
-                      style={{
-                        fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 600,
-                        padding: "4px 12px", borderRadius: 14, cursor: "pointer",
-                        border: evoView === v ? "1.5px solid #D4775A" : "1px solid #ddd6c8",
-                        background: evoView === v ? "#D4775A" : "#fff",
-                        color: evoView === v ? "#fff" : "#777",
-                      }}
-                    >
-                      {v === "supplier" ? "Par fournisseur" : "Par categorie"}
-                    </button>
-                  ))}
                 </div>
-              </div>
-              <div style={{ ...S.card, marginBottom: 14, padding: "18px 20px" }}>
                 {curFYMonths.length === 0 ? (
                   <p style={{ color: "#999", fontSize: 13, margin: 0 }}>Aucune donnee pour cet exercice.</p>
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    {evoView === "supplier"
-                      ? curFYMonths.map(renderStackedBar)
-                      : curFYMonths.map(renderCategoryBar)}
+                  <div style={{ height: Math.max(curFYMonths.length * 32, 200), position: "relative" }}>
+                    <canvas ref={evoChartRef} />
                   </div>
                 )}
-
                 {/* Legend */}
                 {curFYMonths.length > 0 && evoView === "supplier" && (() => {
                   const allSuppliers = new Map<string, { name: string; color: string }>();
@@ -810,257 +794,165 @@ export default function AchatsPage() {
                 )}
               </div>
 
-              {/* Archive FY evolution */}
-              {archiveFYs.length > 0 && (
-                <div style={{ marginBottom: 28 }}>
-                  <div
-                    onClick={() => setEvoArchivesOpen(!evoArchivesOpen)}
-                    style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "8px 0" }}
-                  >
-                    <span style={{ fontSize: 11, color: "#999", transition: "transform 0.2s", transform: evoArchivesOpen ? "rotate(90deg)" : "rotate(0deg)" }}>&#9654;</span>
-                    <span style={{ ...S.sec, marginBottom: 0 }}>Archives</span>
+              {/* Right: doughnut chart */}
+              <div style={S.card}>
+                <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 600, color: "#777", marginBottom: 14 }}>
+                  Repartition par categorie
+                </div>
+                {categoryTotalsFY.length === 0 ? (
+                  <p style={{ color: "#999", fontSize: 13, margin: 0 }}>Aucune donnee.</p>
+                ) : (
+                  <div style={{ height: 240, position: "relative" }}>
+                    <canvas ref={doughnutRef} />
                   </div>
-                  {evoArchivesOpen && archiveFYs.map((afy) => (
-                    <div key={afy.fyStart} style={{ ...S.card, marginBottom: 10, marginTop: 6, padding: "14px 20px" }}>
-                      <div style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 600, fontSize: 12, color: "#999", marginBottom: 10 }}>
-                        Exercice {afy.label}
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        {afy.months.map((mb) => {
-                          const archiveMax = Math.max(...afy.months.map((m) => m.totalHT), 1);
-                          const barW = (mb.totalHT / archiveMax) * 100;
-                          return (
-                            <div key={mb.key} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
-                              <div style={{ width: 100, flexShrink: 0, fontFamily: "DM Sans, sans-serif", fontSize: 11, color: "#999", textAlign: "right" }}>
-                                {MONTH_NAMES[mb.month].slice(0, 3)} {mb.year}
-                              </div>
-                              <div style={{ flex: 1 }}>
-                                <div style={{ display: "flex", height: 18, borderRadius: 4, overflow: "hidden", width: `${Math.max(barW, 2)}%` }}>
-                                  {mb.suppliers.map((sup, i) => {
-                                    const pct = (sup.total / mb.totalHT) * 100;
-                                    return <div key={i} title={`${sup.name}: ${fmt(sup.total)}`} style={{ width: `${pct}%`, background: sup.color, minWidth: pct > 0 ? 2 : 0 }} />;
-                                  })}
-                                </div>
-                              </div>
-                              <div style={{ width: 80, flexShrink: 0, fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 12, color: "#1a1a1a", textAlign: "right" }}>
-                                {fmt(mb.totalHT)}
+                )}
+              </div>
+            </div>
+
+            {/* Archive FY evolution */}
+            {archiveFYs.length > 0 && (
+              <div style={{ marginBottom: 28 }}>
+                <div
+                  onClick={() => setEvoArchivesOpen(!evoArchivesOpen)}
+                  style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "8px 0" }}
+                >
+                  <span style={{ fontSize: 11, color: "#999", transition: "transform 0.2s", transform: evoArchivesOpen ? "rotate(90deg)" : "rotate(0deg)" }}>&#9654;</span>
+                  <span style={{ ...S.sec, marginBottom: 0 }}>Archives</span>
+                </div>
+                {evoArchivesOpen && archiveFYs.map((afy) => (
+                  <div key={afy.fyStart} style={{ ...S.card, marginBottom: 10, marginTop: 6, padding: "14px 20px" }}>
+                    <div style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 600, fontSize: 12, color: "#999", marginBottom: 10 }}>
+                      Exercice {afy.label}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      {afy.months.map((mb) => {
+                        const archiveMax = Math.max(...afy.months.map((m) => m.totalHT), 1);
+                        const barW = (mb.totalHT / archiveMax) * 100;
+                        return (
+                          <div key={mb.key} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
+                            <div style={{ width: 100, flexShrink: 0, fontFamily: "DM Sans, sans-serif", fontSize: 11, color: "#999", textAlign: "right" }}>
+                              {MONTH_NAMES[mb.month].slice(0, 3)} {mb.year}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: "flex", height: 18, borderRadius: 4, overflow: "hidden", width: `${Math.max(barW, 2)}%` }}>
+                                {mb.suppliers.map((sup, i) => {
+                                  const pct = (sup.total / mb.totalHT) * 100;
+                                  return <div key={i} title={`${sup.name}: ${fmt(sup.total)}`} style={{ width: `${pct}%`, background: sup.color, minWidth: pct > 0 ? 2 : 0 }} />;
+                                })}
                               </div>
                             </div>
-                          );
-                        })}
+                            <div style={{ width: 80, flexShrink: 0, fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 12, color: "#1a1a1a", textAlign: "right" }}>
+                              {fmt(mb.totalHT)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════ */}
+            {/*  C) TOP 5 FOURNISSEURS                           */}
+            {/* ══════════════════════════════════════════════════ */}
+            {top5Suppliers.length > 0 && (
+              <>
+                <div style={S.sec}>Top fournisseurs — {MONTH_NAMES[curMonth]} {curYear}</div>
+                <div style={{ ...S.card, marginBottom: 32, padding: "18px 20px" }}>
+                  {top5Suppliers.map((sup, i) => (
+                    <div key={sup.name} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: i < top5Suppliers.length - 1 ? 10 : 0 }}>
+                      <div style={{ width: 20, fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 14, color: "#999", textAlign: "center", flexShrink: 0 }}>
+                        {i + 1}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
+                          <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 600, fontSize: 13, color: "#1a1a1a" }}>{sup.name}</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontSize: 11, color: "#999", fontFamily: "DM Sans, sans-serif" }}>{sup.pct.toFixed(1)}%</span>
+                            <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 13, color: "#1a1a1a" }}>{fmt(sup.total)}</span>
+                          </div>
+                        </div>
+                        <div style={{ height: 6, borderRadius: 3, background: "#f2ede4", overflow: "hidden" }}>
+                          <div style={{ height: "100%", borderRadius: 3, background: sup.color, width: `${sup.pct}%`, transition: "width 0.3s" }} />
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
+              </>
+            )}
+
+            {/* ══════════════════════════════════════════════════ */}
+            {/*  D) FACTURES PAR MOIS — accordion                */}
+            {/* ══════════════════════════════════════════════════ */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ ...S.sec, marginBottom: 0 }}>Factures par mois — Exercice {curFY}/{curFY + 1}</div>
+              <button
+                onClick={() => router.push("/invoices")}
+                style={{
+                  fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 600,
+                  background: "#D4775A", color: "#fff", border: "none", borderRadius: 20,
+                  padding: "7px 16px", cursor: "pointer",
+                }}
+              >
+                Importer une facture
+              </button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 20 }}>
+              {curFYInvoiceMonths.length === 0 ? (
+                <p style={{ color: "#999", fontSize: 13 }}>Aucune facture pour cet exercice.</p>
+              ) : (
+                curFYInvoiceMonths.map(renderMonthAccordion)
               )}
+            </div>
 
-              {/* ── Top 5 fournisseurs ── */}
-              {top5Suppliers.length > 0 && (
-                <>
-                  <div style={S.sec}>Top fournisseurs — {MONTH_NAMES[curMonth]} {curYear}</div>
-                  <div style={{ ...S.card, marginBottom: 28, padding: "18px 20px" }}>
-                    {top5Suppliers.map((sup, i) => (
-                      <div key={sup.name} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: i < top5Suppliers.length - 1 ? 10 : 0 }}>
-                        <div style={{ width: 20, fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 14, color: "#999", textAlign: "center", flexShrink: 0 }}>
-                          {i + 1}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
-                            <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 600, fontSize: 13, color: "#1a1a1a" }}>{sup.name}</span>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <span style={{ fontSize: 11, color: "#999", fontFamily: "DM Sans, sans-serif" }}>{sup.pct.toFixed(1)}%</span>
-                              <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 13, color: "#1a1a1a" }}>{fmt(sup.total)}</span>
-                            </div>
-                          </div>
-                          <div style={{ height: 6, borderRadius: 3, background: "#f2ede4", overflow: "hidden" }}>
-                            <div style={{ height: "100%", borderRadius: 3, background: sup.color, width: `${sup.pct}%`, transition: "width 0.3s" }} />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {/* ── Invoices by month ── */}
-              <div style={S.sec}>Factures par mois — Exercice {curFY}/{curFY + 1}</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 20 }}>
-                {curFYInvoiceMonths.length === 0 ? (
-                  <p style={{ color: "#999", fontSize: 13 }}>Aucune facture pour cet exercice.</p>
-                ) : (
-                  curFYInvoiceMonths.map(renderMonthAccordion)
-                )}
-              </div>
-
-              {/* Archive invoice months */}
-              {archiveInvoiceFYs.length > 0 && (
-                <>
-                  <div
-                    onClick={() => setArchivesOpen(!archivesOpen)}
-                    style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "8px 0", marginBottom: 6 }}
-                  >
-                    <span style={{ fontSize: 11, color: "#999", transition: "transform 0.2s", transform: archivesOpen ? "rotate(90deg)" : "rotate(0deg)" }}>&#9654;</span>
-                    <span style={{ ...S.sec, marginBottom: 0 }}>Archives</span>
-                  </div>
-                  {archivesOpen && archiveInvoiceFYs.map((afy) => {
-                    const isYearOpen = archiveYearOpen === afy.fyStart;
-                    return (
-                      <div key={afy.fyStart} style={{ marginBottom: 6 }}>
-                        <div
-                          onClick={() => setArchiveYearOpen(isYearOpen ? null : afy.fyStart)}
-                          style={{
-                            display: "flex", alignItems: "center", justifyContent: "space-between",
-                            padding: "10px 16px", cursor: "pointer", borderRadius: 10,
-                            border: "1px solid #ddd6c8", background: isYearOpen ? "#f5f0e8" : "#fff",
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ fontSize: 11, color: "#999", transition: "transform 0.2s", transform: isYearOpen ? "rotate(90deg)" : "rotate(0deg)" }}>&#9654;</span>
-                            <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 600, fontSize: 13, color: "#1a1a1a" }}>
-                              Exercice {afy.label}
-                            </span>
-                            <span style={{ fontSize: 10, color: "#999" }}>
-                              {afy.months.reduce((s, m) => s + m.nbInvoices, 0)} factures
-                            </span>
-                          </div>
-                          <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 13, color: "#1a1a1a" }}>
-                            {fmt(afy.months.reduce((s, m) => s + m.totalHT, 0))} HT
+            {/* Archive invoice months */}
+            {archiveInvoiceFYs.length > 0 && (
+              <>
+                <div
+                  onClick={() => setArchivesOpen(!archivesOpen)}
+                  style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "8px 0", marginBottom: 6 }}
+                >
+                  <span style={{ fontSize: 11, color: "#999", transition: "transform 0.2s", transform: archivesOpen ? "rotate(90deg)" : "rotate(0deg)" }}>&#9654;</span>
+                  <span style={{ ...S.sec, marginBottom: 0 }}>Archives</span>
+                </div>
+                {archivesOpen && archiveInvoiceFYs.map((afy) => {
+                  const isYearOpen = archiveYearOpen === afy.fyStart;
+                  return (
+                    <div key={afy.fyStart} style={{ marginBottom: 6 }}>
+                      <div
+                        onClick={() => setArchiveYearOpen(isYearOpen ? null : afy.fyStart)}
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "10px 16px", cursor: "pointer", borderRadius: 10,
+                          border: "1px solid #ddd6c8", background: isYearOpen ? "#f5f0e8" : "#fff",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 11, color: "#999", transition: "transform 0.2s", transform: isYearOpen ? "rotate(90deg)" : "rotate(0deg)" }}>&#9654;</span>
+                          <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 600, fontSize: 13, color: "#1a1a1a" }}>
+                            Exercice {afy.label}
+                          </span>
+                          <span style={{ fontSize: 10, color: "#999" }}>
+                            {afy.months.reduce((s, m) => s + m.nbInvoices, 0)} factures
                           </span>
                         </div>
-                        {isYearOpen && (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6, paddingLeft: 12 }}>
-                            {afy.months.map(renderMonthAccordion)}
-                          </div>
-                        )}
+                        <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 13, color: "#1a1a1a" }}>
+                          {fmt(afy.months.reduce((s, m) => s + m.totalHT, 0))} HT
+                        </span>
                       </div>
-                    );
-                  })}
-                </>
-              )}
-            </>
-          )
-        )}
-
-        {/* ═══ TAB: FACTURES ═══ */}
-        {tab === "factures" && (
-          loading ? (
-            <p style={{ color: "#999", fontSize: 14, textAlign: "center", marginTop: 40 }}>Chargement...</p>
-          ) : (
-            <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
-                {[
-                  { label: "Total achats ce mois", value: fmt(dashKpis.totalHT) },
-                  { label: "Factures ce mois", value: String(dashKpis.nbFactures) },
-                  { label: "Fournisseur principal", value: dashKpis.topSupplier },
-                ].map((k) => (
-                  <div key={k.label} style={{
-                    background: "#fff", borderRadius: 12, padding: "18px 20px",
-                    border: "1px solid #e5ddd0", boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                  }}>
-                    <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginBottom: 8 }}>{k.label}</div>
-                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 22, color: "#1a1a1a" }}>{k.value}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ marginBottom: 24 }}>
-                <button
-                  onClick={() => router.push("/invoices")}
-                  style={{
-                    fontFamily: "DM Sans, sans-serif", fontSize: 14, fontWeight: 600,
-                    background: "#D4775A", color: "#fff", border: "none", borderRadius: 20,
-                    padding: "9px 20px", cursor: "pointer",
-                  }}
-                >
-                  Importer une facture
-                </button>
-              </div>
-
-              <h2 style={{
-                fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 16,
-                color: "#1a1a1a", margin: "0 0 12px", letterSpacing: "0.04em", textTransform: "uppercase",
-              }}>
-                Factures par fournisseur
-              </h2>
-
-              {folders.length === 0 ? (
-                <p style={{ color: "#999", fontSize: 14 }}>Aucune facture importee.</p>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {folders.map(([key, folder]) => {
-                    const isOpen = openFolder === key;
-                    const folderTotal = folder.invoices.reduce((s, i) => s + (i.total_ht ?? 0), 0);
-                    const color = folderColorMap.get(key) ?? "#999";
-                    return (
-                      <div key={key} style={{ border: "1px solid #ddd6c8", borderLeft: `3px solid ${color}`, borderRadius: 10, overflow: "hidden" }}>
-                        <div
-                          onClick={() => setOpenFolder(isOpen ? null : key)}
-                          style={{
-                            display: "flex", alignItems: "center", justifyContent: "space-between",
-                            padding: "12px 16px", cursor: "pointer",
-                            background: isOpen ? "#f5f0e8" : "#fff", transition: "background 0.15s",
-                          }}
-                          onMouseEnter={(e) => { if (!isOpen) e.currentTarget.style.background = "#faf6ef"; }}
-                          onMouseLeave={(e) => { if (!isOpen) e.currentTarget.style.background = "#fff"; }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0 }} />
-                            <span style={{ fontSize: 12, color: "#999", transition: "transform 0.2s", transform: isOpen ? "rotate(90deg)" : "rotate(0deg)" }}>&#9654;</span>
-                            <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 600, fontSize: 14, color: "#1a1a1a" }}>{folder.name}</span>
-                            <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, color: "#999", background: "#f2ede4", borderRadius: 8, padding: "2px 8px" }}>
-                              {folder.invoices.length} facture{folder.invoices.length > 1 ? "s" : ""}
-                            </span>
-                          </div>
-                          <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>{fmt(folderTotal)} HT</span>
+                      {isYearOpen && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6, paddingLeft: 12 }}>
+                          {afy.months.map(renderMonthAccordion)}
                         </div>
-                        {isOpen && (
-                          <div style={{ borderTop: "1px solid #ddd6c8" }}>
-                            <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "DM Sans, sans-serif" }}>
-                              <thead>
-                                <tr style={{ borderBottom: "1px solid #eee6d8" }}>
-                                  <th style={thStyle}>Date</th>
-                                  <th style={thStyle}>N facture</th>
-                                  <th style={{ ...thStyle, textAlign: "right" }}>Total HT</th>
-                                  <th style={{ ...thStyle, textAlign: "right" }}>Total TTC</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {folder.invoices.map((inv) => {
-                                  const isSelected = selectedInvoice === inv.id;
-                                  return (
-                                    <React.Fragment key={inv.id}>
-                                      <tr
-                                        onClick={() => loadLines(inv.id)}
-                                        style={{ borderBottom: "1px solid #eee6d8", cursor: "pointer", background: isSelected ? "#f5f0e8" : "transparent" }}
-                                        onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "#faf6ef"; }}
-                                        onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = isSelected ? "#f5f0e8" : "transparent"; }}
-                                      >
-                                        <td style={tdStyle}>{fmtDate(inv.invoice_date)}</td>
-                                        <td style={{ ...tdStyle, color: "#666" }}>{inv.invoice_number ?? "—"}</td>
-                                        <td style={tdR}>{fmt(inv.total_ht)}</td>
-                                        <td style={tdR}>{fmt(inv.total_ttc)}</td>
-                                      </tr>
-                                      {isSelected && (
-                                        <tr>
-                                          <td colSpan={4} style={{ padding: 0 }}>
-                                            {renderLinesTable(lines, linesLoading)}
-                                          </td>
-                                        </tr>
-                                      )}
-                                    </React.Fragment>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          )
+                      )}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </>
         )}
 
       </div>
