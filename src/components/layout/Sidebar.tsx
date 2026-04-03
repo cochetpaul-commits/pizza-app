@@ -98,7 +98,13 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const isAdmin = role === "group_admin";
   const etabColor = isGroupView ? C.ifratelli : (current?.couleur ?? C.ifratelli);
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+  const isActive = (href: string) => {
+    if (pathname === href) return true;
+    if (!pathname.startsWith(href + "/")) return false;
+    // A parent route like /ventes should NOT match if a more specific sibling like /ventes/marges matches
+    const allHrefs = _sections.flatMap(s => s.items.map(it => it.href));
+    return !allHrefs.some(h => h !== href && h.startsWith(href + "/") && (pathname === h || pathname.startsWith(h + "/")));
+  };
 
   const handleNav = () => { onNavigate?.(); };
 

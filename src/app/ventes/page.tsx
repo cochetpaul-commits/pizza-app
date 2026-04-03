@@ -28,6 +28,7 @@ type WeekData = {
   cat_products: Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]>;
   cat_products_sur: Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]>;
   cat_products_emp: Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]>;
+  cat_products_zones: Record<string, Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]>>;
   top3_cats: { cat: string; rows: { n: string; ca_ttc: string; ca_ht: string }[]; flop: { n: string; ca_ttc: string; ca_ht: string; qty: number } | null }[];
   serveurs: string[]; serv_ca_ttc: number[]; serv_ca_ht: number[]; serv_tickets: number[]; serv_cov: number[];
   ratios: {
@@ -124,6 +125,7 @@ export default function PerformancesPage() {
   const [briefingLoading, setBriefingLoading] = useState(false);
   const [mixDDOpen, setMixDDOpen] = useState<{ label: string; color: string } | null>(null);
   const [placeDetail, setPlaceDetail] = useState<"sur" | "emp" | null>(null);
+  const [zoneDetail, setZoneDetail] = useState<string | null>(null);
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
   const [meteo, setMeteo] = useState<Record<string, { emoji: string; desc: string; temp: number }>>({});
 
@@ -881,8 +883,9 @@ export default function PerformancesPage() {
                   }
                   const maxDay = Math.max(...displayVals, 1);
 
+                  const isActive = zoneDetail === zone;
                   return (
-                    <div key={zone} style={{ background: "#fff", border: "1px solid #e0d8ce", borderRadius: 12, padding: "14px 16px" }}>
+                    <div key={zone} onClick={() => setZoneDetail(isActive ? null : zone)} style={{ background: "#fff", border: isActive ? `1.5px solid ${color}50` : "1px solid #e0d8ce", borderRadius: 12, padding: "14px 16px", cursor: "pointer", transition: "all 0.15s" }}>
                       <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".1em", color, marginBottom: 8 }}>{zone}</div>
                       <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color, lineHeight: 1, marginBottom: 2 }}>{fmt(tot)}</div>
                       <div style={{ fontSize: 10, color: "#777", marginBottom: 10 }}>{pctCA}% du CA</div>
@@ -905,6 +908,50 @@ export default function PerformancesPage() {
                   );
                 })}
               </div>
+              );
+            })()}
+
+            {/* Detail zone */}
+            {zoneDetail && W.cat_products_zones && (() => {
+              const prods = W.cat_products_zones[zoneDetail];
+              if (!prods) return null;
+              const zKey = zoneDetail === "\u00C0 emporter" ? "emp" : zoneDetail;
+              const color = ZC[zKey] ?? "#888";
+              const cats = Object.entries(prods).filter(([, p]) => p.length > 0).sort((a, b) => {
+                const aTotal = a[1].reduce((s: number, p: { ca_ttc: number; ca_ht: number }) => s + (mode === "ttc" ? p.ca_ttc : p.ca_ht), 0);
+                const bTotal = b[1].reduce((s: number, p: { ca_ttc: number; ca_ht: number }) => s + (mode === "ttc" ? p.ca_ttc : p.ca_ht), 0);
+                return bTotal - aTotal;
+              });
+              if (cats.length === 0) return null;
+              return (
+                <div style={{ ...S.card, marginTop: 10, borderLeft: `3px solid ${color}` }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".12em", color, marginBottom: 12 }}>
+                    Detail {zoneDetail}
+                  </div>
+                  {cats.map(([cat, items]) => {
+                    const catTotal = items.reduce((s: number, p: { ca_ttc: number; ca_ht: number }) => s + (mode === "ttc" ? p.ca_ttc : p.ca_ht), 0);
+                    const catQty = items.reduce((s: number, p: { qty: number }) => s + p.qty, 0);
+                    return (
+                    <div key={cat} style={{ marginBottom: 14 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", textTransform: "uppercase", letterSpacing: ".05em" }}>{cat}</span>
+                        <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                          <span style={{ fontSize: 10, color: "#999" }}>{catQty} art.</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{fmt(catTotal)}</span>
+                        </span>
+                      </div>
+                      {items.slice(0, 10).map((p: { n: string; qty: number; ca_ttc: number; ca_ht: number }, i: number) => (
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: i < Math.min(items.length, 10) - 1 ? "1px solid #f0ebe3" : "none" }}>
+                          <span style={{ fontSize: 12, color: "#333", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.n}</span>
+                          <span style={{ fontSize: 11, color: "#999", marginLeft: 8, flexShrink: 0 }}>x{p.qty}</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color, marginLeft: 12, flexShrink: 0, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{fmt(mode === "ttc" ? p.ca_ttc : p.ca_ht)}</span>
+                        </div>
+                      ))}
+                      {items.length > 10 && <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>+{items.length - 10} autres</div>}
+                    </div>
+                    );
+                  })}
+                </div>
               );
             })()}
 

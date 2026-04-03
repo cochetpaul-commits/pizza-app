@@ -349,6 +349,16 @@ function aggregate(rows: Row[]) {
   const cat_products_sur = buildCatProdsForRows(spRows);
   const cat_products_emp = buildCatProdsForRows(empRows);
 
+  // Produits par zone (Salle, Pergolas, etc.)
+  const cat_products_zones: Record<string, Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]>> = {};
+  for (const z of zoneNames) {
+    const matcher = zoneMatch(z);
+    const zoneRows = validRows.filter(matcher);
+    if (zoneRows.length > 0) {
+      cat_products_zones[z] = buildCatProdsForRows(zoneRows);
+    }
+  }
+
   // Top 3 par catégorie
   const top3_cats = mixEntries.slice(0, 8).map(([cat]) => {
     const prods = catProds[cat] || [];
@@ -576,6 +586,7 @@ function aggregate(rows: Row[]) {
     cat_products: catProds,
     cat_products_sur: cat_products_sur,
     cat_products_emp: cat_products_emp,
+    cat_products_zones,
     top3_cats,
     serveurs, serv_ca_ttc, serv_ca_ht, serv_tickets, serv_cov,
     ratios: {
@@ -919,6 +930,7 @@ async function buildFromDailySales(etabId: string, from: string, to: string) {
     cat_products: catProducts as Record<string, unknown[]>,
     cat_products_sur: {} as Record<string, unknown[]>,
     cat_products_emp: {} as Record<string, unknown[]>,
+    cat_products_zones: {} as Record<string, Record<string, unknown[]>>,
     top3_cats,
     serveurs: [] as string[],
     serv_ca_ttc: [] as number[],
