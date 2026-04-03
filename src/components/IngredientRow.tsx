@@ -236,8 +236,8 @@ export const IngredientRow = React.memo(function IngredientRow({
           {supplierName && supplierIdForDisplay ? (
             <button onClick={(e) => { e.stopPropagation(); onOpenSupplier?.(supplierIdForDisplay); }} style={{ color: "inherit", textDecoration: "underline dotted", textUnderlineOffset: 2, background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit", fontSize: "inherit" }}>{supplierName}</button>
           ) : "—"}
-          {(estab === "bellomio" || estab === "both") && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: "#FEF2F2", color: "#D4775A" }}>BM</span>}
-          {(estab === "piccola" || estab === "both") && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: "#F5F3FF", color: "#6B21A8" }}>PM</span>}
+          {(estab === "bellomio" || estab === "both") && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: "rgba(212,119,90,0.1)", color: "#D4775A" }}>BM</span>}
+          {(estab === "piccola" || estab === "both") && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: "rgba(212,160,60,0.1)", color: "#D4A03C" }}>PM</span>}
         </div>
 
         {/* Actions */}
@@ -734,7 +734,7 @@ export const IngredientRow = React.memo(function IngredientRow({
 
             <div style={fieldLabel}>Établissements</div>
             <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-              {([["bellomio", "Bello Mio", "#D4775A"], ["piccola", "Piccola Mia", "#6B21A8"]] as const).map(([key, label, color]) => {
+              {([["bellomio", "Bello Mio", "#D4775A"], ["piccola", "Piccola Mia", "#D4A03C"]] as const).map(([key, label, color]) => {
                 const checked = edit.establishments.includes(key);
                 return (
                   <label key={key} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, background: checked ? `${color}18` : "rgba(0,0,0,0.04)", border: `1.5px solid ${checked ? color : "rgba(0,0,0,0.10)"}`, color: checked ? color : "#6B6257", transition: "all 120ms" }}>
