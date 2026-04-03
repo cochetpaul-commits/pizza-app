@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { RequireRole } from "@/components/RequireRole";
@@ -296,6 +296,8 @@ function CommandesPage() {
 
   // Email sending state
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Historique
   const [histOpen, setHistOpen] = useState(false);
@@ -306,6 +308,17 @@ function CommandesPage() {
   const [loadingSupplier, setLoadingSupplier] = useState(false);
   const [saving, setSaving] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   // ── Load all suppliers ──────────────────────────────────────────────────
 
@@ -1238,29 +1251,78 @@ function CommandesPage() {
 
         {/* Supplier dropdown */}
         {!loading && suppliers.length > 0 && (
-          <div style={{ position: "relative" }}>
-            <select
-              value={selectedSupplierId ?? ""}
-              onChange={(e) => setSelectedSupplierId(e.target.value || null)}
+          <div ref={dropdownRef} style={{ position: "relative" }}>
+            <button
+              type="button"
+              onClick={() => setDropdownOpen((v) => !v)}
               style={{
-                width: "100%", height: 48, padding: "0 36px 0 14px",
-                borderRadius: 12, border: "1.5px solid #ddd6c8",
+                width: "100%", height: 48, padding: "0 40px 0 16px",
+                borderRadius: 12,
+                border: dropdownOpen ? "2px solid #D4775A" : "1.5px solid #ddd6c8",
                 background: "#fff", fontSize: 15, fontWeight: 600,
-                color: "#1a1a1a", fontFamily: "inherit",
-                appearance: "none", WebkitAppearance: "none",
-                cursor: "pointer", outline: "none",
+                color: selectedSupplierId ? "#1a1a1a" : "#999",
+                fontFamily: "inherit", cursor: "pointer", outline: "none",
+                textAlign: "left", position: "relative",
+                boxShadow: dropdownOpen ? "0 2px 12px rgba(212,119,90,0.12)" : "none",
+                transition: "border 0.15s, box-shadow 0.15s",
               }}>
-              <option value="">— Choisir un fournisseur —</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}{draftSupplierIds.has(s.id) ? " ●" : ""}
-                </option>
-              ))}
-            </select>
-            <span style={{
-              position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)",
-              pointerEvents: "none", fontSize: 12, color: "#999",
-            }}>&#9662;</span>
+              {currentSupplier?.name ?? "Choisir un fournisseur"}
+              {currentSupplier && draftSupplierIds.has(currentSupplier.id) && (
+                <span style={{
+                  display: "inline-block", width: 8, height: 8, borderRadius: "50%",
+                  background: "#D4775A", marginLeft: 8, verticalAlign: "middle",
+                }} />
+              )}
+              <span style={{
+                position: "absolute", right: 16, top: "50%",
+                transform: dropdownOpen ? "translateY(-50%) rotate(180deg)" : "translateY(-50%)",
+                transition: "transform 0.2s", fontSize: 11, color: "#999",
+              }}>&#9660;</span>
+            </button>
+
+            {dropdownOpen && (
+              <div style={{
+                position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+                background: "#fff", borderRadius: 12, border: "1.5px solid #ddd6c8",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.1)", zIndex: 50,
+                maxHeight: 320, overflowY: "auto",
+                padding: "6px 0",
+              }}>
+                {suppliers.map((s) => {
+                  const isActive = s.id === selectedSupplierId;
+                  const hasDraft = draftSupplierIds.has(s.id);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => { setSelectedSupplierId(s.id); setDropdownOpen(false); }}
+                      style={{
+                        width: "100%", padding: "10px 16px",
+                        display: "flex", alignItems: "center", gap: 10,
+                        background: isActive ? "#fdf5f2" : "transparent",
+                        border: "none", cursor: "pointer", fontFamily: "inherit",
+                        fontSize: 14, fontWeight: isActive ? 700 : 500,
+                        color: isActive ? "#D4775A" : "#1a1a1a",
+                        textAlign: "left", transition: "background 0.1s",
+                      }}
+                      onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "#f9f5ef"; }}
+                      onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                    >
+                      <span style={{ flex: 1 }}>{s.name}</span>
+                      {hasDraft && (
+                        <span style={{
+                          display: "inline-block", width: 8, height: 8, borderRadius: "50%",
+                          background: "#D4775A", flexShrink: 0,
+                        }} />
+                      )}
+                      {isActive && (
+                        <span style={{ fontSize: 14, color: "#D4775A", flexShrink: 0 }}>&#10003;</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
