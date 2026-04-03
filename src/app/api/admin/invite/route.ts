@@ -77,12 +77,42 @@ export async function POST(req: NextRequest) {
   const origin = process.env.NEXT_PUBLIC_SITE_URL
     || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
     || (reqOrigin.includes("localhost") ? "https://pizza-app.vercel.app" : reqOrigin);
-  const { data: inviteData, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+  let inviteData: { user: { id: string } | null } = { user: null };
+
+  const { data: firstTry, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
     data: { display_name: displayName || email, role: profileRole },
     redirectTo: `${origin}/auth/setup-password`,
   });
 
-  if (inviteErr) return NextResponse.json({ error: inviteErr.message }, { status: 500 });
+  if (inviteErr) {
+    // If user already exists, generate a new magic link to resend the invitation
+    const isAlreadyRegistered = inviteErr.message.toLowerCase().includes("already") ||
+      inviteErr.message.toLowerCase().includes("already been registered");
+    if (isAlreadyRegistered) {
+      // Find existing user
+      const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+      const existingUser = existingUsers?.users?.find(u => u.email === email);
+      if (existingUser) {
+        // Generate a new invite link and send it
+        const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+          type: "invite",
+          email,
+          options: {
+            data: { display_name: displayName || email, role: profileRole },
+            redirectTo: `${origin}/auth/setup-password`,
+          },
+        });
+        if (linkErr) return NextResponse.json({ error: linkErr.message }, { status: 500 });
+        inviteData = { user: linkData?.user ? { id: linkData.user.id } : null };
+      } else {
+        return NextResponse.json({ error: inviteErr.message }, { status: 500 });
+      }
+    } else {
+      return NextResponse.json({ error: inviteErr.message }, { status: 500 });
+    }
+  } else {
+    inviteData = firstTry as { user: { id: string } | null };
+  }
 
   // Update profile role + establishment access
   if (inviteData.user) {
