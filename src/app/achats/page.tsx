@@ -186,11 +186,17 @@ export default function AchatsPage() {
   const [evoArchivesOpen, setEvoArchivesOpen] = useState(false);
   const [evoView, setEvoView] = useState<"supplier" | "category">("supplier");
 
+  // ── Top products state ──
+  type TopProduct = { name: string; supplier: string; totalPrice: number; quantity: number; unit: string; lastUnitPrice: number };
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  const [topProductsLoading, setTopProductsLoading] = useState(false);
+  const [topProductsLimit, setTopProductsLimit] = useState(20);
+
   // ── Chart refs ──
   const evoChartRef = useRef<HTMLCanvasElement>(null);
   const evoChartInstance = useRef<Chart | null>(null);
-  const doughnutRef = useRef<HTMLCanvasElement>(null);
-  const doughnutInstance = useRef<Chart | null>(null);
+  const supplierBarRef = useRef<HTMLCanvasElement>(null);
+  const supplierBarInstance = useRef<Chart | null>(null);
 
   // ── Load ALL invoices ──
   useEffect(() => {
@@ -226,6 +232,46 @@ export default function AchatsPage() {
       return d >= range.from && d <= range.to;
     });
   }, [allInvoices, range]);
+
+  // ── Load top products for range ──
+  useEffect(() => {
+    if (!etabId || loading) return;
+    const ids = rangeInvoices.map((i) => i.id);
+    if (ids.length === 0) { setTopProducts([]); return; }
+    (async () => {
+      setTopProductsLoading(true);
+      const chunkSize = 200;
+      const allLines: { name: string | null; quantity: number | null; unit: string | null; unit_price: number | null; total_price: number | null; invoice_id: string }[] = [];
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        const chunk = ids.slice(i, i + chunkSize);
+        const { data } = await supabase
+          .from("supplier_invoice_lines")
+          .select("name, quantity, unit, unit_price, total_price, invoice_id")
+          .in("invoice_id", chunk);
+        if (data) allLines.push(...(data as typeof allLines));
+      }
+      const invSupplierMap: Record<string, string> = {};
+      for (const inv of rangeInvoices) {
+        invSupplierMap[inv.id] = inv.suppliers?.name ?? "Inconnu";
+      }
+      const agg: Record<string, { name: string; supplier: string; totalPrice: number; quantity: number; unit: string; lastUnitPrice: number }> = {};
+      for (const l of allLines) {
+        const pName = (l.name ?? "").trim();
+        if (!pName) continue;
+        const supplier = invSupplierMap[l.invoice_id] ?? "Inconnu";
+        const key = `${pName.toLowerCase()}||${supplier.toLowerCase()}`;
+        if (!agg[key]) agg[key] = { name: pName, supplier, totalPrice: 0, quantity: 0, unit: l.unit ?? "", lastUnitPrice: l.unit_price ?? 0 };
+        agg[key].totalPrice += l.total_price ?? 0;
+        agg[key].quantity += l.quantity ?? 0;
+        if (l.unit_price != null) agg[key].lastUnitPrice = l.unit_price;
+        if (l.unit) agg[key].unit = l.unit;
+      }
+      const sorted = Object.values(agg).sort((a, b) => b.totalPrice - a.totalPrice);
+      setTopProducts(sorted);
+      setTopProductsLoading(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rangeInvoices, etabId, loading]);
 
   // ══════════════════════════════════════════════════════
   //  COMPUTED DATA
@@ -410,17 +456,27 @@ export default function AchatsPage() {
       .sort((a, b) => b.fyStart - a.fyStart);
   }, [invoicesByMonth, curFY]);
 
-  // ── Category totals for doughnut (selected range) ──
-  const categoryTotalsRange = useMemo(() => {
-    const byCat: Record<string, number> = {};
+  // ── Supplier totals for bar chart (selected range) ──
+  const supplierTotalsRange = useMemo(() => {
+    const bySupp: Record<string, { name: string; total: number }> = {};
     for (const inv of rangeInvoices) {
-      const cat = getSupplierCategory(inv.suppliers?.name ?? "Inconnu");
-      byCat[cat] = (byCat[cat] ?? 0) + (inv.total_ht ?? 0);
+      const name = inv.suppliers?.name ?? "Inconnu";
+      const k = name.toLowerCase().trim();
+      if (!bySupp[k]) bySupp[k] = { name, total: 0 };
+      bySupp[k].total += inv.total_ht ?? 0;
     }
-    const cats = ["Alimentaire", "Boissons", "Services", "Autre"];
-    return cats
-      .map((name) => ({ name, total: byCat[name] ?? 0, color: CATEGORY_COLORS[name] ?? "#999" }))
-      .filter((c) => c.total > 0);
+    const sorted = Object.entries(bySupp)
+      .map(([k, v]) => ({ key: k, name: v.name, total: v.total, color: getSupplierColor(k) }))
+      .sort((a, b) => b.total - a.total);
+
+    // Max 10 suppliers, group rest as "Autres"
+    if (sorted.length > 10) {
+      const top = sorted.slice(0, 10);
+      const rest = sorted.slice(10).reduce((s, r) => s + r.total, 0);
+      if (rest > 0) top.push({ key: "autres", name: "Autres", total: rest, color: "#999" });
+      return top;
+    }
+    return sorted;
   }, [rangeInvoices]);
 
   // ── Invoices grouped for accordion (selected range) ──
@@ -523,46 +579,56 @@ export default function AchatsPage() {
   }, [evoChartData, loading]);
 
   // ══════════════════════════════════════════════════════
-  //  CHART.JS — Doughnut (category, selected range)
+  //  CHART.JS — Horizontal bar (suppliers, selected range)
   // ══════════════════════════════════════════════════════
 
   useEffect(() => {
-    if (!doughnutRef.current || loading || categoryTotalsRange.length === 0) return;
-    if (doughnutInstance.current) doughnutInstance.current.destroy();
-    doughnutInstance.current = new Chart(doughnutRef.current, {
-      type: "doughnut",
+    if (!supplierBarRef.current || loading || supplierTotalsRange.length === 0) return;
+    if (supplierBarInstance.current) supplierBarInstance.current.destroy();
+    supplierBarInstance.current = new Chart(supplierBarRef.current, {
+      type: "bar",
       data: {
-        labels: categoryTotalsRange.map((c) => c.name),
+        labels: supplierTotalsRange.map((s) => s.name),
         datasets: [{
-          data: categoryTotalsRange.map((c) => c.total),
-          backgroundColor: categoryTotalsRange.map((c) => c.color),
-          borderWidth: 2,
-          borderColor: "#fff",
+          data: supplierTotalsRange.map((s) => s.total),
+          backgroundColor: supplierTotalsRange.map((s) => s.color),
+          borderRadius: 4,
+          barThickness: 18,
         }],
       },
       options: {
+        indexAxis: "y",
         responsive: true,
         maintainAspectRatio: false,
-        cutout: "60%",
         plugins: {
-          legend: {
-            position: "bottom",
-            labels: { font: { size: 12, family: "DM Sans, sans-serif" }, color: "#555", padding: 16, usePointStyle: true, pointStyleWidth: 10 },
-          },
+          legend: { display: false },
           tooltip: {
             callbacks: {
-              label: (ctx) => {
-                const total = categoryTotalsRange.reduce((s, c) => s + c.total, 0);
-                const pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : "0";
-                return `${ctx.label}: ${fmt(ctx.parsed)} (${pct}%)`;
-              },
+              label: (ctx) => fmt(ctx.parsed.x),
             },
+          },
+        },
+        scales: {
+          x: {
+            ticks: {
+              callback: (v) => {
+                const n = typeof v === "number" ? v : parseFloat(String(v));
+                return n >= 1000 ? Math.round(n / 1000) + "k" : String(Math.round(n));
+              },
+              font: { size: 10 },
+              color: "#999",
+            },
+            grid: { color: "#f2ede4" },
+          },
+          y: {
+            ticks: { font: { size: 11, family: "DM Sans, sans-serif" }, color: "#555" },
+            grid: { display: false },
           },
         },
       },
     });
-    return () => { doughnutInstance.current?.destroy(); doughnutInstance.current = null; };
-  }, [categoryTotalsRange, loading]);
+    return () => { supplierBarInstance.current?.destroy(); supplierBarInstance.current = null; };
+  }, [supplierTotalsRange, loading]);
 
   // ══════════════════════════════════════════════════════
   //  ACTIONS
@@ -840,7 +906,7 @@ export default function AchatsPage() {
               <div style={{ ...S.sec, marginBottom: 0 }}>Analyse — Exercice {curFY}/{curFY + 1}</div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 14, marginBottom: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 14, marginBottom: 14 }}>
               {/* Left: VERTICAL stacked bar chart */}
               <div style={S.card}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
@@ -902,17 +968,46 @@ export default function AchatsPage() {
                 )}
               </div>
 
-              {/* Right: doughnut chart */}
+              {/* Right: supplier breakdown */}
               <div style={S.card}>
                 <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 600, color: "#777", marginBottom: 14 }}>
-                  Repartition par categorie
+                  Repartition par fournisseur
                 </div>
-                {categoryTotalsRange.length === 0 ? (
+                {supplierTotalsRange.length === 0 ? (
                   <p style={{ color: "#999", fontSize: 13, margin: 0 }}>Aucune donnee.</p>
                 ) : (
-                  <div style={{ height: 240, position: "relative" }}>
-                    <canvas ref={doughnutRef} />
-                  </div>
+                  <>
+                    {/* Summary table */}
+                    <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 14, fontSize: 11, fontFamily: "DM Sans, sans-serif" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid #eee6d8" }}>
+                          <th style={{ padding: "4px 6px", fontWeight: 600, color: "#999", fontSize: 10, textAlign: "left" }}></th>
+                          <th style={{ padding: "4px 6px", fontWeight: 600, color: "#999", fontSize: 10, textAlign: "left" }}>Fournisseur</th>
+                          <th style={{ padding: "4px 6px", fontWeight: 600, color: "#999", fontSize: 10, textAlign: "right" }}>Total</th>
+                          <th style={{ padding: "4px 6px", fontWeight: 600, color: "#999", fontSize: 10, textAlign: "right" }}>%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          const grandTotal = supplierTotalsRange.reduce((s, r) => s + r.total, 0);
+                          return supplierTotalsRange.map((sup) => (
+                            <tr key={sup.key} style={{ borderBottom: "1px solid #f2ede4" }}>
+                              <td style={{ padding: "4px 6px", width: 16 }}>
+                                <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: sup.color }} />
+                              </td>
+                              <td style={{ padding: "4px 6px", color: "#1a1a1a", fontSize: 11 }}>{sup.name}</td>
+                              <td style={{ padding: "4px 6px", textAlign: "right", fontWeight: 600, color: "#1a1a1a", fontSize: 11 }}>{fmt(sup.total)}</td>
+                              <td style={{ padding: "4px 6px", textAlign: "right", color: "#999", fontSize: 11 }}>{grandTotal > 0 ? ((sup.total / grandTotal) * 100).toFixed(1) : "0"}%</td>
+                            </tr>
+                          ));
+                        })()}
+                      </tbody>
+                    </table>
+                    {/* Horizontal bar chart */}
+                    <div style={{ height: Math.max(supplierTotalsRange.length * 28, 120), position: "relative" }}>
+                      <canvas ref={supplierBarRef} />
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -960,6 +1055,57 @@ export default function AchatsPage() {
                 ))}
               </div>
             )}
+
+            {/* ══════════════════════════════════════════════════ */}
+            {/*  C2) TOP ACHATS — products table                   */}
+            {/* ══════════════════════════════════════════════════ */}
+            <div style={{ ...S.sec, marginBottom: 12 }}>Top achats — {periodLabel}</div>
+            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "18px 20px", marginBottom: 28 }}>
+              {topProductsLoading ? (
+                <p style={{ color: "#999", fontSize: 13, margin: 0 }}>Chargement...</p>
+              ) : topProducts.length === 0 ? (
+                <p style={{ color: "#999", fontSize: 13, margin: 0 }}>Aucune ligne de facture pour cette periode.</p>
+              ) : (
+                <>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "DM Sans, sans-serif" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid #ddd6c8" }}>
+                        <th style={thStyle}>Produit</th>
+                        <th style={thStyle}>Fournisseur</th>
+                        <th style={{ ...thStyle, textAlign: "right" }}>Total achats</th>
+                        <th style={{ ...thStyle, textAlign: "right" }}>Quantite</th>
+                        <th style={{ ...thStyle, textAlign: "right" }}>Dernier PU</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {topProducts.slice(0, topProductsLimit).map((p, idx) => (
+                        <tr key={idx} style={{ borderBottom: "1px solid #f2ede4" }}>
+                          <td style={{ ...tdStyle, fontWeight: 600, color: "#1a1a1a" }}>{p.name}</td>
+                          <td style={{ ...tdStyle, color: "#777" }}>{p.supplier}</td>
+                          <td style={{ ...tdR, fontWeight: 600 }}>{fmt(p.totalPrice)}</td>
+                          <td style={tdR}>{p.quantity % 1 === 0 ? p.quantity : p.quantity.toFixed(2)} {p.unit}</td>
+                          <td style={tdR}>{fmt(p.lastUnitPrice)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {topProducts.length > topProductsLimit && (
+                    <div style={{ textAlign: "center", marginTop: 12 }}>
+                      <button
+                        onClick={() => setTopProductsLimit((prev) => prev + 20)}
+                        style={{
+                          fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 600,
+                          color: "#D4775A", background: "transparent", border: "1px solid #D4775A",
+                          borderRadius: 20, padding: "6px 20px", cursor: "pointer",
+                        }}
+                      >
+                        Voir plus ({topProducts.length - topProductsLimit} restants)
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
 
             {/* ══════════════════════════════════════════════════ */}
             {/*  D) FACTURES — filtered by range, by supplier     */}
