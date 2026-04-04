@@ -34,6 +34,20 @@ const selectStyle: CSSProperties = {
 };
 
 
+// ─── Unified packaging type options (shared by piece type, conditionnement, order unit) ──
+const PACK_TYPES = [
+  "piece", "bac", "barquette", "bidon", "bloc", "boite", "bouteille",
+  "brick", "cagette", "carton", "fut", "meule", "pack", "paquet",
+  "plateau", "poche", "sac", "sachet", "seau",
+] as const;
+const PACK_LABELS: Record<string, string> = {
+  piece: "Piece", bac: "Bac", barquette: "Barquette", bidon: "Bidon",
+  bloc: "Bloc", boite: "Boite", bouteille: "Bouteille", brick: "Brick",
+  cagette: "Cagette", carton: "Carton", fut: "Fut", meule: "Meule",
+  pack: "Pack", paquet: "Paquet", plateau: "Plateau", poche: "Poche",
+  sac: "Sac", sachet: "Sachet", seau: "Seau",
+};
+
 // ─── StyledSelect (custom dropdown replacing native <select>) ────────────
 type SelectOption = { value: string; label: string; disabled?: boolean };
 
@@ -478,12 +492,7 @@ export const IngredientRow = React.memo(function IngredientRow({
 
           {/* ─── BLOC 2: PRIX D'ACHAT ─── */}
           {(() => {
-            // ── Piece type options ──
-            const PIECE_TYPES = ["bouteille", "barquette", "brick", "poche", "sachet", "piece"] as const;
-            const PIECE_TYPE_LABELS: Record<string, string> = { bouteille: "Bouteille", barquette: "Barquette", brick: "Brick", poche: "Poche", sachet: "Sachet", piece: "Piece" };
             const CONTENT_UNITS = ["cl", "ml", "L", "g", "kg"] as const;
-            const COND_TYPES = ["carton", "sac", "cagette", "pack", "bac", "bidon", "boite", "fut", "paquet", "plateau", "seau"] as const;
-            const COND_LABELS: Record<string, string> = { carton: "Carton", sac: "Sac", cagette: "Cagette", pack: "Pack", bac: "Bac", bidon: "Bidon", boite: "Boite", fut: "Fut", paquet: "Paquet", plateau: "Plateau", seau: "Seau" };
 
             // ── Content conversion helpers ──
             const contentToMl = (qty: number, unit: string): number | null => {
@@ -648,7 +657,7 @@ export const IngredientRow = React.memo(function IngredientRow({
                       <div style={fieldLabel}>Type</div>
                       <StyledSelect width={130} value={edit.baseUnitLabel || "piece"}
                         onChange={(v) => onEditChange({ ...edit, baseUnitLabel: v })}
-                        options={PIECE_TYPES.map(p => ({ value: p, label: PIECE_TYPE_LABELS[p] }))}
+                        options={PACK_TYPES.map(p => ({ value: p, label: PACK_LABELS[p] }))}
                       />
                     </div>
                     <div>
@@ -695,7 +704,7 @@ export const IngredientRow = React.memo(function IngredientRow({
                     <div style={fieldLabel}>Type</div>
                     <StyledSelect width={120} value={edit.conditionnementLabel || "carton"}
                       onChange={(v) => onEditChange({ ...edit, conditionnementLabel: v })}
-                      options={COND_TYPES.map(c => ({ value: c, label: COND_LABELS[c] }))}
+                      options={PACK_TYPES.map(p => ({ value: p, label: PACK_LABELS[p] }))}
                     />
                   </div>
                   <div>
@@ -774,24 +783,8 @@ export const IngredientRow = React.memo(function IngredientRow({
                     { value: "", label: "— Aucune —" },
                     { value: "kg", label: "kg" },
                     { value: "litre", label: "litre" },
-                    { value: "pièce", label: "pièce" },
                     { value: "", label: "", disabled: true },
-                    { value: "bac", label: "bac" },
-                    { value: "barquette", label: "barquette" },
-                    { value: "bidon", label: "bidon" },
-                    { value: "boite", label: "boite" },
-                    { value: "bouteille", label: "bouteille" },
-                    { value: "brick", label: "brick" },
-                    { value: "carton", label: "carton" },
-                    { value: "cagette", label: "cagette" },
-                    { value: "fût", label: "fût" },
-                    { value: "pack", label: "pack" },
-                    { value: "paquet", label: "paquet" },
-                    { value: "plateau", label: "plateau" },
-                    { value: "poche", label: "poche" },
-                    { value: "sac", label: "sac" },
-                    { value: "sachet", label: "sachet" },
-                    { value: "seau", label: "seau" },
+                    ...PACK_TYPES.map(p => ({ value: p, label: PACK_LABELS[p] })),
                   ]}
                 />
               </div>

@@ -607,7 +607,7 @@ function IngredientsPageInner() {
           baseUnit = "piece";
           baseUnitLabel = x.purchase_unit_label || x.order_unit_label || "piece";
           // Piece-type labels that correspond to base unit piece
-          const PIECE_LABELS = new Set(["bouteille", "barquette", "brick", "poche", "sachet", "piece", "pièce"]);
+          const PIECE_LABELS = new Set(["piece", "pièce", "bac", "barquette", "bidon", "bloc", "boite", "bouteille", "brick", "cagette", "carton", "fut", "meule", "pack", "paquet", "plateau", "poche", "sac", "sachet", "seau"]);
           if (!PIECE_LABELS.has(baseUnitLabel.toLowerCase())) baseUnitLabel = "piece";
           else baseUnitLabel = baseUnitLabel.toLowerCase() === "pièce" ? "piece" : baseUnitLabel.toLowerCase();
           pricePerBaseUnit = off.unit_price != null ? String(off.unit_price) : "";
@@ -656,7 +656,7 @@ function IngredientsPageInner() {
         // Try to guess from pack_each_unit
         if (off.pack_each_unit === "pc") {
           baseUnitLabel = x.purchase_unit_label || x.order_unit_label || "bouteille";
-          const PIECE_LABELS = new Set(["bouteille", "barquette", "brick", "poche", "sachet", "piece", "pièce"]);
+          const PIECE_LABELS = new Set(["piece", "pièce", "bac", "barquette", "bidon", "bloc", "boite", "bouteille", "brick", "cagette", "carton", "fut", "meule", "pack", "paquet", "plateau", "poche", "sac", "sachet", "seau"]);
           if (!PIECE_LABELS.has(baseUnitLabel.toLowerCase())) baseUnitLabel = "bouteille";
           else baseUnitLabel = baseUnitLabel.toLowerCase() === "pièce" ? "piece" : baseUnitLabel.toLowerCase();
         }
