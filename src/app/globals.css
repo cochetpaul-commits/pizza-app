@@ -124,18 +124,13 @@ select.input option {
   -webkit-backdrop-filter: none;
 }
 
-/* Floating action button */
+/* Floating establishment button — hidden (use tab bar Accueil instead) */
 .etab-fab-wrap {
   display: none !important;
 }
 button.etab-fab {
   border-radius: 16px !important;
   overflow: hidden;
-}
-@media (max-width: 767px) {
-  .etab-fab-wrap {
-    display: block !important;
-  }
 }
 
 /* Notification bell — no glass background on desktop */
