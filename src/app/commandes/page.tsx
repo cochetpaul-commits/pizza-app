@@ -123,25 +123,6 @@ const tile: React.CSSProperties = {
   borderBottom: "1px solid #f0ebe2",
 };
 
-const floatingBtn: React.CSSProperties = {
-  position: "fixed",
-  bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
-  left: "50%",
-  transform: "translateX(-50%)",
-  background: "#D4775A",
-  color: "#fff",
-  border: "none",
-  borderRadius: 16,
-  padding: "14px 32px",
-  fontSize: 14,
-  fontWeight: 700,
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-  letterSpacing: 0.5,
-  boxShadow: "0 6px 24px rgba(212,119,90,0.4)",
-  cursor: "pointer",
-  zIndex: 110,
-  whiteSpace: "nowrap",
-};
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1974,13 +1955,6 @@ function CommandesPage() {
             </div>
           );
         })()}
-
-        {/* Bouton flottant — brouillon → valider */}
-        {session && session.status === "brouillon" && activeCount > 0 && (
-          <button type="button" onClick={() => validerSession(session.id)} disabled={saving} style={floatingBtn}>
-            {saving ? "Validation..." : `Valider la commande (${activeCount} article${activeCount > 1 ? "s" : ""})`}
-          </button>
-        )}
 
         {/* Floating mobile actions for brouillon */}
         {session && session.status === "brouillon" && (

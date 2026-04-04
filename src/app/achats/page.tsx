@@ -820,7 +820,7 @@ export default function AchatsPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h1 style={{
             fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24,

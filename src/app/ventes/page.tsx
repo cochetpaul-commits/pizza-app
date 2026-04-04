@@ -529,7 +529,7 @@ function PerformancesPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <div className="ventes-container" style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 16px 60px" }}>
+      <div className="ventes-container" style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 16px 120px" }}>
 
         {/* ── Toolbar: tabs + import + PDF + TTC/HT ── */}
         <div className="ventes-toolbar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>

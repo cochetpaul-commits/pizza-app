@@ -633,7 +633,7 @@ function MargesPage() {
         style={{
           maxWidth: 1100,
           margin: "0 auto",
-          padding: "16px 16px 60px",
+          padding: "16px 16px 120px",
           fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
         }}
       >

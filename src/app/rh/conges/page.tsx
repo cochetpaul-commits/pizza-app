@@ -603,7 +603,7 @@ export default function CongesPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin", "equipier"]}>
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px" }}>
         {/* ── Header ──────────────────────────────────────────── */}
         <h1
           style={{
