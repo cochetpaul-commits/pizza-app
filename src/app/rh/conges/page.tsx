@@ -14,6 +14,8 @@ type Employe = {
   prenom: string;
   nom: string;
   email: string | null;
+  equipes_access: string[] | null;
+  etablissement_id: string | null;
 };
 
 type Contrat = {
@@ -316,7 +318,7 @@ export default function CongesPage() {
     const [empRes, absRes, contratRes] = await Promise.all([
       supabase
         .from("employes")
-        .select("id, prenom, nom, email")
+        .select("id, prenom, nom, email, equipes_access, etablissement_id")
         .eq("etablissement_id", etab.id)
         .eq("actif", true)
         .order("nom"),
@@ -485,6 +487,49 @@ export default function CongesPage() {
         a.date_fin >= selectedRange.lo
     );
   }, [absences, selectedRange]);
+
+  /* ── Team conflict detection ─────────────────────────────── */
+
+  const getTeamConflicts = useCallback(
+    (empId: string, dateFrom: string, dateTo: string): { emp: Employe; sharedTeams: string[] }[] => {
+      const requestingEmp = employes.find((e) => e.id === empId);
+      if (!requestingEmp) return [];
+
+      const myTeams = new Set(requestingEmp.equipes_access ?? []);
+      if (myTeams.size === 0) return [];
+      const myEtab = requestingEmp.etablissement_id;
+
+      const overlapping = absences.filter(
+        (a) =>
+          a.statut !== "refuse" &&
+          a.employe_id !== empId &&
+          a.date_debut <= dateTo &&
+          a.date_fin >= dateFrom
+      );
+
+      const conflicts: { emp: Employe; sharedTeams: string[] }[] = [];
+      for (const absence of overlapping) {
+        const otherEmp = employes.find((e) => e.id === absence.employe_id);
+        if (!otherEmp) continue;
+        if (otherEmp.etablissement_id !== myEtab) continue;
+
+        const otherTeams = otherEmp.equipes_access ?? [];
+        const shared = otherTeams.filter((t) => myTeams.has(t));
+        if (shared.length > 0) {
+          conflicts.push({ emp: otherEmp, sharedTeams: shared });
+        }
+      }
+      return conflicts;
+    },
+    [employes, absences]
+  );
+
+  const teamConflicts = useMemo(() => {
+    if (!selectedRange || !effectiveFormEmployeId) return [];
+    return getTeamConflicts(effectiveFormEmployeId, selectedRange.lo, selectedRange.hi);
+  }, [selectedRange, effectiveFormEmployeId, getTeamConflicts]);
+
+  const hasTeamConflict = teamConflicts.length > 0;
 
   /* ── Selected employee CP balance ─────────────────────────── */
 
@@ -1252,6 +1297,29 @@ export default function CongesPage() {
 
                 {selectedRange && (
                   <>
+                    {/* Team conflict warning */}
+                    {hasTeamConflict && (
+                      <div
+                        style={{
+                          background: "#fce4e4",
+                          border: "1px solid #ef9a9a",
+                          borderRadius: 10,
+                          padding: "10px 14px",
+                          marginBottom: 14,
+                          fontSize: 13,
+                        }}
+                      >
+                        <div style={{ fontWeight: 600, color: "#c62828", marginBottom: 4 }}>
+                          Conflit d&apos;equipe -- Un membre de la meme equipe est deja en conge sur cette periode
+                        </div>
+                        {teamConflicts.map((c) => (
+                          <div key={c.emp.id} style={{ color: "#666", marginBottom: 2 }}>
+                            {c.emp.prenom} {c.emp.nom} -- equipe{c.sharedTeams.length > 1 ? "s" : ""} : {c.sharedTeams.join(", ")}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     {/* CP Balance warning */}
                     {selectedEmployeeCp && formType === "CP" && (
                       <div
@@ -1389,20 +1457,20 @@ export default function CongesPage() {
                       </button>
                       <button
                         onClick={handleSubmit}
-                        disabled={!effectiveFormEmployeId || saving}
+                        disabled={!effectiveFormEmployeId || saving || hasTeamConflict}
                         style={{
                           padding: "8px 20px",
                           border: "none",
                           borderRadius: 20,
-                          background: !effectiveFormEmployeId ? "#ccc" : "#D4775A",
+                          background: (!effectiveFormEmployeId || hasTeamConflict) ? "#ccc" : "#D4775A",
                           color: "#fff",
                           fontSize: 13,
                           fontWeight: 600,
-                          cursor: !effectiveFormEmployeId ? "default" : "pointer",
+                          cursor: (!effectiveFormEmployeId || hasTeamConflict) ? "default" : "pointer",
                           opacity: saving ? 0.7 : 1,
                         }}
                       >
-                        {saving ? "Envoi..." : "Soumettre la demande"}
+                        {saving ? "Envoi..." : hasTeamConflict ? "Conflit d\u2019equipe" : "Soumettre la demande"}
                       </button>
                     </div>
                   </>
@@ -1426,6 +1494,7 @@ export default function CongesPage() {
                     const tc = TYPE_BADGE_COLORS[a.type] ?? { bg: "#f0ece6", fg: "#666" };
                     const days = a.nb_jours ?? businessDaysBetween(a.date_debut, a.date_fin);
                     const isRefusing = refuseId === a.id;
+                    const pendingTeamConflicts = getTeamConflicts(a.employe_id, a.date_debut, a.date_fin);
 
                     return (
                       <div
@@ -1549,6 +1618,29 @@ export default function CongesPage() {
                             </button>
                           </div>
                         </div>
+
+                        {/* Team conflict warning for approval */}
+                        {pendingTeamConflicts.length > 0 && (
+                          <div
+                            style={{
+                              marginTop: 10,
+                              background: "#FFF3E0",
+                              border: "1px solid #FFCC80",
+                              borderRadius: 8,
+                              padding: "8px 12px",
+                              fontSize: 12,
+                            }}
+                          >
+                            <div style={{ fontWeight: 600, color: "#E65100", marginBottom: 2 }}>
+                              Conflit d&apos;equipe : un membre de la meme equipe est deja en conge
+                            </div>
+                            {pendingTeamConflicts.map((c) => (
+                              <div key={c.emp.id} style={{ color: "#666" }}>
+                                {c.emp.prenom} {c.emp.nom} -- equipe{c.sharedTeams.length > 1 ? "s" : ""} : {c.sharedTeams.join(", ")}
+                              </div>
+                            ))}
+                          </div>
+                        )}
 
                         {/* Refuse reason input */}
                         {isRefusing && (
