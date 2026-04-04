@@ -576,7 +576,10 @@ function IngredientsPageInner() {
   const startEdit = useCallback((x: Ingredient) => {
     const off = offersByIngredientId.get(x.id);
     const isPrep = x.category === "preparation";
-    const supplierId = isPrep ? "" : (off?.supplier_id ?? (x.supplier_id ?? ""));
+    // Resolve supplier ID to canonical (deduplicated) ID so it matches the dropdown
+    const rawSupplierId = isPrep ? "" : (off?.supplier_id ?? (x.supplier_id ?? ""));
+    const canonicalSupplier = rawSupplierId ? suppliersMap.get(rawSupplierId) : null;
+    const supplierId = canonicalSupplier?.id ?? rawSupplierId;
 
     // ── Map old DB offer to new EditState ──
     let baseUnit: "piece" | "kg" | "litre" = "kg";
@@ -733,7 +736,7 @@ function IngredientsPageInner() {
 
     setEditingId(x.id);
     setEdit(editState);
-  }, [offersByIngredientId, guessOrderUnit]);
+  }, [offersByIngredientId, guessOrderUnit, suppliersMap]);
 
   function buildOfferFromEdit(ingredient_id: string, uid: string, ingEtabId?: string | null): OfferPayload | null {
     if (!edit) return null;

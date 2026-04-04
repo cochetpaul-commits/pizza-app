@@ -27,11 +27,7 @@ const inputStyle: CSSProperties = {
   border: "1.5px solid #e5ddd0", padding: "8px 12px",
   fontSize: 13, background: "#fff", color: "#1a1a1a", outline: "none",
 };
-const selectStyle: CSSProperties = {
-  ...inputStyle,
-  appearance: "none", WebkitAppearance: "none" as CSSProperties["WebkitAppearance"],
-  paddingRight: 28, cursor: "pointer",
-};
+
 
 
 // ─── Unified packaging type options (shared by piece type, conditionnement, order unit) ──
@@ -51,16 +47,18 @@ const PACK_LABELS: Record<string, string> = {
 // ─── StyledSelect (custom dropdown replacing native <select>) ────────────
 type SelectOption = { value: string; label: string; disabled?: boolean };
 
-function StyledSelect({ value, onChange, options, width, placeholder }: {
+function StyledSelect({ value, onChange, options, width, placeholder, accentColor }: {
   value: string;
   onChange: (v: string) => void;
   options: SelectOption[];
   width?: number | string;
   placeholder?: string;
+  accentColor?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const selected = options.find(o => o.value === value && !o.disabled);
+  const accent = accentColor ?? "#D4775A";
 
   useEffect(() => {
     if (!open) return;
@@ -71,6 +69,9 @@ function StyledSelect({ value, onChange, options, width, placeholder }: {
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
+  // Convert hex accent to rgba for backgrounds
+  const accentBg = `${accent}10`;
+
   return (
     <div ref={ref} style={{ position: "relative", width: width ?? "100%" }}>
       <button
@@ -78,7 +79,7 @@ function StyledSelect({ value, onChange, options, width, placeholder }: {
         onClick={() => setOpen(!open)}
         style={{
           width: "100%", height: 40, textAlign: "left",
-          borderRadius: 10, border: `1.5px solid ${open ? "#D4775A" : "#e5ddd0"}`,
+          borderRadius: 10, border: `1.5px solid ${open ? accent : "#e5ddd0"}`,
           padding: "0 32px 0 12px", fontSize: 13,
           background: "#fff", color: selected ? "#1a1a1a" : "#999",
           cursor: "pointer", fontFamily: "inherit",
@@ -95,7 +96,7 @@ function StyledSelect({ value, onChange, options, width, placeholder }: {
             transition: "transform 200ms ease",
           }}
         >
-          <path d="M1 1l4 4 4-4" stroke="#999" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+          <path d="M1 1l4 4 4-4" stroke={open ? accent : "#999"} strokeWidth="1.5" fill="none" strokeLinecap="round" />
         </svg>
       </button>
       {open && (
@@ -120,16 +121,16 @@ function StyledSelect({ value, onChange, options, width, placeholder }: {
                 style={{
                   padding: "7px 12px", fontSize: 12, cursor: "pointer",
                   display: "flex", alignItems: "center", gap: 8,
-                  color: isSelected ? "#D4775A" : "#1a1a1a",
+                  color: isSelected ? accent : "#1a1a1a",
                   fontWeight: isSelected ? 700 : 400,
-                  background: isSelected ? "rgba(212,119,90,0.06)" : "transparent",
+                  background: isSelected ? accentBg : "transparent",
                   transition: "background 100ms",
                 }}
                 onMouseOver={e => { if (!isSelected) e.currentTarget.style.background = "#f5f0e8"; }}
-                onMouseOut={e => { if (!isSelected) e.currentTarget.style.background = isSelected ? "rgba(212,119,90,0.06)" : "transparent"; }}
+                onMouseOut={e => { if (!isSelected) e.currentTarget.style.background = isSelected ? accentBg : "transparent"; }}
               >
                 {isSelected && (
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#D4775A", flexShrink: 0 }} />
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: accent, flexShrink: 0 }} />
                 )}
                 {o.label}
               </div>
@@ -458,16 +459,22 @@ export const IngredientRow = React.memo(function IngredientRow({
               </div>
               <div>
                 <div style={fieldLabel}>Catégorie</div>
-                <select style={selectStyle} value={edit.category} onChange={(e) => onEditChange({ ...edit, category: e.target.value as Category })}>
-                  {CATEGORIES.map((c) => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
-                </select>
+                <StyledSelect value={edit.category}
+                  onChange={(v) => onEditChange({ ...edit, category: v as Category })}
+                  options={CATEGORIES.map(c => ({ value: c, label: CAT_LABELS[c] }))}
+                  accentColor={CAT_COLORS[edit.category]}
+                />
               </div>
               <div>
                 <div style={fieldLabel}>Fournisseur</div>
-                <select style={selectStyle} value={edit.supplierId} onChange={(e) => onEditChange({ ...edit, supplierId: e.target.value })}>
-                  <option value="">—</option>
-                  {suppliers.filter((s) => s.is_active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
+                <StyledSelect value={edit.supplierId}
+                  onChange={(v) => onEditChange({ ...edit, supplierId: v })}
+                  placeholder="—"
+                  options={[
+                    { value: "", label: "—" },
+                    ...suppliers.filter(s => s.is_active).map(s => ({ value: s.id, label: s.name })),
+                  ]}
+                />
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "end" }}>
