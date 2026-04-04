@@ -2462,6 +2462,8 @@ const tabsRow: React.CSSProperties = {
   marginBottom: 16,
   borderBottom: "1px solid #ddd6c8",
   paddingBottom: 0,
+  overflowX: "auto",
+  WebkitOverflowScrolling: "touch",
 };
 
 const tabBtn = (active: boolean): React.CSSProperties => ({
@@ -2479,6 +2481,8 @@ const tabBtn = (active: boolean): React.CSSProperties => ({
   display: "flex",
   alignItems: "center",
   gap: 6,
+  whiteSpace: "nowrap",
+  flexShrink: 0,
 });
 
 

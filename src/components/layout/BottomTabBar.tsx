@@ -4,6 +4,7 @@ import React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { BottomSheet } from "./BottomSheet";
 
 /* ── Icons ────────────────────────────────────────── */
 
@@ -38,16 +39,6 @@ function IconShoppingBag({ active: _active }: { active: boolean }) {
   );
 }
 
-function _IconBarChart({ active }: { active: boolean }) {
-  return (
-    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.5" : "2"} strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="20" x2="12" y2="10" />
-      <line x1="18" y1="20" x2="18" y2="4" />
-      <line x1="6" y1="20" x2="6" y2="16" />
-    </svg>
-  );
-}
-
 function IconPackage({ active: _active }: { active: boolean }) {
   return (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -68,8 +59,6 @@ function IconUsers({ active }: { active: boolean }) {
     </svg>
   );
 }
-
-// IconClock removed — no longer used after navigation purge
 
 function IconBeach({ active }: { active: boolean }) {
   return (
@@ -160,12 +149,9 @@ type Tab = {
 
 type TabSection = {
   label: string;
-  /** First item href — where hub click navigates */
   href: string;
-  /** Pathnames that belong to this section */
   match: string[];
   icon: (active: boolean) => React.ReactNode;
-  /** Sub-tabs shown when inside this section */
   tabs: Tab[];
 };
 
@@ -296,7 +282,6 @@ function pathMatches(pathname: string, patterns: string[]): boolean {
 }
 
 function getActiveSection(pathname: string, sections: TabSection[]): TabSection | null {
-  // Find all matching sections, then pick the one with the longest (most specific) match
   let best: TabSection | null = null;
   let bestLen = 0;
   for (const section of sections) {
@@ -308,6 +293,24 @@ function getActiveSection(pathname: string, sections: TabSection[]): TabSection 
   return best;
 }
 
+/* ── Building icon for etab indicator ────────────── */
+
+function IconBuilding({ color }: { color: string }) {
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" /><path d="M10 10h4" />
+    </svg>
+  );
+}
+
+function IconGroupBuilding({ color }: { color: string }) {
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="2" /><path d="M9 22V12h6v10" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M8 10h.01" /><path d="M16 10h.01" />
+    </svg>
+  );
+}
+
 /* ── Component ────────────────────────────────────── */
 
 export function BottomTabBar() {
@@ -315,18 +318,7 @@ export function BottomTabBar() {
   const router = useRouter();
   const { role } = useProfile();
   const { current, setCurrent, etablissements, isGroupView, setGroupView } = useEtablissement();
-  const [etabMenuOpen, setEtabMenuOpen] = React.useState(false);
-  const etabMenuRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (etabMenuRef.current && !etabMenuRef.current.contains(e.target as Node)) {
-        setEtabMenuOpen(false);
-      }
-    }
-    if (etabMenuOpen) document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [etabMenuOpen]);
+  const [etabSheetOpen, setEtabSheetOpen] = React.useState(false);
 
   if (!role) return null;
 
@@ -342,123 +334,122 @@ export function BottomTabBar() {
 
   const tabStyle = (isActive: boolean): React.CSSProperties => ({
     display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-    gap: 2, cursor: "pointer", padding: "6px 4px", minWidth: 52, flex: 1,
-    border: "none", borderRadius: 0,
-    background: "transparent",
+    gap: 2, cursor: "pointer", padding: "6px 4px", minWidth: 0, flex: 1,
+    border: "none",
+    borderRadius: isActive ? 16 : 0,
+    background: isActive ? `${etabColor}15` : "transparent",
     color: isActive ? etabColor : INACTIVE_COLOR,
-    transition: "color 0.15s",
+    transition: "color 0.15s, background 0.15s",
   });
 
   return (
     <>
-    {/* Floating establishment button — bottom right */}
-    {/* Establishment button */}
-    <div ref={etabMenuRef} className="etab-fab-wrap" style={{
-      position: "fixed", bottom: "calc(76px + env(safe-area-inset-bottom, 0px))", left: 16, zIndex: 110, display: "none",
-    }}>
-      <button
-        type="button"
-        onClick={() => setEtabMenuOpen(prev => !prev)}
-        className="etab-fab"
-        style={{
-          width: 50, height: 50,
-          border: "none", cursor: "pointer",
-          background: etabColor,
-          boxShadow: `0 4px 14px ${etabColor}60, 0 2px 6px rgba(0,0,0,0.15)`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          transition: "transform 0.15s, box-shadow 0.15s",
-        }}
-        onMouseDown={e => { e.currentTarget.style.transform = "scale(0.92)"; }}
-        onMouseUp={e => { e.currentTarget.style.transform = "scale(1)"; }}
-        onTouchStart={e => { e.currentTarget.style.transform = "scale(0.92)"; }}
-        onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
+      {/* Establishment BottomSheet */}
+      <BottomSheet
+        open={etabSheetOpen}
+        onClose={() => setEtabSheetOpen(false)}
+        title="Etablissement"
       >
-        {isGroupView ? (
-          <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M9 22V12h6v10" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M8 10h.01" /><path d="M16 10h.01" /></svg>
-        ) : (
-          <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" /><path d="M10 10h4" /></svg>
-        )}
-      </button>
-
-      {/* Dropdown above button */}
-      {etabMenuOpen && (
-        <div style={{
-          position: "absolute", left: 0, bottom: "calc(100% + 8px)",
-          minWidth: 180,
-          background: "rgba(255,255,255,0.96)",
-          backdropFilter: "blur(24px) saturate(180%)",
-          WebkitBackdropFilter: "blur(24px) saturate(180%)",
-          border: "1px solid rgba(0,0,0,0.08)",
-          borderRadius: 14, overflow: "hidden",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.14)",
-        }}>
-          {etablissements.map(e => {
-            const isSelected = !isGroupView && current?.id === e.id;
-            const clr = e.couleur ?? "#b45f57";
-            return (
-              <button key={e.id} type="button" onClick={() => {
-                setGroupView(false); setCurrent(e); setEtabMenuOpen(false);
-                const slug = e.slug?.includes("piccola") ? "/piccola-mia" : "/bello-mio";
-                router.push(slug);
-              }} style={{
-                display: "flex", alignItems: "center", gap: 10,
-                width: "100%", padding: "12px 16px",
-                border: "none", cursor: "pointer",
-                background: isSelected ? `${clr}12` : "transparent",
-                borderLeft: isSelected ? `3px solid ${clr}` : "3px solid transparent",
+        {etablissements.map(e => {
+          const isSelected = !isGroupView && current?.id === e.id;
+          const clr = e.couleur ?? "#b45f57";
+          return (
+            <button key={e.id} type="button" onClick={() => {
+              setGroupView(false); setCurrent(e); setEtabSheetOpen(false);
+              const slug = e.slug?.includes("piccola") ? "/piccola-mia" : "/bello-mio";
+              router.push(slug);
+            }} style={{
+              display: "flex", alignItems: "center", gap: 12,
+              width: "100%", padding: "14px 16px",
+              border: "none", cursor: "pointer",
+              borderRadius: 12,
+              background: isSelected ? `${clr}12` : "transparent",
+              borderLeft: isSelected ? `3px solid ${clr}` : "3px solid transparent",
+              marginBottom: 4,
+            }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 10,
+                background: `${clr}18`,
+                display: "flex", alignItems: "center", justifyContent: "center",
               }}>
-                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={clr} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" /><path d="M10 10h4" /></svg>
-                <span style={{ fontSize: 14, fontWeight: isSelected ? 700 : 500, color: "#2c2c2c" }}>{e.nom}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-
-    <nav className="bottom-tab-bar" style={{
-      position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100,
-      display: "none",
-      background: "rgba(245,245,247,0.85)",
-      backdropFilter: "blur(20px) saturate(180%)",
-      WebkitBackdropFilter: "blur(20px) saturate(180%)",
-      borderTop: "1px solid rgba(0,0,0,0.06)",
-      paddingBottom: "env(safe-area-inset-bottom, 0px)",
-    }}>
-      <div style={{
-        display: "flex", alignItems: "center",
-        height: 60, maxWidth: 500, margin: "0 auto",
-        padding: "4px 6px", gap: 2,
-      }}>
-        {showSubTabs ? (
-          <>
-            <button type="button" onClick={() => router.push(etabHome ?? "/dashboard")} style={tabStyle(false)}>
-              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
-              <span style={{ fontSize: 9, fontWeight: 600, lineHeight: 1 }}>Retour</span>
+                <IconBuilding color={clr} />
+              </div>
+              <span style={{ fontSize: 15, fontWeight: isSelected ? 700 : 500, color: "#2c2c2c" }}>{e.nom}</span>
             </button>
-            {activeSection.tabs.map((tab) => {
-              const isActive = pathMatches(pathname, tab.match);
+          );
+        })}
+      </BottomSheet>
+
+      {/* ── Floating pill tab bar ── */}
+      <nav className="bottom-tab-bar" style={{
+        position: "fixed",
+        bottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
+        left: 16, right: 16,
+        zIndex: 100,
+        display: "none",
+        borderRadius: 28,
+        background: "rgba(245,240,232,0.75)",
+        backdropFilter: "blur(20px) saturate(180%)",
+        WebkitBackdropFilter: "blur(20px) saturate(180%)",
+        border: "1px solid rgba(0,0,0,0.08)",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+      }}>
+        <div style={{
+          display: "flex", alignItems: "center",
+          height: 56, margin: "0 auto",
+          padding: "4px 6px", gap: 0,
+        }}>
+          {/* Left: establishment indicator */}
+          <button
+            type="button"
+            onClick={() => setEtabSheetOpen(true)}
+            style={{
+              width: 32, height: 32, borderRadius: 10,
+              border: "none", cursor: "pointer",
+              background: `${etabColor}20`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0, marginRight: 4,
+              transition: "transform 0.12s",
+            }}
+            onTouchStart={e => { e.currentTarget.style.transform = "scale(0.88)"; }}
+            onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
+          >
+            {isGroupView
+              ? <IconGroupBuilding color={etabColor} />
+              : <IconBuilding color={etabColor} />
+            }
+          </button>
+
+          {/* Center: tabs */}
+          {showSubTabs ? (
+            <>
+              <button type="button" onClick={() => router.push(etabHome ?? "/dashboard")} style={tabStyle(false)}>
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
+                <span style={{ fontSize: 9, fontWeight: 600, lineHeight: 1 }}>Retour</span>
+              </button>
+              {activeSection.tabs.map((tab) => {
+                const isActive = pathMatches(pathname, tab.match);
+                return (
+                  <button key={tab.href} type="button" onClick={() => router.push(tab.href)} style={tabStyle(isActive)}>
+                    {tab.icon(isActive)}
+                    <span style={{ fontSize: 9, fontWeight: isActive ? 700 : 500, lineHeight: 1 }}>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </>
+          ) : (
+            sections.map((section) => {
+              const isActive = activeSection === section;
               return (
-                <button key={tab.href} type="button" onClick={() => router.push(tab.href)} style={tabStyle(isActive)}>
-                  {tab.icon(isActive)}
-                  <span style={{ fontSize: 9, fontWeight: isActive ? 700 : 500, lineHeight: 1 }}>{tab.label}</span>
+                <button key={section.label} type="button" onClick={() => router.push(section.href)} style={tabStyle(isActive)}>
+                  {section.icon(isActive)}
+                  <span style={{ fontSize: 9, fontWeight: isActive ? 700 : 500, lineHeight: 1 }}>{section.label}</span>
                 </button>
               );
-            })}
-          </>
-        ) : (
-          sections.map((section) => {
-            const isActive = activeSection === section;
-            return (
-              <button key={section.label} type="button" onClick={() => router.push(section.href)} style={tabStyle(isActive)}>
-                {section.icon(isActive)}
-                <span style={{ fontSize: 9, fontWeight: isActive ? 700 : 500, lineHeight: 1 }}>{section.label}</span>
-              </button>
-            );
-          })
-        )}
-      </div>
-    </nav>
+            })
+          )}
+        </div>
+      </nav>
     </>
   );
 }

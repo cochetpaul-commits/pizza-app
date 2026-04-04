@@ -49,7 +49,7 @@ export function NavBar({ backHref, backLabel, right, primaryAction, menuItems }:
   const hasStructuredRight = !!(primaryAction || (menuItems && menuItems.length > 0));
 
   return (
-    <nav style={navStyle}>
+    <nav className="navbar-desktop" style={navStyle}>
       <div style={inner}>
         {/* ── Left: back button ── */}
         <div style={leftStyle}>

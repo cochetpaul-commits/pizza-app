@@ -124,17 +124,11 @@ select.input option {
   -webkit-backdrop-filter: none;
 }
 
-/* Floating establishment button */
-.etab-fab-wrap {
-  display: none !important;
-}
-button.etab-fab {
-  border-radius: 16px !important;
-  overflow: hidden;
-}
+/* navbar-desktop — hidden on mobile */
+.navbar-desktop {}
 @media (max-width: 767px) {
-  .etab-fab-wrap {
-    display: block !important;
+  .navbar-desktop {
+    display: none !important;
   }
 }
 
@@ -155,12 +149,7 @@ button.etab-fab {
   border: none !important;
   border-bottom: none !important;
 }
-.bottom-tab-bar {
-  background: var(--glass-sidebar) !important;
-  backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
-  border-top: 1px solid var(--glass-sidebar-border) !important;
-}
+/* bottom-tab-bar pill overrides handled inline — no extra glass needed */
 
 *{ box-sizing: border-box; }
 
@@ -230,11 +219,11 @@ html, body{
   }
   .app-main {
     margin-left: 0;
-    /* Extra bottom padding for bottom tab bar */
-    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    /* Extra bottom padding for floating pill tab bar */
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
   }
   .bottom-tab-bar {
-    display: block !important;
+    display: flex !important;
   }
 }
 

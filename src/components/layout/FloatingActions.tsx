@@ -123,7 +123,7 @@ export function FloatingActions({ actions }: FloatingActionsProps) {
         className="floating-actions-bar"
         style={{
           position: "fixed",
-          bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
+          bottom: "calc(92px + env(safe-area-inset-bottom, 0px))",
           left: 0,
           right: 0,
           zIndex: 105,
