@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { fetchPriceAlerts, type PriceAlert } from "@/lib/priceAlerts";
 import type { Ingredient, LatestOffer, Supplier } from "@/types/ingredients";
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 1000;
 
 /** Map establishment slugs (DB) → offer establishment keys */
 function slugToOfferEstab(slug: string): string | null {

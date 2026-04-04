@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { CSSProperties } from "react";
 import {
   CATEGORIES,
@@ -33,6 +33,100 @@ const selectStyle: CSSProperties = {
   paddingRight: 28, cursor: "pointer",
 };
 
+
+// ─── StyledSelect (custom dropdown replacing native <select>) ────────────
+type SelectOption = { value: string; label: string; disabled?: boolean };
+
+function StyledSelect({ value, onChange, options, width, placeholder }: {
+  value: string;
+  onChange: (v: string) => void;
+  options: SelectOption[];
+  width?: number | string;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = options.find(o => o.value === value && !o.disabled);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} style={{ position: "relative", width: width ?? "100%" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          width: "100%", height: 40, textAlign: "left",
+          borderRadius: 10, border: `1.5px solid ${open ? "#D4775A" : "#e5ddd0"}`,
+          padding: "0 32px 0 12px", fontSize: 13,
+          background: "#fff", color: selected ? "#1a1a1a" : "#999",
+          cursor: "pointer", fontFamily: "inherit",
+          transition: "border-color 150ms",
+          outline: "none",
+        }}
+      >
+        {selected?.label ?? placeholder ?? "—"}
+        <svg
+          width="10" height="6" viewBox="0 0 10 6"
+          style={{
+            position: "absolute", right: 12, top: "50%",
+            transform: `translateY(-50%) rotate(${open ? 180 : 0}deg)`,
+            transition: "transform 200ms ease",
+          }}
+        >
+          <path d="M1 1l4 4 4-4" stroke="#999" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+        </svg>
+      </button>
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 4px)", left: 0,
+          minWidth: "100%", width: "max-content",
+          background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 10,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.10)", zIndex: 120,
+          maxHeight: 220, overflowY: "auto",
+          padding: "4px 0",
+          animation: "fadeSlideDown 150ms ease-out",
+        }}>
+          {options.map((o, i) => {
+            if (o.disabled) {
+              return <div key={i} style={{ height: 1, background: "#e5ddd0", margin: "4px 8px" }} />;
+            }
+            const isSelected = o.value === value;
+            return (
+              <div
+                key={o.value}
+                onClick={() => { onChange(o.value); setOpen(false); }}
+                style={{
+                  padding: "7px 12px", fontSize: 12, cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 8,
+                  color: isSelected ? "#D4775A" : "#1a1a1a",
+                  fontWeight: isSelected ? 700 : 400,
+                  background: isSelected ? "rgba(212,119,90,0.06)" : "transparent",
+                  transition: "background 100ms",
+                }}
+                onMouseOver={e => { if (!isSelected) e.currentTarget.style.background = "#f5f0e8"; }}
+                onMouseOut={e => { if (!isSelected) e.currentTarget.style.background = isSelected ? "rgba(212,119,90,0.06)" : "transparent"; }}
+              >
+                {isSelected && (
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#D4775A", flexShrink: 0 }} />
+                )}
+                {o.label}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <style>{`@keyframes fadeSlideDown { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+    </div>
+  );
+}
 
 const BTN_ACTION: CSSProperties = {
   width: 26, height: 26, borderRadius: 7, border: "none",
@@ -552,10 +646,10 @@ export const IngredientRow = React.memo(function IngredientRow({
                   <div style={{ display: "flex", gap: 8, alignItems: "end", flexWrap: "wrap" }}>
                     <div>
                       <div style={fieldLabel}>Type</div>
-                      <select style={{ ...selectStyle, width: 130 }} value={edit.baseUnitLabel || "piece"}
-                        onChange={(e) => onEditChange({ ...edit, baseUnitLabel: e.target.value })}>
-                        {PIECE_TYPES.map(p => <option key={p} value={p}>{PIECE_TYPE_LABELS[p]}</option>)}
-                      </select>
+                      <StyledSelect width={130} value={edit.baseUnitLabel || "piece"}
+                        onChange={(v) => onEditChange({ ...edit, baseUnitLabel: v })}
+                        options={PIECE_TYPES.map(p => ({ value: p, label: PIECE_TYPE_LABELS[p] }))}
+                      />
                     </div>
                     <div>
                       <div style={fieldLabel}>Contenu</div>
@@ -567,14 +661,14 @@ export const IngredientRow = React.memo(function IngredientRow({
                         }} placeholder="ex: 75" />
                     </div>
                     <div>
-                      <select style={{ ...selectStyle, width: 65 }} value={edit.pieceContentUnit}
-                        onChange={(e) => {
-                          const next = { ...edit, pieceContentUnit: e.target.value };
+                      <StyledSelect width={65} value={edit.pieceContentUnit}
+                        onChange={(v) => {
+                          const next = { ...edit, pieceContentUnit: v };
                           if (edit.priceSource) autoCalc(next);
                           onEditChange(next);
-                        }}>
-                        {CONTENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                      </select>
+                        }}
+                        options={CONTENT_UNITS.map(u => ({ value: u, label: u }))}
+                      />
                     </div>
                   </div>
                 </div>
@@ -599,10 +693,10 @@ export const IngredientRow = React.memo(function IngredientRow({
                 <div style={{ display: "flex", gap: 8, alignItems: "end", flexWrap: "wrap", marginTop: 8 }}>
                   <div>
                     <div style={fieldLabel}>Type</div>
-                    <select style={{ ...selectStyle, width: 120 }} value={edit.conditionnementLabel || "carton"}
-                      onChange={(e) => onEditChange({ ...edit, conditionnementLabel: e.target.value })}>
-                      {COND_TYPES.map(c => <option key={c} value={c}>{COND_LABELS[c]}</option>)}
-                    </select>
+                    <StyledSelect width={120} value={edit.conditionnementLabel || "carton"}
+                      onChange={(v) => onEditChange({ ...edit, conditionnementLabel: v })}
+                      options={COND_TYPES.map(c => ({ value: c, label: COND_LABELS[c] }))}
+                    />
                   </div>
                   <div>
                     <div style={fieldLabel}>Quantite par {edit.conditionnementLabel || "carton"}</div>
@@ -674,29 +768,32 @@ export const IngredientRow = React.memo(function IngredientRow({
             <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr 1fr", gap: 8, marginBottom: 12 }}>
               <div>
                 <div style={fieldLabel}>Unité de commande</div>
-                <select style={selectStyle} value={edit.orderUnitLabel} onChange={(e) => onEditChange({ ...edit, orderUnitLabel: e.target.value })}>
-                  <option value="">— Aucune —</option>
-                  <option value="kg">kg</option>
-                  <option value="litre">litre</option>
-                  <option value="pièce">pièce</option>
-                  <option disabled>────────</option>
-                  <option value="bac">bac</option>
-                  <option value="barquette">barquette</option>
-                  <option value="bidon">bidon</option>
-                  <option value="boite">boite</option>
-                  <option value="bouteille">bouteille</option>
-                  <option value="brick">brick</option>
-                  <option value="carton">carton</option>
-                  <option value="cagette">cagette</option>
-                  <option value="fût">fût</option>
-                  <option value="pack">pack</option>
-                  <option value="paquet">paquet</option>
-                  <option value="plateau">plateau</option>
-                  <option value="poche">poche</option>
-                  <option value="sac">sac</option>
-                  <option value="sachet">sachet</option>
-                  <option value="seau">seau</option>
-                </select>
+                <StyledSelect value={edit.orderUnitLabel} onChange={(v) => onEditChange({ ...edit, orderUnitLabel: v })}
+                  placeholder="— Aucune —"
+                  options={[
+                    { value: "", label: "— Aucune —" },
+                    { value: "kg", label: "kg" },
+                    { value: "litre", label: "litre" },
+                    { value: "pièce", label: "pièce" },
+                    { value: "", label: "", disabled: true },
+                    { value: "bac", label: "bac" },
+                    { value: "barquette", label: "barquette" },
+                    { value: "bidon", label: "bidon" },
+                    { value: "boite", label: "boite" },
+                    { value: "bouteille", label: "bouteille" },
+                    { value: "brick", label: "brick" },
+                    { value: "carton", label: "carton" },
+                    { value: "cagette", label: "cagette" },
+                    { value: "fût", label: "fût" },
+                    { value: "pack", label: "pack" },
+                    { value: "paquet", label: "paquet" },
+                    { value: "plateau", label: "plateau" },
+                    { value: "poche", label: "poche" },
+                    { value: "sac", label: "sac" },
+                    { value: "sachet", label: "sachet" },
+                    { value: "seau", label: "seau" },
+                  ]}
+                />
               </div>
               {edit.orderUnitLabel && !["kg", "litre", "pièce"].includes(edit.orderUnitLabel) && (
                 <div>
@@ -706,16 +803,19 @@ export const IngredientRow = React.memo(function IngredientRow({
               )}
               <div>
                 <div style={fieldLabel}>Stockage</div>
-                <select style={selectStyle} value={edit.storageZone} onChange={(e) => onEditChange({ ...edit, storageZone: e.target.value })}>
-                  <option value="">— Aucun —</option>
-                  {storageZones.map(z => <option key={z.id} value={z.name}>{z.name}</option>)}
-                </select>
+                <StyledSelect value={edit.storageZone} onChange={(v) => onEditChange({ ...edit, storageZone: v })}
+                  placeholder="— Aucun —"
+                  options={[
+                    { value: "", label: "— Aucun —" },
+                    ...storageZones.map(z => ({ value: z.name, label: z.name })),
+                  ]}
+                />
               </div>
               <div>
                 <div style={fieldLabel}>Statut</div>
-                <select style={selectStyle} value={edit.is_active ? "1" : "0"} onChange={(e) => onEditChange({ ...edit, is_active: e.target.value === "1" })}>
-                  <option value="1">Actif</option><option value="0">Inactif</option>
-                </select>
+                <StyledSelect value={edit.is_active ? "1" : "0"} onChange={(v) => onEditChange({ ...edit, is_active: v === "1" })}
+                  options={[{ value: "1", label: "Actif" }, { value: "0", label: "Inactif" }]}
+                />
               </div>
             </div>
 

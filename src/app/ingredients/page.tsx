@@ -76,42 +76,63 @@ function Dropdown({ value, onChange, options, style }: {
         onClick={() => setOpen(!open)}
         style={{
           width: "100%", textAlign: "left",
-          borderRadius: 12, border: "1.5px solid #ddd6c8",
+          borderRadius: 12, border: `1.5px solid ${open ? "#D4775A" : "#ddd6c8"}`,
           padding: "8px 32px 8px 14px", fontSize: 13,
           background: "white", color: "#1a1a1a", cursor: "pointer",
           boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
           position: "relative", fontFamily: "inherit",
+          transition: "border-color 150ms",
+          outline: "none",
         }}
       >
         {selected?.label ?? "—"}
-        <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 10, color: "#999", pointerEvents: "none" }}>▼</span>
+        <svg
+          width="10" height="6" viewBox="0 0 10 6"
+          style={{
+            position: "absolute", right: 12, top: "50%",
+            transform: `translateY(-50%) rotate(${open ? 180 : 0}deg)`,
+            transition: "transform 200ms ease",
+          }}
+        >
+          <path d="M1 1l4 4 4-4" stroke="#999" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+        </svg>
       </button>
       {open && (
         <div style={{
           position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
-          background: "#fff", border: "1.5px solid #ddd6c8", borderRadius: 12,
-          boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 100,
+          background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 12,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.10)", zIndex: 100,
           maxHeight: 280, overflowY: "auto",
           padding: "4px 0",
+          animation: "fadeSlideDown 150ms ease-out",
         }}>
-          {options.map(o => (
-            <div
-              key={o.value}
-              onClick={() => { onChange(o.value); setOpen(false); }}
-              style={{
-                padding: "8px 14px", fontSize: 13, cursor: "pointer",
-                color: o.value === value ? "#D4775A" : "#1a1a1a",
-                fontWeight: o.value === value ? 700 : 400,
-                background: o.value === value ? "rgba(212,119,90,0.06)" : "transparent",
-              }}
-              onMouseOver={e => { if (o.value !== value) e.currentTarget.style.background = "#f5f0e8"; }}
-              onMouseOut={e => { if (o.value !== value) e.currentTarget.style.background = "transparent"; }}
-            >
-              {o.value === value && "✓ "}{o.label}
-            </div>
-          ))}
+          {options.map(o => {
+            const isSelected = o.value === value;
+            return (
+              <div
+                key={o.value}
+                onClick={() => { onChange(o.value); setOpen(false); }}
+                style={{
+                  padding: "8px 14px", fontSize: 13, cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 8,
+                  color: isSelected ? "#D4775A" : "#1a1a1a",
+                  fontWeight: isSelected ? 700 : 400,
+                  background: isSelected ? "rgba(212,119,90,0.06)" : "transparent",
+                  transition: "background 100ms",
+                }}
+                onMouseOver={e => { if (!isSelected) e.currentTarget.style.background = "#f5f0e8"; }}
+                onMouseOut={e => { if (!isSelected) e.currentTarget.style.background = isSelected ? "rgba(212,119,90,0.06)" : "transparent"; }}
+              >
+                {isSelected && (
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#D4775A", flexShrink: 0 }} />
+                )}
+                {o.label}
+              </div>
+            );
+          })}
         </div>
       )}
+      <style>{`@keyframes fadeSlideDown { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
     </div>
   );
 }
