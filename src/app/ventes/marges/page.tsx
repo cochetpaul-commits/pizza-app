@@ -637,9 +637,14 @@ function MargesPage() {
           fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
         }}
       >
-        {/* ── Toolbar ── */}
+        {/* ── Toolbar (hidden on mobile except nav pills) ── */}
+        <style>{`
+          @media (max-width: 768px) {
+            .marges-toolbar-desktop { display: none !important; }
+          }
+        `}</style>
         <div className="ventes-toolbar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
-          <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 10, overflow: "hidden" }}>
+          <div className="marges-toolbar-desktop" style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 10, overflow: "hidden" }}>
             {(["jour", "semaine", "mois"] as ViewTab[]).map((t) => (
               <button
                 key={t}
@@ -678,8 +683,9 @@ function MargesPage() {
           </div>
         </div>
 
-        {/* ── Date navigation ── */}
+        {/* ── Date navigation (hidden on mobile) ── */}
         <div
+          className="marges-toolbar-desktop"
           style={{
             display: "flex",
             alignItems: "center",

@@ -344,11 +344,22 @@ export default function CongesPage() {
     if (!empId) return;
 
     setSaving(true);
+    // Compute nb_jours (business days only)
+    const dLo = new Date(selectedRange.lo + "T12:00:00");
+    const dHi = new Date(selectedRange.hi + "T12:00:00");
+    let nbJours = 0;
+    for (const d = new Date(dLo); d <= dHi; d.setDate(d.getDate() + 1)) {
+      const dow = d.getDay();
+      if (dow !== 0 && dow !== 6) nbJours++;
+    }
+
     const { error } = await supabase.from("absences").insert({
       employe_id: empId,
+      etablissement_id: etab?.id,
       type: formType,
       date_debut: selectedRange.lo,
       date_fin: selectedRange.hi,
+      nb_jours: nbJours,
       statut: "en_attente",
       note: formNote || null,
     });
