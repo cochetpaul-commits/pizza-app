@@ -6,7 +6,6 @@ import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import Chart from "chart.js/auto";
 import { getCategoryColor, getCategoryColors } from "@/lib/categoryColors";
-import { FloatingActions, FAIconUpload, FAIconPdf } from "@/components/layout/FloatingActions";
 
 /* ── Types ── */
 type WeekData = {
@@ -168,8 +167,6 @@ function PerformancesPage() {
   const [compareOpen, setCompareOpen] = useState(false);
   const [compareData, setCompareData] = useState<WeekData | null>(null);
   const compareRef = useRef<HTMLDivElement>(null);
-  const floatingFileRef = useRef<HTMLInputElement>(null);
-  const handleFloatingImport = useCallback(() => { floatingFileRef.current?.click(); }, []);
 
   // Date navigation
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -1401,23 +1398,6 @@ function PerformancesPage() {
         )}
       </div>
 
-      {/* Hidden file input for floating action */}
-      <input
-        ref={floatingFileRef}
-        type="file"
-        accept=".xlsx,.xls,.csv"
-        style={{ display: "none" }}
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) handleImport(f);
-          e.target.value = "";
-        }}
-      />
-
-      <FloatingActions actions={[
-        ...(data ? [{ icon: <FAIconPdf size={20} color="#666" />, label: "Exporter PDF", onClick: handleExportPDF, disabled: exporting }] : []),
-        { icon: <FAIconUpload size={22} color="#fff" />, label: "Importer", onClick: handleFloatingImport, primary: true, disabled: importing },
-      ]} />
     </RequireRole>
   );
 }
