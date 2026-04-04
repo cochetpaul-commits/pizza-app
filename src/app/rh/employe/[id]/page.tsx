@@ -573,7 +573,7 @@ export default function EmployeDetailPage() {
           })(),
           borderRadius: 14, padding: "20px 24px 0", color: "#fff",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
             <div style={{
               width: 52, height: 52, borderRadius: "50%", background: "rgba(255,255,255,0.2)",
               display: "flex", alignItems: "center", justifyContent: "center",
@@ -581,7 +581,7 @@ export default function EmployeDetailPage() {
             }}>
               {initDisplay}
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <h1 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color: "#fff", margin: 0 }}>
                   {prenom} {nom.toUpperCase()}
@@ -597,7 +597,7 @@ export default function EmployeDetailPage() {
                 <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", marginTop: 2 }}>{activeContrat.emploi}</div>
               )}
               {/* Supervise X personnes */}
-              <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                 <span style={{ padding: "2px 10px", borderRadius: 12, background: "rgba(255,255,255,0.15)", fontSize: 11, color: "rgba(255,255,255,0.9)", display: "flex", alignItems: "center", gap: 4 }}>
                   <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
                   Supervise {((emp as Record<string, unknown>).equipes_access as string[] ?? []).length > 0 ? "son equipe" : "—"}
@@ -607,7 +607,7 @@ export default function EmployeDetailPage() {
                 </span>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
               {canWrite && (
                 <button type="button" onClick={handleSave} disabled={saving} style={{
                   ...saveBtnStyle, background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.3)",
@@ -630,6 +630,7 @@ export default function EmployeDetailPage() {
             display: "flex", gap: 24, marginTop: 16, padding: "10px 0",
             borderTop: "1px solid rgba(255,255,255,0.15)",
             fontSize: 11, color: "rgba(255,255,255,0.7)",
+            flexWrap: "wrap",
           }}>
             <div>
               <div style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Debut du contrat</div>

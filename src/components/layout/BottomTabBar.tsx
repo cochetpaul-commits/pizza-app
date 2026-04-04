@@ -354,7 +354,7 @@ export function BottomTabBar() {
     {/* Floating establishment button — bottom right */}
     {/* Establishment button */}
     <div ref={etabMenuRef} className="etab-fab-wrap" style={{
-      position: "fixed", bottom: "calc(76px + env(safe-area-inset-bottom, 0px))", right: 16, zIndex: 110, display: "none",
+      position: "fixed", bottom: "calc(76px + env(safe-area-inset-bottom, 0px))", left: 16, zIndex: 110, display: "none",
     }}>
       <button
         type="button"
@@ -383,7 +383,7 @@ export function BottomTabBar() {
       {/* Dropdown above button */}
       {etabMenuOpen && (
         <div style={{
-          position: "absolute", right: 0, bottom: "calc(100% + 8px)",
+          position: "absolute", left: 0, bottom: "calc(100% + 8px)",
           minWidth: 180,
           background: "rgba(255,255,255,0.96)",
           backdropFilter: "blur(24px) saturate(180%)",

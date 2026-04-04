@@ -534,7 +534,7 @@ function RecettesInner() {
     <>
       <main className="container" style={{ paddingBottom: 80 }}>
         {/* ── Header : line 1 — title + actions ── */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a", textTransform: "uppercase", letterSpacing: 1 }}>
             Fiches techniques <span style={{ fontSize: 14, fontWeight: 500, color: "#999", letterSpacing: 0, textTransform: "none" }}>({totalCount})</span>
           </h1>
@@ -597,7 +597,7 @@ function RecettesInner() {
         )}
 
         {/* ── Line 2 — search + category dropdown + sort + filters ── */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ position: "relative", flex: 1 }}>
             <input
               type="search"

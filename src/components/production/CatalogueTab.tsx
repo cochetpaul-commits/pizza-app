@@ -509,7 +509,7 @@ export function CatalogueContent() {
     <main className="container" style={{ paddingBottom: 80 }}>
 
         {/* ── Line 1 — title + AI suggestions ── */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
           <h1 style={{
             fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24,
             color: "#1a1a1a", margin: 0, textTransform: "uppercase", letterSpacing: "0.04em",

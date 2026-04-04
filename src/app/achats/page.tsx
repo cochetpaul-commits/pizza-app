@@ -847,7 +847,7 @@ export default function AchatsPage() {
         {/* ══════════════════════════════════════════════════ */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
           {/* View mode pills + page nav pills */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <div style={{ display: "flex", gap: 6 }}>
               {(["mois", "semaine"] as const).map((mode) => (
                 <button

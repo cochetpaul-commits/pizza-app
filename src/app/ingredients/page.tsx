@@ -990,6 +990,15 @@ function IngredientsPageInner() {
 
   return (
     <div style={{ background: "#f2ede4", minHeight: "100vh" }}>
+      <style>{`
+        .ing-desktop-filters { display: grid; }
+        .ing-mobile-btn { display: none; }
+        @media (max-width: 767px) {
+          .ing-desktop-filters { display: none !important; }
+          .ing-mobile-btn { display: inline-flex !important; }
+          .ing-add-btn { padding: 6px 12px !important; font-size: 12px !important; }
+        }
+      `}</style>
 
       {/* ══════════════════════════════════════════════
           HEADER
@@ -1011,11 +1020,11 @@ function IngredientsPageInner() {
         </div>
 
         {/* Right */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0, marginLeft: 12 }}>
+        <div className="ing-header-right" style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0, marginLeft: 12 }}>
           {/* Rafraîchir (desktop) */}
-          <button onClick={reload} className="hidden md:inline-flex" style={headerBtnStyle}>Rafraîchir</button>
+          <button onClick={reload} className="desktop-only" style={headerBtnStyle}>Rafraîchir</button>
           {/* Doublons */}
-          <button onClick={() => setShowDuplicates(true)} style={headerBtnStyle}>
+          <button onClick={() => setShowDuplicates(true)} className="desktop-only" style={headerBtnStyle}>
             Doublons
             {duplicatePairs.length > 0 && (
               <span style={{
@@ -1029,6 +1038,7 @@ function IngredientsPageInner() {
           {/* + Ingrédient */}
           {userCanWrite && (
           <button
+            className="ing-add-btn"
             onClick={() => {
               setShowCreateForm(v => {
                 const next = !v;
@@ -1068,7 +1078,7 @@ function IngredientsPageInner() {
         {!isVariations && (
           <>
             {/* Desktop filter row */}
-            <div className="hidden md:grid" style={{ gridTemplateColumns: "1fr 1fr auto auto auto", gap: 8, padding: "10px 20px" }}>
+            <div className="ing-desktop-filters" style={{ gridTemplateColumns: "1fr 1fr auto auto auto", gap: 8, padding: "10px 20px" }}>
               <Dropdown
                 value={filterCategory}
                 onChange={(v) => setFilterCategory(v as "all" | Category)}
@@ -1100,10 +1110,10 @@ function IngredientsPageInner() {
                 style={{ flex: 1, borderRadius: 12, border: "1.5px solid #ddd6c8", padding: "10px 16px", fontSize: 13, background: "white", outline: "none", color: "#1a1a1a", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
               />
               {/* Mobile only: Filtres + compact */}
-              <button className="md:hidden" onClick={() => setShowFilters(true)} style={{ padding: "10px 14px", borderRadius: 12, border: "1.5px solid #ddd6c8", background: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+              <button className="ing-mobile-btn" onClick={() => setShowFilters(true)} style={{ padding: "10px 14px", borderRadius: 12, border: "1.5px solid #ddd6c8", background: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
                 Filtres{filterActive ? " ●" : ""}
               </button>
-              <button className="md:hidden" onClick={toggleCompact} style={{ padding: "10px 12px", borderRadius: 12, border: "1.5px solid #ddd6c8", background: "white", fontSize: 14, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+              <button className="ing-mobile-btn" onClick={toggleCompact} style={{ padding: "10px 12px", borderRadius: 12, border: "1.5px solid #ddd6c8", background: "white", fontSize: 14, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
                 {compactMode ? "⊞" : "☰"}
               </button>
             </div>
