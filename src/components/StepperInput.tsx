@@ -69,15 +69,26 @@ export function StepperInput({
   }
 
   const displayValue = editing ? draft : (value === "" ? "" : String(value));
+  const hasValue = value !== "" && value > 0;
   const atMin = min != null && (value === "" ? 0 : value) <= min;
   const atMax = max != null && (value === "" ? 0 : value) >= max;
+
+  const btnBase: React.CSSProperties = {
+    width: 32, height: 32,
+    borderRadius: "50%",
+    border: "none",
+    fontSize: 16,
+    fontWeight: 700,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    transition: "background 0.12s, transform 0.1s",
+    flexShrink: 0,
+  };
 
   return (
     <div style={{
       display: "inline-flex",
-      border: "1.5px solid #e5ddd0",
-      borderRadius: 10,
-      overflow: "hidden",
+      alignItems: "center",
+      gap: 4,
       opacity: disabled ? 0.5 : 1,
     }}>
       <button
@@ -85,12 +96,10 @@ export function StepperInput({
         onClick={() => increment(-1)}
         disabled={disabled || atMin}
         style={{
-          width: 36, height: 40,
-          background: "#f5f0e8", color: "#8B1A1A",
-          fontSize: 18, border: "none",
+          ...btnBase,
+          background: hasValue ? "rgba(139,26,26,0.08)" : "rgba(0,0,0,0.04)",
+          color: hasValue ? "#8B1A1A" : "#ccc",
           cursor: disabled || atMin ? "not-allowed" : "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontWeight: 700,
         }}
       >−</button>
       <input
@@ -105,13 +114,14 @@ export function StepperInput({
         placeholder={placeholder}
         disabled={disabled}
         style={{
-          width: 64, height: 40,
-          background: "#fff",
-          borderLeft: "1.5px solid #e5ddd0",
-          borderRight: "1.5px solid #e5ddd0",
-          borderTop: "none", borderBottom: "none",
-          textAlign: "center", fontWeight: 600,
-          fontSize: 14, fontFamily: "inherit",
+          width: 38, height: 32,
+          background: "transparent",
+          border: "none",
+          textAlign: "center",
+          fontWeight: hasValue ? 800 : 500,
+          fontSize: hasValue ? 16 : 13,
+          fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+          color: hasValue ? "#D4775A" : "#bbb",
           outline: "none",
           MozAppearance: "textfield",
           WebkitAppearance: "none",
@@ -122,12 +132,10 @@ export function StepperInput({
         onClick={() => increment(1)}
         disabled={disabled || atMax}
         style={{
-          width: 36, height: 40,
-          background: "#f5f0e8", color: "#8B1A1A",
-          fontSize: 18, border: "none",
+          ...btnBase,
+          background: "rgba(74,103,65,0.10)",
+          color: "#4a6741",
           cursor: disabled || atMax ? "not-allowed" : "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontWeight: 700,
         }}
       >+</button>
     </div>

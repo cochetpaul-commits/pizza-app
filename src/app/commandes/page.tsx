@@ -1019,55 +1019,57 @@ function CommandesPage() {
     });
   }
 
-  // ── Render: unit toggle (carton/bouteille) ───────────────────────────
+  // ── Render: unit toggle (individual/carton) ──────────────────────────
+
+  function individualUnitLabel(item: CatalogItem): string {
+    const u = (item.order_unit ?? item.default_unit ?? "").toLowerCase();
+    if (u === "pc" || u === "pcs" || u === "piece" || u === "pièce") return "unité";
+    if (u.includes("bouteille") || u === "bt" || u === "btl") return "bouteille";
+    if (u.includes("bac")) return "bac";
+    if (u.includes("barquette")) return "barquette";
+    if (u.includes("sac")) return "sac";
+    if (u.includes("boite") || u.includes("boîte")) return "boîte";
+    if (u.includes("bidon")) return "bidon";
+    if (u.includes("pot")) return "pot";
+    if (u) return u;
+    return "unité";
+  }
 
   function unitToggle(item: CatalogItem) {
     const packCount = item.pack_count ?? 0;
     if (packCount <= 0) return null;
+    const indivLabel = individualUnitLabel(item);
+    // Don't show toggle when individual unit is already "carton" — "carton / carton de X" is redundant
+    if (indivLabel === "carton") return null;
     const mode = unitModes[item.id] ?? "individual";
     const rawQty = Number(quantities[item.id] ?? 0);
     const packEachQty = item.pack_each_qty ?? 1;
     const unitLabel = packEachQty > 1 ? `${packCount}x${packEachQty}` : `${packCount}`;
 
+    const pillStyle = (active: boolean): React.CSSProperties => ({
+      fontSize: 10,
+      fontWeight: active ? 700 : 500,
+      color: active ? "#D4775A" : "#999",
+      background: active ? "#FFF0EB" : "#f5f0e8",
+      border: active ? "1.5px solid #D4775A" : "1px solid #ddd6c8",
+      borderRadius: 6,
+      padding: "3px 8px",
+      cursor: "pointer",
+    });
+
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2 }}>
         <div style={{ display: "flex", gap: 4 }}>
-          <button
-            type="button"
-            onClick={() => toggleUnitMode(item.id)}
-            style={{
-              fontSize: 10,
-              fontWeight: mode === "individual" ? 700 : 500,
-              color: mode === "individual" ? "#D4775A" : "#999",
-              background: mode === "individual" ? "#FFF0EB" : "#f5f0e8",
-              border: mode === "individual" ? "1.5px solid #D4775A" : "1px solid #ddd6c8",
-              borderRadius: 6,
-              padding: "3px 8px",
-              cursor: "pointer",
-            }}
-          >
-            bouteille
+          <button type="button" onClick={() => toggleUnitMode(item.id)} style={pillStyle(mode === "individual")}>
+            {indivLabel}
           </button>
-          <button
-            type="button"
-            onClick={() => toggleUnitMode(item.id)}
-            style={{
-              fontSize: 10,
-              fontWeight: mode === "carton" ? 700 : 500,
-              color: mode === "carton" ? "#D4775A" : "#999",
-              background: mode === "carton" ? "#FFF0EB" : "#f5f0e8",
-              border: mode === "carton" ? "1.5px solid #D4775A" : "1px solid #ddd6c8",
-              borderRadius: 6,
-              padding: "3px 8px",
-              cursor: "pointer",
-            }}
-          >
+          <button type="button" onClick={() => toggleUnitMode(item.id)} style={pillStyle(mode === "carton")}>
             carton de {unitLabel}
           </button>
         </div>
         {mode === "carton" && rawQty > 0 && item.prix_commande != null && (
           <span style={{ fontSize: 10, color: "#666" }}>
-            {getDisplayQty(item.id)} carton{(getDisplayQty(item.id) as number) > 1 ? "s" : ""} = {rawQty} bouteille{rawQty > 1 ? "s" : ""} = {(rawQty * item.prix_commande).toFixed(2).replace(".", ",")}&#8239;&#8364;
+            {getDisplayQty(item.id)} carton{(getDisplayQty(item.id) as number) > 1 ? "s" : ""} = {rawQty} {indivLabel}{rawQty > 1 ? "s" : ""} = {(rawQty * item.prix_commande).toFixed(2).replace(".", ",")}&#8239;&#8364;
           </span>
         )}
       </div>
@@ -1233,7 +1235,7 @@ function CommandesPage() {
                     <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color }}>
                       {catLabel(cat)}
                     </span>
-                    <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${color}18`, color }}>
+                    <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${color}18`, color }}>
                       {items.length}
                     </span>
                   </div>
@@ -1348,7 +1350,7 @@ function CommandesPage() {
                 <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color }}>
                   {catLabel(cat)}
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${color}18`, color }}>
+                <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${color}18`, color }}>
                   {allItems.length}
                 </span>
                 {selectedCount > 0 && (
@@ -1356,7 +1358,7 @@ function CommandesPage() {
                     {selectedCount}
                   </span>
                 )}
-                <span style={{ marginLeft: "auto", fontSize: 10, color: "#b0a894", transition: "transform 0.2s", transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}>{"▼"}</span>
+                <span style={{ fontSize: 10, color: "#b0a894", transition: "transform 0.2s", transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}>{"▼"}</span>
               </button>
 
               <div style={{

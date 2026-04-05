@@ -214,10 +214,10 @@ export const CategoryHeader = React.memo(function CategoryHeader({
         letterSpacing: "0.14em", textTransform: "uppercase", color: accent,
       }}>{CAT_LABELS[cat]}</span>
       <span style={{
-        fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
+        marginLeft: "auto", fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
         background: `${accent}18`, color: accent,
       }}>{count}</span>
-      <span style={{ marginLeft: "auto", fontSize: 10, color: "#b0a894", transition: "transform 0.2s", transform: isCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
+      <span style={{ fontSize: 10, color: "#b0a894", transition: "transform 0.2s", transform: isCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
     </button>
   );
 });
