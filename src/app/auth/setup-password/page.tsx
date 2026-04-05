@@ -10,6 +10,7 @@ export default function SetupPasswordPage() {
 
   const [ready, setReady] = useState(false);
   const [expired, setExpired] = useState(false);
+  const [isRecovery, setIsRecovery] = useState(false);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
@@ -17,9 +18,12 @@ export default function SetupPasswordPage() {
 
   useEffect(() => {
     const init = async () => {
+      const hash = window.location.hash;
+      const recovery = hash.includes("type=recovery") || hash.includes("type%3Drecovery");
       // Supabase client auto-detects session from hash URL (detectSessionInUrl: true)
       const { data } = await supabase.auth.getSession();
       if (data.session) {
+        if (recovery) setIsRecovery(true);
         setReady(true);
       } else {
         setExpired(true);
@@ -90,7 +94,7 @@ export default function SetupPasswordPage() {
 
   return (
     <main className="container">
-      <TopNav title="Créer mon compte" subtitle="Bienvenue" />
+      <TopNav title={isRecovery ? "Nouveau mot de passe" : "Creer mon compte"} subtitle={isRecovery ? "Reinitialisation" : "Bienvenue"} />
 
         <div className="card" style={{ marginTop: 14 }}>
           <div className="muted">Nouveau mot de passe</div>
@@ -128,7 +132,7 @@ export default function SetupPasswordPage() {
               onClick={handleSubmit}
               disabled={loading}
             >
-              {loading ? "Création…" : "Créer mon compte"}
+              {loading ? "Enregistrement…" : isRecovery ? "Changer le mot de passe" : "Creer mon compte"}
             </button>
           </div>
         </div>

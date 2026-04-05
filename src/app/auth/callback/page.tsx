@@ -6,9 +6,10 @@ import { supabase } from "@/lib/supabaseClient";
 export default function AuthCallbackPage() {
   useEffect(() => {
     const run = async () => {
-      // Detect invite flow from hash URL (type=invite)
       const hash = window.location.hash;
-      if (hash.includes("type=invite") || hash.includes("type%3Dinvite")) {
+      // Detect invite or password recovery flow from hash URL
+      if (hash.includes("type=invite") || hash.includes("type%3Dinvite")
+        || hash.includes("type=recovery") || hash.includes("type%3Drecovery")) {
         window.location.href = `/auth/setup-password${hash}`;
         return;
       }

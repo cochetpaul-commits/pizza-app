@@ -44,6 +44,8 @@ function UsersContent() {
   const [inviteName, setInviteName] = useState("");
   const [inviting, setInviting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [resetSending, setResetSending] = useState<string | null>(null);
+  const [resetSent, setResetSent] = useState<string | null>(null);
 
   async function getToken() {
     const { data } = await supabase.auth.getSession();
@@ -89,6 +91,24 @@ function UsersContent() {
     });
     setDeleteConfirm(null);
     setUsers((prev) => prev.filter((u) => u.id !== userId));
+  }
+
+  async function handleResetPassword(userId: string) {
+    setResetSending(userId);
+    const token = await getToken();
+    const res = await fetchApi("/api/admin/users", {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    setResetSending(null);
+    if (res.ok) {
+      setResetSent(userId);
+      setTimeout(() => setResetSent(null), 4000);
+    } else {
+      const data = await res.json();
+      alert(data.error || "Erreur envoi reset");
+    }
   }
 
   async function handleInvite() {
@@ -255,6 +275,19 @@ function UsersContent() {
                         <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                       ))}
                     </select>
+                    {resetSent === u.id ? (
+                      <span style={{ fontSize: 11, color: "#2D6A4F", fontWeight: 600 }}>Email envoye</span>
+                    ) : (
+                      <button
+                        onClick={() => handleResetPassword(u.id)}
+                        disabled={resetSending === u.id}
+                        style={{
+                          padding: "5px 10px", borderRadius: 6, border: "1px solid #ddd6c8",
+                          background: "#fff", fontSize: 11, cursor: "pointer", color: "#D4775A", fontWeight: 600,
+                          opacity: resetSending === u.id ? 0.5 : 1,
+                        }}
+                      >{resetSending === u.id ? "Envoi…" : "Reset mdp"}</button>
+                    )}
                     {deleteConfirm === u.id ? (
                       <div style={{ display: "flex", gap: 4 }}>
                         <button

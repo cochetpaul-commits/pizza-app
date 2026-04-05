@@ -71,6 +71,33 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ ok: true });
 }
 
+/** PUT — send password reset email to a user */
+export async function PUT(req: NextRequest) {
+  const callerRole = await getCallerRole(req);
+  if (callerRole !== "group_admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const body = await req.json();
+  const { userId } = body as { userId?: string };
+  if (!userId) return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+
+  // Get user email from auth
+  const { data: userData, error: userErr } = await supabaseAdmin.auth.admin.getUserById(userId);
+  if (userErr || !userData.user?.email) {
+    return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 });
+  }
+
+  const reqOrigin = new URL(req.url).origin;
+  const origin = process.env.NEXT_PUBLIC_SITE_URL
+    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
+    || (reqOrigin.includes("localhost") ? "https://pizza-app.vercel.app" : reqOrigin);
+
+  const { error } = await supabaseAdmin.auth.resetPasswordForEmail(userData.user.email, {
+    redirectTo: `${origin}/auth/callback`,
+  });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true, email: userData.user.email });
+}
+
 /** DELETE — delete user */
 export async function DELETE(req: NextRequest) {
   const callerRole = await getCallerRole(req);
