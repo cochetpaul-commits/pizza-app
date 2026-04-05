@@ -592,14 +592,9 @@ export const IngredientRow = React.memo(function IngredientRow({
                   const next = { ...edit, hasConditionnement: !edit.hasConditionnement };
                   if (!next.hasConditionnement) {
                     next.pricePerConditionnement = ""; if (next.priceSource === "cond") next.priceSource = null;
-                  } else if ((next.baseUnit === "kg" || next.baseUnit === "litre") && parseFloat(next.pricePerBaseUnit) > 0 && !next.pricePerConditionnement) {
-                    // When enabling conditionnement on a kg/L item, the existing price is almost
-                    // always the pack price (e.g. 18.68€ for a 1.5kg barquette), not the per-kg price.
-                    // Move it to the pack field so the user just needs to enter the pack qty.
-                    next.pricePerConditionnement = next.pricePerBaseUnit;
-                    next.pricePerBaseUnit = "";
-                    next.priceSource = "cond";
                   }
+                  // Don't auto-swap prices: both EUR/kg and EUR/pack are editable.
+                  // The user types in whichever field is the source (orange border = source).
                   onEditChange(next);
                 }}
                 style={{ margin: 0 }} />
