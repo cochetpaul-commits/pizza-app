@@ -109,6 +109,52 @@ export function extractPackFromName(name: string): { count: number; eachQty: num
 }
 
 /**
+ * Detect unit weight/volume in a product name (e.g. "1,5KG", "500G", "2,5L", "75CL").
+ * Returns { totalQty (in kg or L), unit: "kg" | "l" } or null.
+ * Used to detect that a price is per-pack (barquette/bidon), not per-kg/L.
+ */
+export function extractWeightFromName(name: string): { totalQty: number; unit: "kg" | "l" } | null {
+  const s = String(name ?? "").toUpperCase();
+
+  // Skip if it's a multi-pack pattern (e.g. "6X1,5KG") — handled by extractPackFromName
+  if (/\d+\s*[Xx×]\s*\d/.test(s)) return null;
+
+  // Weight: "1,5KG", "500G", "2.5KG", "1KG" — but NOT "15%MG" (fat content)
+  const kgM = s.match(/\b(\d+(?:[.,]\d+)?)\s*KG\b/);
+  if (kgM) {
+    const qty = parseFloat(kgM[1].replace(",", "."));
+    if (qty > 0 && qty < 100) return { totalQty: qty, unit: "kg" };
+  }
+
+  const gM = s.match(/\b(\d+(?:[.,]\d+)?)\s*G\b/);
+  if (gM && !s.includes("%MG")) {
+    const qty = parseFloat(gM[1].replace(",", "."));
+    if (qty > 0 && qty < 10000) return { totalQty: qty / 1000, unit: "kg" };
+  }
+
+  // Volume: "75CL", "1,5L", "50CL"
+  const lM = s.match(/\b(\d+(?:[.,]\d+)?)\s*L\b/);
+  if (lM) {
+    const qty = parseFloat(lM[1].replace(",", "."));
+    if (qty > 0 && qty < 100) return { totalQty: qty, unit: "l" };
+  }
+
+  const clM = s.match(/\b(\d+(?:[.,]\d+)?)\s*CL\b/);
+  if (clM) {
+    const qty = parseFloat(clM[1].replace(",", "."));
+    if (qty > 0 && qty < 10000) return { totalQty: qty / 100, unit: "l" };
+  }
+
+  const mlM = s.match(/\b(\d+(?:[.,]\d+)?)\s*ML\b/);
+  if (mlM) {
+    const qty = parseFloat(mlM[1].replace(",", "."));
+    if (qty > 0 && qty < 100000) return { totalQty: qty / 1000, unit: "l" };
+  }
+
+  return null;
+}
+
+/**
  * Détecte l'unité d'achat depuis un nom de produit.
  *
  * Règles :

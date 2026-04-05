@@ -28,6 +28,33 @@ const inputStyle: CSSProperties = {
   fontSize: 13, background: "#fff", color: "#1a1a1a", outline: "none",
 };
 
+// ─── MobileAccordion (module-level to avoid focus loss on re-render) ────────
+function MobileAccordion({ label, sectionKey, isOpen, onToggleSection, children }: {
+  label: string; sectionKey: string; isOpen: boolean;
+  onToggleSection: (key: string) => void; children: React.ReactNode;
+}) {
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <button type="button" onClick={() => onToggleSection(sectionKey)}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "10px 12px", background: isOpen ? "#f0ebe3" : "#fff", border: "1.5px solid #e5ddd0",
+          borderRadius: isOpen ? "8px 8px 0 0" : 8, cursor: "pointer",
+          fontSize: 11, fontWeight: 700, color: "#8a7e6b", textTransform: "uppercase" as const,
+          letterSpacing: "0.06em",
+        }}>
+        <span>{label}</span>
+        <span style={{ fontSize: 10, transition: "transform 0.2s", transform: isOpen ? "rotate(0)" : "rotate(-90deg)" }}>&#9660;</span>
+      </button>
+      {isOpen && (
+        <div style={{ padding: 12, background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 8px 8px" }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 
 // ─── Unified packaging type options (shared by piece type, conditionnement, order unit) ──
@@ -252,6 +279,9 @@ export const IngredientRow = React.memo(function IngredientRow({
   onStartEdit, onSaveEdit, onDelete, onSetStatus, onEditChange, onEditImportName, onCreateDerived, onOpenSupplier,
 }: IngredientRowProps) {
   const [mobileSection, setMobileSection] = React.useState<string>("prix"); // mobile accordion: only one open at a time
+  const toggleMobileSection = React.useCallback((key: string) => {
+    setMobileSection(prev => prev === key ? "" : key);
+  }, []);
 
   const price = formatIngredientPrice(x, offer ?? null);
   // Use ingredient's establishments array (not offer.establishment)
@@ -558,7 +588,20 @@ export const IngredientRow = React.memo(function IngredientRow({
           <div style={{ marginBottom: 8 }}>
             <label style={{ display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#666" }}>
               <input type="checkbox" checked={edit.hasConditionnement}
-                onChange={() => { const next = { ...edit, hasConditionnement: !edit.hasConditionnement }; if (!next.hasConditionnement) { next.pricePerConditionnement = ""; if (next.priceSource === "cond") next.priceSource = null; } onEditChange(next); }}
+                onChange={() => {
+                  const next = { ...edit, hasConditionnement: !edit.hasConditionnement };
+                  if (!next.hasConditionnement) {
+                    next.pricePerConditionnement = ""; if (next.priceSource === "cond") next.priceSource = null;
+                  } else if ((next.baseUnit === "kg" || next.baseUnit === "litre") && parseFloat(next.pricePerBaseUnit) > 0 && !next.pricePerConditionnement) {
+                    // When enabling conditionnement on a kg/L item, the existing price is almost
+                    // always the pack price (e.g. 18.68€ for a 1.5kg barquette), not the per-kg price.
+                    // Move it to the pack field so the user just needs to enter the pack qty.
+                    next.pricePerConditionnement = next.pricePerBaseUnit;
+                    next.pricePerBaseUnit = "";
+                    next.priceSource = "cond";
+                  }
+                  onEditChange(next);
+                }}
                 style={{ margin: 0 }} />
               Conditionnement
             </label>
@@ -689,31 +732,6 @@ export const IngredientRow = React.memo(function IngredientRow({
           {edit.allergens.length > 0 && <div style={{ fontSize: 9, color: "#999", marginTop: 3 }}>{edit.allergens.join(" · ")}</div>}
         </>);
 
-        // ── Mobile accordion header ──
-        const MobileAccordion = ({ label, sectionKey, children }: { label: string; sectionKey: string; children: React.ReactNode }) => {
-          const isOpen = mobileSection === sectionKey;
-          return (
-            <div style={{ marginBottom: 6 }}>
-              <button type="button" onClick={() => setMobileSection(isOpen ? "" : sectionKey)}
-                style={{
-                  width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "10px 12px", background: isOpen ? "#f0ebe3" : "#fff", border: "1.5px solid #e5ddd0",
-                  borderRadius: isOpen ? "8px 8px 0 0" : 8, cursor: "pointer",
-                  fontSize: 11, fontWeight: 700, color: "#8a7e6b", textTransform: "uppercase" as const,
-                  letterSpacing: "0.06em",
-                }}>
-                <span>{label}</span>
-                <span style={{ fontSize: 10, transition: "transform 0.2s", transform: isOpen ? "rotate(0)" : "rotate(-90deg)" }}>▼</span>
-              </button>
-              {isOpen && (
-                <div style={{ padding: 12, background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 8px 8px" }}>
-                  {children}
-                </div>
-              )}
-            </div>
-          );
-        };
-
         return (
         <div style={{ padding: "12px 16px", borderTop: "1.5px solid #e5ddd0", background: "#faf7f2" }}>
 
@@ -813,13 +831,13 @@ export const IngredientRow = React.memo(function IngredientRow({
 
           {/* ═══ MOBILE: stacked accordions ═══ */}
           <div className="md:hidden">
-            <MobileAccordion label="Prix d'achat" sectionKey="prix">
+            <MobileAccordion label="Prix d'achat" sectionKey="prix" isOpen={mobileSection === "prix"} onToggleSection={toggleMobileSection}>
               {renderPrixContent()}
             </MobileAccordion>
-            <MobileAccordion label="Commande & stock" sectionKey="commande">
+            <MobileAccordion label="Commande & stock" sectionKey="commande" isOpen={mobileSection === "commande"} onToggleSection={toggleMobileSection}>
               {renderCommandeContent()}
             </MobileAccordion>
-            <MobileAccordion label="Établ. & allergènes" sectionKey="etab">
+            <MobileAccordion label="Établ. & allergènes" sectionKey="etab" isOpen={mobileSection === "etab"} onToggleSection={toggleMobileSection}>
               {renderEtabAllergenesContent()}
             </MobileAccordion>
           </div>

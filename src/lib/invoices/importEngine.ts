@@ -6,7 +6,7 @@ import * as fs from "node:fs/promises";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { detectCategoryFromName, normalizeIngredientName } from "@/lib/invoices/categoryDetector";
 import { detectAllergensFromName } from "@/lib/invoices/allergenDetector";
-import { extractPackFromName, extractVolumeFromName, extractWeightGFromName } from "@/lib/invoices/utils";
+import { extractPackFromName, extractVolumeFromName, extractWeightGFromName, extractWeightFromName } from "@/lib/invoices/utils";
 import type { Category } from "@/types/ingredients";
 
 const execFileAsync = promisify(execFile);
@@ -523,6 +523,9 @@ export async function runImport(options: {
         // Detect pack from product name (e.g., "LAIT 1L X6", "BIERE 33CL X24")
         const packInfo = l.name ? extractPackFromName(l.name) : null;
         const _volumeFromName = l.name ? extractVolumeFromName(l.name) : null;
+        // Detect unit weight/volume in name (e.g., "1,5KG", "500G", "75CL")
+        // Used to detect that a price is per-pack, not per-kg/L
+        const weightInName = l.name ? extractWeightFromName(l.name) : null;
 
         const offerRow: Record<string, unknown> = {
           user_id: userId,
@@ -549,6 +552,18 @@ export async function runImport(options: {
           } else {
             offerRow.pack_each_unit = "pc";
           }
+          offerRow.piece_weight_g = l.piece_weight_g ?? null;
+        } else if (weightInName && weightInName.totalQty !== 1 && u === weightInName.unit) {
+          // Weight/volume detected in product name AND matches the offer unit
+          // e.g. "HACHE VR 1,5KG" with unit="kg" → price is per barquette (1.5kg), not per kg
+          // Create pack_simple so the unit price is correctly derived
+          offerRow.price_kind = "pack_simple";
+          offerRow.pack_price = p;
+          offerRow.pack_total_qty = weightInName.totalQty;
+          offerRow.pack_unit = weightInName.unit;
+          offerRow.unit_price = p / weightInName.totalQty;
+          offerRow.unit = weightInName.unit;
+          offerRow.price = p;
           offerRow.piece_weight_g = l.piece_weight_g ?? null;
         } else {
           // Standard unit pricing
