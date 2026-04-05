@@ -45,15 +45,22 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/settings":     ["group_admin"],
 };
 
+// Routes accessible to anyone authenticated (no RBAC needed)
+const PUBLIC_ROUTES = ["/", "/login", "/auth", "/settings/account", "/mes-shifts", "/notifications"];
+
 /** Check if a role can access a given path (prefix match) */
 export function canAccess(role: Role, path: string): boolean {
+  // Public routes are always accessible
+  if (PUBLIC_ROUTES.some(r => path === r || path.startsWith(r + "/"))) return true;
+
   let bestMatch = "";
   for (const prefix of Object.keys(ROUTE_ACCESS)) {
     if (path === prefix || path.startsWith(prefix + "/")) {
       if (prefix.length > bestMatch.length) bestMatch = prefix;
     }
   }
-  if (!bestMatch) return true;
+  // Deny access to unlisted routes (security: deny by default)
+  if (!bestMatch) return role === "group_admin";
   return ROUTE_ACCESS[bestMatch].includes(role);
 }
 

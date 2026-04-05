@@ -4,6 +4,7 @@ import React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import type { Role } from "@/lib/rbac";
 import { BottomSheet } from "./BottomSheet";
 import { ChefHat, ShoppingBasket, Undo2 } from "lucide-react";
 
@@ -148,6 +149,7 @@ type TabSection = {
   match: string[];
   icon: (active: boolean) => React.ReactNode;
   tabs: Tab[];
+  roles?: Role[];
 };
 
 /* ── Sections with sub-tabs ──────────────────────── */
@@ -168,11 +170,21 @@ const SECTION_HOME: TabSection = {
   tabs: [],
 };
 
+const SECTION_MY_PLANNING: TabSection = {
+  label: "Planning",
+  href: "/mes-shifts",
+  match: ["/mes-shifts"],
+  icon: (a) => <IconCalendar active={a} />,
+  roles: ["equipier"],
+  tabs: [],
+};
+
 const SECTION_PERSONNEL: TabSection = {
   label: "Personnel",
   href: "/rh/equipe",
   match: ["/rh/", "/mes-shifts", "/plannings", "/personnel"],
   icon: (a) => <IconUsers active={a} />,
+  roles: ["group_admin"],
   tabs: [
     { label: "Employes", href: "/rh/equipe", match: ["/rh/equipe", "/rh/employe"], icon: (a) => <IconUsers active={a} /> },
     { label: "Conges", href: "/rh/conges", match: ["/rh/conges"], icon: (a) => <IconBeach active={a} /> },
@@ -185,6 +197,7 @@ const SECTION_PILOTAGE: TabSection = {
   href: "/ventes",
   match: ["/ventes", "/tresorerie"],
   icon: (a) => <IconWallet active={a} />,
+  roles: ["group_admin"],
   tabs: [
     { label: "Produits", href: "/ventes/marges", match: ["/ventes/marges"], icon: (a) => <IconWallet active={a} /> },
     { label: "Tresorerie", href: "/tresorerie", match: ["/tresorerie"], icon: (a) => <IconTrendingUp active={a} /> },
@@ -196,6 +209,7 @@ const SECTION_ACHATS: TabSection = {
   href: "/commandes",
   match: ["/achats", "/commandes", "/ingredients", "/invoices", "/fournisseurs", "/stats-achats"],
   icon: (a) => <IconShoppingBag active={a} />,
+  roles: ["group_admin"],
   tabs: [
     { label: "Produits", href: "/ingredients", match: ["/ingredients"], icon: () => <ShoppingBasket size={24} strokeWidth={1.8} /> },
     { label: "Commandes", href: "/commandes", match: ["/commandes"], icon: (a) => <IconTruck active={a} /> },
@@ -257,6 +271,7 @@ const SECTION_SETTINGS: TabSection = {
   href: "/settings/employes",
   match: ["/settings", "/admin"],
   icon: (a) => <IconSettings active={a} />,
+  roles: ["group_admin"],
   tabs: [
     { label: "Employes", href: "/settings/employes", match: ["/settings/employes"], icon: (a) => <IconUsers active={a} /> },
     { label: "Etab.", href: "/settings/etablissements", match: ["/settings/etablissements"], icon: (a) => <IconGrid active={a} /> },
@@ -265,8 +280,8 @@ const SECTION_SETTINGS: TabSection = {
   ],
 };
 
-const SECTIONS_BELLO: TabSection[] = [SECTION_HOME, SECTION_PILOTAGE, SECTION_PERSONNEL, SECTION_PRODUCTION, SECTION_ACHATS, SECTION_SETTINGS];
-const SECTIONS_PICCOLA: TabSection[] = [SECTION_HOME, SECTION_PILOTAGE, SECTION_PERSONNEL, SECTION_PRODUCTION_PICCOLA, SECTION_ACHATS, SECTION_EVENTS, SECTION_SETTINGS];
+const SECTIONS_BELLO: TabSection[] = [SECTION_HOME, SECTION_PILOTAGE, SECTION_PERSONNEL, SECTION_MY_PLANNING, SECTION_PRODUCTION, SECTION_ACHATS, SECTION_SETTINGS];
+const SECTIONS_PICCOLA: TabSection[] = [SECTION_HOME, SECTION_PILOTAGE, SECTION_PERSONNEL, SECTION_MY_PLANNING, SECTION_PRODUCTION_PICCOLA, SECTION_ACHATS, SECTION_EVENTS, SECTION_SETTINGS];
 
 const INACTIVE_COLOR = "#999";
 
@@ -318,7 +333,8 @@ export function BottomTabBar() {
   if (!role) return null;
 
   const isPiccola = current?.slug?.includes("piccola");
-  const sections = isPiccola ? SECTIONS_PICCOLA : SECTIONS_BELLO;
+  const allSections = isPiccola ? SECTIONS_PICCOLA : SECTIONS_BELLO;
+  const sections = allSections.filter(s => !s.roles || s.roles.includes(role));
   const activeSection = getActiveSection(pathname, sections);
   const showSubTabs = activeSection && activeSection.tabs.length > 0;
   const etabColor = isGroupView ? "#b45f57" : (current?.couleur ?? "#b45f57");
