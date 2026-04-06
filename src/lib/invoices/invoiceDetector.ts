@@ -50,7 +50,10 @@ const SUPPLIER_KEYWORDS: Record<string, { name: string; keywords: string[] }> = 
  * Searches for keywords (case-insensitive) in the text.
  */
 export function detectInvoice(rawText: string): DetectionResult {
-  const upper = rawText.toUpperCase();
+  // Collapse spaced-out uppercase words: "V I N O F L O" → "VINOFLO"
+  // pdfToText sometimes produces this pattern from certain PDFs
+  let upper = rawText.toUpperCase();
+  upper = upper.replace(/\b([A-ZÀ-Ü])((?:\s[A-ZÀ-Ü]){2,})\b/g, (_, first, rest) => first + rest.replace(/\s/g, ""));
 
   let supplier: DetectedSupplier | null = null;
   for (const [slug, { name, keywords }] of Object.entries(SUPPLIER_KEYWORDS)) {
