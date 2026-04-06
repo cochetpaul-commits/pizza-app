@@ -39,15 +39,15 @@ function extractMeta(
 
   // Total HT + TVA from VENTILATION summary line:
   // "TOTAL 12,70 1537,10 1537,10 1549,80 160,35"
-  //        droits  march.  serv.   total_ht  total_tva
+  // or "14 ATTESTATION FACTURE TOTAL 10,64 1385,33 1385,33 1395,97 220,27 ..."
   const totalMatch = text.match(
-    /^TOTAL\s+[\d,]+\s+[\d,]+\s+[\d,]+\s+([\d,]+)\s+([\d,]+)/m
+    /TOTAL\s+([\d,]+)\s+([\d,]+)\s+([\d,]+)\s+([\d,]+)\s+([\d,]+)/
   );
   let total_ht: number | null = null;
   let total_ttc: number | null = null;
   if (totalMatch) {
-    const ht = parseFrenchNumber(totalMatch[1]);
-    const tva = parseFrenchNumber(totalMatch[2]);
+    const ht = parseFrenchNumber(totalMatch[4]);
+    const tva = parseFrenchNumber(totalMatch[5]);
     if (ht != null) total_ht = ht;
     if (ht != null && tva != null) total_ttc = Math.round((ht + tva) * 100) / 100;
   }
@@ -55,35 +55,44 @@ function extractMeta(
   return { invoice_number, invoice_date, total_ht, total_ttc };
 }
 
-// Each product line ends with: QTY PU A[24] MONTANT 8 XXXXXX XXXXXX
-// The greedy .* forces QTY to be the RIGHTMOST integer before the tail
-const TAIL_RE = /(.*)\s(\d+)\s+([\d,]+)\s+(A[24])\s+([\d,]+)\s+8\s+\d{6}\s+\d{6}$/;
+// Product line tail: QTY PU A[24] MONTANT 8 EAN_DIGITS...
+// EAN can be 8 or 13 digits, split with spaces: "8 002172 8" or "8 002010 680458"
+const TAIL_RE = /(.*)\s(\d+)\s+([\d,]+)\s+(A[24])\s+([\d,]+)\s+8\s+\d{3,6}(?:\s+\d{1,6})?$/;
+
+// Lines that are clearly not product continuations (page headers, footers, noise)
+const NOISE_RE = /^(CONDITIONS|VOIR|VENTILATION|DROITS|MARCHANDISES|ATTESTATION|TOTAL|NB\.|VOL\.|VIGNETTE|RETARDS|AVIS|RECOMMANDATIONS|EXPEDITEUR|FACTURE|SIRET|COMMENTAIRES|NBRE|CODE\s+PR|CART\.|REMISES|RUM|IBAN|^\d{5}\s+SAINT|BONNEUIL|RUNGIS|^\*{3}|^-{3}|^N[°º]|^BL\s+N|REGLEMENT|HORS\s+TAXE|T\.V\.A|T\.T\.C|Société|BELLO|PICCOLA|FRATELLI|PLACE|FRANCE|SAINT\s+MALO|facture@|TVA\s*:|ACCISES|DOCUMENT\s+SIMP|COMMERCIAL|CONTROLE|Siège|Tel\s*:|Fax|E-mail|capital|R\.C\.S|Entrepôt|internet|LME\s+du)/i;
 
 function parseLines(text: string): ParsedLine[] {
   const rows = text.split(/\r?\n/);
 
-  // Product entries are between "BL N°..." and "LME du ..."
+  // Product entries are between "BL N°..." and end of products
   const SECTION_START_RE = /^BL\s+N°/;
-  const SECTION_END_RE = /^LME\s+du/i;
+  const SECTION_END_RE = /^(LME\s+du|VOIR\s+CONDITIONS)/i;
   // Each entry starts with: CODE 01NAME...
   const PROD_START_RE = /^(\d{4,6})\s+01(.*)$/;
 
   const entries: Array<{ sku: string; lines: string[] }> = [];
   let currentEntry: { sku: string; lines: string[] } | null = null;
   let inProducts = false;
+  let sectionCount = 0;
 
   for (const row of rows) {
     const trimmed = row.trim();
 
     if (!inProducts) {
-      if (SECTION_START_RE.test(trimmed)) inProducts = true;
+      if (SECTION_START_RE.test(trimmed)) {
+        inProducts = true;
+        sectionCount++;
+      }
       continue;
     }
 
+    // End of a product section
     if (SECTION_END_RE.test(trimmed)) {
       if (currentEntry) entries.push(currentEntry);
       currentEntry = null;
-      break;
+      inProducts = false; // allow finding the next section (page 2)
+      continue;
     }
 
     const m = PROD_START_RE.exec(trimmed);
@@ -91,7 +100,16 @@ function parseLines(text: string): ParsedLine[] {
       if (currentEntry) entries.push(currentEntry);
       currentEntry = { sku: m[1], lines: [m[2].trim()] };
     } else if (currentEntry && trimmed) {
-      currentEntry.lines.push(trimmed);
+      // Real continuations are short name parts immediately after: "DOC 0,75", "SICILIA"
+      // Stop collecting as soon as we see anything that isn't a short name part
+      const isNamePart = trimmed.length < 25 && /[A-Za-z]/.test(trimmed) && !NOISE_RE.test(trimmed) && currentEntry.lines.length <= 2;
+      if (isNamePart) {
+        currentEntry.lines.push(trimmed);
+      } else {
+        // Not a continuation — finalize entry and stop collecting
+        entries.push(currentEntry);
+        currentEntry = null;
+      }
     }
   }
 
@@ -100,9 +118,25 @@ function parseLines(text: string): ParsedLine[] {
   const result: ParsedLine[] = [];
 
   for (const entry of entries) {
-    const fullText = entry.lines.join(" ").trim();
-    const tail = TAIL_RE.exec(fullText);
-    if (!tail) continue;
+    // Strategy: try TAIL_RE on the first line alone first (handles multi-line
+    // entries where continuation text like "DOC 0,75" comes AFTER the EAN).
+    // If that fails, join all lines and try again.
+    let tail = TAIL_RE.exec(entry.lines[0]);
+    let nameSuffix = "";
+    if (tail) {
+      // Continuation lines are just name parts (e.g., "DOC 0,75", "0,75L", "SICILIA")
+      // Only keep short ones that look like real name parts, not page footer noise
+      if (entry.lines.length > 1) {
+        const parts = entry.lines.slice(1)
+          .filter((l) => l.length < 30 && !NOISE_RE.test(l));
+        if (parts.length > 0) nameSuffix = " " + parts.join(" ").trim();
+      }
+    } else {
+      // Try joined text
+      const fullText = entry.lines.join(" ").trim();
+      tail = TAIL_RE.exec(fullText);
+      if (!tail) continue;
+    }
 
     const prefix = tail[1]; // name + leading numeric noise
     const qty = parseInt(tail[2], 10);
@@ -121,7 +155,16 @@ function parseLines(text: string): ParsedLine[] {
         break;
       }
     }
-    const name = tokens.join(" ").trim();
+    let name = tokens.join(" ").trim();
+    // Append continuation suffix (e.g., "DOC 0,75") to name
+    if (nameSuffix) {
+      // Clean suffix: remove pure numeric parts that are not volume/weight info
+      const cleanSuffix = nameSuffix.trim();
+      if (cleanSuffix && !/^\d+$/.test(cleanSuffix)) {
+        name += " " + cleanSuffix;
+      }
+    }
+    name = name.replace(/\s+/g, " ").trim();
     if (!name) continue;
 
     result.push({
