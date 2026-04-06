@@ -351,7 +351,6 @@ function RecettesInner() {
   const [emps,      setEmps]      = useState<EmpRow[]>([]);
   const [loading,    setLoading]    = useState(true);
   const [loadErrors, setLoadErrors] = useState<string[]>([]);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [q, setQ]         = useState("");
   const [mainTab, setMainTab] = useState<MainTab>("tous");
   const [sortKey, setSortKey] = useState<SortKey>("name");
@@ -364,8 +363,6 @@ function RecettesInner() {
   const [showFilters, setShowFilters] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const [showCuisinePop, setShowCuisinePop] = useState(false);
-
-  function refresh() { setLoading(true); setRefreshKey(k => k + 1); }
 
   useEffect(() => {
     let cancelled = false;
@@ -409,7 +406,7 @@ function RecettesInner() {
     });
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshKey, etabCtx?.id]);
+  }, [etabCtx?.id]);
 
   // ── Food cost helpers ──
   const pizzaFc = (r: PizzaRow) => computeFoodCost(r.total_cost, r.sell_price, pvTTCPizza(r));
