@@ -50,7 +50,6 @@ const LINE_RE = /^(.+?)\s+([\d]+[.,]\d+)\s+([\d]+[.,]\d+)\s+([\d]+[.,]\d+)\s+([\
 
 function parseLines(text: string): ParsedLine[] {
   const result: ParsedLine[] = [];
-  const seen = new Set<string>();
 
   for (const row of text.split(/\r?\n/)) {
     const trimmed = row.trim();
@@ -70,12 +69,8 @@ function parseLines(text: string): ParsedLine[] {
 
     if (!name || pu == null) continue;
 
-    const key = `${name}|${pu}|${qty}|${montant}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    // Volume from name: "4.5 L VANILLE"
-    const volMatch = name.match(/^(\d+(?:[.,]\d+)?)\s*L\s+/i);
+    // Volume from name: "4.5 L VANILLE" or "BIO - 2.5 L CITRON"
+    const volMatch = name.match(/(\d+(?:[.,]\d+)?)\s*L\s+/i);
     const volumeMl = volMatch ? parseFloat(volMatch[1].replace(",", ".")) * 1000 : null;
 
     result.push({
