@@ -62,8 +62,13 @@ function extractMeta(text: string): Pick<ParsedInvoice, "invoice_number" | "invo
   const invoiceMatch = text.match(/Facture\s*N[°º]\s*([A-Z0-9]+)/i);
   const dateMatch = text.match(/(\d{2}\/\d{2}\/\d{4})/);
 
-  const totalTtcMatch = text.match(/Totals*TTC[s:]+([0-9][0-9 .,]*)/i);
   const totalHtMatch = text.match(/H\.T\.\s*:\s*([0-9][0-9 .,]*)/i);
+
+  // TTC: captured from the line "T.V.A. : 36,61 702,30" (TTC follows TVA amount)
+  // or fallback to "Net à payer" on same line
+  const totalTtcMatch =
+    text.match(/T\.V\.A\.\s*:\s*[\d,.]+\s+([\d,.]+)/i) ??
+    text.match(/Net\s+[àa]\s+payer\b[^\n]*([\d][0-9.,]+)/i);
 
   return {
     invoice_number: invoiceMatch?.[1] ?? null,
