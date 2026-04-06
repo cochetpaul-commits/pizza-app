@@ -18,17 +18,20 @@ export default function LoginPage() {
     try {
       setMsg("Connexion…");
 
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
 
       if (error) {
-        setMsg(`ERROR: ${error.message}`);
+        const msg = error.message.toLowerCase().includes("invalid login")
+          ? "Email ou mot de passe incorrect."
+          : error.message;
+        setMsg(msg);
         return;
       }
 
-      setMsg(`OK: ${data.user?.email ?? ""}`);
+      setMsg("");
       router.push("/");
       router.refresh();
       } catch (e: unknown) {
@@ -99,7 +102,11 @@ export default function LoginPage() {
                   Annuler
                 </button>
               </div>
-              {msg && <pre className="code" style={{ marginTop: 12 }}>{msg}</pre>}
+              {msg && msg !== "Connexion…" && (
+              <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: "rgba(220,38,38,0.08)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.15)" }}>
+                {msg}
+              </div>
+            )}
             </>
           )
         ) : (
@@ -144,7 +151,11 @@ export default function LoginPage() {
               Mot de passe oublie ?
             </button>
 
-            {msg && <pre className="code" style={{ marginTop: 12 }}>{msg}</pre>}
+            {msg && msg !== "Connexion…" && (
+              <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: "rgba(220,38,38,0.08)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.15)" }}>
+                {msg}
+              </div>
+            )}
           </>
         )}
       </div>
