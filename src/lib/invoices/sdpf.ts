@@ -118,8 +118,6 @@ function parseLines(text: string): ParsedLine[] {
     }
     merged.push(line);
   }
-  const mergedText = merged.join("\n");
-
   // Match line by line to avoid cross-line regex issues
   for (const row of merged) {
     let m = LINE_RE.exec(row);
