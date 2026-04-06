@@ -577,7 +577,7 @@ export default function EventsPage() {
 
         {/* ═══ FILTERS ═══ */}
         {!selectedDate && (
-          <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+          <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, marginBottom: 16 }}>
             {(["upcoming", "all", "past"] as const).map((f) => {
               const active = filter === f;
               return (
@@ -586,14 +586,15 @@ export default function EventsPage() {
                   onClick={() => setFilter(f)}
                   style={{
                     padding: "6px 16px",
-                    borderRadius: 20,
-                    border: active ? `1.5px solid ${accentDark}` : "1px solid #ddd6c8",
-                    background: active ? accentDark : "#fff",
-                    color: active ? "#fff" : "#6f6a61",
+                    borderRadius: 10,
+                    border: "none",
+                    background: active ? (etab?.couleur ? etab.couleur + "25" : "#fff") : "transparent",
+                    color: active ? "#1a1a1a" : "#999",
                     fontWeight: 700,
                     fontSize: 12,
                     cursor: "pointer",
-                    letterSpacing: 0.2,
+                    boxShadow: active ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+                    transition: "all 0.15s",
                   }}
                 >
                   {f === "upcoming" ? "À venir" : f === "all" ? "Tous" : "Passés"}

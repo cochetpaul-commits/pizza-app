@@ -1150,12 +1150,14 @@ export default function EtablissementDetailPage() {
     );
   };
 
+  const ec = settings?.couleur;
   const tabStyle = (t: Tab): React.CSSProperties => ({
-    padding: "6px 16px", borderRadius: 20, border: "none", cursor: "pointer",
+    padding: "6px 16px", borderRadius: 10, border: "none", cursor: "pointer",
     fontSize: 13, fontWeight: 600,
-    background: tab === t ? "#2D6A4F" : "transparent",
-    color: tab === t ? "#fff" : "#1a1a1a",
-    transition: "background 0.12s",
+    background: tab === t ? (ec ? ec + "25" : "#fff") : "transparent",
+    color: tab === t ? "#1a1a1a" : "#999",
+    boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+    transition: "all 0.15s",
   });
 
   return (
@@ -1178,7 +1180,7 @@ export default function EtablissementDetailPage() {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: "flex", gap: 4, marginBottom: 20 }}>
+        <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, marginBottom: 20 }}>
           <button type="button" style={tabStyle("social")} onClick={() => setTab("social")}>Regles sociales</button>
           <button type="button" style={tabStyle("planification")} onClick={() => setTab("planification")}>Planification</button>
           <button type="button" style={tabStyle("modulation")} onClick={() => setTab("modulation")}>Modulation</button>

@@ -365,7 +365,7 @@ export default function InvoicesPage() {
               <div style={{ fontSize: 11, color: "#999", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
                 Import par fournisseur
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <div style={{ display: "inline-flex", flexWrap: "wrap", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12 }}>
                 {SUPPLIERS.map((s) => (
                   <a key={s.slug} href={`/invoices/${s.slug}`}
                     style={{ ...pillBtnBase, textDecoration: "none" }}>
@@ -398,7 +398,7 @@ export default function InvoicesPage() {
                   <span style={checkBadge(false)}>⚠</span>
                   <div style={{ flex: 1 }}>
                     <div style={confirmLabel}>Etablissement non detecte</div>
-                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, marginTop: 8 }}>
                       {ETABS.map((e) => (
                         <button key={e.value} type="button"
                           onClick={() => setSelectedEtab(e.value)}
@@ -430,7 +430,7 @@ export default function InvoicesPage() {
                   <span style={checkBadge(false)}>⚠</span>
                   <div style={{ flex: 1 }}>
                     <div style={confirmLabel}>Fournisseur non detecte</div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                    <div style={{ display: "inline-flex", flexWrap: "wrap", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, marginTop: 8 }}>
                       {SUPPLIERS.map((s) => (
                         <button key={s.slug} type="button"
                           onClick={() => setSelectedSupplier(s.slug)}
@@ -551,12 +551,14 @@ export default function InvoicesPage() {
             {!batchRunning && batchItems.every(b => b.status === "pending") && (
               <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
                 <span style={{ fontSize: 12, color: "#666" }}>Etablissement par defaut :</span>
-                {ETABS.map(e => (
-                  <button key={e.value} type="button" onClick={() => setBatchEtab(e.value)}
-                    style={pillBtn(batchEtab === e.value)}>
-                    {e.name}
-                  </button>
-                ))}
+                <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12 }}>
+                  {ETABS.map(e => (
+                    <button key={e.value} type="button" onClick={() => setBatchEtab(e.value)}
+                      style={pillBtn(batchEtab === e.value)}>
+                      {e.name}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -772,15 +774,17 @@ const errorBox: React.CSSProperties = {
   border: "1px solid #f5c6c6",
 };
 
-const pillBtn = (active: boolean): React.CSSProperties => ({
+const pillBtn = (active: boolean, ec?: string): React.CSSProperties => ({
   padding: "6px 14px",
-  borderRadius: 8,
-  border: active ? "2px solid #D4775A" : "1px solid #ddd6c8",
-  background: active ? "rgba(212,119,90,0.08)" : "#fff",
-  color: active ? "#D4775A" : "#374151",
+  borderRadius: 10,
+  border: "none",
+  background: active ? (ec ? ec + "25" : "#fff") : "transparent",
+  color: active ? "#1a1a1a" : "#999",
   fontSize: 13,
   fontWeight: 700,
   cursor: "pointer",
+  boxShadow: active ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+  transition: "all 0.15s",
 });
 
 const pillBtnBase: React.CSSProperties = {

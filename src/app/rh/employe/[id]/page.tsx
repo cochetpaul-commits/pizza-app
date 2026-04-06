@@ -684,7 +684,7 @@ export default function EmployeDetailPage() {
               key={key}
               type="button"
               onClick={() => setMainTab(key)}
-              style={tabBtn(mainTab === key)}
+              style={tabBtn(mainTab === key, etab?.couleur)}
             >
               {label}
             </button>
@@ -2466,12 +2466,13 @@ const tabsRow: React.CSSProperties = {
   WebkitOverflowScrolling: "touch",
 };
 
-const tabBtn = (active: boolean): React.CSSProperties => ({
+const tabBtn = (active: boolean, ec?: string): React.CSSProperties => ({
   padding: "8px 16px",
   border: "none",
-  borderBottom: active ? "2px solid #e27f57" : "2px solid transparent",
-  background: "none",
-  color: active ? "#e27f57" : "#999",
+  borderBottom: "none",
+  borderRadius: 10,
+  background: active ? (ec ? ec + "25" : "#fff") : "transparent",
+  color: active ? "#1a1a1a" : "#999",
   fontSize: 13,
   fontWeight: 700,
   cursor: "pointer",
@@ -2482,6 +2483,8 @@ const tabBtn = (active: boolean): React.CSSProperties => ({
   alignItems: "center",
   gap: 6,
   whiteSpace: "nowrap",
+  boxShadow: active ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+  transition: "all 0.15s",
   flexShrink: 0,
 });
 

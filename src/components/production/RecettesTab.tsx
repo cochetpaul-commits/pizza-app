@@ -533,61 +533,6 @@ function RecettesInner() {
   return (
     <>
       <main className="container" style={{ paddingBottom: 80 }}>
-        {/* ── Header : line 1 — title + actions ── */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a", textTransform: "uppercase", letterSpacing: 1 }}>
-            Fiches techniques <span style={{ fontSize: 14, fontWeight: 500, color: "#999", letterSpacing: 0, textTransform: "none" }}>({totalCount})</span>
-          </h1>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {alertCount > 0 && (
-              <button type="button" onClick={() => { setFoodCostFilter("alerte"); }}
-                style={{ padding: "4px 10px", borderRadius: 8, border: "none", background: "rgba(139,26,26,0.10)", color: "#8B1A1A", fontSize: 11, fontWeight: 800, cursor: "pointer" }}>
-                {alertCount} alerte{alertCount > 1 ? "s" : ""}
-              </button>
-            )}
-            {canWrite && (
-              <div className="desktop-only" style={{ position: "relative" }}>
-                <button type="button" onClick={() => setShowFab(f => !f)}
-                  style={{ padding: "7px 14px", borderRadius: 10, border: "1.5px solid #D4775A", background: "#fff", color: "#D4775A", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-                  + Nouvelle recette
-                </button>
-                {showFab && (
-                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, minWidth: 200, background: "#fff", border: "1px solid #e0d8ce", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", overflow: "hidden", zIndex: 50 }}>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.12em", padding: "10px 16px 4px" }}>Nouvelle recette</div>
-                    {[
-                      { label: "Pizza", href: "/recettes/new/pizza", color: "#8B1A1A" },
-                      { label: "Cuisine", href: "/recettes/new/cuisine", color: "#4a6741" },
-                      { label: "Cocktail", href: "/recettes/new/cocktail", color: "#D4775A" },
-                      { label: "Empatement", href: "/recettes/new/empatement", color: "#888" },
-                    ].map(item => (
-                      <Link key={item.href} href={item.href} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", textDecoration: "none", fontSize: 14, fontWeight: 500, color: "#1a1a1a", borderBottom: "1px solid #f0ebe2" }}>
-                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: item.color, flexShrink: 0 }} />
-                        {item.label}
-                      </Link>
-                    ))}
-                    <div style={{ height: 1, background: "#e0d8ce", margin: "4px 0" }} />
-                    <button type="button" onClick={() => {
-                      const nom = prompt("Nom de la nouvelle categorie :");
-                      if (nom && nom.trim()) {
-                        const slug = nom.trim().toLowerCase().replace(/\s+/g, "_").normalize("NFD").replace(/[̀-ͯ]/g, "");
-                        router.push(`/recettes/new/cuisine?category=${encodeURIComponent(slug)}&categoryLabel=${encodeURIComponent(nom.trim())}`);
-                        setShowFab(false);
-                      }
-                    }} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", width: "100%", border: "none", background: "transparent", fontSize: 13, fontWeight: 600, color: "#D4775A", cursor: "pointer", textAlign: "left" }}>
-                      <span style={{ fontSize: 16, lineHeight: 1 }}>+</span>
-                      Nouvelle categorie
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-            <button onClick={refresh} disabled={loading}
-              style={{ width: 34, height: 34, borderRadius: "50%", border: "1.5px solid #ddd6c8", background: "#fff", fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {loading ? "…" : "↻"}
-            </button>
-          </div>
-        </div>
-
         {/* ── Erreurs ── */}
         {loadErrors.length > 0 && (
           <div style={{ marginBottom: 10, padding: "10px 14px", borderRadius: 10, background: "#FEF2F2", border: "1px solid rgba(139,26,26,0.2)", fontSize: 13 }}>
@@ -596,30 +541,42 @@ function RecettesInner() {
           </div>
         )}
 
-        {/* ── Line 2 — search + category dropdown + sort + filters ── */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ position: "relative", flex: 1 }}>
+        {/* ── Single-line header: title + search + filters + CTA ── */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a", textTransform: "uppercase", letterSpacing: 1, whiteSpace: "nowrap", flexShrink: 0 }}>
+            Fiches techniques <span style={{ fontSize: 13, fontWeight: 500, color: "#999", letterSpacing: 0, textTransform: "none" }}>({totalCount})</span>
+          </h1>
+          {alertCount > 0 && (
+            <button type="button" onClick={() => { setFoodCostFilter("alerte"); }}
+              style={{ padding: "4px 10px", borderRadius: 8, border: "none", background: "rgba(139,26,26,0.10)", color: "#8B1A1A", fontSize: 11, fontWeight: 800, cursor: "pointer", flexShrink: 0 }}>
+              {alertCount} alerte{alertCount > 1 ? "s" : ""}
+            </button>
+          )}
+          <div style={{ position: "relative", flex: 1, minWidth: 120 }}>
             <input
               type="search"
               placeholder="Rechercher..."
               value={q}
               onChange={e => setQ(e.target.value)}
               style={{
-                width: "100%", padding: "8px 12px", borderRadius: 10,
+                width: "100%", padding: "7px 12px", borderRadius: 10,
                 border: "1.5px solid #ddd6c8", background: "#fff",
                 fontSize: 13, outline: "none", boxSizing: "border-box",
               }}
             />
           </div>
-          {/* Category dropdown */}
+          {/* Category dropdown + sort + filters — grouped */}
+          <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, alignItems: "center", flexShrink: 0 }}>
           <div style={{ position: "relative", flexShrink: 0 }}>
             <button type="button" onClick={() => setShowCuisinePop(p => !p)}
               style={{
-                padding: "8px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                border: mainTab !== "tous" ? `1.5px solid ${mainTab === "pizza" ? PIZZA_COLOR : mainTab === "cuisine" ? CUISINE_COLOR : mainTab === "cocktail" ? COCKTAIL_COLOR : EMP_COLOR}` : "1.5px solid #ddd6c8",
-                background: mainTab !== "tous" ? (mainTab === "pizza" ? PIZZA_COLOR : mainTab === "cuisine" ? CUISINE_COLOR : mainTab === "cocktail" ? COCKTAIL_COLOR : EMP_COLOR) + "14" : "#fff",
-                color: mainTab !== "tous" ? (mainTab === "pizza" ? PIZZA_COLOR : mainTab === "cuisine" ? CUISINE_COLOR : mainTab === "cocktail" ? COCKTAIL_COLOR : EMP_COLOR) : "#1a1a1a",
+                padding: "6px 10px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                border: "none",
+                background: mainTab !== "tous" ? (etabCtx?.couleur ? etabCtx.couleur + "25" : "#fff") : "transparent",
+                color: mainTab !== "tous" ? "#1a1a1a" : "#999",
+                boxShadow: mainTab !== "tous" ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
                 cursor: "pointer", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
+                transition: "all 0.15s",
               }}>
               {mainTab === "tous" ? "Toutes" : mainTab === "pizza" ? "Pizza" : mainTab === "cuisine" ? (cuisineCatFilter !== "all" ? CUISINE_CAT_FILTERS.find(f => f.id === cuisineCatFilter)?.label ?? "Cuisine" : "Cuisine") : mainTab === "cocktail" ? "Cocktail" : "Empât."}
               <span style={{ fontSize: 10, opacity: 0.6 }}>({tabCounts[mainTab]})</span>
@@ -680,11 +637,12 @@ function RecettesInner() {
             <button type="button"
               onClick={() => { setProdFilter(p => !p); }}
               style={{
-                padding: "7px 10px", borderRadius: 10, fontSize: 11, fontWeight: 700,
-                border: prodFilter ? "1.5px solid #4a6741" : "1.5px solid #ddd6c8",
-                background: prodFilter ? "#4a674114" : "#fff",
+                padding: "6px 10px", borderRadius: 10, fontSize: 11, fontWeight: 700,
+                border: "none",
+                background: prodFilter ? (etabCtx?.couleur ? etabCtx.couleur + "25" : "#fff") : "transparent",
                 color: prodFilter ? "#4a6741" : "#999",
-                cursor: "pointer", whiteSpace: "nowrap",
+                boxShadow: prodFilter ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+                cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.15s",
               }}>
               Prod. ({prodCount})
             </button>
@@ -693,10 +651,11 @@ function RecettesInner() {
           <div style={{ position: "relative", flexShrink: 0 }}>
             <button type="button" onClick={() => setShowSort(s => !s)}
               style={{
-                height: 36, padding: "0 10px", borderRadius: 10,
-                border: "1.5px solid #ddd6c8", background: "#fff",
-                fontSize: 11, fontWeight: 700, color: "#1a1a1a", cursor: "pointer",
+                height: 30, padding: "0 10px", borderRadius: 10,
+                border: "none", background: "transparent",
+                fontSize: 11, fontWeight: 700, color: "#999", cursor: "pointer",
                 display: "flex", alignItems: "center", gap: 3,
+                transition: "all 0.15s",
               }}>
               {sortKey === "name" ? (sortDir === "asc" ? "A-Z" : "Z-A") : sortKey === "cost" ? "Coût" : sortKey === "fc" ? "FC" : "Prix"}
               <span style={{ fontSize: 8, opacity: 0.5 }}>{"▼"}</span>
@@ -741,14 +700,53 @@ function RecettesInner() {
           {/* Filters toggle */}
           <button type="button" onClick={() => setShowFilters(f => !f)}
             style={{
-              width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-              border: hasActiveFilter ? "1.5px solid #D4775A" : "1.5px solid #ddd6c8",
-              background: hasActiveFilter ? "#D4775A10" : "#fff",
+              width: 30, height: 30, borderRadius: 10, flexShrink: 0,
+              border: "none",
+              background: hasActiveFilter ? (etabCtx?.couleur ? etabCtx.couleur + "25" : "#fff") : "transparent",
+              boxShadow: hasActiveFilter ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
               cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 16, color: hasActiveFilter ? "#D4775A" : "#999",
+              transition: "all 0.15s",
             }}>
             {hasActiveFilter ? "✱" : "☰"}
           </button>
+          </div>{/* end segment group */}
+          {canWrite && (
+            <div className="desktop-only" style={{ position: "relative", flexShrink: 0 }}>
+              <button type="button" onClick={() => setShowFab(f => !f)}
+                style={{ padding: "7px 14px", borderRadius: 10, border: "none", background: "#D4775A", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", boxShadow: "0 1px 4px rgba(212,119,90,0.3)" }}>
+                + Nouvelle recette
+              </button>
+              {showFab && (
+                <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, minWidth: 200, background: "#fff", border: "1px solid #e0d8ce", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", overflow: "hidden", zIndex: 50 }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.12em", padding: "10px 16px 4px" }}>Nouvelle recette</div>
+                  {[
+                    { label: "Pizza", href: "/recettes/new/pizza", color: "#8B1A1A" },
+                    { label: "Cuisine", href: "/recettes/new/cuisine", color: "#4a6741" },
+                    { label: "Cocktail", href: "/recettes/new/cocktail", color: "#D4775A" },
+                    { label: "Empatement", href: "/recettes/new/empatement", color: "#888" },
+                  ].map(item => (
+                    <Link key={item.href} href={item.href} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", textDecoration: "none", fontSize: 14, fontWeight: 500, color: "#1a1a1a", borderBottom: "1px solid #f0ebe2" }}>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: item.color, flexShrink: 0 }} />
+                      {item.label}
+                    </Link>
+                  ))}
+                  <div style={{ height: 1, background: "#e0d8ce", margin: "4px 0" }} />
+                  <button type="button" onClick={() => {
+                    const nom = prompt("Nom de la nouvelle categorie :");
+                    if (nom && nom.trim()) {
+                      const slug = nom.trim().toLowerCase().replace(/\s+/g, "_").normalize("NFD").replace(/[̀-ͯ]/g, "");
+                      router.push(`/recettes/new/cuisine?category=${encodeURIComponent(slug)}&categoryLabel=${encodeURIComponent(nom.trim())}`);
+                      setShowFab(false);
+                    }
+                  }} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", width: "100%", border: "none", background: "transparent", fontSize: 13, fontWeight: 600, color: "#D4775A", cursor: "pointer", textAlign: "left" }}>
+                    <span style={{ fontSize: 16, lineHeight: 1 }}>+</span>
+                    Nouvelle categorie
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── Filter panel (collapsible) ── */}

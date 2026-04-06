@@ -615,17 +615,18 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         />
 
                 {/* ── Tab bar ── */}
-        <div style={{ display: "flex", gap: 0, borderBottom: "1.5px solid #ddd6c8", marginBottom: 16, overflowX: "auto" }}>
+        <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, marginBottom: 16, overflowX: "auto" }}>
           {MAIN_TABS.map((t) => (
             <button
               key={t.key}
               type="button"
               onClick={() => setMainTab(t.key)}
               style={{
-                padding: "10px 16px", fontSize: 13, fontWeight: mainTab === t.key ? 700 : 500,
-                cursor: "pointer", border: "none", background: "transparent",
-                color: mainTab === t.key ? "#D4775A" : "#999",
-                borderBottom: mainTab === t.key ? "2.5px solid #D4775A" : "2.5px solid transparent",
+                padding: "8px 20px", fontSize: 13, fontWeight: 600,
+                cursor: "pointer", border: "none", borderRadius: 10,
+                background: mainTab === t.key ? (etab?.couleur ? etab.couleur + "25" : "#fff") : "transparent",
+                color: mainTab === t.key ? "#1a1a1a" : "#999",
+                boxShadow: mainTab === t.key ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
                 transition: "all 0.15s", whiteSpace: "nowrap",
               }}
             >
@@ -798,17 +799,17 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
 
                     <div>
                       <label className="label">Catégorie</label>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      <div style={{ display: "inline-flex", flexWrap: "wrap", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12 }}>
                         {CATEGORIES.map(c => (
                           <button
                             key={c.id} type="button" onClick={() => setCategory(c.id)}
                             style={{
-                              padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                              border: "1.5px solid",
-                              borderColor: category === c.id ? "#4a6741" : "rgba(217,199,182,0.9)",
-                              background: category === c.id ? "rgba(22,101,52,0.08)" : "rgba(255,255,255,0.7)",
-                              color: category === c.id ? "#4a6741" : "#6f6a61",
-                              cursor: "pointer",
+                              padding: "6px 14px", borderRadius: 10, fontSize: 12, fontWeight: 600,
+                              border: "none",
+                              background: category === c.id ? (etab?.couleur ? etab.couleur + "25" : "#fff") : "transparent",
+                              color: category === c.id ? "#1a1a1a" : "#999",
+                              boxShadow: category === c.id ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+                              cursor: "pointer", transition: "all 0.15s",
                             }}
                           >{c.label}</button>
                         ))}

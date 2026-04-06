@@ -522,17 +522,18 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         />
 
                 {/* ── Tab bar ── */}
-        <div style={{ display: "flex", gap: 0, borderBottom: "1.5px solid #ddd6c8", marginBottom: 16, overflowX: "auto" }}>
+        <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, marginBottom: 16, overflowX: "auto" }}>
           {MAIN_TABS.map((t) => (
             <button
               key={t.key}
               type="button"
               onClick={() => setMainTab(t.key)}
               style={{
-                padding: "10px 16px", fontSize: 13, fontWeight: mainTab === t.key ? 700 : 500,
-                cursor: "pointer", border: "none", background: "transparent",
-                color: mainTab === t.key ? "#D4775A" : "#999",
-                borderBottom: mainTab === t.key ? "2.5px solid #D4775A" : "2.5px solid transparent",
+                padding: "8px 20px", fontSize: 13, fontWeight: 600,
+                cursor: "pointer", border: "none", borderRadius: 10,
+                background: mainTab === t.key ? (etab?.current?.couleur ? etab.current.couleur + "25" : "#fff") : "transparent",
+                color: mainTab === t.key ? "#1a1a1a" : "#999",
+                boxShadow: mainTab === t.key ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
                 transition: "all 0.15s", whiteSpace: "nowrap",
               }}
             >

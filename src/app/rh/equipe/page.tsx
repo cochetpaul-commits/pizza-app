@@ -220,13 +220,13 @@ export default function EquipePage() {
           />
 
           {/* Statut filter */}
-          <div style={{ display: "flex", gap: 4 }}>
+          <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12 }}>
             {(["actif", "inactif", "tous"] as StatutFilter[]).map((f) => (
               <button
                 key={f}
                 type="button"
                 onClick={() => setStatutFilter(f)}
-                style={pillBtn(statutFilter === f)}
+                style={pillBtn(statutFilter === f, etab?.couleur)}
               >
                 {f === "tous" ? "Tous" : f === "actif" ? "Actifs" : "Inactifs"}
               </button>
@@ -421,15 +421,17 @@ const searchStyle: React.CSSProperties = {
   outline: "none",
 };
 
-const pillBtn = (active: boolean): React.CSSProperties => ({
-  padding: "5px 12px",
-  borderRadius: 20,
-  border: active ? "1px solid #D4775A" : "1px solid #ddd6c8",
-  background: active ? "#D4775A" : "#fff",
-  color: active ? "#fff" : "#1a1a1a",
+const pillBtn = (active: boolean, ec?: string): React.CSSProperties => ({
+  padding: "6px 14px",
+  borderRadius: 10,
+  border: "none",
+  background: active ? (ec ? ec + "25" : "#fff") : "transparent",
+  color: active ? "#1a1a1a" : "#999",
   fontSize: 12,
   fontWeight: 600,
   cursor: "pointer",
+  boxShadow: active ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+  transition: "all 0.15s",
 });
 
 const tableStyle: React.CSSProperties = {

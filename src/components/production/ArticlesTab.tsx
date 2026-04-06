@@ -121,10 +121,12 @@ const S = {
     lineHeight: 1.2,
   } as CSSProperties,
   tabs: {
-    display: "flex",
-    gap: 0,
+    display: "inline-flex",
+    gap: 4,
+    padding: 4,
+    background: "#e8e0d0",
+    borderRadius: 12,
     marginBottom: 20,
-    borderBottom: `2px solid ${COLORS.border}`,
   } as CSSProperties,
   th: {
     padding: "10px 8px",
@@ -478,14 +480,15 @@ export function ArticlesContent() {
 
   /* ── Tab button style ── */
   const tabBtn = (t: Tab): CSSProperties => ({
-    padding: "10px 20px",
+    padding: "8px 20px",
     fontSize: 13,
     fontWeight: 600,
     cursor: "pointer",
     border: "none",
-    background: "transparent",
-    color: tab === t ? accent : COLORS.muted,
-    borderBottom: tab === t ? `3px solid ${accent}` : "3px solid transparent",
+    borderRadius: 10,
+    background: tab === t ? (etab?.couleur ? etab.couleur + "25" : "#fff") : "transparent",
+    color: tab === t ? "#1a1a1a" : COLORS.muted,
+    boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
     transition: "all .15s",
   });
 
@@ -498,16 +501,18 @@ export function ArticlesContent() {
         <td colSpan={5} style={{ padding: "16px 8px", background: "#faf7f2", borderBottom: `1px solid ${COLORS.border}` }}>
           <div style={{ maxWidth: 600 }}>
             {/* Link mode selector */}
-            <div className="ventes-link-modes" style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+            <div className="ventes-link-modes" style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, marginBottom: 14, flexWrap: "wrap" }}>
               {(["recette", "achat", "manuel"] as const).map((m) => (
                 <button
                   key={m}
                   onClick={() => { setLinkMode(m); setLinkRecipeId(""); setLinkIngredientId(""); }}
                   style={{
-                    ...S.btnOutline,
-                    background: linkMode === m ? accent : "transparent",
-                    color: linkMode === m ? "#fff" : COLORS.dark,
-                    borderColor: linkMode === m ? accent : COLORS.border,
+                    padding: "6px 14px", borderRadius: 10, fontSize: 12, fontWeight: 600,
+                    border: "none",
+                    background: linkMode === m ? (etab?.couleur ? etab.couleur + "25" : "#fff") : "transparent",
+                    color: linkMode === m ? "#1a1a1a" : "#999",
+                    boxShadow: linkMode === m ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+                    cursor: "pointer", transition: "all 0.15s",
                   }}
                 >
                   {m === "recette" ? "Lier a une recette" : m === "achat" ? "Lier a un produit d'achat" : "Saisir un cout manuellement"}

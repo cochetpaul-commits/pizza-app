@@ -266,13 +266,13 @@ export default function SettingsPlanningPage() {
         </div>
 
         {/* Section pills */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+        <div style={{ display: "inline-flex", flexWrap: "wrap", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, marginBottom: 16 }}>
           {SECTIONS.map((s) => (
             <button
               key={s}
               type="button"
               onClick={() => setActiveSection(s)}
-              style={pillBtn(activeSection === s)}
+              style={pillBtn(activeSection === s, etab?.couleur)}
             >
               {SECTION_LABELS[s]}
             </button>
@@ -285,7 +285,7 @@ export default function SettingsPlanningPage() {
             <div style={sectionTitle}>Social</div>
 
             <FieldRow label="Convention collective">
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12 }}>
                 {[
                   { key: "HCR_1979", label: "HCR (IDCC 1979)" },
                   { key: "RAPIDE_1501", label: "Rapide (IDCC 1501)" },
@@ -294,7 +294,7 @@ export default function SettingsPlanningPage() {
                     key={c.key}
                     type="button"
                     onClick={() => updateField("convention", c.key)}
-                    style={pillBtn(values.convention === c.key)}
+                    style={pillBtn(values.convention === c.key, etab?.couleur)}
                   >
                     {c.label}
                   </button>
@@ -383,7 +383,7 @@ export default function SettingsPlanningPage() {
             <div style={sectionTitle}>Conges payes</div>
 
             <FieldRow label="Base de calcul">
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12 }}>
                 {[
                   { key: 6, label: "Jours ouvrables (6j)" },
                   { key: 5, label: "Jours ouvres (5j)" },
@@ -392,7 +392,7 @@ export default function SettingsPlanningPage() {
                     key={c.key}
                     type="button"
                     onClick={() => updateField("base_calcul_cp", c.key)}
-                    style={pillBtn(values.base_calcul_cp === c.key)}
+                    style={pillBtn(values.base_calcul_cp === c.key, etab?.couleur)}
                   >
                     {c.label}
                   </button>
@@ -587,9 +587,9 @@ export default function SettingsPlanningPage() {
             </FieldRow>
 
             <FieldRow label="Equipe">
-              <div style={{ display: "flex", gap: 6 }}>
+              <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12 }}>
                 {["Cuisine", "Salle", "Shop"].map((eq) => (
-                  <button key={eq} type="button" onClick={() => setPEquipe(eq)} style={pillBtn(pEquipe === eq)}>
+                  <button key={eq} type="button" onClick={() => setPEquipe(eq)} style={pillBtn(pEquipe === eq, etab?.couleur)}>
                     {eq}
                   </button>
                 ))}
@@ -761,12 +761,14 @@ const inputStyle: React.CSSProperties = {
   outline: "none", boxSizing: "border-box",
 };
 
-const pillBtn = (active: boolean): React.CSSProperties => ({
-  padding: "6px 14px", borderRadius: 20,
-  border: active ? "1px solid #D4775A" : "1px solid #ddd6c8",
-  background: active ? "#D4775A" : "#fff",
-  color: active ? "#fff" : "#1a1a1a",
+const pillBtn = (active: boolean, ec?: string): React.CSSProperties => ({
+  padding: "6px 14px", borderRadius: 10,
+  border: "none",
+  background: active ? (ec ? ec + "25" : "#fff") : "transparent",
+  color: active ? "#1a1a1a" : "#999",
   fontSize: 12, fontWeight: 600, cursor: "pointer",
+  boxShadow: active ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+  transition: "all 0.15s",
 });
 
 const warningBox: React.CSSProperties = {

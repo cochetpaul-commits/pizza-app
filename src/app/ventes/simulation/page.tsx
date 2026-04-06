@@ -323,18 +323,19 @@ export default function SimulationPage() {
         </div>
 
         {/* ── Tabs ── */}
-        <div style={{ display: "flex", gap: 24, marginBottom: 20, borderBottom: "1px solid #f0ebe3", paddingBottom: 10 }}>
+        <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, marginBottom: 20 }}>
           {([
             { key: "reel" as Tab, label: "Masse salariale reelle", icon: "\uD83D\uDCCA" },
             { key: "tns" as Tab, label: "Statuts TNS", icon: "\uD83D\uDCCB" },
             { key: "simulateur" as Tab, label: "Simulateur d\u2019embauche", icon: "\uD83C\uDFAF" },
           ]).map((t) => (
             <button key={t.key} type="button" onClick={() => setTab(t.key)} style={{
-              background: "none", border: "none", cursor: "pointer", padding: "4px 0",
-              fontSize: 14, fontWeight: tab === t.key ? 700 : 500,
-              color: tab === t.key ? accent : "#999",
-              borderBottom: tab === t.key ? `2px solid ${accent}` : "2px solid transparent",
-              marginBottom: -11,
+              background: tab === t.key ? (etab?.couleur ? etab.couleur + "25" : "#fff") : "transparent",
+              border: "none", cursor: "pointer", padding: "8px 16px",
+              fontSize: 13, fontWeight: 600, borderRadius: 10,
+              color: tab === t.key ? "#1a1a1a" : "#999",
+              boxShadow: tab === t.key ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+              transition: "all 0.15s", whiteSpace: "nowrap",
             }}>
               {t.icon} {t.label}
             </button>

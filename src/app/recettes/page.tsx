@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useEtablissement } from "@/lib/EtablissementContext";
 import { RecettesContent } from "@/components/production/RecettesTab";
 import { CatalogueContent } from "@/components/production/CatalogueTab";
 import { ArticlesContent } from "@/components/production/ArticlesTab";
@@ -15,40 +16,37 @@ const TABS: { key: TabKey; label: string }[] = [
 
 export default function FichesTechniquesPage() {
   const [tab, setTab] = useState<TabKey>("recettes");
+  const { current: etab } = useEtablissement();
+  const ec = etab?.couleur;
 
   return (
     <div>
-      {/* Tab bar */}
+      {/* Tab bar — segment control */}
       <div style={{
-        display: "flex",
-        gap: 0,
-        borderBottom: "1.5px solid #e0d8ce",
-        marginBottom: 16,
-        overflowX: "auto",
-        position: "sticky",
-        top: 0,
-        background: "#f2ede4",
-        zIndex: 50,
+        padding: "12px 16px", position: "sticky", top: 0,
+        background: "#f2ede4", zIndex: 50,
       }}>
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            style={{
-              padding: "10px 20px",
-              fontSize: 13,
-              fontWeight: tab === t.key ? 700 : 500,
-              cursor: "pointer",
-              border: "none",
-              background: "transparent",
-              color: tab === t.key ? "#D4775A" : "#999",
-              borderBottom: tab === t.key ? "2.5px solid #D4775A" : "2.5px solid transparent",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
+        <div style={{
+          display: "inline-flex", gap: 4, padding: 4,
+          background: "#e8e0d0", borderRadius: 12,
+        }}>
+          {TABS.map(t => {
+            const active = tab === t.key;
+            return (
+              <button key={t.key} onClick={() => setTab(t.key)} style={{
+                padding: "8px 20px", fontSize: 13, fontWeight: 600,
+                cursor: "pointer", border: "none", borderRadius: 10,
+                background: active ? (ec ? ec + "25" : "#fff") : "transparent",
+                color: active ? "#1a1a1a" : "#999",
+                fontFamily: "inherit", whiteSpace: "nowrap",
+                boxShadow: active ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+                transition: "all 0.15s",
+              }}>
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Tab content — lazy render (only mount active tab) */}

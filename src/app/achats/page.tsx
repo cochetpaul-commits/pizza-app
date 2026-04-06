@@ -665,13 +665,16 @@ export default function AchatsPage() {
   const tdStyle: React.CSSProperties = { padding: "8px 10px", fontSize: 13 };
   const tdR: React.CSSProperties = { ...tdStyle, textAlign: "right" };
 
+  const ec = etab.current?.couleur;
   const pillStyle = (active: boolean): CSSProperties => ({
     fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 12, fontWeight: 700,
-    padding: "6px 16px", borderRadius: 20, cursor: "pointer",
-    border: active ? "1.5px solid #D4775A" : "1px solid #ddd6c8",
-    background: active ? "#D4775A" : "#fff",
-    color: active ? "#fff" : "#777",
+    padding: "6px 16px", borderRadius: 10, cursor: "pointer",
+    border: "none",
+    background: active ? (ec ? ec + "25" : "#fff") : "transparent",
+    color: active ? "#1a1a1a" : "#999",
     textTransform: "uppercase", letterSpacing: "0.06em",
+    boxShadow: active ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+    transition: "all 0.15s",
   });
 
   const navBtnStyle: CSSProperties = {

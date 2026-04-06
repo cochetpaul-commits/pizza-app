@@ -1098,15 +1098,15 @@ function IngredientsPageInner() {
       <div style={{ position: "sticky", top: 56, zIndex: 40, background: "#f2ede4", borderBottom: "1px solid #ddd6c8" }}>
 
         {/* Tabs — pill toggle scrollable */}
-        <div style={{ overflowX: "auto", display: "flex", gap: 6, padding: "10px 20px", background: "#f2ede4" }}>
+        <div style={{ overflowX: "auto", display: "inline-flex", gap: 4, padding: 4, margin: "0 16px", background: "#e8e0d0", borderRadius: 12 }}>
           {TABS_MAIN.map(({ t, label, count }) => (
             <button key={t} onClick={() => setTab(t)} style={{
               flexShrink: 0, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
-              borderRadius: 12, whiteSpace: "nowrap",
-              border: tab === t ? "1.5px solid #D4775A" : "1.5px solid #ddd6c8",
-              background: tab === t ? "#D4775A" : "#fff",
-              color: tab === t ? "#fff" : "#999",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+              borderRadius: 10, whiteSpace: "nowrap",
+              border: "none",
+              background: tab === t ? (etab?.couleur ? etab.couleur + "25" : "#fff") : "transparent",
+              color: tab === t ? "#1a1a1a" : "#999",
+              boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
               transition: "all 0.15s",
             }}>{label} ({count})</button>
           ))}

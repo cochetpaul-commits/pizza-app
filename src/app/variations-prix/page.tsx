@@ -265,10 +265,14 @@ export default function VariationsPrixPage() {
   const totalActiveAlerts = activeUp.length + activeDown.length;
 
   // ── Styles ──
-  const pillBtn = (active: boolean, color = "#D4775A") => ({
-    padding: "5px 13px", borderRadius: 20, border: `1px solid ${active ? color : "rgba(217,199,182,0.95)"}`,
-    background: active ? color : "rgba(255,255,255,0.38)", color: active ? "#fff" : "var(--text)" as const,
-    fontWeight: 700, fontSize: 13, cursor: "pointer" as const, transition: "all 120ms",
+  const ec = etab?.couleur;
+  const pillBtn = (active: boolean, _color = "#D4775A") => ({
+    padding: "6px 14px", borderRadius: 10, border: "none" as const,
+    background: active ? (ec ? ec + "25" : "#fff") : "transparent",
+    color: active ? "#1a1a1a" : "#999" as const,
+    fontWeight: 700, fontSize: 13, cursor: "pointer" as const,
+    boxShadow: active ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+    transition: "all 0.15s",
   });
 
   return (
@@ -284,7 +288,7 @@ export default function VariationsPrixPage() {
         {error && <div className="errorBox" style={{ marginBottom: 16 }}>{error}</div>}
 
         {/* ── Tabs ── */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+        <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, marginBottom: 16 }}>
           {[
             { key: "variations" as const, label: "Variations" },
             { key: "alertes" as const, label: "Alertes", badge: totalActiveAlerts },
@@ -293,21 +297,17 @@ export default function VariationsPrixPage() {
               key={t.key}
               onClick={() => setTab(t.key)}
               style={{
+                ...pillBtn(tab === t.key),
                 display: "inline-flex", alignItems: "center", gap: 6,
-                padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                border: `1.5px solid ${tab === t.key ? "#D4775A" : "rgba(217,199,182,0.95)"}`,
-                background: tab === t.key ? "#D4775A" : "rgba(255,255,255,0.55)",
-                color: tab === t.key ? "#fff" : "var(--text)",
-                cursor: "pointer",
               }}
             >
               {t.label}
               {t.badge != null && t.badge > 0 && (
                 <span style={{
                   fontSize: 11, fontWeight: 900, lineHeight: 1,
-                  background: tab === t.key ? "rgba(255,255,255,0.25)" : "rgba(220,38,38,0.12)",
-                  color: tab === t.key ? "#fff" : "#DC2626",
-                  border: tab === t.key ? "1px solid rgba(255,255,255,0.35)" : "1px solid rgba(220,38,38,0.25)",
+                  background: "rgba(220,38,38,0.12)",
+                  color: "#DC2626",
+                  border: "1px solid rgba(220,38,38,0.25)",
                   borderRadius: 999, padding: "2px 7px",
                 }}>
                   {t.badge}
@@ -323,7 +323,7 @@ export default function VariationsPrixPage() {
             {/* Période */}
             <div className="card" style={{ marginBottom: 12, padding: "12px 14px" }}>
               <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.6, letterSpacing: 0.5, marginBottom: 8, textTransform: "uppercase" }}>Période</div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, flexWrap: "wrap" }}>
                 {PERIODS.map(p => (
                   <button key={p.key} onClick={() => setPeriod(p.key)} style={pillBtn(period === p.key)}>{p.label}</button>
                 ))}
@@ -411,7 +411,7 @@ export default function VariationsPrixPage() {
                 {/* Sort + list */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 8, flexWrap: "wrap" }}>
                   <div style={{ fontSize: 13, opacity: 0.7 }}>{sorted.length} variation{sorted.length > 1 ? "s" : ""}</div>
-                  <div style={{ display: "flex", gap: 6 }}>
+                  <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12 }}>
                     {(["date", "pct", "price"] as const).map(s => (
                       <button key={s} onClick={() => setSortBy(s)} style={pillBtn(sortBy === s, "#6B6257")}>
                         {s === "date" ? "Date" : s === "pct" ? "%" : "Prix"}
