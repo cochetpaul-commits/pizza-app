@@ -74,15 +74,12 @@ function parseLines(text: string): ParsedLine[] {
   const entries: Array<{ sku: string; lines: string[] }> = [];
   let currentEntry: { sku: string; lines: string[] } | null = null;
   let inProducts = false;
-  let sectionCount = 0;
-
   for (const row of rows) {
     const trimmed = row.trim();
 
     if (!inProducts) {
       if (SECTION_START_RE.test(trimmed)) {
         inProducts = true;
-        sectionCount++;
       }
       continue;
     }
