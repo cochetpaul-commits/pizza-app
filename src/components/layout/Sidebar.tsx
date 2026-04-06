@@ -52,7 +52,7 @@ const C = {
   textActive: "#2c2c2c",
   divider: "rgba(0,0,0,0.06)",
   ifratelli: "#b45f57",
-  piccolaMia: "#c4a24e",
+  piccolaMia: "#e6c428",
 };
 
 function isRoleAllowed(roles: Role[] | undefined, role: Role | null): boolean {

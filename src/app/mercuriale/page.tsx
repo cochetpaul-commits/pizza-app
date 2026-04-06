@@ -81,7 +81,7 @@ export default function MercurialePage() {
       <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, padding: 20, marginBottom: 12 }}>
         <div style={{ fontWeight: 700, marginBottom: 10, color: "#374151", fontSize: 13 }}>Établissement</div>
         <div style={{ display: "flex", gap: 8 }}>
-          {([["all", "Tous", "#999999"], ["bellomio", "Bello Mio", "#e27f57"], ["piccola", "Piccola Mia", "#efd199"]] as const).map(([v, label, color]) => (
+          {([["all", "Tous", "#999999"], ["bellomio", "Bello Mio", "#e27f57"], ["piccola", "Piccola Mia", "#e6c428"]] as const).map(([v, label, color]) => (
             <button key={v} onClick={() => setEstablishment(v)} style={btnStyle(establishment === v, color)}>{label}</button>
           ))}
         </div>

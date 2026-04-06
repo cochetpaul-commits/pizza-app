@@ -7,8 +7,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { T } from "@/lib/tokens";
 import { RequireRole } from "@/components/RequireRole";
 
-const COLOR = "#8B6914";
-const COLOR_LIGHT = "#efd199";
+const COLOR = "#e6c428";
+const COLOR_LIGHT = "#f8edb0";
 
 function fmtEur(n: number) {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });

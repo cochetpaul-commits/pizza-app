@@ -4,7 +4,7 @@ export const T = {
   creme: "#f6eedf",
   cremeLegacy: "#f2ede4",
   terracotta: "#e27f57",
-  jaune: "#efd199",
+  jaune: "#f8edb0",
   jauneDark: "#a8893a",
   dark: "#1a1a1a",
   muted: "#999",
@@ -17,7 +17,7 @@ export const T = {
   sidebar: "#1a1512",
   ifratelli: "#b45f57",
   belloMio: "#e27f57",
-  piccolaMia: "#efd199",
+  piccolaMia: "#e6c428",
 
   // Section accents
   sauge: "#4a6741",       // achats, approvisionnement

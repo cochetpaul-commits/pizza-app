@@ -18,8 +18,8 @@ export type DevisPdfData = {
   logoBase64: string | null;
 };
 
-const GOLD = "#8B6914";
-const GOLD_LIGHT = "#efd199";
+const GOLD = "#e6c428";
+const GOLD_LIGHT = "#f8edb0";
 const TEXT_DARK = "#1a1a1a";
 const TEXT_MUTED = "#666";
 const BORDER = "#ddd6c8";

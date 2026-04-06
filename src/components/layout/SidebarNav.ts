@@ -191,7 +191,7 @@ export function buildDynamicNav(
 /** Hardcoded fallback while context loads */
 export const SIDEBAR_NAV_V2: SidebarEntry[] = buildDynamicNav([
   { slug: "bello-mio", nom: "Bello Mio", couleur: "#e27f57" },
-  { slug: "piccola-mia", nom: "Piccola Mia", couleur: "#efd199" },
+  { slug: "piccola-mia", nom: "Piccola Mia", couleur: "#e6c428" },
 ]);
 
 /* ── Simplified nav for employee roles ─────────────────── */

@@ -568,7 +568,7 @@ export default function EmployeDetailPage() {
             // Employé + Manager = couleur du restaurant de l'employé
             const c = empEtab?.couleur ?? etab?.couleur ?? "#e27f57";
             // Fallback si couleur est le défaut Supabase #D4775A
-            const finalColor = (c === "#D4775A" && empEtab?.nom?.toLowerCase().includes("piccola")) ? "#efd199" : c;
+            const finalColor = (c === "#D4775A" && empEtab?.nom?.toLowerCase().includes("piccola")) ? "#e6c428" : c;
             return `linear-gradient(135deg, ${finalColor} 0%, ${finalColor}cc 100%)`;
           })(),
           borderRadius: 14, padding: "20px 24px 0", color: "#fff",
