@@ -64,12 +64,21 @@ function extractMeta(
   return { invoice_number: invMatch?.[1] ?? null, invoice_date, total_ht, total_ttc };
 }
 
-// Line regex: REF NAME UNIT TIxxxxxx du DD/MM/YY QTY PU [REMISE] MONTANT_HT
+// Line regex: REF NAME T[A-Z]xxxxxx du DD/MM/YY QTY PU [REMISE] MONTANT_HT
+// Unit (KG, PCE...) may be in the name or on a continuation line
 const LINE_RE =
-  /(\d{6,15})\s+(.+?)\s+(KG|PCE?|PCS|L|CL|ML|BT|LOT|PIECE|UNITE?)\s+TI\d+\s+du\s+\d{2}\/\d{2}\/\d{2,4}\s+([\d.,]+)\s+([\d.,]+)\s+(?:([\d.,]+)\s+)?([\d.,]+)/gi;
+  /(\d{6,15})\s+(.+?)\s+T[A-Z]\d+\s+du\s+\d{2}\/\d{2}\/\d{2,4}\s+([\d.,]+)\s+([\d.,]+)\s+(?:([\d.,]+)\s+)?([\d.,]+)/gi;
 
+// Fallback: no T[A-Z] reference — just REF NAME QTY PU [REMISE] MONTANT
 const LINE_ALT_RE =
   /(\d{6,15})\s+(.+?)\s+(KG|PCE?|PCS|L|CL|ML|BT|LOT|PIECE|UNITE?)\s+([\d.,]+)\s+([\d.,]+)\s+(?:([\d.,]+)\s+)?([\d.,]+)/gi;
+
+function unitFromName(name: string): "kg" | "l" | "pc" {
+  const u = name.toUpperCase();
+  if (/\bKG\b/.test(u)) return "kg";
+  if (/\b(L|CL|ML|LIT)\b/.test(u)) return "l";
+  return "pc";
+}
 
 function parseLines(text: string): ParsedLine[] {
   const result: ParsedLine[] = [];
@@ -83,46 +92,72 @@ function parseLines(text: string): ParsedLine[] {
   }
 
   function extractTaxRate(text: string): number | null {
-    // Look for TVA rate in the TVA summary: "V05 444,90 5,5% 24,47" or "V20 ... 20% ..."
     const m = text.match(/(\d+[.,]?\d*)\s*%/);
     return m ? parseFrenchNumber(m[1]) : null;
   }
 
   const defaultTaxRate = extractTaxRate(text);
 
-  LINE_RE.lastIndex = 0;
-  let m: RegExpExecArray | null;
-
-  while ((m = LINE_RE.exec(text)) !== null) {
-    const sku = m[1];
-    const name = m[2].trim().replace(/\s+/g, " ");
-    const rawUnit = m[3];
-    const qty = parseFrenchNumber(m[4]);
-    const pu = parseFrenchNumber(m[5]);
-    const montant = parseFrenchNumber(m[7]);
-
-    const key = `${sku}|${name}|${qty}|${pu}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    result.push({
-      sku,
-      name,
-      quantity: qty,
-      unit: unitMap(rawUnit),
-      unit_price: pu,
-      total_price: montant,
-      tax_rate: defaultTaxRate,
-      notes: null,
-      piece_weight_g: null,
-      piece_volume_ml: null,
-    });
+  // Pre-process: merge continuation lines into main product lines
+  // Continuation lines are short, don't start with a long digit ref, and contain unit/description
+  const rows = text.split(/\r?\n/);
+  const merged: string[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const line = rows[i].trim();
+    if (!line) continue;
+    // If the line already ends with a price (complete product line), don't merge.
+    // Only merge continuations onto lines that are missing data (e.g., name-only lines).
+    // Continuation = short, starts with letters, no leading digits that could be a ref or price.
+    if (i + 1 < rows.length && !/[\d.,]+$/.test(line)) {
+      const next = rows[i + 1]?.trim() ?? "";
+      if (next && next.length < 40 && !/^\d{6,}/.test(next) && /[A-Za-z]/.test(next) && !/^(Code|TOTAL|Conditions|Page|Conformément|Téléphone|Télécopie|Courriel|Site|V\d{2}\s)/i.test(next)) {
+        merged.push(line + " " + next);
+        i++; // skip next line
+        continue;
+      }
+    }
+    merged.push(line);
   }
+  const mergedText = merged.join("\n");
 
-  // Fallback
-  if (result.length === 0) {
+  // Match line by line to avoid cross-line regex issues
+  for (const row of merged) {
+    let m = LINE_RE.exec(row);
+    LINE_RE.lastIndex = 0;
+    if (m) {
+      const sku = m[1];
+      const name = m[2].trim().replace(/\s+/g, " ");
+      const qty = parseFrenchNumber(m[3]);
+      const pu = parseFrenchNumber(m[4]);
+      const montant = parseFrenchNumber(m[6]);
+
+      const key = `${sku}|${name}|${qty}|${pu}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        // Look at next line for unit info (e.g., "BLOC KG", "1KG400 ES")
+        const nextIdx = merged.indexOf(row) + 1;
+        const nextLine = nextIdx < merged.length ? merged[nextIdx] : "";
+        const fullName = name + (nextLine && !/^\d{6,}/.test(nextLine) && nextLine.length < 30 ? " " + nextLine.trim() : "");
+        result.push({
+          sku,
+          name: fullName.replace(/\s+/g, " ").trim(),
+          quantity: qty,
+          unit: unitFromName(fullName),
+          unit_price: pu,
+          total_price: montant,
+          tax_rate: defaultTaxRate,
+          notes: null,
+          piece_weight_g: null,
+          piece_volume_ml: null,
+        });
+      }
+      continue;
+    }
+
+    // Fallback: no T[A-Z] reference
+    m = LINE_ALT_RE.exec(row);
     LINE_ALT_RE.lastIndex = 0;
-    while ((m = LINE_ALT_RE.exec(text)) !== null) {
+    if (m) {
       const sku = m[1];
       const name = m[2].trim().replace(/\s+/g, " ");
       const rawUnit = m[3];
@@ -131,21 +166,21 @@ function parseLines(text: string): ParsedLine[] {
       const montant = parseFrenchNumber(m[7]);
 
       const key = `${sku}|${name}|${qty}|${pu}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      result.push({
-        sku,
-        name,
-        quantity: qty,
-        unit: unitMap(rawUnit),
-        unit_price: pu,
-        total_price: montant,
-        tax_rate: defaultTaxRate,
-        notes: null,
-        piece_weight_g: null,
-        piece_volume_ml: null,
-      });
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push({
+          sku,
+          name,
+          quantity: qty,
+          unit: unitMap(rawUnit),
+          unit_price: pu,
+          total_price: montant,
+          tax_rate: defaultTaxRate,
+          notes: null,
+          piece_weight_g: null,
+          piece_volume_ml: null,
+        });
+      }
     }
   }
 
