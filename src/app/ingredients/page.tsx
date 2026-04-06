@@ -883,13 +883,27 @@ function IngredientsPageInner() {
         }
       }
     }
+    // Auto-validate if still "to_check" — one click instead of two
+    const ing = items.find((i) => i.id === editingId);
+    if (ing && ing.status !== "validated" && userId) {
+      const off = offersByIngredientId.get(editingId);
+      const hasP = offerHasPrice(off, { piece_volume_ml: ing.piece_volume_ml }) || legacyHasPrice(ing);
+      if (hasP) {
+        await supabase.from("ingredients").update({
+          status: "validated" as IngredientStatus,
+          validated_at: new Date().toISOString(),
+          validated_by: userId,
+          status_note: null,
+        }).eq("id", editingId);
+      }
+    }
     const scrollY = window.scrollY;
     setEditingId(null); setEdit(null);
     if (backUrl) { router.push(backUrl); return; }
     await mutate();
     requestAnimationFrame(() => window.scrollTo(0, scrollY));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingId, edit, userId, backUrl, router, mutate]);
+  }, [editingId, edit, userId, items, offersByIngredientId, backUrl, router, mutate]);
 
   const del = useCallback(async (id: string, name: string) => {
     if (!confirm(`Supprimer "${name}" ?`)) return;
