@@ -10,7 +10,7 @@ import { fetchApi } from "@/lib/fetchApi";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { IngredientAvatar } from "@/components/IngredientAvatar";
 import type { Category } from "@/types/ingredients";
-import { FloatingActions, FAIconPdf, FAIconMail, FAIconTrash, FAIconCheck } from "@/components/layout/FloatingActions";
+import { FloatingActions, FAIconPdf, FAIconMail, FAIconTrash, FAIconCheck, FAIconPause, FAIconPlus } from "@/components/layout/FloatingActions";
 import type { FloatingAction } from "@/components/layout/FloatingActions";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 
@@ -866,6 +866,18 @@ function CommandesPage() {
     setTimeout(() => setConfirmation(null), 6000);
   }
 
+  // ── Pause: quit the current draft without deleting it ───────────────
+  // The brouillon stays in DB; user can resume later via the supplier drawer.
+
+  function pauseSession() {
+    setSession(null);
+    setSelectedSupplierId(null);
+    setQuantities({});
+    setNotes("");
+    setConfirmation("Commande mise en pause");
+    setTimeout(() => setConfirmation(null), 3000);
+  }
+
   // ── Delete session ──────────────────────────────────────────────────
 
   async function deleteSession() {
@@ -1429,46 +1441,33 @@ function CommandesPage() {
           </div>
         )}
 
-        {/* Nouvelle commande / Changer fournisseur button */}
-        {!loading && suppliers.length > 0 && (
+        {/* Current supplier indicator (when selected) */}
+        {!loading && selectedSupplierId && currentSupplier && (
           <button
             type="button"
             onClick={() => setDropdownOpen(true)}
             style={{
-              width: "100%", height: 52, padding: "0 18px",
-              borderRadius: 14,
-              border: "none",
-              background: selectedSupplierId ? "#fff" : "#D4775A",
-              color: selectedSupplierId ? "#1a1a1a" : "#fff",
-              fontSize: 15, fontWeight: 700,
+              width: "100%", height: 48, padding: "0 18px",
+              borderRadius: 12,
+              border: "1px solid rgba(0,0,0,0.08)",
+              background: "#fff",
+              color: "#1a1a1a",
+              fontSize: 13, fontWeight: 700,
               fontFamily: "var(--font-oswald), Oswald, sans-serif",
               textTransform: "uppercase", letterSpacing: ".04em",
               cursor: "pointer", outline: "none",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-              boxShadow: selectedSupplierId ? "0 2px 8px rgba(0,0,0,0.06)" : "0 6px 20px rgba(212,119,90,0.28)",
-              transition: "all 0.15s",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
             }}
           >
-            {selectedSupplierId ? (
-              <>
-                <span style={{ color: "#999", fontWeight: 500, fontSize: 11 }}>FOURNISSEUR</span>
-                <span>{currentSupplier?.name ?? ""}</span>
-                {currentSupplier && draftSupplierIds.has(currentSupplier.id) && (
-                  <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#D4775A" }} />
-                )}
-                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginLeft: 4, opacity: 0.5 }}>
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </>
-            ) : (
-              <>
-                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                Nouvelle commande
-              </>
+            <span style={{ color: "#999", fontWeight: 500, fontSize: 11 }}>FOURNISSEUR</span>
+            <span>{currentSupplier.name}</span>
+            {draftSupplierIds.has(currentSupplier.id) && (
+              <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#D4775A" }} />
             )}
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginLeft: 4, opacity: 0.5 }}>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
           </button>
         )}
 
@@ -1751,38 +1750,6 @@ function CommandesPage() {
           </div>
         )}
 
-        {/* Action bar (brouillon) */}
-        {!loading && !loadingSupplier && session?.status === "brouillon" && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>
-            <button type="button" onClick={() => deleteSession()}
-              disabled={saving}
-              style={{
-                padding: "8px 16px", borderRadius: 8, border: "none",
-                background: "none", color: "#DC2626", fontSize: 12, fontWeight: 600,
-                cursor: "pointer", fontFamily: "inherit",
-              }}>
-              Supprimer
-            </button>
-            <button type="button" onClick={() => downloadPdf(session.id)}
-              style={{
-                padding: "8px 16px", borderRadius: 8, border: "1.5px solid #ddd6c8",
-                background: "#fff", color: "#1a1a1a", fontSize: 12, fontWeight: 600,
-                cursor: "pointer", fontFamily: "inherit",
-              }}>
-              Télécharger PDF
-            </button>
-            <button type="button" onClick={() => sendEmailOnly(session.id)}
-              disabled={sendingEmail}
-              style={{
-                padding: "8px 16px", borderRadius: 8, border: "none",
-                background: "#D4775A", color: "#fff", fontSize: 12, fontWeight: 600,
-                cursor: "pointer", fontFamily: "inherit", opacity: sendingEmail ? 0.6 : 1,
-              }}>
-              {sendingEmail ? "Envoi..." : "Envoyer par mail"}
-            </button>
-          </div>
-        )}
-
         {(loading || loadingSupplier) && (
           <p style={{ textAlign: "center", color: "#999", marginTop: 40 }}>Chargement...</p>
         )}
@@ -1969,19 +1936,27 @@ function CommandesPage() {
           );
         })()}
 
-        {/* Floating mobile actions for brouillon */}
+        {/* Floating actions — draft in progress */}
         {session && session.status === "brouillon" && (
           <FloatingActions actions={(() => {
             const acts: FloatingAction[] = [
               { icon: <FAIconTrash size={20} color="#DC2626" />, label: "Supprimer", onClick: () => deleteSession(), disabled: saving },
               { icon: <FAIconPdf size={20} color="#666" />, label: "PDF", onClick: () => downloadPdf(session.id) },
               { icon: <FAIconMail size={20} color="#666" />, label: "Envoyer", onClick: () => sendEmailOnly(session.id), disabled: sendingEmail },
+              { icon: <FAIconPause size={20} color="#666" />, label: "Pause", onClick: () => pauseSession() },
             ];
             if (activeCount > 0) {
               acts.push({ icon: <FAIconCheck size={22} color="#fff" />, label: "Valider", onClick: () => validerSession(session.id), primary: true, disabled: saving });
             }
             return acts;
           })()} />
+        )}
+
+        {/* Floating action — new commande (no draft in progress) */}
+        {!loading && !session && (
+          <FloatingActions actions={[
+            { icon: <FAIconPlus size={24} color="#fff" />, label: "Nouvelle commande", onClick: () => setDropdownOpen(true), primary: true },
+          ]} />
         )}
       </div>
     </RequireRole>

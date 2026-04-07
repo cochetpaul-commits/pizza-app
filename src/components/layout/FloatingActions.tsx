@@ -86,6 +86,15 @@ export function FAIconPdf({ size = 20, color = "currentColor" }: IconProps) {
   );
 }
 
+export function FAIconPause({ size = 20, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="6" y="4" width="4" height="16" />
+      <rect x="14" y="4" width="4" height="16" />
+    </svg>
+  );
+}
+
 /* ── Component ─────────────────────────────────────────────────── */
 
 export function FloatingActions({ actions }: FloatingActionsProps) {
