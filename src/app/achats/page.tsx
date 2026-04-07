@@ -7,8 +7,9 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { getSupplierColor } from "@/lib/supplierColors";
 import Chart from "chart.js/auto";
-import { FloatingActions, FAIconUpload } from "@/components/layout/FloatingActions";
+import { FloatingActions, FAIconPlus } from "@/components/layout/FloatingActions";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
+import { BottomSheet } from "@/components/layout/BottomSheet";
 
 /* ── Types ── */
 
@@ -141,6 +142,7 @@ export default function AchatsPage() {
 
   // ── All invoices ──
   const [allInvoices, setAllInvoices] = useState<InvoiceRow[]>([]);
+  const [importDrawerOpen, setImportDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // ── Accordion state ──
@@ -763,45 +765,20 @@ export default function AchatsPage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
           <h1 style={{
             fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24,
             color: "#1a1a1a", margin: 0, textTransform: "uppercase", letterSpacing: "0.04em",
           }}>
-            Achats
+            Factures
           </h1>
-          <button
-            className="achats-import-btn-desktop"
-            onClick={() => router.push("/invoices")}
-            style={{
-              fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 600,
-              background: "#D4775A", color: "#fff", border: "none", borderRadius: 20,
-              padding: "8px 18px", cursor: "pointer",
-            }}
-          >
-            Importer une facture
-          </button>
-          <style>{`.achats-import-btn-desktop { display: inline-block; } @media (max-width: 768px) { .achats-import-btn-desktop { display: none !important; } }`}</style>
         </div>
 
         {/* ══════════════════════════════════════════════════ */}
-        {/*  DATE RANGE PICKER + PAGE NAV                    */}
+        {/*  DATE RANGE PICKER — centered                    */}
         {/* ══════════════════════════════════════════════════ */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
           <DateRangePicker value={range} onChange={(r) => setRange(r)} />
-          {/* Page nav pills: Factures / Commandes */}
-          <div style={{ display: "inline-flex", background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
-            <span style={{
-              padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "default",
-              background: "#D4775A", color: "#fff",
-              fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-            }}>Factures</span>
-            <button type="button" onClick={() => router.push("/commandes")} style={{
-              padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "pointer",
-              background: "transparent", color: "#777", border: "none",
-              fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-            }}>Commandes</button>
-          </div>
         </div>
 
         {loading ? (
@@ -1212,9 +1189,97 @@ export default function AchatsPage() {
         )}
 
         <FloatingActions actions={[
-          { icon: <FAIconUpload size={22} color="#fff" />, label: "Importer facture", onClick: () => router.push("/invoices"), primary: true },
+          { icon: <FAIconPlus size={24} color="#fff" />, label: "Ajouter", onClick: () => setImportDrawerOpen(true), primary: true },
         ]} />
+
+        {/* ── Import drawer: 3 source options ── */}
+        <BottomSheet open={importDrawerOpen} onClose={() => setImportDrawerOpen(false)}>
+          <div style={{ display: "flex", flexDirection: "column", paddingBottom: 4 }}>
+            <ImportOption
+              icon={
+                <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+              }
+              label="Scanner des justificatifs"
+              accept="image/*"
+              capture="environment"
+              onFile={() => { setImportDrawerOpen(false); router.push("/invoices"); }}
+            />
+            <ImportOption
+              icon={
+                <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+              }
+              label="Importer depuis la galerie"
+              accept="image/*"
+              onFile={() => { setImportDrawerOpen(false); router.push("/invoices"); }}
+            />
+            <ImportOption
+              icon={
+                <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+              }
+              label="Importer depuis les documents"
+              accept=".pdf,application/pdf"
+              onFile={() => { setImportDrawerOpen(false); router.push("/invoices"); }}
+              isLast
+            />
+          </div>
+        </BottomSheet>
       </div>
     </RequireRole>
+  );
+}
+
+/* ── Import option row (inside import drawer) ── */
+function ImportOption({
+  icon, label, accept, capture, onFile, isLast,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  accept: string;
+  capture?: "environment" | "user";
+  onFile: (file: File | null) => void;
+  isLast?: boolean;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        {...(capture ? { capture } : {})}
+        style={{ display: "none" }}
+        onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        style={{
+          display: "flex", alignItems: "center", gap: 14,
+          width: "100%", padding: "16px 4px",
+          border: "none", cursor: "pointer",
+          background: "transparent",
+          textAlign: "left",
+          borderBottom: isLast ? "none" : "1px solid rgba(0,0,0,0.06)",
+          color: "#1a1a1a",
+          fontSize: 15, fontWeight: 500,
+          fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        }}
+      >
+        <span style={{ color: "#1a1a1a", flexShrink: 0 }}>{icon}</span>
+        {label}
+      </button>
+    </>
   );
 }
