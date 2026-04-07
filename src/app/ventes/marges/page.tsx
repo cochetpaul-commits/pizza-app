@@ -650,41 +650,43 @@ function MargesPage() {
             .marges-toolbar-desktop { display: none !important; }
           }
         `}</style>
-        <div className="ventes-toolbar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
+        {/* ── Toolbar: Import | Calendar | PDF | TTC/HT ── */}
+        <div className="ventes-toolbar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 14 }}>
+          <label style={{
+            padding: "7px 14px", borderRadius: 8, border: "none",
+            background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
+          }}>
+            {importing ? "Import..." : "Import"}
+            <input type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => {
+              const f = e.target.files?.[0];
+              if (f) handleImport(f);
+              e.target.value = "";
+            }} />
+          </label>
           <DateRangePicker value={range} onChange={(r) => setRange(r)} />
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <label style={{
-              padding: "7px 14px", borderRadius: 8, border: "none",
-              background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
-            }}>
-              {importing ? "Import..." : "Import"}
-              <input type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => {
-                const f = e.target.files?.[0];
-                if (f) handleImport(f);
-                e.target.value = "";
-              }} />
-            </label>
-            <button type="button" onClick={handleExportPDF} disabled={exportingPdf} style={{
-              padding: "7px 14px", borderRadius: 8, border: "1px solid #e0d8ce",
-              background: "#fff", color: "#1a1a1a", fontSize: 12, fontWeight: 700, cursor: "pointer",
-              opacity: exportingPdf ? 0.5 : 1,
-            }}>
-              {exportingPdf ? "Export..." : "PDF"}
-            </button>
-            <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
-              <button type="button" onClick={() => setMode("ttc")} style={{
-                padding: "4px 14px", borderRadius: 16, border: "none", cursor: "pointer",
-                background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#777",
-                fontSize: 11, fontWeight: 500,
-              }}>TTC</button>
-              <button type="button" onClick={() => setMode("ht")} style={{
-                padding: "4px 14px", borderRadius: 16, border: "none", cursor: "pointer",
-                background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#777",
-                fontSize: 11, fontWeight: 500,
-              }}>HT</button>
-            </div>
+          <button type="button" onClick={handleExportPDF} disabled={exportingPdf} style={{
+            padding: "7px 14px", borderRadius: 8, border: "1px solid #e0d8ce",
+            background: "#fff", color: "#1a1a1a", fontSize: 12, fontWeight: 700, cursor: "pointer",
+            opacity: exportingPdf ? 0.5 : 1,
+          }}>
+            {exportingPdf ? "Export..." : "PDF"}
+          </button>
+          <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 999, padding: 2 }}>
+            <button type="button" onClick={() => setMode("ttc")} style={{
+              padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
+              background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#999",
+              fontSize: 10, fontWeight: 700, letterSpacing: ".03em",
+            }}>TTC</button>
+            <button type="button" onClick={() => setMode("ht")} style={{
+              padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
+              background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#999",
+              fontSize: 10, fontWeight: 700, letterSpacing: ".03em",
+            }}>HT</button>
           </div>
-          {/* ── Page nav pills: Ventes / Produits ── */}
+        </div>
+
+        {/* ── Page nav pills: Ventes / Produits ── */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
           <div style={{ display: "inline-flex", background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
             <button type="button" onClick={() => router.push(`/ventes?from=${from}&to=${to}`)} style={{
               padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "pointer",

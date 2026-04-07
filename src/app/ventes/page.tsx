@@ -438,48 +438,46 @@ function PerformancesPage() {
     <RequireRole allowedRoles={["group_admin"]}>
       <div className="ventes-container" style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 16px 120px" }}>
 
-        {/* ── Toolbar: import + PDF + compact TTC/HT + page nav ── */}
-        <div className="ventes-toolbar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
-          {/* Date picker — shown inline on desktop only (mobile has fixed bottom version) */}
-          <div className="ventes-date-desktop">
-            <DateRangePicker value={range} onChange={(r) => setRange(r)} />
-          </div>
-          <div className="ventes-toolbar-actions" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <label style={{
-              padding: "7px 14px", borderRadius: 8, border: "none",
-              background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
+        {/* ── Toolbar: Import | Calendar | PDF | TTC/HT ── */}
+        <div className="ventes-toolbar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 14 }}>
+          <label style={{
+            padding: "7px 14px", borderRadius: 8, border: "none",
+            background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
+          }}>
+            {importing ? "Import..." : "Import"}
+            <input type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => {
+              const f = e.target.files?.[0];
+              if (f) handleImport(f);
+              e.target.value = "";
+            }} />
+          </label>
+          <DateRangePicker value={range} onChange={(r) => setRange(r)} />
+          {data && (
+            <button type="button" onClick={() => setPdfDrawerOpen(true)} disabled={exporting} style={{
+              padding: "7px 14px", borderRadius: 8, border: "1px solid #e0d8ce",
+              background: "#fff", color: "#1a1a1a", fontSize: 12, fontWeight: 700, cursor: "pointer",
+              opacity: exporting ? 0.5 : 1,
             }}>
-              {importing ? "Import..." : "Import"}
-              <input type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => {
-                const f = e.target.files?.[0];
-                if (f) handleImport(f);
-                e.target.value = "";
-              }} />
-            </label>
-            {data && (
-              <button type="button" onClick={() => setPdfDrawerOpen(true)} disabled={exporting} style={{
-                padding: "7px 14px", borderRadius: 8, border: "1px solid #e0d8ce",
-                background: "#fff", color: "#1a1a1a", fontSize: 12, fontWeight: 700, cursor: "pointer",
-                opacity: exporting ? 0.5 : 1,
-              }}>
-                {exporting ? "Export..." : "PDF"}
-              </button>
-            )}
-            {/* Compact TTC/HT toggle */}
-            <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 999, padding: 2 }}>
-              <button type="button" onClick={() => setMode("ttc")} style={{
-                padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
-                background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#999",
-                fontSize: 10, fontWeight: 700, letterSpacing: ".03em",
-              }}>TTC</button>
-              <button type="button" onClick={() => setMode("ht")} style={{
-                padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
-                background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#999",
-                fontSize: 10, fontWeight: 700, letterSpacing: ".03em",
-              }}>HT</button>
-            </div>
+              {exporting ? "Export..." : "PDF"}
+            </button>
+          )}
+          {/* Compact TTC/HT toggle */}
+          <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 999, padding: 2 }}>
+            <button type="button" onClick={() => setMode("ttc")} style={{
+              padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
+              background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#999",
+              fontSize: 10, fontWeight: 700, letterSpacing: ".03em",
+            }}>TTC</button>
+            <button type="button" onClick={() => setMode("ht")} style={{
+              padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
+              background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#999",
+              fontSize: 10, fontWeight: 700, letterSpacing: ".03em",
+            }}>HT</button>
           </div>
-          {/* ── Page nav pills: Ventes / Produits ── */}
+        </div>
+
+        {/* ── Page nav pills: Ventes / Produits ── */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
           <div style={{ display: "inline-flex", background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
             <span style={{
               padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "default",
@@ -492,11 +490,6 @@ function PerformancesPage() {
               fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
             }}>Produits</button>
           </div>
-        </div>
-
-        {/* Mobile: fixed bottom date picker (sits above the section pill) */}
-        <div className="ventes-date-mobile">
-          <DateRangePicker value={range} onChange={(r) => setRange(r)} />
         </div>
 
         {/* PDF export drawer */}

@@ -260,6 +260,28 @@ function pathMatches(pathname: string, patterns: string[]): boolean {
   return patterns.some(m => pathname === m || pathname.startsWith(m + "/") || (m.endsWith("/") && pathname.startsWith(m)));
 }
 
+/** Length of the longest pattern in `match` that covers the pathname (or -1). */
+function matchScore(pathname: string, patterns: string[]): number {
+  let best = -1;
+  for (const m of patterns) {
+    if (pathname === m || pathname.startsWith(m + "/")) {
+      if (m.length > best) best = m.length;
+    }
+  }
+  return best;
+}
+
+/** Pick the single tab whose match pattern has the longest overlap. */
+function findActiveTab<T extends { match: string[] }>(pathname: string, tabs: T[]): T | null {
+  let best: T | null = null;
+  let bestLen = -1;
+  for (const tab of tabs) {
+    const s = matchScore(pathname, tab.match);
+    if (s > bestLen) { bestLen = s; best = tab; }
+  }
+  return bestLen >= 0 ? best : null;
+}
+
 function getActiveSection(pathname: string, sections: TabSection[]): TabSection | null {
   let best: TabSection | null = null;
   let bestLen = 0;
@@ -337,9 +359,12 @@ export function BottomTabBar() {
         onClose={() => setDrawerSection(null)}
         title={drawerSection?.label ?? ""}
       >
+        {(() => {
+          const activeDrawerTab = drawerSection ? findActiveTab(pathname, drawerSection.tabs) : null;
+          return (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {drawerSection?.tabs.map((tab) => {
-            const isActive = pathMatches(pathname, tab.match);
+            const isActive = tab === activeDrawerTab;
             return (
               <button
                 key={tab.href}
@@ -376,6 +401,8 @@ export function BottomTabBar() {
             );
           })}
         </div>
+          );
+        })()}
       </BottomSheet>
 
       {/* ── Floating section pill ── */}

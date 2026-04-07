@@ -245,27 +245,6 @@ body.bottom-sheet-open .bottom-tab-bar {
   }
 }
 
-/* Ventes page: date picker desktop inline vs mobile fixed */
-.ventes-date-desktop { display: block; }
-.ventes-date-mobile { display: none; }
-@media (max-width: 767px) {
-  .ventes-date-desktop { display: none !important; }
-  /* NB: no CSS `transform` here — a transformed parent would hijack
-     the containing block of the picker popover's `position: fixed`. */
-  .ventes-date-mobile {
-    display: flex !important;
-    justify-content: center;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
-    z-index: 99;
-    pointer-events: none;
-  }
-  .ventes-date-mobile > * {
-    pointer-events: auto;
-  }
-}
 
 /* ── Desktop/Mobile visibility helpers ── */
 .desktop-only { display: block; }
