@@ -823,76 +823,91 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
             ) : (
               /* ── MODE NORMAL ── */
               <>
-                {/* Infos générales */}
-                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    <div>
-                      <label className="label">Nom de la recette</label>
-                      <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Nom…" />
-                    </div>
+                {/* Header recette : nom + categorie + stats */}
+                <div style={{
+                  background: "#fff", borderRadius: 16, padding: "24px 24px 20px",
+                  border: "1px solid #e0d8ce", marginBottom: 14,
+                }}>
+                  <div style={{
+                    fontSize: 10, fontWeight: 700, color: "#999",
+                    textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 8,
+                  }}>
+                    {CATEGORIES.find(c => c.id === category)?.label ?? "Recette"}
+                  </div>
+                  <input
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="Nom de la recette…"
+                    style={{
+                      width: "100%", border: "none", outline: "none", background: "transparent",
+                      fontSize: 28, fontWeight: 700, color: "#1a1a1a",
+                      fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                      padding: 0, marginBottom: 14,
+                    }}
+                  />
 
-                    <div>
-                      <label className="label">Catégorie</label>
-                      <div style={{ display: "inline-flex", flexWrap: "wrap", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12 }}>
-                        {CATEGORIES.map(c => (
-                          <button
-                            key={c.id} type="button" onClick={() => setCategory(c.id)}
-                            style={{
-                              padding: "6px 14px", borderRadius: 10, fontSize: 12, fontWeight: 600,
-                              border: "none",
-                              background: category === c.id ? (etab?.couleur ? etab.couleur + "25" : "#fff") : "transparent",
-                              color: category === c.id ? "#1a1a1a" : "#999",
-                              boxShadow: category === c.id ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
-                              cursor: "pointer", transition: "all 0.15s",
-                            }}
-                          >{c.label}</button>
-                        ))}
-                      </div>
-                    </div>
+                  {/* Stats inline */}
+                  <div style={{
+                    display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center",
+                    paddingBottom: 14, marginBottom: 14, borderBottom: "1px solid #f0ebe2",
+                  }}>
+                    <RecipeStat label="Rendement" value={
+                      <StepperInput value={yieldGrams} onChange={setYieldGrams} step={50} min={0} placeholder="0" />
+                    } unit="g" extra={totalWeightG > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setYieldGrams(Math.round(totalWeightG))}
+                        title={`= ${Math.round(totalWeightG)} g`}
+                        style={{
+                          padding: "0 8px", height: 24, borderRadius: 6, fontSize: 10, fontWeight: 700,
+                          border: "1px solid #4a6741", background: "rgba(74,103,65,0.08)",
+                          color: "#4a6741", cursor: "pointer", whiteSpace: "nowrap",
+                        }}
+                      >= ingrédients</button>
+                    )} />
+                    <RecipeStat label="Portions" value={
+                      <StepperInput value={portionsCount} onChange={setPortionsCount} step={1} min={1} placeholder="1" />
+                    } />
+                    {lines.length > 0 && (
+                      <RecipeStat label="Ingrédients" value={
+                        <span style={{ fontSize: 18, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
+                          {lines.filter(l => l.ingredient_id).length}
+                        </span>
+                      } />
+                    )}
+                  </div>
 
-                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
-                      <div>
-                        <label className="label">Rendement (g)</label>
-                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                          <StepperInput
-                            value={yieldGrams}
-                            onChange={setYieldGrams}
-                            step={50} min={0}
-                            placeholder="ex: 1000"
-                          />
-                          {totalWeightG > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => setYieldGrams(Math.round(totalWeightG))}
-                              title={`Utiliser le poids total des ingrédients (${Math.round(totalWeightG)} g)`}
-                              style={{
-                                padding: "0 10px", height: 36, borderRadius: 8, fontSize: 12, fontWeight: 700,
-                                border: "1.5px solid #4a6741", background: "rgba(22,101,52,0.07)",
-                                color: "#4a6741", cursor: "pointer", whiteSpace: "nowrap",
-                              }}
-                            >= Poids ingrédients</button>
-                          )}
-                        </div>
-                      </div>
-                      <div>
-                        <label className="label">Portions</label>
-                        <StepperInput
-                          value={portionsCount}
-                          onChange={setPortionsCount}
-                          step={1} min={1}
-                          placeholder="ex: 4"
-                        />
-                      </div>
-                    </div>
-
+                  {/* Categorie pills */}
+                  <div style={{ display: "inline-flex", flexWrap: "wrap", gap: 4, padding: 4, background: "#f5f0e8", borderRadius: 12 }}>
+                    {CATEGORIES.map(c => (
+                      <button
+                        key={c.id} type="button" onClick={() => setCategory(c.id)}
+                        style={{
+                          padding: "6px 14px", borderRadius: 10, fontSize: 12, fontWeight: 600,
+                          border: "none",
+                          background: category === c.id ? (etab?.couleur ? etab.couleur + "25" : "#fff") : "transparent",
+                          color: category === c.id ? "#1a1a1a" : "#999",
+                          boxShadow: category === c.id ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+                          cursor: "pointer", transition: "all 0.15s",
+                        }}
+                      >{c.label}</button>
+                    ))}
                   </div>
                 </div>
 
                 {/* Ingrédients */}
-                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
-                    Ingrédients
-                  </h3>
+                <div style={{ background: "#fff", borderRadius: 16, padding: "20px 24px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                    <h3 style={{ margin: 0, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
+                      Ingrédients
+                    </h3>
+                    {(totalWeightG > 0 || totalCost > 0) && (
+                      <div style={{ fontSize: 11, color: "#9a8f84", display: "flex", gap: 12, alignItems: "baseline" }}>
+                        {totalWeightG > 0 && <span><strong style={{ color: "#4a6741", fontSize: 13 }}>{Math.round(totalWeightG).toLocaleString("fr-FR")}</strong> g</span>}
+                        {totalCost > 0 && <span><strong style={{ color: "#D4775A", fontSize: 13 }}>{round2(totalCost).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> €</span>}
+                      </div>
+                    )}
+                  </div>
                   <IngredientListDnD
                     items={lines}
                     ingredients={ingredients}
@@ -903,20 +918,18 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
                     pivotId={pivotIngredientId}
                     onPivotChange={setPivotIngredientId}
                   />
-                  {totalWeightG > 0 && (
-                    <div style={{ marginTop: 10, fontSize: 13, color: "#6f6a61", display: "flex", gap: 16, flexWrap: "wrap" }}>
-                      <span>Poids total : <strong style={{ color: "#4a6741" }}>{Math.round(totalWeightG).toLocaleString("fr-FR")} g</strong></span>
-                      {totalCost > 0 && <span>Coût total : <strong style={{ color: "#4a6741" }}>{round2(totalCost).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</strong></span>}
-                    </div>
-                  )}
                 </div>
 
                 {/* Étapes */}
-                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
+                <div style={{ background: "#fff", borderRadius: 16, padding: "20px 24px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
+                  <h3 style={{ margin: "0 0 14px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Étapes
                   </h3>
-                  <StepsList steps={steps} onChange={setSteps} />
+                  {steps.length === 0 ? (
+                    <StepsGhostSlots onAdd={(label) => setSteps([label])} />
+                  ) : (
+                    <StepsList steps={steps} onChange={setSteps} />
+                  )}
                 </div>
 
                 {/* Index button for preparations */}
@@ -952,32 +965,38 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
                   </div>
                 )}
 
-                {/* Allergènes */}
-                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
-                    Allergènes
-                  </h3>
-                  <AllergenBadges allergens={computedAllergens} />
-                </div>
-
-                {/* Photo */}
-                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
-                    Photo
-                  </h3>
-                  {photoPreview && (
-                    <div style={{ marginBottom: 10 }}>
-                      <Image src={photoPreview} alt="Photo" width={200} height={150} style={{ borderRadius: 10, objectFit: "cover" }} />
+                {/* Infos complémentaires (allergènes + photo) */}
+                <details style={{ background: "#fff", borderRadius: 16, border: "1px solid #e0d8ce", marginBottom: 14, overflow: "hidden" }}>
+                  <summary style={{
+                    padding: "16px 24px", cursor: "pointer", listStyle: "none",
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777",
+                  }}>
+                    <span>Infos complémentaires</span>
+                    <span style={{ fontSize: 10, color: "#bbb" }}>allergènes · photo</span>
+                  </summary>
+                  <div style={{ padding: "0 24px 20px", display: "flex", flexDirection: "column", gap: 18 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#999", fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>Allergènes</div>
+                      <AllergenBadges allergens={computedAllergens} />
                     </div>
-                  )}
-                  <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoChange} />
-                  <button
-                    type="button" onClick={() => fileRef.current?.click()} disabled={photoUploading}
-                    className="btn"
-                  >
-                    {photoUploading ? "Envoi…" : photoPreview ? "Changer la photo" : "Ajouter une photo"}
-                  </button>
-                </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#999", fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>Photo</div>
+                      {photoPreview && (
+                        <div style={{ marginBottom: 10 }}>
+                          <Image src={photoPreview} alt="Photo" width={200} height={150} style={{ borderRadius: 10, objectFit: "cover" }} />
+                        </div>
+                      )}
+                      <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoChange} />
+                      <button
+                        type="button" onClick={() => fileRef.current?.click()} disabled={photoUploading}
+                        className="btn"
+                      >
+                        {photoUploading ? "Envoi…" : photoPreview ? "Changer la photo" : "Ajouter une photo"}
+                      </button>
+                    </div>
+                  </div>
+                </details>
 
                 {/* Bottom save */}
                 <div style={{ paddingBottom: 32 }}>
@@ -1004,6 +1023,54 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         />
       )}
     </>
+  );
+}
+
+// ── Recipe stat (header inline) ──────────────────────────────────
+function RecipeStat({ label, value, unit, extra }: { label: string; value: React.ReactNode; unit?: string; extra?: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <span style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+        {label}
+      </span>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        {value}
+        {unit && <span style={{ fontSize: 11, color: "#9a8f84", fontWeight: 600 }}>{unit}</span>}
+        {extra}
+      </div>
+    </div>
+  );
+}
+
+// ── Steps ghost slots (suggestion when empty) ────────────────────
+function StepsGhostSlots({ onAdd }: { onAdd: (label: string) => void }) {
+  const slots = ["Mise en place", "Cuisson", "Dressage"];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {slots.map((s, i) => (
+        <button
+          key={s} type="button" onClick={() => onAdd(s)}
+          style={{
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "12px 16px", background: "transparent",
+            border: "1.5px dashed #d9d2c4", borderRadius: 10,
+            cursor: "pointer", textAlign: "left",
+            transition: "all 0.15s",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "#f9f5ef"; e.currentTarget.style.borderColor = "#4a6741"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "#d9d2c4"; }}
+        >
+          <span style={{
+            width: 26, height: 26, borderRadius: "50%",
+            background: "#f0ebe2", color: "#9a8f84",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 12, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+          }}>{i + 1}</span>
+          <span style={{ fontSize: 13, color: "#9a8f84", fontWeight: 500 }}>{s}</span>
+          <span style={{ marginLeft: "auto", fontSize: 10, color: "#bbb" }}>cliquer pour ajouter</span>
+        </button>
+      ))}
+    </div>
   );
 }
 

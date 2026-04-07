@@ -113,7 +113,6 @@ export function GestionFoodCost({
   const foodCostPct = sp ? (costPerPortion / sp) * 100 : null;
   const margeBrute = sp ? sp - costPerPortion : null;
   const prixTTC = sp ? sp * (1 + vatRate) : null;
-  const prixMiniFC = costPerPortion > 0 ? round2(costPerPortion / (foodCostTarget / 100)) : null;
 
   const fcColor = foodCostPct == null ? "#999"
     : foodCostPct <= foodCostTarget ? "#16a34a"
@@ -312,120 +311,137 @@ export function GestionFoodCost({
         </table>
       </div>
 
-      {/* ── Simulation prix de vente ── */}
+      {/* ── Simulateur ── */}
       <div style={{
-        borderRadius: 14, overflow: "hidden",
-        boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
-        background: "#fff",
+        background: "#faf6ee",
+        borderRadius: 16,
+        padding: "24px 24px 28px",
+        border: "1px solid #ece4d4",
       }}>
-        {/* Header with gradient */}
-        <div style={{
-          padding: "14px 20px",
-          background: "linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)",
-          color: "#fff",
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-        }}>
-          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.3 }}>
-            Simulation prix de vente
+        {/* Title row */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+          <span style={{
+            fontSize: 11, fontWeight: 700, color: "#999",
+            textTransform: "uppercase", letterSpacing: "0.12em",
+          }}>
+            Simulateur de prix
           </span>
-          {saving && <span style={{ fontSize: 10, opacity: 0.6 }}>Enregistrement...</span>}
+          {saving && <span style={{ fontSize: 10, color: "#bbb", fontStyle: "italic" }}>enregistrement…</span>}
+        </div>
+        <div style={{ fontSize: 11, color: "#9a8f84", marginBottom: 18 }}>
+          glissez pour ajuster le prix de vente
         </div>
 
-        <div style={{ padding: "20px" }}>
-          {/* Price slider */}
-          <div style={{ marginBottom: 20 }}>
+        {/* Big price */}
+        <div style={{
+          fontSize: 56, fontWeight: 800, color: "#1a1a1a",
+          fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+          lineHeight: 1, textAlign: "center", marginBottom: 4,
+          fontVariantNumeric: "tabular-nums",
+        }}>
+          {localSellPrice > 0 ? `${localSellPrice.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€` : "—"}
+        </div>
+        <div style={{ fontSize: 11, color: "#9a8f84", textAlign: "center", marginBottom: 16 }}>
+          HT {prixTTC != null && `· ${prixTTC.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€ TTC`}
+        </div>
+
+        {/* Slider */}
+        <div style={{ position: "relative", marginBottom: 6 }}>
+          <input
+            type="range"
+            min={2} max={50} step={0.25}
+            value={localSellPrice}
+            onChange={(e) => setLocalSellPrice(Number(e.target.value))}
+            onMouseUp={() => saveSellPrice(localSellPrice)}
+            onTouchEnd={() => saveSellPrice(localSellPrice)}
+            className="recipe-price-slider"
+            style={{ width: "100%", accentColor: "#D4775A", height: 6 }}
+          />
+        </div>
+        <div style={{
+          display: "flex", justifyContent: "space-between",
+          fontSize: 10, color: "#bbb", fontWeight: 600, marginBottom: 24,
+        }}>
+          <span>2€</span>
+          <span>25€</span>
+          <span>50€</span>
+        </div>
+
+        {/* Food cost — héroïque */}
+        {foodCostPct != null && (
+          <div style={{ marginBottom: 18 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: "#888", fontWeight: 500 }}>Prix de vente HT</span>
               <span style={{
-                fontSize: 24, fontWeight: 700, color: "#1a1a1a",
-                fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                fontSize: 11, fontWeight: 700, color: "#999",
+                textTransform: "uppercase", letterSpacing: "0.08em",
               }}>
-                {localSellPrice > 0 ? fmtEur(localSellPrice) : "-"}
+                Food cost
+              </span>
+              <span style={{
+                fontSize: 28, fontWeight: 800, color: fcColor,
+                fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                fontVariantNumeric: "tabular-nums",
+              }}>
+                {foodCostPct.toFixed(1)}%
               </span>
             </div>
-            <input
-              type="range"
-              min={2} max={50} step={0.25}
-              value={localSellPrice}
-              onChange={(e) => setLocalSellPrice(Number(e.target.value))}
-              onMouseUp={() => saveSellPrice(localSellPrice)}
-              onTouchEnd={() => saveSellPrice(localSellPrice)}
-              style={{ width: "100%", accentColor: "#D4775A" }}
-            />
-          </div>
-
-          {/* FC progress bar */}
-          {foodCostPct != null && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontSize: 12, color: "#888", fontWeight: 500 }}>Food cost</span>
-                <span style={{ fontSize: 16, fontWeight: 700, color: fcColor, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                  {foodCostPct.toFixed(1)}%
-                </span>
-              </div>
-              <div style={{ height: 10, background: "#f0ebe2", borderRadius: 5, overflow: "hidden", position: "relative" }}>
-                {/* target marker */}
-                <div style={{
-                  position: "absolute", left: `${Math.min(foodCostTarget, 100)}%`, top: 0, bottom: 0, width: 2,
-                  background: "rgba(0,0,0,0.15)", zIndex: 1,
-                }} />
-                <div style={{
-                  height: "100%", borderRadius: 5, transition: "width 0.3s ease",
-                  width: `${Math.min(foodCostPct, 100)}%`,
-                  background: `linear-gradient(90deg, ${fcColor}cc, ${fcColor})`,
-                }} />
-              </div>
-              <div style={{ fontSize: 9, color: "#bbb", marginTop: 3, textAlign: "right" }}>
-                objectif {foodCostTarget}%
-              </div>
+            <div style={{
+              height: 14, background: "#ece4d4", borderRadius: 999,
+              overflow: "hidden", position: "relative",
+            }}>
+              {/* target marker */}
+              <div style={{
+                position: "absolute", left: `${Math.min(foodCostTarget, 100)}%`, top: 0, bottom: 0, width: 2,
+                background: "rgba(0,0,0,0.18)", zIndex: 1,
+              }} />
+              <div style={{
+                height: "100%", borderRadius: 999, transition: "width 0.4s ease",
+                width: `${Math.min(foodCostPct, 100)}%`,
+                background: `linear-gradient(90deg, ${fcColor}cc, ${fcColor})`,
+              }} />
             </div>
-          )}
-
-          {/* KPI grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <SimKpiCard
-              label="Cout revient"
-              value={fmtEur(costPerPortion)}
-              accent="#D4775A"
-            />
-            <SimKpiCard
-              label="Marge brute"
-              value={margeBrute != null ? fmtEur(margeBrute) : "-"}
-              accent="#16a34a"
-            />
-            <SimKpiCard
-              label={`Prix TTC (${vatPct}%)`}
-              value={prixTTC != null ? fmtEur(prixTTC) : "-"}
-              accent="#1a1a1a"
-            />
-            <SimKpiCard
-              label={`Prix mini FC ${foodCostTarget}%`}
-              value={prixMiniFC != null ? fmtEur(prixMiniFC) : "-"}
-              accent="#D97706"
-            />
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 10, color: "#9a8f84" }}>
+              <span>{foodCostPct <= foodCostTarget ? "dans la cible" : foodCostPct <= foodCostTarget + 5 ? "limite haute" : "au-dessus de la cible"}</span>
+              <span>objectif {foodCostTarget}%</span>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Marge brute one-liner */}
+        {margeBrute != null && (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            paddingTop: 16, borderTop: "1px solid #ece4d4",
+          }}>
+            <span style={{
+              fontSize: 11, fontWeight: 700, color: "#999",
+              textTransform: "uppercase", letterSpacing: "0.08em",
+            }}>
+              Marge brute
+            </span>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+              <span style={{
+                fontSize: 24, fontWeight: 800,
+                color: margeBrute > 0 ? "#16a34a" : "#DC2626",
+                fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                fontVariantNumeric: "tabular-nums",
+              }}>
+                {margeBrute > 0 ? "+" : ""}{margeBrute.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+              </span>
+              {costPerPortion > 0 && (
+                <span style={{
+                  fontSize: 12, fontWeight: 700,
+                  color: margeBrute > 0 ? "#16a34a" : "#DC2626",
+                  background: margeBrute > 0 ? "rgba(22,163,74,0.10)" : "rgba(220,38,38,0.10)",
+                  padding: "3px 8px", borderRadius: 6,
+                }}>
+                  {margeBrute > 0 ? "▲" : "▼"} {Math.abs(Math.round((margeBrute / costPerPortion) * 100))}%
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
-    </div>
-  );
-}
-
-// ── Sub-components ───────────────────────────────────────────
-
-function SimKpiCard({ label, value, accent }: { label: string; value: string; accent: string }) {
-  return (
-    <div style={{
-      padding: "12px 14px", borderRadius: 10,
-      background: "#faf8f5",
-      borderLeft: `3px solid ${accent}`,
-      display: "flex", flexDirection: "column", gap: 3,
-    }}>
-      <span style={{ fontSize: 10, color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.3 }}>
-        {label}
-      </span>
-      <span style={{ fontSize: 17, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-        {value}
-      </span>
     </div>
   );
 }
