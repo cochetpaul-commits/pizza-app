@@ -17,7 +17,7 @@ import { StepsList } from "./StepsList";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { PricingModule } from "./PricingModule";
-import { RecipeHero, HeroBtn, HeroDangerBtn } from "./RecipeHero";
+import { RecipeHero, RecipeKpis, HeroBtn, HeroDangerBtn } from "./RecipeHero";
 import { GestionFoodCost } from "./GestionFoodCost";
 import { GestionCommandes } from "./GestionCommandes";
 import { GestionPilotage } from "./GestionPilotage";
@@ -494,7 +494,6 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
           etabName={etab?.nom}
           typeLabel={typeLabel}
           onBack={() => router.push("/recettes")}
-          kpis={{ costPerPortion: effectiveCostPerPortion ?? null, foodCostPct: foodCostPct ?? null, sellPriceHT: sp ?? null, sellPriceTTC: prixTTC ?? null, margeBrute: margeBrute ?? null }}
           actions={<>
             {isEdit && pivotIngredientId && <HeroBtn onClick={() => setShowProdModal(true)}>Production</HeroBtn>}
             <HeroBtn onClick={handleExportPdf} disabled={!isEdit || pdfLoading} title={!isEdit ? "Enregistrer la recette pour exporter le PDF" : undefined}>{pdfLoading ? "Export…" : "PDF"}</HeroBtn>
@@ -509,6 +508,17 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
               }}>Supprimer</HeroDangerBtn>
             )}
           </>}
+        />
+
+        <RecipeKpis
+          costPerPortion={effectiveCostPerPortion ?? null}
+          foodCostPct={foodCostPct ?? null}
+          sellPriceHT={sp ?? null}
+          sellPriceTTC={prixTTC ?? null}
+          margeBrute={margeBrute ?? null}
+          accent={ACCENT}
+          portionLabel="cocktail"
+          foodCostTarget={20}
         />
 
                 {/* ── Tab bar ── */}
@@ -536,17 +546,36 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
         {/* ── TAB: FOOD COST & MARGES ── */}
         {mainTab === "fc" && (
-          <GestionFoodCost
-            recipeId={cocktailId}
-            recipeType="cocktail"
-            lines={lines}
-            ingredients={ingredients}
-            priceByIngredient={priceByIngredient}
-            supplierByIngredient={supplierByIngredient}
-            totalCost={round2(totalCostEur)}
-            sellPrice={sp}
-            onSellPriceChange={(p) => setSellPrice(p)}
-          />
+          <>
+            <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
+              <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
+                Prix, marges &amp; simulateur
+              </h3>
+              <PricingModule
+                showDoseSimulator
+                costPerPortion={totalCostEur > 0 ? round2(totalCostEur) : null}
+                portionLabel="cocktail"
+                vatRate={vatRate}
+                onVatChange={setVatRate}
+                marginRate={marginRate}
+                onMarginChange={setMarginRate}
+                sellPrice={sellPrice}
+                onSellPriceChange={setSellPrice}
+                accentColor={ACCENT}
+              />
+            </div>
+            <GestionFoodCost
+              recipeId={cocktailId}
+              recipeType="cocktail"
+              lines={lines}
+              ingredients={ingredients}
+              priceByIngredient={priceByIngredient}
+              supplierByIngredient={supplierByIngredient}
+              totalCost={round2(totalCostEur)}
+              sellPrice={sp}
+              onSellPriceChange={(p) => setSellPrice(p)}
+            />
+          </>
         )}
 
         {/* ── TAB: COMMANDES ── */}
@@ -767,25 +796,6 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                     Allergènes
                   </h3>
                   <AllergenBadges allergens={computedAllergens} />
-                </div>
-
-{/* Prix & Marges */}
-                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
-                    Prix, marges &amp; simulateur
-                  </h3>
-                  <PricingModule
-                    showDoseSimulator
-                    costPerPortion={totalCostEur > 0 ? round2(totalCostEur) : null}
-                    portionLabel="cocktail"
-                    vatRate={vatRate}
-                    onVatChange={setVatRate}
-                    marginRate={marginRate}
-                    onMarginChange={setMarginRate}
-                    sellPrice={sellPrice}
-                    onSellPriceChange={setSellPrice}
-                    accentColor={ACCENT}
-                  />
                 </div>
 
                 {/* Photo */}

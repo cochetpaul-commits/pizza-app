@@ -5,13 +5,11 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { StepsList } from "./StepsList";
-import { PricingModule } from "./PricingModule";
 import { RecipeHero, HeroBtn } from "./RecipeHero";
 import { StepperInput } from "@/components/StepperInput";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { calculerPate, type EmpatementType, type FlourMixItem } from "@/lib/pateEngine";
-import { GestionFoodCost } from "./GestionFoodCost";
 import { GestionCommandes } from "./GestionCommandes";
 import { GestionPilotage } from "./GestionPilotage";
 import type { Ingredient } from "@/types/ingredients";
@@ -80,7 +78,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
 
   // Main tab
   type MainTab = "fc" | "recette" | "cmd" | "pop";
-  const [mainTab, setMainTab] = useState<MainTab>(initialProdMode ? "recette" : isEdit ? "fc" : "recette");
+  const [mainTab, setMainTab] = useState<MainTab>("recette");
 
   // Production mode
   const [prodMode, setProdMode] = useState(initialProdMode ?? false);
@@ -147,24 +145,12 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     return acc + (prodFactor !== null ? Math.round(i.qty * prodFactor) : i.qty);
   }, 0);
 
-  const _costPerKg: number | null = null;
-  const costPerBall: number | null = null;
-
-  // ── KPI computations ──────────────────────────────────────────
-  const sp = typeof sellPrice === "number" && sellPrice > 0 ? sellPrice : null;
-  const effectiveCost = costPerBall ?? 0;
-  const foodCostPct = sp && effectiveCost > 0 ? (effectiveCost / sp) * 100 : null;
-  const margeBrute = sp && effectiveCost > 0 ? sp - effectiveCost : null;
-  const prixTTC = sp ? sp * (1 + vatRate) : null;
-
   // Tab definitions
   const MAIN_TABS: { key: MainTab; label: string }[] = isEdit ? [
-    { key: "fc", label: "Food cost & Marges" },
     { key: "recette", label: "Recette & Procede" },
     { key: "cmd", label: "Commandes fournisseurs" },
     { key: "pop", label: "Pilotage CA" },
   ] : [
-    { key: "fc", label: "Food cost & Marges" },
     { key: "recette", label: "Recette & Procede" },
   ];
 
@@ -345,7 +331,6 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
           etabName={etab?.nom}
           typeLabel="Empatement"
           onBack={() => router.push("/recettes")}
-          kpis={{ costPerPortion: effectiveCost > 0 ? effectiveCost : null, foodCostPct: foodCostPct ?? null, sellPriceHT: sp ?? null, sellPriceTTC: prixTTC ?? null, margeBrute: margeBrute ?? null }}
           actions={<>
             <HeroBtn onClick={handleExportPdf} disabled={!isEdit || pdfLoading} title={!isEdit ? "Enregistrer la recette pour exporter le PDF" : undefined}>{pdfLoading ? "Export…" : "PDF"}</HeroBtn>
             {isEdit ? <PublishCatalogueButton recipeType="empatement" recipeId={recipeId!} /> : <HeroBtn disabled title="Enregistrer la recette pour publier au catalogue">Catalogue</HeroBtn>}
@@ -375,21 +360,6 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         </div>
 
         {saveError && <div className="errorBox" style={{ marginBottom: 12 }}>{saveError}</div>}
-
-        {/* ── TAB: FOOD COST & MARGES ── */}
-        {mainTab === "fc" && (
-          <GestionFoodCost
-            recipeId={recipeId}
-            recipeType="empatement"
-            lines={[]}
-            ingredients={[]}
-            priceByIngredient={{}}
-            totalCost={0}
-            sellPrice={sp}
-            onSellPriceChange={(p) => setSellPrice(p)}
-            yieldGrams={result?.summary.total_dough_g ?? null}
-          />
-        )}
 
         {/* ── TAB: COMMANDES ── */}
         {mainTab === "cmd" && isEdit && recipeId && (
@@ -739,24 +709,6 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                     Procedure / Etapes
                   </h3>
                   <StepsList steps={steps} onChange={setSteps} />
-                </div>
-
-                {/* Prix & Marges */}
-                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
-                    Prix, marges &amp; simulateur
-                  </h3>
-                  <PricingModule
-                    costPerPortion={effectiveCost > 0 ? effectiveCost : null}
-                    portionLabel="paton"
-                    vatRate={vatRate}
-                    onVatChange={setVatRate}
-                    marginRate={marginRate}
-                    onMarginChange={setMarginRate}
-                    sellPrice={sellPrice}
-                    onSellPriceChange={setSellPrice}
-                    accentColor={ACCENT}
-                  />
                 </div>
 
                 {/* Bottom save */}

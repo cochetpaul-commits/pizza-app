@@ -18,7 +18,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
 import { PricingModule } from "./PricingModule";
-import { RecipeHero, HeroBtn, HeroDangerBtn } from "./RecipeHero";
+import { RecipeHero, RecipeKpis, HeroBtn, HeroDangerBtn } from "./RecipeHero";
 import { GestionFoodCost } from "./GestionFoodCost";
 import { PublishCatalogueButton } from "./PublishCatalogueButton";
 import { GestionCommandes } from "./GestionCommandes";
@@ -523,7 +523,6 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
           etabName={etab.current?.nom}
           typeLabel="Pizza"
           onBack={() => router.push("/recettes")}
-          kpis={{ costPerPortion: effectiveCostPerPortion ?? null, foodCostPct: foodCostPct ?? null, sellPriceHT: sp ?? null, sellPriceTTC: prixTTC ?? null, margeBrute: margeBrute ?? null }}
           actions={<>
             {isEdit && pivotIngredientId && <HeroBtn onClick={() => setShowProdModal(true)}>Production</HeroBtn>}
             <HeroBtn onClick={handleExportPdf} disabled={!isEdit || pdfLoading} title={!isEdit ? "Enregistrer la recette pour exporter le PDF" : undefined}>{pdfLoading ? "Export…" : "PDF"}</HeroBtn>
@@ -538,6 +537,16 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
               }}>Supprimer</HeroDangerBtn>
             )}
           </>}
+        />
+
+        <RecipeKpis
+          costPerPortion={effectiveCostPerPortion ?? null}
+          foodCostPct={foodCostPct ?? null}
+          sellPriceHT={sp ?? null}
+          sellPriceTTC={prixTTC ?? null}
+          margeBrute={margeBrute ?? null}
+          accent={ACCENT}
+          portionLabel="pizza"
         />
 
                 {/* ── Tab bar ── */}
@@ -565,19 +574,37 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
         {/* ── TAB: FOOD COST & MARGES ── */}
         {mainTab === "fc" && (
-          <GestionFoodCost
-            recipeId={pizzaId}
-            recipeType="pizza"
-            lines={allLines}
-            ingredients={ingredients}
-            priceByIngredient={priceByIngredient}
-            supplierByIngredient={supplierByIngredient}
-            totalCost={totalCost}
-            sellPrice={sp}
-            onSellPriceChange={(p) => setSellPrice(p)}
-            portionsCount={null}
-            yieldGrams={ballWeightG !== "" ? Number(ballWeightG) : null}
-          />
+          <>
+            <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
+              <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
+                Prix, marges &amp; simulateur
+              </h3>
+              <PricingModule
+                costPerPortion={totalCost > 0 ? round2(totalCost) : null}
+                portionLabel="pizza"
+                vatRate={vatRate}
+                onVatChange={setVatRate}
+                marginRate={marginRate}
+                onMarginChange={setMarginRate}
+                sellPrice={sellPrice}
+                onSellPriceChange={setSellPrice}
+                accentColor={ACCENT}
+              />
+            </div>
+            <GestionFoodCost
+              recipeId={pizzaId}
+              recipeType="pizza"
+              lines={allLines}
+              ingredients={ingredients}
+              priceByIngredient={priceByIngredient}
+              supplierByIngredient={supplierByIngredient}
+              totalCost={totalCost}
+              sellPrice={sp}
+              onSellPriceChange={(p) => setSellPrice(p)}
+              portionsCount={null}
+              yieldGrams={ballWeightG !== "" ? Number(ballWeightG) : null}
+            />
+          </>
         )}
 
         {/* ── TAB: COMMANDES ── */}
@@ -802,24 +829,6 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                     Allergenes
                   </h3>
                   <AllergenBadges allergens={computedAllergens} />
-                </div>
-
-                {/* Prix & Marges */}
-                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
-                    Prix, marges &amp; simulateur
-                  </h3>
-                  <PricingModule
-                    costPerPortion={totalCost > 0 ? round2(totalCost) : null}
-                    portionLabel="pizza"
-                    vatRate={vatRate}
-                    onVatChange={setVatRate}
-                    marginRate={marginRate}
-                    onMarginChange={setMarginRate}
-                    sellPrice={sellPrice}
-                    onSellPriceChange={setSellPrice}
-                    accentColor={ACCENT}
-                  />
                 </div>
 
                 {/* Photo */}
