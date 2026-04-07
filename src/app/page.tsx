@@ -7,8 +7,8 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 
 export default function RootPage() {
   const router = useRouter();
-  const { role, loading: profileLoading } = useProfile();
-  const { etablissements, loading: etabLoading } = useEtablissement();
+  const { role, isGroupAdmin, loading: profileLoading } = useProfile();
+  const { etablissements, setCurrent, setGroupView, loading: etabLoading } = useEtablissement();
 
   useEffect(() => {
     if (profileLoading || etabLoading) return;
@@ -19,9 +19,27 @@ export default function RootPage() {
       return;
     }
 
-    // All authenticated users → dashboard
+    // Group admins → iFratelli group home
+    if (isGroupAdmin) {
+      setGroupView(true);
+      setCurrent(null);
+      router.replace("/groupe");
+      return;
+    }
+
+    // Employees → their affiliated establishment home
+    if (etablissements.length > 0) {
+      const etab = etablissements[0];
+      setGroupView(false);
+      setCurrent(etab);
+      const slug = etab.slug?.includes("piccola") ? "/piccola-mia" : "/bello-mio";
+      router.replace(slug);
+      return;
+    }
+
+    // Fallback
     router.replace("/dashboard");
-  }, [profileLoading, etabLoading, role, etablissements, router]);
+  }, [profileLoading, etabLoading, role, isGroupAdmin, etablissements, setCurrent, setGroupView, router]);
 
   return (
     <div style={{

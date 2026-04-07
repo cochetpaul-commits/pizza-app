@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import type { Role } from "@/lib/rbac";
-import { BottomSheet } from "./BottomSheet";
 import { ChefHat, ShoppingBasket, Undo2 } from "lucide-react";
 
 /* ── Icons ────────────────────────────────────────── */
@@ -256,31 +255,8 @@ const SECTION_EVENTS: TabSection = {
   ],
 };
 
-function IconSettings({ active: _active }: { active: boolean }) {
-  return (
-    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-  );
-}
-
-const SECTION_SETTINGS: TabSection = {
-  label: "Param.",
-  href: "/settings/employes",
-  match: ["/settings", "/admin"],
-  icon: (a) => <IconSettings active={a} />,
-  roles: ["group_admin"],
-  tabs: [
-    { label: "Employes", href: "/settings/employes", match: ["/settings/employes"], icon: (a) => <IconUsers active={a} /> },
-    { label: "Etab.", href: "/settings/etablissements", match: ["/settings/etablissements"], icon: (a) => <IconGrid active={a} /> },
-    { label: "Planning", href: "/settings/planning", match: ["/settings/planning"], icon: (a) => <IconCalendar active={a} /> },
-    { label: "Finance", href: "/settings/finance", match: ["/settings/finance"], icon: (a) => <IconWallet active={a} /> },
-  ],
-};
-
-const SECTIONS_BELLO: TabSection[] = [SECTION_HOME, SECTION_PILOTAGE, SECTION_PERSONNEL, SECTION_MY_PLANNING, SECTION_PRODUCTION, SECTION_ACHATS, SECTION_SETTINGS];
-const SECTIONS_PICCOLA: TabSection[] = [SECTION_HOME, SECTION_PILOTAGE, SECTION_PERSONNEL, SECTION_MY_PLANNING, SECTION_PRODUCTION_PICCOLA, SECTION_ACHATS, SECTION_EVENTS, SECTION_SETTINGS];
+const SECTIONS_BELLO: TabSection[] = [SECTION_HOME, SECTION_PILOTAGE, SECTION_PERSONNEL, SECTION_MY_PLANNING, SECTION_PRODUCTION, SECTION_ACHATS];
+const SECTIONS_PICCOLA: TabSection[] = [SECTION_HOME, SECTION_PILOTAGE, SECTION_PERSONNEL, SECTION_MY_PLANNING, SECTION_PRODUCTION_PICCOLA, SECTION_ACHATS, SECTION_EVENTS];
 
 const INACTIVE_COLOR = "#999";
 
@@ -302,41 +278,23 @@ function getActiveSection(pathname: string, sections: TabSection[]): TabSection 
   return best;
 }
 
-/* ── Building icon for etab indicator ────────────── */
-
-function IconBuilding({ color }: { color: string }) {
-  return (
-    <svg width={30} height={30} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" /><path d="M10 10h4" />
-    </svg>
-  );
-}
-
-function IconGroupBuilding({ color }: { color: string }) {
-  return (
-    <svg width={30} height={30} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="2" width="16" height="20" rx="2" /><path d="M9 22V12h6v10" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M8 10h.01" /><path d="M16 10h.01" />
-    </svg>
-  );
-}
-
 /* ── Component ────────────────────────────────────── */
 
 export function BottomTabBar() {
   const pathname = usePathname();
   const router = useRouter();
   const { role } = useProfile();
-  const { current, setCurrent, etablissements, isGroupView, setGroupView } = useEtablissement();
-  const [etabSheetOpen, setEtabSheetOpen] = React.useState(false);
+  const { current } = useEtablissement();
 
-  if (!role) return null;
+  // Hide entirely until an establishment is selected (no group view bar)
+  if (!role || !current) return null;
 
   const isPiccola = current?.slug?.includes("piccola");
   const allSections = isPiccola ? SECTIONS_PICCOLA : SECTIONS_BELLO;
   const sections = allSections.filter(s => !s.roles || s.roles.includes(role));
   const activeSection = getActiveSection(pathname, sections);
   const showSubTabs = activeSection && activeSection.tabs.length > 0;
-  const etabColor = isGroupView ? "#b45f57" : (current?.couleur ?? "#b45f57");
+  const etabColor = current?.couleur ?? "#b45f57";
 
   const etabHome = current?.slug?.includes("bello") ? "/bello-mio"
     : isPiccola ? "/piccola-mia"
@@ -354,42 +312,6 @@ export function BottomTabBar() {
 
   return (
     <>
-      {/* Establishment BottomSheet */}
-      <BottomSheet
-        open={etabSheetOpen}
-        onClose={() => setEtabSheetOpen(false)}
-        title="Etablissement"
-      >
-        {etablissements.map(e => {
-          const isSelected = !isGroupView && current?.id === e.id;
-          const clr = e.couleur ?? "#b45f57";
-          return (
-            <button key={e.id} type="button" onClick={() => {
-              setGroupView(false); setCurrent(e); setEtabSheetOpen(false);
-              const slug = e.slug?.includes("piccola") ? "/piccola-mia" : "/bello-mio";
-              router.push(slug);
-            }} style={{
-              display: "flex", alignItems: "center", gap: 12,
-              width: "100%", padding: "14px 16px",
-              border: "none", cursor: "pointer",
-              borderRadius: 12,
-              background: isSelected ? `${clr}12` : "transparent",
-              borderLeft: isSelected ? `3px solid ${clr}` : "3px solid transparent",
-              marginBottom: 4,
-            }}>
-              <div style={{
-                width: 32, height: 32, borderRadius: 10,
-                background: `${clr}18`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <IconBuilding color={clr} />
-              </div>
-              <span style={{ fontSize: 15, fontWeight: isSelected ? 700 : 500, color: "#2c2c2c" }}>{e.nom}</span>
-            </button>
-          );
-        })}
-      </BottomSheet>
-
       {/* ── Full-width bottom tab bar ── */}
       <nav className="bottom-tab-bar" style={{
         position: "fixed",
@@ -408,33 +330,28 @@ export function BottomTabBar() {
           height: 60, margin: "0 auto",
           padding: "4px 10px", gap: 4,
         }}>
-          {/* Left: establishment (main tabs) or back (sub-tabs) */}
-          <button
-            type="button"
-            onClick={() => {
-              if (showSubTabs) router.push(etabHome ?? "/dashboard");
-              else setEtabSheetOpen(true);
-            }}
-            style={{
-              width: 50, height: 50, borderRadius: 16,
-              border: "none",
-              cursor: "pointer",
-              background: showSubTabs ? "rgba(0,0,0,0.06)" : `${etabColor}18`,
-              color: showSubTabs ? "#666" : etabColor,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0, marginRight: 6,
-              transition: "transform 0.12s, background 0.2s",
-            }}
-            onTouchStart={e => { e.currentTarget.style.transform = "scale(0.88)"; }}
-            onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
-          >
-            {showSubTabs
-              ? <Undo2 size={26} strokeWidth={2} />
-              : isGroupView
-                ? <IconGroupBuilding color={etabColor} />
-                : <IconBuilding color={etabColor} />
-            }
-          </button>
+          {/* Left: back button only when in sub-tabs view */}
+          {showSubTabs && (
+            <button
+              type="button"
+              onClick={() => router.push(etabHome ?? "/dashboard")}
+              style={{
+                width: 44, height: 44, borderRadius: 14,
+                border: "none",
+                cursor: "pointer",
+                background: "rgba(0,0,0,0.05)",
+                color: "#666",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0, marginRight: 4,
+                transition: "transform 0.12s, background 0.2s",
+              }}
+              onTouchStart={e => { e.currentTarget.style.transform = "scale(0.88)"; }}
+              onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
+              aria-label="Retour"
+            >
+              <Undo2 size={22} strokeWidth={2} />
+            </button>
+          )}
 
           {/* Center: tabs with icon + label */}
           {showSubTabs ? (

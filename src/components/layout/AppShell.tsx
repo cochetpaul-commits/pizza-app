@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { canAccess } from "@/lib/rbac";
 import { Sidebar } from "./Sidebar";
-import { TopBar } from "./TopBar";
+import { MobileHeader } from "./MobileHeader";
 import { BottomTabBar } from "./BottomTabBar";
 
 const EXCLUDED_PATHS = ["/login", "/auth"];
@@ -51,7 +51,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
 
       <div className="app-main">
-        <TopBar />
+        <MobileHeader />
         <main>{allowed ? children : <AccessDenied />}</main>
       </div>
 

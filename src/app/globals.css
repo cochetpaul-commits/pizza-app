@@ -194,10 +194,8 @@ html, body{
   width: var(--sidebar-width);
 }
 
-.topbar-mobile {
-  display: none !important;
-}
-/* Never show topbar on mobile — notifications handled elsewhere */
+.topbar-mobile { display: none !important; }
+.mobile-header { display: none !important; }
 
 .app-main {
   margin-left: var(--sidebar-width);
@@ -214,12 +212,14 @@ html, body{
   .sidebar-desktop {
     display: none;
   }
-  .topbar-mobile {
-    display: flex !important;
+  .mobile-header {
+    display: block !important;
   }
   .app-main {
     margin-left: 0;
-    /* Extra bottom padding for full-width tab bar */
+    /* Reserve space for fixed mobile header (52px) + safe-area */
+    padding-top: calc(52px + env(safe-area-inset-top, 0px));
+    /* Reserve space for full-width bottom tab bar */
     padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   }
   .bottom-tab-bar {
