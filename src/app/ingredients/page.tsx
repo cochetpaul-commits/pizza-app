@@ -42,6 +42,7 @@ import { getSupplierColor } from "@/lib/supplierColors";
 import { updateDerivedIngredients, computeDerivedPrice, computeRendement } from "@/lib/rendement";
 import DuplicatePanel from "@/components/DuplicatePanel";
 import { detectDuplicates, type DuplicatePair } from "@/lib/duplicateDetection";
+import { BottomSheet } from "@/components/layout/BottomSheet";
 
 type OfferPayload = Record<string, unknown>;
 
@@ -1018,14 +1019,6 @@ function IngredientsPageInner() {
     { t: "to_check"  as Tab, label: "À contrôler",  count: counts.to_check },
   ] as const;
 
-  const headerBtnStyle: CSSProperties = {
-    height: 34, padding: "0 14px", borderRadius: 12, fontSize: 13, fontWeight: 600,
-    cursor: "pointer", border: "1.5px solid #ddd6c8", background: "white", color: "#1a1a1a",
-    display: "inline-flex", alignItems: "center",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-  };
-
-
   return (
     <div style={{ background: "#f2ede4", minHeight: "100vh" }}>
       <style>{`
@@ -1039,78 +1032,25 @@ function IngredientsPageInner() {
       `}</style>
 
       {/* ══════════════════════════════════════════════
-          HEADER
+          TOOLBAR (no header bandeau — global header handles nav)
       ══════════════════════════════════════════════ */}
-      <header style={{
-        position: "sticky", top: 0, zIndex: 50,
-        background: "#fff", borderBottom: "1.5px solid #ddd6c8",
-        height: 56, display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 20px", boxSizing: "border-box",
-      }}>
-        {/* Left */}
-        <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, overflow: "hidden" }}>
-          <Link href={backUrl ?? "/"} style={{ color: "#999", fontSize: 13, textDecoration: "none", flexShrink: 0, fontWeight: 500 }}>
-            ← {backUrl ? "Retour" : "Accueil"}
-          </Link>
-          <span style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontSize: 22, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: 0.5 }}>
-            Achats
-          </span>
-        </div>
+      <div style={{ position: "sticky", top: 0, zIndex: 40, background: "#f2ede4", borderBottom: "1px solid #ddd6c8" }}>
 
-        {/* Right */}
-        <div className="ing-header-right" style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0, marginLeft: 12 }}>
-          {/* Rafraîchir (desktop) */}
-          <button onClick={reload} className="desktop-only" style={headerBtnStyle}>Rafraîchir</button>
-          {/* Doublons */}
-          <button onClick={() => setShowDuplicates(true)} className="desktop-only" style={headerBtnStyle}>
-            Doublons
-            {duplicatePairs.length > 0 && (
-              <span style={{
-                background: "#D4775A", color: "white", borderRadius: 10,
-                fontSize: 10, padding: "1px 6px", marginLeft: 5,
-              }}>
-                {duplicatePairs.length}
-              </span>
-            )}
-          </button>
-          {/* + Ingrédient */}
-          {userCanWrite && (
-          <button
-            className="ing-add-btn"
-            onClick={() => {
-              setShowCreateForm(v => {
-                const next = !v;
-                if (next) setTimeout(() => document.getElementById("create-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
-                return next;
-              });
-            }}
-            style={{ background: "#D4775A", color: "white", border: "none", borderRadius: 12, cursor: "pointer", fontWeight: 700, fontSize: 13, padding: "8px 16px", whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(212,119,90,0.25)" }}
-          >
-            {showCreateForm ? "✕ Fermer" : "+ Ingredient"}
-          </button>
-          )}
-        </div>
-      </header>
-
-      {/* ══════════════════════════════════════════════
-          TOOLBAR
-      ══════════════════════════════════════════════ */}
-      <div style={{ position: "sticky", top: 56, zIndex: 40, background: "#f2ede4", borderBottom: "1px solid #ddd6c8" }}>
-
-        {/* Tabs — pill toggle scrollable */}
-        <div style={{ overflowX: "auto", display: "inline-flex", gap: 4, padding: 4, margin: "0 16px", background: "#e8e0d0", borderRadius: 12 }}>
-          {TABS_MAIN.map(({ t, label, count }) => (
-            <button key={t} onClick={() => setTab(t)} style={{
-              flexShrink: 0, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
-              borderRadius: 10, whiteSpace: "nowrap",
-              border: "none",
-              background: tab === t ? (etab?.couleur ? etab.couleur + "25" : "#fff") : "transparent",
-              color: tab === t ? "#1a1a1a" : "#999",
-              boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
-              transition: "all 0.15s",
-            }}>{label} ({count})</button>
-          ))}
-          {/* Variations prix tab removed — accessible via sidebar */}
+        {/* Tabs — centered pill toggle */}
+        <div style={{ display: "flex", justifyContent: "center", paddingTop: 12 }}>
+          <div style={{ overflowX: "auto", display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12 }}>
+            {TABS_MAIN.map(({ t, label, count }) => (
+              <button key={t} onClick={() => setTab(t)} style={{
+                flexShrink: 0, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                borderRadius: 10, whiteSpace: "nowrap",
+                border: "none",
+                background: tab === t ? (etab?.couleur ? etab.couleur + "25" : "#fff") : "transparent",
+                color: tab === t ? "#1a1a1a" : "#999",
+                boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+                transition: "all 0.15s",
+              }}>{label} ({count})</button>
+            ))}
+          </div>
         </div>
 
         {!isVariations && (
@@ -1495,40 +1435,51 @@ function IngredientsPageInner() {
         );
       })()}
 
-      {showFilters && (
-        <>
-          <div style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.4)" }} onClick={() => setShowFilters(false)} />
-          <div className="safe-bottom" style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 61, background: "#faf7f2", borderRadius: "20px 20px 0 0", padding: 20, animation: "slideUp 0.25s ease-out" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <span style={{ fontSize: 17, fontWeight: 800 }}>Filtres</span>
-              <button onClick={() => setShowFilters(false)} style={{ height: 32, padding: "0 12px", borderRadius: 8, border: "1px solid #e5ddd0", background: "white", cursor: "pointer", fontSize: 13 }}>✕ Fermer</button>
-            </div>
-            <div style={{ display: "grid", gap: 12 }}>
-              <div><div style={{ fontSize: 12, color: "#999", marginBottom: 6 }}>Catégorie</div>
-                <Dropdown
-                  value={filterCategory}
-                  onChange={(v) => setFilterCategory(v as "all" | Category)}
-                  options={[{ value: "all", label: "Tous" }, ...CATEGORIES.map(c => ({ value: c, label: CAT_LABELS[c] }))]}
-                />
-              </div>
-              <div><div style={{ fontSize: 12, color: "#999", marginBottom: 6 }}>Fournisseur</div>
-                <Dropdown
-                  value={filterSupplier}
-                  onChange={setFilterSupplier}
-                  options={[{ value: "all", label: "Tous" }, ...suppliers.filter(s => s.is_active).map(s => ({ value: s.id, label: s.name }))]}
-                />
-              </div>
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} style={{ accentColor: "#D4775A" }} />
-                Inclure sans offre
-              </label>
-            </div>
-            <button onClick={() => setShowFilters(false)} style={{ width: "100%", height: 44, marginTop: 16, borderRadius: 10, border: "none", background: "#D4775A", color: "white", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
-              Appliquer
-            </button>
+      <BottomSheet open={showFilters} onClose={() => setShowFilters(false)} title="Filtres">
+        <div style={{ display: "grid", gap: 14 }}>
+          <div>
+            <div style={{ fontSize: 12, color: "#999", marginBottom: 6 }}>Categorie</div>
+            <Dropdown
+              value={filterCategory}
+              onChange={(v) => setFilterCategory(v as "all" | Category)}
+              options={[{ value: "all", label: "Tous" }, ...CATEGORIES.map(c => ({ value: c, label: CAT_LABELS[c] }))]}
+            />
           </div>
-        </>
-      )}
+          <div>
+            <div style={{ fontSize: 12, color: "#999", marginBottom: 6 }}>Fournisseur</div>
+            <Dropdown
+              value={filterSupplier}
+              onChange={setFilterSupplier}
+              options={[{ value: "all", label: "Tous" }, ...suppliers.filter(s => s.is_active).map(s => ({ value: s.id, label: s.name }))]}
+            />
+          </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} style={{ accentColor: "#D4775A" }} />
+            Inclure sans offre
+          </label>
+          <button
+            type="button"
+            onClick={() => { setShowFilters(false); setShowDuplicates(true); }}
+            style={{
+              width: "100%", height: 44, borderRadius: 10,
+              border: "1.5px solid #ddd6c8", background: "#fff",
+              color: "#1a1a1a", fontSize: 14, fontWeight: 700, cursor: "pointer",
+            }}
+          >
+            Detecter les doublons {duplicatePairs.length > 0 ? `(${duplicatePairs.length})` : ""}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowFilters(false)}
+            style={{
+              width: "100%", height: 44, borderRadius: 10, border: "none",
+              background: "#D4775A", color: "white", fontSize: 15, fontWeight: 700, cursor: "pointer",
+            }}
+          >
+            Appliquer
+          </button>
+        </div>
+      </BottomSheet>
 
       {/* ═══ MODALE FICHE FOURNISSEUR ═══ */}
       {modalSupplierId && (() => {
@@ -1565,6 +1516,40 @@ function IngredientsPageInner() {
           </div>
         );
       })()}
+
+      {/* ── Floating "+ Produits" pill (mobile, sits above section pill) ── */}
+      {userCanWrite && !isVariations && (
+        <button
+          type="button"
+          className="ing-floating-add"
+          onClick={() => {
+            setShowCreateForm(v => {
+              const next = !v;
+              if (next) setTimeout(() => document.getElementById("create-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+              return next;
+            });
+          }}
+          style={{
+            position: "fixed",
+            right: 16,
+            bottom: "calc(80px + env(safe-area-inset-bottom, 0px))",
+            zIndex: 105,
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "12px 18px",
+            borderRadius: 999,
+            border: "none",
+            background: "#D4775A",
+            color: "#fff",
+            fontFamily: "var(--font-oswald), Oswald, sans-serif",
+            fontSize: 13, fontWeight: 700,
+            textTransform: "uppercase", letterSpacing: ".05em",
+            boxShadow: "0 6px 24px rgba(212,119,90,0.35), 0 2px 8px rgba(0,0,0,0.10)",
+            cursor: "pointer",
+          }}
+        >
+          {showCreateForm ? "✕ Fermer" : "+ Produits"}
+        </button>
+      )}
     </div>
   );
 }
