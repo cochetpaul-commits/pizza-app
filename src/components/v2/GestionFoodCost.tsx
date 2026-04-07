@@ -25,6 +25,12 @@ export interface GestionFoodCostProps {
   onSellPriceChange: (price: number) => void;
   portionsCount?: number | null;
   yieldGrams?: number | null;
+  /** TVA rate (e.g. 0.10) */
+  vatRate?: number;
+  onVatChange?: (v: number) => void;
+  /** Food cost target in % (e.g. 30) */
+  foodCostTarget?: number;
+  onFoodCostTargetChange?: (v: number) => void;
 }
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -53,6 +59,8 @@ export function GestionFoodCost({
   recipeId, recipeType, lines, ingredients, priceByIngredient,
   supplierByIngredient, totalCost, sellPrice, onSellPriceChange,
   portionsCount, yieldGrams,
+  vatRate = 0.10, onVatChange,
+  foodCostTarget = 30, onFoodCostTargetChange,
 }: GestionFoodCostProps) {
 
   const [localSellPrice, setLocalSellPrice] = useState(sellPrice ?? 0);
@@ -104,12 +112,12 @@ export function GestionFoodCost({
   const sp = localSellPrice > 0 ? localSellPrice : null;
   const foodCostPct = sp ? (costPerPortion / sp) * 100 : null;
   const margeBrute = sp ? sp - costPerPortion : null;
-  const prixTTC = sp ? sp * 1.1 : null;
-  const prixMiniFC32 = costPerPortion > 0 ? round2(costPerPortion / 0.32) : null;
+  const prixTTC = sp ? sp * (1 + vatRate) : null;
+  const prixMiniFC = costPerPortion > 0 ? round2(costPerPortion / (foodCostTarget / 100)) : null;
 
   const fcColor = foodCostPct == null ? "#999"
-    : foodCostPct <= 28 ? "#16a34a"
-    : foodCostPct <= 32 ? "#D97706"
+    : foodCostPct <= foodCostTarget ? "#16a34a"
+    : foodCostPct <= foodCostTarget + 5 ? "#D97706"
     : "#DC2626";
 
   async function saveSellPrice(price: number) {
@@ -138,8 +146,46 @@ export function GestionFoodCost({
     ? (sortedLines[0].cost / effectiveTotal) * 100
     : 0;
 
+  const vatPct = Math.round(vatRate * 100);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* ── Control bar ── */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+        background: "#fff", padding: "12px 16px", borderRadius: 12,
+        border: "1px solid #ece4d4",
+      }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5 }}>
+          Parametres
+        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 11, color: "#666" }}>TVA</span>
+          <select
+            value={vatPct}
+            onChange={(e) => onVatChange?.(Number(e.target.value) / 100)}
+            disabled={!onVatChange}
+            style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd6c8", fontSize: 12, fontWeight: 600, background: "#fff" }}
+          >
+            {[0, 5.5, 10, 20].map((v) => (
+              <option key={v} value={v}>{v}%</option>
+            ))}
+          </select>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 11, color: "#666" }}>Cible food cost</span>
+          <input
+            type="number"
+            min={5} max={80} step={1}
+            value={foodCostTarget}
+            onChange={(e) => onFoodCostTargetChange?.(Number(e.target.value))}
+            disabled={!onFoodCostTargetChange}
+            style={{ width: 60, padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd6c8", fontSize: 12, fontWeight: 600, textAlign: "right" }}
+          />
+          <span style={{ fontSize: 11, color: "#666" }}>%</span>
+        </div>
+      </div>
 
       {/* ── Header + multiplier ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -318,9 +364,9 @@ export function GestionFoodCost({
                 </span>
               </div>
               <div style={{ height: 10, background: "#f0ebe2", borderRadius: 5, overflow: "hidden", position: "relative" }}>
-                {/* 32% marker */}
+                {/* target marker */}
                 <div style={{
-                  position: "absolute", left: "32%", top: 0, bottom: 0, width: 2,
+                  position: "absolute", left: `${Math.min(foodCostTarget, 100)}%`, top: 0, bottom: 0, width: 2,
                   background: "rgba(0,0,0,0.15)", zIndex: 1,
                 }} />
                 <div style={{
@@ -330,7 +376,7 @@ export function GestionFoodCost({
                 }} />
               </div>
               <div style={{ fontSize: 9, color: "#bbb", marginTop: 3, textAlign: "right" }}>
-                objectif 32%
+                objectif {foodCostTarget}%
               </div>
             </div>
           )}
@@ -348,13 +394,13 @@ export function GestionFoodCost({
               accent="#16a34a"
             />
             <SimKpiCard
-              label="Prix TTC (10%)"
+              label={`Prix TTC (${vatPct}%)`}
               value={prixTTC != null ? fmtEur(prixTTC) : "-"}
               accent="#1a1a1a"
             />
             <SimKpiCard
-              label="Prix mini FC 32%"
-              value={prixMiniFC32 != null ? fmtEur(prixMiniFC32) : "-"}
+              label={`Prix mini FC ${foodCostTarget}%`}
+              value={prixMiniFC != null ? fmtEur(prixMiniFC) : "-"}
               accent="#D97706"
             />
           </div>
