@@ -7,7 +7,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { AllergenBadges } from "@/components/AllergenBadges";
 import { parseAllergens, mergeAllergens } from "@/lib/allergens";
 import { offerRowToCpu, enrichCpuWithConversions } from "@/lib/offerPricing";
-import { formatCpuLabel } from "@/lib/formatPrice";
+import { formatCpuLabel, formatIngredientPriceLine } from "@/lib/formatPrice";
+import type { LatestOffer } from "@/types/ingredients";
 import { compressImage } from "@/lib/compressImage";
 
 import { fetchApi } from "@/lib/fetchApi";
@@ -178,11 +179,13 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
       const pm: Record<string, CpuByUnit> = {};
       const metaM: Record<string, { density_kg_per_l?: number | null; piece_weight_g?: number | null }> = {};
       const supplierByIng: Record<string, string | null> = {};
+      const offerByIng: Record<string, LatestOffer> = {};
       for (const o of offerList) {
         const iid = String(o.ingredient_id ?? "");
         if (!iid) continue;
         pm[iid] = offerRowToCpu(o);
         metaM[iid] = { density_kg_per_l: o.density_kg_per_l as number | null, piece_weight_g: o.piece_weight_g as number | null };
+        offerByIng[iid] = o as unknown as LatestOffer;
         const sid = String(o.supplier_id ?? "");
         supplierByIng[iid] = sid ? (supplierNameById[sid] ?? null) : null;
       }
@@ -267,9 +270,18 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
       setPriceByIngredient(pm);
       setSupplierByIngredient(supplierByIng);
 
+      // Pour le LABEL on utilise la même fonction que la page /ingredients
+      // (formatIngredientPriceLine via formatIngredientPrice → fromOffer/fromLegacy),
+      // garantissant la cohérence d'affichage (€/kg, €/L) et l'utilisation correcte
+      // de piece_weight_g / piece_volume_ml depuis l'offre OU l'ingrédient.
       const labelMap: Record<string, string> = {};
       for (const i of ingList) {
-        labelMap[i.id] = formatCpuLabel(pm[i.id] ?? {}, metaM[i.id] ?? {}, i.piece_volume_ml ?? null, supplierByIng[i.id] ?? null);
+        const off = offerByIng[i.id] ?? null;
+        if (off) {
+          labelMap[i.id] = formatIngredientPriceLine(i, off, supplierByIng[i.id] ?? null);
+        } else {
+          labelMap[i.id] = formatCpuLabel(pm[i.id] ?? {}, metaM[i.id] ?? {}, i.piece_volume_ml ?? null, supplierByIng[i.id] ?? null);
+        }
       }
       setPriceLabelByIngredient(labelMap);
 
