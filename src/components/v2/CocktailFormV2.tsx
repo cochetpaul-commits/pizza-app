@@ -544,20 +544,16 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
               accent={ACCENT}
               portionLabel="cocktail"
               foodCostTarget={20}
+              onSellPriceChange={(p) => setSellPrice(p)}
+              vatRate={vatRate}
+              onVatChange={setVatRate}
             />
             <GestionFoodCost
-              recipeId={cocktailId}
-              recipeType="cocktail"
               lines={lines}
               ingredients={ingredients}
               priceByIngredient={priceByIngredient}
               supplierByIngredient={supplierByIngredient}
               totalCost={round2(totalCostEur)}
-              sellPrice={sp}
-              onSellPriceChange={(p) => setSellPrice(p)}
-              vatRate={vatRate}
-              onVatChange={setVatRate}
-              foodCostTarget={20}
             />
           </>
         )}

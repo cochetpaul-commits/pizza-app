@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 
 function fmtMoney(v: number) {
@@ -72,11 +72,21 @@ export interface RecipeKpisProps {
   portionLabel?: string;
   /** Accent color (used as default for cost color) */
   accent?: string;
+  /** Editable mode — provide callbacks to allow direct editing of the cards */
+  onSellPriceChange?: (price: number) => void;
+  vatRate?: number;
+  onVatChange?: (rate: number) => void;
+  onFoodCostTargetChange?: (target: number) => void;
+  /** Portions multiplier (×1, ×2, …) — controls the Cost card */
+  multiplier?: number;
+  onMultiplierChange?: (m: number) => void;
 }
 
 export function RecipeKpis({
   costPerPortion, foodCostPct, sellPriceHT, sellPriceTTC, margeBrute,
   foodCostTarget = 30, portionLabel = "portion", accent = "#D4775A",
+  onSellPriceChange, vatRate, onVatChange, onFoodCostTargetChange,
+  multiplier = 1, onMultiplierChange,
 }: RecipeKpisProps) {
   // Food cost color: green ≤ target, orange ≤ target+5, red >
   const fcColor = foodCostPct == null
@@ -84,12 +94,25 @@ export function RecipeKpis({
     : foodCostPct <= foodCostTarget ? "#16a34a"
     : foodCostPct <= foodCostTarget + 5 ? "#D97706"
     : "#DC2626";
-  const fcRatio = foodCostPct == null ? 0 : Math.min(1, foodCostPct / (foodCostTarget * 1.67)); // top scale = target * 1.67
+  const fcRatio = foodCostPct == null ? 0 : Math.min(1, foodCostPct / (foodCostTarget * 1.67));
 
   const margeColor = margeBrute != null && margeBrute > 0 ? "#16a34a" : "#999";
   const margeRatio = margeBrute != null && sellPriceHT
     ? Math.min(1, Math.max(0, margeBrute / sellPriceHT))
     : 0;
+
+  const vatPct = vatRate != null ? Math.round(vatRate * 100) : null;
+
+  // Coefficient = prix HT / coût de revient
+  const coefficient = sellPriceHT && costPerPortion && costPerPortion > 0
+    ? sellPriceHT / costPerPortion
+    : null;
+
+  // Display values include the multiplier (so the cards reflect the chosen portions count)
+  const dispCost = costPerPortion != null ? costPerPortion * multiplier : null;
+  const dispSell = sellPriceHT != null ? sellPriceHT * multiplier : null;
+  const dispTTC = sellPriceTTC != null ? sellPriceTTC * multiplier : null;
+  const dispMarge = margeBrute != null ? margeBrute * multiplier : null;
 
   return (
     <div style={{
@@ -97,55 +120,213 @@ export function RecipeKpis({
       borderRadius: 16,
       padding: 16,
       marginBottom: 16,
-      display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-      gap: 12,
     }}>
-      {/* COUT DE REVIENT */}
-      <BigKpiCard
-        label="Cout de revient"
-        value={costPerPortion != null ? `${fmtMoney(costPerPortion)}€` : "-"}
-        sub={`par ${portionLabel}`}
-        color={accent}
-      />
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+        gap: 12,
+      }}>
+        {/* COUT DE REVIENT — avec toggle portions */}
+        <BigKpiCard
+          label="Cout de revient"
+          color={accent}
+          valueNode={
+            <span>{dispCost != null ? `${fmtMoney(dispCost)}€` : "-"}</span>
+          }
+          subNode={<span>{multiplier === 1 ? `par ${portionLabel}` : `pour ${multiplier} ${portionLabel}s`}</span>}
+          bottomNode={onMultiplierChange ? (
+            <PortionsToggle value={multiplier} onChange={onMultiplierChange} accent={accent} />
+          ) : undefined}
+        />
 
-      {/* FOOD COST */}
-      <BigKpiCard
-        label="Food cost"
-        value={foodCostPct != null ? `${foodCostPct.toFixed(0)}%` : "-"}
-        sub={`cible ${foodCostTarget}%`}
-        color={fcColor}
-        progress={{ ratio: fcRatio, color: fcColor }}
-      />
+        {/* FOOD COST — cible éditable inline */}
+        <BigKpiCard
+          label="Food cost"
+          color={fcColor}
+          valueNode={
+            <span>{foodCostPct != null ? `${foodCostPct.toFixed(0)}%` : "-"}</span>
+          }
+          subNode={
+            onFoodCostTargetChange ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                cible
+                <input
+                  type="number"
+                  min={5} max={80} step={1}
+                  value={foodCostTarget}
+                  onChange={(e) => onFoodCostTargetChange(Number(e.target.value))}
+                  style={{
+                    width: 38, padding: "1px 4px", borderRadius: 5,
+                    border: "1px solid #d9d2c4", background: "#fff",
+                    fontSize: 12, fontWeight: 700, textAlign: "right",
+                    color: "#1a1a1a",
+                  }}
+                />
+                %
+              </span>
+            ) : <span>{`cible ${foodCostTarget}%`}</span>
+          }
+          bottomNode={
+            <div style={{
+              height: 6, background: "#ece4d4",
+              borderRadius: 999, overflow: "hidden",
+            }}>
+              <div style={{
+                width: `${Math.min(100, fcRatio * 100)}%`,
+                height: "100%", background: fcColor,
+                borderRadius: 999, transition: "width 0.3s",
+              }} />
+            </div>
+          }
+        />
 
-      {/* PRIX DE VENTE */}
-      <BigKpiCard
-        label="Prix de vente"
-        value={sellPriceHT != null ? `${fmtMoney(sellPriceHT)}€` : "-"}
-        sub={sellPriceTTC != null ? `HT · ${fmtMoney(sellPriceTTC)}€ TTC` : "HT"}
-        color="#1a1a1a"
-      />
+        {/* PRIX DE VENTE — input éditable + TVA inline */}
+        <BigKpiCard
+          label="Prix de vente"
+          color="#1a1a1a"
+          valueNode={
+            onSellPriceChange ? (
+              <EditablePrice value={dispSell} onChange={(v) => onSellPriceChange(v / multiplier)} />
+            ) : (
+              <span>{dispSell != null ? `${fmtMoney(dispSell)}€` : "-"}</span>
+            )
+          }
+          subNode={
+            onVatChange && vatPct != null ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                TVA
+                <select
+                  value={vatPct}
+                  onChange={(e) => onVatChange(Number(e.target.value) / 100)}
+                  style={{
+                    padding: "1px 4px", borderRadius: 5, border: "1px solid #d9d2c4",
+                    background: "#fff", fontSize: 12, fontWeight: 700, color: "#1a1a1a",
+                    cursor: "pointer",
+                  }}
+                >
+                  {[0, 5.5, 10, 20].map((v) => (
+                    <option key={v} value={v}>{v}%</option>
+                  ))}
+                </select>
+                {dispTTC != null && <span>· {fmtMoney(dispTTC)}€ TTC</span>}
+              </span>
+            ) : (
+              <span>{dispTTC != null ? `HT · ${fmtMoney(dispTTC)}€ TTC` : "HT"}</span>
+            )
+          }
+        />
 
-      {/* MARGE BRUTE */}
-      <BigKpiCard
-        label="Marge brute"
-        value={margeBrute != null ? `${fmtMoney(margeBrute)}€` : "-"}
-        sub={`par ${portionLabel}`}
-        color={margeColor}
-        progress={margeBrute != null && margeBrute > 0 ? { ratio: margeRatio, color: margeColor } : undefined}
-      />
+        {/* MARGE BRUTE */}
+        <BigKpiCard
+          label="Marge brute"
+          color={margeColor}
+          valueNode={<span>{dispMarge != null ? `${fmtMoney(dispMarge)}€` : "-"}</span>}
+          subNode={<span>{multiplier === 1 ? `par ${portionLabel}` : `pour ${multiplier} ${portionLabel}s`}</span>}
+          bottomNode={dispMarge != null && dispMarge > 0 ? (
+            <div style={{
+              height: 6, background: "#ece4d4",
+              borderRadius: 999, overflow: "hidden",
+            }}>
+              <div style={{
+                width: `${Math.min(100, margeRatio * 100)}%`,
+                height: "100%", background: margeColor,
+                borderRadius: 999, transition: "width 0.3s",
+              }} />
+            </div>
+          ) : undefined}
+        />
+
+        {/* COEFFICIENT — info pure */}
+        <BigKpiCard
+          label="Coefficient"
+          color="#7C3AED"
+          valueNode={<span>{coefficient != null ? `×${coefficient.toFixed(2)}` : "-"}</span>}
+          subNode={<span>prix / coût</span>}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Editable price input (looks like a big number) ───────────────
+function EditablePrice({ value, onChange }: { value: number | null; onChange: (v: number) => void }) {
+  const [local, setLocal] = useState<string>(value != null ? value.toFixed(2) : "");
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!editing) setLocal(value != null ? value.toFixed(2) : "");
+  }, [value, editing]);
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={editing ? local : (value != null ? `${fmtMoney(value)}€` : "-")}
+      onFocus={(e) => {
+        setEditing(true);
+        setLocal(value != null ? value.toFixed(2) : "");
+        setTimeout(() => e.target.select(), 0);
+      }}
+      onChange={(e) => {
+        const raw = e.target.value.replace(",", ".").replace(/[^\d.]/g, "");
+        setLocal(raw);
+        const n = Number(raw);
+        if (!isNaN(n) && n > 0) onChange(n);
+      }}
+      onBlur={() => {
+        setEditing(false);
+        const n = Number(local);
+        if (!isNaN(n) && n > 0) onChange(n);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur();
+      }}
+      style={{
+        width: "100%", border: "none", outline: "none", background: "transparent",
+        fontSize: 36, fontWeight: 800, color: "#1a1a1a",
+        fontFamily: "var(--font-oswald), Oswald, sans-serif",
+        lineHeight: 1.05, marginTop: 4, padding: 0,
+        fontVariantNumeric: "tabular-nums",
+        cursor: "text",
+      }}
+    />
+  );
+}
+
+// ── Portions multiplier toggle ───────────────────────────────────
+function PortionsToggle({ value, onChange, accent }: { value: number; onChange: (v: number) => void; accent: string }) {
+  const options = [1, 2, 5, 10, 20];
+  return (
+    <div style={{
+      display: "flex", gap: 2, padding: 2, background: "#f5f0e8",
+      borderRadius: 6, alignSelf: "flex-start",
+    }}>
+      {options.map((n) => (
+        <button
+          key={n} type="button" onClick={() => onChange(n)}
+          style={{
+            padding: "3px 9px", borderRadius: 5, fontSize: 10, fontWeight: 700,
+            border: "none", cursor: "pointer",
+            background: value === n ? accent : "transparent",
+            color: value === n ? "#fff" : "#888",
+            transition: "all 0.15s",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >×{n}</button>
+      ))}
     </div>
   );
 }
 
 function BigKpiCard({
-  label, value, sub, color, progress,
+  label, color, valueNode, subNode, bottomNode,
 }: {
   label: string;
-  value: string;
-  sub?: string;
   color: string;
-  progress?: { ratio: number; color: string };
+  valueNode: React.ReactNode;
+  subNode?: React.ReactNode;
+  bottomNode?: React.ReactNode;
 }) {
   return (
     <div style={{
@@ -168,22 +349,13 @@ function BigKpiCard({
         fontFamily: "var(--font-oswald), Oswald, sans-serif",
         lineHeight: 1.05, marginTop: 4,
       }}>
-        {value}
+        {valueNode}
       </div>
-      {sub && (
-        <div style={{ fontSize: 12, color: "#9a8f84", marginTop: 2 }}>{sub}</div>
+      {subNode && (
+        <div style={{ fontSize: 12, color: "#9a8f84", marginTop: 2 }}>{subNode}</div>
       )}
-      {progress && (
-        <div style={{
-          marginTop: 10, height: 6, background: "#ece4d4",
-          borderRadius: 999, overflow: "hidden",
-        }}>
-          <div style={{
-            width: `${Math.min(100, progress.ratio * 100)}%`,
-            height: "100%", background: progress.color,
-            borderRadius: 999, transition: "width 0.3s",
-          }} />
-        </div>
+      {bottomNode && (
+        <div style={{ marginTop: 10 }}>{bottomNode}</div>
       )}
     </div>
   );
