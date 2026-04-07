@@ -1,11 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import type { Role } from "@/lib/rbac";
-import { ChefHat, ShoppingBasket, Undo2 } from "lucide-react";
+import { ChefHat, ShoppingBasket } from "lucide-react";
+import { BottomSheet } from "./BottomSheet";
 
 /* ── Icons ────────────────────────────────────────── */
 
@@ -271,6 +272,17 @@ function getActiveSection(pathname: string, sections: TabSection[]): TabSection 
   return best;
 }
 
+/* ── Short labels for sections in pill ──────────── */
+
+const SECTION_SHORT_LABEL: Record<string, string> = {
+  Pilotage: "Pilotage",
+  Personnel: "Personnel",
+  Planning: "Planning",
+  "Prod.": "Prod.",
+  Achats: "Achats",
+  Events: "Events",
+};
+
 /* ── Component ────────────────────────────────────── */
 
 export function BottomTabBar() {
@@ -278,8 +290,9 @@ export function BottomTabBar() {
   const router = useRouter();
   const { role } = useProfile();
   const { current } = useEtablissement();
+  const [drawerSection, setDrawerSection] = useState<TabSection | null>(null);
 
-  // Hide entirely until an establishment is selected (no group view bar)
+  // Hide entirely until an establishment is selected
   if (!role || !current) return null;
 
   const isPiccola = current?.slug?.includes("piccola");
@@ -288,83 +301,123 @@ export function BottomTabBar() {
   const activeSection = getActiveSection(pathname, sections);
   const etabColor = current?.couleur ?? "#b45f57";
 
-  const etabHome = current?.slug?.includes("bello") ? "/bello-mio"
-    : isPiccola ? "/piccola-mia"
-    : null;
+  const handleSectionClick = (section: TabSection) => {
+    if (section.tabs.length === 0) {
+      // No sub-tabs → navigate directly to the section href
+      router.push(section.href);
+      return;
+    }
+    setDrawerSection(section);
+  };
 
-  // Hide entirely if there's no active section with tabs (e.g. on home page)
-  if (!activeSection || activeSection.tabs.length === 0) return null;
+  const handleTabClick = (href: string) => {
+    setDrawerSection(null);
+    router.push(href);
+  };
 
-  // Toggle pill style — active gets accent color background
   const toggleStyle = (isActive: boolean): React.CSSProperties => ({
-    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-    cursor: "pointer", padding: "10px 16px",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    cursor: "pointer", padding: "10px 14px",
     border: "none", borderRadius: 999,
     background: isActive ? etabColor : "transparent",
     color: isActive ? "#fff" : "#666",
-    fontSize: 12, fontWeight: 700,
+    fontSize: 11, fontWeight: 700,
     fontFamily: "var(--font-oswald), Oswald, sans-serif",
     textTransform: "uppercase", letterSpacing: ".05em",
     transition: "all 0.2s cubic-bezier(.34,1.56,.64,1)",
     flexShrink: 0,
+    whiteSpace: "nowrap",
   });
 
   return (
-    <nav className="bottom-tab-bar" style={{
-      position: "fixed",
-      bottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
-      left: "50%",
-      transform: "translateX(-50%)",
-      zIndex: 100,
-      display: "none",
-      maxWidth: "calc(100vw - 24px)",
-    }}>
-      <div style={{
-        display: "flex", alignItems: "center", gap: 4,
-        padding: "5px 6px",
-        borderRadius: 999,
-        background: "rgba(245,240,232,0.85)",
-        backdropFilter: "blur(24px) saturate(180%)",
-        WebkitBackdropFilter: "blur(24px) saturate(180%)",
-        border: "1px solid rgba(0,0,0,0.06)",
-        boxShadow: "0 6px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)",
-        overflowX: "auto",
-        scrollbarWidth: "none",
-      }}>
-        {/* Back chevron */}
-        <button
-          type="button"
-          onClick={() => router.push(etabHome ?? "/dashboard")}
-          style={{
-            width: 38, height: 38, borderRadius: 999,
-            border: "none", cursor: "pointer",
-            background: "transparent",
-            color: "#666",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            flexShrink: 0,
-            transition: "transform 0.12s",
-          }}
-          onTouchStart={e => { e.currentTarget.style.transform = "scale(0.88)"; }}
-          onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
-          aria-label="Retour"
-        >
-          <Undo2 size={20} strokeWidth={2.2} />
-        </button>
+    <>
+      {/* ── Section drawer ── */}
+      <BottomSheet
+        open={!!drawerSection}
+        onClose={() => setDrawerSection(null)}
+        title={drawerSection?.label ?? ""}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {drawerSection?.tabs.map((tab) => {
+            const isActive = pathMatches(pathname, tab.match);
+            return (
+              <button
+                key={tab.href}
+                type="button"
+                onClick={() => handleTabClick(tab.href)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 14,
+                  width: "100%", padding: "16px 18px",
+                  border: "none", cursor: "pointer",
+                  borderRadius: 16,
+                  background: isActive ? `${etabColor}15` : "rgba(255,255,255,0.55)",
+                  borderLeft: isActive ? `4px solid ${etabColor}` : "4px solid transparent",
+                  transition: "background 0.15s",
+                }}
+              >
+                <div style={{
+                  width: 40, height: 40, borderRadius: 12,
+                  background: isActive ? `${etabColor}25` : "rgba(0,0,0,0.04)",
+                  color: isActive ? etabColor : "#666",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  flexShrink: 0,
+                }}>
+                  {tab.icon(isActive)}
+                </div>
+                <span style={{
+                  fontSize: 15,
+                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? etabColor : "#1a1a1a",
+                  fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+                }}>
+                  {tab.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </BottomSheet>
 
-        {/* Contextual section toggles */}
-        {activeSection.tabs.map((tab) => {
-          const isActive = pathMatches(pathname, tab.match);
-          return (
-            <button key={tab.href} type="button" onClick={() => router.push(tab.href)}
-              style={toggleStyle(isActive)}
-              onTouchStart={e => { e.currentTarget.style.transform = "scale(0.94)"; }}
-              onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-    </nav>
+      {/* ── Floating section pill ── */}
+      <nav className="bottom-tab-bar" style={{
+        position: "fixed",
+        bottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 100,
+        display: "none",
+        maxWidth: "calc(100vw - 24px)",
+      }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 2,
+          padding: "5px 6px",
+          borderRadius: 999,
+          background: "rgba(245,240,232,0.85)",
+          backdropFilter: "blur(24px) saturate(180%)",
+          WebkitBackdropFilter: "blur(24px) saturate(180%)",
+          border: "1px solid rgba(0,0,0,0.06)",
+          boxShadow: "0 6px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)",
+          overflowX: "auto",
+          scrollbarWidth: "none",
+        }}>
+          {sections.map((section) => {
+            const isActive = activeSection === section;
+            const label = SECTION_SHORT_LABEL[section.label] ?? section.label;
+            return (
+              <button
+                key={section.label}
+                type="button"
+                onClick={() => handleSectionClick(section)}
+                style={toggleStyle(isActive)}
+                onTouchStart={e => { e.currentTarget.style.transform = "scale(0.94)"; }}
+                onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+    </>
   );
 }
