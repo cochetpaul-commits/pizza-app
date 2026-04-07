@@ -91,7 +91,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
 
   // Main tab
   type MainTab = "fc" | "recette" | "cmd" | "pop";
-  const [mainTab, setMainTab] = useState<MainTab>(initialProdMode ? "recette" : "fc");
+  const [mainTab, setMainTab] = useState<MainTab>(initialProdMode ? "recette" : isEdit ? "fc" : "recette");
 
   // Save state
   const [saving, setSaving] = useState(false);

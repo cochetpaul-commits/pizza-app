@@ -94,7 +94,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
   // Main tab
   type MainTab = "fc" | "recette" | "cmd" | "pop";
-  const [mainTab, setMainTab] = useState<MainTab>(initialProdMode ? "recette" : "fc");
+  const [mainTab, setMainTab] = useState<MainTab>(initialProdMode ? "recette" : isEdit ? "fc" : "recette");
 
   // Production mode
   const [prodMode, setProdMode] = useState(initialProdMode ?? false);
