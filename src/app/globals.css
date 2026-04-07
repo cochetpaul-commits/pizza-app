@@ -219,12 +219,17 @@ html, body{
     margin-left: 0;
     /* Reserve space for fixed mobile header (52px) + safe-area */
     padding-top: calc(52px + env(safe-area-inset-top, 0px));
-    /* Reserve space for full-width bottom tab bar */
-    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    /* Reserve space for floating bottom pill (pill height ~50 + 14 + safe-area) */
+    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
   }
   .bottom-tab-bar {
-    display: flex !important;
+    display: block !important;
   }
+}
+
+/* Hide bottom tab bar pill when a bottom sheet drawer is open */
+body.bottom-sheet-open .bottom-tab-bar {
+  display: none !important;
 }
 
 /* ── Desktop/Mobile visibility helpers ── */

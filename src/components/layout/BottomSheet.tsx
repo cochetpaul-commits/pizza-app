@@ -50,13 +50,15 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
     return () => document.removeEventListener("keydown", handleKey);
   }, [open, onClose]);
 
-  // Prevent body scroll when open
+  // Prevent body scroll + hide bottom tab bar when open
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
+      document.body.classList.add("bottom-sheet-open");
     }
     return () => {
       document.body.style.overflow = "";
+      document.body.classList.remove("bottom-sheet-open");
     };
   }, [open]);
 
@@ -85,14 +87,14 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
           bottom: 0,
           left: 0,
           right: 0,
-          maxHeight: "70dvh",
-          background: "rgba(245,240,232,0.92)",
-          backdropFilter: "blur(24px) saturate(180%)",
-          WebkitBackdropFilter: "blur(24px) saturate(180%)",
-          borderRadius: "24px 24px 0 0",
-          border: "1px solid rgba(255,255,255,0.35)",
+          maxHeight: "82dvh",
+          background: "rgba(252,248,240,0.96)",
+          backdropFilter: "blur(28px) saturate(180%)",
+          WebkitBackdropFilter: "blur(28px) saturate(180%)",
+          borderRadius: "32px 32px 0 0",
+          border: "1px solid rgba(255,255,255,0.45)",
           borderBottom: "none",
-          boxShadow: "0 -4px 32px rgba(0,0,0,0.12)",
+          boxShadow: "0 -8px 40px rgba(0,0,0,0.14), 0 -2px 12px rgba(0,0,0,0.06)",
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
           overflowY: "auto",
           transform: "translateY(0)",

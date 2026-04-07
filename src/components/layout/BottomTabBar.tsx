@@ -161,14 +161,6 @@ function IconHeart({ active: _active }: { active: boolean }) {
   );
 }
 
-const SECTION_HOME: TabSection = {
-  label: "Accueil",
-  href: "/dashboard",
-  match: ["/dashboard", "/bello-mio", "/piccola-mia", "/groupe"],
-  icon: (a) => <IconGrid active={a} />,
-  tabs: [],
-};
-
 const SECTION_MY_PLANNING: TabSection = {
   label: "Planning",
   href: "/mes-shifts",
@@ -198,6 +190,8 @@ const SECTION_PILOTAGE: TabSection = {
   icon: (a) => <IconWallet active={a} />,
   roles: ["group_admin"],
   tabs: [
+    { label: "Ventes", href: "/ventes", match: ["/ventes"], icon: (a) => <IconWallet active={a} /> },
+    { label: "Produits", href: "/ventes/marges", match: ["/ventes/marges"], icon: (a) => <IconTag active={a} /> },
     { label: "Tresorerie", href: "/tresorerie", match: ["/tresorerie"], icon: (a) => <IconTrendingUp active={a} /> },
   ],
 };
@@ -255,10 +249,9 @@ const SECTION_EVENTS: TabSection = {
   ],
 };
 
-const SECTIONS_BELLO: TabSection[] = [SECTION_HOME, SECTION_PILOTAGE, SECTION_PERSONNEL, SECTION_MY_PLANNING, SECTION_PRODUCTION, SECTION_ACHATS];
-const SECTIONS_PICCOLA: TabSection[] = [SECTION_HOME, SECTION_PILOTAGE, SECTION_PERSONNEL, SECTION_MY_PLANNING, SECTION_PRODUCTION_PICCOLA, SECTION_ACHATS, SECTION_EVENTS];
+const SECTIONS_BELLO: TabSection[] = [SECTION_PILOTAGE, SECTION_PERSONNEL, SECTION_MY_PLANNING, SECTION_PRODUCTION, SECTION_ACHATS];
+const SECTIONS_PICCOLA: TabSection[] = [SECTION_PILOTAGE, SECTION_PERSONNEL, SECTION_MY_PLANNING, SECTION_PRODUCTION_PICCOLA, SECTION_ACHATS, SECTION_EVENTS];
 
-const INACTIVE_COLOR = "#999";
 
 /* ── Helpers ──────────────────────────────────────── */
 
@@ -293,100 +286,85 @@ export function BottomTabBar() {
   const allSections = isPiccola ? SECTIONS_PICCOLA : SECTIONS_BELLO;
   const sections = allSections.filter(s => !s.roles || s.roles.includes(role));
   const activeSection = getActiveSection(pathname, sections);
-  const showSubTabs = activeSection && activeSection.tabs.length > 0;
   const etabColor = current?.couleur ?? "#b45f57";
 
   const etabHome = current?.slug?.includes("bello") ? "/bello-mio"
     : isPiccola ? "/piccola-mia"
     : null;
 
-  // Tab style: column layout with icon + label, active gets colored pill
-  const tabStyle = (isActive: boolean): React.CSSProperties => ({
-    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-    gap: 2, cursor: "pointer", padding: "6px 6px 4px",
-    border: "none", borderRadius: 12, minWidth: 0, flex: 1,
-    background: isActive ? `${etabColor}15` : "transparent",
-    color: isActive ? etabColor : INACTIVE_COLOR,
+  // Hide entirely if there's no active section with tabs (e.g. on home page)
+  if (!activeSection || activeSection.tabs.length === 0) return null;
+
+  // Toggle pill style — active gets accent color background
+  const toggleStyle = (isActive: boolean): React.CSSProperties => ({
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+    cursor: "pointer", padding: "10px 16px",
+    border: "none", borderRadius: 999,
+    background: isActive ? etabColor : "transparent",
+    color: isActive ? "#fff" : "#666",
+    fontSize: 12, fontWeight: 700,
+    fontFamily: "var(--font-oswald), Oswald, sans-serif",
+    textTransform: "uppercase", letterSpacing: ".05em",
     transition: "all 0.2s cubic-bezier(.34,1.56,.64,1)",
+    flexShrink: 0,
   });
 
   return (
-    <>
-      {/* ── Full-width bottom tab bar ── */}
-      <nav className="bottom-tab-bar" style={{
-        position: "fixed",
-        bottom: 0, left: 0, right: 0,
-        zIndex: 100,
-        display: "none",
-        borderRadius: 0,
-        background: "rgba(245,240,232,0.82)",
+    <nav className="bottom-tab-bar" style={{
+      position: "fixed",
+      bottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
+      left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: 100,
+      display: "none",
+      maxWidth: "calc(100vw - 24px)",
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 4,
+        padding: "5px 6px",
+        borderRadius: 999,
+        background: "rgba(245,240,232,0.85)",
         backdropFilter: "blur(24px) saturate(180%)",
         WebkitBackdropFilter: "blur(24px) saturate(180%)",
-        borderTop: "1px solid rgba(0,0,0,0.06)",
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        border: "1px solid rgba(0,0,0,0.06)",
+        boxShadow: "0 6px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)",
+        overflowX: "auto",
+        scrollbarWidth: "none",
       }}>
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "center",
-          height: 60, margin: "0 auto",
-          padding: "4px 10px", gap: 4,
-        }}>
-          {/* Left: back button only when in sub-tabs view */}
-          {showSubTabs && (
-            <button
-              type="button"
-              onClick={() => router.push(etabHome ?? "/dashboard")}
-              style={{
-                width: 44, height: 44, borderRadius: 14,
-                border: "none",
-                cursor: "pointer",
-                background: "rgba(0,0,0,0.05)",
-                color: "#666",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                flexShrink: 0, marginRight: 4,
-                transition: "transform 0.12s, background 0.2s",
-              }}
-              onTouchStart={e => { e.currentTarget.style.transform = "scale(0.88)"; }}
-              onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
-              aria-label="Retour"
-            >
-              <Undo2 size={22} strokeWidth={2} />
-            </button>
-          )}
+        {/* Back chevron */}
+        <button
+          type="button"
+          onClick={() => router.push(etabHome ?? "/dashboard")}
+          style={{
+            width: 38, height: 38, borderRadius: 999,
+            border: "none", cursor: "pointer",
+            background: "transparent",
+            color: "#666",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0,
+            transition: "transform 0.12s",
+          }}
+          onTouchStart={e => { e.currentTarget.style.transform = "scale(0.88)"; }}
+          onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
+          aria-label="Retour"
+        >
+          <Undo2 size={20} strokeWidth={2.2} />
+        </button>
 
-          {/* Center: tabs with icon + label */}
-          {showSubTabs ? (
-            <>
-              {activeSection.tabs.map((tab) => {
-                const isActive = pathMatches(pathname, tab.match);
-                return (
-                  <button key={tab.href} type="button" onClick={() => router.push(tab.href)}
-                    style={tabStyle(isActive)}
-                    onTouchStart={e => { e.currentTarget.style.transform = "scale(0.92)"; }}
-                    onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
-                  >
-                    {tab.icon(isActive)}
-                    <span style={{ fontSize: 9, fontWeight: isActive ? 700 : 500, lineHeight: 1 }}>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </>
-          ) : (
-            sections.map((section) => {
-              const isActive = activeSection === section;
-              return (
-                <button key={section.label} type="button" onClick={() => router.push(section.href)}
-                  style={tabStyle(isActive)}
-                  onTouchStart={e => { e.currentTarget.style.transform = "scale(0.92)"; }}
-                  onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
-                >
-                  {section.icon(isActive)}
-                  <span style={{ fontSize: 9, fontWeight: isActive ? 700 : 500, lineHeight: 1 }}>{section.label}</span>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </nav>
-    </>
+        {/* Contextual section toggles */}
+        {activeSection.tabs.map((tab) => {
+          const isActive = pathMatches(pathname, tab.match);
+          return (
+            <button key={tab.href} type="button" onClick={() => router.push(tab.href)}
+              style={toggleStyle(isActive)}
+              onTouchStart={e => { e.currentTarget.style.transform = "scale(0.94)"; }}
+              onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
