@@ -205,6 +205,9 @@ function MargesPage() {
   });
   const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
+  const [mode, setMode] = useState<"ttc" | "ht">("ttc");
   const [sortKey, setSortKey] = useState<SortKey>("ca_ttc");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [filterCat, setFilterCat] = useState<string>("all");
@@ -264,11 +267,62 @@ function MargesPage() {
     loadData();
   }, [loadData]);
 
+  // Import XLSX (same endpoint as /ventes)
+  const handleImport = async (file: File) => {
+    if (!etab) return;
+    setImporting(true);
+    setImportMsg("");
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("etablissement_id", etab.id);
+    try {
+      const res = await fetch("/api/ventes/import", { method: "POST", body: fd });
+      const json = await res.json();
+      if (json.ok) {
+        setImportMsg(`${json.inserted} lignes importees (${json.range})`);
+        loadData();
+      } else {
+        setImportMsg("Erreur : " + (json.error || "inconnue"));
+      }
+    } catch (e) {
+      setImportMsg("Erreur : " + String(e));
+    }
+    setImporting(false);
+  };
+
+  // PDF export — fetch stats then call shared PDF endpoint
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const handleExportPDF = async () => {
+    if (!etab) return;
+    setExportingPdf(true);
+    try {
+      const { from, to } = getRange();
+      const sRes = await fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${from}&to=${to}`);
+      const sJson = await sRes.json();
+      if (!sJson.stats) { setExportingPdf(false); return; }
+      const isSingle = from === to;
+      const label = isSingle
+        ? new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+        : `Du ${new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })} au ${new Date(to + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`;
+      const res = await fetch("/api/ventes/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stats: sJson.stats, prev: sJson.prev ?? null, mode, viewTab: isSingle ? "jour" : "perso", rangeLabel: label, etabName: etab.nom ?? "Etablissement", briefing: null }),
+      });
+      if (!res.ok) { setExportingPdf(false); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const dateSuffix = isSingle ? from : `${from}_${to}`;
+      a.download = `produits-${etab.nom?.replace(/\s/g, "_")}-${dateSuffix}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { /* ignore */ }
+    setExportingPdf(false);
+  };
+
   const { from, to } = getRange();
-  const isSingleDay = from === to;
-  const rangeLabel = isSingleDay
-    ? new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
-    : `Du ${new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })} au ${new Date(to + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`;
 
   // Charts
   useEffect(() => {
@@ -597,8 +651,38 @@ function MargesPage() {
           }
         `}</style>
         <div className="ventes-toolbar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
-          <div className="marges-toolbar-desktop">
-            <DateRangePicker value={range} onChange={(r) => setRange(r)} />
+          <DateRangePicker value={range} onChange={(r) => setRange(r)} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <label style={{
+              padding: "7px 14px", borderRadius: 8, border: "none",
+              background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
+            }}>
+              {importing ? "Import..." : "Import"}
+              <input type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => {
+                const f = e.target.files?.[0];
+                if (f) handleImport(f);
+                e.target.value = "";
+              }} />
+            </label>
+            <button type="button" onClick={handleExportPDF} disabled={exportingPdf} style={{
+              padding: "7px 14px", borderRadius: 8, border: "1px solid #e0d8ce",
+              background: "#fff", color: "#1a1a1a", fontSize: 12, fontWeight: 700, cursor: "pointer",
+              opacity: exportingPdf ? 0.5 : 1,
+            }}>
+              {exportingPdf ? "Export..." : "PDF"}
+            </button>
+            <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
+              <button type="button" onClick={() => setMode("ttc")} style={{
+                padding: "4px 14px", borderRadius: 16, border: "none", cursor: "pointer",
+                background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#777",
+                fontSize: 11, fontWeight: 500,
+              }}>TTC</button>
+              <button type="button" onClick={() => setMode("ht")} style={{
+                padding: "4px 14px", borderRadius: 16, border: "none", cursor: "pointer",
+                background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#777",
+                fontSize: 11, fontWeight: 500,
+              }}>HT</button>
+            </div>
           </div>
           {/* ── Page nav pills: Ventes / Produits ── */}
           <div style={{ display: "inline-flex", background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
@@ -614,17 +698,7 @@ function MargesPage() {
             }}>Produits</span>
           </div>
         </div>
-
-        <div
-          style={{
-            textAlign: "center",
-            fontSize: 14,
-            color: COLORS.muted,
-            marginBottom: 18,
-          }}
-        >
-          {rangeLabel}
-        </div>
+        {importMsg && <div style={{ fontSize: 12, color: accent, marginBottom: 10, textAlign: "center" }}>{importMsg}</div>}
 
         {loading && (
           <div
@@ -665,8 +739,8 @@ function MargesPage() {
               }}
             >
               <div style={S.kpiCard}>
-                <div style={S.kpiLabel}>CA TTC</div>
-                <div style={S.kpiValue}>{fmt(K.ca_ttc)}</div>
+                <div style={S.kpiLabel}>CA {mode.toUpperCase()}</div>
+                <div style={S.kpiValue}>{fmt(mode === "ttc" ? K.ca_ttc : K.ca_ht)}</div>
               </div>
               <div style={S.kpiCard}>
                 <div style={S.kpiLabel}>Cout matiere</div>

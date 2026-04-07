@@ -171,15 +171,6 @@ function PerformancesPage() {
   const [catTrendLoading, setCatTrendLoading] = useState(false);
   const catTrendChartRef = useRef<HTMLCanvasElement>(null);
 
-  // Comparison state
-  type CompareMode = "none" | "prev" | "prev-sem" | "prev-mois" | "a-1" | "custom";
-  const [compareMode, setCompareMode] = useState<CompareMode>("a-1");
-  const [compareFrom, setCompareFrom] = useState("");
-  const [compareTo, setCompareTo] = useState("");
-  const [compareOpen, setCompareOpen] = useState(false);
-  const [compareData, setCompareData] = useState<WeekData | null>(null);
-  const compareRef = useRef<HTMLDivElement>(null);
-
   // Compute date range from state
   const getRange = useCallback(() => {
     const { from, to } = range;
@@ -215,52 +206,12 @@ function PerformancesPage() {
         setMeteo(mMap);
       } catch { setMeteo({}); }
 
-      // Fetch comparison data
-      if (compareMode !== "none") {
-        let cFrom = "", cTo = "";
-        if (compareMode === "a-1") {
-          cFrom = (parseInt(from.slice(0, 4)) - 1) + from.slice(4);
-          cTo = (parseInt(to.slice(0, 4)) - 1) + to.slice(4);
-        } else if (compareMode === "prev") {
-          const days = Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86400000) + 1;
-          const pTo = new Date(new Date(from + "T12:00:00").getTime() - 86400000);
-          const pFrom = new Date(pTo.getTime() - (days - 1) * 86400000);
-          cFrom = pFrom.toISOString().slice(0, 10);
-          cTo = pTo.toISOString().slice(0, 10);
-        } else if (compareMode === "prev-sem") {
-          const pFrom = new Date(new Date(from + "T12:00:00").getTime() - 7 * 86400000);
-          const pTo = new Date(new Date(to + "T12:00:00").getTime() - 7 * 86400000);
-          cFrom = pFrom.toISOString().slice(0, 10);
-          cTo = pTo.toISOString().slice(0, 10);
-        } else if (compareMode === "prev-mois") {
-          const fD = new Date(from + "T12:00:00");
-          const tD = new Date(to + "T12:00:00");
-          fD.setMonth(fD.getMonth() - 1);
-          tD.setMonth(tD.getMonth() - 1);
-          cFrom = fD.toISOString().slice(0, 10);
-          cTo = tD.toISOString().slice(0, 10);
-        } else if (compareMode === "custom" && compareFrom && compareTo) {
-          cFrom = compareFrom;
-          cTo = compareTo;
-        }
-        if (cFrom && cTo) {
-          try {
-            const cRes = await fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${cFrom}&to=${cTo}`);
-            const cJson = await cRes.json();
-            setCompareData(cJson.stats ?? null);
-          } catch { setCompareData(null); }
-        } else {
-          setCompareData(null);
-        }
-      } else {
-        setCompareData(null);
-      }
     } catch {
       setData(null);
       setPrev(null);
     }
     setLoading(false);
-  }, [etab, getRange, compareMode, compareFrom, compareTo]);
+  }, [etab, getRange]);
 
   useEffect(() => { loadData(); }, [loadData]); // eslint-disable-line react-hooks/set-state-in-effect -- async data fetch
 
@@ -440,18 +391,6 @@ function PerformancesPage() {
     setBriefingLoading(false);
   };
 
-  // Close compare dropdown on outside click
-  useEffect(() => {
-    if (!compareOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (compareRef.current && !compareRef.current.contains(e.target as Node)) {
-        setCompareOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [compareOpen]);
-
   const { from, to } = getRange();
   const isSingleDay = from === to;
   const rangeLabel = isSingleDay
@@ -482,8 +421,7 @@ function PerformancesPage() {
   };
 
   const W = data;
-  // Use compareData if available, otherwise fall back to API's built-in prev (A-1)
-  const activePrev = compareData ?? prev;
+  const activePrev = prev;
   const ca = W ? (mode === "ttc" ? W.ca_ttc : W.ca_ht) : 0;
 
   return (
@@ -527,66 +465,6 @@ function PerformancesPage() {
               }}>HT</button>
             </div>
           </div>
-          {/* Compare dropdown */}
-          <div ref={compareRef} style={{ position: "relative" }}>
-            <button type="button" onClick={() => setCompareOpen(v => !v)} style={{
-              padding: "7px 14px", borderRadius: 8, border: "1px solid #e0d8ce",
-              background: compareMode !== "none" ? `${accent}15` : "#fff",
-              color: compareMode !== "none" ? accent : "#777",
-              fontSize: 12, fontWeight: 600, cursor: "pointer",
-              display: "flex", alignItems: "center", gap: 4,
-            }}>
-              {compareMode === "none" ? "vs..." : compareMode === "a-1" ? "vs A-1" : compareMode === "prev" ? "vs Prec." : compareMode === "prev-sem" ? "vs S-1" : compareMode === "prev-mois" ? "vs M-1" : "vs Perso."}
-              <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transform: compareOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform .2s" }}><polyline points="6 9 12 15 18 9" /></svg>
-            </button>
-            {compareOpen && (
-              <div style={{
-                position: "absolute", right: 0, top: "calc(100% + 4px)", zIndex: 200, minWidth: 280,
-                background: "#fff", border: "1px solid #e0d8ce", borderRadius: 12,
-                boxShadow: "0 8px 28px rgba(0,0,0,.12)", padding: 12,
-              }}>
-                {([
-                  { key: "none" as CompareMode, label: "Aucune comparaison" },
-                  { key: "prev" as CompareMode, label: "Periode precedente" },
-                  { key: "prev-sem" as CompareMode, label: "Semaine precedente" },
-                  { key: "prev-mois" as CompareMode, label: "Mois precedent" },
-                  { key: "a-1" as CompareMode, label: "Annee precedente (A-1)" },
-                  { key: "custom" as CompareMode, label: "Personnalise..." },
-                ]).map(opt => (
-                  <button key={opt.key} type="button" onClick={() => {
-                    setCompareMode(opt.key);
-                    if (opt.key !== "custom") setCompareOpen(false);
-                  }} style={{
-                    display: "block", width: "100%", padding: "8px 10px", border: "none", cursor: "pointer",
-                    background: compareMode === opt.key ? `${accent}10` : "transparent",
-                    borderRadius: 6, fontSize: 12, fontWeight: compareMode === opt.key ? 700 : 400,
-                    color: compareMode === opt.key ? accent : "#1a1a1a", textAlign: "left",
-                    marginBottom: 2,
-                  }}>
-                    {opt.label} {compareMode === opt.key && "\u2713"}
-                  </button>
-                ))}
-                {compareMode === "custom" && (
-                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0ebe3" }}>
-                    <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 10, color: "#777", marginBottom: 3 }}>Du</div>
-                        <input type="date" value={compareFrom} onChange={e => setCompareFrom(e.target.value)} style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #e0d8ce", fontSize: 12 }} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 10, color: "#777", marginBottom: 3 }}>Au</div>
-                        <input type="date" value={compareTo} onChange={e => setCompareTo(e.target.value)} style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #e0d8ce", fontSize: 12 }} />
-                      </div>
-                    </div>
-                    <button type="button" onClick={() => setCompareOpen(false)} style={{
-                      width: "100%", padding: "8px", borderRadius: 8, border: "none",
-                      background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
-                    }}>Appliquer</button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
           {/* ── Page nav pills: Ventes / Produits ── */}
           <div style={{ display: "inline-flex", background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
             <span style={{
@@ -602,9 +480,6 @@ function PerformancesPage() {
           </div>
         </div>
         {importMsg && <div style={{ fontSize: 12, color: accent, marginBottom: 10 }}>{importMsg}</div>}
-
-        {/* Range label */}
-        <div style={{ textAlign: "center", marginBottom: 16, fontSize: 12, color: "#777", textTransform: "capitalize" }}>{rangeLabel}</div>
 
         {/* ── Loading / Empty ── */}
         {loading && <div style={{ textAlign: "center", padding: 60, color: "#999" }}>Chargement...</div>}

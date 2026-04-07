@@ -199,7 +199,6 @@ const SECTION_PILOTAGE: TabSection = {
   icon: (a) => <IconWallet active={a} />,
   roles: ["group_admin"],
   tabs: [
-    { label: "Produits", href: "/ventes/marges", match: ["/ventes/marges"], icon: (a) => <IconWallet active={a} /> },
     { label: "Tresorerie", href: "/tresorerie", match: ["/tresorerie"], icon: (a) => <IconTrendingUp active={a} /> },
   ],
 };

@@ -6,6 +6,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
 import { NavBar } from "@/components/NavBar";
+import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
 
 /* ══════════════════════════════════════════════════════
    TYPES
@@ -63,11 +64,6 @@ function getMonthLabel(y: number, m: number): string {
   return `${MONTH_NAMES[m - 1]} ${y}`;
 }
 
-function getCurrentYM(): [number, number] {
-  const now = new Date();
-  return [now.getFullYear(), now.getMonth() + 1];
-}
-
 function ymToFrom(y: number, m: number): string {
   return `${y}-${String(m).padStart(2, "0")}-01`;
 }
@@ -75,19 +71,6 @@ function ymToFrom(y: number, m: number): string {
 function ymToTo(y: number, m: number): string {
   const lastDay = new Date(y, m, 0).getDate();
   return `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-}
-
-function shiftYM(y: number, m: number, delta: number): [number, number] {
-  const d = new Date(y, m - 1 + delta, 1);
-  return [d.getFullYear(), d.getMonth() + 1];
-}
-
-/** Get fiscal year start (Oct 1) */
-function getFiscalYearStart(): [number, number] {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth() + 1;
-  return m >= 10 ? [y, 10] : [y - 1, 10];
 }
 
 /* ── Category display config ── */
@@ -238,54 +221,20 @@ const S = {
    PERIOD TYPE
    ══════════════════════════════════════════════════════ */
 
-type PeriodMode = "month" | "3m" | "6m" | "exercice";
-
-function getPeriodRange(
-  mode: PeriodMode,
-  year: number,
-  month: number,
-): { from: string; to: string; months: { y: number; m: number }[] } {
+/** Build the list of months covered by an ISO date range */
+function rangeToMonths(fromIso: string, toIso: string): { y: number; m: number }[] {
   const months: { y: number; m: number }[] = [];
-  let startY = year;
-  let startM = month;
-  let count = 1;
-
-  if (mode === "month") {
-    count = 1;
-  } else if (mode === "3m") {
-    count = 3;
-  } else if (mode === "6m") {
-    count = 6;
-  } else {
-    // exercice: from Oct to current month
-    const [fy, fm] = getFiscalYearStart();
-    startY = fy;
-    startM = fm;
-    // Count months from fiscal start to selected month
-    let cy = fy, cm = fm;
-    count = 0;
-    while (cy < year || (cy === year && cm <= month)) {
-      count++;
-      [cy, cm] = shiftYM(cy, cm, 1);
-    }
-    if (count < 1) count = 1;
+  if (!fromIso || !toIso) return months;
+  const f = new Date(fromIso + "T12:00:00");
+  const t = new Date(toIso + "T12:00:00");
+  let y = f.getFullYear();
+  let m = f.getMonth() + 1; // 1..12
+  while (y < t.getFullYear() || (y === t.getFullYear() && m <= t.getMonth() + 1)) {
+    months.push({ y, m });
+    m++;
+    if (m > 12) { m = 1; y++; }
   }
-
-  if (mode === "3m" || mode === "6m") {
-    [startY, startM] = shiftYM(year, month, -(count - 1));
-  }
-
-  let cy = startY, cm = startM;
-  for (let i = 0; i < count; i++) {
-    months.push({ y: cy, m: cm });
-    if (i < count - 1) [cy, cm] = shiftYM(cy, cm, 1);
-  }
-
-  const from = ymToFrom(startY, startM);
-  const lastM = months[months.length - 1];
-  const to = ymToTo(lastM.y, lastM.m);
-
-  return { from, to, months };
+  return months;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -296,11 +245,13 @@ function TresoreriePage() {
   const { current: etab } = useEtablissement();
   const etabId = etab?.id;
 
-  // Period state
-  const [curYear, curMonth] = getCurrentYM();
-  const [year, setYear] = useState(curYear);
-  const [month, setMonth] = useState(curMonth);
-  const [periodMode, setPeriodMode] = useState<PeriodMode>("month");
+  // Period state — defaults to current month
+  const [range, setRange] = useState<DateRange>(() => {
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return { from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10) };
+  });
 
   // Data
   const [ops, setOps] = useState<BankOp[]>([]);
@@ -336,7 +287,11 @@ function TresoreriePage() {
     }
   }, [etabId]);
 
-  const period = useMemo(() => getPeriodRange(periodMode, year, month), [periodMode, year, month]);
+  const period = useMemo(() => ({
+    from: range.from,
+    to: range.to,
+    months: rangeToMonths(range.from, range.to),
+  }), [range]);
 
   /* ── Data loading ── */
   const load = useCallback(async () => {
@@ -391,13 +346,6 @@ function TresoreriePage() {
   }, [etabId, period.from, period.to]);
 
   useEffect(() => { load(); }, [load]);
-
-  /* ── Month navigation ── */
-  const goMonth = (delta: number) => {
-    const [ny, nm] = shiftYM(year, month, delta);
-    setYear(ny);
-    setMonth(nm);
-  };
 
   /* ── Computed data ── */
 
@@ -702,8 +650,9 @@ function TresoreriePage() {
 
     if (lastMonth) {
       const [ly, lm] = lastMonth.split("-").map(Number);
-      setYear(ly);
-      setMonth(lm);
+      const first = new Date(ly, lm - 1, 1);
+      const last = new Date(ly, lm, 0);
+      setRange({ from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10) });
     }
 
     setTimeout(() => load(), 300);
@@ -739,85 +688,9 @@ function TresoreriePage() {
           Tresorerie
         </h1>
 
-        {/* ══════ Period Navigation ══════ */}
-        <div
-          style={{
-            ...S.card,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 10,
-          }}
-        >
-          <button
-            onClick={() => goMonth(-1)}
-            style={{
-              background: "none",
-              border: "none",
-              fontSize: 22,
-              cursor: "pointer",
-              padding: "4px 12px",
-              color: "#1a1a1a",
-              fontWeight: 700,
-            }}
-          >
-            &lsaquo;
-          </button>
-
-          <div style={{ textAlign: "center", flex: 1 }}>
-            <div
-              style={{
-                fontFamily: OSWALD,
-                fontSize: 16,
-                fontWeight: 700,
-                color: "#1a1a1a",
-              }}
-            >
-              {getMonthLabel(year, month)}
-            </div>
-            <div style={{ marginTop: 8, display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 4 }}>
-              {(["month", "3m", "6m", "exercice"] as PeriodMode[]).map((pm) => {
-                const labels: Record<PeriodMode, string> = {
-                  month: "Ce mois",
-                  "3m": "3 mois",
-                  "6m": "6 mois",
-                  exercice: "Exercice",
-                };
-                return (
-                  <span
-                    key={pm}
-                    onClick={() => setPeriodMode(pm)}
-                    style={{
-                      ...S.pill,
-                      ...(periodMode === pm ? S.pillActive : {}),
-                      fontSize: 10,
-                      padding: "3px 10px",
-                      marginRight: 0,
-                      marginBottom: 0,
-                    }}
-                  >
-                    {labels[pm]}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-
-          <button
-            onClick={() => goMonth(1)}
-            style={{
-              background: "none",
-              border: "none",
-              fontSize: 22,
-              cursor: "pointer",
-              padding: "4px 12px",
-              color: "#1a1a1a",
-              fontWeight: 700,
-            }}
-          >
-            &rsaquo;
-          </button>
+        {/* ══════ Period Picker ══════ */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
+          <DateRangePicker value={range} onChange={(r) => setRange(r)} />
         </div>
 
         {loading && (
