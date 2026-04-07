@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef, useCallback, type CSSProperties } from "react";
+import React, { useEffect, useState, useMemo, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getSupplierColor } from "@/lib/supplierColors";
 import Chart from "chart.js/auto";
 import { FloatingActions, FAIconUpload } from "@/components/layout/FloatingActions";
+import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
 
 /* ── Types ── */
 
@@ -30,7 +31,6 @@ type InvoiceLine = {
   total_price: number | null;
 };
 
-type ViewMode = "mois" | "semaine";
 
 /* ── Helpers ── */
 
@@ -63,65 +63,31 @@ function fiscalMonths(fyStart: number): { year: number; month: number; label: st
   return months;
 }
 
-/** Get Monday of the week containing a date */
-function getMonday(d: Date): Date {
-  const copy = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const dow = copy.getDay() || 7;
-  copy.setDate(copy.getDate() - dow + 1);
-  return copy;
+/** Convert ISO date string to Date at noon (timezone-safe) */
+function isoToDate(iso: string, endOfDay = false): Date {
+  const d = new Date(iso + "T12:00:00");
+  if (endOfDay) d.setHours(23, 59, 59);
+  return d;
 }
 
-/** Get Sunday of the week containing a date */
-function getSunday(d: Date): Date {
-  const mon = getMonday(d);
-  return new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6);
-}
-
-/** Format date range for a week */
-function formatWeekRange(d: Date): string {
-  const mon = getMonday(d);
-  const sun = getSunday(d);
-  const dFmt = (dt: Date) => dt.getDate();
-  const mFmt = (dt: Date) => MONTH_NAMES[dt.getMonth()].toLowerCase();
-  if (mon.getMonth() === sun.getMonth()) {
-    return `Semaine du ${dFmt(mon)} au ${dFmt(sun)} ${mFmt(sun)} ${sun.getFullYear()}`;
+/** Format display for a range */
+function formatRangeLabel(fromIso: string, toIso: string): string {
+  if (!fromIso || !toIso) return "";
+  const f = isoToDate(fromIso);
+  const t = isoToDate(toIso);
+  const isSame = fromIso === toIso;
+  if (isSame) {
+    return f.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   }
-  return `Semaine du ${dFmt(mon)} ${mFmt(mon)} au ${dFmt(sun)} ${mFmt(sun)} ${sun.getFullYear()}`;
-}
-
-/** Get {from, to} date range based on viewMode and selectedDate */
-function getRange(viewMode: ViewMode, selectedDate: string): { from: Date; to: Date } {
-  const d = new Date(selectedDate + "T12:00:00");
-  if (viewMode === "mois") {
-    const from = new Date(d.getFullYear(), d.getMonth(), 1);
-    const to = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
-    return { from, to };
+  // Full month?
+  const isFullMonth = f.getDate() === 1
+    && t.getDate() === new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate()
+    && f.getMonth() === t.getMonth()
+    && f.getFullYear() === t.getFullYear();
+  if (isFullMonth) {
+    return `${MONTH_NAMES[f.getMonth()]} ${f.getFullYear()}`;
   }
-  // semaine
-  const mon = getMonday(d);
-  const sun = getSunday(d);
-  sun.setHours(23, 59, 59);
-  return { from: mon, to: sun };
-}
-
-/** Navigate date forward or backward */
-function navigateDate(viewMode: ViewMode, selectedDate: string, direction: -1 | 1): string {
-  const d = new Date(selectedDate + "T12:00:00");
-  if (viewMode === "mois") {
-    d.setMonth(d.getMonth() + direction);
-  } else {
-    d.setDate(d.getDate() + direction * 7);
-  }
-  return d.toISOString().slice(0, 10);
-}
-
-/** Format display for the current selection */
-function formatPeriodLabel(viewMode: ViewMode, selectedDate: string): string {
-  const d = new Date(selectedDate + "T12:00:00");
-  if (viewMode === "mois") {
-    return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
-  }
-  return formatWeekRange(d);
+  return `Du ${f.getDate()} ${MONTH_NAMES[f.getMonth()].toLowerCase()} au ${t.getDate()} ${MONTH_NAMES[t.getMonth()].toLowerCase()} ${t.getFullYear()}`;
 }
 
 /* ── Supplier Categories ── */
@@ -165,11 +131,12 @@ export default function AchatsPage() {
   const etab = useEtablissement();
   const etabId = etab.current?.id ?? null;
 
-  // ── View mode & date navigation ──
-  const [viewMode, setViewMode] = useState<ViewMode>("mois");
-  const [selectedDate, setSelectedDate] = useState(() => {
+  // ── Date range (default: current month) ──
+  const [range, setRange] = useState<DateRange>(() => {
     const now = new Date();
-    return now.toISOString().slice(0, 10);
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return { from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10) };
   });
 
   // ── All invoices ──
@@ -219,21 +186,20 @@ export default function AchatsPage() {
   //  DATE RANGE
   // ══════════════════════════════════════════════════════
 
-  const range = useMemo(() => getRange(viewMode, selectedDate), [viewMode, selectedDate]);
-  const periodLabel = useMemo(() => formatPeriodLabel(viewMode, selectedDate), [viewMode, selectedDate]);
-
-  const handleNav = useCallback((dir: -1 | 1) => {
-    setSelectedDate((prev) => navigateDate(viewMode, prev, dir));
-  }, [viewMode]);
+  const rangeDates = useMemo(() => ({
+    from: isoToDate(range.from),
+    to: isoToDate(range.to, true),
+  }), [range]);
+  const periodLabel = useMemo(() => formatRangeLabel(range.from, range.to), [range]);
 
   // ── Filtered invoices for selected range ──
   const rangeInvoices = useMemo(() => {
     return allInvoices.filter((inv) => {
       if (!inv.invoice_date) return false;
       const d = new Date(inv.invoice_date);
-      return d >= range.from && d <= range.to;
+      return d >= rangeDates.from && d <= rangeDates.to;
     });
-  }, [allInvoices, range]);
+  }, [allInvoices, rangeDates]);
 
   // ── Load top products for range ──
   useEffect(() => {
@@ -300,19 +266,10 @@ export default function AchatsPage() {
   const dashKpis = useMemo(() => {
     const thisRange = rangeInvoices;
 
-    // Previous period for comparison
-    let prevFrom: Date;
-    let prevTo: Date;
-    if (viewMode === "mois") {
-      const d = new Date(selectedDate + "T12:00:00");
-      prevFrom = new Date(d.getFullYear(), d.getMonth() - 1, 1);
-      prevTo = new Date(d.getFullYear(), d.getMonth(), 0, 23, 59, 59);
-    } else {
-      prevFrom = new Date(range.from);
-      prevFrom.setDate(prevFrom.getDate() - 7);
-      prevTo = new Date(range.to);
-      prevTo.setDate(prevTo.getDate() - 7);
-    }
+    // Previous period for comparison: shift range back by its own length
+    const rangeLenMs = rangeDates.to.getTime() - rangeDates.from.getTime();
+    const prevTo = new Date(rangeDates.from.getTime() - 86_400_000); // day before current start
+    const prevFrom = new Date(prevTo.getTime() - rangeLenMs);
 
     const prevRange = allInvoices.filter((inv) => {
       if (!inv.invoice_date) return false;
@@ -339,7 +296,7 @@ export default function AchatsPage() {
     const monthlyAvg = fyTotal / Math.max(1, Math.min(elapsedMonths, 12));
 
     return { totalHT, nbFactures, variationPct, monthlyAvg };
-  }, [allInvoices, rangeInvoices, viewMode, selectedDate, range, curMonth, curYear, curFY]);
+  }, [allInvoices, rangeInvoices, rangeDates, curMonth, curYear, curFY]);
 
   // ── Monthly breakdown for evolution chart ──
   type MonthBreakdown = {
@@ -665,24 +622,6 @@ export default function AchatsPage() {
   const tdStyle: React.CSSProperties = { padding: "8px 10px", fontSize: 13 };
   const tdR: React.CSSProperties = { ...tdStyle, textAlign: "right" };
 
-  const ec = etab.current?.couleur;
-  const pillStyle = (active: boolean): CSSProperties => ({
-    fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 12, fontWeight: 700,
-    padding: "6px 16px", borderRadius: 10, cursor: "pointer",
-    border: "none",
-    background: active ? (ec ? ec + "25" : "#fff") : "transparent",
-    color: active ? "#1a1a1a" : "#999",
-    textTransform: "uppercase", letterSpacing: "0.06em",
-    boxShadow: active ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
-    transition: "all 0.15s",
-  });
-
-  const navBtnStyle: CSSProperties = {
-    background: "#fff", border: "1px solid #ddd6c8", borderRadius: 8,
-    width: 32, height: 32, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-    fontSize: 16, color: "#777", fontWeight: 700,
-  };
-
   // ── Render helper: invoice lines table ──
   const renderLinesTable = (lns: InvoiceLine[], isLoading: boolean) => (
     <div style={{ background: "#faf6ef", padding: "12px 16px" }}>
@@ -846,57 +785,22 @@ export default function AchatsPage() {
         </div>
 
         {/* ══════════════════════════════════════════════════ */}
-        {/*  VIEW TABS + DATE NAVIGATION                     */}
+        {/*  DATE RANGE PICKER + PAGE NAV                    */}
         {/* ══════════════════════════════════════════════════ */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
-          {/* View mode pills + page nav pills */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <div style={{ display: "flex", gap: 6 }}>
-              {(["mois", "semaine"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setViewMode(mode)}
-                  style={pillStyle(viewMode === mode)}
-                >
-                  {mode === "mois" ? "Mensuel" : "Hebdo"}
-                </button>
-              ))}
-            </div>
-            {/* Page nav pills: Factures / Commandes */}
-            <div style={{ display: "inline-flex", background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
-              <span style={{
-                padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "default",
-                background: "#D4775A", color: "#fff",
-                fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-              }}>Factures</span>
-              <button type="button" onClick={() => router.push("/commandes")} style={{
-                padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "pointer",
-                background: "transparent", color: "#777", border: "none",
-                fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-              }}>Commandes</button>
-            </div>
-          </div>
-
-          {/* Date navigation */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button onClick={() => handleNav(-1)} style={navBtnStyle}>&larr;</button>
-            <div style={{
-              fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 16,
-              color: "#1a1a1a", textTransform: "capitalize", minWidth: 200, textAlign: "center",
-            }}>
-              {periodLabel}
-            </div>
-            <button onClick={() => handleNav(1)} style={navBtnStyle}>&rarr;</button>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => { if (e.target.value) setSelectedDate(e.target.value); }}
-              style={{
-                fontFamily: "DM Sans, sans-serif", fontSize: 12, padding: "5px 10px",
-                border: "1px solid #ddd6c8", borderRadius: 8, color: "#777", background: "#fff",
-                marginLeft: 4,
-              }}
-            />
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
+          <DateRangePicker value={range} onChange={(r) => setRange(r)} />
+          {/* Page nav pills: Factures / Commandes */}
+          <div style={{ display: "inline-flex", background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
+            <span style={{
+              padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "default",
+              background: "#D4775A", color: "#fff",
+              fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+            }}>Factures</span>
+            <button type="button" onClick={() => router.push("/commandes")} style={{
+              padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "pointer",
+              background: "transparent", color: "#777", border: "none",
+              fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+            }}>Commandes</button>
           </div>
         </div>
 
@@ -915,7 +819,7 @@ export default function AchatsPage() {
                 <div style={S.kpiValue}>{fmt(dashKpis.totalHT)}</div>
                 {dashKpis.variationPct !== null && (
                   <div style={{ fontSize: 11, color: dashKpis.variationPct <= 0 ? "#166534" : "#991b1b", marginTop: 4, fontFamily: "DM Sans, sans-serif", fontWeight: 600 }}>
-                    {dashKpis.variationPct > 0 ? "+" : ""}{dashKpis.variationPct.toFixed(1)}% vs {viewMode === "mois" ? "mois" : "sem."} prec.
+                    {dashKpis.variationPct > 0 ? "+" : ""}{dashKpis.variationPct.toFixed(1)}% vs periode prec.
                   </div>
                 )}
               </div>

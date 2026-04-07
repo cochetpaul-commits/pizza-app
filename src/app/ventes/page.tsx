@@ -6,6 +6,7 @@ import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import Chart from "chart.js/auto";
 import { getCategoryColor, getCategoryColors } from "@/lib/categoryColors";
+import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
 
 /* ── Types ── */
 type WeekData = {
@@ -60,7 +61,15 @@ type WeekData = {
   hourly_totals?: number[];
 };
 
-type ViewTab = "jour" | "semaine" | "mois" | "perso";
+/* ── Helpers: compute default range (today, weekend-safe) ── */
+function defaultRange(): DateRange {
+  const d = new Date();
+  const dow = d.getDay();
+  if (dow === 0) d.setDate(d.getDate() - 2); // Sunday → Friday
+  else if (dow === 6) d.setDate(d.getDate() - 1); // Saturday → Friday
+  const iso = d.toISOString().slice(0, 10);
+  return { from: iso, to: iso };
+}
 
 /* ── Helpers ── */
 const fmt = (v: number) => Math.round(v).toLocaleString("fr-FR") + "\u20AC";
@@ -123,22 +132,13 @@ function PerformancesPage() {
   const { current: etab } = useEtablissement();
   const accent = etab?.couleur ?? "#D4775A";
 
-  const [viewTab, setViewTab] = useState<ViewTab>(() => {
-    const v = searchParams.get("view");
-    if (v === "jour" || v === "semaine" || v === "mois" || v === "perso") return v;
-    return "jour";
-  });
-  // Custom date range for "perso" view
-  const [customFrom, setCustomFrom] = useState<string>(() => {
+  const [range, setRange] = useState<DateRange>(() => {
     const qf = searchParams.get("from");
-    if (qf && /^\d{4}-\d{2}-\d{2}$/.test(qf)) return qf;
-    const d = new Date(); d.setDate(d.getDate() - 7);
-    return d.toISOString().slice(0, 10);
-  });
-  const [customTo, setCustomTo] = useState<string>(() => {
     const qt = searchParams.get("to");
-    if (qt && /^\d{4}-\d{2}-\d{2}$/.test(qt)) return qt;
-    return new Date().toISOString().slice(0, 10);
+    if (qf && qt && /^\d{4}-\d{2}-\d{2}$/.test(qf) && /^\d{4}-\d{2}-\d{2}$/.test(qt)) {
+      return { from: qf, to: qt };
+    }
+    return defaultRange();
   });
   const [mode, setMode] = useState<"ttc" | "ht">(() => {
     const m = searchParams.get("mode");
@@ -180,46 +180,12 @@ function PerformancesPage() {
   const [compareData, setCompareData] = useState<WeekData | null>(null);
   const compareRef = useRef<HTMLDivElement>(null);
 
-  // Date navigation
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const qd = searchParams.get("date");
-    if (qd && /^\d{4}-\d{2}-\d{2}$/.test(qd)) return qd;
-    const today = new Date();
-    const dow = today.getDay();
-    if (dow === 0) today.setDate(today.getDate() - 2); // Sunday → Friday
-    if (dow === 6) today.setDate(today.getDate() - 1); // Saturday → Friday
-    return today.toISOString().slice(0, 10);
-  });
-
-  // Compute date range based on viewTab
+  // Compute date range from state
   const getRange = useCallback(() => {
-    if (viewTab === "perso") {
-      // Custom range — ensure from <= to
-      const f = customFrom, t = customTo;
-      if (f && t && f > t) return { from: t, to: f };
-      return { from: f, to: t };
-    }
-    const d = new Date(selectedDate + "T12:00:00");
-    if (viewTab === "jour") {
-      // If selected date is Saturday, go back to Friday; if Sunday, advance to Monday
-      if (d.getDay() === 6) { d.setDate(d.getDate() - 1); }
-      else if (d.getDay() === 0) { d.setDate(d.getDate() + 1); }
-      const iso = d.toISOString().slice(0, 10);
-      return { from: iso, to: iso };
-    }
-    if (viewTab === "semaine") {
-      const dow = d.getDay() || 7;
-      const mon = new Date(d);
-      mon.setDate(d.getDate() - dow + 1);
-      const sun = new Date(mon);
-      sun.setDate(mon.getDate() + 6);
-      return { from: mon.toISOString().slice(0, 10), to: sun.toISOString().slice(0, 10) };
-    }
-    // mois
-    const first = new Date(d.getFullYear(), d.getMonth(), 1);
-    const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-    return { from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10) };
-  }, [selectedDate, viewTab, customFrom, customTo]);
+    const { from, to } = range;
+    if (from && to && from > to) return { from: to, to: from };
+    return { from, to };
+  }, [range]);
 
   // Load data
   const loadData = useCallback(async () => {
@@ -474,31 +440,6 @@ function PerformancesPage() {
     setBriefingLoading(false);
   };
 
-  const navigate = (dir: -1 | 1) => {
-    if (viewTab === "perso") return; // No navigation in custom range mode
-    const d = new Date(selectedDate + "T12:00:00");
-    if (viewTab === "jour") {
-      d.setDate(d.getDate() + dir);
-      // Skip Saturday (6) and Sunday (0)
-      while (d.getDay() === 0 || d.getDay() === 6) {
-        d.setDate(d.getDate() + dir);
-      }
-    } else if (viewTab === "semaine") d.setDate(d.getDate() + dir * 7);
-    else d.setMonth(d.getMonth() + dir);
-    setSelectedDate(d.toISOString().slice(0, 10));
-  };
-
-  // Keyboard shortcuts: left/right arrow keys to navigate
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === "ArrowLeft") { navigate(-1); }
-      else if (e.key === "ArrowRight") { navigate(1); }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  });
-
   // Close compare dropdown on outside click
   useEffect(() => {
     if (!compareOpen) return;
@@ -512,15 +453,10 @@ function PerformancesPage() {
   }, [compareOpen]);
 
   const { from, to } = getRange();
-  const rangeLabel = viewTab === "jour"
-    ? new Date(selectedDate + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
-    : viewTab === "semaine"
-      ? `Semaine du ${new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} au ${new Date(to + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`
-      : viewTab === "perso"
-        ? (from && to
-            ? `Du ${new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })} au ${new Date(to + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`
-            : "Periode personnalisee")
-        : new Date(selectedDate + "T12:00:00").toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  const isSingleDay = from === to;
+  const rangeLabel = isSingleDay
+    ? new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+    : `Du ${new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })} au ${new Date(to + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`;
 
   // PDF export
   const handleExportPDF = async () => {
@@ -530,15 +466,15 @@ function PerformancesPage() {
       const res = await fetch("/api/ventes/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stats: data, prev: activePrev, mode, viewTab, rangeLabel, etabName: etab.nom ?? "Etablissement", briefing }),
+        body: JSON.stringify({ stats: data, prev: activePrev, mode, viewTab: isSingleDay ? "jour" : "perso", rangeLabel, etabName: etab.nom ?? "Etablissement", briefing }),
       });
       if (!res.ok) { setExporting(false); return; }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      const dateSuffix = viewTab === "jour" ? selectedDate : `${from}_${to}`;
-      a.download = `rapport-${viewTab}-${etab.nom?.replace(/\s/g, "_")}-${dateSuffix}.pdf`;
+      const dateSuffix = isSingleDay ? from : `${from}_${to}`;
+      a.download = `rapport-${etab.nom?.replace(/\s/g, "_")}-${dateSuffix}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch { /* ignore */ }
@@ -554,21 +490,9 @@ function PerformancesPage() {
     <RequireRole allowedRoles={["group_admin"]}>
       <div className="ventes-container" style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 16px 120px" }}>
 
-        {/* ── Toolbar: tabs + import + PDF + TTC/HT ── */}
+        {/* ── Toolbar: date picker + import + PDF + TTC/HT ── */}
         <div className="ventes-toolbar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
-          <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 10, overflow: "hidden" }}>
-            {(["jour", "semaine", "mois", "perso"] as ViewTab[]).map(t => (
-              <button key={t} type="button" onClick={() => setViewTab(t)} style={{
-                padding: "8px 18px", border: "none", borderRight: "1px solid rgba(0,0,0,.08)",
-                background: viewTab === t ? accent : "transparent",
-                color: viewTab === t ? "#fff" : "#777",
-                fontSize: 12, fontWeight: 600, cursor: "pointer",
-                fontFamily: "var(--font-oswald), Oswald, sans-serif", textTransform: "uppercase", letterSpacing: ".05em",
-              }}>
-                {t === "jour" ? "Journalier" : t === "semaine" ? "Hebdo" : t === "mois" ? "Mensuel" : "Perso"}
-              </button>
-            ))}
-          </div>
+          <DateRangePicker value={range} onChange={(r) => setRange(r)} />
           <div className="ventes-toolbar-actions" style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <label style={{
               padding: "7px 14px", borderRadius: 8, border: "none",
@@ -670,9 +594,7 @@ function PerformancesPage() {
               background: accent, color: "#fff",
               fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
             }}>Ventes</span>
-            <button type="button" onClick={() => router.push(viewTab === "perso"
-              ? `/ventes/marges?view=perso&from=${customFrom}&to=${customTo}`
-              : `/ventes/marges?date=${selectedDate}&view=${viewTab}`)} style={{
+            <button type="button" onClick={() => router.push(`/ventes/marges?from=${from}&to=${to}`)} style={{
               padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "pointer",
               background: "transparent", color: "#777", border: "none",
               fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
@@ -681,38 +603,8 @@ function PerformancesPage() {
         </div>
         {importMsg && <div style={{ fontSize: 12, color: accent, marginBottom: 10 }}>{importMsg}</div>}
 
-        {/* ── Date navigation ── */}
-        <div className="ventes-date-row" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
-          {viewTab === "perso" ? (
-            <>
-              <span style={{ fontSize: 11, color: "#777", fontWeight: 600 }}>Du</span>
-              <input
-                type="date"
-                value={customFrom}
-                onChange={e => { if (e.target.value) setCustomFrom(e.target.value); }}
-                style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 12, padding: "5px 8px", border: "1px solid #e0d8ce", borderRadius: 8, background: "#fff", color: "#1a1a1a", cursor: "pointer", width: 140 }}
-              />
-              <span style={{ fontSize: 11, color: "#777", fontWeight: 600 }}>au</span>
-              <input
-                type="date"
-                value={customTo}
-                onChange={e => { if (e.target.value) setCustomTo(e.target.value); }}
-                style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 12, padding: "5px 8px", border: "1px solid #e0d8ce", borderRadius: 8, background: "#fff", color: "#1a1a1a", cursor: "pointer", width: 140 }}
-              />
-            </>
-          ) : (
-            <>
-              <button type="button" onClick={() => navigate(-1)} style={{ width: 36, height: 36, borderRadius: 10, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>&larr;</button>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={e => { if (e.target.value) setSelectedDate(e.target.value); }}
-                style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 12, padding: "5px 8px", border: "1px solid #e0d8ce", borderRadius: 8, background: "#fff", color: "#1a1a1a", cursor: "pointer", width: 120 }}
-              />
-              <button type="button" onClick={() => navigate(1)} style={{ width: 36, height: 36, borderRadius: 10, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>&rarr;</button>
-            </>
-          )}
-        </div>
+        {/* Range label */}
+        <div style={{ textAlign: "center", marginBottom: 16, fontSize: 12, color: "#777", textTransform: "capitalize" }}>{rangeLabel}</div>
 
         {/* ── Loading / Empty ── */}
         {loading && <div style={{ textAlign: "center", padding: 60, color: "#999" }}>Chargement...</div>}
@@ -1093,7 +985,7 @@ function PerformancesPage() {
               const zones = mode === "ttc" ? W.zones_ttc : W.zones_ht;
               const activeZones = Object.entries(zones).filter(([, vals]) => vals.some(v => v > 0));
               const totalCA = activeZones.reduce((s, [, vals]) => s + vals.reduce((a, b) => a + b, 0), 0);
-              const zoneBuckets = (viewTab === "mois" || (viewTab === "perso" && W.dates.length > 14)) ? buildWeekBuckets(W.dates) : null;
+              const zoneBuckets = W.dates.length > 14 ? buildWeekBuckets(W.dates) : null;
               const cols = Math.min(activeZones.length, 4);
 
               return (
@@ -1187,7 +1079,7 @@ function PerformancesPage() {
 
             {/* Comparatif A-1 */}
             {activePrev && W.days.length > 1 && (() => {
-              const compBuckets = (viewTab === "mois" || (viewTab === "perso" && W.dates.length > 14)) ? buildWeekBuckets(W.dates) : null;
+              const compBuckets = W.dates.length > 14 ? buildWeekBuckets(W.dates) : null;
               const curDayVals = mode === "ttc" ? W.day_ttc : W.day_ht;
               const prevDayVals = mode === "ttc" ? activePrev!.day_ttc : activePrev!.day_ht;
               const rawCompLabels = compBuckets ? compBuckets.map(b => b.label) : W.days;
@@ -1207,7 +1099,7 @@ function PerformancesPage() {
               const compMax = Math.max(...compCur, ...compPrev);
               return (
               <div style={S.card}>
-                <div style={S.sec}>Comparatif · CA {mode.toUpperCase()} {(viewTab === "mois" || (viewTab === "perso" && W.dates.length > 14)) ? "par semaine" : "par jour"} vs A-1</div>
+                <div style={S.sec}>Comparatif · CA {mode.toUpperCase()} {W.dates.length > 14 ? "par semaine" : "par jour"} vs A-1</div>
                 <div className="ventes-comparatif-legend" style={{ marginBottom: 8, display: "flex", gap: 16 }}>
                   <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "#777" }}>
                     <span style={{ width: 8, height: 8, borderRadius: 2, background: accent }} /> {new Date(from + "T12:00:00").getFullYear()} (courante)
@@ -1252,7 +1144,7 @@ function PerformancesPage() {
               <div style={S.card}>
                 <div style={S.sec}>Par service · {mode.toUpperCase()} · couverts</div>
                 <div className="ventes-recap-wrap" style={{ overflow: "hidden", borderRadius: 8, border: "1px solid #e0d8ce" }}>
-                  <RecapTable services={W.services} mode={mode} meteo={meteo} dates={W.dates} days={W.days} viewTab={viewTab} />
+                  <RecapTable services={W.services} mode={mode} meteo={meteo} dates={W.dates} days={W.days} useWeeks={W.dates.length > 14} />
                 </div>
               </div>
             )}
@@ -1395,7 +1287,7 @@ function PerformancesPage() {
                   fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 11, fontWeight: 700,
                   letterSpacing: ".1em", textTransform: "uppercase", color: accent,
                 }}>
-                  Points briefing {viewTab === "jour" ? "du jour" : viewTab === "semaine" ? "lundi" : viewTab === "perso" ? "de la periode" : "du mois"}
+                  Points briefing {isSingleDay ? "du jour" : "de la periode"}
                 </div>
                 <button
                   type="button"
@@ -1580,7 +1472,7 @@ function PlaceBlock({ label, color, ca, pct, couverts, tm, onClick, active }: { 
   );
 }
 
-function RecapTable({ services, mode, meteo, dates, days, viewTab }: { services: WeekData["services"]; mode: "ttc" | "ht"; meteo: Record<string, { emoji: string; desc: string; temp: number }>; dates: string[]; days: string[]; viewTab: ViewTab }) {
+function RecapTable({ services, mode, meteo, dates, days, useWeeks: useWeeksProp }: { services: WeekData["services"]; mode: "ttc" | "ht"; meteo: Record<string, { emoji: string; desc: string; temp: number }>; dates: string[]; days: string[]; useWeeks: boolean }) {
   // Map day name → date for meteo lookup (simple 1:1 for jour/semaine views)
   const dayToDate: Record<string, string> = {};
   for (let i = 0; i < days.length; i++) {
@@ -1611,7 +1503,7 @@ function RecapTable({ services, mode, meteo, dates, days, viewTab }: { services:
   }
 
   // Group services by week when in monthly view
-  const useWeeks = viewTab === "mois" || (viewTab === "perso" && dates.length > 14);
+  const useWeeks = useWeeksProp;
   type GroupEntry = { groupLabel: string; services: WeekData["services"] };
   const groups: GroupEntry[] = [];
 

@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { AiInsightCard } from "@/components/AiInsightCard";
+import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
 
 import Chart from "chart.js/auto";
 import { getCategoryColor, getCategoryColors } from "@/lib/categoryColors";
@@ -53,7 +54,6 @@ type ApiData = {
   recipeCount: number;
 };
 
-type ViewTab = "jour" | "semaine" | "mois";
 
 type TrendDaily = { date: string; qty: number; ca_ttc: number; ca_ht: number };
 type TrendMode = "par_jour_semaine" | "par_mois";
@@ -191,10 +191,17 @@ function MargesPage() {
   const { current: etab } = useEtablissement();
   const accent = etab?.couleur ?? COLORS.accent;
 
-  const [viewTab, setViewTab] = useState<ViewTab>(() => {
-    const v = searchParams.get("view");
-    if (v === "jour" || v === "semaine" || v === "mois") return v;
-    return "jour";
+  const [range, setRange] = useState<DateRange>(() => {
+    const qf = searchParams.get("from");
+    const qt = searchParams.get("to");
+    if (qf && qt && /^\d{4}-\d{2}-\d{2}$/.test(qf) && /^\d{4}-\d{2}-\d{2}$/.test(qt)) {
+      return { from: qf, to: qt };
+    }
+    const d = new Date();
+    if (d.getDay() === 6) d.setDate(d.getDate() - 1);
+    if (d.getDay() === 0) d.setDate(d.getDate() - 2);
+    const iso = d.toISOString().slice(0, 10);
+    return { from: iso, to: iso };
   });
   const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -205,16 +212,6 @@ function MargesPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
-
-  // Date navigation — skip weekends
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const qd = searchParams.get("date");
-    if (qd && /^\d{4}-\d{2}-\d{2}$/.test(qd)) return qd;
-    const d = new Date();
-    if (d.getDay() === 6) d.setDate(d.getDate() - 1); // samedi → vendredi
-    if (d.getDay() === 0) d.setDate(d.getDate() - 2); // dimanche → vendredi
-    return d.toISOString().slice(0, 10);
-  });
 
   // Trend card state
   const [trendFilter, setTrendFilter] = useState<"all" | "product" | "category">("all");
@@ -237,33 +234,10 @@ function MargesPage() {
 
   // Compute date range
   const getRange = useCallback(() => {
-    const d = new Date(selectedDate + "T12:00:00");
-    if (viewTab === "jour") {
-      // Skip weekends
-      if (d.getDay() === 6) d.setDate(d.getDate() - 1);
-      else if (d.getDay() === 0) d.setDate(d.getDate() + 1);
-      const iso = d.toISOString().slice(0, 10);
-      return { from: iso, to: iso };
-    }
-    if (viewTab === "semaine") {
-      const dow = d.getDay() || 7;
-      const mon = new Date(d);
-      mon.setDate(d.getDate() - dow + 1);
-      const sun = new Date(mon);
-      sun.setDate(mon.getDate() + 6);
-      return {
-        from: mon.toISOString().slice(0, 10),
-        to: sun.toISOString().slice(0, 10),
-      };
-    }
-    // mois
-    const first = new Date(d.getFullYear(), d.getMonth(), 1);
-    const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-    return {
-      from: first.toISOString().slice(0, 10),
-      to: last.toISOString().slice(0, 10),
-    };
-  }, [selectedDate, viewTab]);
+    const { from, to } = range;
+    if (from && to && from > to) return { from: to, to: from };
+    return { from, to };
+  }, [range]);
 
   // Load data
   const loadData = useCallback(async () => {
@@ -290,32 +264,11 @@ function MargesPage() {
     loadData();
   }, [loadData]);
 
-  // Navigate dates (skip weekends in jour mode)
-  const navigate = (dir: -1 | 1) => {
-    const d = new Date(selectedDate + "T12:00:00");
-    if (viewTab === "jour") {
-      d.setDate(d.getDate() + dir);
-      while (d.getDay() === 0 || d.getDay() === 6) {
-        d.setDate(d.getDate() + dir);
-      }
-    } else if (viewTab === "semaine") {
-      d.setDate(d.getDate() + dir * 7);
-    } else {
-      d.setMonth(d.getMonth() + dir);
-    }
-    setSelectedDate(d.toISOString().slice(0, 10));
-  };
-
   const { from, to } = getRange();
-  const rangeLabel =
-    viewTab === "jour"
-      ? new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
-      : viewTab === "semaine"
-        ? `Semaine du ${new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} au ${new Date(to + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`
-        : new Date(selectedDate + "T12:00:00").toLocaleDateString("fr-FR", {
-            month: "long",
-            year: "numeric",
-          });
+  const isSingleDay = from === to;
+  const rangeLabel = isSingleDay
+    ? new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+    : `Du ${new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })} au ${new Date(to + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`;
 
   // Charts
   useEffect(() => {
@@ -644,33 +597,12 @@ function MargesPage() {
           }
         `}</style>
         <div className="ventes-toolbar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
-          <div className="marges-toolbar-desktop" style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 10, overflow: "hidden" }}>
-            {(["jour", "semaine", "mois"] as ViewTab[]).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setViewTab(t)}
-                style={{
-                  padding: "8px 18px",
-                  border: "none",
-                  borderRight: "1px solid rgba(0,0,0,.08)",
-                  background: viewTab === t ? accent : "transparent",
-                  color: viewTab === t ? "#fff" : "#777",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontFamily: "var(--font-oswald), Oswald, sans-serif",
-                  textTransform: "uppercase",
-                  letterSpacing: ".05em",
-                }}
-              >
-                {t === "jour" ? "Journalier" : t === "semaine" ? "Hebdo" : "Mensuel"}
-              </button>
-            ))}
+          <div className="marges-toolbar-desktop">
+            <DateRangePicker value={range} onChange={(r) => setRange(r)} />
           </div>
           {/* ── Page nav pills: Ventes / Produits ── */}
           <div style={{ display: "inline-flex", background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
-            <button type="button" onClick={() => router.push(`/ventes?date=${selectedDate}&view=${viewTab}`)} style={{
+            <button type="button" onClick={() => router.push(`/ventes?from=${from}&to=${to}`)} style={{
               padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "pointer",
               background: "transparent", color: "#777", border: "none",
               fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
@@ -683,64 +615,6 @@ function MargesPage() {
           </div>
         </div>
 
-        {/* ── Date navigation (hidden on mobile) ── */}
-        <div
-          className="marges-toolbar-desktop"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 12,
-            marginBottom: 16,
-            paddingBottom: 14,
-            borderBottom: "1px solid rgba(70,101,90,.15)",
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              border: `1px solid ${COLORS.border}`,
-              background: "#fff",
-              cursor: "pointer",
-              fontSize: 16,
-              flexShrink: 0,
-            }}
-          >
-            &larr;
-          </button>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            style={{
-              border: `1px solid ${COLORS.border}`,
-              borderRadius: 8,
-              padding: "6px 10px",
-              fontSize: 13,
-              background: "#fff",
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => navigate(1)}
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              border: `1px solid ${COLORS.border}`,
-              background: "#fff",
-              cursor: "pointer",
-              fontSize: 16,
-              flexShrink: 0,
-            }}
-          >
-            &rarr;
-          </button>
-        </div>
         <div
           style={{
             textAlign: "center",
