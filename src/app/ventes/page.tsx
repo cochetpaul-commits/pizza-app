@@ -60,7 +60,7 @@ type WeekData = {
   hourly_totals?: number[];
 };
 
-type ViewTab = "jour" | "semaine" | "mois";
+type ViewTab = "jour" | "semaine" | "mois" | "perso";
 
 /* ── Helpers ── */
 const fmt = (v: number) => Math.round(v).toLocaleString("fr-FR") + "\u20AC";
@@ -125,8 +125,20 @@ function PerformancesPage() {
 
   const [viewTab, setViewTab] = useState<ViewTab>(() => {
     const v = searchParams.get("view");
-    if (v === "jour" || v === "semaine" || v === "mois") return v;
+    if (v === "jour" || v === "semaine" || v === "mois" || v === "perso") return v;
     return "jour";
+  });
+  // Custom date range for "perso" view
+  const [customFrom, setCustomFrom] = useState<string>(() => {
+    const qf = searchParams.get("from");
+    if (qf && /^\d{4}-\d{2}-\d{2}$/.test(qf)) return qf;
+    const d = new Date(); d.setDate(d.getDate() - 7);
+    return d.toISOString().slice(0, 10);
+  });
+  const [customTo, setCustomTo] = useState<string>(() => {
+    const qt = searchParams.get("to");
+    if (qt && /^\d{4}-\d{2}-\d{2}$/.test(qt)) return qt;
+    return new Date().toISOString().slice(0, 10);
   });
   const [mode, setMode] = useState<"ttc" | "ht">(() => {
     const m = searchParams.get("mode");
@@ -181,6 +193,12 @@ function PerformancesPage() {
 
   // Compute date range based on viewTab
   const getRange = useCallback(() => {
+    if (viewTab === "perso") {
+      // Custom range — ensure from <= to
+      const f = customFrom, t = customTo;
+      if (f && t && f > t) return { from: t, to: f };
+      return { from: f, to: t };
+    }
     const d = new Date(selectedDate + "T12:00:00");
     if (viewTab === "jour") {
       // If selected date is Saturday, go back to Friday; if Sunday, advance to Monday
@@ -201,7 +219,7 @@ function PerformancesPage() {
     const first = new Date(d.getFullYear(), d.getMonth(), 1);
     const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
     return { from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10) };
-  }, [selectedDate, viewTab]);
+  }, [selectedDate, viewTab, customFrom, customTo]);
 
   // Load data
   const loadData = useCallback(async () => {
@@ -457,6 +475,7 @@ function PerformancesPage() {
   };
 
   const navigate = (dir: -1 | 1) => {
+    if (viewTab === "perso") return; // No navigation in custom range mode
     const d = new Date(selectedDate + "T12:00:00");
     if (viewTab === "jour") {
       d.setDate(d.getDate() + dir);
@@ -497,7 +516,11 @@ function PerformancesPage() {
     ? new Date(selectedDate + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
     : viewTab === "semaine"
       ? `Semaine du ${new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} au ${new Date(to + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`
-      : new Date(selectedDate + "T12:00:00").toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+      : viewTab === "perso"
+        ? (from && to
+            ? `Du ${new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })} au ${new Date(to + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`
+            : "Periode personnalisee")
+        : new Date(selectedDate + "T12:00:00").toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
 
   // PDF export
   const handleExportPDF = async () => {
@@ -534,7 +557,7 @@ function PerformancesPage() {
         {/* ── Toolbar: tabs + import + PDF + TTC/HT ── */}
         <div className="ventes-toolbar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
           <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 10, overflow: "hidden" }}>
-            {(["jour", "semaine", "mois"] as ViewTab[]).map(t => (
+            {(["jour", "semaine", "mois", "perso"] as ViewTab[]).map(t => (
               <button key={t} type="button" onClick={() => setViewTab(t)} style={{
                 padding: "8px 18px", border: "none", borderRight: "1px solid rgba(0,0,0,.08)",
                 background: viewTab === t ? accent : "transparent",
@@ -542,7 +565,7 @@ function PerformancesPage() {
                 fontSize: 12, fontWeight: 600, cursor: "pointer",
                 fontFamily: "var(--font-oswald), Oswald, sans-serif", textTransform: "uppercase", letterSpacing: ".05em",
               }}>
-                {t === "jour" ? "Journalier" : t === "semaine" ? "Hebdo" : "Mensuel"}
+                {t === "jour" ? "Journalier" : t === "semaine" ? "Hebdo" : t === "mois" ? "Mensuel" : "Perso"}
               </button>
             ))}
           </div>
@@ -647,7 +670,9 @@ function PerformancesPage() {
               background: accent, color: "#fff",
               fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
             }}>Ventes</span>
-            <button type="button" onClick={() => router.push(`/ventes/marges?date=${selectedDate}&view=${viewTab}`)} style={{
+            <button type="button" onClick={() => router.push(viewTab === "perso"
+              ? `/ventes/marges?view=perso&from=${customFrom}&to=${customTo}`
+              : `/ventes/marges?date=${selectedDate}&view=${viewTab}`)} style={{
               padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "pointer",
               background: "transparent", color: "#777", border: "none",
               fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
@@ -658,14 +683,35 @@ function PerformancesPage() {
 
         {/* ── Date navigation ── */}
         <div className="ventes-date-row" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
-          <button type="button" onClick={() => navigate(-1)} style={{ width: 36, height: 36, borderRadius: 10, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>&larr;</button>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={e => { if (e.target.value) setSelectedDate(e.target.value); }}
-            style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 12, padding: "5px 8px", border: "1px solid #e0d8ce", borderRadius: 8, background: "#fff", color: "#1a1a1a", cursor: "pointer", width: 120 }}
-          />
-          <button type="button" onClick={() => navigate(1)} style={{ width: 36, height: 36, borderRadius: 10, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>&rarr;</button>
+          {viewTab === "perso" ? (
+            <>
+              <span style={{ fontSize: 11, color: "#777", fontWeight: 600 }}>Du</span>
+              <input
+                type="date"
+                value={customFrom}
+                onChange={e => { if (e.target.value) setCustomFrom(e.target.value); }}
+                style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 12, padding: "5px 8px", border: "1px solid #e0d8ce", borderRadius: 8, background: "#fff", color: "#1a1a1a", cursor: "pointer", width: 140 }}
+              />
+              <span style={{ fontSize: 11, color: "#777", fontWeight: 600 }}>au</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={e => { if (e.target.value) setCustomTo(e.target.value); }}
+                style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 12, padding: "5px 8px", border: "1px solid #e0d8ce", borderRadius: 8, background: "#fff", color: "#1a1a1a", cursor: "pointer", width: 140 }}
+              />
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={() => navigate(-1)} style={{ width: 36, height: 36, borderRadius: 10, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>&larr;</button>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={e => { if (e.target.value) setSelectedDate(e.target.value); }}
+                style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 12, padding: "5px 8px", border: "1px solid #e0d8ce", borderRadius: 8, background: "#fff", color: "#1a1a1a", cursor: "pointer", width: 120 }}
+              />
+              <button type="button" onClick={() => navigate(1)} style={{ width: 36, height: 36, borderRadius: 10, border: "1px solid #e0d8ce", background: "#fff", cursor: "pointer", fontSize: 16, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>&rarr;</button>
+            </>
+          )}
         </div>
 
         {/* ── Loading / Empty ── */}
@@ -1047,7 +1093,7 @@ function PerformancesPage() {
               const zones = mode === "ttc" ? W.zones_ttc : W.zones_ht;
               const activeZones = Object.entries(zones).filter(([, vals]) => vals.some(v => v > 0));
               const totalCA = activeZones.reduce((s, [, vals]) => s + vals.reduce((a, b) => a + b, 0), 0);
-              const zoneBuckets = viewTab === "mois" ? buildWeekBuckets(W.dates) : null;
+              const zoneBuckets = (viewTab === "mois" || (viewTab === "perso" && W.dates.length > 14)) ? buildWeekBuckets(W.dates) : null;
               const cols = Math.min(activeZones.length, 4);
 
               return (
@@ -1141,7 +1187,7 @@ function PerformancesPage() {
 
             {/* Comparatif A-1 */}
             {activePrev && W.days.length > 1 && (() => {
-              const compBuckets = viewTab === "mois" ? buildWeekBuckets(W.dates) : null;
+              const compBuckets = (viewTab === "mois" || (viewTab === "perso" && W.dates.length > 14)) ? buildWeekBuckets(W.dates) : null;
               const curDayVals = mode === "ttc" ? W.day_ttc : W.day_ht;
               const prevDayVals = mode === "ttc" ? activePrev!.day_ttc : activePrev!.day_ht;
               const rawCompLabels = compBuckets ? compBuckets.map(b => b.label) : W.days;
@@ -1161,7 +1207,7 @@ function PerformancesPage() {
               const compMax = Math.max(...compCur, ...compPrev);
               return (
               <div style={S.card}>
-                <div style={S.sec}>Comparatif · CA {mode.toUpperCase()} {viewTab === "mois" ? "par semaine" : "par jour"} vs A-1</div>
+                <div style={S.sec}>Comparatif · CA {mode.toUpperCase()} {(viewTab === "mois" || (viewTab === "perso" && W.dates.length > 14)) ? "par semaine" : "par jour"} vs A-1</div>
                 <div className="ventes-comparatif-legend" style={{ marginBottom: 8, display: "flex", gap: 16 }}>
                   <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "#777" }}>
                     <span style={{ width: 8, height: 8, borderRadius: 2, background: accent }} /> {new Date(from + "T12:00:00").getFullYear()} (courante)
@@ -1349,7 +1395,7 @@ function PerformancesPage() {
                   fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 11, fontWeight: 700,
                   letterSpacing: ".1em", textTransform: "uppercase", color: accent,
                 }}>
-                  Points briefing {viewTab === "jour" ? "du jour" : viewTab === "semaine" ? "lundi" : "du mois"}
+                  Points briefing {viewTab === "jour" ? "du jour" : viewTab === "semaine" ? "lundi" : viewTab === "perso" ? "de la periode" : "du mois"}
                 </div>
                 <button
                   type="button"
@@ -1565,7 +1611,7 @@ function RecapTable({ services, mode, meteo, dates, days, viewTab }: { services:
   }
 
   // Group services by week when in monthly view
-  const useWeeks = viewTab === "mois";
+  const useWeeks = viewTab === "mois" || (viewTab === "perso" && dates.length > 14);
   type GroupEntry = { groupLabel: string; services: WeekData["services"] };
   const groups: GroupEntry[] = [];
 
