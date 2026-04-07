@@ -54,22 +54,31 @@ function isMissingDensity(ing: Ingredient | undefined, line: IngredientLine): bo
   return ing.density_g_per_ml == null || ing.density_g_per_ml === 0;
 }
 
-function computeCost(line: IngredientLine, cpu: CpuByUnit | undefined): number | null {
+function computeCost(line: IngredientLine, cpu: CpuByUnit | undefined, ing?: Ingredient): number | null {
   if (!cpu || line.qty === "" || !(Number(line.qty) > 0)) return null;
   const qty = Number(line.qty);
   const unit = line.unit.toLowerCase();
-  if ((unit === "g" || unit === "kg") && cpu.g) {
-    return cpu.g * (unit === "kg" ? qty * 1000 : qty);
+
+  // Derive missing cpu entries from ingredient meta (piece_weight_g, piece_volume_ml, density)
+  const eff: CpuByUnit = { ...cpu };
+  const pwg = ing?.piece_weight_g ?? null;
+  const pvm = ing?.piece_volume_ml ?? null;
+  const dens = ing?.density_g_per_ml ?? null;
+  if (eff.g == null && eff.pcs != null && pwg && pwg > 0) eff.g = eff.pcs / pwg;
+  if (eff.ml == null && eff.pcs != null && pvm && pvm > 0) eff.ml = eff.pcs / pvm;
+  if (eff.g == null && eff.ml != null && dens && dens > 0) eff.g = eff.ml / dens;
+  if (eff.ml == null && eff.g != null && dens && dens > 0) eff.ml = eff.g * dens;
+
+  if ((unit === "g" || unit === "kg") && eff.g) {
+    return eff.g * (unit === "kg" ? qty * 1000 : qty);
   }
-  if ((unit === "ml" || unit === "cl" || unit === "l") && cpu.ml) {
+  if ((unit === "ml" || unit === "cl" || unit === "l") && eff.ml) {
     const factor = unit === "cl" ? 10 : unit === "l" ? 1000 : 1;
-    return cpu.ml * qty * factor;
+    return eff.ml * qty * factor;
   }
-  if ((unit === "pc" || unit === "pcs") && cpu.pcs) {
-    return cpu.pcs * qty;
+  if ((unit === "pc" || unit === "pcs") && eff.pcs) {
+    return eff.pcs * qty;
   }
-  // fallback: try g then ml
-  if (cpu.g && (unit === "g" || unit === "kg")) return cpu.g * qty;
   return null;
 }
 
@@ -123,8 +132,8 @@ export function IngredientListDnD({
             <div ref={provided.innerRef} {...provided.droppableProps} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {items.map((line, i) => {
                 const cpu = priceByIngredient[line.ingredient_id];
-                const cost = computeCost(line, cpu);
                 const ing = ingredients.find(ig => ig.id === line.ingredient_id);
+                const cost = computeCost(line, cpu, ing);
                 const densityMissing = isMissingDensity(ing, line);
 
                 return (
