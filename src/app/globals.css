@@ -237,13 +237,20 @@ body.bottom-sheet-open .bottom-tab-bar {
 .ventes-date-mobile { display: none; }
 @media (max-width: 767px) {
   .ventes-date-desktop { display: none !important; }
+  /* NB: no CSS `transform` here — a transformed parent would hijack
+     the containing block of the picker popover's `position: fixed`. */
   .ventes-date-mobile {
-    display: block !important;
+    display: flex !important;
+    justify-content: center;
     position: fixed;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
     bottom: calc(78px + env(safe-area-inset-bottom, 0px));
     z-index: 99;
+    pointer-events: none;
+  }
+  .ventes-date-mobile > * {
+    pointer-events: auto;
   }
 }
 
