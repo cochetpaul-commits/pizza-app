@@ -80,7 +80,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
 
   // Main tab
   type MainTab = "fc" | "recette" | "cmd" | "pop";
-  const [mainTab, setMainTab] = useState<MainTab>(initialProdMode ? "recette" : isEdit ? "fc" : "recette");
+  const [mainTab, setMainTab] = useState<MainTab>(initialProdMode ? "recette" : "fc");
 
   // Production mode
   const [prodMode, setProdMode] = useState(initialProdMode ?? false);
@@ -164,7 +164,8 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     { key: "cmd", label: "Commandes fournisseurs" },
     { key: "pop", label: "Pilotage CA" },
   ] : [
-    { key: "recette", label: "Recette" },
+    { key: "fc", label: "Food cost & Marges" },
+    { key: "recette", label: "Recette & Procede" },
   ];
 
   useEffect(() => {
@@ -320,7 +321,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     } finally { setPdfLoading(false); }
   }
 
-  const title = name || (isEdit ? "Empatement" : "Nouvel empatement");
+  const title = name || "Nouvel empatement";
 
   if (status === "loading") {
     return (
@@ -340,14 +341,14 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         <RecipeHero
           title={title}
           accent={ACCENT}
-          isEdit={isEdit}
+          isEdit={true}
           etabName={etab?.nom}
           typeLabel="Empatement"
           onBack={() => router.push("/recettes")}
-          kpis={isEdit ? { costPerPortion: effectiveCost > 0 ? effectiveCost : null, foodCostPct: foodCostPct ?? null, sellPriceHT: sp ?? null, sellPriceTTC: prixTTC ?? null, margeBrute: margeBrute ?? null } : undefined}
+          kpis={{ costPerPortion: effectiveCost > 0 ? effectiveCost : null, foodCostPct: foodCostPct ?? null, sellPriceHT: sp ?? null, sellPriceTTC: prixTTC ?? null, margeBrute: margeBrute ?? null }}
           actions={<>
-            {isEdit && <HeroBtn onClick={handleExportPdf} disabled={pdfLoading}>{pdfLoading ? "Export…" : "PDF"}</HeroBtn>}
-            {isEdit && <PublishCatalogueButton recipeType="empatement" recipeId={recipeId!} />}
+            <HeroBtn onClick={handleExportPdf} disabled={!isEdit || pdfLoading} title={!isEdit ? "Enregistrer la recette pour exporter le PDF" : undefined}>{pdfLoading ? "Export…" : "PDF"}</HeroBtn>
+            {isEdit ? <PublishCatalogueButton recipeType="empatement" recipeId={recipeId!} /> : <HeroBtn disabled title="Enregistrer la recette pour publier au catalogue">Catalogue</HeroBtn>}
             {userCanWrite && <HeroBtn onClick={handleSave} disabled={saving} primary>{saving ? "Sauvegarde…" : "Enregistrer"}</HeroBtn>}
           </>}
         />
@@ -376,7 +377,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         {saveError && <div className="errorBox" style={{ marginBottom: 12 }}>{saveError}</div>}
 
         {/* ── TAB: FOOD COST & MARGES ── */}
-        {mainTab === "fc" && isEdit && recipeId && (
+        {mainTab === "fc" && (
           <GestionFoodCost
             recipeId={recipeId}
             recipeType="empatement"

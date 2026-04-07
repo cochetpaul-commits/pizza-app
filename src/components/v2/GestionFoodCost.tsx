@@ -14,7 +14,7 @@ interface IngLine {
 }
 
 export interface GestionFoodCostProps {
-  recipeId: string;
+  recipeId?: string;
   recipeType: "cuisine" | "pizza" | "cocktail" | "empatement";
   lines: IngLine[];
   ingredients: Ingredient[];
@@ -113,6 +113,11 @@ export function GestionFoodCost({
     : "#DC2626";
 
   async function saveSellPrice(price: number) {
+    // Pre-save state: just update local state, no API call
+    if (!recipeId) {
+      onSellPriceChange(price);
+      return;
+    }
     setSaving(true);
     await fetchApi(`/api/recettes/${recipeId}/sell-price`, {
       method: "PATCH",

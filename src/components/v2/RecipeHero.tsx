@@ -107,13 +107,14 @@ function KpiCard({ label, value, color, sub }: { label: string; value: string; c
 }
 
 /** Action button styled for the hero card */
-export function HeroBtn({ onClick, disabled, children, primary }: { onClick: () => void; disabled?: boolean; children: React.ReactNode; primary?: boolean }) {
+export function HeroBtn({ onClick, disabled, children, primary, title }: { onClick?: () => void; disabled?: boolean; children: React.ReactNode; primary?: boolean; title?: string }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} style={{
-      fontSize: 11, fontWeight: 700, padding: "6px 14px", borderRadius: 8, cursor: "pointer",
+    <button type="button" onClick={onClick} disabled={disabled} title={title} style={{
+      fontSize: 11, fontWeight: 700, padding: "6px 14px", borderRadius: 8, cursor: disabled ? "not-allowed" : "pointer",
       border: primary ? "none" : "1px solid rgba(255,255,255,0.3)",
       background: primary ? "#fff" : "rgba(255,255,255,0.15)",
       color: primary ? "#1a1a1a" : "#fff",
+      opacity: disabled ? 0.5 : 1,
     }}>{children}</button>
   );
 }

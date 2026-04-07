@@ -91,7 +91,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
 
   // Main tab
   type MainTab = "fc" | "recette" | "cmd" | "pop";
-  const [mainTab, setMainTab] = useState<MainTab>(initialProdMode ? "recette" : isEdit ? "fc" : "recette");
+  const [mainTab, setMainTab] = useState<MainTab>(initialProdMode ? "recette" : "fc");
 
   // Save state
   const [saving, setSaving] = useState(false);
@@ -561,7 +561,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
     }
   }
 
-  const title = name || (isEdit ? "Fiche cuisine" : "Nouvelle fiche cuisine");
+  const title = name || "Nouvelle fiche cuisine";
 
   // ── Production mode computations ───────────────────────────────────────
   const prodPivotLine = pivotIngredientId
@@ -589,12 +589,10 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
 
   const categoryLabel = CATEGORIES.find(c => c.id === category)?.label ?? category;
 
-  // Tab definitions
-  const MAIN_TABS: { key: MainTab; label: string }[] = isEdit ? [
+  // Tab definitions — same in create and edit (cmd & pop tabs require existing recipe)
+  const MAIN_TABS: { key: MainTab; label: string }[] = [
     { key: "fc", label: "Food cost & Marges" },
     { key: "recette", label: "Recette & Procede" },
-  ] : [
-    { key: "recette", label: "Recette" },
   ];
 
   if (status === "loading") {
@@ -615,16 +613,16 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         <RecipeHero
           title={title}
           accent={ACCENT}
-          isEdit={isEdit}
+          isEdit={true}
           photoPreview={photoPreview}
           etabName={etab?.nom}
           typeLabel={categoryLabel}
           onBack={() => router.push("/recettes")}
-          kpis={isEdit ? { costPerPortion: effectiveCostPerPortion ?? null, foodCostPct: foodCostPct ?? null, sellPriceHT: sp ?? null, sellPriceTTC: prixTTC ?? null, margeBrute: margeBrute ?? null, costPerKg: costPerKg ?? null } : undefined}
+          kpis={{ costPerPortion: effectiveCostPerPortion ?? null, foodCostPct: foodCostPct ?? null, sellPriceHT: sp ?? null, sellPriceTTC: prixTTC ?? null, margeBrute: margeBrute ?? null, costPerKg: costPerKg ?? null }}
           actions={<>
             {isEdit && pivotIngredientId && <HeroBtn onClick={() => setShowProdModal(true)}>Production</HeroBtn>}
-            {isEdit && <HeroBtn onClick={handleExportPdf} disabled={pdfLoading}>{pdfLoading ? "Export…" : "PDF"}</HeroBtn>}
-            {isEdit && <PublishCatalogueButton recipeType="cuisine" recipeId={recipeId!} />}
+            <HeroBtn onClick={handleExportPdf} disabled={!isEdit || pdfLoading} title={!isEdit ? "Enregistrer la recette pour exporter le PDF" : undefined}>{pdfLoading ? "Export…" : "PDF"}</HeroBtn>
+            {isEdit ? <PublishCatalogueButton recipeType="cuisine" recipeId={recipeId!} /> : <HeroBtn disabled title="Enregistrer la recette pour publier au catalogue">Catalogue</HeroBtn>}
             {userCanWrite && <HeroBtn onClick={handleSave} disabled={saving} primary>{saving ? "Sauvegarde…" : "Enregistrer"}</HeroBtn>}
             {isEdit && userCanWrite && (
               <HeroDangerBtn onClick={async () => {
@@ -661,7 +659,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         {saveError && <div className="errorBox" style={{ marginBottom: 12 }}>{saveError}</div>}
 
         {/* ── TAB: FOOD COST & MARGES ── */}
-        {mainTab === "fc" && isEdit && recipeId && (
+        {mainTab === "fc" && (
           <GestionFoodCost
             recipeId={recipeId}
             recipeType="cuisine"

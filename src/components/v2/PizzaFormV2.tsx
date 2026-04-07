@@ -94,7 +94,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
   // Main tab
   type MainTab = "fc" | "recette" | "cmd" | "pop";
-  const [mainTab, setMainTab] = useState<MainTab>(initialProdMode ? "recette" : isEdit ? "fc" : "recette");
+  const [mainTab, setMainTab] = useState<MainTab>(initialProdMode ? "recette" : "fc");
 
   // Production mode
   const [prodMode, setProdMode] = useState(initialProdMode ?? false);
@@ -190,10 +190,11 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
     { key: "cmd", label: "Commandes fournisseurs" },
     { key: "pop", label: "Pilotage CA" },
   ] : [
-    { key: "recette", label: "Recette" },
+    { key: "fc", label: "Food cost & Marges" },
+    { key: "recette", label: "Recette & Procede" },
   ];
 
-  const title = name || (isEdit ? "Fiche pizza" : "Nouvelle pizza");
+  const title = name || "Nouvelle pizza";
 
   // Load
   useEffect(() => {
@@ -517,16 +518,16 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         <RecipeHero
           title={title}
           accent={ACCENT}
-          isEdit={isEdit}
+          isEdit={true}
           photoPreview={photoPreview}
           etabName={etab.current?.nom}
           typeLabel="Pizza"
           onBack={() => router.push("/recettes")}
-          kpis={isEdit ? { costPerPortion: effectiveCostPerPortion ?? null, foodCostPct: foodCostPct ?? null, sellPriceHT: sp ?? null, sellPriceTTC: prixTTC ?? null, margeBrute: margeBrute ?? null } : undefined}
+          kpis={{ costPerPortion: effectiveCostPerPortion ?? null, foodCostPct: foodCostPct ?? null, sellPriceHT: sp ?? null, sellPriceTTC: prixTTC ?? null, margeBrute: margeBrute ?? null }}
           actions={<>
             {isEdit && pivotIngredientId && <HeroBtn onClick={() => setShowProdModal(true)}>Production</HeroBtn>}
-            {isEdit && <HeroBtn onClick={handleExportPdf} disabled={pdfLoading}>{pdfLoading ? "Export…" : "PDF"}</HeroBtn>}
-            {isEdit && <PublishCatalogueButton recipeType="pizza" recipeId={pizzaId!} />}
+            <HeroBtn onClick={handleExportPdf} disabled={!isEdit || pdfLoading} title={!isEdit ? "Enregistrer la recette pour exporter le PDF" : undefined}>{pdfLoading ? "Export…" : "PDF"}</HeroBtn>
+            {isEdit ? <PublishCatalogueButton recipeType="pizza" recipeId={pizzaId!} /> : <HeroBtn disabled title="Enregistrer la recette pour publier au catalogue">Catalogue</HeroBtn>}
             {userCanWrite && <HeroBtn onClick={handleSave} disabled={saving} primary>{saving ? "Sauvegarde…" : "Enregistrer"}</HeroBtn>}
             {isEdit && userCanWrite && (
               <HeroDangerBtn onClick={async () => {
@@ -563,7 +564,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         {saveError && <div className="errorBox" style={{ marginBottom: 12 }}>{saveError}</div>}
 
         {/* ── TAB: FOOD COST & MARGES ── */}
-        {mainTab === "fc" && isEdit && pizzaId && (
+        {mainTab === "fc" && (
           <GestionFoodCost
             recipeId={pizzaId}
             recipeType="pizza"
