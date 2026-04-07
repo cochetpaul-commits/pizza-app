@@ -237,6 +237,16 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         const sid = String(o.supplier_id ?? "");
         supplierByIng[iid] = sid ? (supplierNameById[sid] ?? null) : null;
       }
+      // Enrichissement avec les méta de l'ingrédient (piece_weight_g, density)
+      for (const i of ingList) {
+        const cpu = pm[i.id];
+        if (!cpu) continue;
+        const meta = metaM[i.id] ?? {};
+        const pwg = meta.piece_weight_g ?? i.piece_weight_g ?? null;
+        const dens = meta.density_kg_per_l ?? i.density_g_per_ml ?? null;
+        pm[i.id] = enrichCpuWithConversions({ piece_weight_g: pwg, density_kg_per_l: dens }, cpu);
+        metaM[i.id] = { piece_weight_g: pwg, density_kg_per_l: dens };
+      }
       // Fallback 1 : purchase_price / purchase_unit depuis l'ingredient
       for (const i of ingList) {
         if (pm[i.id] && (pm[i.id].g || pm[i.id].ml || pm[i.id].pcs)) continue;
