@@ -822,7 +822,7 @@ export default function AchatsPage() {
               <div style={{ ...S.sec, marginBottom: 0 }}>Analyse — Exercice {curFY}/{curFY + 1}</div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 14, marginBottom: 14 }}>
+            <div className="achats-charts-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 340px", gap: 14, marginBottom: 14 }}>
               {/* Left: VERTICAL stacked bar chart */}
               <div style={S.card}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
@@ -1000,28 +1000,30 @@ export default function AchatsPage() {
                       ))}
                     </select>
                   </div>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "DM Sans, sans-serif" }}>
-                    <thead>
-                      <tr style={{ borderBottom: "1px solid #ddd6c8" }}>
-                        <th style={thStyle}>Produit</th>
-                        <th style={thStyle}>Fournisseur</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>Total achats</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>Quantite</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>Dernier PU</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredTopProducts.slice(0, topProductsLimit).map((p, idx) => (
-                        <tr key={idx} style={{ borderBottom: "1px solid #f2ede4" }}>
-                          <td style={{ ...tdStyle, fontWeight: 600, color: "#1a1a1a" }}>{p.name}</td>
-                          <td style={{ ...tdStyle, color: "#777" }}>{p.supplier}</td>
-                          <td style={{ ...tdR, fontWeight: 600 }}>{fmt(p.totalPrice)}</td>
-                          <td style={tdR}>{p.quantity % 1 === 0 ? p.quantity : p.quantity.toFixed(2)} {p.unit}</td>
-                          <td style={tdR}>{fmt(p.lastUnitPrice)}</td>
+                  <div className="achats-top-table-scroll" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "DM Sans, sans-serif", minWidth: 560 }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid #ddd6c8" }}>
+                          <th style={thStyle}>Produit</th>
+                          <th style={thStyle}>Fournisseur</th>
+                          <th style={{ ...thStyle, textAlign: "right" }}>Total achats</th>
+                          <th className="achats-col-hide-mobile" style={{ ...thStyle, textAlign: "right" }}>Quantite</th>
+                          <th className="achats-col-hide-mobile" style={{ ...thStyle, textAlign: "right" }}>Dernier PU</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {filteredTopProducts.slice(0, topProductsLimit).map((p, idx) => (
+                          <tr key={idx} style={{ borderBottom: "1px solid #f2ede4" }}>
+                            <td style={{ ...tdStyle, fontWeight: 600, color: "#1a1a1a" }}>{p.name}</td>
+                            <td style={{ ...tdStyle, color: "#777" }}>{p.supplier}</td>
+                            <td style={{ ...tdR, fontWeight: 600 }}>{fmt(p.totalPrice)}</td>
+                            <td className="achats-col-hide-mobile" style={tdR}>{p.quantity % 1 === 0 ? p.quantity : p.quantity.toFixed(2)} {p.unit}</td>
+                            <td className="achats-col-hide-mobile" style={tdR}>{fmt(p.lastUnitPrice)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                   {filteredTopProducts.length > topProductsLimit && (
                     <div style={{ textAlign: "center", marginTop: 12 }}>
                       <button

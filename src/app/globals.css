@@ -232,6 +232,19 @@ body.bottom-sheet-open .bottom-tab-bar {
   display: none !important;
 }
 
+/* Achats page: responsive charts grid + top achats table */
+@media (max-width: 767px) {
+  .achats-charts-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .achats-col-hide-mobile {
+    display: none !important;
+  }
+  .achats-top-table-scroll table {
+    min-width: 0 !important;
+  }
+}
+
 /* Ventes page: date picker desktop inline vs mobile fixed */
 .ventes-date-desktop { display: block; }
 .ventes-date-mobile { display: none; }
