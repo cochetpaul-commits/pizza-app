@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
-import { useProfile } from "@/lib/ProfileContext";
 import { AddCollaborateurModal } from "@/components/rh/AddCollaborateurModal";
 
 /* ── Types ─────────────────────────────────────────────────────── */
@@ -38,7 +37,6 @@ type Employe = {
   code_pin: string | null;
 };
 
-type StatutFilter = "actif" | "inactif" | "tous";
 
 /* ── Helpers ───────────────────────────────────────────────────── */
 
@@ -107,13 +105,10 @@ function EyeIcon({ open }: { open: boolean }) {
 export default function EquipePage() {
   const router = useRouter();
   const { current: etab } = useEtablissement();
-  const { canWrite } = useProfile();
 
   const [employes, setEmployes] = useState<Employe[]>([]);
   const [contrats, setContrats] = useState<Contrat[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statutFilter, setStatutFilter] = useState<StatutFilter>("actif");
-  const [search, setSearch] = useState("");
   const [revealedPins, setRevealedPins] = useState<Set<string>>(new Set());
 
   // ── Modal state ──
@@ -156,17 +151,8 @@ export default function EquipePage() {
     return contrats.some((c) => c.employe_id === empId && c.actif);
   };
 
-  /* ── Filtered list ── */
-  const filtered = employes.filter((e) => {
-    if (statutFilter === "actif" && !e.actif) return false;
-    if (statutFilter === "inactif" && e.actif) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      const full = `${e.prenom} ${e.nom}`.toLowerCase();
-      if (!full.includes(q)) return false;
-    }
-    return true;
-  });
+  /* ── Active employees only ── */
+  const filtered = employes.filter((e) => e.actif);
 
   const togglePin = (id: string) => {
     setRevealedPins((prev) => {
@@ -181,57 +167,14 @@ export default function EquipePage() {
     window.location.reload();
   };
 
-  /* ── Counts ── */
-  const countActif = employes.filter((e) => e.actif).length;
-  const countInactif = employes.filter((e) => !e.actif).length;
-
   const etabColor = getEtabColor(etab?.slug);
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={pageStyle}>
         {/* ── Header ── */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-          <div>
-            <h1 style={h1Style}>Personnel</h1>
-            <p style={subtitleStyle}>
-              {countActif} actif{countActif > 1 ? "s" : ""}
-              {countInactif > 0 && (
-                <span style={{ color: "#bbb" }}> · {countInactif} inactif{countInactif > 1 ? "s" : ""}</span>
-              )}
-            </p>
-          </div>
-          {canWrite && (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-              <button type="button" onClick={() => setShowModal(true)} style={primaryBtnStyle}>+ Employe</button>
-            </div>
-          )}
-        </div>
-
-        {/* ── Filters ── */}
-        <div style={filtersRow}>
-          {/* Search */}
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher par nom..."
-            style={searchStyle}
-          />
-
-          {/* Statut filter */}
-          <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12 }}>
-            {(["actif", "inactif", "tous"] as StatutFilter[]).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setStatutFilter(f)}
-                style={pillBtn(statutFilter === f, etab?.couleur)}
-              >
-                {f === "tous" ? "Tous" : f === "actif" ? "Actifs" : "Inactifs"}
-              </button>
-            ))}
-          </div>
+        <div style={{ marginBottom: 20 }}>
+          <h1 style={h1Style}>Personnel</h1>
         </div>
 
         {/* ── Table ── */}
@@ -292,9 +235,6 @@ export default function EquipePage() {
                             <div style={{ fontWeight: 600, fontSize: 14, color: "#1a1a1a" }}>
                               {emp.prenom} {emp.nom}
                             </div>
-                            <span style={statutBadge(emp.actif)}>
-                              {emp.actif ? "Actif" : "Inactif"}
-                            </span>
                           </div>
                         </div>
                       </td>
@@ -395,45 +335,6 @@ const h1Style: React.CSSProperties = {
   color: "#1a1a1a",
 };
 
-const subtitleStyle: React.CSSProperties = {
-  margin: "4px 0 0",
-  fontSize: 14,
-  color: "#6f6a61",
-  fontFamily: "var(--font-dm), 'DM Sans', sans-serif",
-};
-
-const filtersRow: React.CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 10,
-  alignItems: "center",
-  marginBottom: 16,
-};
-
-const searchStyle: React.CSSProperties = {
-  flex: "1 1 200px",
-  minWidth: 140,
-  padding: "7px 12px",
-  borderRadius: 8,
-  border: "1px solid #ddd6c8",
-  fontSize: 13,
-  background: "#fff",
-  outline: "none",
-};
-
-const pillBtn = (active: boolean, ec?: string): React.CSSProperties => ({
-  padding: "6px 14px",
-  borderRadius: 10,
-  border: "none",
-  background: active ? (ec ? ec + "25" : "#fff") : "transparent",
-  color: active ? "#1a1a1a" : "#999",
-  fontSize: 12,
-  fontWeight: 600,
-  cursor: "pointer",
-  boxShadow: active ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
-  transition: "all 0.15s",
-});
-
 const tableStyle: React.CSSProperties = {
   width: "100%",
   borderCollapse: "collapse",
@@ -489,17 +390,6 @@ const avatarImgStyle: React.CSSProperties = {
   flexShrink: 0,
 };
 
-const statutBadge = (actif: boolean): React.CSSProperties => ({
-  display: "inline-block",
-  padding: "1px 8px",
-  borderRadius: 8,
-  fontSize: 11,
-  fontWeight: 700,
-  background: actif ? "#e8ede6" : "#f0f0f0",
-  color: actif ? "#4a6741" : "#bbb",
-  marginTop: 2,
-});
-
 const eyeBtnStyle: React.CSSProperties = {
   background: "none",
   border: "none",
@@ -525,17 +415,3 @@ const progressBarFill: React.CSSProperties = {
   transition: "width 0.3s",
 };
 
-const primaryBtnStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  height: 32,
-  padding: "0 14px",
-  borderRadius: 20,
-  border: "none",
-  background: "#D4775A",
-  color: "#fff",
-  fontSize: 13,
-  fontWeight: 700,
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-};
