@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { RequireRole } from "@/components/RequireRole";
@@ -12,6 +12,7 @@ import { IngredientAvatar } from "@/components/IngredientAvatar";
 import type { Category } from "@/types/ingredients";
 import { FloatingActions, FAIconPdf, FAIconMail, FAIconTrash, FAIconCheck } from "@/components/layout/FloatingActions";
 import type { FloatingAction } from "@/components/layout/FloatingActions";
+import { BottomSheet } from "@/components/layout/BottomSheet";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -280,7 +281,6 @@ function CommandesPage() {
   // Email sending state
   const [sendingEmail, setSendingEmail] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Historique
   const [histOpen, setHistOpen] = useState(false);
@@ -303,17 +303,6 @@ function CommandesPage() {
   const [loadingSupplier, setLoadingSupplier] = useState(false);
   const [saving, setSaving] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
-
-  // Close dropdown on click outside
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
 
   // ── Load all suppliers ──────────────────────────────────────────────────
 
@@ -1440,82 +1429,104 @@ function CommandesPage() {
           </div>
         )}
 
-        {/* Supplier dropdown */}
+        {/* Nouvelle commande / Changer fournisseur button */}
         {!loading && suppliers.length > 0 && (
-          <div ref={dropdownRef} style={{ position: "relative" }}>
-            <button
-              type="button"
-              onClick={() => setDropdownOpen((v) => !v)}
-              style={{
-                width: "100%", height: 48, padding: "0 40px 0 16px",
-                borderRadius: 12,
-                border: dropdownOpen ? "2px solid #D4775A" : "1.5px solid #ddd6c8",
-                background: "#fff", fontSize: 15, fontWeight: 600,
-                color: selectedSupplierId ? "#1a1a1a" : "#999",
-                fontFamily: "inherit", cursor: "pointer", outline: "none",
-                textAlign: "left", position: "relative",
-                boxShadow: dropdownOpen ? "0 2px 12px rgba(212,119,90,0.12)" : "none",
-                transition: "border 0.15s, box-shadow 0.15s",
-              }}>
-              {currentSupplier?.name ?? "Fournisseur"}
-              {currentSupplier && draftSupplierIds.has(currentSupplier.id) && (
-                <span style={{
-                  display: "inline-block", width: 8, height: 8, borderRadius: "50%",
-                  background: "#D4775A", marginLeft: 8, verticalAlign: "middle",
-                }} />
-              )}
-              <span style={{
-                position: "absolute", right: 16, top: "50%",
-                transform: dropdownOpen ? "translateY(-50%) rotate(180deg)" : "translateY(-50%)",
-                transition: "transform 0.2s", fontSize: 11, color: "#999",
-              }}>&#9660;</span>
-            </button>
-
-            {dropdownOpen && (
-              <div style={{
-                position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
-                background: "#fff", borderRadius: 12, border: "1.5px solid #ddd6c8",
-                boxShadow: "0 8px 24px rgba(0,0,0,0.1)", zIndex: 50,
-                maxHeight: 320, overflowY: "auto",
-                padding: "6px 0",
-              }}>
-                {suppliers.map((s) => {
-                  const isActive = s.id === selectedSupplierId;
-                  const hasDraft = draftSupplierIds.has(s.id);
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => { setSelectedSupplierId(s.id); setDropdownOpen(false); }}
-                      style={{
-                        width: "100%", padding: "10px 16px",
-                        display: "flex", alignItems: "center", gap: 10,
-                        background: isActive ? "#fdf5f2" : "transparent",
-                        border: "none", cursor: "pointer", fontFamily: "inherit",
-                        fontSize: 14, fontWeight: isActive ? 700 : 500,
-                        color: isActive ? "#D4775A" : "#1a1a1a",
-                        textAlign: "left", transition: "background 0.1s",
-                      }}
-                      onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "#f9f5ef"; }}
-                      onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-                    >
-                      <span style={{ flex: 1 }}>{s.name}</span>
-                      {hasDraft && (
-                        <span style={{
-                          display: "inline-block", width: 8, height: 8, borderRadius: "50%",
-                          background: "#D4775A", flexShrink: 0,
-                        }} />
-                      )}
-                      {isActive && (
-                        <span style={{ fontSize: 14, color: "#D4775A", flexShrink: 0 }}>&#10003;</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+          <button
+            type="button"
+            onClick={() => setDropdownOpen(true)}
+            style={{
+              width: "100%", height: 52, padding: "0 18px",
+              borderRadius: 14,
+              border: "none",
+              background: selectedSupplierId ? "#fff" : "#D4775A",
+              color: selectedSupplierId ? "#1a1a1a" : "#fff",
+              fontSize: 15, fontWeight: 700,
+              fontFamily: "var(--font-oswald), Oswald, sans-serif",
+              textTransform: "uppercase", letterSpacing: ".04em",
+              cursor: "pointer", outline: "none",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+              boxShadow: selectedSupplierId ? "0 2px 8px rgba(0,0,0,0.06)" : "0 6px 20px rgba(212,119,90,0.28)",
+              transition: "all 0.15s",
+            }}
+          >
+            {selectedSupplierId ? (
+              <>
+                <span style={{ color: "#999", fontWeight: 500, fontSize: 11 }}>FOURNISSEUR</span>
+                <span>{currentSupplier?.name ?? ""}</span>
+                {currentSupplier && draftSupplierIds.has(currentSupplier.id) && (
+                  <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#D4775A" }} />
+                )}
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginLeft: 4, opacity: 0.5 }}>
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </>
+            ) : (
+              <>
+                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Nouvelle commande
+              </>
             )}
-          </div>
+          </button>
         )}
+
+        {/* Supplier drawer */}
+        <BottomSheet
+          open={dropdownOpen}
+          onClose={() => setDropdownOpen(false)}
+          title="Choisir un fournisseur"
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {suppliers.map((s) => {
+              const isActive = s.id === selectedSupplierId;
+              const hasDraft = draftSupplierIds.has(s.id);
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => { setSelectedSupplierId(s.id); setDropdownOpen(false); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    width: "100%", padding: "14px 16px",
+                    border: "none", cursor: "pointer",
+                    borderRadius: 12,
+                    background: isActive ? "rgba(212,119,90,0.12)" : "rgba(255,255,255,0.55)",
+                    borderLeft: isActive ? "4px solid #D4775A" : "4px solid transparent",
+                    transition: "background 0.15s",
+                    fontFamily: "inherit",
+                    textAlign: "left",
+                  }}
+                >
+                  <span style={{
+                    fontSize: 15,
+                    fontWeight: isActive ? 700 : 500,
+                    color: isActive ? "#D4775A" : "#1a1a1a",
+                    flex: 1,
+                  }}>
+                    {s.name}
+                  </span>
+                  {hasDraft && (
+                    <span style={{
+                      display: "inline-flex", alignItems: "center", gap: 5,
+                      fontSize: 10, fontWeight: 700, color: "#D4775A",
+                      padding: "2px 8px", borderRadius: 6,
+                      background: "rgba(212,119,90,0.12)",
+                      textTransform: "uppercase", letterSpacing: ".05em",
+                    }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#D4775A" }} />
+                      brouillon
+                    </span>
+                  )}
+                  {isActive && !hasDraft && (
+                    <span style={{ fontSize: 16, color: "#D4775A" }}>✓</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </BottomSheet>
 
         {/* Commandes en cours */}
         {!loading && activeSessions.length > 0 && (

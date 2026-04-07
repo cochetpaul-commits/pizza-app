@@ -270,13 +270,19 @@ function IngredientsPageInner() {
     return base;
   }, [items, tab, filterCategory, filterSupplier, supplierAliases, includeNoOffer, offersByIngredientId]);
 
+  // Categories sorted alphabetically by label (French locale)
+  const CATEGORIES_ALPHA = useMemo(
+    () => [...CATEGORIES].sort((a, b) => CAT_LABELS[a].localeCompare(CAT_LABELS[b], "fr")),
+    [],
+  );
+
   const grouped = useMemo(() => {
     const byCategory = new Map<Category, Ingredient[]>();
-    for (const cat of CATEGORIES) byCategory.set(cat, []);
+    for (const cat of CATEGORIES_ALPHA) byCategory.set(cat, []);
     for (const x of filtered) byCategory.get(x.category)?.push(x);
     for (const arr of byCategory.values()) arr.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", "fr"));
-    return CATEGORIES.map((cat) => ({ cat, items: byCategory.get(cat) ?? [] })).filter((g) => g.items.length > 0);
-  }, [filtered]);
+    return CATEGORIES_ALPHA.map((cat) => ({ cat, items: byCategory.get(cat) ?? [] })).filter((g) => g.items.length > 0);
+  }, [filtered, CATEGORIES_ALPHA]);
 
   // Collapsed by default; open all when searching
   const [collapsedCats, setCollapsedCats] = useState<Set<Category>>(() => new Set(CATEGORIES));
@@ -1060,7 +1066,7 @@ function IngredientsPageInner() {
               <Dropdown
                 value={filterCategory}
                 onChange={(v) => setFilterCategory(v as "all" | Category)}
-                options={[{ value: "all", label: "Toutes categories" }, ...CATEGORIES.map(c => ({ value: c, label: CAT_LABELS[c] }))]}
+                options={[{ value: "all", label: "Toutes categories" }, ...CATEGORIES_ALPHA.map(c => ({ value: c, label: CAT_LABELS[c] }))]}
               />
               <Dropdown
                 value={filterSupplier}
@@ -1442,7 +1448,7 @@ function IngredientsPageInner() {
             <Dropdown
               value={filterCategory}
               onChange={(v) => setFilterCategory(v as "all" | Category)}
-              options={[{ value: "all", label: "Tous" }, ...CATEGORIES.map(c => ({ value: c, label: CAT_LABELS[c] }))]}
+              options={[{ value: "all", label: "Tous" }, ...CATEGORIES_ALPHA.map(c => ({ value: c, label: CAT_LABELS[c] }))]}
             />
           </div>
           <div>

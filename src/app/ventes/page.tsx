@@ -7,6 +7,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import Chart from "chart.js/auto";
 import { getCategoryColor, getCategoryColors } from "@/lib/categoryColors";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
+import { BottomSheet } from "@/components/layout/BottomSheet";
 
 /* ── Types ── */
 type WeekData = {
@@ -152,6 +153,7 @@ function PerformancesPage() {
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [pdfDrawerOpen, setPdfDrawerOpen] = useState(false);
   const [briefing, setBriefing] = useState<string[] | null>(null);
   const [briefingLoading, setBriefingLoading] = useState(false);
   const [mixDDOpen, setMixDDOpen] = useState<{ label: string; color: string } | null>(null);
@@ -397,15 +399,23 @@ function PerformancesPage() {
     ? new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
     : `Du ${new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })} au ${new Date(to + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`;
 
-  // PDF export
-  const handleExportPDF = async () => {
+  // PDF export — supports 3 types: "ventes" | "produits" | "complet"
+  const handleExportPDF = async (exportType: "ventes" | "produits" | "complet") => {
     if (!data || !etab) return;
+    setPdfDrawerOpen(false);
     setExporting(true);
     try {
       const res = await fetch("/api/ventes/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stats: data, prev: activePrev, mode, viewTab: isSingleDay ? "jour" : "perso", rangeLabel, etabName: etab.nom ?? "Etablissement", briefing }),
+        body: JSON.stringify({
+          stats: data, prev: activePrev, mode,
+          viewTab: isSingleDay ? "jour" : "perso",
+          rangeLabel,
+          etabName: etab.nom ?? "Etablissement",
+          briefing,
+          exportType,
+        }),
       });
       if (!res.ok) { setExporting(false); return; }
       const blob = await res.blob();
@@ -413,7 +423,7 @@ function PerformancesPage() {
       const a = document.createElement("a");
       a.href = url;
       const dateSuffix = isSingleDay ? from : `${from}_${to}`;
-      a.download = `rapport-${etab.nom?.replace(/\s/g, "_")}-${dateSuffix}.pdf`;
+      a.download = `rapport-${exportType}-${etab.nom?.replace(/\s/g, "_")}-${dateSuffix}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch { /* ignore */ }
@@ -428,9 +438,12 @@ function PerformancesPage() {
     <RequireRole allowedRoles={["group_admin"]}>
       <div className="ventes-container" style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 16px 120px" }}>
 
-        {/* ── Toolbar: date picker + import + PDF + TTC/HT ── */}
+        {/* ── Toolbar: import + PDF + compact TTC/HT + page nav ── */}
         <div className="ventes-toolbar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
-          <DateRangePicker value={range} onChange={(r) => setRange(r)} />
+          {/* Date picker — shown inline on desktop only (mobile has fixed bottom version) */}
+          <div className="ventes-date-desktop">
+            <DateRangePicker value={range} onChange={(r) => setRange(r)} />
+          </div>
           <div className="ventes-toolbar-actions" style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <label style={{
               padding: "7px 14px", borderRadius: 8, border: "none",
@@ -444,7 +457,7 @@ function PerformancesPage() {
               }} />
             </label>
             {data && (
-              <button type="button" onClick={handleExportPDF} disabled={exporting} style={{
+              <button type="button" onClick={() => setPdfDrawerOpen(true)} disabled={exporting} style={{
                 padding: "7px 14px", borderRadius: 8, border: "1px solid #e0d8ce",
                 background: "#fff", color: "#1a1a1a", fontSize: 12, fontWeight: 700, cursor: "pointer",
                 opacity: exporting ? 0.5 : 1,
@@ -452,16 +465,17 @@ function PerformancesPage() {
                 {exporting ? "Export..." : "PDF"}
               </button>
             )}
-            <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
+            {/* Compact TTC/HT toggle */}
+            <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 999, padding: 2 }}>
               <button type="button" onClick={() => setMode("ttc")} style={{
-                padding: "4px 14px", borderRadius: 16, border: "none", cursor: "pointer",
-                background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#777",
-                fontSize: 11, fontWeight: 500,
+                padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
+                background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#999",
+                fontSize: 10, fontWeight: 700, letterSpacing: ".03em",
               }}>TTC</button>
               <button type="button" onClick={() => setMode("ht")} style={{
-                padding: "4px 14px", borderRadius: 16, border: "none", cursor: "pointer",
-                background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#777",
-                fontSize: 11, fontWeight: 500,
+                padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
+                background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#999",
+                fontSize: 10, fontWeight: 700, letterSpacing: ".03em",
               }}>HT</button>
             </div>
           </div>
@@ -479,6 +493,47 @@ function PerformancesPage() {
             }}>Produits</button>
           </div>
         </div>
+
+        {/* Mobile: fixed bottom date picker (sits above the section pill) */}
+        <div className="ventes-date-mobile">
+          <DateRangePicker value={range} onChange={(r) => setRange(r)} />
+        </div>
+
+        {/* PDF export drawer */}
+        <BottomSheet
+          open={pdfDrawerOpen}
+          onClose={() => setPdfDrawerOpen(false)}
+          title="Exporter en PDF"
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {[
+              { key: "ventes" as const, label: "Ventes", sub: "Rapport detaille des ventes" },
+              { key: "produits" as const, label: "Produits", sub: "Marges et food cost par produit" },
+              { key: "complet" as const, label: "Complet", sub: "Ventes + Produits reunis" },
+            ].map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => handleExportPDF(opt.key)}
+                disabled={exporting}
+                style={{
+                  display: "flex", flexDirection: "column", alignItems: "flex-start",
+                  gap: 2,
+                  width: "100%", padding: "14px 18px",
+                  border: "none", cursor: "pointer",
+                  borderRadius: 14,
+                  background: "rgba(255,255,255,0.55)",
+                  textAlign: "left",
+                  fontFamily: "inherit",
+                  opacity: exporting ? 0.5 : 1,
+                }}
+              >
+                <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>{opt.label}</span>
+                <span style={{ fontSize: 12, color: "#777" }}>{opt.sub}</span>
+              </button>
+            ))}
+          </div>
+        </BottomSheet>
         {importMsg && <div style={{ fontSize: 12, color: accent, marginBottom: 10 }}>{importMsg}</div>}
 
         {/* ── Loading / Empty ── */}
