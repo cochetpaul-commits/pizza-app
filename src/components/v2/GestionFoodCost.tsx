@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { CpuByUnit } from "@/lib/offerPricing";
 import type { Ingredient } from "@/types/ingredients";
-import { fetchApi } from "@/lib/fetchApi";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -14,23 +13,14 @@ interface IngLine {
 }
 
 export interface GestionFoodCostProps {
-  recipeId?: string;
-  recipeType: "cuisine" | "pizza" | "cocktail" | "empatement";
   lines: IngLine[];
   ingredients: Ingredient[];
   priceByIngredient: Record<string, CpuByUnit>;
   supplierByIngredient?: Record<string, string | null>;
   totalCost: number;
-  sellPrice: number | null;
-  onSellPriceChange: (price: number) => void;
-  portionsCount?: number | null;
   yieldGrams?: number | null;
-  /** TVA rate (e.g. 0.10) */
-  vatRate?: number;
-  onVatChange?: (v: number) => void;
-  /** Food cost target in % (e.g. 30) */
-  foodCostTarget?: number;
-  onFoodCostTargetChange?: (v: number) => void;
+  /** Portions multiplier (controlled by parent — same as the KPI Coût) */
+  multiplier?: number;
 }
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -56,16 +46,10 @@ function round2(n: number) { return Math.round(n * 100) / 100; }
 // ── Component ────────────────────────────────────────────────
 
 export function GestionFoodCost({
-  recipeId, recipeType, lines, ingredients, priceByIngredient,
-  supplierByIngredient, totalCost, sellPrice, onSellPriceChange,
-  portionsCount, yieldGrams,
-  vatRate = 0.10, onVatChange,
-  foodCostTarget = 30, onFoodCostTargetChange,
+  lines, ingredients, priceByIngredient,
+  supplierByIngredient, totalCost, yieldGrams,
+  multiplier = 1,
 }: GestionFoodCostProps) {
-
-  const [localSellPrice, setLocalSellPrice] = useState(sellPrice ?? 0);
-  const [saving, setSaving] = useState(false);
-  const [multiplier, setMultiplier] = useState(1);
 
   const ingMap = useMemo(() => {
     const m = new Map<string, Ingredient>();
@@ -106,34 +90,6 @@ export function GestionFoodCost({
   [lineDetails]);
 
   const effectiveTotal = computedTotal > 0 ? computedTotal : totalCost;
-  const costPerPortion = portionsCount && portionsCount > 0 ? effectiveTotal / portionsCount : effectiveTotal;
-
-  // Food cost simulation
-  const sp = localSellPrice > 0 ? localSellPrice : null;
-  const foodCostPct = sp ? (costPerPortion / sp) * 100 : null;
-  const margeBrute = sp ? sp - costPerPortion : null;
-  const prixTTC = sp ? sp * (1 + vatRate) : null;
-
-  const fcColor = foodCostPct == null ? "#999"
-    : foodCostPct <= foodCostTarget ? "#16a34a"
-    : foodCostPct <= foodCostTarget + 5 ? "#D97706"
-    : "#DC2626";
-
-  async function saveSellPrice(price: number) {
-    // Pre-save state: just update local state, no API call
-    if (!recipeId) {
-      onSellPriceChange(price);
-      return;
-    }
-    setSaving(true);
-    await fetchApi(`/api/recettes/${recipeId}/sell-price`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sell_price: price, recipe_type: recipeType }),
-    });
-    onSellPriceChange(price);
-    setSaving(false);
-  }
 
   // Sort by cost descending for visual impact
   const sortedLines = useMemo(() =>
@@ -145,78 +101,27 @@ export function GestionFoodCost({
     ? (sortedLines[0].cost / effectiveTotal) * 100
     : 0;
 
-  const vatPct = Math.round(vatRate * 100);
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-      {/* ── Control bar ── */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
-        background: "#fff", padding: "12px 16px", borderRadius: 12,
-        border: "1px solid #ece4d4",
-      }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5 }}>
-          Parametres
+      {/* ── Header ── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
+          Detail des couts
         </span>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 11, color: "#666" }}>TVA</span>
-          <select
-            value={vatPct}
-            onChange={(e) => onVatChange?.(Number(e.target.value) / 100)}
-            disabled={!onVatChange}
-            style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd6c8", fontSize: 12, fontWeight: 600, background: "#fff" }}
-          >
-            {[0, 5.5, 10, 20].map((v) => (
-              <option key={v} value={v}>{v}%</option>
-            ))}
-          </select>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 11, color: "#666" }}>Cible food cost</span>
-          <input
-            type="number"
-            min={5} max={80} step={1}
-            value={foodCostTarget}
-            onChange={(e) => onFoodCostTargetChange?.(Number(e.target.value))}
-            disabled={!onFoodCostTargetChange}
-            style={{ width: 60, padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd6c8", fontSize: 12, fontWeight: 600, textAlign: "right" }}
-          />
-          <span style={{ fontSize: 11, color: "#666" }}>%</span>
-        </div>
-      </div>
-
-      {/* ── Header + multiplier ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-            Detail des couts
+        {multiplier !== 1 && (
+          <span style={{
+            fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
+            background: "rgba(212,119,90,0.12)", color: "#D4775A",
+          }}>
+            ×{multiplier}
           </span>
-          {yieldGrams && yieldGrams > 0 && (
-            <span style={{ fontWeight: 400, color: "#999", marginLeft: 10, fontSize: 12 }}>
-              Rendement : {(yieldGrams / 1000).toFixed(2)} kg
-            </span>
-          )}
-        </div>
-        <div style={{
-          display: "flex", alignItems: "center", gap: 6,
-          background: "#fff", padding: "4px 10px", borderRadius: 8,
-          border: "1px solid #e8e2d8",
-        }}>
-          <span style={{ fontSize: 11, color: "#888" }}>Portions</span>
-          <select
-            value={multiplier}
-            onChange={(e) => setMultiplier(Number(e.target.value))}
-            style={{
-              padding: "3px 6px", borderRadius: 6, border: "1px solid #ddd6c8",
-              fontSize: 12, background: "#fff", fontWeight: 600,
-            }}
-          >
-            {[1, 2, 5, 10, 20, 50].map((n) => (
-              <option key={n} value={n}>{n}x</option>
-            ))}
-          </select>
-        </div>
+        )}
+        {yieldGrams && yieldGrams > 0 && (
+          <span style={{ fontWeight: 400, color: "#999", fontSize: 12 }}>
+            · Rendement {(yieldGrams / 1000).toFixed(2)} kg
+          </span>
+        )}
       </div>
 
       {/* ── Ingredient cost table ── */}
@@ -311,137 +216,6 @@ export function GestionFoodCost({
         </table>
       </div>
 
-      {/* ── Simulateur ── */}
-      <div style={{
-        background: "#faf6ee",
-        borderRadius: 16,
-        padding: "24px 24px 28px",
-        border: "1px solid #ece4d4",
-      }}>
-        {/* Title row */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-          <span style={{
-            fontSize: 11, fontWeight: 700, color: "#999",
-            textTransform: "uppercase", letterSpacing: "0.12em",
-          }}>
-            Simulateur de prix
-          </span>
-          {saving && <span style={{ fontSize: 10, color: "#bbb", fontStyle: "italic" }}>enregistrement…</span>}
-        </div>
-        <div style={{ fontSize: 11, color: "#9a8f84", marginBottom: 18 }}>
-          glissez pour ajuster le prix de vente
-        </div>
-
-        {/* Big price */}
-        <div style={{
-          fontSize: 56, fontWeight: 800, color: "#1a1a1a",
-          fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-          lineHeight: 1, textAlign: "center", marginBottom: 4,
-          fontVariantNumeric: "tabular-nums",
-        }}>
-          {localSellPrice > 0 ? `${localSellPrice.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€` : "—"}
-        </div>
-        <div style={{ fontSize: 11, color: "#9a8f84", textAlign: "center", marginBottom: 16 }}>
-          HT {prixTTC != null && `· ${prixTTC.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€ TTC`}
-        </div>
-
-        {/* Slider */}
-        <div style={{ position: "relative", marginBottom: 6 }}>
-          <input
-            type="range"
-            min={2} max={50} step={0.25}
-            value={localSellPrice}
-            onChange={(e) => setLocalSellPrice(Number(e.target.value))}
-            onMouseUp={() => saveSellPrice(localSellPrice)}
-            onTouchEnd={() => saveSellPrice(localSellPrice)}
-            className="recipe-price-slider"
-            style={{ width: "100%", accentColor: "#D4775A", height: 6 }}
-          />
-        </div>
-        <div style={{
-          display: "flex", justifyContent: "space-between",
-          fontSize: 10, color: "#bbb", fontWeight: 600, marginBottom: 24,
-        }}>
-          <span>2€</span>
-          <span>25€</span>
-          <span>50€</span>
-        </div>
-
-        {/* Food cost — héroïque */}
-        {foodCostPct != null && (
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-              <span style={{
-                fontSize: 11, fontWeight: 700, color: "#999",
-                textTransform: "uppercase", letterSpacing: "0.08em",
-              }}>
-                Food cost
-              </span>
-              <span style={{
-                fontSize: 28, fontWeight: 800, color: fcColor,
-                fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                fontVariantNumeric: "tabular-nums",
-              }}>
-                {foodCostPct.toFixed(1)}%
-              </span>
-            </div>
-            <div style={{
-              height: 14, background: "#ece4d4", borderRadius: 999,
-              overflow: "hidden", position: "relative",
-            }}>
-              {/* target marker */}
-              <div style={{
-                position: "absolute", left: `${Math.min(foodCostTarget, 100)}%`, top: 0, bottom: 0, width: 2,
-                background: "rgba(0,0,0,0.18)", zIndex: 1,
-              }} />
-              <div style={{
-                height: "100%", borderRadius: 999, transition: "width 0.4s ease",
-                width: `${Math.min(foodCostPct, 100)}%`,
-                background: `linear-gradient(90deg, ${fcColor}cc, ${fcColor})`,
-              }} />
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 10, color: "#9a8f84" }}>
-              <span>{foodCostPct <= foodCostTarget ? "dans la cible" : foodCostPct <= foodCostTarget + 5 ? "limite haute" : "au-dessus de la cible"}</span>
-              <span>objectif {foodCostTarget}%</span>
-            </div>
-          </div>
-        )}
-
-        {/* Marge brute one-liner */}
-        {margeBrute != null && (
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            paddingTop: 16, borderTop: "1px solid #ece4d4",
-          }}>
-            <span style={{
-              fontSize: 11, fontWeight: 700, color: "#999",
-              textTransform: "uppercase", letterSpacing: "0.08em",
-            }}>
-              Marge brute
-            </span>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-              <span style={{
-                fontSize: 24, fontWeight: 800,
-                color: margeBrute > 0 ? "#16a34a" : "#DC2626",
-                fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                fontVariantNumeric: "tabular-nums",
-              }}>
-                {margeBrute > 0 ? "+" : ""}{margeBrute.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
-              </span>
-              {costPerPortion > 0 && (
-                <span style={{
-                  fontSize: 12, fontWeight: 700,
-                  color: margeBrute > 0 ? "#16a34a" : "#DC2626",
-                  background: margeBrute > 0 ? "rgba(22,163,74,0.10)" : "rgba(220,38,38,0.10)",
-                  padding: "3px 8px", borderRadius: 6,
-                }}>
-                  {margeBrute > 0 ? "▲" : "▼"} {Math.abs(Math.round((margeBrute / costPerPortion) * 100))}%
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

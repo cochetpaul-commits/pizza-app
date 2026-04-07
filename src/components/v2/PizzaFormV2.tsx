@@ -89,6 +89,8 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
   // Pricing
   const [vatRate, setVatRate] = useState(0.1);
+  const [fcMultiplier, setFcMultiplier] = useState(1);
+  const [fcTarget, setFcTarget] = useState(30);
   const [marginRate, setMarginRate] = useState("75");
 
   // Main tab
@@ -572,23 +574,22 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
               margeBrute={margeBrute ?? null}
               accent={ACCENT}
               portionLabel="pizza"
-              foodCostTarget={30}
+              foodCostTarget={fcTarget}
+              onFoodCostTargetChange={setFcTarget}
+              onSellPriceChange={(p) => setSellPrice(p)}
+              vatRate={vatRate}
+              onVatChange={setVatRate}
+              multiplier={fcMultiplier}
+              onMultiplierChange={setFcMultiplier}
             />
             <GestionFoodCost
-              recipeId={pizzaId}
-              recipeType="pizza"
               lines={allLines}
               ingredients={ingredients}
               priceByIngredient={priceByIngredient}
               supplierByIngredient={supplierByIngredient}
               totalCost={totalCost}
-              sellPrice={sp}
-              onSellPriceChange={(p) => setSellPrice(p)}
-              portionsCount={null}
               yieldGrams={ballWeightG !== "" ? Number(ballWeightG) : null}
-              vatRate={vatRate}
-              onVatChange={setVatRate}
-              foodCostTarget={30}
+              multiplier={fcMultiplier}
             />
           </>
         )}

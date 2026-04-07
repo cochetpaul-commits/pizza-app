@@ -83,6 +83,8 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
   // Pricing
   const [vatRate, setVatRate] = useState(0.2);
+  const [fcMultiplier, setFcMultiplier] = useState(1);
+  const [fcTarget, setFcTarget] = useState(20);
   const [marginRate, setMarginRate] = useState("75");
 
   // Main tab
@@ -543,10 +545,13 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
               margeBrute={margeBrute ?? null}
               accent={ACCENT}
               portionLabel="cocktail"
-              foodCostTarget={20}
+              foodCostTarget={fcTarget}
+              onFoodCostTargetChange={setFcTarget}
               onSellPriceChange={(p) => setSellPrice(p)}
               vatRate={vatRate}
               onVatChange={setVatRate}
+              multiplier={fcMultiplier}
+              onMultiplierChange={setFcMultiplier}
             />
             <GestionFoodCost
               lines={lines}
@@ -554,6 +559,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
               priceByIngredient={priceByIngredient}
               supplierByIngredient={supplierByIngredient}
               totalCost={round2(totalCostEur)}
+              multiplier={fcMultiplier}
             />
           </>
         )}

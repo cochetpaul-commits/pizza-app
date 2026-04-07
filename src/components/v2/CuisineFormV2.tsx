@@ -79,6 +79,8 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
 
   // Pricing — marginRate as string "75" = 75%
   const [vatRate, setVatRate] = useState(0.1);
+  const [fcMultiplier, setFcMultiplier] = useState(1);
+  const [fcTarget, setFcTarget] = useState(30);
   const [marginRate, setMarginRate] = useState("75");
   const [sellPrice, setSellPrice] = useState<number | "">("");
 
@@ -667,23 +669,22 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
               margeBrute={margeBrute ?? null}
               accent={ACCENT}
               portionLabel="portion"
-              foodCostTarget={30}
+              foodCostTarget={fcTarget}
+              onFoodCostTargetChange={setFcTarget}
+              onSellPriceChange={(p) => setSellPrice(p)}
+              vatRate={vatRate}
+              onVatChange={setVatRate}
+              multiplier={fcMultiplier}
+              onMultiplierChange={setFcMultiplier}
             />
             <GestionFoodCost
-              recipeId={recipeId}
-              recipeType="cuisine"
               lines={lines}
               ingredients={ingredients}
               priceByIngredient={priceByIngredient}
               supplierByIngredient={supplierByIngredient}
               totalCost={totalCost}
-              sellPrice={sp}
-              onSellPriceChange={(p) => setSellPrice(p)}
-              portionsCount={typeof portionsCount === "number" ? portionsCount : null}
               yieldGrams={typeof yieldGrams === "number" ? yieldGrams : null}
-              vatRate={vatRate}
-              onVatChange={setVatRate}
-              foodCostTarget={30}
+              multiplier={fcMultiplier}
             />
           </>
         )}
