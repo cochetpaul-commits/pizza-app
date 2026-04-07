@@ -68,6 +68,12 @@ function cpuFromPack(row: Record<string, unknown>): CpuByUnit {
     return offerToCpu(packEachUnit, perUnit);
   }
 
+  // Pack composé en pièces sans qty unitaire : prix/pc = pack_price / pack_count
+  // (la conversion vers €/g se fera ensuite via piece_weight_g dans enrichCpuWithConversions)
+  if (packCount > 0 && (packEachUnit === "pc" || packEachUnit === "pcs" || !packEachUnit)) {
+    return { pcs: packPrice / packCount };
+  }
+
   return {};
 }
 
