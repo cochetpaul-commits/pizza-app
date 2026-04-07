@@ -10,6 +10,7 @@ import Chart from "chart.js/auto";
 import { FloatingActions, FAIconPlus } from "@/components/layout/FloatingActions";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
 import { BottomSheet } from "@/components/layout/BottomSheet";
+import { setPendingInvoiceFile } from "@/lib/pendingInvoiceFile";
 
 /* ── Types ── */
 
@@ -1230,7 +1231,7 @@ export default function AchatsPage() {
               }
               label="Importer depuis les documents"
               accept=".pdf,application/pdf"
-              onFile={() => { setImportDrawerOpen(false); router.push("/invoices"); }}
+              onFile={(f) => { setImportDrawerOpen(false); if (f) setPendingInvoiceFile(f); router.push("/invoices"); }}
               isLast
             />
           </div>

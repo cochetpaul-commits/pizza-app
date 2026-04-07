@@ -227,11 +227,12 @@ export function ArticlesContent() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Linked table state
-  const [sortCol, setSortCol] = useState<SortCol>("nom_vente");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  // Linked list state
+  const [sortCol] = useState<SortCol>("nom_vente");
+  const [sortDir] = useState<"asc" | "desc">("asc");
   const [linkedPage, setLinkedPage] = useState(0);
   const [searchLinked, setSearchLinked] = useState("");
+  const [filterCategory, setFilterCategory] = useState<string>("all");
 
   // Unmatched table state
   const [unmatchedPage, setUnmatchedPage] = useState(1);
@@ -363,22 +364,15 @@ export function ArticlesContent() {
     await fetchData();
   };
 
-  /* ── Linked table sort/filter/paginate ── */
-  const handleSort = (col: SortCol) => {
-    if (sortCol === col) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortCol(col);
-      setSortDir(col === "nom_vente" ? "asc" : "desc");
-    }
-    setLinkedPage(0);
-  };
-
+  /* ── Linked filter/paginate ── */
   const filteredLinked = useMemo(() => {
     let list = [...articles];
     if (searchLinked) {
       const s = searchLinked.toLowerCase();
       list = list.filter((a) => a.nom_vente.toLowerCase().includes(s));
+    }
+    if (filterCategory !== "all") {
+      list = list.filter((a) => (a.categorie_vente ?? "") === filterCategory);
     }
     list.sort((a, b) => {
       const av = a[sortCol] ?? 0;
@@ -389,17 +383,31 @@ export function ArticlesContent() {
       return sortDir === "asc" ? Number(av) - Number(bv) : Number(bv) - Number(av);
     });
     return list;
-  }, [articles, searchLinked, sortCol, sortDir]);
+  }, [articles, searchLinked, filterCategory, sortCol, sortDir]);
 
   const pagedLinked = filteredLinked.slice(linkedPage * PER_PAGE, (linkedPage + 1) * PER_PAGE);
   const totalLinkedPages = Math.ceil(filteredLinked.length / PER_PAGE);
 
   /* ── Unmatched filter + paginate ── */
   const filteredUnmatched = useMemo(() => {
-    if (!searchUnmatched) return unmatched;
-    const s = searchUnmatched.toLowerCase();
-    return unmatched.filter((p) => p.nom_vente.toLowerCase().includes(s) || p.categorie.toLowerCase().includes(s));
-  }, [unmatched, searchUnmatched]);
+    let list = unmatched;
+    if (searchUnmatched) {
+      const s = searchUnmatched.toLowerCase();
+      list = list.filter((p) => p.nom_vente.toLowerCase().includes(s) || p.categorie.toLowerCase().includes(s));
+    }
+    if (filterCategory !== "all") {
+      list = list.filter((p) => p.categorie === filterCategory);
+    }
+    return list;
+  }, [unmatched, searchUnmatched, filterCategory]);
+
+  /* ── All categories (union of unmatched + linked) ── */
+  const allCategories = useMemo(() => {
+    const set = new Set<string>();
+    unmatched.forEach((p) => { if (p.categorie) set.add(p.categorie); });
+    articles.forEach((a) => { if (a.categorie_vente) set.add(a.categorie_vente); });
+    return Array.from(set).sort();
+  }, [unmatched, articles]);
 
   const totalUnmatchedPages = Math.ceil(filteredUnmatched.length / PER_PAGE);
   const pagedUnmatched = filteredUnmatched.slice((unmatchedPage - 1) * PER_PAGE, unmatchedPage * PER_PAGE);
@@ -497,8 +505,7 @@ export function ArticlesContent() {
     if (expandedRow !== product.nom_vente) return null;
 
     return (
-      <tr>
-        <td colSpan={5} style={{ padding: "16px 8px", background: "#faf7f2", borderBottom: `1px solid ${COLORS.border}` }}>
+      <div style={{ padding: "14px 16px 16px", background: "#faf7f2", borderTop: `1px solid ${COLORS.border}`, borderBottomLeftRadius: 12, borderBottomRightRadius: 12 }}>
           <div style={{ maxWidth: 600 }}>
             {/* Link mode selector */}
             <div className="ventes-link-modes" style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, marginBottom: 14, flexWrap: "wrap" }}>
@@ -678,15 +685,8 @@ export function ArticlesContent() {
               </div>
             )}
           </div>
-        </td>
-      </tr>
+      </div>
     );
-  };
-
-  /* ── Sort indicator ── */
-  const sortArrow = (col: SortCol) => {
-    if (sortCol !== col) return "";
-    return sortDir === "asc" ? " ▲" : " ▼";
   };
 
   /* ══════════════════ RENDER ══════════════════ */
@@ -741,53 +741,77 @@ export function ArticlesContent() {
               </div>
             ) : (
               <>
-                <div style={{ marginBottom: 12 }}>
+                {/* Filters row */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
                   <input
-                    style={{ ...S.input, maxWidth: 300 }}
+                    style={{ ...S.input, flex: "1 1 220px", maxWidth: "none" }}
                     placeholder="Rechercher un produit..."
                     value={searchUnmatched}
                     onChange={(e) => { setSearchUnmatched(e.target.value); setUnmatchedPage(1); }}
                   />
+                  <select
+                    style={{
+                      ...S.input,
+                      flex: "0 1 200px",
+                      cursor: "pointer",
+                      background: "#fff",
+                    }}
+                    value={filterCategory}
+                    onChange={(e) => { setFilterCategory(e.target.value); setUnmatchedPage(1); setLinkedPage(0); }}
+                  >
+                    <option value="all">Toutes categories</option>
+                    {allCategories.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
                 </div>
-                <div className="ventes-table-scroll" style={{ overflowX: "auto" }}>
-                <table className="ventes-articles-table" style={{ width: "100%", borderCollapse: "collapse", minWidth: 600 }}>
-                  <thead>
-                    <tr>
-                      <th style={S.th}>Produit</th>
-                      <th style={S.th}>Categorie</th>
-                      <th className="ventes-col-hide-mobile" style={{ ...S.thR, cursor: "default" }}>Qty vendues</th>
-                      <th className="ventes-col-hide-mobile" style={{ ...S.thR, cursor: "default" }}>CA TTC</th>
-                      <th style={{ ...S.thR, cursor: "default" }}>Prix unit.</th>
-                      <th style={{ ...S.th, textAlign: "center", cursor: "default" }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedUnmatched.map((p) => (
-                      <React.Fragment key={p.nom_vente}>
-                        <tr style={{ background: expandedRow === p.nom_vente ? "#faf7f2" : "transparent" }}>
-                          <td style={S.td}>
+
+                {/* Compact card list */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {pagedUnmatched.map((p) => {
+                    const isOpen = expandedRow === p.nom_vente;
+                    return (
+                      <div
+                        key={p.nom_vente}
+                        style={{
+                          border: `1px solid ${isOpen ? accent : COLORS.border}`,
+                          borderRadius: 12,
+                          background: "#fff",
+                          overflow: "hidden",
+                          transition: "border-color 0.15s",
+                        }}
+                      >
+                        <div style={{
+                          display: "flex", alignItems: "center", gap: 10,
+                          padding: "12px 14px",
+                        }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
                             <button
                               onClick={() => router.push("/ingredients?search=" + encodeURIComponent(p.nom_vente))}
-                              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: accent, fontWeight: 600, fontSize: 13, textAlign: "left", textDecoration: "underline", fontFamily: "inherit" }}
+                              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: COLORS.dark, fontWeight: 700, fontSize: 14, textAlign: "left", fontFamily: "inherit", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block", maxWidth: "100%" }}
                               title="Rechercher dans les ingredients"
                             >
                               {p.nom_vente}
                             </button>
-                          </td>
-                          <td style={S.td}>
-                            <span style={{
-                              fontSize: 11,
-                              padding: "2px 8px",
-                              borderRadius: 8,
-                              background: "#f0ece4",
-                              color: COLORS.dark,
-                            }}>{p.categorie}</span>
-                          </td>
-                          <td className="ventes-col-hide-mobile" style={S.tdR}>{p.qty}</td>
-                          <td className="ventes-col-hide-mobile" style={S.tdR}>{fmt(p.ca_ttc)}</td>
-                          <td style={{ ...S.tdR, color: accent, fontWeight: 600 }}>{p.prix_unit_ttc ? p.prix_unit_ttc.toFixed(2) + "€" : "—"}</td>
-                          <td style={{ ...S.td, textAlign: "center" }}>
-                            {expandedRow === p.nom_vente ? (
+                            <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4, flexWrap: "wrap" }}>
+                              <span style={{
+                                fontSize: 10,
+                                padding: "2px 8px",
+                                borderRadius: 6,
+                                background: "#f0ece4",
+                                color: COLORS.dark,
+                                fontWeight: 600,
+                                textTransform: "uppercase",
+                                letterSpacing: ".04em",
+                              }}>{p.categorie}</span>
+                              <span style={{ fontSize: 11, color: COLORS.muted }}>{p.qty} vendus · {fmt(p.ca_ttc)}</span>
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                            <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 15, fontWeight: 700, color: accent }}>
+                              {p.prix_unit_ttc ? p.prix_unit_ttc.toFixed(2) + "€" : "—"}
+                            </div>
+                            {isOpen ? (
                               <button style={S.btnOutline} onClick={resetLinkForm}>Fermer</button>
                             ) : (
                               <button
@@ -801,13 +825,12 @@ export function ArticlesContent() {
                                 Lier
                               </button>
                             )}
-                          </td>
-                        </tr>
+                          </div>
+                        </div>
                         {renderLinkForm(p)}
-                      </React.Fragment>
-                    ))}
-                  </tbody>
-                </table>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Pagination Non lies */}
@@ -842,13 +865,23 @@ export function ArticlesContent() {
         {/* ── TAB: Lies ── */}
         {!loading && tab === "lies" && (
           <div style={S.card}>
-            <div style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
               <input
-                style={{ ...S.input, maxWidth: 300 }}
+                style={{ ...S.input, flex: "1 1 220px", maxWidth: "none" }}
                 placeholder="Rechercher un article..."
                 value={searchLinked}
                 onChange={(e) => { setSearchLinked(e.target.value); setLinkedPage(0); }}
               />
+              <select
+                style={{ ...S.input, flex: "0 1 200px", cursor: "pointer", background: "#fff" }}
+                value={filterCategory}
+                onChange={(e) => { setFilterCategory(e.target.value); setLinkedPage(0); setUnmatchedPage(1); }}
+              >
+                <option value="all">Toutes categories</option>
+                {allCategories.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </div>
             {filteredLinked.length === 0 ? (
               <div style={{ textAlign: "center", padding: 20, color: COLORS.muted }}>
@@ -856,59 +889,59 @@ export function ArticlesContent() {
               </div>
             ) : (
               <>
-                <div className="ventes-table-scroll" style={{ overflowX: "auto" }}>
-                <table className="ventes-articles-linked-table" style={{ width: "100%", borderCollapse: "collapse", minWidth: 650 }}>
-                  <thead>
-                    <tr>
-                      <th style={S.th} onClick={() => handleSort("nom_vente")}>Produit{sortArrow("nom_vente")}</th>
-                      <th className="ventes-col-hide-mobile" style={S.th} onClick={() => handleSort("source")}>Source{sortArrow("source")}</th>
-                      <th style={S.thR} onClick={() => handleSort("cout_unitaire")}>Cout unit.{sortArrow("cout_unitaire")}</th>
-                      <th style={S.thR} onClick={() => handleSort("prix_vente_ttc")}>Prix vente{sortArrow("prix_vente_ttc")}</th>
-                      <th className="ventes-col-hide-mobile" style={S.thR} onClick={() => handleSort("marge_pct")}>Marge{sortArrow("marge_pct")}</th>
-                      <th style={S.thR} onClick={() => handleSort("food_cost_pct")}>Food cost{sortArrow("food_cost_pct")}</th>
-                      <th style={{ ...S.th, textAlign: "center", cursor: "default" }}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedLinked.map((a) => (
-                      <tr key={a.id} style={{ cursor: "default" }}>
-                        <td style={S.td}>
-                          <div style={{ fontWeight: 600 }}>{a.nom_vente}</div>
-                          {a.categorie_vente && (
-                            <span style={{ fontSize: 11, color: COLORS.muted }}>{a.categorie_vente}</span>
-                          )}
-                        </td>
-                        <td className="ventes-col-hide-mobile" style={S.td}>
-                          <span style={{
-                            fontSize: 11,
-                            padding: "2px 8px",
-                            borderRadius: 8,
-                            background: a.source === "recette" ? "#e8f5e9" : a.source === "achat" ? "#e3f2fd" : "#fff3e0",
-                            color: a.source === "recette" ? "#2e7d32" : a.source === "achat" ? "#1565c0" : "#e65100",
-                          }}>
-                            {sourceLabel(a)}
-                          </span>
-                        </td>
-                        <td style={S.tdR}>{a.cout_unitaire !== null ? fmt(a.cout_unitaire) : "-"}</td>
-                        <td style={S.tdR}>{a.prix_vente_ttc !== null ? fmt(a.prix_vente_ttc) : "-"}</td>
-                        <td className="ventes-col-hide-mobile" style={{ ...S.tdR, color: a.marge_pct !== null ? (a.marge_pct >= 70 ? COLORS.green : a.marge_pct >= 65 ? COLORS.orange : COLORS.red) : COLORS.muted }}>
-                          {fmtPct(a.marge_pct)}
-                        </td>
-                        <td style={{ ...S.tdR, fontWeight: 600, color: foodCostColor(a.food_cost_pct) }}>
-                          {fmtPct(a.food_cost_pct)}
-                        </td>
-                        <td style={{ ...S.td, textAlign: "center" }}>
-                          <button
-                            onClick={() => deleteArticle(a.id)}
-                            style={{ border: "none", background: "transparent", color: COLORS.red, cursor: "pointer", fontSize: 13, fontWeight: 500 }}
-                          >
-                            Supprimer
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                {/* Compact card list */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {pagedLinked.map((a) => {
+                    const sourceBg = a.source === "recette" ? "#e8f5e9" : a.source === "achat" ? "#e3f2fd" : "#fff3e0";
+                    const sourceColor = a.source === "recette" ? "#2e7d32" : a.source === "achat" ? "#1565c0" : "#e65100";
+                    return (
+                      <div
+                        key={a.id}
+                        style={{
+                          border: `1px solid ${COLORS.border}`,
+                          borderRadius: 12,
+                          background: "#fff",
+                          padding: "12px 14px",
+                          display: "flex", alignItems: "center", gap: 12,
+                        }}
+                      >
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: COLORS.dark, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {a.nom_vente}
+                          </div>
+                          <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4, flexWrap: "wrap" }}>
+                            {a.categorie_vente && (
+                              <span style={{
+                                fontSize: 10, padding: "2px 8px", borderRadius: 6,
+                                background: "#f0ece4", color: COLORS.dark, fontWeight: 600,
+                                textTransform: "uppercase", letterSpacing: ".04em",
+                              }}>{a.categorie_vente}</span>
+                            )}
+                            <span style={{
+                              fontSize: 10, padding: "2px 8px", borderRadius: 6,
+                              background: sourceBg, color: sourceColor, fontWeight: 600,
+                            }}>{sourceLabel(a)}</span>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
+                          <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.dark }}>
+                            {a.prix_vente_ttc !== null ? fmt(a.prix_vente_ttc) : "-"}
+                          </div>
+                          <div style={{ fontSize: 10, color: foodCostColor(a.food_cost_pct), fontWeight: 700 }}>
+                            FC {fmtPct(a.food_cost_pct)} · {fmtPct(a.marge_pct)}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => deleteArticle(a.id)}
+                          style={{ border: "none", background: "transparent", color: COLORS.red, cursor: "pointer", fontSize: 18, padding: "4px 6px", flexShrink: 0, lineHeight: 1 }}
+                          title="Supprimer"
+                          aria-label="Supprimer"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Pagination */}

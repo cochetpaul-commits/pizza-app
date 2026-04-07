@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { RequireRole } from "@/components/RequireRole";
 import { fetchApi } from "@/lib/fetchApi";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { takePendingInvoiceFile } from "@/lib/pendingInvoiceFile";
 
 type DetectionResult = {
   supplier: { slug: string; name: string; matchedKeyword: string } | null;
@@ -97,6 +98,15 @@ export default function InvoicesPage() {
   // Import results
   const [preview, setPreview] = useState<ImportResult | null>(null);
   const [commitResult, setCommitResult] = useState<ImportResult | null>(null);
+
+  // If a file was staged by the /achats import drawer, consume it and trigger
+  // the detection flow immediately.
+  useEffect(() => {
+    const pending = takePendingInvoiceFile();
+    if (pending) {
+      handleFileUpload(pending);
+    }
+  }, []);
 
   function getAuthHeader(): string {
     const raw = localStorage.getItem(
