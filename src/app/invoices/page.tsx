@@ -56,6 +56,7 @@ const SUPPLIERS = [
   { slug: "lmdw", name: "LMDW" },
   { slug: "sdpf", name: "SDPF" },
   { slug: "elien", name: "Eric Elien" },
+  { slug: "hardy", name: "Maison Hardy" },
 ];
 
 const ETABS = [

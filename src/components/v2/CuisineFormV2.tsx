@@ -16,7 +16,6 @@ import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
-import { PricingModule } from "./PricingModule";
 import { RecipeHero, RecipeKpis, HeroBtn, HeroDangerBtn } from "./RecipeHero";
 import { GestionFoodCost } from "./GestionFoodCost";
 import { PublishCatalogueButton } from "./PublishCatalogueButton";
@@ -634,17 +633,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
           </>}
         />
 
-        <RecipeKpis
-          costPerPortion={effectiveCostPerPortion ?? null}
-          foodCostPct={foodCostPct ?? null}
-          sellPriceHT={sp ?? null}
-          sellPriceTTC={prixTTC ?? null}
-          margeBrute={margeBrute ?? null}
-          accent={ACCENT}
-          portionLabel="portion"
-        />
-
-                {/* ── Tab bar ── */}
+        {/* ── Tab bar ── */}
         <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, marginBottom: 16, overflowX: "auto" }}>
           {MAIN_TABS.map((t) => (
             <button
@@ -670,24 +659,16 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         {/* ── TAB: FOOD COST & MARGES ── */}
         {mainTab === "fc" && (
           <>
-            <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
-              <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
-                Prix, marges &amp; simulateur
-              </h3>
-              <PricingModule
-                showDoseSimulator={["sauce", "preparation", "accompagnement"].includes(category)}
-                costPerKg={costPerKg}
-                costPerPortion={totalCost > 0 ? round2(totalCost) : null}
-                portionLabel="portion"
-                vatRate={vatRate}
-                onVatChange={setVatRate}
-                marginRate={marginRate}
-                onMarginChange={setMarginRate}
-                sellPrice={sellPrice}
-                onSellPriceChange={setSellPrice}
-                accentColor={ACCENT}
-              />
-            </div>
+            <RecipeKpis
+              costPerPortion={effectiveCostPerPortion ?? null}
+              foodCostPct={foodCostPct ?? null}
+              sellPriceHT={sp ?? null}
+              sellPriceTTC={prixTTC ?? null}
+              margeBrute={margeBrute ?? null}
+              accent={ACCENT}
+              portionLabel="portion"
+              foodCostTarget={30}
+            />
             <GestionFoodCost
               recipeId={recipeId}
               recipeType="cuisine"
@@ -700,6 +681,9 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
               onSellPriceChange={(p) => setSellPrice(p)}
               portionsCount={typeof portionsCount === "number" ? portionsCount : null}
               yieldGrams={typeof yieldGrams === "number" ? yieldGrams : null}
+              vatRate={vatRate}
+              onVatChange={setVatRate}
+              foodCostTarget={30}
             />
           </>
         )}
