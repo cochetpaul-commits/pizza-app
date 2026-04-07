@@ -766,13 +766,24 @@ export default function AchatsPage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px" }}>
-        <div style={{ textAlign: "center", marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 20, position: "relative" }}>
           <h1 style={{
             fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24,
             color: "#1a1a1a", margin: 0, textTransform: "uppercase", letterSpacing: "0.04em",
           }}>
             Factures
           </h1>
+          <a
+            href="/invoices"
+            style={{
+              position: "absolute", right: 0,
+              background: "#D4775A", color: "#fff", textDecoration: "none",
+              padding: "8px 14px", borderRadius: 20, fontSize: 13, fontWeight: 700,
+              fontFamily: "DM Sans, sans-serif", whiteSpace: "nowrap",
+            }}
+          >
+            + Import facture
+          </a>
         </div>
 
         {/* ══════════════════════════════════════════════════ */}
