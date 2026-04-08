@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { normalizeRole } from "@/lib/rbac";
 import type { Etablissement } from "@/types/etablissement";
 
 const LS_KEY = "etab_current_id";
@@ -56,7 +57,10 @@ export function EtablissementProvider({ children }: { children: ReactNode }) {
         console.warn("[EtablissementProvider] profile query failed:", profileErr.message);
       }
 
-      const groupAdmin = profile?.role === "group_admin";
+      // Normalize role — DB may store "admin" or "direction" which both map to group_admin
+      const groupAdmin = profile?.role
+        ? normalizeRole(profile.role as string) === "group_admin"
+        : false;
       const accessIds: string[] = profile?.etablissements_access ?? [];
 
       setIsGroupAdmin(groupAdmin);

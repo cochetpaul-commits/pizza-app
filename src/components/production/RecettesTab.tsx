@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -43,7 +43,8 @@ type EmpRow = {
 type MainTab = "tous" | "pizza" | "cuisine" | "cocktail" | "empatement";
 type SortKey = "name" | "cost" | "fc" | "price";
 type SortDir = "asc" | "desc";
-type CuisineCatFilter = "all" | "plat_cuisine" | "preparation" | "entree" | "sauce" | "dessert" | "autre";
+// "all" or any category id (built-in or custom-discovered)
+type CuisineCatFilter = string;
 type FoodCostFilter = "all" | "bon" | "attention" | "alerte";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -68,16 +69,6 @@ const CUISINE_CAT_COLORS: Record<string, string> = {
   entree: "#0284C7", sauce: "#DC2626", dessert: "#D4775A",
   accompagnement: "#16A34A", autre: "#6B7280",
 };
-
-const CUISINE_CAT_FILTERS: { id: CuisineCatFilter; label: string; color: string }[] = [
-  { id: "all",           label: "Tous",            color: CUISINE_CAT_COLORS.all },
-  { id: "plat_cuisine",  label: "Plat",            color: CUISINE_CAT_COLORS.plat_cuisine },
-  { id: "preparation",   label: "Prep",            color: CUISINE_CAT_COLORS.preparation },
-  { id: "entree",        label: "Entrée",     color: CUISINE_CAT_COLORS.entree },
-  { id: "sauce",         label: "Sauce",           color: CUISINE_CAT_COLORS.sauce },
-  { id: "dessert",       label: "Dessert",         color: CUISINE_CAT_COLORS.dessert },
-  { id: "autre",         label: "Autre",           color: CUISINE_CAT_COLORS.autre },
-];
 
 const FOOD_COST_FILTERS: { id: FoodCostFilter; label: string }[] = [
   { id: "all",       label: "Tous" },
@@ -167,18 +158,24 @@ function matchesFoodCostFilter(fc: number | null, filter: FoodCostFilter): boole
 function Thumb({ src, name, color }: { src: string | null; name: string; color: string }) {
   if (src) {
     return (
-      <div style={{ width: 44, height: 44, borderRadius: 10, overflow: "hidden", flexShrink: 0, background: "#f2ede4" }}>
-        <Image src={src} alt={name} width={44} height={44} style={{ objectFit: "cover", width: 44, height: 44 }} />
+      <div style={{
+        width: 52, height: 52, borderRadius: 12, overflow: "hidden", flexShrink: 0,
+        background: "#f2ede4", border: `1px solid ${color}20`,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+      }}>
+        <Image src={src} alt={name} width={52} height={52} style={{ objectFit: "cover", width: 52, height: 52 }} />
       </div>
     );
   }
   const initials = (name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
   return (
     <div style={{
-      width: 44, height: 44, borderRadius: 10, flexShrink: 0,
-      background: color + "18",
+      width: 52, height: 52, borderRadius: 12, flexShrink: 0,
+      background: `linear-gradient(135deg, ${color}22 0%, ${color}0D 100%)`,
+      border: `1px solid ${color}20`,
       display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: 14, fontWeight: 800, color, letterSpacing: 1,
+      fontSize: 15, fontWeight: 800, color, letterSpacing: 1,
+      fontFamily: "var(--font-oswald), Oswald, sans-serif",
     }}>
       {initials}
     </div>
@@ -220,14 +217,15 @@ function RecipeCard({
       onClick={() => router.push(href)}
       onKeyDown={ev => ev.key === "Enter" && router.push(href)}
       style={{
-        display: "flex", alignItems: "center", gap: 12,
-        padding: "10px 14px", borderRadius: 14,
+        display: "flex", alignItems: "center", gap: 14,
+        padding: "14px 16px 14px 19px", borderRadius: 16,
         background: "#fff",
-        border: "1px solid #ddd6c8",
-        cursor: "pointer", transition: "all 0.15s",
+        border: "1px solid #ede6d9",
+        cursor: "pointer", transition: "all 0.18s",
+        boxShadow: `inset 3px 0 0 ${color}, 0 1px 2px rgba(0,0,0,0.03)`,
       }}
-      onMouseEnter={e => { e.currentTarget.style.background = "#f8f5f0"; e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"; }}
-      onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "none"; }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = `${color}60`; e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `inset 3px 0 0 ${color}, 0 6px 16px ${color}22`; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = "#ede6d9"; e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = `inset 3px 0 0 ${color}, 0 1px 2px rgba(0,0,0,0.03)`; }}
     >
       {/* Photo */}
       <Thumb src={photoUrl ?? null} name={name} color={color} />
@@ -363,6 +361,8 @@ function RecettesInner() {
   const [showFilters, setShowFilters] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const [showCuisinePop, setShowCuisinePop] = useState(false);
+  const [showNewCatModal, setShowNewCatModal] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -408,6 +408,43 @@ function RecettesInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etabCtx?.id]);
 
+  // ── Category helpers ──
+  const KNOWN_CAT_IDS = useMemo(() => new Set(CUISINE_CATS.map(c => c.id)), []);
+
+  const handleDeleteCategory = useCallback(async (catId: string, label: string) => {
+    if (KNOWN_CAT_IDS.has(catId)) {
+      alert(`La catégorie "${label}" est une catégorie de base et ne peut pas être supprimée.`);
+      return;
+    }
+    const count = kitchens.filter(k => k.category === catId).length;
+    const msg = count > 0
+      ? `Supprimer la catégorie "${label}" ?\n\n${count} recette${count > 1 ? "s" : ""} ser${count > 1 ? "ont" : "a"} déplacée${count > 1 ? "s" : ""} vers "Autre".`
+      : `Supprimer la catégorie "${label}" ?`;
+    if (!window.confirm(msg)) return;
+    if (count > 0) {
+      const { error } = await supabase
+        .from("kitchen_recipes")
+        .update({ category: "autre" })
+        .eq("category", catId);
+      if (error) {
+        alert(`Erreur : ${error.message}`);
+        return;
+      }
+      setKitchens(prev => prev.map(k => k.category === catId ? { ...k, category: "autre" } : k));
+    }
+    if (cuisineCatFilter === catId) setCuisineCatFilter("all");
+  }, [kitchens, cuisineCatFilter, KNOWN_CAT_IDS]);
+
+  const handleCreateCategory = useCallback(() => {
+    const nom = newCatName.trim();
+    if (!nom) return;
+    const slug = nom.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+    if (!slug) return;
+    setShowNewCatModal(false);
+    setNewCatName("");
+    router.push(`/recettes/new/cuisine?category=${encodeURIComponent(slug)}&categoryLabel=${encodeURIComponent(nom)}`);
+  }, [newCatName, router]);
+
   // ── Food cost helpers ──
   const pizzaFc = (r: PizzaRow) => computeFoodCost(r.total_cost, r.sell_price, pvTTCPizza(r));
   const kitchenFc = (r: KitchenRow) => {
@@ -432,10 +469,7 @@ function RecettesInner() {
       .filter(r => {
         if (cuisineCatFilter !== "all") {
           const cat = r.category ?? "autre";
-          if (cuisineCatFilter === "autre") {
-            const explicitCats = ["plat_cuisine", "preparation", "entree", "sauce", "dessert"];
-            if (explicitCats.includes(cat)) return false;
-          } else if (cat !== cuisineCatFilter) return false;
+          if (cat !== cuisineCatFilter) return false;
         }
         return true;
       })
@@ -472,6 +506,21 @@ function RecettesInner() {
     }
     return map;
   }, [filteredKitchens]);
+
+  // Dynamic list of all cuisine categories: base list + any custom category
+  // actually present in the DB, sorted alphabetically by label.
+  const dynamicCuisineCats = useMemo(() => {
+    const byId: Record<string, { id: string; label: string }> = {};
+    for (const c of CUISINE_CATS) byId[c.id] = { id: c.id, label: c.label };
+    for (const r of kitchens) {
+      const id = r.category;
+      if (!id || byId[id]) continue;
+      // Turn slug (e.g. "verre_de_vin") into a human label ("Verre de vin")
+      const label = id.replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
+      byId[id] = { id, label };
+    }
+    return Object.values(byId).sort((a, b) => a.label.localeCompare(b.label, "fr"));
+  }, [kitchens]);
 
   const totalCount = filteredPizzas.length + filteredKitchens.length + filteredCocktails.length + filteredEmps.length;
 
@@ -563,7 +612,7 @@ function RecettesInner() {
             />
           </div>
           {/* Category dropdown + sort + filters — grouped */}
-          <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, alignItems: "center", flexShrink: 0 }}>
+          <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#f0ebe2", borderRadius: 12, alignItems: "center", flexShrink: 0, border: "1px solid #e8e0d0" }}>
           <div style={{ position: "relative", flexShrink: 0 }}>
             <button type="button" onClick={() => setShowCuisinePop(p => !p)}
               style={{
@@ -575,7 +624,7 @@ function RecettesInner() {
                 cursor: "pointer", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
                 transition: "all 0.15s",
               }}>
-              {mainTab === "tous" ? "Toutes" : mainTab === "pizza" ? "Pizza" : mainTab === "cuisine" ? (cuisineCatFilter !== "all" ? CUISINE_CAT_FILTERS.find(f => f.id === cuisineCatFilter)?.label ?? "Cuisine" : "Cuisine") : mainTab === "cocktail" ? "Cocktail" : "Empât."}
+              {mainTab === "tous" ? "Toutes" : mainTab === "pizza" ? "Pizza" : mainTab === "cuisine" ? (cuisineCatFilter !== "all" ? dynamicCuisineCats.find(f => f.id === cuisineCatFilter)?.label ?? "Cuisine" : "Cuisine") : mainTab === "cocktail" ? "Cocktail" : "Empât."}
               <span style={{ fontSize: 10, opacity: 0.6 }}>({tabCounts[mainTab]})</span>
               <span style={{ fontSize: 8, opacity: 0.5 }}>{"▼"}</span>
             </button>
@@ -606,12 +655,15 @@ function RecettesInner() {
                     Cuisine (tous)
                     <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.cuisine}</span>
                   </button>
-                  {CUISINE_CAT_FILTERS.filter(f => f.id !== "all").map(f => (
-                    <button key={f.id} type="button" onClick={() => { setMainTab("cuisine"); setCuisineCatFilter(f.id); setShowCuisinePop(false); }}
-                      style={{ ...filterMenuItemStyle(mainTab === "cuisine" && cuisineCatFilter === f.id, f.color), paddingLeft: 32 }}>
-                      {f.label}
-                    </button>
-                  ))}
+                  {dynamicCuisineCats.map(f => {
+                    const color = CUISINE_CAT_COLORS[f.id] ?? CUISINE_COLOR;
+                    return (
+                      <button key={f.id} type="button" onClick={() => { setMainTab("cuisine"); setCuisineCatFilter(f.id); setShowCuisinePop(false); }}
+                        style={{ ...filterMenuItemStyle(mainTab === "cuisine" && cuisineCatFilter === f.id, color), paddingLeft: 32 }}>
+                        {f.label}
+                      </button>
+                    );
+                  })}
                   <div style={{ height: 1, background: "#f0ebe2", margin: "4px 0" }} />
                   <button type="button" onClick={() => { setMainTab("cocktail"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
                     style={filterMenuItemStyle(mainTab === "cocktail", COCKTAIL_COLOR)}>
@@ -708,6 +760,13 @@ function RecettesInner() {
             {hasActiveFilter ? "✱" : "☰"}
           </button>
           </div>{/* end segment group */}
+          {canWrite && (
+            <button type="button" onClick={() => setShowNewCatModal(true)}
+              className="desktop-only"
+              style={{ padding: "7px 12px", borderRadius: 10, border: "1.5px solid #4a6741", background: "#fff", color: "#4a6741", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: 14, lineHeight: 1 }}>+</span> Catégorie
+            </button>
+          )}
           {canWrite && (
             <div className="desktop-only" style={{ position: "relative", flexShrink: 0 }}>
               <button type="button" onClick={() => setShowFab(f => !f)}
@@ -809,13 +868,57 @@ function RecettesInner() {
           <div style={{ marginBottom: 24 }}>
             <SectionHeader title="Cuisine" color={CUISINE_COLOR} count={filteredKitchens.length}
               />
-            {CUISINE_CATS.filter(cat => (kitchenByCat[cat.id]?.length ?? 0) > 0).map(cat => {
+            {dynamicCuisineCats.filter(cat => (kitchenByCat[cat.id]?.length ?? 0) > 0).map(cat => {
               const catColor = CUISINE_CAT_COLORS[cat.id] ?? CUISINE_COLOR;
+              const isCustom = !KNOWN_CAT_IDS.has(cat.id);
               return (
-                <div key={cat.id}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 0 6px" }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: catColor, letterSpacing: 0.3 }}>{cat.label}</span>
-                    <span style={{ fontSize: 11, color: "#999" }}>({kitchenByCat[cat.id].length})</span>
+                <div key={cat.id} style={{ marginTop: 14 }}>
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "8px 12px", marginBottom: 10,
+                    background: `${catColor}10`,
+                    border: `1px solid ${catColor}25`,
+                    borderRadius: 10,
+                  }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: catColor, flexShrink: 0 }} />
+                    <span style={{
+                      fontSize: 12, fontWeight: 800, color: catColor,
+                      textTransform: "uppercase", letterSpacing: "0.1em",
+                      fontFamily: "var(--font-oswald), Oswald, sans-serif",
+                    }}>
+                      {cat.label}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: catColor, opacity: 0.6 }}>
+                      {kitchenByCat[cat.id].length}
+                    </span>
+                    {isCustom && canWrite && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCategory(cat.id, cat.label)}
+                        title={`Supprimer la catégorie "${cat.label}"`}
+                        aria-label={`Supprimer la catégorie ${cat.label}`}
+                        style={{
+                          marginLeft: "auto", width: 22, height: 22, padding: 0,
+                          borderRadius: 6, border: "1px solid rgba(220,38,38,0.2)",
+                          background: "rgba(220,38,38,0.06)", color: "#DC2626",
+                          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                          transition: "all 0.15s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "#DC2626";
+                          e.currentTarget.style.color = "#fff";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "rgba(220,38,38,0.06)";
+                          e.currentTarget.style.color = "#DC2626";
+                        }}
+                      >
+                        <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                          <line x1="6" y1="18" x2="18" y2="6" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 8, marginBottom: 8 }}>
                     {kitchenByCat[cat.id].map(r => {
@@ -957,6 +1060,68 @@ function RecettesInner() {
           pivotIngredientId={prodModal.pivotId}
           onClose={() => setProdModal(null)}
         />
+      )}
+
+      {/* ── New category modal ── */}
+      {showNewCatModal && (
+        <div
+          onClick={() => { setShowNewCatModal(false); setNewCatName(""); }}
+          style={{
+            position: "fixed", inset: 0, zIndex: 300,
+            background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: "#fff", borderRadius: 16, padding: 24, maxWidth: 420, width: "100%",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.25)", border: "1px solid #e0d8ce",
+            }}
+          >
+            <h3 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700, color: "#1a1a1a", margin: "0 0 6px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Nouvelle catégorie
+            </h3>
+            <p style={{ fontSize: 12, color: "#999", margin: "0 0 16px" }}>
+              Tu seras redirigé vers la création d&apos;une recette dans cette catégorie. La catégorie sera sauvegardée dès que la recette est enregistrée.
+            </p>
+            <input
+              type="text"
+              autoFocus
+              value={newCatName}
+              onChange={e => setNewCatName(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") handleCreateCategory(); }}
+              placeholder="Ex : Verre de vin"
+              style={{
+                width: "100%", padding: "10px 14px", borderRadius: 10,
+                border: "1.5px solid #ddd6c8", background: "#faf7f2",
+                fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit",
+              }}
+            />
+            <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => { setShowNewCatModal(false); setNewCatName(""); }}
+                style={{ padding: "8px 16px", borderRadius: 10, border: "1.5px solid #ddd6c8", background: "#fff", color: "#666", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateCategory}
+                disabled={!newCatName.trim()}
+                style={{
+                  padding: "8px 16px", borderRadius: 10, border: "none",
+                  background: newCatName.trim() ? "#4a6741" : "#ccc",
+                  color: "#fff", fontSize: 13, fontWeight: 700,
+                  cursor: newCatName.trim() ? "pointer" : "not-allowed",
+                }}
+              >
+                Créer
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

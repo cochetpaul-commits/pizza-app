@@ -105,6 +105,9 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
   const [indexSaving, setIndexSaving] = useState(false);
 
   const fileRef = useRef<HTMLInputElement | null>(null);
+  // Track the actually-saved recipe id across renders to prevent re-inserting
+  // on subsequent Save clicks when the component stays mounted.
+  const savedIdRef = useRef<string | null>(recipeId ?? null);
 
   // Computed allergens
   const computedAllergens = useMemo(() => {
@@ -389,7 +392,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         updated_at: new Date().toISOString(),
       };
 
-      let rid = recipeId;
+      let rid = savedIdRef.current ?? recipeId;
       if (rid) {
         const { error } = await supabase.from("kitchen_recipes").update(payload).eq("id", rid);
         if (error) throw error;
@@ -399,6 +402,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
           .select("id").single<{ id: string }>();
         if (error) throw error;
         rid = data.id;
+        savedIdRef.current = rid;
       }
 
       // Save pivot (column added by migration — silent failure if not yet applied)
@@ -471,7 +475,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         console.warn("Ingredient sync failed:", e);
       }
 
-      if (!isEdit) router.push(`/recettes/cuisine/${rid}`);
+      if (!isEdit && !recipeId) router.replace(`/recettes/cuisine/${rid}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message
         : (err as { message?: string })?.message ?? JSON.stringify(err);

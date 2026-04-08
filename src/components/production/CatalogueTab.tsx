@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo, useCallback } from "react";
 import type { CSSProperties } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { useProfile } from "@/lib/ProfileContext";
 import { calculerPate, type EmpatementType, type FlourMixItem, type PateResult } from "@/lib/pateEngine";
 import { AiInsightCard } from "@/components/AiInsightCard";
 
@@ -11,7 +12,8 @@ import { AiInsightCard } from "@/components/AiInsightCard";
 
 type RecipeType = "pizza" | "cuisine" | "cocktail" | "production";
 type MainFilter = "tous" | "pizza" | "cuisine" | "cocktail" | "empatement";
-type CuisineCatFilter = "all" | "plat_cuisine" | "preparation" | "entree" | "sauce" | "dessert" | "accompagnement" | "autre";
+// "all" or any category id (built-in or custom-discovered)
+type CuisineCatFilter = string;
 
 type RecipeLine = {
   ingredient_id: string | null;
@@ -81,15 +83,6 @@ const CUISINE_CAT_COLORS: Record<string, string> = {
   entree: "#0284C7", sauce: "#DC2626", dessert: "#D4775A",
   accompagnement: "#16A34A", autre: "#6B7280",
 };
-
-const CUISINE_SUB_FILTERS: { id: CuisineCatFilter; label: string; color: string }[] = [
-  { id: "plat_cuisine",  label: "Plat",       color: CUISINE_CAT_COLORS.plat_cuisine },
-  { id: "preparation",   label: "Prep",       color: CUISINE_CAT_COLORS.preparation },
-  { id: "entree",        label: "Entrée",     color: CUISINE_CAT_COLORS.entree },
-  { id: "sauce",         label: "Sauce",      color: CUISINE_CAT_COLORS.sauce },
-  { id: "dessert",       label: "Dessert",    color: CUISINE_CAT_COLORS.dessert },
-  { id: "autre",         label: "Autre",      color: CUISINE_CAT_COLORS.autre },
-];
 
 function fmtQty(v: number): string {
   if (v === 0) return "0";
@@ -385,6 +378,8 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
 export function CatalogueContent() {
   const { current: etab } = useEtablissement();
   const etabSlug = etab?.slug ?? null;
+  const { can } = useProfile();
+  const canWrite = can("operations.edit_recettes");
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
@@ -430,6 +425,22 @@ export function CatalogueContent() {
     return arr;
   }, [recipes, mainFilter, cuisineCatFilter, prodFilter, q]);
 
+  // Dynamic cuisine categories: base labels + any custom category actually
+  // present in the data, sorted alphabetically by label.
+  const dynamicCuisineCats = useMemo(() => {
+    const byId: Record<string, { id: string; label: string; color: string }> = {};
+    for (const [id, label] of Object.entries(CUISINE_CAT_LABELS)) {
+      byId[id] = { id, label, color: CUISINE_CAT_COLORS[id] ?? "#4a6741" };
+    }
+    for (const r of recipes) {
+      if (r.type !== "cuisine" || !r.category) continue;
+      if (byId[r.category]) continue;
+      const label = r.category.replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
+      byId[r.category] = { id: r.category, label, color: "#6B7280" };
+    }
+    return Object.values(byId).sort((a, b) => a.label.localeCompare(b.label, "fr"));
+  }, [recipes]);
+
   // Counts per main filter (independent of current filter)
   const filterCounts = useMemo(() => {
     const prodPreps = recipes.filter(r => r.type === "production" && r.category !== "empatement").length;
@@ -443,7 +454,13 @@ export function CatalogueContent() {
     };
   }, [recipes]);
 
-  // Group by type, then by category
+  // Build a label for a cuisine category id (built-in or custom slug)
+  const cuisineCatLabel = useCallback((id: string): string => {
+    return CUISINE_CAT_LABELS[id]
+      ?? id.replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
+  }, []);
+
+  // Group by type, then by category (cuisine categories sorted alphabetically)
   const groups = useMemo(() => {
     const map: Record<string, Recipe[]> = {};
     for (const r of filtered) {
@@ -452,7 +469,6 @@ export function CatalogueContent() {
       map[key].push(r);
     }
     const typeOrder: RecipeType[] = ["pizza", "cuisine", "cocktail", "production"];
-    const cuisineCatOrder = ["entree", "plat_cuisine", "accompagnement", "dessert", "sauce", "autre"];
     const prodCatOrder = ["preparation", "prep", "empatement"];
     return Object.entries(map).sort(([a], [b]) => {
       const ta = a.split(":")[0];
@@ -462,10 +478,13 @@ export function CatalogueContent() {
       if (ia !== ib) return ia - ib;
       const ca = a.includes(":") ? a.split(":")[1] : "";
       const cb = b.includes(":") ? b.split(":")[1] : "";
-      const catOrder = ta === "production" ? prodCatOrder : cuisineCatOrder;
-      return catOrder.indexOf(ca) - catOrder.indexOf(cb);
+      if (ta === "production") {
+        return prodCatOrder.indexOf(ca) - prodCatOrder.indexOf(cb);
+      }
+      // Cuisine (and any other type): alphabetical by label
+      return cuisineCatLabel(ca).localeCompare(cuisineCatLabel(cb), "fr");
     });
-  }, [filtered]);
+  }, [filtered, cuisineCatLabel]);
 
   const toggleCat = useCallback((key: string) => {
     setCollapsedCats(prev => {
@@ -479,10 +498,52 @@ export function CatalogueContent() {
     setOpenId(prev => prev === id ? null : id);
   }, []);
 
+  const handleDelete = useCallback(async (recipe: Recipe) => {
+    if (!window.confirm(`Supprimer "${recipe.name}" ?\nCette action est irréversible.`)) return;
+    try {
+      if (recipe.type === "pizza") {
+        await supabase.from("pizza_ingredients").delete().eq("recipe_id", recipe.id);
+        const { error } = await supabase.from("pizza_recipes").delete().eq("id", recipe.id);
+        if (error) throw error;
+      } else if (recipe.type === "cuisine") {
+        await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", recipe.id);
+        const { error } = await supabase.from("kitchen_recipes").delete().eq("id", recipe.id);
+        if (error) throw error;
+      } else if (recipe.type === "cocktail") {
+        await supabase.from("cocktail_ingredients").delete().eq("recipe_id", recipe.id);
+        const { error } = await supabase.from("cocktails").delete().eq("id", recipe.id);
+        if (error) throw error;
+      } else if (recipe.type === "production") {
+        if (recipe.category === "empatement") {
+          const realId = recipe.id.replace(/^emp-/, "");
+          await supabase.from("recipe_ingredients").delete().eq("recipe_id", realId);
+          await supabase.from("recipe_phases").delete().eq("recipe_id", realId);
+          await supabase.from("recipe_flours").delete().eq("recipe_id", realId);
+          const { error } = await supabase.from("recipes").delete().eq("id", realId);
+          if (error) throw error;
+        } else if (recipe.category === "prep") {
+          const realId = recipe.id.replace(/^prep-/, "");
+          await supabase.from("prep_recipe_lines").delete().eq("recipe_id", realId);
+          const { error } = await supabase.from("prep_recipes").delete().eq("id", realId);
+          if (error) throw error;
+        } else {
+          // kitchen_recipes with category "preparation"
+          await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", recipe.id);
+          const { error } = await supabase.from("kitchen_recipes").delete().eq("id", recipe.id);
+          if (error) throw error;
+        }
+      }
+      setRecipes(prev => prev.filter(r => r.id !== recipe.id));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`Erreur lors de la suppression : ${msg}`);
+    }
+  }, []);
+
   function groupLabel(key: string): string {
     const [type, cat] = key.split(":");
     if (!cat) return TYPE_LABELS[type as RecipeType] ?? type;
-    if (type === "cuisine") return CUISINE_CAT_LABELS[cat] ?? cat;
+    if (type === "cuisine") return cuisineCatLabel(cat);
     if (cat === "empatement") return "Empâtement";
     if (cat === "prep" || cat === "preparation") return "Préparations";
     return cat;
@@ -503,7 +564,7 @@ export function CatalogueContent() {
   });
 
   const activeColor = mainFilter === "pizza" ? TYPE_COLORS.pizza : mainFilter === "cuisine" ? TYPE_COLORS.cuisine : mainFilter === "cocktail" ? TYPE_COLORS.cocktail : mainFilter === "empatement" ? EMP_COLOR : null;
-  const activeLabel = mainFilter === "tous" ? "Toutes" : mainFilter === "pizza" ? "Pizza" : mainFilter === "cuisine" ? (cuisineCatFilter !== "all" ? CUISINE_SUB_FILTERS.find(f => f.id === cuisineCatFilter)?.label ?? "Cuisine" : "Cuisine") : mainFilter === "cocktail" ? "Cocktail" : "Empât.";
+  const activeLabel = mainFilter === "tous" ? "Toutes" : mainFilter === "pizza" ? "Pizza" : mainFilter === "cuisine" ? (cuisineCatFilter !== "all" ? dynamicCuisineCats.find(f => f.id === cuisineCatFilter)?.label ?? "Cuisine" : "Cuisine") : mainFilter === "cocktail" ? "Cocktail" : "Empât.";
 
   return (
     <main className="container" style={{ paddingBottom: 80 }}>
@@ -584,7 +645,7 @@ export function CatalogueContent() {
                     <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{filterCounts.cuisine}</span>
                   </button>
                   {/* Cuisine sub-categories */}
-                  {CUISINE_SUB_FILTERS.map(f => (
+                  {dynamicCuisineCats.map(f => (
                     <button key={f.id} type="button" onClick={() => { setMainFilter("cuisine"); setCuisineCatFilter(f.id); setShowTypePop(false); }}
                       style={{ ...menuItem(mainFilter === "cuisine" && cuisineCatFilter === f.id, f.color), paddingLeft: 32 }}>
                       {f.label}
@@ -637,28 +698,28 @@ export function CatalogueContent() {
           const color = groupColor(key);
           const isCollapsed = collapsedCats.has(key);
           return (
-            <div key={key} style={{ marginBottom: 8 }}>
+            <div key={key} style={{ marginBottom: 18 }}>
               {/* Category header */}
               <button
                 onClick={() => toggleCat(key)}
                 style={{
-                  width: "100%", display: "flex", alignItems: "center", gap: 10,
-                  padding: "12px 16px", background: "#fff",
-                  border: "1.5px solid #ddd6c8", borderLeft: `3px solid ${color}`,
-                  borderRadius: 12, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                  marginBottom: 6, boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                  width: "100%", display: "flex", alignItems: "center", gap: 12,
+                  padding: "14px 18px", background: "#fff",
+                  border: "1px solid #ede6d9",
+                  boxShadow: `inset 4px 0 0 ${color}, 0 1px 3px rgba(0,0,0,0.04)`,
+                  borderRadius: 14, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                  marginBottom: 8,
                 }}
               >
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0 }} />
                 <span style={{
-                  fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700,
-                  letterSpacing: "0.14em", textTransform: "uppercase", color,
+                  fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 14, fontWeight: 800,
+                  letterSpacing: "0.12em", textTransform: "uppercase", color,
                 }}>
                   {groupLabel(key)}
                 </span>
                 <span style={{
-                  fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
-                  background: `${color}18`, color,
+                  fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20,
+                  background: `${color}15`, color,
                 }}>
                   {items.length}
                 </span>
@@ -679,23 +740,26 @@ export function CatalogueContent() {
                   || !!recipe.pivot_ingredient_id;
 
                 return (
-                  <div key={recipe.id} style={{ marginBottom: 2 }}>
+                  <div key={recipe.id} style={{ marginBottom: 6 }}>
                     {/* Row */}
                     <div
                       onClick={() => toggleOpen(recipe.id)}
                       style={{
-                        display: "flex", alignItems: "center", gap: 12,
-                        padding: "10px 16px", background: isOpen ? "#fff" : "rgba(255,255,255,0.7)",
-                        borderRadius: isOpen ? "10px 10px 0 0" : 10,
-                        cursor: "pointer", borderBottom: isOpen ? "1px solid #ede6d9" : "none",
-                        transition: "background 0.15s",
+                        display: "flex", alignItems: "center", gap: 14,
+                        padding: "14px 18px", background: "#fff",
+                        border: "1px solid #ede6d9",
+                        borderRadius: isOpen ? "12px 12px 0 0" : 12,
+                        borderBottom: isOpen ? "1px solid #f2ede4" : "1px solid #ede6d9",
+                        cursor: "pointer",
+                        transition: "all 0.18s",
+                        boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
                       }}
-                      onMouseEnter={e => { if (!isOpen) (e.currentTarget as HTMLElement).style.background = "#fff"; }}
-                      onMouseLeave={e => { if (!isOpen) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.7)"; }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = `${color}40`; (e.currentTarget as HTMLElement).style.boxShadow = `0 2px 8px ${color}12`; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = isOpen ? "#f2ede4" : "#ede6d9"; (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 2px rgba(0,0,0,0.02)"; }}
                     >
                       {/* Thumbnail */}
                       <div style={{
-                        width: 40, height: 40, borderRadius: 8, flexShrink: 0, overflow: "hidden",
+                        width: 46, height: 46, borderRadius: 10, flexShrink: 0, overflow: "hidden",
                         background: recipe.photo_url
                           ? `url(${recipe.photo_url}) center/cover`
                           : `linear-gradient(135deg, ${color}25 0%, ${color}10 100%)`,
@@ -712,12 +776,13 @@ export function CatalogueContent() {
                       {/* Name + meta */}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{
-                          fontFamily: "DM Sans, sans-serif", fontWeight: 700, fontSize: 14,
+                          fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 15,
                           color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          textTransform: "uppercase", letterSpacing: "0.03em",
                         }}>
                           {recipe.name}
                         </div>
-                        <div style={{ fontSize: 11, color: "#999", marginTop: 1 }}>
+                        <div style={{ fontSize: 11, color: "#999", marginTop: 3 }}>
                           {recipe.lines.length} ingr.
                           {recipe.steps.length > 0 && ` · ${recipe.steps.length} étape${recipe.steps.length > 1 ? "s" : ""}`}
                           {recipe.yield_info && ` · ${recipe.yield_info}`}
@@ -756,6 +821,38 @@ export function CatalogueContent() {
                             <span style={{ fontSize: 8, color: "#999" }}>+{recipe.allergens.length - 3}</span>
                           )}
                         </div>
+                      )}
+
+                      {/* Delete button */}
+                      {canWrite && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleDelete(recipe); }}
+                          title="Supprimer la recette"
+                          aria-label="Supprimer"
+                          style={{
+                            width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(220,38,38,0.2)",
+                            background: "rgba(220,38,38,0.06)", color: "#DC2626", cursor: "pointer",
+                            flexShrink: 0,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            transition: "all 0.15s",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "#DC2626";
+                            e.currentTarget.style.color = "#fff";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "rgba(220,38,38,0.06)";
+                            e.currentTarget.style.color = "#DC2626";
+                          }}
+                        >
+                          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                            <path d="M10 11v6M14 11v6" />
+                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                          </svg>
+                        </button>
                       )}
 
                       {/* Chevron */}
