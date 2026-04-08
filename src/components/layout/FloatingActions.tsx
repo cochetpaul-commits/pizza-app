@@ -121,13 +121,6 @@ export function FloatingActions({ actions }: FloatingActionsProps) {
 
   return (
     <>
-      <style>{`
-        .floating-actions-bar { display: none !important; }
-        @media (max-width: 768px) {
-          .floating-actions-bar { display: flex !important; }
-        }
-      `}</style>
-
       <div
         className="floating-actions-bar"
         style={{
