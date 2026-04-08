@@ -10,7 +10,7 @@ import { fetchApi } from "@/lib/fetchApi";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { IngredientAvatar } from "@/components/IngredientAvatar";
 import type { Category } from "@/types/ingredients";
-import { FloatingActions, FAIconPdf, FAIconMail, FAIconTrash, FAIconCheck, FAIconPause, FAIconPlus } from "@/components/layout/FloatingActions";
+import { FloatingActions, FAIconPdf, FAIconMail, FAIconTrash, FAIconCheck, FAIconPause } from "@/components/layout/FloatingActions";
 import type { FloatingAction } from "@/components/layout/FloatingActions";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 
@@ -122,6 +122,21 @@ const tile: React.CSSProperties = {
   flexDirection: "column",
   gap: 4,
   borderBottom: "1px solid #f0ebe2",
+};
+
+const menuItemStyle: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  padding: "11px 16px",
+  border: "none",
+  background: "transparent",
+  color: "#1a1a1a",
+  fontSize: 13,
+  fontWeight: 500,
+  fontFamily: "inherit",
+  textAlign: "left",
+  cursor: "pointer",
+  borderBottom: "1px solid rgba(0,0,0,0.04)",
 };
 
 
@@ -281,6 +296,7 @@ function CommandesPage() {
   // Email sending state
   const [sendingEmail, setSendingEmail] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
   // Historique
   const [histOpen, setHistOpen] = useState(false);
@@ -1527,79 +1543,6 @@ function CommandesPage() {
           </div>
         </BottomSheet>
 
-        {/* Fournisseurs (tuiles) — home page when no supplier selected */}
-        {!loading && !selectedSupplierId && suppliers.length > 0 && (
-          <div style={{ marginTop: 4 }}>
-            <div style={{
-              fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
-              color: "#A0845C", marginBottom: 10,
-              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-            }}>
-              Fournisseurs
-            </div>
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-              gap: 10,
-            }}>
-              {suppliers.map((s) => {
-                const hasDraft = draftSupplierIds.has(s.id);
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setSelectedSupplierId(s.id)}
-                    style={{
-                      padding: "18px 14px",
-                      borderRadius: 14,
-                      border: hasDraft ? "1.5px solid #D4775A" : "1px solid #e0d8ce",
-                      background: "#fff",
-                      cursor: "pointer",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 6,
-                      minHeight: 86,
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-                      fontFamily: "inherit",
-                      transition: "box-shadow 0.2s, transform 0.12s",
-                    }}
-                    onTouchStart={(e) => { e.currentTarget.style.transform = "scale(0.97)"; }}
-                    onTouchEnd={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
-                  >
-                    <span style={{
-                      fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                      fontSize: 13, fontWeight: 700,
-                      color: "#1a1a1a",
-                      textTransform: "uppercase",
-                      letterSpacing: ".04em",
-                      textAlign: "center",
-                      lineHeight: 1.2,
-                    }}>
-                      {s.name}
-                    </span>
-                    {hasDraft && (
-                      <span style={{
-                        display: "inline-flex", alignItems: "center", gap: 4,
-                        fontSize: 9, fontWeight: 700,
-                        padding: "2px 8px", borderRadius: 6,
-                        background: "rgba(212,119,90,0.12)",
-                        color: "#D4775A",
-                        textTransform: "uppercase",
-                        letterSpacing: ".05em",
-                      }}>
-                        <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#D4775A" }} />
-                        brouillon
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Commandes en cours */}
         {!loading && activeSessions.length > 0 && (
           <div style={{ marginTop: 16 }}>
@@ -1615,97 +1558,124 @@ function CommandesPage() {
               const badgeColor = isBrouillon ? "#A0845C" : "#2563EB";
               const badgeBg = isBrouillon ? "#FFF8F0" : "#EFF6FF";
               const isCurrentSupplier = s.supplier_id === selectedSupplierId;
+              const menuOpen = activeMenuId === s.id;
+              const reprendre = () => {
+                let canonicalId = s.supplier_id;
+                for (const [cid, aliasSet] of supplierAliases.entries()) {
+                  if (aliasSet.has(s.supplier_id)) { canonicalId = cid; break; }
+                }
+                setSelectedSupplierId(canonicalId);
+              };
               return (
-                <div key={s.id} style={{
-                  background: isCurrentSupplier ? "#fdf5f2" : "#fff",
-                  borderRadius: 10, border: isCurrentSupplier ? "1.5px solid #D4775A" : "1px solid #e0d8ce",
-                  padding: "10px 14px", marginBottom: 6,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", flex: 1 }}>{s.supplier_name}</span>
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
-                      background: badgeBg, color: badgeColor, whiteSpace: "nowrap",
-                    }}>
-                      {statusLabel[s.status] ?? s.status}
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 11, color: "#666" }}>{s.nb_articles} article{s.nb_articles > 1 ? "s" : ""}</span>
-                      {s.total_ht > 0 && (
+                <div key={s.id} style={{ position: "relative", marginBottom: 8 }}>
+                  <div
+                    onClick={() => { if (!isCurrentSupplier) reprendre(); }}
+                    style={{
+                      background: isCurrentSupplier ? "#fdf5f2" : "#fff",
+                      borderRadius: 12, border: isCurrentSupplier ? "1.5px solid #D4775A" : "1px solid #e0d8ce",
+                      padding: "14px 16px",
+                      cursor: isCurrentSupplier ? "default" : "pointer",
+                      display: "flex", alignItems: "center", gap: 12,
+                      transition: "border-color 0.15s",
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{s.supplier_name}</span>
                         <span style={{
-                          fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                          fontWeight: 700, fontSize: 13, color: "#1a1a1a",
+                          fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 6,
+                          background: badgeBg, color: badgeColor, whiteSpace: "nowrap",
+                          textTransform: "uppercase", letterSpacing: ".05em",
                         }}>
-                          {s.total_ht.toFixed(2)} €
+                          {statusLabel[s.status] ?? s.status}
                         </span>
-                      )}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontSize: 11, color: "#999" }}>
+                          {s.nb_articles} article{s.nb_articles > 1 ? "s" : ""}
+                        </span>
+                        {s.total_ht > 0 && (
+                          <span style={{
+                            fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                            fontWeight: 700, fontSize: 13, color: "#1a1a1a",
+                          }}>
+                            {s.total_ht.toFixed(2)} €
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button type="button" onClick={() => downloadPdfById(s.id, s.supplier_name)}
-                        style={{
-                          fontSize: 10, fontWeight: 600, color: "#4a6741", background: "#fff",
-                          border: "1px solid #ddd6c8", borderRadius: 6, cursor: "pointer", padding: "4px 8px",
-                          fontFamily: "inherit",
-                        }}>
-                        PDF
-                      </button>
-                      {isBrouillon && (
-                        <button type="button" onClick={() => sendEmailForSession(s.id)} disabled={sendingEmail}
-                          style={{
-                            fontSize: 10, fontWeight: 600, color: "#2563EB", background: "#fff",
-                            border: "1px solid #ddd6c8", borderRadius: 6, cursor: "pointer", padding: "4px 8px",
-                            fontFamily: "inherit", opacity: sendingEmail ? 0.6 : 1,
-                          }}>
-                          Envoyer
-                        </button>
-                      )}
-                      {isBrouillon && (
-                        <button type="button" onClick={() => validerActiveSession(s.id)} disabled={saving}
-                          style={{
-                            fontSize: 10, fontWeight: 700, color: "#fff", background: "#4a6741",
-                            border: "none", borderRadius: 6, cursor: "pointer", padding: "4px 10px",
-                            fontFamily: "inherit",
-                          }}>
-                          Valider
-                        </button>
-                      )}
-                      <button type="button" onClick={async () => {
-                        if (!confirm(`Supprimer la commande ${s.supplier_name} ?`)) return;
-                        await supabase.from("commande_lignes").delete().eq("session_id", s.id);
-                        await supabase.from("commande_sessions").delete().eq("id", s.id);
-                        setActiveSessions((prev) => prev.filter((x) => x.id !== s.id));
-                        if (session?.id === s.id) { setSession(null); setQuantities({}); }
-                        setConfirmation("Commande supprimée");
-                        setTimeout(() => setConfirmation(null), 3000);
+                    {/* 3-dot menu trigger */}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setActiveMenuId(menuOpen ? null : s.id); }}
+                      style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        border: "none", background: menuOpen ? "rgba(0,0,0,0.06)" : "transparent",
+                        cursor: "pointer", color: "#666", flexShrink: 0,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 18, fontWeight: 700, lineHeight: 1,
                       }}
-                        style={{
-                          fontSize: 10, fontWeight: 600, color: "#DC2626", background: "#fff",
-                          border: "1px solid #fca5a5", borderRadius: 6, cursor: "pointer", padding: "4px 8px",
-                          fontFamily: "inherit",
-                        }}>
-                        Suppr.
-                      </button>
-                      {!isCurrentSupplier && (
-                        <button type="button" onClick={() => {
-                          // Find canonical supplier id for this session
-                          let canonicalId = s.supplier_id;
-                          for (const [cid, aliasSet] of supplierAliases.entries()) {
-                            if (aliasSet.has(s.supplier_id)) { canonicalId = cid; break; }
-                          }
-                          setSelectedSupplierId(canonicalId);
-                        }}
-                          style={{
-                            fontSize: 10, fontWeight: 700, color: "#D4775A", background: "#FFF0EB",
-                            border: "1px solid #D4775A", borderRadius: 6, cursor: "pointer", padding: "4px 10px",
-                            fontFamily: "inherit",
-                          }}>
-                          Reprendre
-                        </button>
-                      )}
-                    </div>
+                      aria-label="Actions"
+                    >
+                      ⋯
+                    </button>
                   </div>
+
+                  {/* Action menu */}
+                  {menuOpen && (
+                    <>
+                      <div onClick={() => setActiveMenuId(null)}
+                        style={{ position: "fixed", inset: 0, zIndex: 90 }} />
+                      <div style={{
+                        position: "absolute", top: "calc(100% - 6px)", right: 8, zIndex: 91,
+                        minWidth: 180,
+                        background: "#fff",
+                        border: "1px solid rgba(0,0,0,0.08)",
+                        borderRadius: 12,
+                        boxShadow: "0 8px 28px rgba(0,0,0,0.14)",
+                        overflow: "hidden",
+                      }}>
+                        {!isCurrentSupplier && (
+                          <button type="button" onClick={() => { setActiveMenuId(null); reprendre(); }}
+                            style={menuItemStyle}>
+                            Reprendre
+                          </button>
+                        )}
+                        <button type="button" onClick={() => { setActiveMenuId(null); downloadPdfById(s.id, s.supplier_name); }}
+                          style={menuItemStyle}>
+                          Telecharger PDF
+                        </button>
+                        {isBrouillon && (
+                          <button type="button" disabled={sendingEmail}
+                            onClick={() => { setActiveMenuId(null); sendEmailForSession(s.id); }}
+                            style={{ ...menuItemStyle, opacity: sendingEmail ? 0.5 : 1 }}>
+                            Envoyer par mail
+                          </button>
+                        )}
+                        {isBrouillon && (
+                          <button type="button" disabled={saving}
+                            onClick={() => { setActiveMenuId(null); validerActiveSession(s.id); }}
+                            style={{ ...menuItemStyle, color: "#4a6741", fontWeight: 700 }}>
+                            Valider
+                          </button>
+                        )}
+                        <button type="button"
+                          onClick={async () => {
+                            setActiveMenuId(null);
+                            if (!confirm(`Supprimer la commande ${s.supplier_name} ?`)) return;
+                            await supabase.from("commande_lignes").delete().eq("session_id", s.id);
+                            await supabase.from("commande_sessions").delete().eq("id", s.id);
+                            setActiveSessions((prev) => prev.filter((x) => x.id !== s.id));
+                            if (session?.id === s.id) { setSession(null); setQuantities({}); }
+                            setConfirmation("Commande supprimée");
+                            setTimeout(() => setConfirmation(null), 3000);
+                          }}
+                          style={{ ...menuItemStyle, color: "#DC2626" }}>
+                          Supprimer
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })}
@@ -2025,11 +1995,39 @@ function CommandesPage() {
           })()} />
         )}
 
-        {/* Floating action — new commande (no draft in progress) */}
+        {/* Floating "+ Nouvelle commande" — visible on mobile + desktop */}
         {!loading && !session && (
-          <FloatingActions actions={[
-            { icon: <FAIconPlus size={24} color="#fff" />, label: "Nouvelle commande", onClick: () => setDropdownOpen(true), primary: true },
-          ]} />
+          <button
+            type="button"
+            onClick={() => setDropdownOpen(true)}
+            style={{
+              position: "fixed",
+              right: 20,
+              bottom: "calc(96px + env(safe-area-inset-bottom, 0px))",
+              zIndex: 105,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "14px 22px",
+              borderRadius: 999,
+              border: "none",
+              background: "#D4775A",
+              color: "#fff",
+              fontFamily: "var(--font-oswald), Oswald, sans-serif",
+              fontSize: 13, fontWeight: 700,
+              textTransform: "uppercase", letterSpacing: ".05em",
+              cursor: "pointer",
+              boxShadow: "0 6px 24px rgba(212,119,90,0.35), 0 2px 8px rgba(0,0,0,0.10)",
+            }}
+            onTouchStart={(e) => { e.currentTarget.style.transform = "scale(0.96)"; }}
+            onTouchEnd={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+          >
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Nouvelle commande
+          </button>
         )}
       </div>
     </RequireRole>
