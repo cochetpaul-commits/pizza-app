@@ -408,16 +408,19 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
       await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", rid!);
       const validLines = lines.filter(l => l.ingredient_id && l.qty !== "" && Number(l.qty) > 0);
       if (validLines.length > 0) {
-        const { error: lErr } = await supabase.from("kitchen_recipe_lines").insert(
-          validLines.map((l, i) => ({
-            recipe_id: rid!,
-            ingredient_id: l.ingredient_id,
-            qty: Number(l.qty),
-            unit: l.unit,
-            sort_order: i,
-          }))
-        );
-        if (lErr) throw lErr;
+        const payload = validLines.map((l, i) => ({
+          recipe_id: rid!,
+          ingredient_id: l.ingredient_id,
+          qty: Number(l.qty),
+          // Force canonical unit (g / cL / pcs) to satisfy the DB check
+          unit: normalizeUnit(l.unit),
+          sort_order: i,
+        }));
+        const { error: lErr } = await supabase.from("kitchen_recipe_lines").insert(payload);
+        if (lErr) {
+          console.error("[kitchen_recipe_lines] insert payload:", payload);
+          throw lErr;
+        }
       }
 
       // Sync ingredient catalog — silent failure
