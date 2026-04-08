@@ -1125,31 +1125,45 @@ export default function EmployeDetailPage() {
                 ))}
               </AccordionSection>
 
-              <AccordionSection
-                title="Zone de danger"
-                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>}
-                iconColor="#DC2626" iconBg="rgba(220,38,38,0.1)"
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>Supprimer le compte employe</div>
-                    <div style={{ fontSize: 11, color: "#999" }}>Effacer definitivement l&apos;employe de votre etablissement.</div>
-                  </div>
-                  <button type="button" onClick={async () => {
-                    if (!confirm("Supprimer definitivement cet employe ? Ses contrats, absences et shifts seront aussi supprimes. Irreversible.")) return;
-                    const empId = emp.id as string;
-                    await supabase.from("contrat_elements").delete().in("contrat_id", contrats.map(c => c.id));
-                    await supabase.from("contrats").delete().eq("employe_id", empId);
-                    await supabase.from("absences").delete().eq("employe_id", empId);
-                    await supabase.from("shifts").delete().eq("employe_id", empId);
-                    const { error } = await supabase.from("employes").delete().eq("id", empId);
-                    if (error) { alert("Erreur : " + error.message); return; }
-                    window.location.href = "/settings/employes";
-                  }} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid rgba(220,38,38,0.3)", background: "rgba(220,38,38,0.06)", color: "#DC2626", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                    Supprimer le compte
-                  </button>
-                </div>
-              </AccordionSection>
+              {/* Bouton suppression — sans tuile, avec avertissement */}
+              <div style={{
+                marginTop: 32, marginBottom: 16,
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+              }}>
+                <p style={{
+                  fontSize: 11, color: "#999", textAlign: "center",
+                  maxWidth: 360, lineHeight: 1.5, margin: 0,
+                }}>
+                  Action irreversible. La suppression efface definitivement l&apos;employe ainsi que ses contrats, absences et shifts.
+                </p>
+                <button type="button" onClick={async () => {
+                  if (!confirm("Supprimer definitivement cet employe ? Ses contrats, absences et shifts seront aussi supprimes. Irreversible.")) return;
+                  const empId = emp.id as string;
+                  await supabase.from("contrat_elements").delete().in("contrat_id", contrats.map(c => c.id));
+                  await supabase.from("contrats").delete().eq("employe_id", empId);
+                  await supabase.from("absences").delete().eq("employe_id", empId);
+                  await supabase.from("shifts").delete().eq("employe_id", empId);
+                  const { error } = await supabase.from("employes").delete().eq("id", empId);
+                  if (error) { alert("Erreur : " + error.message); return; }
+                  window.location.href = "/settings/employes";
+                }} style={{
+                  display: "inline-flex", alignItems: "center", gap: 8,
+                  padding: "10px 20px", borderRadius: 999,
+                  border: "1px solid rgba(220,38,38,0.4)",
+                  background: "transparent",
+                  color: "#DC2626",
+                  fontSize: 12, fontWeight: 700,
+                  fontFamily: "var(--font-oswald), Oswald, sans-serif",
+                  textTransform: "uppercase", letterSpacing: ".05em",
+                  cursor: "pointer",
+                }}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
+                  Supprimer le compte
+                </button>
+              </div>
             </>
           );
         })()}
