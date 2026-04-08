@@ -1543,6 +1543,32 @@ function CommandesPage() {
           </div>
         </BottomSheet>
 
+        {/* Empty state — no draft + nothing in flight */}
+        {!loading && !selectedSupplierId && activeSessions.length === 0 && pendingReceptions.length === 0 && (
+          <div style={{
+            textAlign: "center",
+            padding: "80px 24px 40px",
+            color: "#bbb",
+          }}>
+            <svg width={56} height={56} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ margin: "0 auto 16px", display: "block", opacity: 0.6 }}>
+              <path d="M9 11V7a3 3 0 0 1 6 0v4" />
+              <rect x="5" y="11" width="14" height="10" rx="2" />
+            </svg>
+            <div style={{
+              fontFamily: "var(--font-oswald), Oswald, sans-serif",
+              fontSize: 16, fontWeight: 700,
+              textTransform: "uppercase", letterSpacing: ".06em",
+              color: "#999",
+              marginBottom: 6,
+            }}>
+              Aucune commande en cours
+            </div>
+            <div style={{ fontSize: 12, color: "#bbb" }}>
+              Touchez « Nouvelle commande » pour demarrer.
+            </div>
+          </div>
+        )}
+
         {/* Commandes en cours */}
         {!loading && activeSessions.length > 0 && (
           <div style={{ marginTop: 16 }}>
