@@ -177,6 +177,8 @@ export default function EmployeDetailPage() {
   const [contratTab, setContratTab] = useState<"contrat" | "paie">("contrat");
   const [contratEquipes, setContratEquipes] = useState<string[]>([]);
   const [contratManagers, setContratManagers] = useState<{ id: string; label: string }[]>([]);
+  const [contratPostes, setContratPostes] = useState<{ id: string; nom: string; equipe: string | null }[]>([]);
+  const [posteId, setPosteId] = useState<string>("");
   const [showContratModal, setShowContratModal] = useState(false);
   const [editContratId, setEditContratId] = useState<string | null>(null);
   const [cType, setCType] = useState("CDI");
@@ -239,7 +241,21 @@ export default function EmployeDetailPage() {
       if (empData.etablissement_id) {
         const { data: etabData } = await supabase.from("etablissements").select("id, nom, couleur").eq("id", empData.etablissement_id).single();
         if (etabData && !cancelled) setEmpEtab(etabData as { id: string; nom: string; couleur: string });
+
+        // Load postes available on this establishment
+        const { data: postesData } = await supabase
+          .from("postes")
+          .select("id, nom, equipe")
+          .eq("etablissement_id", empData.etablissement_id)
+          .eq("actif", true)
+          .order("equipe", { ascending: true })
+          .order("nom", { ascending: true });
+        if (postesData && !cancelled) {
+          setContratPostes(postesData as { id: string; nom: string; equipe: string | null }[]);
+        }
       }
+      // Load existing poste_id
+      if (empData.poste_id) setPosteId(empData.poste_id);
 
       setPrenom(empData.prenom ?? "");
       setNom(empData.nom ?? "");
@@ -333,6 +349,7 @@ export default function EmployeDetailPage() {
       iban: iban || null, bic: bic || null, titulaire_compte: titulaireCompte || null,
       matricule: matricule || null, date_anciennete: dateAnciennete || null,
       travailleur_etranger: travailleurEtranger, actif,
+      poste_id: posteId || null,
     };
 
     // Only include note if the column exists (graceful handling)
@@ -351,14 +368,6 @@ export default function EmployeDetailPage() {
     setTimeout(() => setSaveOk(false), 2000);
   };
 
-  /* ── Archive employee ── */
-  const handleArchive = async () => {
-    if (!id) return;
-    if (!confirm("Archiver cet employe ? Il sera marque comme inactif.")) return;
-    const { error } = await supabase.from("employes").update({ actif: false }).eq("id", id);
-    if (error) { alert("Erreur : " + error.message); return; }
-    setActif(false);
-  };
 
   /* ── Save contrat ── */
   const handleSaveContrat = async () => {
@@ -550,6 +559,7 @@ export default function EmployeDetailPage() {
             return `linear-gradient(135deg, ${finalColor} 0%, ${finalColor}cc 100%)`;
           })(),
           borderRadius: 14, padding: 20, color: "#fff",
+          marginBottom: 24,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
             <div style={{
@@ -578,13 +588,6 @@ export default function EmployeDetailPage() {
                   ...saveBtnStyle, background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.3)",
                 }}>
                   {saving ? "..." : saveOk ? "OK" : "Sauvegarder"}
-                </button>
-              )}
-              {canWrite && actif && (
-                <button type="button" onClick={handleArchive} style={{
-                  ...archiveBtnStyle, background: "transparent", border: "1px solid rgba(255,255,255,0.3)", color: "#fff",
-                }}>
-                  Archiver
                 </button>
               )}
             </div>
@@ -634,7 +637,7 @@ export default function EmployeDetailPage() {
               if (sel) sel.value = next[0] ?? "";
             };
             return (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+              <div style={{ display: "flex", flexDirection: "row", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
                 {etablissements.map((e) => {
                   const isActive = selectedIds.includes(e.id);
                   const c = e.couleur ?? "#D4775A";
@@ -645,53 +648,33 @@ export default function EmployeDetailPage() {
                       disabled={!canWrite}
                       onClick={() => toggleEtab(e.id)}
                       style={{
-                        padding: "16px 18px",
-                        borderRadius: 14,
-                        border: isActive ? `2px solid ${c}` : "1px solid #e0d8ce",
-                        background: isActive ? `${c}10` : "#fff",
+                        padding: "8px 14px",
+                        borderRadius: 999,
+                        border: isActive ? `1.5px solid ${c}` : "1px solid #e0d8ce",
+                        background: isActive ? `${c}12` : "#fff",
                         cursor: canWrite ? "pointer" : "default",
-                        display: "flex", alignItems: "center", gap: 14,
+                        display: "inline-flex", alignItems: "center", gap: 8,
                         fontFamily: "inherit",
                         transition: "all 0.15s",
-                        boxShadow: isActive ? `0 4px 16px ${c}25` : "0 1px 4px rgba(0,0,0,0.04)",
                       }}
                     >
-                      <div style={{
-                        width: 40, height: 40, borderRadius: 12,
-                        background: `${c}20`,
-                        color: c,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        flexShrink: 0,
+                      <span style={{
+                        width: 8, height: 8, borderRadius: "50%",
+                        background: c, flexShrink: 0,
+                      }} />
+                      <span style={{
+                        fontSize: 12, fontWeight: 700,
+                        color: isActive ? c : "#666",
+                        fontFamily: "var(--font-oswald), Oswald, sans-serif",
+                        textTransform: "uppercase", letterSpacing: ".04em",
                       }}>
-                        <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" />
+                        {e.nom}
+                      </span>
+                      {isActive && (
+                        <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                          <polyline points="20 6 9 17 4 12" />
                         </svg>
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
-                        <div style={{
-                          fontSize: 14, fontWeight: 700,
-                          color: isActive ? c : "#1a1a1a",
-                          fontFamily: "var(--font-oswald), Oswald, sans-serif",
-                          textTransform: "uppercase", letterSpacing: ".04em",
-                        }}>
-                          {e.nom}
-                        </div>
-                      </div>
-                      {/* Checkbox */}
-                      <div style={{
-                        width: 22, height: 22, borderRadius: 6,
-                        border: isActive ? `2px solid ${c}` : "2px solid #ddd6c8",
-                        background: isActive ? c : "#fff",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        flexShrink: 0,
-                        transition: "all 0.15s",
-                      }}>
-                        {isActive && (
-                          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        )}
-                      </div>
+                      )}
                     </button>
                   );
                 })}
@@ -709,22 +692,50 @@ export default function EmployeDetailPage() {
             {etablissements.map((e) => (<option key={e.id} value={e.id}>{e.nom}</option>))}
           </select>
 
-          {/* Equipe + Type contrat + Salaire */}
+          {/* Equipe + Poste */}
+          {(() => {
+            const currentEquipe = (((emp as Record<string, unknown>).equipes_access as string[] ?? [])[0]) ?? "";
+            const filteredPostes = currentEquipe
+              ? contratPostes.filter((p) => p.equipe === currentEquipe)
+              : contratPostes;
+            return (
+              <div style={grid2}>
+                <div>
+                  <div style={{ fontSize: 11, color: "#999", marginBottom: 4, fontWeight: 600 }}>Equipe</div>
+                  <select
+                    id="contrat-equipe"
+                    style={inputSt}
+                    defaultValue={currentEquipe}
+                    disabled={!canWrite}
+                  >
+                    <option value="">-- Aucune --</option>
+                    {contratEquipes.map((eq) => (
+                      <option key={eq} value={eq}>{eq}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: "#999", marginBottom: 4, fontWeight: 600 }}>Poste</div>
+                  <select
+                    style={inputSt}
+                    value={posteId}
+                    onChange={(e) => setPosteId(e.target.value)}
+                    disabled={!canWrite || filteredPostes.length === 0}
+                  >
+                    <option value="">{filteredPostes.length === 0 ? "Aucun poste configure" : "-- Aucun --"}</option>
+                    {filteredPostes.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nom}{p.equipe ? ` (${p.equipe})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Type contrat + Salaire */}
           <div style={grid2}>
-            <div>
-              <div style={{ fontSize: 11, color: "#999", marginBottom: 4, fontWeight: 600 }}>Equipe</div>
-              <select
-                id="contrat-equipe"
-                style={inputSt}
-                defaultValue={(((emp as Record<string, unknown>).equipes_access as string[] ?? [])[0]) ?? ""}
-                disabled={!canWrite}
-              >
-                <option value="">-- Aucune --</option>
-                {contratEquipes.map((eq) => (
-                  <option key={eq} value={eq}>{eq}</option>
-                ))}
-              </select>
-            </div>
             <FieldSelect
               label="Type de contrat"
               value={cType}
@@ -732,14 +743,14 @@ export default function EmployeDetailPage() {
               disabled={!canWrite}
               options={Object.entries(CONTRAT_LABELS).map(([k, v]) => [k, v])}
             />
+            <Field
+              label="Salaire brut mensuel (EUR)"
+              type="number"
+              value={String(cRemuneration)}
+              onChange={(v) => setCRemuneration(Number(v))}
+              disabled={!canWrite}
+            />
           </div>
-          <Field
-            label="Salaire brut mensuel (EUR)"
-            type="number"
-            value={String(cRemuneration)}
-            onChange={(v) => setCRemuneration(Number(v))}
-            disabled={!canWrite}
-          />
         </AccordionSection>
 
         {/* ═══ TAB: CONTRATS (hidden — kept for legacy) ═══ */}
