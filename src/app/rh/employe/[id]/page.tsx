@@ -641,7 +641,6 @@ export default function EmployeDetailPage() {
         {/* ═══ INFORMATIONS PERSONNELLES ═══ */}
         <InfosTab
           canWrite={canWrite}
-          accent={empEtab?.couleur ?? etab?.couleur ?? "#D4775A"}
           genre={genre} setGenre={setGenre}
           prenom={prenom} setPrenom={setPrenom}
           nom={nom} setNom={setNom}
@@ -653,20 +652,82 @@ export default function EmployeDetailPage() {
           adresse={adresse} setAdresse={setAdresse}
           codePostal={codePostal} setCodePostal={setCodePostal}
           ville={ville} setVille={setVille}
-          contactUrgPrenom={contactUrgPrenom} setContactUrgPrenom={setContactUrgPrenom}
-          contactUrgNom={contactUrgNom} setContactUrgNom={setContactUrgNom}
-          contactUrgLien={contactUrgLien} setContactUrgLien={setContactUrgLien}
-          contactUrgTel={contactUrgTel} setContactUrgTel={setContactUrgTel}
           dateAnciennete={dateAnciennete} setDateAnciennete={setDateAnciennete}
           matricule={matricule} setMatricule={setMatricule}
-          titulaireCompte={titulaireCompte} setTitulaireCompte={setTitulaireCompte}
-          iban={iban} setIban={setIban}
-          bic={bic} setBic={setBic}
-          numeroSecu={numeroSecu} setNumeroSecu={setNumeroSecu}
-          saving={saving} handleSave={handleSave}
         />
 
-        {/* ═══ TAB: CONTRATS ═══ */}
+        {/* ═══ TUILE: ETABLISSEMENT / EQUIPE / CONTRAT ═══ */}
+        {(() => {
+          const empEquipes = ((emp as Record<string, unknown>).equipes_access as string[] ?? []);
+          const nbContrats = contrats.length;
+          return (
+            <div style={{
+              background: "#fff",
+              border: "1px solid #e0d8ce",
+              borderRadius: 14,
+              padding: 18,
+              marginBottom: 14,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+            }}>
+              <div style={{
+                display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
+              }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 8,
+                  background: "rgba(212,119,90,0.10)", color: "#D4775A",
+                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                }}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" />
+                  </svg>
+                </div>
+                <span style={{
+                  fontFamily: "var(--font-oswald), Oswald, sans-serif",
+                  fontSize: 14, fontWeight: 700,
+                  textTransform: "uppercase", letterSpacing: ".06em",
+                  color: "#1a1a1a",
+                }}>
+                  Etablissement / Equipe
+                </span>
+              </div>
+
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gap: 12,
+              }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>Etablissement</div>
+                  <div style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 600 }}>{empEtab?.nom ?? etab?.nom ?? "—"}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>Equipe</div>
+                  <div style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 600 }}>{empEquipes.length > 0 ? empEquipes.join(", ") : "—"}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>Type de contrat</div>
+                  <div style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 600 }}>
+                    {activeContrat ? (CONTRAT_LABELS[activeContrat.type] ?? activeContrat.type) : "—"}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>Salaire brut</div>
+                  <div style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 600, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
+                    {activeContrat?.remuneration ? `${activeContrat.remuneration.toLocaleString("fr-FR")} €` : "—"}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>N° de contrat</div>
+                  <div style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 600 }}>
+                    {nbContrats > 0 ? `${nbContrats}` : "—"}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ═══ TAB: CONTRATS (hidden — kept for legacy) ═══ */}
         {mainTab === "dossier" && (
           <>
             {/* Contrat en cours — inline editable */}
@@ -863,51 +924,9 @@ export default function EmployeDetailPage() {
             accident_travail: { label: "Accident du travail", color: "#DC2626" },
             maternite: { label: "Maternite/Paternite", color: "#7B1FA2" },
           };
-          const cpPris = absences.filter(a => a.type === "conge_paye" || a.type === "CP").length;
 
           return (
             <>
-              {/* Compteurs CP */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
-                {[
-                  { label: "CP Acquis", value: `${(cpPris * 2.5).toFixed(1)} j`, color: "#2D6A4F" },
-                  { label: "CP Pris", value: `${cpPris} j`, color: "#D4775A" },
-                  { label: "Solde CP", value: `${((cpPris * 2.5) - cpPris).toFixed(1)} j`, color: "#2563eb" },
-                ].map(kpi => (
-                  <div key={kpi.label} style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 10, padding: 14, textAlign: "center" }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", marginBottom: 4 }}>{kpi.label}</div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: kpi.color, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{kpi.value}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Nouvelle absence — inline */}
-              <AccordionSection
-                title="Nouvelle absence"
-                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>}
-                iconColor="#2D6A4F" iconBg="rgba(45,106,79,0.1)"
-              >
-                <div style={grid2}>
-                  <FieldSelect label="Type d'absence" value={aType} onChange={setAType}
-                    options={Object.entries(ABSENCE_TYPES).map(([k, v]) => [k, v.label])} />
-                  <Field label="Nb jours" type="number" value={String(aNbJours)} onChange={(v) => setANbJours(v ? Number(v) : "")} />
-                </div>
-                <div style={grid2}>
-                  <Field label="Date debut" type="date" value={aDebut} onChange={setADebut} />
-                  <Field label="Date fin" type="date" value={aFin} onChange={setAFin} />
-                </div>
-                <Field label="Note" value={aNote} onChange={setANote} placeholder="Commentaire optionnel..." />
-                <div style={{ marginTop: 8 }}>
-                  <button type="button" onClick={handleSaveAbsence} disabled={saving || !aDebut} style={{
-                    padding: "8px 18px", borderRadius: 8, border: "none",
-                    background: "#1a1a1a", color: "#fff", fontSize: 12, fontWeight: 600,
-                    cursor: !aDebut ? "not-allowed" : "pointer", opacity: saving || !aDebut ? 0.5 : 1,
-                  }}>
-                    {saving ? "..." : "Enregistrer l'absence"}
-                  </button>
-                </div>
-              </AccordionSection>
-
               {/* Historique absences */}
               <AccordionSection
                 title={`Historique des absences (${absences.length})`}
@@ -2156,7 +2175,7 @@ const SIT_OPTIONS: [string, string][] = [
 ];
 
 function InfosTab(props: {
-  canWrite: boolean; accent: string;
+  canWrite: boolean;
   genre: string; setGenre: (v: string) => void;
   prenom: string; setPrenom: (v: string) => void;
   nom: string; setNom: (v: string) => void;
@@ -2168,17 +2187,8 @@ function InfosTab(props: {
   adresse: string; setAdresse: (v: string) => void;
   codePostal: string; setCodePostal: (v: string) => void;
   ville: string; setVille: (v: string) => void;
-  contactUrgPrenom: string; setContactUrgPrenom: (v: string) => void;
-  contactUrgNom: string; setContactUrgNom: (v: string) => void;
-  contactUrgLien: string; setContactUrgLien: (v: string) => void;
-  contactUrgTel: string; setContactUrgTel: (v: string) => void;
   dateAnciennete: string; setDateAnciennete: (v: string) => void;
   matricule: string; setMatricule: (v: string) => void;
-  titulaireCompte: string; setTitulaireCompte: (v: string) => void;
-  iban: string; setIban: (v: string) => void;
-  bic: string; setBic: (v: string) => void;
-  numeroSecu: string; setNumeroSecu: (v: string) => void;
-  saving: boolean; handleSave: () => void;
 }) {
   const p = props;
   const cw = p.canWrite;
@@ -2228,46 +2238,6 @@ function InfosTab(props: {
         </div>
       </AccordionSection>
 
-      <AccordionSection
-        title="Informations bancaires"
-        icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><rect x="1" y="5" width="22" height="16" rx="2" /><path d="M1 10h22" /></svg>}
-        iconColor="#A0845C" iconBg="rgba(160,132,92,0.1)"
-      >
-        <div style={{ padding: 10, borderRadius: 8, background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.12)", marginBottom: 12, fontSize: 12, color: "#666" }}>
-          Le salaire doit etre verse sur un compte dont le collaborateur est titulaire ou co-titulaire.
-        </div>
-        <Field label="Nom du titulaire du compte" value={p.titulaireCompte} onChange={p.setTitulaireCompte} disabled={!cw} />
-        <div style={grid2}>
-          <Field label="IBAN" value={p.iban} onChange={p.setIban} disabled={!cw} />
-          <Field label="BIC" value={p.bic} onChange={p.setBic} disabled={!cw} />
-        </div>
-        <Field label="Numero de Securite sociale" value={p.numeroSecu} onChange={p.setNumeroSecu} disabled={!cw} />
-      </AccordionSection>
-
-      <AccordionSection
-        title="Contact d'urgence"
-        icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>}
-        iconColor="#DC2626" iconBg="rgba(220,38,38,0.1)"
-      >
-        <div style={grid2}>
-          <Field label="Prenom" value={p.contactUrgPrenom} onChange={p.setContactUrgPrenom} disabled={!cw} />
-          <Field label="Nom" value={p.contactUrgNom} onChange={p.setContactUrgNom} disabled={!cw} />
-        </div>
-        <div style={grid2}>
-          <Field label="Lien" value={p.contactUrgLien} onChange={p.setContactUrgLien} disabled={!cw} />
-          <Field label="Tel. mobile" value={p.contactUrgTel} onChange={p.setContactUrgTel} disabled={!cw} />
-        </div>
-      </AccordionSection>
-
-      {/* Save bar */}
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16, padding: "16px 0", borderTop: "1px solid #f0ebe3" }}>
-        <button type="button" onClick={() => window.location.reload()} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#1a1a1a" }}>
-          Annuler
-        </button>
-        <button type="button" onClick={p.handleSave} disabled={p.saving} style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: p.saving ? 0.5 : 1 }}>
-          {p.saving ? "..." : "Enregistrer les modifications"}
-        </button>
-      </div>
     </>
   );
 }
