@@ -641,19 +641,10 @@ export default function EmployeDetailPage() {
         {/* ═══ INFORMATIONS PERSONNELLES ═══ */}
         <InfosTab
           canWrite={canWrite}
-          genre={genre} setGenre={setGenre}
           prenom={prenom} setPrenom={setPrenom}
           nom={nom} setNom={setNom}
-          nationalite={nationalite} setNationalite={setNationalite}
-          dateNaissance={dateNaissance} setDateNaissance={setDateNaissance}
-          situationFamiliale={situationFamiliale} setSituationFamiliale={setSituationFamiliale}
           email={email} setEmail={setEmail}
           telMobile={telMobile} setTelMobile={setTelMobile}
-          adresse={adresse} setAdresse={setAdresse}
-          codePostal={codePostal} setCodePostal={setCodePostal}
-          ville={ville} setVille={setVille}
-          dateAnciennete={dateAnciennete} setDateAnciennete={setDateAnciennete}
-          matricule={matricule} setMatricule={setMatricule}
         />
 
         {/* ═══ TUILE: ETABLISSEMENT — parametrable ═══ */}
@@ -2172,19 +2163,10 @@ const SIT_OPTIONS: [string, string][] = [
 
 function InfosTab(props: {
   canWrite: boolean;
-  genre: string; setGenre: (v: string) => void;
   prenom: string; setPrenom: (v: string) => void;
   nom: string; setNom: (v: string) => void;
-  nationalite: string; setNationalite: (v: string) => void;
-  dateNaissance: string; setDateNaissance: (v: string) => void;
-  situationFamiliale: string; setSituationFamiliale: (v: string) => void;
   email: string; setEmail: (v: string) => void;
   telMobile: string; setTelMobile: (v: string) => void;
-  adresse: string; setAdresse: (v: string) => void;
-  codePostal: string; setCodePostal: (v: string) => void;
-  ville: string; setVille: (v: string) => void;
-  dateAnciennete: string; setDateAnciennete: (v: string) => void;
-  matricule: string; setMatricule: (v: string) => void;
 }) {
   const p = props;
   const cw = p.canWrite;
@@ -2197,30 +2179,12 @@ function InfosTab(props: {
       iconColor="#2D6A4F" iconBg="rgba(45,106,79,0.1)"
     >
       <div style={grid2}>
-        <FieldSelect label="Genre" value={p.genre} onChange={p.setGenre} disabled={!cw}
-          options={[["", "-- Selectionner --"], ["M", "Homme"], ["F", "Femme"]]} />
-        <Field label="Nationalite" value={p.nationalite} onChange={p.setNationalite} disabled={!cw} />
-      </div>
-      <div style={grid2}>
         <Field label="Prenom" value={p.prenom} onChange={p.setPrenom} disabled={!cw} />
-        <Field label="Nom de naissance" value={p.nom} onChange={p.setNom} disabled={!cw} />
-      </div>
-      <div style={grid2}>
-        <Field label="Date de naissance" type="date" value={p.dateNaissance} onChange={p.setDateNaissance} disabled={!cw} />
-        <FieldSelect label="Situation familiale" value={p.situationFamiliale} onChange={p.setSituationFamiliale} disabled={!cw} options={SIT_OPTIONS} />
-      </div>
-      <div style={grid2}>
-        <Field label="Date d'anciennete" type="date" value={p.dateAnciennete} onChange={p.setDateAnciennete} disabled={!cw} />
-        <Field label="Matricule" value={p.matricule} onChange={p.setMatricule} disabled={!cw} />
+        <Field label="Nom" value={p.nom} onChange={p.setNom} disabled={!cw} />
       </div>
       <div style={grid2}>
         <Field label="Email" type="email" value={p.email} onChange={p.setEmail} disabled={!cw} />
         <Field label="Tel. mobile" value={p.telMobile} onChange={p.setTelMobile} disabled={!cw} />
-      </div>
-      <Field label="Adresse" value={p.adresse} onChange={p.setAdresse} disabled={!cw} />
-      <div style={grid2}>
-        <Field label="Code postal" value={p.codePostal} onChange={p.setCodePostal} disabled={!cw} />
-        <Field label="Ville" value={p.ville} onChange={p.setVille} disabled={!cw} />
       </div>
     </AccordionSection>
   );
