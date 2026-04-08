@@ -549,7 +549,7 @@ export default function EmployeDetailPage() {
             const finalColor = (c === "#D4775A" && empEtab?.nom?.toLowerCase().includes("piccola")) ? "#e6c428" : c;
             return `linear-gradient(135deg, ${finalColor} 0%, ${finalColor}cc 100%)`;
           })(),
-          borderRadius: 14, padding: "20px 24px 0", color: "#fff",
+          borderRadius: 14, padding: 20, color: "#fff",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
             <div style={{
@@ -571,16 +571,6 @@ export default function EmployeDetailPage() {
                   {roleLabel}
                 </span>
               </div>
-              {activeContrat?.emploi && (
-                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", marginTop: 2 }}>{activeContrat.emploi}</div>
-              )}
-              {/* Supervise X personnes */}
-              <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                <span style={{ padding: "2px 10px", borderRadius: 12, background: "rgba(255,255,255,0.15)", fontSize: 11, color: "rgba(255,255,255,0.9)", display: "flex", alignItems: "center", gap: 4 }}>
-                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-                  Supervise {((emp as Record<string, unknown>).equipes_access as string[] ?? []).length > 0 ? "son equipe" : "—"}
-                </span>
-              </div>
             </div>
             <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
               {canWrite && (
@@ -600,42 +590,6 @@ export default function EmployeDetailPage() {
             </div>
           </div>
 
-          {/* Contract info band */}
-          <div style={{
-            display: "flex", gap: 24, marginTop: 16, padding: "10px 0",
-            borderTop: "1px solid rgba(255,255,255,0.15)",
-            fontSize: 11, color: "rgba(255,255,255,0.7)",
-            flexWrap: "wrap",
-          }}>
-            <div>
-              <div style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Debut du contrat</div>
-              <div style={{ color: "#fff", fontSize: 12, marginTop: 2 }}>
-                {activeContrat?.date_debut ? new Date(activeContrat.date_debut).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "—"}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Fin du contrat</div>
-              <div style={{ color: "#fff", fontSize: 12, marginTop: 2 }}>
-                {activeContrat?.date_fin ? new Date(activeContrat.date_fin).toLocaleDateString("fr-FR") : "—"}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Type de contrat</div>
-              <div style={{ color: "#fff", fontSize: 12, marginTop: 2 }}>{activeContrat?.type ?? "—"}</div>
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Etablissement</div>
-              <div style={{ color: "#fff", fontSize: 12, marginTop: 2 }}>{empEtab?.nom ?? etab?.nom ?? "—"}</div>
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Equipe</div>
-              <div style={{ color: "#fff", fontSize: 12, marginTop: 2 }}>{((emp as Record<string, unknown>).equipes_access as string[] ?? []).join(", ") || "—"}</div>
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Responsable hierarchique</div>
-              <div style={{ color: "#fff", fontSize: 12, marginTop: 2 }}>—</div>
-            </div>
-          </div>
         </div>
 
         {/* ═══ INFORMATIONS PERSONNELLES ═══ */}
@@ -647,27 +601,83 @@ export default function EmployeDetailPage() {
           telMobile={telMobile} setTelMobile={setTelMobile}
         />
 
-        {/* ═══ TUILE: ETABLISSEMENT — parametrable ═══ */}
+        {/* ═══ TUILE: ETABLISSEMENT — parametrable, 2 etabs ═══ */}
         <AccordionSection
           title="Etablissement"
           icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" /></svg>}
           iconColor="#D4775A" iconBg="rgba(212,119,90,0.10)"
         >
+          {/* Etab cards (radio-style, the 2 etabs) */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+            {etablissements.map((e) => {
+              const isActive = (empEtab?.id ?? (emp as Record<string, unknown>).etablissement_id as string) === e.id;
+              const c = e.couleur ?? "#D4775A";
+              return (
+                <button
+                  key={e.id}
+                  type="button"
+                  disabled={!canWrite}
+                  onClick={() => {
+                    // Update the hidden contrat-etab select so handleSave picks it up
+                    const sel = document.getElementById("contrat-etab") as HTMLSelectElement | null;
+                    if (sel) sel.value = e.id;
+                    setEmpEtab({ id: e.id, nom: e.nom, couleur: e.couleur ?? "#D4775A" });
+                  }}
+                  style={{
+                    padding: "16px 14px",
+                    borderRadius: 14,
+                    border: isActive ? `2px solid ${c}` : "1px solid #e0d8ce",
+                    background: isActive ? `${c}10` : "#fff",
+                    cursor: canWrite ? "pointer" : "default",
+                    display: "flex", alignItems: "center", gap: 12,
+                    fontFamily: "inherit",
+                    transition: "all 0.15s",
+                    boxShadow: isActive ? `0 4px 16px ${c}25` : "0 1px 4px rgba(0,0,0,0.04)",
+                  }}
+                >
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 10,
+                    background: `${c}20`,
+                    color: c,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0,
+                  }}>
+                    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" />
+                    </svg>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+                    <div style={{
+                      fontSize: 13, fontWeight: 700,
+                      color: isActive ? c : "#1a1a1a",
+                      fontFamily: "var(--font-oswald), Oswald, sans-serif",
+                      textTransform: "uppercase", letterSpacing: ".04em",
+                    }}>
+                      {e.nom}
+                    </div>
+                  </div>
+                  {isActive && (
+                    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Hidden select read by handleSave */}
+          <select
+            id="contrat-etab"
+            defaultValue={empEtab?.id ?? (emp as Record<string, unknown>).etablissement_id as string ?? ""}
+            style={{ display: "none" }}
+          >
+            <option value="">--</option>
+            {etablissements.map((e) => (<option key={e.id} value={e.id}>{e.nom}</option>))}
+          </select>
+
+          {/* Equipe + Type contrat + Salaire */}
           <div style={grid2}>
-            <div>
-              <div style={{ fontSize: 11, color: "#999", marginBottom: 4, fontWeight: 600 }}>Etablissement</div>
-              <select
-                id="contrat-etab"
-                style={inputSt}
-                defaultValue={empEtab?.id ?? (emp as Record<string, unknown>).etablissement_id as string ?? ""}
-                disabled={!canWrite}
-              >
-                <option value="">-- Selectionner --</option>
-                {etablissements.map((e) => (
-                  <option key={e.id} value={e.id}>{e.nom}</option>
-                ))}
-              </select>
-            </div>
             <div>
               <div style={{ fontSize: 11, color: "#999", marginBottom: 4, fontWeight: 600 }}>Equipe</div>
               <select
@@ -682,8 +692,6 @@ export default function EmployeDetailPage() {
                 ))}
               </select>
             </div>
-          </div>
-          <div style={grid2}>
             <FieldSelect
               label="Type de contrat"
               value={cType}
@@ -691,14 +699,14 @@ export default function EmployeDetailPage() {
               disabled={!canWrite}
               options={Object.entries(CONTRAT_LABELS).map(([k, v]) => [k, v])}
             />
-            <Field
-              label="Salaire brut mensuel (EUR)"
-              type="number"
-              value={String(cRemuneration)}
-              onChange={(v) => setCRemuneration(Number(v))}
-              disabled={!canWrite}
-            />
           </div>
+          <Field
+            label="Salaire brut mensuel (EUR)"
+            type="number"
+            value={String(cRemuneration)}
+            onChange={(v) => setCRemuneration(Number(v))}
+            disabled={!canWrite}
+          />
         </AccordionSection>
 
         {/* ═══ TAB: CONTRATS (hidden — kept for legacy) ═══ */}
@@ -1052,20 +1060,21 @@ export default function EmployeDetailPage() {
           return (
             <>
               <AccordionSection
-                title="Role"
+                title="Role et permissions"
                 icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>}
                 iconColor="#D4775A" iconBg="rgba(212,119,90,0.1)"
-                defaultOpen
               >
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                {/* Role cards */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
                   {(["equipier", "admin"] as PermRole[]).map(r => {
                     const info = ROLE_INFO[r];
                     const active = empRole === r;
                     return (
                       <button key={r} type="button" onClick={() => changeRole(r)} style={{
-                        padding: 14, borderRadius: 10, cursor: "pointer", textAlign: "left",
-                        border: active ? `2px solid ${info.color}` : "1px solid #ddd6c8",
+                        padding: 14, borderRadius: 12, cursor: "pointer", textAlign: "left",
+                        border: active ? `2px solid ${info.color}` : "1px solid #e0d8ce",
                         background: active ? info.bg : "#fff",
+                        transition: "all 0.15s",
                       }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                           <div style={{
@@ -1080,40 +1089,44 @@ export default function EmployeDetailPage() {
                     );
                   })}
                 </div>
-              </AccordionSection>
 
-              <AccordionSection
-                title="Permissions detaillees"
-                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>}
-                iconColor="#2563eb" iconBg="rgba(37,99,235,0.1)"
-              >
-                {PERM_SECTIONS.map(sec => (
-                  <div key={sec.label} style={{ marginBottom: 10 }}>
-                    <div style={{ padding: "6px 10px", background: "#faf7f2", borderRadius: 6, marginBottom: 2 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a" }}>{sec.label}</span>
-                    </div>
-                    {sec.permissions.map(p => {
-                      const defaultVal = perms[p.key];
-                      const isToggle = defaultVal === "toggle";
-                      const isOn = isToggle ? (customPerms[p.key] ?? false) : defaultVal === true;
-                      return (
-                        <div key={p.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderBottom: "1px solid #f0ebe3" }}>
-                          <span style={{ fontSize: 12, color: "#1a1a1a" }}>{p.label}</span>
-                          <span style={{ flexShrink: 0, marginLeft: 12 }}>
-                            {isToggle ? (
-                              <button type="button" onClick={() => togglePerm(p.key, isOn)} style={{
-                                width: 36, height: 20, borderRadius: 10, border: "none", cursor: "pointer",
-                                background: isOn ? "#2D6A4F" : "#ddd6c8", position: "relative",
-                              }}>
-                                <span style={{ position: "absolute", top: 2, left: isOn ? 18 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
-                              </button>
-                            ) : defaultVal === true ? <CheckIcon /> : <XIcon />}
-                          </span>
-                        </div>
-                      );
-                    })}
+                {/* Permissions detaillees — sub-section */}
+                <div style={{ paddingTop: 14, borderTop: "1px solid #f0ebe3" }}>
+                  <div style={{
+                    fontSize: 10, fontWeight: 700, color: "#999",
+                    textTransform: "uppercase", letterSpacing: ".08em",
+                    marginBottom: 10,
+                  }}>
+                    Permissions detaillees
                   </div>
-                ))}
+                  {PERM_SECTIONS.map(sec => (
+                    <div key={sec.label} style={{ marginBottom: 10 }}>
+                      <div style={{ padding: "6px 10px", background: "#faf7f2", borderRadius: 6, marginBottom: 2 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a" }}>{sec.label}</span>
+                      </div>
+                      {sec.permissions.map(p => {
+                        const defaultVal = perms[p.key];
+                        const isToggle = defaultVal === "toggle";
+                        const isOn = isToggle ? (customPerms[p.key] ?? false) : defaultVal === true;
+                        return (
+                          <div key={p.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderBottom: "1px solid #f0ebe3" }}>
+                            <span style={{ fontSize: 12, color: "#1a1a1a" }}>{p.label}</span>
+                            <span style={{ flexShrink: 0, marginLeft: 12 }}>
+                              {isToggle ? (
+                                <button type="button" onClick={() => togglePerm(p.key, isOn)} style={{
+                                  width: 36, height: 20, borderRadius: 10, border: "none", cursor: "pointer",
+                                  background: isOn ? "#2D6A4F" : "#ddd6c8", position: "relative",
+                                }}>
+                                  <span style={{ position: "absolute", top: 2, left: isOn ? 18 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
+                                </button>
+                              ) : defaultVal === true ? <CheckIcon /> : <XIcon />}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
               </AccordionSection>
 
               {/* Bouton suppression — sans tuile, avec avertissement */}
