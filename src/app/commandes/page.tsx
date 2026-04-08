@@ -803,7 +803,7 @@ function CommandesPage() {
   }
 
   async function sendEmailForSession(sessionId: string) {
-    await sendMailClient(sessionId);
+    await sendEmailOnly(sessionId);
   }
 
   // ── PDF download ──────────────────────────────────────────────────────
@@ -821,92 +821,29 @@ function CommandesPage() {
     URL.revokeObjectURL(url);
   }
 
-  // ── Envoi mail via app native (navigator.share mobile, mailto desktop) ──
-  // Plus d'OAuth/Gmail API côté serveur : chaque manager envoie depuis le
-  // compte mail commun configuré sur son device (ex. commande@bellomio.fr).
+  // ── Envoi mail via Resend (serveur, zero friction) ──────────────────
 
-  async function sendMailClient(sessionId: string) {
+  async function sendEmailOnly(sessionId: string) {
     setSendingEmail(true);
     try {
-      // 1. Récupère les infos email (destinataires, sujet, corps)
-      const res = await fetchApi("/api/commandes/prepare-email", {
+      const res = await fetchApi("/api/commandes/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: sessionId }),
       });
       const data = await res.json();
-      if (!data.ok) {
-        alert(data.error ?? "Erreur preparation mail");
-        return;
-      }
-      const { recipients, cc, subject, bodyText, filename } = data as {
-        recipients: string[]; cc: string; subject: string; bodyText: string; filename: string;
-      };
-
-      // 2. Récupère le PDF
-      const pdfRes = await fetchApi(`/api/commandes/pdf?session_id=${sessionId}`);
-      if (!pdfRes.ok) { alert("Erreur generation PDF"); return; }
-      const pdfBlob = await pdfRes.blob();
-
-      // 3. Mobile : partage natif avec fichier attaché
-      const pdfFile = new File([pdfBlob], filename, { type: "application/pdf" });
-      const nav = navigator as Navigator & {
-        canShare?: (data: ShareData) => boolean;
-        share?: (data: ShareData) => Promise<void>;
-      };
-      const canShareFile = typeof nav.canShare === "function" && nav.canShare({ files: [pdfFile] });
-
-      if (canShareFile && nav.share) {
-        // Copie l'adresse du destinataire pour l'utilisateur
-        try { await navigator.clipboard?.writeText(recipients.join(", ")); } catch { /* silencieux */ }
-        try {
-          await nav.share({
-            files: [pdfFile],
-            title: subject,
-            text: `${bodyText}\n\n— Destinataire : ${recipients.join(", ")}\nCC : ${cc}`,
-          });
-        } catch (err) {
-          // L'utilisateur a annulé : on n'enregistre pas l'envoi
-          if (err instanceof Error && err.name === "AbortError") return;
-          throw err;
-        }
+      if (data.ok) {
+        setConfirmation(`Mail envoye a ${data.recipients?.join(", ")}`);
+        await reloadSession();
       } else {
-        // 4. Desktop : téléchargement PDF + ouverture mailto
-        const url = URL.createObjectURL(pdfBlob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 2000);
-
-        const mailto = `mailto:${encodeURIComponent(recipients.join(","))}`
-          + `?cc=${encodeURIComponent(cc)}`
-          + `&subject=${encodeURIComponent(subject)}`
-          + `&body=${encodeURIComponent(bodyText + "\n\n(Merci de joindre le PDF télécharge.)")}`;
-        window.location.href = mailto;
+        alert(data.error ?? "Erreur envoi mail");
       }
-
-      // 5. Marque l'envoi en DB (déclaratif)
-      await supabase
-        .from("commande_sessions")
-        .update({
-          email_sent_at: new Date().toISOString(),
-          email_sent_to: recipients.join(", "),
-        })
-        .eq("id", sessionId);
-
-      setConfirmation(`Mail prepare pour ${recipients.join(", ")}`);
-      await reloadSession();
     } catch (err) {
-      console.error("[commandes] send mail error:", err);
-      alert("Erreur lors de la preparation du mail");
+      console.error("[commandes] send email error:", err);
+      alert("Erreur lors de l'envoi du mail");
     }
     setSendingEmail(false);
     setTimeout(() => setConfirmation(null), 6000);
-  }
-
-  async function sendEmailOnly(sessionId: string) {
-    await sendMailClient(sessionId);
   }
 
   // ── Pause: quit the current draft without deleting it ───────────────
