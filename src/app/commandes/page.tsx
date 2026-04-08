@@ -1527,6 +1527,79 @@ function CommandesPage() {
           </div>
         </BottomSheet>
 
+        {/* Fournisseurs (tuiles) — home page when no supplier selected */}
+        {!loading && !selectedSupplierId && suppliers.length > 0 && (
+          <div style={{ marginTop: 4 }}>
+            <div style={{
+              fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
+              color: "#A0845C", marginBottom: 10,
+              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+            }}>
+              Fournisseurs
+            </div>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+              gap: 10,
+            }}>
+              {suppliers.map((s) => {
+                const hasDraft = draftSupplierIds.has(s.id);
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSelectedSupplierId(s.id)}
+                    style={{
+                      padding: "18px 14px",
+                      borderRadius: 14,
+                      border: hasDraft ? "1.5px solid #D4775A" : "1px solid #e0d8ce",
+                      background: "#fff",
+                      cursor: "pointer",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
+                      minHeight: 86,
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                      fontFamily: "inherit",
+                      transition: "box-shadow 0.2s, transform 0.12s",
+                    }}
+                    onTouchStart={(e) => { e.currentTarget.style.transform = "scale(0.97)"; }}
+                    onTouchEnd={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+                  >
+                    <span style={{
+                      fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                      fontSize: 13, fontWeight: 700,
+                      color: "#1a1a1a",
+                      textTransform: "uppercase",
+                      letterSpacing: ".04em",
+                      textAlign: "center",
+                      lineHeight: 1.2,
+                    }}>
+                      {s.name}
+                    </span>
+                    {hasDraft && (
+                      <span style={{
+                        display: "inline-flex", alignItems: "center", gap: 4,
+                        fontSize: 9, fontWeight: 700,
+                        padding: "2px 8px", borderRadius: 6,
+                        background: "rgba(212,119,90,0.12)",
+                        color: "#D4775A",
+                        textTransform: "uppercase",
+                        letterSpacing: ".05em",
+                      }}>
+                        <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#D4775A" }} />
+                        brouillon
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Commandes en cours */}
         {!loading && activeSessions.length > 0 && (
           <div style={{ marginTop: 16 }}>
