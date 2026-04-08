@@ -607,64 +607,97 @@ export default function EmployeDetailPage() {
           icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" /></svg>}
           iconColor="#D4775A" iconBg="rgba(212,119,90,0.10)"
         >
-          {/* Etab cards (radio-style, the 2 etabs) */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
-            {etablissements.map((e) => {
-              const isActive = (empEtab?.id ?? (emp as Record<string, unknown>).etablissement_id as string) === e.id;
-              const c = e.couleur ?? "#D4775A";
-              return (
-                <button
-                  key={e.id}
-                  type="button"
-                  disabled={!canWrite}
-                  onClick={() => {
-                    // Update the hidden contrat-etab select so handleSave picks it up
-                    const sel = document.getElementById("contrat-etab") as HTMLSelectElement | null;
-                    if (sel) sel.value = e.id;
-                    setEmpEtab({ id: e.id, nom: e.nom, couleur: e.couleur ?? "#D4775A" });
-                  }}
-                  style={{
-                    padding: "16px 14px",
-                    borderRadius: 14,
-                    border: isActive ? `2px solid ${c}` : "1px solid #e0d8ce",
-                    background: isActive ? `${c}10` : "#fff",
-                    cursor: canWrite ? "pointer" : "default",
-                    display: "flex", alignItems: "center", gap: 12,
-                    fontFamily: "inherit",
-                    transition: "all 0.15s",
-                    boxShadow: isActive ? `0 4px 16px ${c}25` : "0 1px 4px rgba(0,0,0,0.04)",
-                  }}
-                >
-                  <div style={{
-                    width: 36, height: 36, borderRadius: 10,
-                    background: `${c}20`,
-                    color: c,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    flexShrink: 0,
-                  }}>
-                    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" />
-                    </svg>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
-                    <div style={{
-                      fontSize: 13, fontWeight: 700,
-                      color: isActive ? c : "#1a1a1a",
-                      fontFamily: "var(--font-oswald), Oswald, sans-serif",
-                      textTransform: "uppercase", letterSpacing: ".04em",
-                    }}>
-                      {e.nom}
-                    </div>
-                  </div>
-                  {isActive && (
-                    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          {/* Etab cards — multi-select toggles */}
+          {(() => {
+            const empEtabIds = ((emp as Record<string, unknown>).etablissements_ids as string[] | null) ?? [];
+            const fallbackId = (emp as Record<string, unknown>).etablissement_id as string | null;
+            const selectedIds = empEtabIds.length > 0 ? empEtabIds : (fallbackId ? [fallbackId] : []);
+            const toggleEtab = async (id: string) => {
+              const isOn = selectedIds.includes(id);
+              const next = isOn ? selectedIds.filter((x) => x !== id) : [...selectedIds, id];
+              // Update DB immediately + local state
+              await supabase.from("employes").update({
+                etablissements_ids: next,
+                // primary etab = first selected (or null if none)
+                etablissement_id: next[0] ?? null,
+              }).eq("id", emp.id);
+              setEmp((prev: Record<string, unknown>) => ({ ...prev, etablissements_ids: next, etablissement_id: next[0] ?? null }));
+              // Refresh empEtab display from primary
+              if (next[0]) {
+                const primary = etablissements.find((x) => x.id === next[0]);
+                if (primary) setEmpEtab({ id: primary.id, nom: primary.nom, couleur: primary.couleur ?? "#D4775A" });
+              } else {
+                setEmpEtab(null);
+              }
+              // Sync hidden select for handleSave
+              const sel = document.getElementById("contrat-etab") as HTMLSelectElement | null;
+              if (sel) sel.value = next[0] ?? "";
+            };
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+                {etablissements.map((e) => {
+                  const isActive = selectedIds.includes(e.id);
+                  const c = e.couleur ?? "#D4775A";
+                  return (
+                    <button
+                      key={e.id}
+                      type="button"
+                      disabled={!canWrite}
+                      onClick={() => toggleEtab(e.id)}
+                      style={{
+                        padding: "16px 18px",
+                        borderRadius: 14,
+                        border: isActive ? `2px solid ${c}` : "1px solid #e0d8ce",
+                        background: isActive ? `${c}10` : "#fff",
+                        cursor: canWrite ? "pointer" : "default",
+                        display: "flex", alignItems: "center", gap: 14,
+                        fontFamily: "inherit",
+                        transition: "all 0.15s",
+                        boxShadow: isActive ? `0 4px 16px ${c}25` : "0 1px 4px rgba(0,0,0,0.04)",
+                      }}
+                    >
+                      <div style={{
+                        width: 40, height: 40, borderRadius: 12,
+                        background: `${c}20`,
+                        color: c,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0,
+                      }}>
+                        <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" />
+                        </svg>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+                        <div style={{
+                          fontSize: 14, fontWeight: 700,
+                          color: isActive ? c : "#1a1a1a",
+                          fontFamily: "var(--font-oswald), Oswald, sans-serif",
+                          textTransform: "uppercase", letterSpacing: ".04em",
+                        }}>
+                          {e.nom}
+                        </div>
+                      </div>
+                      {/* Checkbox */}
+                      <div style={{
+                        width: 22, height: 22, borderRadius: 6,
+                        border: isActive ? `2px solid ${c}` : "2px solid #ddd6c8",
+                        background: isActive ? c : "#fff",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0,
+                        transition: "all 0.15s",
+                      }}>
+                        {isActive && (
+                          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* Hidden select read by handleSave */}
           <select

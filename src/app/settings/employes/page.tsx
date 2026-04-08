@@ -196,8 +196,8 @@ export default function SettingsEmployesPage() {
           <div style={{ padding: 40, textAlign: "center", color: "#999", fontSize: 13 }}>Aucun collaborateur trouve</div>
         ) : (
           <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+            display: "flex",
+            flexDirection: "column",
             gap: 12,
           }}>
             {filtered.map(emp => {

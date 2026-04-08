@@ -16,6 +16,7 @@ type Employe = {
   email: string | null;
   equipes_access: string[] | null;
   etablissement_id: string | null;
+  cp_n_minus_1?: { acquis?: number; pris?: number } | null;
 };
 
 type Contrat = {
@@ -46,9 +47,15 @@ type CpBalance = {
   employe_id: string;
   prenom: string;
   nom: string;
+  etablissement: string;
+  equipe: string;
+  acquis_n_minus_1: number;
+  pris_n_minus_1: number;
+  solde_n_minus_1: number;
   acquis: number;
   pris: number;
   solde: number;
+  solde_total: number;
 };
 
 /* ── Constants ─────────────────────────────────────────────────── */
@@ -318,7 +325,7 @@ export default function CongesPage() {
     const [empRes, absRes, contratRes] = await Promise.all([
       supabase
         .from("employes")
-        .select("id, prenom, nom, email, equipes_access, etablissement_id")
+        .select("id, prenom, nom, email, equipes_access, etablissement_id, cp_n_minus_1")
         .eq("etablissement_id", etab.id)
         .eq("actif", true)
         .order("nom"),
@@ -395,7 +402,6 @@ export default function CongesPage() {
           if (a.employe_id !== emp.id) return false;
           if (a.type !== "CP" && a.type !== "conge_paye") return false;
           if (a.statut !== "valide") return false;
-          // Overlaps with reference period
           return a.date_fin >= cpReferencePeriod.start && a.date_debut <= cpReferencePeriod.end;
         })
         .reduce((sum, a) => {
@@ -403,16 +409,36 @@ export default function CongesPage() {
           return sum + businessDaysBetween(a.date_debut, a.date_fin);
         }, 0);
 
+      const acquisNm1 = Number(emp.cp_n_minus_1?.acquis ?? 0);
+      const prisNm1 = Number(emp.cp_n_minus_1?.pris ?? 0);
+      const soldeNm1 = Math.max(0, acquisNm1 - prisNm1);
+      const solde = Math.round((acquis - pris) * 10) / 10;
+
       return {
         employe_id: emp.id,
         prenom: emp.prenom,
         nom: emp.nom,
+        etablissement: etab?.nom ?? "—",
+        equipe: (emp.equipes_access ?? [])[0] ?? "—",
+        acquis_n_minus_1: acquisNm1,
+        pris_n_minus_1: prisNm1,
+        solde_n_minus_1: soldeNm1,
         acquis: Math.round(acquis * 10) / 10,
         pris: Math.round(pris * 10) / 10,
-        solde: Math.round((acquis - pris) * 10) / 10,
+        solde,
+        solde_total: Math.round((soldeNm1 + solde) * 10) / 10,
       };
     });
-  }, [employes, contrats, absences, cpReferencePeriod, now]);
+  }, [employes, contrats, absences, cpReferencePeriod, now, etab]);
+
+  /* ── Save N-1 override ──────────────────────────────────────── */
+  const updateNMinus1 = useCallback(async (employeId: string, field: "acquis" | "pris", value: number) => {
+    const emp = employes.find((e) => e.id === employeId);
+    if (!emp) return;
+    const nextNm1 = { ...(emp.cp_n_minus_1 ?? {}), [field]: value };
+    setEmployes((prev) => prev.map((e) => e.id === employeId ? { ...e, cp_n_minus_1: nextNm1 } : e));
+    await supabase.from("employes").update({ cp_n_minus_1: nextNm1 }).eq("id", employeId);
+  }, [employes]);
 
   /* ── KPIs ───────────────────────────────────────────────────── */
 
@@ -646,6 +672,21 @@ export default function CongesPage() {
     marginBottom: 12,
   };
 
+  const cellInputStyle: React.CSSProperties = {
+    width: 64,
+    padding: "5px 8px",
+    border: "1px solid #e0d8ce",
+    borderRadius: 6,
+    fontSize: 13,
+    fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+    background: "#fff",
+    color: "#1a1a1a",
+    textAlign: "right",
+    outline: "none",
+    appearance: "textfield",
+    MozAppearance: "textfield",
+  };
+
   return (
     <RequireRole allowedRoles={["group_admin", "equipier"]}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px" }}>
@@ -784,110 +825,115 @@ export default function CongesPage() {
           </p>
         ) : (
           <>
-            {/* ── SOLDES CP (admin only) ──────────────────────── */}
+            {/* ── COMPTEURS DE CONGES PAYES (admin only, table) ── */}
             {!isEquipier && cpBalances.length > 0 && (
-              <div style={{ marginBottom: 24 }}>
-                <h2 style={sectionTitleStyle}>Soldes CP</h2>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-                    gap: 10,
-                  }}
-                >
-                  {cpBalances.map((b) => {
-                    const pct = b.acquis > 0 ? Math.min((b.pris / b.acquis) * 100, 100) : 0;
-                    const barColor = b.solde <= 5 ? "#c62828" : b.solde <= 10 ? "#E65100" : "#2E7D32";
-                    return (
-                      <div
-                        key={b.employe_id}
-                        style={{
-                          background: "#fff",
-                          border: "1px solid #ddd6c8",
-                          borderRadius: 12,
-                          padding: "12px 14px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            marginBottom: 6,
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <div
-                              style={{
-                                width: 28,
-                                height: 28,
-                                borderRadius: "50%",
-                                background: "#f6eedf",
-                                border: "1px solid #ddd6c8",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: 10,
-                                fontWeight: 700,
-                                color: "#D4775A",
-                                flexShrink: 0,
-                              }}
-                            >
-                              {getInitials(b.prenom, b.nom)}
-                            </div>
-                            <span style={{ fontWeight: 600, fontSize: 13, color: "#1a1a1a" }}>
-                              {b.prenom} {b.nom}
-                            </span>
-                          </div>
-                          <span
-                            style={{
-                              fontFamily: "var(--font-oswald), Oswald, sans-serif",
-                              fontSize: 18,
-                              fontWeight: 700,
-                              color: b.solde <= 0 ? "#c62828" : "#1a1a1a",
-                            }}
-                          >
-                            {b.solde}j
-                          </span>
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            fontSize: 11,
-                            color: "#999",
-                            marginBottom: 4,
-                          }}
-                        >
-                          <span>Acquis : {b.acquis}j</span>
-                          <span>Pris : {b.pris}j</span>
-                        </div>
-                        {/* Progress bar */}
-                        <div
-                          style={{
-                            height: 4,
-                            borderRadius: 2,
-                            background: "#f0ece6",
-                            overflow: "hidden",
-                          }}
-                        >
-                          <div
-                            style={{
-                              height: "100%",
-                              width: `${pct}%`,
-                              background: barColor,
-                              borderRadius: 2,
-                              transition: "width 0.3s",
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+              <div style={{
+                marginBottom: 24,
+                background: "#fff",
+                border: "1px solid #e0d8ce",
+                borderRadius: 14,
+                padding: 18,
+                boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+              }}>
+                <div style={{ marginBottom: 4 }}>
+                  <h2 style={{ ...sectionTitleStyle, marginBottom: 4 }}>Compteurs de conges payes</h2>
+                  <div style={{ fontSize: 11, color: "#999" }}>
+                    Periode N : {formatDateFR(cpReferencePeriod.start)} au {formatDateFR(cpReferencePeriod.end)} · 2.5 j / mois · les colonnes N-1 sont editables
+                  </div>
                 </div>
-                <div style={{ fontSize: 11, color: "#999", marginTop: 6 }}>
-                  Periode de reference : {formatDateFR(cpReferencePeriod.start)} au{" "}
-                  {formatDateFR(cpReferencePeriod.end)} -- 2.5 jours/mois
+
+                <div style={{ marginTop: 14, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                  <table style={{
+                    width: "100%", borderCollapse: "collapse",
+                    fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+                    fontSize: 13, minWidth: 880,
+                  }}>
+                    <thead>
+                      <tr style={{ borderBottom: "2px solid #e0d8ce" }}>
+                        {["Salarie", "Etablissement", "Equipe", "Acquis N-1", "Pris N-1", "Solde N-1", "Acquis N", "Pris N", "Solde N", "Solde total"].map((h, i) => (
+                          <th key={h} style={{
+                            padding: "10px 8px",
+                            fontSize: 10, fontWeight: 700, color: "#999",
+                            textTransform: "uppercase", letterSpacing: ".06em",
+                            textAlign: i === 0 || i === 1 || i === 2 ? "left" : "right",
+                            whiteSpace: "nowrap",
+                          }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cpBalances.map((b) => {
+                        const totalColor = b.solde_total <= 5 ? "#c62828" : b.solde_total <= 10 ? "#E65100" : "#2E7D32";
+                        return (
+                          <tr key={b.employe_id} style={{ borderBottom: "1px solid #f0ebe3" }}>
+                            <td style={{ padding: "10px 8px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{
+                                  width: 6, height: 6, borderRadius: "50%",
+                                  background: "#2D6A4F", flexShrink: 0,
+                                }} />
+                                <span style={{ fontWeight: 600, color: "#1a1a1a" }}>
+                                  {b.prenom} {b.nom}
+                                </span>
+                              </div>
+                            </td>
+                            <td style={{ padding: "10px 8px", color: "#666" }}>{b.etablissement}</td>
+                            <td style={{ padding: "10px 8px", color: "#666" }}>{b.equipe}</td>
+                            {/* Acquis N-1 (editable) */}
+                            <td style={{ padding: "6px 8px", textAlign: "right" }}>
+                              <input
+                                type="number" step={0.5} min={0}
+                                defaultValue={b.acquis_n_minus_1}
+                                onBlur={(e) => {
+                                  const v = Number(e.target.value) || 0;
+                                  if (v !== b.acquis_n_minus_1) updateNMinus1(b.employe_id, "acquis", v);
+                                }}
+                                style={cellInputStyle}
+                              />
+                            </td>
+                            {/* Pris N-1 (editable) */}
+                            <td style={{ padding: "6px 8px", textAlign: "right" }}>
+                              <input
+                                type="number" step={0.5} min={0}
+                                defaultValue={b.pris_n_minus_1}
+                                onBlur={(e) => {
+                                  const v = Number(e.target.value) || 0;
+                                  if (v !== b.pris_n_minus_1) updateNMinus1(b.employe_id, "pris", v);
+                                }}
+                                style={cellInputStyle}
+                              />
+                            </td>
+                            {/* Solde N-1 */}
+                            <td style={{ padding: "10px 8px", textAlign: "right", color: "#666" }}>
+                              {b.solde_n_minus_1} j
+                            </td>
+                            {/* Acquis N (computed) */}
+                            <td style={{ padding: "10px 8px", textAlign: "right", color: "#1a1a1a" }}>
+                              {b.acquis} j
+                            </td>
+                            {/* Pris N (computed) */}
+                            <td style={{ padding: "10px 8px", textAlign: "right", color: "#1a1a1a" }}>
+                              {b.pris} j
+                            </td>
+                            {/* Solde N */}
+                            <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 600, color: b.solde <= 0 ? "#c62828" : "#1a1a1a" }}>
+                              {b.solde} j
+                            </td>
+                            {/* Solde total */}
+                            <td style={{ padding: "10px 8px", textAlign: "right" }}>
+                              <span style={{
+                                fontFamily: "var(--font-oswald), Oswald, sans-serif",
+                                fontSize: 14, fontWeight: 700,
+                                color: totalColor,
+                              }}>
+                                {b.solde_total} j
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
