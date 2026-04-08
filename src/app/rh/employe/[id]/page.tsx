@@ -656,76 +656,59 @@ export default function EmployeDetailPage() {
           matricule={matricule} setMatricule={setMatricule}
         />
 
-        {/* ═══ TUILE: ETABLISSEMENT / EQUIPE / CONTRAT ═══ */}
-        {(() => {
-          const empEquipes = ((emp as Record<string, unknown>).equipes_access as string[] ?? []);
-          const nbContrats = contrats.length;
-          return (
-            <div style={{
-              background: "#fff",
-              border: "1px solid #e0d8ce",
-              borderRadius: 14,
-              padding: 18,
-              marginBottom: 14,
-              boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-            }}>
-              <div style={{
-                display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
-              }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: 8,
-                  background: "rgba(212,119,90,0.10)", color: "#D4775A",
-                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                }}>
-                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" />
-                  </svg>
-                </div>
-                <span style={{
-                  fontFamily: "var(--font-oswald), Oswald, sans-serif",
-                  fontSize: 14, fontWeight: 700,
-                  textTransform: "uppercase", letterSpacing: ".06em",
-                  color: "#1a1a1a",
-                }}>
-                  Etablissement / Equipe
-                </span>
-              </div>
-
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-                gap: 12,
-              }}>
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>Etablissement</div>
-                  <div style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 600 }}>{empEtab?.nom ?? etab?.nom ?? "—"}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>Equipe</div>
-                  <div style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 600 }}>{empEquipes.length > 0 ? empEquipes.join(", ") : "—"}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>Type de contrat</div>
-                  <div style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 600 }}>
-                    {activeContrat ? (CONTRAT_LABELS[activeContrat.type] ?? activeContrat.type) : "—"}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>Salaire brut</div>
-                  <div style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 600, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
-                    {activeContrat?.remuneration ? `${activeContrat.remuneration.toLocaleString("fr-FR")} €` : "—"}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>N° de contrat</div>
-                  <div style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 600 }}>
-                    {nbContrats > 0 ? `${nbContrats}` : "—"}
-                  </div>
-                </div>
-              </div>
+        {/* ═══ TUILE: ETABLISSEMENT — parametrable ═══ */}
+        <AccordionSection
+          title="Etablissement"
+          icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" /></svg>}
+          iconColor="#D4775A" iconBg="rgba(212,119,90,0.10)"
+        >
+          <div style={grid2}>
+            <div>
+              <div style={{ fontSize: 11, color: "#999", marginBottom: 4, fontWeight: 600 }}>Etablissement</div>
+              <select
+                id="contrat-etab"
+                style={inputSt}
+                defaultValue={empEtab?.id ?? (emp as Record<string, unknown>).etablissement_id as string ?? ""}
+                disabled={!canWrite}
+              >
+                <option value="">-- Selectionner --</option>
+                {etablissements.map((e) => (
+                  <option key={e.id} value={e.id}>{e.nom}</option>
+                ))}
+              </select>
             </div>
-          );
-        })()}
+            <div>
+              <div style={{ fontSize: 11, color: "#999", marginBottom: 4, fontWeight: 600 }}>Equipe</div>
+              <select
+                id="contrat-equipe"
+                style={inputSt}
+                defaultValue={(((emp as Record<string, unknown>).equipes_access as string[] ?? [])[0]) ?? ""}
+                disabled={!canWrite}
+              >
+                <option value="">-- Aucune --</option>
+                {contratEquipes.map((eq) => (
+                  <option key={eq} value={eq}>{eq}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div style={grid2}>
+            <FieldSelect
+              label="Type de contrat"
+              value={cType}
+              onChange={setCType}
+              disabled={!canWrite}
+              options={Object.entries(CONTRAT_LABELS).map(([k, v]) => [k, v])}
+            />
+            <Field
+              label="Salaire brut mensuel (EUR)"
+              type="number"
+              value={String(cRemuneration)}
+              onChange={(v) => setCRemuneration(Number(v))}
+              disabled={!canWrite}
+            />
+          </div>
+        </AccordionSection>
 
         {/* ═══ TAB: CONTRATS (hidden — kept for legacy) ═══ */}
         {mainTab === "dossier" && (
@@ -2106,40 +2089,39 @@ function PlanifEquipes({ etabId, currentAccess, empId, onUpdate }: {
 
 /* ── InfosTab — Accordion-based layout ─────────────────────────── */
 
-function AccordionSection({ title, icon, iconColor, iconBg, defaultOpen = false, children }: {
+function AccordionSection({ title, icon, iconBg, children }: {
   title: string; icon: React.ReactNode; iconColor?: string; iconBg?: string; defaultOpen?: boolean; children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div style={{ border: "1px solid #ddd6c8", borderRadius: 12, marginBottom: 10, overflow: "hidden", background: "#fff" }}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        style={{
-          display: "flex", alignItems: "center", gap: 10, width: "100%",
-          padding: "14px 18px", border: "none", cursor: "pointer",
-          background: open ? "#faf7f2" : "#fff",
-          borderLeft: open ? `3px solid ${iconColor ?? "#D4775A"}` : "3px solid transparent",
-          transition: "background 0.15s, border-color 0.15s",
-        }}
-      >
+    <div style={{
+      border: "1px solid #e0d8ce",
+      borderRadius: 14,
+      marginBottom: 14,
+      background: "#fff",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+      overflow: "hidden",
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10, width: "100%",
+        padding: "16px 18px 12px",
+      }}>
         <span style={{
-          width: 26, height: 26, borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center",
+          width: 28, height: 28, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
           background: iconBg ?? "rgba(212,119,90,0.1)", flexShrink: 0,
         }}>
           {icon}
         </span>
-        <span style={{ flex: 1, textAlign: "left", fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{title}</span>
-        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2"
-          style={{ transform: open ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s" }}>
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-      {open && (
-        <div style={{ padding: "4px 18px 18px" }}>
-          {children}
-        </div>
-      )}
+        <span style={{
+          flex: 1, textAlign: "left",
+          fontFamily: "var(--font-oswald), Oswald, sans-serif",
+          fontSize: 14, fontWeight: 700,
+          textTransform: "uppercase", letterSpacing: ".05em",
+          color: "#1a1a1a",
+        }}>{title}</span>
+      </div>
+      <div style={{ padding: "0 18px 18px" }}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -2195,50 +2177,38 @@ function InfosTab(props: {
   const ic = (color: string) => <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>;
 
   return (
-    <>
-      <AccordionSection
-        title="Etat civil"
-        icon={ic("#2D6A4F")}
-        iconColor="#2D6A4F" iconBg="rgba(45,106,79,0.1)"
-        defaultOpen
-      >
-        <div style={grid2}>
-          <FieldSelect label="Genre" value={p.genre} onChange={p.setGenre} disabled={!cw}
-            options={[["", "-- Selectionner --"], ["M", "Homme"], ["F", "Femme"]]} />
-          <Field label="Nationalite" value={p.nationalite} onChange={p.setNationalite} disabled={!cw} />
-        </div>
-        <div style={grid2}>
-          <Field label="Prenom" value={p.prenom} onChange={p.setPrenom} disabled={!cw} />
-          <Field label="Nom de naissance" value={p.nom} onChange={p.setNom} disabled={!cw} />
-        </div>
-        <div style={grid2}>
-          <Field label="Date de naissance" type="date" value={p.dateNaissance} onChange={p.setDateNaissance} disabled={!cw} />
-          <FieldSelect label="Situation familiale" value={p.situationFamiliale} onChange={p.setSituationFamiliale} disabled={!cw} options={SIT_OPTIONS} />
-        </div>
-        <div style={grid2}>
-          <Field label="Date d'anciennete" type="date" value={p.dateAnciennete} onChange={p.setDateAnciennete} disabled={!cw} />
-          <Field label="Matricule" value={p.matricule} onChange={p.setMatricule} disabled={!cw} />
-        </div>
-      </AccordionSection>
-
-      <AccordionSection
-        title="Coordonnees"
-        icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7l-10 7L2 7" /></svg>}
-        iconColor="#2563eb" iconBg="rgba(37,99,235,0.1)"
-        defaultOpen
-      >
-        <div style={grid2}>
-          <Field label="Email" type="email" value={p.email} onChange={p.setEmail} disabled={!cw} />
-          <Field label="Tel. mobile" value={p.telMobile} onChange={p.setTelMobile} disabled={!cw} />
-        </div>
-        <Field label="Adresse" value={p.adresse} onChange={p.setAdresse} disabled={!cw} />
-        <div style={grid2}>
-          <Field label="Code postal" value={p.codePostal} onChange={p.setCodePostal} disabled={!cw} />
-          <Field label="Ville" value={p.ville} onChange={p.setVille} disabled={!cw} />
-        </div>
-      </AccordionSection>
-
-    </>
+    <AccordionSection
+      title="Identite"
+      icon={ic("#2D6A4F")}
+      iconColor="#2D6A4F" iconBg="rgba(45,106,79,0.1)"
+    >
+      <div style={grid2}>
+        <FieldSelect label="Genre" value={p.genre} onChange={p.setGenre} disabled={!cw}
+          options={[["", "-- Selectionner --"], ["M", "Homme"], ["F", "Femme"]]} />
+        <Field label="Nationalite" value={p.nationalite} onChange={p.setNationalite} disabled={!cw} />
+      </div>
+      <div style={grid2}>
+        <Field label="Prenom" value={p.prenom} onChange={p.setPrenom} disabled={!cw} />
+        <Field label="Nom de naissance" value={p.nom} onChange={p.setNom} disabled={!cw} />
+      </div>
+      <div style={grid2}>
+        <Field label="Date de naissance" type="date" value={p.dateNaissance} onChange={p.setDateNaissance} disabled={!cw} />
+        <FieldSelect label="Situation familiale" value={p.situationFamiliale} onChange={p.setSituationFamiliale} disabled={!cw} options={SIT_OPTIONS} />
+      </div>
+      <div style={grid2}>
+        <Field label="Date d'anciennete" type="date" value={p.dateAnciennete} onChange={p.setDateAnciennete} disabled={!cw} />
+        <Field label="Matricule" value={p.matricule} onChange={p.setMatricule} disabled={!cw} />
+      </div>
+      <div style={grid2}>
+        <Field label="Email" type="email" value={p.email} onChange={p.setEmail} disabled={!cw} />
+        <Field label="Tel. mobile" value={p.telMobile} onChange={p.setTelMobile} disabled={!cw} />
+      </div>
+      <Field label="Adresse" value={p.adresse} onChange={p.setAdresse} disabled={!cw} />
+      <div style={grid2}>
+        <Field label="Code postal" value={p.codePostal} onChange={p.setCodePostal} disabled={!cw} />
+        <Field label="Ville" value={p.ville} onChange={p.setVille} disabled={!cw} />
+      </div>
+    </AccordionSection>
   );
 }
 
