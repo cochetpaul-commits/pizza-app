@@ -80,14 +80,6 @@ const ELEMENT_LABELS: Record<string, string> = {
   acompte: "Acompte", mutuelle_dispense: "Dispense mutuelle",
 };
 
-/* ── Completion fields ─────────────────────────────────────────── */
-
-const COMPLETION_FIELDS = [
-  "prenom", "nom", "email", "tel_mobile", "date_naissance",
-  "adresse", "code_postal", "ville", "nationalite", "numero_secu",
-  "genre", "iban", "contact_urgence_tel",
-] as const;
-
 /* ── Component ─────────────────────────────────────────────────── */
 
 export default function EmployeDetailPage() {
@@ -99,7 +91,7 @@ export default function EmployeDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
-  const [mainTab, setMainTab] = useState<MainTab>("infos");
+  const [mainTab] = useState<MainTab>("infos");
 
   // ── Employee fields ──
   const [emp, setEmp] = useState<Record<string, unknown>>({});
@@ -227,20 +219,6 @@ export default function EmployeDetailPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contrats]);
-
-  /* ── Completion % ── */
-  const completionPct = useMemo(() => {
-    const values: Record<string, unknown> = {
-      prenom, nom, email, tel_mobile: telMobile, date_naissance: dateNaissance,
-      adresse, code_postal: codePostal, ville, nationalite, numero_secu: numeroSecu,
-      genre, iban, contact_urgence_tel: contactUrgTel,
-    };
-    let filled = 0;
-    for (const k of COMPLETION_FIELDS) {
-      if (values[k]) filled++;
-    }
-    return Math.round((filled / COMPLETION_FIELDS.length) * 100);
-  }, [prenom, nom, email, telMobile, dateNaissance, adresse, codePostal, ville, nationalite, numeroSecu, genre, iban, contactUrgTel]);
 
   /* ── Load ── */
   useEffect(() => {
@@ -602,9 +580,6 @@ export default function EmployeDetailPage() {
                   <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
                   Supervise {((emp as Record<string, unknown>).equipes_access as string[] ?? []).length > 0 ? "son equipe" : "—"}
                 </span>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.6)" }}>
-                  {completionPct}% {completionPct === 100 ? "complet" : "incomplet"}
-                </span>
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
@@ -663,74 +638,33 @@ export default function EmployeDetailPage() {
           </div>
         </div>
 
-        {/* Completion bar */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "12px 0" }}>
-          <div style={completionBarBg}>
-            <div style={{ ...completionBarFill, width: `${completionPct}%` }} />
-          </div>
-          <span style={{ fontSize: 11, fontWeight: 700, color: completionPct === 100 ? "#4a6741" : "#e27f57" }}>
-            {completionPct}% {completionPct === 100 ? "Complet" : "Incomplet"}
-          </span>
-        </div>
-
-        {/* ── Tabs — separated from header ── */}
-        <div style={{ ...tabsRow, marginBottom: 16 }}>
-          {([
-            ["infos", "Informations personnelles"],
-            ["conges", "Conges et Absences"],
-            ["roles", "Role et permissions"],
-          ] as [MainTab, string][]).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setMainTab(key)}
-              style={tabBtn(mainTab === key, etab?.couleur)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* ═══ TAB: INFORMATIONS GENERALES ═══ */}
-        {mainTab === "infos" && (
-          <InfosTab
-            canWrite={canWrite}
-            accent={empEtab?.couleur ?? etab?.couleur ?? "#D4775A"}
-            genre={genre} setGenre={setGenre}
-            prenom={prenom} setPrenom={setPrenom}
-            nom={nom} setNom={setNom}
-            nationalite={nationalite} setNationalite={setNationalite}
-            dateNaissance={dateNaissance} setDateNaissance={setDateNaissance}
-            lieuNaissance={lieuNaissance} setLieuNaissance={setLieuNaissance}
-            deptNaissance={deptNaissance} setDeptNaissance={setDeptNaissance}
-            situationFamiliale={situationFamiliale} setSituationFamiliale={setSituationFamiliale}
-            nbPersonnesCharge={nbPersonnesCharge} setNbPersonnesCharge={setNbPersonnesCharge}
-            email={email} setEmail={setEmail}
-            telMobile={telMobile} setTelMobile={setTelMobile}
-            telFixe={telFixe} setTelFixe={setTelFixe}
-            adresse={adresse} setAdresse={setAdresse}
-            codePostal={codePostal} setCodePostal={setCodePostal}
-            ville={ville} setVille={setVille}
-            contactUrgPrenom={contactUrgPrenom} setContactUrgPrenom={setContactUrgPrenom}
-            contactUrgNom={contactUrgNom} setContactUrgNom={setContactUrgNom}
-            contactUrgLien={contactUrgLien} setContactUrgLien={setContactUrgLien}
-            contactUrgTel={contactUrgTel} setContactUrgTel={setContactUrgTel}
-            dateAnciennete={dateAnciennete} setDateAnciennete={setDateAnciennete}
-            matricule={matricule} setMatricule={setMatricule}
-            titulaireCompte={titulaireCompte} setTitulaireCompte={setTitulaireCompte}
-            iban={iban} setIban={setIban}
-            bic={bic} setBic={setBic}
-            numeroSecu={numeroSecu} setNumeroSecu={setNumeroSecu}
-            handicap={handicap} setHandicap={setHandicap}
-            typeHandicap={typeHandicap} setTypeHandicap={setTypeHandicap}
-            dateVisiteMedicale={dateVisiteMedicale} setDateVisiteMedicale={setDateVisiteMedicale}
-            visiteRenforcee={visiteRenforcee} setVisiteRenforcee={setVisiteRenforcee}
-            prochaineVisite={prochaineVisite} setProchaineVisite={setProchaineVisite}
-            travailleurEtranger={travailleurEtranger} setTravailleurEtranger={setTravailleurEtranger}
-            note={note} setNote={setNote}
-            saving={saving} handleSave={handleSave}
-          />
-        )}
+        {/* ═══ INFORMATIONS PERSONNELLES ═══ */}
+        <InfosTab
+          canWrite={canWrite}
+          accent={empEtab?.couleur ?? etab?.couleur ?? "#D4775A"}
+          genre={genre} setGenre={setGenre}
+          prenom={prenom} setPrenom={setPrenom}
+          nom={nom} setNom={setNom}
+          nationalite={nationalite} setNationalite={setNationalite}
+          dateNaissance={dateNaissance} setDateNaissance={setDateNaissance}
+          situationFamiliale={situationFamiliale} setSituationFamiliale={setSituationFamiliale}
+          email={email} setEmail={setEmail}
+          telMobile={telMobile} setTelMobile={setTelMobile}
+          adresse={adresse} setAdresse={setAdresse}
+          codePostal={codePostal} setCodePostal={setCodePostal}
+          ville={ville} setVille={setVille}
+          contactUrgPrenom={contactUrgPrenom} setContactUrgPrenom={setContactUrgPrenom}
+          contactUrgNom={contactUrgNom} setContactUrgNom={setContactUrgNom}
+          contactUrgLien={contactUrgLien} setContactUrgLien={setContactUrgLien}
+          contactUrgTel={contactUrgTel} setContactUrgTel={setContactUrgTel}
+          dateAnciennete={dateAnciennete} setDateAnciennete={setDateAnciennete}
+          matricule={matricule} setMatricule={setMatricule}
+          titulaireCompte={titulaireCompte} setTitulaireCompte={setTitulaireCompte}
+          iban={iban} setIban={setIban}
+          bic={bic} setBic={setBic}
+          numeroSecu={numeroSecu} setNumeroSecu={setNumeroSecu}
+          saving={saving} handleSave={handleSave}
+        />
 
         {/* ═══ TAB: CONTRATS ═══ */}
         {mainTab === "dossier" && (
@@ -914,8 +848,8 @@ export default function EmployeDetailPage() {
           </>
         )}
 
-        {/* ═══ TAB: Conges et Absences ═══ */}
-        {mainTab === "conges" && (() => {
+        {/* ═══ CONGES ET ABSENCES ═══ */}
+        {(() => {
           const ABSENCE_TYPES: Record<string, { label: string; color: string }> = {
             conge_paye: { label: "Conge paye", color: "#2D6A4F" },
             maladie: { label: "Maladie", color: "#DC2626" },
@@ -1093,9 +1027,8 @@ export default function EmployeDetailPage() {
           );
         })()}
 
-        {/* ═══ TAB: ACCES ═══ */}
-        {/* ═══ TAB: Role et Permissions ═══ */}
-        {mainTab === "roles" && (() => {
+        {/* ═══ ROLE ET PERMISSIONS ═══ */}
+        {(() => {
           const empRole = mapToPermRole((emp as Record<string, unknown>)?.role as string ?? "equipier");
           const perms = DEFAULT_PERMS[empRole] ?? DEFAULT_PERMS.equipier;
           const customPerms: Record<string, boolean> = ((emp as Record<string, unknown>)?.custom_permissions as Record<string, boolean>) ?? {};
@@ -2229,13 +2162,9 @@ function InfosTab(props: {
   nom: string; setNom: (v: string) => void;
   nationalite: string; setNationalite: (v: string) => void;
   dateNaissance: string; setDateNaissance: (v: string) => void;
-  lieuNaissance: string; setLieuNaissance: (v: string) => void;
-  deptNaissance: string; setDeptNaissance: (v: string) => void;
   situationFamiliale: string; setSituationFamiliale: (v: string) => void;
-  nbPersonnesCharge: number; setNbPersonnesCharge: (v: number) => void;
   email: string; setEmail: (v: string) => void;
   telMobile: string; setTelMobile: (v: string) => void;
-  telFixe: string; setTelFixe: (v: string) => void;
   adresse: string; setAdresse: (v: string) => void;
   codePostal: string; setCodePostal: (v: string) => void;
   ville: string; setVille: (v: string) => void;
@@ -2249,13 +2178,6 @@ function InfosTab(props: {
   iban: string; setIban: (v: string) => void;
   bic: string; setBic: (v: string) => void;
   numeroSecu: string; setNumeroSecu: (v: string) => void;
-  handicap: boolean; setHandicap: (v: boolean) => void;
-  typeHandicap: string; setTypeHandicap: (v: string) => void;
-  dateVisiteMedicale: string; setDateVisiteMedicale: (v: string) => void;
-  visiteRenforcee: boolean; setVisiteRenforcee: (v: boolean) => void;
-  prochaineVisite: string; setProchaineVisite: (v: string) => void;
-  travailleurEtranger: boolean; setTravailleurEtranger: (v: boolean) => void;
-  note: string; setNote: (v: string) => void;
   saving: boolean; handleSave: () => void;
 }) {
   const p = props;
@@ -2281,13 +2203,12 @@ function InfosTab(props: {
         </div>
         <div style={grid2}>
           <Field label="Date de naissance" type="date" value={p.dateNaissance} onChange={p.setDateNaissance} disabled={!cw} />
-          <Field label="Lieu de naissance" value={p.lieuNaissance} onChange={p.setLieuNaissance} disabled={!cw} />
-        </div>
-        <div style={grid2}>
-          <FieldSelect label="Departement de naissance" value={p.deptNaissance} onChange={p.setDeptNaissance} disabled={!cw} options={DEPT_OPTIONS} />
           <FieldSelect label="Situation familiale" value={p.situationFamiliale} onChange={p.setSituationFamiliale} disabled={!cw} options={SIT_OPTIONS} />
         </div>
-        <Field label="Nb personnes a charge" type="number" value={String(p.nbPersonnesCharge)} onChange={(v) => p.setNbPersonnesCharge(Number(v))} disabled={!cw} />
+        <div style={grid2}>
+          <Field label="Date d'anciennete" type="date" value={p.dateAnciennete} onChange={p.setDateAnciennete} disabled={!cw} />
+          <Field label="Matricule" value={p.matricule} onChange={p.setMatricule} disabled={!cw} />
+        </div>
       </AccordionSection>
 
       <AccordionSection
@@ -2300,37 +2221,10 @@ function InfosTab(props: {
           <Field label="Email" type="email" value={p.email} onChange={p.setEmail} disabled={!cw} />
           <Field label="Tel. mobile" value={p.telMobile} onChange={p.setTelMobile} disabled={!cw} />
         </div>
-        <Field label="Tel. fixe" value={p.telFixe} onChange={p.setTelFixe} disabled={!cw} />
         <Field label="Adresse" value={p.adresse} onChange={p.setAdresse} disabled={!cw} />
         <div style={grid2}>
           <Field label="Code postal" value={p.codePostal} onChange={p.setCodePostal} disabled={!cw} />
           <Field label="Ville" value={p.ville} onChange={p.setVille} disabled={!cw} />
-        </div>
-      </AccordionSection>
-
-      <AccordionSection
-        title="Contact d'urgence"
-        icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>}
-        iconColor="#DC2626" iconBg="rgba(220,38,38,0.1)"
-      >
-        <div style={grid2}>
-          <Field label="Prenom" value={p.contactUrgPrenom} onChange={p.setContactUrgPrenom} disabled={!cw} />
-          <Field label="Nom" value={p.contactUrgNom} onChange={p.setContactUrgNom} disabled={!cw} />
-        </div>
-        <div style={grid2}>
-          <Field label="Lien" value={p.contactUrgLien} onChange={p.setContactUrgLien} disabled={!cw} />
-          <Field label="Tel. mobile" value={p.contactUrgTel} onChange={p.setContactUrgTel} disabled={!cw} />
-        </div>
-      </AccordionSection>
-
-      <AccordionSection
-        title="Informations professionnelles"
-        icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>}
-        iconColor="#A0845C" iconBg="rgba(160,132,92,0.1)"
-      >
-        <div style={grid2}>
-          <Field label="Date d'anciennete" type="date" value={p.dateAnciennete} onChange={p.setDateAnciennete} disabled={!cw} />
-          <Field label="Matricule" value={p.matricule} onChange={p.setMatricule} disabled={!cw} />
         </div>
       </AccordionSection>
 
@@ -2347,58 +2241,22 @@ function InfosTab(props: {
           <Field label="IBAN" value={p.iban} onChange={p.setIban} disabled={!cw} />
           <Field label="BIC" value={p.bic} onChange={p.setBic} disabled={!cw} />
         </div>
-      </AccordionSection>
-
-      <AccordionSection
-        title="Informations medicales"
-        icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>}
-        iconColor="#2563eb" iconBg="rgba(37,99,235,0.1)"
-      >
-        <div style={{ padding: 10, borderRadius: 8, background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.12)", marginBottom: 12, fontSize: 12, color: "#2563eb" }}>
-          Le numero de Securite sociale doit comporter 15 chiffres (1 ou 2 en debut). 7 ou 8 = NIA provisoire.
-        </div>
         <Field label="Numero de Securite sociale" value={p.numeroSecu} onChange={p.setNumeroSecu} disabled={!cw} />
-        <Checkbox label="Personne en situation de handicap" checked={p.handicap} onChange={p.setHandicap} disabled={!cw} />
-        {p.handicap && <Field label="Type de handicap" value={p.typeHandicap} onChange={p.setTypeHandicap} disabled={!cw} />}
+      </AccordionSection>
+
+      <AccordionSection
+        title="Contact d'urgence"
+        icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>}
+        iconColor="#DC2626" iconBg="rgba(220,38,38,0.1)"
+      >
         <div style={grid2}>
-          <Field label="Derniere visite medicale" type="date" value={p.dateVisiteMedicale} onChange={p.setDateVisiteMedicale} disabled={!cw} />
-          <Field label="Prochaine visite medicale" type="date" value={p.prochaineVisite} onChange={p.setProchaineVisite} disabled={!cw} />
+          <Field label="Prenom" value={p.contactUrgPrenom} onChange={p.setContactUrgPrenom} disabled={!cw} />
+          <Field label="Nom" value={p.contactUrgNom} onChange={p.setContactUrgNom} disabled={!cw} />
         </div>
-        <Checkbox label="Visite medicale renforcee" checked={p.visiteRenforcee} onChange={p.setVisiteRenforcee} disabled={!cw} />
-      </AccordionSection>
-
-      <AccordionSection
-        title="Autorisations de travail"
-        icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#7B1FA2" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>}
-        iconColor="#7B1FA2" iconBg="rgba(123,31,162,0.1)"
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 14, color: "#1a1a1a" }}>Travailleur etranger avec autorisation de travail</span>
-          <button type="button" onClick={() => p.setTravailleurEtranger(!p.travailleurEtranger)} disabled={!cw} style={{
-            width: 40, height: 22, borderRadius: 11, border: "none", cursor: cw ? "pointer" : "default",
-            background: p.travailleurEtranger ? "#2D6A4F" : "#ddd6c8", position: "relative",
-          }}>
-            <span style={{
-              position: "absolute", top: 2, left: p.travailleurEtranger ? 20 : 2,
-              width: 18, height: 18, borderRadius: "50%", background: "#fff",
-              transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
-            }} />
-          </button>
+        <div style={grid2}>
+          <Field label="Lien" value={p.contactUrgLien} onChange={p.setContactUrgLien} disabled={!cw} />
+          <Field label="Tel. mobile" value={p.contactUrgTel} onChange={p.setContactUrgTel} disabled={!cw} />
         </div>
-      </AccordionSection>
-
-      <AccordionSection
-        title="Notes"
-        icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#6f6a61" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>}
-        iconColor="#6f6a61" iconBg="rgba(111,106,97,0.1)"
-      >
-        <textarea
-          value={p.note}
-          onChange={(e) => p.setNote(e.target.value)}
-          disabled={!cw}
-          placeholder="Notes internes sur le collaborateur..."
-          style={{ ...inputSt, minHeight: 80, resize: "vertical", fontFamily: "inherit" }}
-        />
       </AccordionSection>
 
       {/* Save bar */}
