@@ -116,7 +116,7 @@ export default function EmargementPage() {
         supabase
           .from("employes")
           .select("id, prenom, nom")
-          .eq("etablissement_id", etab.id)
+          .contains("etablissements_ids", [etab.id])
           .eq("actif", true)
           .order("nom"),
         supabase

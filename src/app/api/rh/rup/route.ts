@@ -54,7 +54,7 @@ export async function GET(req: Request) {
   const [etabRes, empRes, contratRes] = await Promise.all([
     etabQuery,
     etabId
-      ? supabaseAdmin.from("employes").select("*").eq("etablissement_id", etabId).neq("affichage_rup", false).order("nom")
+      ? supabaseAdmin.from("employes").select("*").contains("etablissements_ids", [etabId]).neq("affichage_rup", false).order("nom")
       : supabaseAdmin.from("employes").select("*").neq("affichage_rup", false).order("nom"),
     supabaseAdmin.from("contrats").select("employe_id, type, emploi, qualification, heures_semaine, date_debut, date_fin, actif").order("date_debut"),
   ]);

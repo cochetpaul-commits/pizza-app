@@ -16,7 +16,7 @@ export function useEmployes(etablissementId: string | null) {
     const { data, error: err } = await supabase
       .from("employes")
       .select("*, contrats(id, employe_id, type, date_debut, date_fin, remuneration, salaire_brut, emploi, qualification, heures_semaine, jours_semaine, actif, created_at)")
-      .eq("etablissement_id", etablissementId)
+      .contains("etablissements_ids", [etablissementId])
       .order("nom", { ascending: true });
     if (err) { setError(err.message); setLoading(false); return; }
     const mapped: EmployeAvecContrat[] = (data ?? []).map((e) => {

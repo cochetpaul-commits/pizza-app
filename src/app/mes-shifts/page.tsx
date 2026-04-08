@@ -92,7 +92,7 @@ export default function MesShiftsPage() {
       const { data: emp } = await supabase
         .from("employes")
         .select("id, prenom, nom")
-        .eq("etablissement_id", etab.id)
+        .contains("etablissements_ids", [etab.id])
         .ilike("email", user.email)
         .eq("actif", true)
         .limit(1)

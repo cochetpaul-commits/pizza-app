@@ -172,7 +172,7 @@ export default function SimulationPage() {
       setLoading(true);
       const empRes = await supabase
         .from("employes").select("*")
-        .eq("etablissement_id", etab.id).eq("actif", true).order("nom");
+        .contains("etablissements_ids", [etab.id]).eq("actif", true).order("nom");
       if (cancelled) return;
 
       const empIds = (empRes.data ?? []).map((e: Record<string, unknown>) => e.id as string);

@@ -123,7 +123,7 @@ export default function EquipePage() {
       const empRes = await supabase
         .from("employes")
         .select("*")
-        .eq("etablissement_id", etab.id)
+        .contains("etablissements_ids", [etab.id])
         .order("nom", { ascending: true });
       if (cancelled) return;
       const emps = empRes.data ?? [];

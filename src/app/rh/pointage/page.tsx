@@ -260,7 +260,7 @@ export default function PointagePage() {
     const empRes = await supabase
       .from("employes")
       .select("*")
-      .eq("etablissement_id", etab.id)
+      .contains("etablissements_ids", [etab.id])
       .eq("actif", true)
       .order("nom");
 

@@ -326,7 +326,7 @@ export default function CongesPage() {
       supabase
         .from("employes")
         .select("id, prenom, nom, email, equipes_access, etablissement_id, cp_n_minus_1")
-        .eq("etablissement_id", etab.id)
+        .contains("etablissements_ids", [etab.id])
         .eq("actif", true)
         .order("nom"),
       supabase

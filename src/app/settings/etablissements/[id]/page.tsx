@@ -207,7 +207,7 @@ export default function EtablissementDetailPage() {
         supabase.from("etablissements").select("id, nom").eq("actif", true).order("nom"),
         supabase.from("equipes").select("id, nom, actif").eq("etablissement_id", id).eq("actif", true).order("nom"),
         supabase.from("periodes_modulation").select("*").eq("etablissement_id", id).order("date_debut", { ascending: false }),
-        supabase.from("employes").select("id, prenom, nom, equipes_access").eq("etablissement_id", id).eq("actif", true).order("nom"),
+        supabase.from("employes").select("id, prenom, nom, equipes_access").contains("etablissements_ids", [id]).eq("actif", true).order("nom"),
       ]);
       if (!cancelled) {
         if (etabRes.data) setSettings(etabRes.data as unknown as Settings);

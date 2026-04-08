@@ -54,13 +54,13 @@ export default function SettingsAccesPage() {
       supabase
         .from("employes")
         .select("id, prenom, nom, actif")
-        .eq("etablissement_id", etab.id)
+        .contains("etablissements_ids", [etab.id])
         .eq("actif", true)
         .order("nom"),
       supabase
         .from("employes")
         .select("id, modules_access")
-        .eq("etablissement_id", etab.id)
+        .contains("etablissements_ids", [etab.id])
         .eq("actif", true),
     ]).then(([empRes, accRes]) => {
       setEmployes((empRes.data ?? []) as Employe[]);

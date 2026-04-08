@@ -90,7 +90,7 @@ export default function PersonnelPage() {
     let cancelled = false;
     (async () => {
       const [empRes, shiftsRes, shiftsPrevRes, absRes, contratRes] = await Promise.all([
-        supabase.from("employes").select("id, prenom, nom, actif, date_anciennete, email, tel_mobile, numero_secu, date_naissance, adresse").eq("etablissement_id", etab.id).order("nom"),
+        supabase.from("employes").select("id, prenom, nom, actif, date_anciennete, email, tel_mobile, numero_secu, date_naissance, adresse").contains("etablissements_ids", [etab.id]).order("nom"),
         supabase.from("shifts").select("id, employe_id, date, heure_debut, heure_fin, pause_minutes").eq("etablissement_id", etab.id).gte("date", mondayISO).lte("date", sundayISO),
         supabase.from("shifts").select("id, employe_id, date, heure_debut, heure_fin, pause_minutes").eq("etablissement_id", etab.id).gte("date", prevMondayISO).lte("date", prevSundayISO),
         supabase.from("absences").select("id, employe_id, type, date_debut, date_fin, statut").eq("etablissement_id", etab.id).gte("date_fin", mondayISO).lte("date_debut", sundayISO),
