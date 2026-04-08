@@ -47,9 +47,8 @@ export default function SettingsEmployesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [etabFilter, setEtabFilter] = useState("all");
-  const [contratFilter, setContratFilter] = useState("all");
-  const [statutFilter, setStatutFilter] = useState("actif");
-  const [sortBy, setSortBy] = useState("nom");
+  const [statutFilter] = useState("actif");
+  const [sortBy] = useState("nom");
   const [authEmails, setAuthEmails] = useState<Set<string>>(new Set());
   const [invitingId, setInvitingId] = useState<string | null>(null);
 
@@ -144,29 +143,12 @@ export default function SettingsEmployesPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px 60px" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px 120px" }}>
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <div style={{ marginBottom: 20 }}>
           <h1 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 26, fontWeight: 700, letterSpacing: 1, color: "#1a1a1a" }}>
             Equipe
           </h1>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button type="button" onClick={() => {
-              const url = etabFilter !== "all" ? `/api/rh/rup?etab=${etabFilter}` : "/api/rh/rup";
-              window.open(url, "_blank");
-            }} style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", borderRadius: 10,
-              border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
-            }}>
-              Registre Unique
-            </button>
-            <button type="button" onClick={() => setShowAddModal(true)} style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", borderRadius: 10,
-              background: "#1a1a1a", color: "#fff", border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer",
-            }}>
-              + Collaborateur
-            </button>
-          </div>
         </div>
 
         {/* Search */}
@@ -176,27 +158,34 @@ export default function SettingsEmployesPage() {
           style={{ ...INPUT, width: "100%", marginBottom: 12 }}
         />
 
-        {/* Filters */}
-        <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-          <select style={{ ...INPUT, width: "auto", minWidth: 250 }} value={etabFilter} onChange={e => setEtabFilter(e.target.value)}>
-            <option value="all">Tous les etablissements ({etabs.length}) / Toutes les equipes ({totalEquipes})</option>
+        {/* Etablissement filter — centered, themed pill */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
+          <select
+            value={etabFilter}
+            onChange={e => setEtabFilter(e.target.value)}
+            style={{
+              padding: "10px 36px 10px 18px",
+              borderRadius: 999,
+              border: "1.5px solid #D4775A",
+              background: "rgba(212,119,90,0.08)",
+              color: "#D4775A",
+              fontSize: 13, fontWeight: 700,
+              fontFamily: "var(--font-oswald), Oswald, sans-serif",
+              textTransform: "uppercase", letterSpacing: ".05em",
+              cursor: "pointer",
+              appearance: "none",
+              WebkitAppearance: "none",
+              MozAppearance: "none",
+              backgroundImage:
+                "linear-gradient(45deg, transparent 50%, #D4775A 50%), linear-gradient(135deg, #D4775A 50%, transparent 50%)",
+              backgroundPosition: "calc(100% - 18px) 50%, calc(100% - 13px) 50%",
+              backgroundSize: "5px 5px, 5px 5px",
+              backgroundRepeat: "no-repeat",
+              maxWidth: "100%",
+            }}
+          >
+            <option value="all">Tous les etablissements ({etabs.length}) · {totalEquipes} equipes</option>
             {etabs.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
-          </select>
-          <select style={{ ...INPUT, width: "auto", minWidth: 180 }} value={contratFilter} onChange={e => setContratFilter(e.target.value)}>
-            <option value="all">Tous les types de contrats</option>
-            <option value="CDI">CDI</option>
-            <option value="CDD">CDD</option>
-            <option value="extra">Extra</option>
-            <option value="apprenti">Apprenti</option>
-          </select>
-          <select style={{ ...INPUT, width: "auto", minWidth: 150 }} value={statutFilter} onChange={e => setStatutFilter(e.target.value)}>
-            <option value="actif">Utilisateurs actifs</option>
-            <option value="inactif">Utilisateurs inactifs</option>
-            <option value="tous">Tous</option>
-          </select>
-          <select style={{ ...INPUT, width: "auto", minWidth: 130 }} value={sortBy} onChange={e => setSortBy(e.target.value)}>
-            <option value="nom">Tri par nom</option>
-            <option value="prenom">Tri par prenom</option>
           </select>
         </div>
 
@@ -319,6 +308,39 @@ export default function SettingsEmployesPage() {
             })}
           </div>
         )}
+
+        {/* Floating "+ Collaborateur" — visible mobile + desktop */}
+        <button
+          type="button"
+          onClick={() => setShowAddModal(true)}
+          style={{
+            position: "fixed",
+            right: 20,
+            bottom: "calc(96px + env(safe-area-inset-bottom, 0px))",
+            zIndex: 105,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "14px 22px",
+            borderRadius: 999,
+            border: "none",
+            background: "#D4775A",
+            color: "#fff",
+            fontFamily: "var(--font-oswald), Oswald, sans-serif",
+            fontSize: 13, fontWeight: 700,
+            textTransform: "uppercase", letterSpacing: ".05em",
+            cursor: "pointer",
+            boxShadow: "0 6px 24px rgba(212,119,90,0.35), 0 2px 8px rgba(0,0,0,0.10)",
+          }}
+          onTouchStart={(e) => { e.currentTarget.style.transform = "scale(0.96)"; }}
+          onTouchEnd={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+        >
+          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          Collaborateur
+        </button>
       </div>
 
       {showAddModal && (
