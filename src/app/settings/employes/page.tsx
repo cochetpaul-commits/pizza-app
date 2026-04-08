@@ -36,8 +36,6 @@ const ROLE_LABELS: Record<string, { label: string; color: string; bg: string }> 
   plonge: { label: "Employe", color: "#1a1a1a", bg: "transparent" },
 };
 
-const CARD: React.CSSProperties = { background: "#fff", borderRadius: 14, border: "1px solid #ddd6c8" };
-const LABEL: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5 };
 const INPUT: React.CSSProperties = { padding: "8px 14px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14, boxSizing: "border-box" };
 
 export default function SettingsEmployesPage() {
@@ -152,27 +150,21 @@ export default function SettingsEmployesPage() {
           <h1 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 26, fontWeight: 700, letterSpacing: 1, color: "#1a1a1a" }}>
             Equipe
           </h1>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button type="button" onClick={() => router.push("/settings/employes/import")} style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", borderRadius: 8,
-              border: "1px solid #ddd6c8", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
-            }}>
-              Importer (CSV)
-            </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button" onClick={() => {
               const url = etabFilter !== "all" ? `/api/rh/rup?etab=${etabFilter}` : "/api/rh/rup";
               window.open(url, "_blank");
             }} style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", borderRadius: 8,
-              border: "1px solid #ddd6c8", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
+              display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", borderRadius: 10,
+              border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
             }}>
-              Registre Unique du Personnel
+              Registre Unique
             </button>
             <button type="button" onClick={() => setShowAddModal(true)} style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", borderRadius: 8,
-              background: "#1a1a1a", color: "#fff", border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", borderRadius: 10,
+              background: "#1a1a1a", color: "#fff", border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer",
             }}>
-              + Ajouter un collaborateur
+              + Collaborateur
             </button>
           </div>
         </div>
@@ -208,77 +200,125 @@ export default function SettingsEmployesPage() {
           </select>
         </div>
 
-        {/* Table */}
-        <div style={CARD}>
-          {loading ? (
-            <div style={{ padding: 20, color: "#999", fontSize: 13 }}>Chargement...</div>
-          ) : filtered.length === 0 ? (
-            <div style={{ padding: 20, color: "#999", fontSize: 13 }}>Aucun collaborateur trouve</div>
-          ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ borderBottom: "1px solid #ddd6c8" }}>
-                  <th style={{ ...LABEL, textAlign: "left", padding: "12px 16px" }}>Collaborateur</th>
-                  <th style={{ ...LABEL, textAlign: "left", padding: "12px 8px" }}>Role</th>
-                  <th style={{ ...LABEL, textAlign: "left", padding: "12px 8px" }}>Email</th>
-                  <th style={{ ...LABEL, textAlign: "left", padding: "12px 8px" }}>Mobile</th>
-                  <th style={{ ...LABEL, textAlign: "left", padding: "12px 8px" }}>Rattachement</th>
-                  <th style={{ ...LABEL, textAlign: "left", padding: "12px 8px" }}>Acces app</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(emp => (
-                  <tr
-                    key={emp.id}
-                    onClick={() => router.push(`/rh/employe/${emp.id}`)}
-                    style={{ borderBottom: "1px solid #f0ebe3", cursor: "pointer" }}
-                    onMouseOver={e => (e.currentTarget.style.background = "#f5f0e8")}
-                    onMouseOut={e => (e.currentTarget.style.background = "transparent")}
-                  >
-                    <td style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{
-                        width: 32, height: 32, borderRadius: "50%",
-                        background: emp.avatar_url ? "transparent" : "#ddd6c8",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 11, fontWeight: 700, color: "#1a1a1a", flexShrink: 0,
-                        overflow: "hidden",
+        {/* Tile grid */}
+        {loading ? (
+          <div style={{ padding: 40, textAlign: "center", color: "#999", fontSize: 13 }}>Chargement...</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ padding: 40, textAlign: "center", color: "#999", fontSize: 13 }}>Aucun collaborateur trouve</div>
+        ) : (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+            gap: 12,
+          }}>
+            {filtered.map(emp => {
+              const hasAccess = emp.email && authEmails.has(emp.email.toLowerCase());
+              const initials = emp.initiales ?? `${emp.prenom[0] ?? ""}${emp.nom[0] ?? ""}`.toUpperCase();
+              return (
+                <div
+                  key={emp.id}
+                  onClick={() => router.push(`/rh/employe/${emp.id}`)}
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #e0d8ce",
+                    borderRadius: 14,
+                    padding: 16,
+                    cursor: "pointer",
+                    display: "flex", flexDirection: "column", gap: 12,
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                    transition: "box-shadow 0.15s, border-color 0.15s",
+                  }}
+                  onMouseOver={e => { e.currentTarget.style.borderColor = "#D4775A"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; }}
+                  onMouseOut={e => { e.currentTarget.style.borderColor = "#e0d8ce"; e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)"; }}
+                >
+                  {/* Top: avatar + name + role */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <span style={{
+                      width: 44, height: 44, borderRadius: "50%",
+                      background: "#D4775A",
+                      color: "#fff",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 14, fontWeight: 700,
+                      fontFamily: "var(--font-oswald), Oswald, sans-serif",
+                      flexShrink: 0,
+                      overflow: "hidden",
+                    }}>
+                      {initials}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 14, fontWeight: 700, color: "#1a1a1a",
+                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                       }}>
-                        {emp.initiales ?? `${emp.prenom[0]}${emp.nom[0]}`.toUpperCase()}
-                      </span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: "#2563eb" }}>
                         {emp.prenom} {emp.nom.toUpperCase()}
+                      </div>
+                      <div style={{ marginTop: 4 }}>{getRoleBadge(emp.role)}</div>
+                    </div>
+                  </div>
+
+                  {/* Middle: contact + rattachement */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#666", paddingTop: 10, borderTop: "1px solid #f0ebe3" }}>
+                    {emp.email && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                          <rect x="2" y="4" width="20" height="16" rx="2" />
+                          <path d="M22 7l-10 7L2 7" />
+                        </svg>
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{emp.email}</span>
+                      </div>
+                    )}
+                    {emp.tel_mobile && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                        </svg>
+                        <span>{emp.tel_mobile}</span>
+                      </div>
+                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#999", fontSize: 11 }}>
+                      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                        <path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" />
+                      </svg>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getRattachement(emp)}</span>
+                    </div>
+                  </div>
+
+                  {/* Bottom: access badge / invite */}
+                  <div style={{ paddingTop: 10, borderTop: "1px solid #f0ebe3", display: "flex", justifyContent: "flex-end" }}>
+                    {hasAccess ? (
+                      <span style={{
+                        display: "inline-flex", alignItems: "center", gap: 5,
+                        padding: "5px 12px", borderRadius: 999,
+                        background: "rgba(45,106,79,0.10)", fontSize: 11, fontWeight: 700,
+                        color: "#2D6A4F",
+                        textTransform: "uppercase", letterSpacing: ".05em",
+                      }}>
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#2D6A4F" }} />
+                        Acces actif
                       </span>
-                    </td>
-                    <td style={{ padding: "12px 8px" }}>{getRoleBadge(emp.role)}</td>
-                    <td style={{ padding: "12px 8px", fontSize: 12, color: "#1a1a1a" }}>{emp.email ?? "—"}</td>
-                    <td style={{ padding: "12px 8px", fontSize: 12, color: "#1a1a1a" }}>{emp.tel_mobile ?? "Non renseigne"}</td>
-                    <td style={{ padding: "12px 8px", fontSize: 12, color: "#666" }}>{getRattachement(emp)}</td>
-                    <td style={{ padding: "12px 8px" }}>
-                      {emp.email && authEmails.has(emp.email.toLowerCase()) ? (
-                        <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(45,106,79,0.1)", fontSize: 11, fontWeight: 600, color: "#2D6A4F" }}>Acces actif</span>
-                      ) : emp.email ? (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleInvite(emp); }}
-                          disabled={invitingId === emp.id}
-                          style={{
-                            padding: "4px 12px", borderRadius: 6, border: "none",
-                            background: "#D4775A", color: "#fff", fontSize: 11, fontWeight: 700,
-                            cursor: "pointer", opacity: invitingId === emp.id ? 0.5 : 1,
-                          }}
-                        >
-                          {invitingId === emp.id ? "Envoi..." : "Inviter"}
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: 11, color: "#999" }}>Pas d&apos;email</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+                    ) : emp.email ? (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleInvite(emp); }}
+                        disabled={invitingId === emp.id}
+                        style={{
+                          padding: "6px 16px", borderRadius: 999, border: "none",
+                          background: "#D4775A", color: "#fff", fontSize: 11, fontWeight: 700,
+                          textTransform: "uppercase", letterSpacing: ".05em",
+                          cursor: "pointer", opacity: invitingId === emp.id ? 0.5 : 1,
+                        }}
+                      >
+                        {invitingId === emp.id ? "Envoi..." : "Inviter"}
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: 11, color: "#bbb", fontStyle: "italic" }}>Pas d&apos;email</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {showAddModal && (
