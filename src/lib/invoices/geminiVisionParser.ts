@@ -1,4 +1,3 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { ParsedInvoice, ParsedLine } from "@/lib/invoices/importEngine";
 
 export type SupplierInfo = {
@@ -102,6 +101,50 @@ function parseJsonResponse(text: string): Record<string, unknown> {
   throw new Error("Impossible de parser la réponse Gemini en JSON");
 }
 
+// Try models in order until one works (quota/availability varies by project)
+const MODELS = [
+  "gemini-2.0-flash-lite",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-pro-vision",
+];
+
+async function callGeminiRest(
+  apiKey: string,
+  model: string,
+  base64Data: string,
+  mimeType: string,
+  prompt: string,
+): Promise<string> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const body = {
+    contents: [{
+      parts: [
+        { text: SYSTEM_PROMPT },
+        { inline_data: { mime_type: mimeType, data: base64Data } },
+        { text: prompt },
+      ],
+    }],
+    generationConfig: { temperature: 0.1 },
+  };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Gemini ${model} (${res.status}): ${errText.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error(`Gemini ${model}: réponse vide`);
+  return text;
+}
+
 export async function geminiVisionParse(
   fileBytes: Uint8Array,
   mimeType: string,
@@ -110,25 +153,26 @@ export async function geminiVisionParse(
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY manquante dans .env.local");
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
-
+  const base64Data = Buffer.from(fileBytes).toString("base64");
   const userPrompt = supplierNameHint
     ? `Voici une facture du fournisseur "${supplierNameHint}". Extrais les données.`
     : "Voici une facture fournisseur. Identifie le fournisseur et extrais les données.";
 
-  const result = await model.generateContent([
-    { text: SYSTEM_PROMPT },
-    {
-      inlineData: {
-        mimeType,
-        data: Buffer.from(fileBytes).toString("base64"),
-      },
-    },
-    { text: userPrompt },
-  ]);
+  // Try each model until one succeeds
+  let responseText = "";
+  const errors: string[] = [];
+  for (const model of MODELS) {
+    try {
+      responseText = await callGeminiRest(apiKey, model, base64Data, mimeType, userPrompt);
+      break;
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : String(e));
+    }
+  }
+  if (!responseText) {
+    throw new Error(`Aucun modèle Gemini disponible.\n${errors.join("\n")}`);
+  }
 
-  const responseText = result.response.text();
   const parsed = parseJsonResponse(responseText);
 
   const inv = (parsed.invoice ?? parsed) as Record<string, unknown>;
