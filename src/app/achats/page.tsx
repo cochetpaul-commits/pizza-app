@@ -7,7 +7,6 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { getSupplierColor } from "@/lib/supplierColors";
 import Chart from "chart.js/auto";
-import { FloatingActions, FAIconPlus } from "@/components/layout/FloatingActions";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { setPendingInvoiceFile } from "@/lib/pendingInvoiceFile";
@@ -1192,9 +1191,26 @@ export default function AchatsPage() {
           </>
         )}
 
-        <FloatingActions actions={[
-          { icon: <FAIconPlus size={24} color="#fff" />, label: "Ajouter", onClick: () => setImportDrawerOpen(true), primary: true },
-        ]} />
+        {/* FAB — Import facture */}
+        <button
+          type="button"
+          onClick={() => setImportDrawerOpen(true)}
+          style={{
+            position: "fixed",
+            bottom: "calc(92px + env(safe-area-inset-bottom, 0px))",
+            right: 16, zIndex: 105,
+            height: 44, padding: "0 20px",
+            borderRadius: 22, border: "none",
+            background: "#D4775A", color: "#fff",
+            fontSize: 13, fontWeight: 700, cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 6,
+            boxShadow: "0 4px 14px rgba(212,119,90,0.35), 0 2px 6px rgba(0,0,0,0.1)",
+            fontFamily: "inherit",
+          }}
+        >
+          <span style={{ fontSize: 18, lineHeight: 1, fontWeight: 300 }}>+</span>
+          Import facture
+        </button>
 
         {/* ── Import drawer: 3 source options ── */}
         <BottomSheet open={importDrawerOpen} onClose={() => setImportDrawerOpen(false)}>
