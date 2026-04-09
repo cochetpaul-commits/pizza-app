@@ -80,6 +80,7 @@ const labelStyle: React.CSSProperties = {
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
+  minWidth: 0,
   height: 40,
   borderRadius: 10,
   border: "1.5px solid #ddd6c8",
@@ -531,11 +532,11 @@ export default function EventForm({ eventId }: { eventId?: string }) {
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <label style={labelStyle}>Date</label>
               <input style={inputStyle} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <label style={labelStyle}>Heure</label>
               <input style={inputStyle} type="time" value={time} onChange={(e) => setTime(e.target.value)} />
             </div>
