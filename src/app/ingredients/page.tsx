@@ -1132,10 +1132,9 @@ function IngredientsPageInner() {
 
         {!isVariations && (
           <>
-            {/* ── Create form ── */}
-            {showCreateForm && (
-              <div id="create-form" style={{ background: "white", border: "1px solid #e5ddd0", borderRadius: 12, padding: "20px", marginTop: 16, marginBottom: 8, animation: "slideDown 0.2s ease-out" }}>
-                <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 14, color: "#1a1a1a" }}>Créer un ingrédient</div>
+            {/* ── Create form (in drawer) ── */}
+            <BottomSheet open={showCreateForm} onClose={() => setShowCreateForm(false)} title="Créer un ingrédient">
+              <div style={{ padding: "0 4px 16px" }}>
                 <form onSubmit={addIngredient} className="grid gap-3">
                   <div className="grid gap-3" style={{ gridTemplateColumns: "2fr 1fr" }}>
                     <div><div className={lCls}>Ingrédient</div><input className={iCls} placeholder="Ex: Huile d'olive" value={newName} onChange={(e) => handleNewNameChange(e.target.value)} /></div>
@@ -1220,7 +1219,7 @@ function IngredientsPageInner() {
                   ) : null}
                 </form>
               </div>
-            )}
+            </BottomSheet>
 
             {/* Skeleton loader */}
             {loading && <SkeletonTable />}
@@ -1564,7 +1563,7 @@ function IngredientsPageInner() {
             cursor: "pointer",
           }}
         >
-          {showCreateForm ? "✕ Fermer" : "+ Produits"}
+          + Produits
         </button>
       )}
     </div>
