@@ -78,7 +78,6 @@ type BatchItem = {
 
 export default function InvoicesPage() {
   const fileRef = useRef<HTMLInputElement>(null);
-  const batchRef = useRef<HTMLInputElement>(null);
   const { etablissements } = useEtablissement();
 
   const [step, setStep] = useState<Step>("upload");
@@ -268,7 +267,7 @@ export default function InvoicesPage() {
     setError(null);
     setBatchItems([]);
     if (fileRef.current) fileRef.current.value = "";
-    if (batchRef.current) batchRef.current.value = "";
+    // input value is reset in the onChange handler
   }
 
   // ── Batch import ──
@@ -364,107 +363,94 @@ export default function InvoicesPage() {
         {/* ════════════ STEP 1: Upload ════════════ */}
         {step === "upload" && (
           <>
-            {/* Drop zone — desktop drag & drop */}
-            <div
-              style={dropZoneStyle}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                const files = e.dataTransfer.files;
-                if (files.length > 1) {
-                  handleBatchFiles(files);
-                } else if (files[0]) {
-                  handleFileUpload(files[0]);
-                }
-              }}
-            >
-              {loading ? (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 24, height: 24, border: "3px solid #ddd6c8", borderTopColor: "#D4775A", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#D4775A" }}>Analyse en cours...</div>
-                  <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                </div>
-              ) : (
-                <>
-                  {/* Label wraps input — iOS-safe, no programmatic .click() */}
-                  <label style={{ cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
-                    <input
-                      ref={fileRef}
-                      type="file"
-                      style={{ display: "none" }}
-                      accept="application/pdf,image/*"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) handleFileUpload(f);
-                        e.target.value = "";
-                      }}
-                    />
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
-                      Glisser ou cliquer pour importer
-                    </div>
-                    <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
-                      PDF ou photo
-                    </div>
-                  </label>
-                </>
-              )}
-            </div>
+            {loading ? (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "48px 0" }}>
+                <div style={{ width: 28, height: 28, border: "3px solid #ddd6c8", borderTopColor: "#D4775A", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#D4775A" }}>Analyse IA en cours...</div>
+                <div style={{ fontSize: 11, color: "#999" }}>Extraction des produits et du fournisseur</div>
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* Main action: camera (mobile) or file picker */}
+                <label style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                  padding: "20px 24px", borderRadius: 16, border: "none",
+                  background: "#D4775A", color: "#fff", fontSize: 15, fontWeight: 700,
+                  cursor: "pointer",
+                  boxShadow: "0 4px 16px rgba(212,119,90,0.3)",
+                }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    style={{ display: "none" }}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleFileUpload(f);
+                      e.target.value = "";
+                    }}
+                  />
+                  <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                  Scanner une facture
+                </label>
 
-            {/* Camera button — uses <label> for iOS Safari compatibility */}
-            <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}>
-              <label style={{
-                padding: "10px 20px", borderRadius: 10, border: "none",
-                background: "#D4775A", color: "#fff", fontSize: 13, fontWeight: 700,
-                cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6,
-                boxShadow: "0 2px 8px rgba(212,119,90,0.3)",
-              }}>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  style={{ display: "none" }}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleFileUpload(f);
-                    e.target.value = "";
+                {/* Secondary: gallery / file picker */}
+                <label style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                  padding: "14px 24px", borderRadius: 14, cursor: "pointer",
+                  border: "1.5px solid #ddd6c8", background: "#fff",
+                  fontSize: 13, fontWeight: 600, color: "#1a1a1a",
+                }}>
+                  <input
+                    type="file"
+                    accept="application/pdf,image/*"
+                    multiple
+                    style={{ display: "none" }}
+                    onChange={(e) => {
+                      const files = e.target.files;
+                      if (files && files.length > 1) {
+                        handleBatchFiles(files);
+                      } else if (files?.[0]) {
+                        handleFileUpload(files[0]);
+                      }
+                      e.target.value = "";
+                    }}
+                  />
+                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <polyline points="21 15 16 10 5 21" />
+                  </svg>
+                  Galerie ou fichier (PDF, photo)
+                </label>
+
+                {/* Drop zone — desktop only */}
+                <div
+                  className="desktop-only"
+                  style={dropZoneStyle}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const files = e.dataTransfer.files;
+                    if (files.length > 1) {
+                      handleBatchFiles(files);
+                    } else if (files[0]) {
+                      handleFileUpload(files[0]);
+                    }
                   }}
-                />
-                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                  <circle cx="12" cy="13" r="4" />
-                </svg>
-                Scanner une facture
-              </label>
-            </div>
+                >
+                  <div style={{ fontSize: 13, color: "#999" }}>Glisser des fichiers ici</div>
+                </div>
 
-            <p style={{ fontSize: 12, color: "#999", textAlign: "center", marginTop: 12 }}>
-              Le fournisseur est detecte automatiquement (IA pour les photos).
-            </p>
-
-            {/* Batch upload */}
-            <div style={{ textAlign: "center", marginTop: 16 }}>
-              <input ref={batchRef} type="file" multiple accept=".pdf,application/pdf" style={{ display: "none" }}
-                onChange={(e) => { if (e.target.files && e.target.files.length > 0) handleBatchFiles(e.target.files); }} />
-              <button type="button" onClick={() => batchRef.current?.click()}
-                style={{ padding: "10px 24px", borderRadius: 10, border: "1.5px solid #D4775A", background: "#fff", color: "#D4775A", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                Importer plusieurs factures (PDF)
-              </button>
-            </div>
-
-            {/* Quick links to legacy pages */}
-            <div style={{ marginTop: 32, borderTop: "1px solid #f0ebe3", paddingTop: 16 }}>
-              <div style={{ fontSize: 11, color: "#999", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-                Import par fournisseur
+                <p style={{ fontSize: 11, color: "#999", textAlign: "center", margin: 0 }}>
+                  Le fournisseur, les produits et les prix sont extraits automatiquement par IA.
+                </p>
               </div>
-              <div style={{ display: "inline-flex", flexWrap: "wrap", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12 }}>
-                {SUPPLIERS.map((s) => (
-                  <a key={s.slug} href={`/invoices/${s.slug}`}
-                    style={{ ...pillBtnBase, textDecoration: "none" }}>
-                    {s.name}
-                  </a>
-                ))}
-              </div>
-            </div>
+            )}
           </>
         )}
 
@@ -877,17 +863,6 @@ const pillBtn = (active: boolean, ec?: string): React.CSSProperties => ({
   boxShadow: active ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
   transition: "all 0.15s",
 });
-
-const pillBtnBase: React.CSSProperties = {
-  padding: "5px 12px",
-  borderRadius: 8,
-  border: "1px solid #ddd6c8",
-  background: "#fff",
-  color: "#374151",
-  fontSize: 12,
-  fontWeight: 600,
-  cursor: "pointer",
-};
 
 const primaryBtnStyle: React.CSSProperties = {
   display: "inline-flex",

@@ -160,7 +160,7 @@ export async function geminiVisionParse(
   fileBytes: Uint8Array,
   mimeType: string,
   supplierNameHint?: string | null,
-): Promise<{ invoice: ParsedInvoice; supplierName: string }> {
+): Promise<{ invoice: ParsedInvoice; supplierName: string; supplierInfo: SupplierInfo | null }> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY manquante dans .env.local");
 
@@ -202,5 +202,13 @@ export async function geminiVisionParse(
     ? String(supplierInfo.name)
     : (supplierNameHint ?? "Fournisseur inconnu");
 
-  return { invoice, supplierName };
+  const supplierInfoParsed: SupplierInfo | null = supplierInfo ? {
+    name: String(supplierInfo.name ?? supplierName),
+    siret: supplierInfo.siret ? String(supplierInfo.siret) : null,
+    address: supplierInfo.address ? String(supplierInfo.address) : null,
+    phone: supplierInfo.phone ? String(supplierInfo.phone) : null,
+    email: supplierInfo.email ? String(supplierInfo.email) : null,
+  } : null;
+
+  return { invoice, supplierName, supplierInfo: supplierInfoParsed };
 }

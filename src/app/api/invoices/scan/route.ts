@@ -70,7 +70,7 @@ export async function POST(req: Request) {
     }
 
     // Call Gemini Vision
-    const { invoice, supplierName } = await geminiVisionParse(bytes, mimeType, supplierHint);
+    const { invoice, supplierName, supplierInfo } = await geminiVisionParse(bytes, mimeType, supplierHint);
 
     if (mode === "preview") {
       return NextResponse.json({
@@ -80,6 +80,7 @@ export async function POST(req: Request) {
         bytes: bytes.byteLength,
         parsed: invoice,
         supplier_detected: supplierName,
+        supplier_info: supplierInfo,
       });
     }
 
@@ -96,12 +97,41 @@ export async function POST(req: Request) {
       etabId,
     });
 
+    // Enrich supplier with extracted contact info (create if new, complete if existing)
+    if (supplierInfo && result.supplierId) {
+      const updates: Record<string, unknown> = {};
+      if (supplierInfo.siret) updates.siret = supplierInfo.siret;
+      if (supplierInfo.address) updates.adresse = supplierInfo.address;
+      if (supplierInfo.phone) updates.telephone = supplierInfo.phone;
+      if (supplierInfo.email) updates.email = supplierInfo.email;
+
+      if (Object.keys(updates).length > 0) {
+        // Only fill empty fields — don't overwrite existing data
+        const { data: existing } = await supabase
+          .from("suppliers")
+          .select("siret,adresse,telephone,email")
+          .eq("id", result.supplierId)
+          .single();
+
+        const patch: Record<string, unknown> = {};
+        if (updates.siret && !existing?.siret) patch.siret = updates.siret;
+        if (updates.adresse && !existing?.adresse) patch.adresse = updates.adresse;
+        if (updates.telephone && !existing?.telephone) patch.telephone = updates.telephone;
+        if (updates.email && !existing?.email) patch.email = updates.email;
+
+        if (Object.keys(patch).length > 0) {
+          await supabase.from("suppliers").update(patch).eq("id", result.supplierId);
+        }
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       kind: "scan",
       filename: file.name,
       bytes: bytes.byteLength,
       supplier_detected: supplierName,
+      supplier_info: supplierInfo,
       invoice: { id: result.invoiceId, already_imported: result.invoiceAlreadyImported },
       inserted: {
         supplier_id: result.supplierId,
