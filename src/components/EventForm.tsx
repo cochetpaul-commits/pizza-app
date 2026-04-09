@@ -450,6 +450,12 @@ export default function EventForm({ eventId }: { eventId?: string }) {
 
   return (
     <>
+      <style>{`
+        .ef-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+        @media (max-width: 480px) {
+          .ef-grid2-stack { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "12px 16px 200px" }}>
 
         {/* ── Back + action buttons ── */}
@@ -498,7 +504,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
             <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Mariage Dupont" />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <div className="ef-grid2 ef-grid2-stack">
             <div>
               <label style={labelStyle}>Type</label>
               <select style={inputStyle} value={type} onChange={(e) => setType(e.target.value)}>
@@ -531,7 +537,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <div className="ef-grid2 ef-grid2-stack">
             <div style={{ minWidth: 0 }}>
               <label style={labelStyle}>Date</label>
               <input style={inputStyle} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -542,7 +548,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <div className="ef-grid2 ef-grid2-stack">
             <div>
               <label style={labelStyle}>Lieu</label>
               <input style={inputStyle} value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ex: Domaine des Pins" />
@@ -553,7 +559,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div className="ef-grid2 ef-grid2-stack" style={{ marginBottom: 0 }}>
             <div>
               <label style={labelStyle}>Nombre de couverts</label>
               <input
