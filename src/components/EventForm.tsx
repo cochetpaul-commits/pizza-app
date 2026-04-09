@@ -449,7 +449,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
 
   return (
     <>
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "12px 16px 140px" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "12px 16px 200px" }}>
 
         {/* ── Back + action buttons ── */}
         <button
