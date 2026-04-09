@@ -1015,10 +1015,10 @@ function IngredientsPageInner() {
     <div style={{ background: "#f2ede4", minHeight: "100vh" }}>
       <style>{`
         .ing-desktop-filters { display: grid; }
-        .ing-mobile-btn { display: none; }
+        .ing-mobile-search { display: none !important; }
         @media (max-width: 767px) {
           .ing-desktop-filters { display: none !important; }
-          .ing-mobile-btn { display: inline-flex !important; }
+          .ing-mobile-search { display: flex !important; }
           .ing-add-btn { padding: 6px 12px !important; font-size: 12px !important; }
         }
       `}</style>
@@ -1049,7 +1049,7 @@ function IngredientsPageInner() {
               </div>
             </div>
 
-            {/* Row 2 — Dropdowns (desktop) */}
+            {/* Row 2 — Dropdowns (desktop) + Search — same grid for perfect alignment */}
             <div className="ing-desktop-filters" style={{ gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <Dropdown
                 value={filterCategory}
@@ -1061,12 +1061,8 @@ function IngredientsPageInner() {
                 onChange={setFilterSupplier}
                 options={[{ value: "all", label: "Tous fournisseurs" }, ...suppliers.filter(s => s.is_active).map(s => ({ value: s.id, label: s.name }))]}
               />
-            </div>
-
-            {/* Row 3 — Search */}
-            <div style={{ display: "flex", gap: 8 }}>
-              <div style={{ flex: 1, position: "relative" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}>
+              <div style={{ gridColumn: "1 / -1", position: "relative" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
                   <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
                 </svg>
                 <input
@@ -1080,11 +1076,28 @@ function IngredientsPageInner() {
                   }}
                 />
               </div>
-              {/* Mobile only: Filtres + compact */}
-              <button className="ing-mobile-btn" onClick={() => setShowFilters(true)} style={{ padding: "9px 14px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+            </div>
+            {/* Mobile only: Search + Filtres + compact */}
+            <div className="ing-mobile-search" style={{ display: "none", gap: 8 }}>
+              <div style={{ flex: 1, position: "relative" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+                  <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+                </svg>
+                <input
+                  placeholder="Rechercher un ingredient…"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  style={{
+                    width: "100%", borderRadius: 10, border: "1.5px solid #e5ddd0",
+                    padding: "9px 14px 9px 36px", fontSize: 13, background: "#fff",
+                    outline: "none", color: "#1a1a1a", boxSizing: "border-box",
+                  }}
+                />
+              </div>
+              <button onClick={() => setShowFilters(true)} style={{ padding: "9px 14px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 Filtres{filterActive ? " ●" : ""}
               </button>
-              <button className="ing-mobile-btn" onClick={toggleCompact} style={{ padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 14, cursor: "pointer" }}>
+              <button onClick={toggleCompact} style={{ padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 14, cursor: "pointer" }}>
                 {compactMode ? "⊞" : "☰"}
               </button>
             </div>
