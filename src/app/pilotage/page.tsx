@@ -536,6 +536,12 @@ export default function PilotagePage() {
   const [actionDrawerOpen, setActionDrawerOpen] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
 
+  // Day-by-day navigation (mobile)
+  const [selectedDay, setSelectedDay] = useState<string>(() => {
+    return new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
+  });
+  const [dayNavMode, setDayNavMode] = useState(false); // false=week, true=day
+
   const isPiccola = etab.current?.slug?.includes("piccola");
   const currentEtabId = etab.current?.id;
 
@@ -590,6 +596,29 @@ export default function PilotagePage() {
       const next = shiftWeek(w, 1);
       return next <= currentWeek ? next : w;
     });
+  }
+
+  // Day-by-day navigation
+  const todayISO = useMemo(() => new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" }), []);
+
+  function shiftDay(offset: number) {
+    setSelectedDay(prev => {
+      const d = new Date(prev + "T12:00:00");
+      d.setDate(d.getDate() + offset);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      // Don't go beyond today
+      if (iso > todayISO) return prev;
+      // If the new day is in a different week, load that week
+      const newWeek = dateToISOWeek(iso);
+      if (newWeek !== weekStr) setWeekStr(newWeek);
+      return iso;
+    });
+  }
+
+  function formatDayShort(dateStr: string): string {
+    return new Date(dateStr + "T12:00:00").toLocaleDateString("fr-FR", {
+      weekday: "short", day: "numeric", month: "short",
+    }).replace(/^\w/, c => c.toUpperCase());
   }
 
   async function handleBarClick(_day: DayData) {
@@ -968,62 +997,102 @@ export default function PilotagePage() {
         {/* ── Day Detail Drawer ── */}
         {drawerOpen && <DayDrawer detail={dayDetail} loading={dayLoading} onClose={closeDrawer} />}
 
-        {/* ── Mobile Bottom Bar: week nav + action button ── */}
+        {/* ── Mobile Bottom Bar: day/week nav + action button ── */}
         <div className="mobile-only" style={{
           position: "fixed", bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
           left: 12, right: 12, zIndex: 100,
-          display: "flex", alignItems: "center", gap: 8,
-          padding: "10px 14px",
+          display: "flex", flexDirection: "column", gap: 0,
           background: "rgba(255,255,255,0.92)",
           backdropFilter: "blur(20px) saturate(180%)",
           WebkitBackdropFilter: "blur(20px) saturate(180%)",
           borderRadius: 16,
           boxShadow: "0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
           border: "1px solid rgba(0,0,0,0.06)",
+          overflow: "hidden",
         }}>
-          {/* Prev week */}
-          <button onClick={goPrevWeek} style={{
-            width: 36, height: 36, borderRadius: 10, border: "none",
-            background: ACCENT + "15", color: ACCENT,
-            fontSize: 16, fontWeight: 700, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-          }}>←</button>
-
-          {/* Week label */}
-          <div style={{ flex: 1, textAlign: "center", minWidth: 0 }}>
-            <div style={{
-              fontSize: 12, fontWeight: 700, color: "#1a1a1a",
-              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-            }}>
-              {getWeekLabel(weekStr).replace("Semaine du ", "S. ")}
-            </div>
-            {weekStr === currentWeek && (
-              <div style={{ fontSize: 9, fontWeight: 700, color: ACCENT, marginTop: 1 }}>Cette semaine</div>
-            )}
+          {/* Mode toggle: Semaine / Jour */}
+          <div style={{ display: "flex", background: "#f5f0e8", borderBottom: "1px solid rgba(0,0,0,0.04)" }}>
+            {(["week", "day"] as const).map(m => (
+              <button key={m} type="button" onClick={() => setDayNavMode(m === "day")} style={{
+                flex: 1, padding: "6px 0", border: "none", cursor: "pointer",
+                background: (m === "day") === dayNavMode ? "#fff" : "transparent",
+                color: (m === "day") === dayNavMode ? ACCENT : "#999",
+                fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em",
+                fontFamily: "inherit",
+              }}>
+                {m === "week" ? "Semaine" : "Jour"}
+              </button>
+            ))}
           </div>
 
-          {/* Next week */}
-          <button onClick={goNextWeek} disabled={weekStr === currentWeek} style={{
-            width: 36, height: 36, borderRadius: 10, border: "none",
-            background: weekStr === currentWeek ? "#f0ebe3" : ACCENT + "15",
-            color: weekStr === currentWeek ? "#ccc" : ACCENT,
-            fontSize: 16, fontWeight: 700,
-            cursor: weekStr === currentWeek ? "not-allowed" : "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-          }}>→</button>
+          {/* Nav row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px" }}>
+            {/* Prev */}
+            <button onClick={() => dayNavMode ? shiftDay(-1) : goPrevWeek()} style={{
+              width: 36, height: 36, borderRadius: 10, border: "none",
+              background: ACCENT + "15", color: ACCENT,
+              fontSize: 16, fontWeight: 700, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            }}>←</button>
 
-          {/* Action button */}
-          <button onClick={() => setActionDrawerOpen(true)} style={{
-            width: 36, height: 36, borderRadius: 10, border: "none",
-            background: ACCENT, color: "#fff",
-            fontSize: 14, fontWeight: 700, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            boxShadow: `0 2px 8px ${ACCENT}40`,
-          }}>
-            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
-            </svg>
-          </button>
+            {/* Label */}
+            <div onClick={() => { if (dayNavMode) { setSelectedDay(todayISO); setWeekStr(currentWeek); } else { setWeekStr(currentWeek); } }}
+              style={{ flex: 1, textAlign: "center", minWidth: 0, cursor: "pointer" }}>
+              {dayNavMode ? (
+                <>
+                  <div style={{
+                    fontSize: 13, fontWeight: 700, color: "#1a1a1a",
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                  }}>
+                    {formatDayShort(selectedDay)}
+                  </div>
+                  {selectedDay === todayISO && (
+                    <div style={{ fontSize: 9, fontWeight: 700, color: ACCENT, marginTop: 1 }}>Aujourd&apos;hui</div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div style={{
+                    fontSize: 12, fontWeight: 700, color: "#1a1a1a",
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                  }}>
+                    {getWeekLabel(weekStr).replace("Semaine du ", "S. ")}
+                  </div>
+                  {weekStr === currentWeek && (
+                    <div style={{ fontSize: 9, fontWeight: 700, color: ACCENT, marginTop: 1 }}>Cette semaine</div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Next */}
+            {(() => {
+              const atEnd = dayNavMode ? selectedDay >= todayISO : weekStr === currentWeek;
+              return (
+                <button onClick={() => dayNavMode ? shiftDay(1) : goNextWeek()} disabled={atEnd} style={{
+                  width: 36, height: 36, borderRadius: 10, border: "none",
+                  background: atEnd ? "#f0ebe3" : ACCENT + "15",
+                  color: atEnd ? "#ccc" : ACCENT,
+                  fontSize: 16, fontWeight: 700,
+                  cursor: atEnd ? "not-allowed" : "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                }}>→</button>
+              );
+            })()}
+
+            {/* Action button */}
+            <button onClick={() => setActionDrawerOpen(true)} style={{
+              width: 36, height: 36, borderRadius: 10, border: "none",
+              background: ACCENT, color: "#fff",
+              fontSize: 14, fontWeight: 700, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+              boxShadow: `0 2px 8px ${ACCENT}40`,
+            }}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* ── Action Drawer ── */}
