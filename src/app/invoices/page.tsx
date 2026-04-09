@@ -139,16 +139,19 @@ export default function InvoicesPage() {
   async function handleFileUpload(f: File) {
     const isPdf = f.name.toLowerCase().endsWith(".pdf") || f.type === "application/pdf";
     const isImage = isImageFile(f);
-    if (!isPdf && !isImage) {
+    // On iOS, camera photos sometimes have empty type — accept them
+    if (!isPdf && !isImage && f.type) {
       setError("Formats acceptes : PDF, JPEG, PNG, WebP.");
       return;
     }
+    // If type is empty and not PDF, treat as image (common on iOS)
+    const treatAsImage = isImage || (!isPdf && !f.type);
     setFile(f);
     setError(null);
     setLoading(true);
 
     try {
-      if (isImage || !isPdf) {
+      if (treatAsImage) {
         // Vision scan path — Gemini analyses the image directly
         const form = new FormData();
         form.append("file", f);
@@ -380,10 +383,11 @@ export default function InvoicesPage() {
                 ref={fileRef}
                 type="file"
                 style={{ display: "none" }}
-                accept=".pdf,application/pdf,image/jpeg,image/png,image/webp,.heic"
+                accept="application/pdf,image/*"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (f) handleFileUpload(f);
+                  e.target.value = "";
                 }}
               />
               <input
@@ -395,6 +399,7 @@ export default function InvoicesPage() {
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (f) handleFileUpload(f);
+                  e.target.value = "";
                 }}
               />
               {loading ? (

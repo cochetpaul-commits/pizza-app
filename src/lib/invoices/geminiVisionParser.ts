@@ -111,7 +111,7 @@ export async function geminiVisionParse(
   if (!apiKey) throw new Error("GEMINI_API_KEY manquante dans .env.local");
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   const userPrompt = supplierNameHint
     ? `Voici une facture du fournisseur "${supplierNameHint}". Extrais les données.`
