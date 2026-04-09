@@ -103,10 +103,9 @@ function parseJsonResponse(text: string): Record<string, unknown> {
 
 // Try models in order until one works (quota/availability varies by project)
 const MODELS = [
+  "gemini-2.5-flash",
   "gemini-2.0-flash-lite",
   "gemini-2.0-flash",
-  "gemini-1.5-flash",
-  "gemini-pro-vision",
 ];
 
 async function callGeminiRest(
