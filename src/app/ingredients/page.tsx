@@ -77,13 +77,12 @@ function Dropdown({ value, onChange, options, style }: {
         onClick={() => setOpen(!open)}
         style={{
           width: "100%", textAlign: "left",
-          borderRadius: 12, border: `1.5px solid ${open ? "#D4775A" : "#ddd6c8"}`,
-          padding: "8px 32px 8px 14px", fontSize: 13,
+          borderRadius: 10, border: `1.5px solid ${open ? "#D4775A" : "#e5ddd0"}`,
+          padding: "9px 32px 9px 14px", fontSize: 13,
           background: "white", color: "#1a1a1a", cursor: "pointer",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
           position: "relative", fontFamily: "inherit",
           transition: "border-color 150ms",
-          outline: "none",
+          outline: "none", boxSizing: "border-box" as const,
         }}
       >
         {selected?.label ?? "—"}
