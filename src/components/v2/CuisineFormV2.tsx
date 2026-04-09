@@ -657,7 +657,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         />
 
         {/* ── Tab bar ── */}
-        <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, marginBottom: 16, overflowX: "auto" }}>
+        <div style={{ textAlign: "center", marginBottom: 16 }}><div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, overflowX: "auto" }}>
           {MAIN_TABS.map((t) => (
             <button
               key={t.key}
@@ -675,7 +675,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
               {t.label}
             </button>
           ))}
-        </div>
+        </div></div>
 
         {saveError && <div className="errorBox" style={{ marginBottom: 12 }}>{saveError}</div>}
 
