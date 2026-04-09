@@ -164,10 +164,12 @@ function PerformancesPage() {
 
   // Category trend state
   type CatTrendDaily = { date: string; qty: number; ca_ttc: number; ca_ht: number };
-  const [catTrendFrom, setCatTrendFrom] = useState(() => {
-    const d = new Date(); d.setMonth(d.getMonth() - 3); return d.toISOString().slice(0, 10);
+  const [catTrendRange, setCatTrendRange] = useState<DateRange>(() => {
+    const d = new Date(); d.setMonth(d.getMonth() - 3);
+    return { from: d.toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) };
   });
-  const [catTrendTo, setCatTrendTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const catTrendFrom = catTrendRange.from;
+  const catTrendTo = catTrendRange.to;
   const [catTrendMetric, setCatTrendMetric] = useState<"qty" | "ca_ttc">("ca_ttc");
   const [catTrendData, setCatTrendData] = useState<Record<string, CatTrendDaily[]> | null>(null);
   const [catTrendLoading, setCatTrendLoading] = useState(false);
@@ -1218,11 +1220,12 @@ function PerformancesPage() {
 
               {/* Date range + metric toggle */}
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <input type="date" value={catTrendFrom} onChange={e => setCatTrendFrom(e.target.value)} style={{ fontSize: 11, border: "1px solid #e0d8ce", borderRadius: 6, padding: "3px 6px", color: "#555" }} />
-                  <span style={{ fontSize: 10, color: "#999" }}>-</span>
-                  <input type="date" value={catTrendTo} onChange={e => setCatTrendTo(e.target.value)} style={{ fontSize: 11, border: "1px solid #e0d8ce", borderRadius: 6, padding: "3px 6px", color: "#555" }} />
-                </div>
+                <DateRangePicker
+                  value={catTrendRange}
+                  onChange={(r) => setCatTrendRange(r)}
+                  presets={["last-7-days", "last-30-days", "last-90-days", "this-month", "last-month", "this-year"]}
+                  format="short"
+                />
                 <div style={{ display: "flex", gap: 0, background: "#f5f0e8", borderRadius: 20, padding: 3, marginLeft: "auto" }}>
                   <button type="button" onClick={() => setCatTrendMetric("ca_ttc")} style={{
                     padding: "4px 12px", borderRadius: 16, border: "none", cursor: "pointer",
