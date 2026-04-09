@@ -144,13 +144,27 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
       if (!cpu) return acc;
       const qty = Number(l.qty);
       const unit = l.unit.toLowerCase();
-      if (unit === "g" && cpu.g) return acc + cpu.g * qty;
-      if (unit === "cl" && cpu.ml) return acc + cpu.ml * qty * 10;
-      if (unit === "ml" && cpu.ml) return acc + cpu.ml * qty;
-      if ((unit === "pcs" || unit === "pc") && cpu.pcs) return acc + cpu.pcs * qty;
+
+      // Enrich cpu with ingredient meta (same conversions as IngredientListDnD)
+      const ing = ingredients.find(i => i.id === l.ingredient_id);
+      const eff = { ...cpu };
+      const pwg = ing?.piece_weight_g ?? null;
+      const pvm = (ing as Record<string, unknown>)?.piece_volume_ml as number | null ?? null;
+      const dens = ing?.density_g_per_ml ?? null;
+      if (eff.g == null && eff.pcs != null && pwg && pwg > 0) eff.g = eff.pcs / pwg;
+      if (eff.ml == null && eff.pcs != null && pvm && pvm > 0) eff.ml = eff.pcs / pvm;
+      if (eff.g == null && eff.ml != null && dens && dens > 0) eff.g = eff.ml / dens;
+      if (eff.ml == null && eff.g != null && dens && dens > 0) eff.ml = eff.g * dens;
+
+      if ((unit === "g" || unit === "kg") && eff.g) return acc + eff.g * (unit === "kg" ? qty * 1000 : qty);
+      if ((unit === "cl" || unit === "ml" || unit === "l") && eff.ml) {
+        const factor = unit === "cl" ? 10 : unit === "l" ? 1000 : 1;
+        return acc + eff.ml * qty * factor;
+      }
+      if ((unit === "pc" || unit === "pcs") && eff.pcs) return acc + eff.pcs * qty;
       return acc;
     }, 0);
-  }, [allLines, priceByIngredient]);
+  }, [allLines, priceByIngredient, ingredients]);
 
   const totalCost = round2((doughCostPerBall ?? 0) + ingredientCostTotal);
 

@@ -25,15 +25,26 @@ export interface GestionFoodCostProps {
 
 // ── Helpers ──────────────────────────────────────────────────
 
-function resolveCost(cpu: CpuByUnit | undefined, qty: number, unit: string): number | null {
+function resolveCost(cpu: CpuByUnit | undefined, qty: number, unit: string, ing?: Ingredient | null): number | null {
   if (!cpu || qty <= 0) return null;
   const u = unit.toLowerCase();
-  if (u === "g" && cpu.g) return cpu.g * qty;
-  if (u === "kg" && cpu.g) return cpu.g * qty * 1000;
-  if (u === "cl" && cpu.ml) return cpu.ml * qty * 10;
-  if (u === "ml" && cpu.ml) return cpu.ml * qty;
-  if ((u === "pcs" || u === "pc") && cpu.pcs) return cpu.pcs * qty;
-  if (u === "l" && cpu.ml) return cpu.ml * qty * 1000;
+
+  // Enrich cpu with ingredient meta (same conversions as IngredientListDnD)
+  const eff = { ...cpu };
+  const pwg = ing?.piece_weight_g ?? null;
+  const pvm = (ing as Record<string, unknown>)?.piece_volume_ml as number | null ?? null;
+  const dens = ing?.density_g_per_ml ?? null;
+  if (eff.g == null && eff.pcs != null && pwg && pwg > 0) eff.g = eff.pcs / pwg;
+  if (eff.ml == null && eff.pcs != null && pvm && pvm > 0) eff.ml = eff.pcs / pvm;
+  if (eff.g == null && eff.ml != null && dens && dens > 0) eff.g = eff.ml / dens;
+  if (eff.ml == null && eff.g != null && dens && dens > 0) eff.ml = eff.g * dens;
+
+  if ((u === "g" || u === "kg") && eff.g) return eff.g * (u === "kg" ? qty * 1000 : qty);
+  if ((u === "cl" || u === "ml" || u === "l") && eff.ml) {
+    const factor = u === "cl" ? 10 : u === "l" ? 1000 : 1;
+    return eff.ml * qty * factor;
+  }
+  if ((u === "pcs" || u === "pc") && eff.pcs) return eff.pcs * qty;
   return null;
 }
 
@@ -65,7 +76,7 @@ export function GestionFoodCost({
         const ing = ingMap.get(l.ingredient_id);
         const cpu = priceByIngredient[l.ingredient_id];
         const qty = Number(l.qty);
-        const cost = resolveCost(cpu, qty, l.unit);
+        const cost = resolveCost(cpu, qty, l.unit, ing);
         const rendement = ing?.rendement ?? 1;
         const adjustedCost = cost != null && rendement < 1 ? cost / rendement : cost;
         const supplier = supplierByIngredient?.[l.ingredient_id] ?? null;

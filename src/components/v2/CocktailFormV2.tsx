@@ -104,13 +104,6 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  // Volume by ingredient (for cl->ml conversion)
-  const pieceVolById = useMemo(() => {
-    const m = new Map<string, number | null>();
-    for (const i of ingredients) m.set(i.id, i.piece_volume_ml ?? null);
-    return m;
-  }, [ingredients]);
-
   // Computed allergens
   const computedAllergens = useMemo(() => {
     const lists = lines
@@ -129,18 +122,27 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
       if (!cpu) return acc;
       const qty = Number(l.qty);
       const unit = l.unit.toLowerCase();
-      let cpuMl = cpu.ml;
-      if (cpuMl == null && cpu.pcs != null) {
-        const pvm = pieceVolById.get(l.ingredient_id) ?? null;
-        if (pvm && pvm > 0) cpuMl = cpu.pcs / pvm;
+
+      // Enrich cpu with ingredient meta (same conversions as IngredientListDnD)
+      const ing = ingredients.find(i => i.id === l.ingredient_id);
+      const eff = { ...cpu };
+      const pwg = ing?.piece_weight_g ?? null;
+      const pvm = (ing as Record<string, unknown>)?.piece_volume_ml as number | null ?? null;
+      const dens = ing?.density_g_per_ml ?? null;
+      if (eff.g == null && eff.pcs != null && pwg && pwg > 0) eff.g = eff.pcs / pwg;
+      if (eff.ml == null && eff.pcs != null && pvm && pvm > 0) eff.ml = eff.pcs / pvm;
+      if (eff.g == null && eff.ml != null && dens && dens > 0) eff.g = eff.ml / dens;
+      if (eff.ml == null && eff.g != null && dens && dens > 0) eff.ml = eff.g * dens;
+
+      if ((unit === "g" || unit === "kg") && eff.g) return acc + eff.g * (unit === "kg" ? qty * 1000 : qty);
+      if ((unit === "cl" || unit === "ml" || unit === "l") && eff.ml) {
+        const factor = unit === "cl" ? 10 : unit === "l" ? 1000 : 1;
+        return acc + eff.ml * qty * factor;
       }
-      if (unit === "cl" && cpuMl != null) return acc + qty * 10 * cpuMl;
-      if (unit === "ml" && cpuMl != null) return acc + qty * cpuMl;
-      if (unit === "g" && cpu.g != null) return acc + qty * cpu.g;
-      if ((unit === "pc" || unit === "pcs") && cpu.pcs != null) return acc + qty * cpu.pcs;
+      if ((unit === "pc" || unit === "pcs") && eff.pcs) return acc + eff.pcs * qty;
       return acc;
     }, 0);
-  }, [lines, priceByIngredient, pieceVolById]);
+  }, [lines, priceByIngredient, ingredients]);
 
   // Production mode computations
   const prodPivotLine = pivotIngredientId
