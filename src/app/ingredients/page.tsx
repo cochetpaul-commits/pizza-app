@@ -406,7 +406,7 @@ function IngredientsPageInner() {
     setPackEachQty(""); setPackEachUnit("l"); setPackPieceWeightG("");
   }
 
-  const previewCreatePack = useMemo(() => {
+  const _previewCreatePack = useMemo(() => {
     let d: LatestOffer | null = null;
     if (priceKind === "unit") {
       const p = parseNum(newUnitPrice);
