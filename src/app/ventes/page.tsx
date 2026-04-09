@@ -8,6 +8,7 @@ import Chart from "chart.js/auto";
 import { getCategoryColor, getCategoryColors } from "@/lib/categoryColors";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
 import { BottomSheet } from "@/components/layout/BottomSheet";
+import { supabase } from "@/lib/supabaseClient";
 
 /* ── Types ── */
 type WeekData = {
@@ -133,6 +134,7 @@ function PerformancesPage() {
   const { current: etab } = useEtablissement();
   const accent = etab?.couleur ?? "#D4775A";
 
+  const hasUrlRange = !!(searchParams.get("from") && searchParams.get("to"));
   const [range, setRange] = useState<DateRange>(() => {
     const qf = searchParams.get("from");
     const qt = searchParams.get("to");
@@ -141,6 +143,7 @@ function PerformancesPage() {
     }
     return defaultRange();
   });
+  const initialLoadDone = useRef(hasUrlRange);
   const [mode, setMode] = useState<"ttc" | "ht">(() => {
     const m = searchParams.get("mode");
     if (m === "ttc" || m === "ht") return m;
@@ -161,6 +164,24 @@ function PerformancesPage() {
   const [zoneDetail, setZoneDetail] = useState<string | null>(null);
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
   const [meteo, setMeteo] = useState<Record<string, { emoji: string; desc: string; temp: number }>>({});
+
+  // Fetch last import date on first load (when no URL range provided)
+  useEffect(() => {
+    if (initialLoadDone.current || !etab) return;
+    initialLoadDone.current = true;
+    (async () => {
+      const { data: row } = await supabase
+        .from("ventes_lignes")
+        .select("date_service")
+        .eq("etablissement_id", etab.id)
+        .order("date_service", { ascending: false })
+        .limit(1)
+        .single();
+      if (row?.date_service) {
+        setRange({ from: row.date_service, to: row.date_service });
+      }
+    })();
+  }, [etab]);
 
   // Category trend state
   type CatTrendDaily = { date: string; qty: number; ca_ttc: number; ca_ht: number };
@@ -502,8 +523,8 @@ function PerformancesPage() {
     <RequireRole allowedRoles={["group_admin"]}>
       <div className="ventes-container" style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 16px 120px" }}>
 
-        {/* ── Toolbar: Import | Calendar | PDF | TTC/HT ── */}
-        <div className="ventes-toolbar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 14 }}>
+        {/* ── Toolbar: Import | Calendar | PDF | TTC/HT (desktop only) ── */}
+        <div className="ventes-toolbar desktop-only" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 14 }}>
           <label style={{
             padding: "7px 14px", borderRadius: 8, border: "none",
             background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
@@ -1202,20 +1223,25 @@ function PerformancesPage() {
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
-                {catTrendFilterCat && data && (
-                  <select
-                    value={catTrendFilterProd ?? ""}
-                    onChange={(e) => setCatTrendFilterProd(e.target.value || null)}
-                    style={{ flex: 1, height: 36, borderRadius: 10, border: "1px solid #e0d8ce", padding: "0 10px", fontSize: 12, background: "#fff", color: "#1a1a1a", cursor: "pointer" }}
-                  >
-                    <option value="">Tous les produits</option>
-                    {(data.cat_products[catTrendFilterCat] ?? [])
-                      .sort((a, b) => b.ca_ttc - a.ca_ttc)
-                      .map(p => (
-                        <option key={p.n} value={p.n}>{p.n}</option>
-                      ))}
-                  </select>
-                )}
+                {catTrendFilterCat && data && (() => {
+                  // cat_products uses normalized keys ("Alcool") while catTrendData uses raw ("ALCOOL")
+                  const cpKey = Object.keys(data.cat_products).find(k => k.toLowerCase() === catTrendFilterCat.toLowerCase()) ?? catTrendFilterCat;
+                  const products = data.cat_products[cpKey] ?? [];
+                  return (
+                    <select
+                      value={catTrendFilterProd ?? ""}
+                      onChange={(e) => setCatTrendFilterProd(e.target.value || null)}
+                      style={{ flex: 1, height: 36, borderRadius: 10, border: "1px solid #e0d8ce", padding: "0 10px", fontSize: 12, background: "#fff", color: "#1a1a1a", cursor: "pointer" }}
+                    >
+                      <option value="">Tous les produits ({products.length})</option>
+                      {products
+                        .sort((a, b) => b.ca_ttc - a.ca_ttc)
+                        .map(p => (
+                          <option key={p.n} value={p.n}>{p.n}</option>
+                        ))}
+                    </select>
+                  );
+                })()}
               </div>
 
               {/* Date range + metric toggle */}
@@ -1353,6 +1379,72 @@ function PerformancesPage() {
             </div>
           </>
         )}
+      </div>
+
+      {/* ── Mobile Bottom Bar: day nav + import button ── */}
+      <div className="mobile-only" style={{
+        position: "fixed", bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
+        left: 12, right: 12, zIndex: 100,
+        display: "flex", alignItems: "center", gap: 8, padding: "10px 14px",
+        background: "rgba(255,255,255,0.92)",
+        backdropFilter: "blur(20px) saturate(180%)",
+        WebkitBackdropFilter: "blur(20px) saturate(180%)",
+        borderRadius: 16,
+        boxShadow: "0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
+        border: "1px solid rgba(0,0,0,0.06)",
+      }}>
+        {/* Prev day */}
+        <button type="button" onClick={() => {
+          const nf = new Date(new Date(range.from + "T12:00:00").getTime() - 86400000);
+          const nt = new Date(new Date(range.to + "T12:00:00").getTime() - 86400000);
+          setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
+        }} style={{
+          width: 36, height: 36, borderRadius: 10, border: "none",
+          background: accent + "15", color: accent,
+          fontSize: 16, fontWeight: 700, cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>{"\u2190"}</button>
+
+        {/* Center label — tap to go to today */}
+        <div
+          onClick={() => {
+            const today = new Date().toISOString().slice(0, 10);
+            setRange({ from: today, to: today });
+          }}
+          style={{ flex: 1, textAlign: "center", minWidth: 0, cursor: "pointer" }}
+        >
+          <div style={{
+            fontSize: 13, fontWeight: 700, color: "#1a1a1a",
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          }}>
+            {isSingleDay
+              ? new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })
+              : `${new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} - ${new Date(to + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`}
+          </div>
+          {isSingleDay && from === new Date().toISOString().slice(0, 10) && (
+            <div style={{ fontSize: 9, fontWeight: 700, color: accent, marginTop: 1 }}>Aujourd&apos;hui</div>
+          )}
+        </div>
+
+        {/* Next day */}
+        <button type="button" onClick={() => {
+          const nf = new Date(new Date(range.from + "T12:00:00").getTime() + 86400000);
+          const nt = new Date(new Date(range.to + "T12:00:00").getTime() + 86400000);
+          setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
+        }} style={{
+          width: 36, height: 36, borderRadius: 10, border: "none",
+          background: accent + "15", color: accent,
+          fontSize: 16, fontWeight: 700, cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>{"\u2192"}</button>
+
+        {/* Import facture button */}
+        <button type="button" onClick={() => router.push("/invoices")} style={{
+          padding: "8px 14px", borderRadius: 10, border: "none",
+          background: accent, color: "#fff",
+          fontSize: 11, fontWeight: 700, cursor: "pointer",
+          whiteSpace: "nowrap", flexShrink: 0,
+        }}>+ Import</button>
       </div>
 
     </RequireRole>
