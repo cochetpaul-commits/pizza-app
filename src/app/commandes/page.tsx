@@ -302,6 +302,12 @@ function CommandesPage() {
   const [histOpen, setHistOpen] = useState(false);
   const [historique, setHistorique] = useState<HistItem[]>([]);
 
+  // Global recent orders for dashboard
+  const [recentOrders, setRecentOrders] = useState<{
+    id: string; supplier_name: string; status: string;
+    created_at: string; total_ht: number;
+  }[]>([]);
+
   // Pending receptions (validated orders awaiting reception)
   const [pendingReceptions, setPendingReceptions] = useState<{
     id: string; supplier_id: string; supplier_name: string;
@@ -417,6 +423,24 @@ function CommandesPage() {
               nb_articles: a.commande_lignes?.[0]?.count ?? 0,
               total_ht: a.total_ht ?? 0,
             }))
+        );
+
+        // Load recent orders (recue) for dashboard historique
+        const { data: recentData } = await supabase
+          .from("commande_sessions")
+          .select("id, supplier_id, status, created_at, total_ht")
+          .eq("etablissement_id", etab.id)
+          .eq("status", "recue")
+          .order("created_at", { ascending: false })
+          .limit(8);
+        setRecentOrders(
+          (recentData ?? []).map((r: { id: string; supplier_id: string; status: string; created_at: string; total_ht: number }) => ({
+            id: r.id,
+            supplier_name: supplierMap.get(r.supplier_id) ?? "Fournisseur",
+            status: r.status,
+            created_at: r.created_at,
+            total_ht: r.total_ht ?? 0,
+          }))
         );
       }
 
@@ -1507,34 +1531,42 @@ function CommandesPage() {
           </div>
         </BottomSheet>
 
-        {/* Empty state — no draft + nothing in flight */}
-        {!loading && !selectedSupplierId && activeSessions.length === 0 && pendingReceptions.length === 0 && (
-          <div style={{
-            textAlign: "center",
-            padding: "80px 24px 40px",
-            color: "#bbb",
-          }}>
-            <svg width={56} height={56} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ margin: "0 auto 16px", display: "block", opacity: 0.6 }}>
-              <path d="M9 11V7a3 3 0 0 1 6 0v4" />
-              <rect x="5" y="11" width="14" height="10" rx="2" />
-            </svg>
-            <div style={{
-              fontFamily: "var(--font-oswald), Oswald, sans-serif",
-              fontSize: 16, fontWeight: 700,
-              textTransform: "uppercase", letterSpacing: ".06em",
-              color: "#999",
-              marginBottom: 6,
-            }}>
-              Aucune commande en cours
+        {/* ── DASHBOARD (no supplier selected) ── */}
+        {!loading && !selectedSupplierId && (
+          <>
+            {/* KPI row */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginTop: 8 }}>
+              {[
+                { label: "Brouillons", count: activeSessions.filter(s => s.status === "brouillon").length, color: "#A0845C" },
+                { label: "En attente", count: activeSessions.filter(s => s.status === "en_attente").length, color: "#2563EB" },
+                { label: "A recevoir", count: pendingReceptions.length, color: "#4a6741" },
+                { label: "Recues ce mois", count: recentOrders.filter(r => {
+                  const d = new Date(r.created_at);
+                  const now = new Date();
+                  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                }).length, color: "#16a34a" },
+              ].map((kpi) => (
+                <div key={kpi.label} style={{
+                  background: "#fff", borderRadius: 12, border: "1px solid #ece4d4",
+                  padding: "16px 18px",
+                }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999", marginBottom: 6 }}>
+                    {kpi.label}
+                  </div>
+                  <div style={{
+                    fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                    fontWeight: 700, fontSize: 28, color: kpi.count > 0 ? kpi.color : "#ccc",
+                  }}>
+                    {kpi.count}
+                  </div>
+                </div>
+              ))}
             </div>
-            <div style={{ fontSize: 12, color: "#bbb" }}>
-              Touchez « Nouvelle commande » pour demarrer.
-            </div>
-          </div>
+          </>
         )}
 
         {/* Commandes en cours */}
-        {!loading && activeSessions.length > 0 && (
+        {!loading && !selectedSupplierId && activeSessions.length > 0 && (
           <div style={{ marginTop: 16 }}>
             <div style={{
               fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
@@ -1673,7 +1705,7 @@ function CommandesPage() {
         )}
 
         {/* Réceptions en attente */}
-        {!loading && pendingReceptions.length > 0 && (
+        {!loading && !selectedSupplierId && pendingReceptions.length > 0 && (
           <div style={{ marginTop: 16 }}>
             <div style={{
               fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
@@ -1724,6 +1756,132 @@ function CommandesPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Fournisseurs grid */}
+        {!loading && !selectedSupplierId && suppliers.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{
+              fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
+              color: "#999", marginBottom: 10,
+              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+            }}>
+              Commander par fournisseur
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10 }}>
+              {suppliers.map((s) => {
+                const hasDraft = draftSupplierIds.has(s.id);
+                const schedule = s.delivery_schedule;
+                let nextDelivery: string | null = null;
+                if (schedule && schedule.length > 0) {
+                  const DAY_NAMES = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+                  const now = new Date();
+                  for (let offset = 0; offset < 7; offset++) {
+                    const d = new Date(now);
+                    d.setDate(d.getDate() + offset);
+                    const dayName = DAY_NAMES[d.getDay()];
+                    const rule = schedule.find((r) => r.day.toLowerCase() === dayName);
+                    if (rule) {
+                      if (offset === 0) {
+                        const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+                        if (currentTime >= rule.cutoff) continue;
+                      }
+                      nextDelivery = `Liv. ${rule.delivery_day}`;
+                      break;
+                    }
+                  }
+                }
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => { setSelectedSupplierId(s.id); setDropdownOpen(false); }}
+                    style={{
+                      background: "#fff", borderRadius: 12,
+                      border: hasDraft ? "1.5px solid #D4775A" : "1px solid #ece4d4",
+                      padding: "16px 14px", cursor: "pointer",
+                      textAlign: "left", position: "relative",
+                      transition: "border-color 0.15s",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <span style={{
+                        fontSize: 13, fontWeight: 700, color: "#1a1a1a",
+                        fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                        textTransform: "uppercase", letterSpacing: ".03em",
+                      }}>
+                        {s.name}
+                      </span>
+                      {hasDraft && (
+                        <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#D4775A", flexShrink: 0 }} />
+                      )}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      {s.franco_minimum != null && s.franco_minimum > 0 && (
+                        <span style={{ fontSize: 11, color: "#999" }}>
+                          Franco {s.franco_minimum.toFixed(0)} €
+                        </span>
+                      )}
+                      {nextDelivery && (
+                        <span style={{ fontSize: 11, color: "#4a6741", fontWeight: 600 }}>
+                          {nextDelivery}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Historique recent */}
+        {!loading && !selectedSupplierId && recentOrders.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{
+              fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
+              color: "#999", marginBottom: 10,
+              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+            }}>
+              Historique recent
+            </div>
+            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #ece4d4", overflow: "hidden" }}>
+              {recentOrders.map((r, idx) => (
+                <div key={r.id} style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "12px 16px",
+                  borderBottom: idx < recentOrders.length - 1 ? "1px solid #f0ebe2" : "none",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{
+                      fontSize: 13, fontWeight: 700, color: "#1a1a1a", minWidth: 100,
+                    }}>
+                      {r.supplier_name}
+                    </span>
+                    <span style={{ fontSize: 11, color: "#999" }}>
+                      {new Date(r.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 6,
+                      background: "#e8ede6", color: "#16a34a",
+                      textTransform: "uppercase", letterSpacing: ".05em",
+                    }}>
+                      Recue
+                    </span>
+                    <span style={{
+                      fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                      fontWeight: 700, fontSize: 13, color: "#1a1a1a",
+                      fontVariantNumeric: "tabular-nums",
+                    }}>
+                      {r.total_ht > 0 ? `${r.total_ht.toFixed(2)} €` : "—"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
