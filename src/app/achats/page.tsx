@@ -1219,7 +1219,7 @@ export default function AchatsPage() {
               label="Scanner des justificatifs"
               accept="image/*"
               capture="environment"
-              onFile={() => { setImportDrawerOpen(false); router.push("/invoices"); }}
+              onFile={(f) => { setImportDrawerOpen(false); if (f) setPendingInvoiceFile(f); router.push("/invoices"); }}
             />
             <ImportOption
               icon={
@@ -1231,7 +1231,7 @@ export default function AchatsPage() {
               }
               label="Importer depuis la galerie"
               accept="image/*"
-              onFile={() => { setImportDrawerOpen(false); router.push("/invoices"); }}
+              onFile={(f) => { setImportDrawerOpen(false); if (f) setPendingInvoiceFile(f); router.push("/invoices"); }}
             />
             <ImportOption
               icon={
@@ -1265,23 +1265,14 @@ function ImportOption({
   onFile: (file: File | null) => void;
   isLast?: boolean;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
   return (
     <>
-      <input
-        ref={inputRef}
-        type="file"
-        accept={accept}
-        {...(capture ? { capture } : {})}
-        style={{ display: "none" }}
-        onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-      />
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
+      {/* Use <label> instead of button+click() for iOS Safari compatibility */}
+      <label
         style={{
           display: "flex", alignItems: "center", gap: 14,
           width: "100%", padding: "16px 4px",
+          cursor: "pointer",
           border: "none", cursor: "pointer",
           background: "transparent",
           textAlign: "left",
@@ -1291,9 +1282,16 @@ function ImportOption({
           fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
         }}
       >
+        <input
+          type="file"
+          accept={accept}
+          {...(capture ? { capture } : {})}
+          style={{ display: "none" }}
+          onChange={(e) => { onFile(e.target.files?.[0] ?? null); e.target.value = ""; }}
+        />
         <span style={{ color: "#1a1a1a", flexShrink: 0 }}>{icon}</span>
         {label}
-      </button>
+      </label>
     </>
   );
 }
