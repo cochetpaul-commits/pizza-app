@@ -1830,33 +1830,21 @@ function CommandesPage() {
                     {/* Color top bar */}
                     <div style={{ height: 4, background: color }} />
                     <div style={{ padding: "12px 14px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                        <div style={{
-                          width: 32, height: 32, borderRadius: 8,
-                          background: `${color}18`, color,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 14, fontWeight: 800,
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                        <span style={{
+                          fontSize: 13, fontWeight: 700, color: "#1a1a1a",
                           fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                          flexShrink: 0,
+                          textTransform: "uppercase", letterSpacing: ".03em",
+                          flex: 1, minWidth: 0,
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                         }}>
-                          {s.name.charAt(0)}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <span style={{
-                            fontSize: 13, fontWeight: 700, color: "#1a1a1a",
-                            fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                            textTransform: "uppercase", letterSpacing: ".03em",
-                            display: "block",
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          }}>
-                            {s.name}
-                          </span>
-                        </div>
+                          {s.name}
+                        </span>
                         {hasDraft && (
                           <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#D4775A", flexShrink: 0 }} />
                         )}
                       </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingLeft: 42 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                         {s.franco_minimum != null && s.franco_minimum > 0 && (
                           <span style={{ fontSize: 11, color: "#999" }}>
                             Franco {s.franco_minimum.toFixed(0)} €
@@ -1890,42 +1878,33 @@ function CommandesPage() {
               Historique recent
             </div>
             <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #ece4d4", overflow: "hidden" }}>
-              {recentOrders.map((r, idx) => {
-                const sc = supplierColor(r.supplier_name);
-                return (
-                  <div key={r.id} style={{
-                    display: "flex", alignItems: "center", gap: 12,
-                    padding: "12px 16px",
-                    borderBottom: idx < recentOrders.length - 1 ? "1px solid #f0ebe2" : "none",
-                  }}>
-                    <div style={{
-                      width: 30, height: 30, borderRadius: 8,
-                      background: `${sc}18`, color: sc,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 13, fontWeight: 800,
-                      fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                      flexShrink: 0,
-                    }}>
-                      {r.supplier_name.charAt(0)}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
-                        {r.supplier_name}
-                      </span>
-                      <span style={{ fontSize: 11, color: "#999", marginLeft: 8 }}>
-                        {new Date(r.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
-                      </span>
-                    </div>
-                    <span style={{
-                      fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                      fontWeight: 700, fontSize: 14, color: "#1a1a1a",
-                      fontVariantNumeric: "tabular-nums",
-                    }}>
-                      {r.total_ht > 0 ? `${r.total_ht.toFixed(2)} €` : "—"}
+              {recentOrders.map((r, idx) => (
+                <div key={r.id} style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "11px 16px",
+                  borderBottom: idx < recentOrders.length - 1 ? "1px solid #f0ebe2" : "none",
+                }}>
+                  <span style={{
+                    width: 8, height: 8, borderRadius: "50%",
+                    background: supplierColor(r.supplier_name), flexShrink: 0,
+                  }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
+                      {r.supplier_name}
+                    </span>
+                    <span style={{ fontSize: 11, color: "#999", marginLeft: 8 }}>
+                      {new Date(r.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
                     </span>
                   </div>
-                );
-              })}
+                  <span style={{
+                    fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                    fontWeight: 700, fontSize: 14, color: "#1a1a1a",
+                    fontVariantNumeric: "tabular-nums",
+                  }}>
+                    {r.total_ht > 0 ? `${r.total_ht.toFixed(2)} €` : "—"}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         )}
