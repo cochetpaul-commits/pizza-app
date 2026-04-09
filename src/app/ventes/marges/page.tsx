@@ -6,6 +6,7 @@ import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { AiInsightCard } from "@/components/AiInsightCard";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
+import { BottomSheet } from "@/components/layout/BottomSheet";
 
 import Chart from "chart.js/auto";
 import { getCategoryColor, getCategoryColors } from "@/lib/categoryColors";
@@ -292,6 +293,7 @@ function MargesPage() {
 
   // PDF export — fetch stats then call shared PDF endpoint
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [fileDrawerOpen, setFileDrawerOpen] = useState(false);
   const handleExportPDF = async () => {
     if (!etab) return;
     setExportingPdf(true);
@@ -1779,6 +1781,84 @@ function MargesPage() {
           </>
         )}
       </div>
+
+      {/* ── Mobile Bottom Bar: ← date → + file icon ── */}
+      <div className="mobile-only" style={{
+        position: "fixed",
+        bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
+        left: 12, right: 12, zIndex: 100,
+        height: 48,
+        display: "flex", flexDirection: "row", alignItems: "center", gap: 6,
+        padding: "0 8px",
+        background: "rgba(255,255,255,0.95)",
+        backdropFilter: "blur(20px) saturate(180%)",
+        WebkitBackdropFilter: "blur(20px) saturate(180%)",
+        borderRadius: 14,
+        boxShadow: "0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
+        border: "1px solid rgba(0,0,0,0.06)",
+      }}>
+        <button type="button" onClick={() => {
+          const nf = new Date(new Date(range.from + "T12:00:00").getTime() - 86400000);
+          const nt = new Date(new Date(range.to + "T12:00:00").getTime() - 86400000);
+          setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
+        }} style={{
+          width: 32, height: 32, borderRadius: 8, border: "none",
+          background: COLORS.accent + "15", color: COLORS.accent, fontSize: 14, fontWeight: 700,
+          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>{"←"}</button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
+        </div>
+        <button type="button" onClick={() => {
+          const today = new Date().toISOString().slice(0, 10);
+          if (range.from >= today) return;
+          const nf = new Date(new Date(range.from + "T12:00:00").getTime() + 86400000);
+          const nt = new Date(new Date(range.to + "T12:00:00").getTime() + 86400000);
+          setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
+        }} style={{
+          width: 32, height: 32, borderRadius: 8, border: "none",
+          background: range.from >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : COLORS.accent + "15",
+          color: range.from >= new Date().toISOString().slice(0, 10) ? "#ccc" : COLORS.accent,
+          fontSize: 14, fontWeight: 700,
+          cursor: range.from >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>{"→"}</button>
+        <button type="button" onClick={() => setFileDrawerOpen(true)} style={{
+          width: 36, height: 36, borderRadius: 10, border: "1px solid #ddd6c8",
+          background: "#fff", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>
+          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
+        </button>
+      </div>
+
+      {/* ── File actions drawer ── */}
+      <BottomSheet open={fileDrawerOpen} onClose={() => setFileDrawerOpen(false)}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#999", padding: "4px 4px 8px" }}>
+            Importer fichier
+          </div>
+          <button type="button" onClick={() => { setFileDrawerOpen(false); router.push("/invoices"); }}
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 12px", border: "none", cursor: "pointer", borderRadius: 12, background: "rgba(255,255,255,0.55)", textAlign: "left", fontFamily: "inherit" }}>
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Rapport Popina</span>
+          </button>
+          <div style={{ height: 1, background: "rgba(0,0,0,0.06)", margin: "8px 0" }} />
+          <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#999", padding: "4px 4px 8px" }}>
+            Exporter rapport
+          </div>
+          <button type="button" onClick={() => { setFileDrawerOpen(false); handleExportPDF(); }} disabled={exportingPdf}
+            style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2, width: "100%", padding: "14px 12px", border: "none", cursor: "pointer", borderRadius: 12, background: "rgba(255,255,255,0.55)", textAlign: "left", fontFamily: "inherit", opacity: exportingPdf ? 0.5 : 1 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Produits</span>
+            <span style={{ fontSize: 11, color: "#777" }}>Marges et food cost par produit</span>
+          </button>
+        </div>
+      </BottomSheet>
 
     </RequireRole>
   );
