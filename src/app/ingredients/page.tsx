@@ -211,7 +211,6 @@ function IngredientsPageInner() {
   const [tab, setTab] = useState<Tab>("all");
   const [filterCategory, setFilterCategory] = useState<"all" | Category>("all");
   const [filterSupplier, setFilterSupplier] = useState<"all" | string>(supplierParam ?? "all");
-  const [includeNoOffer, setIncludeNoOffer] = useState(true);
   const [storageZones, setStorageZones] = useState<StorageZoneOption[]>([]);
 
   useEffect(() => {
@@ -258,7 +257,6 @@ function IngredientsPageInner() {
     let base = items.filter((x) => { if (seen.has(x.id)) return false; seen.add(x.id); return true; });
     if (tab !== "all") base = base.filter((x) => ((x.status ?? "to_check") as IngredientStatus) === tab);
     if (filterCategory !== "all") base = base.filter((x) => x.category === filterCategory);
-    if (!includeNoOffer) base = base.filter((x) => offersByIngredientId.has(x.id));
     if (filterSupplier !== "all") {
       const aliasIds = supplierAliases.get(filterSupplier) ?? new Set([filterSupplier]);
       base = base.filter((x) => {
@@ -268,7 +266,7 @@ function IngredientsPageInner() {
       });
     }
     return base;
-  }, [items, tab, filterCategory, filterSupplier, supplierAliases, includeNoOffer, offersByIngredientId]);
+  }, [items, tab, filterCategory, filterSupplier, supplierAliases, offersByIngredientId]);
 
   // Categories sorted alphabetically by label (French locale)
   const CATEGORIES_ALPHA = useMemo(
@@ -295,7 +293,6 @@ function IngredientsPageInner() {
     }
   }, [debouncedQ]);
 
-  const allCollapsed = grouped.length > 0 && collapsedCats.size >= grouped.length;
   const filterActive = filterCategory !== "all" || filterSupplier !== "all";
 
   const [compactMode, setCompactMode] = useState(() => {
@@ -333,14 +330,6 @@ function IngredientsPageInner() {
   );
 
   // ─── Stable callbacks ────────────────────────────────────────────────────
-  const toggleAll = useCallback(() => {
-    setCollapsedCats(prev => {
-      const allCats = grouped.map(g => g.cat);
-      const allAreCollapsed = allCats.length > 0 && allCats.every(c => prev.has(c));
-      return allAreCollapsed ? new Set<Category>() : new Set<Category>(allCats);
-    });
-  }, [grouped]);
-
   const toggleCat = useCallback((cat: Category) => {
     setCollapsedCats((prev) => {
       const next = new Set(prev);
@@ -348,8 +337,6 @@ function IngredientsPageInner() {
       return next;
     });
   }, []);
-
-  const reload = useCallback(() => mutate(), [mutate]);
 
   const setIngredientStatus = useCallback(async (id: string, next: IngredientStatus) => {
     const ing = items.find((x) => x.id === id);
@@ -1040,29 +1027,31 @@ function IngredientsPageInner() {
       {/* ══════════════════════════════════════════════
           TOOLBAR (no header bandeau — global header handles nav)
       ══════════════════════════════════════════════ */}
-      <div style={{ position: "sticky", top: 0, zIndex: 40, background: "#f2ede4", borderBottom: "1px solid #ddd6c8" }}>
+      <div style={{ position: "sticky", top: 0, zIndex: 40, background: "#f2ede4" }}>
+        {!isVariations ? (
+          <div style={{
+            margin: "12px 20px", padding: 16, background: "#f9f5ef",
+            borderRadius: 16, border: "1px solid #ece4d4",
+            display: "flex", flexDirection: "column", gap: 12,
+          }}>
+            {/* Row 1 — Tabs */}
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <div style={{ display: "inline-flex", gap: 4, padding: 3, background: "#ece4d4", borderRadius: 10 }}>
+                {TABS_MAIN.map(({ t, label, count }) => (
+                  <button key={t} onClick={() => setTab(t)} style={{
+                    flexShrink: 0, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                    borderRadius: 8, whiteSpace: "nowrap", border: "none",
+                    background: tab === t ? "#fff" : "transparent",
+                    color: tab === t ? "#1a1a1a" : "#999",
+                    boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+                    transition: "all 0.15s",
+                  }}>{label} ({count})</button>
+                ))}
+              </div>
+            </div>
 
-        {/* Tabs — centered pill toggle */}
-        <div style={{ display: "flex", justifyContent: "center", paddingTop: 12 }}>
-          <div style={{ overflowX: "auto", display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12 }}>
-            {TABS_MAIN.map(({ t, label, count }) => (
-              <button key={t} onClick={() => setTab(t)} style={{
-                flexShrink: 0, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
-                borderRadius: 10, whiteSpace: "nowrap",
-                border: "none",
-                background: tab === t ? (etab?.couleur ? etab.couleur + "25" : "#fff") : "transparent",
-                color: tab === t ? "#1a1a1a" : "#999",
-                boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
-                transition: "all 0.15s",
-              }}>{label} ({count})</button>
-            ))}
-          </div>
-        </div>
-
-        {!isVariations && (
-          <>
-            {/* Desktop filter row */}
-            <div className="ing-desktop-filters" style={{ gridTemplateColumns: "1fr 1fr auto auto auto", gap: 8, padding: "10px 20px" }}>
+            {/* Row 2 — Dropdowns (desktop) */}
+            <div className="ing-desktop-filters" style={{ gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <Dropdown
                 value={filterCategory}
                 onChange={(v) => setFilterCategory(v as "all" | Category)}
@@ -1073,35 +1062,49 @@ function IngredientsPageInner() {
                 onChange={setFilterSupplier}
                 options={[{ value: "all", label: "Tous fournisseurs" }, ...suppliers.filter(s => s.is_active).map(s => ({ value: s.id, label: s.name }))]}
               />
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} style={{ accentColor: "#D4775A" }} />
-                Sans offre
-              </label>
-              <button onClick={toggleAll} title={allCollapsed ? "Tout déplier" : "Tout replier"} style={{ width: 34, height: 34, borderRadius: 12, border: "1.5px solid #ddd6c8", background: "white", fontSize: 16, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
-                {allCollapsed ? "▸▸" : "▾▾"}
-              </button>
-              <button onClick={reload} style={{ padding: "8px 12px", borderRadius: 12, border: "1.5px solid #ddd6c8", background: "white", fontSize: 14, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
-                ↺
-              </button>
             </div>
 
-            {/* Search bar — all sizes */}
-            <div style={{ padding: "8px 20px 10px", display: "flex", gap: 8 }}>
-              <input
-                placeholder="Rechercher un ingredient…"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                style={{ flex: 1, borderRadius: 12, border: "1.5px solid #ddd6c8", padding: "10px 16px", fontSize: 13, background: "white", outline: "none", color: "#1a1a1a", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
-              />
+            {/* Row 3 — Search */}
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 1, position: "relative" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}>
+                  <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+                </svg>
+                <input
+                  placeholder="Rechercher un ingredient…"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  style={{
+                    width: "100%", borderRadius: 10, border: "1.5px solid #e5ddd0",
+                    padding: "9px 14px 9px 36px", fontSize: 13, background: "#fff",
+                    outline: "none", color: "#1a1a1a", boxSizing: "border-box",
+                  }}
+                />
+              </div>
               {/* Mobile only: Filtres + compact */}
-              <button className="ing-mobile-btn" onClick={() => setShowFilters(true)} style={{ padding: "10px 14px", borderRadius: 12, border: "1.5px solid #ddd6c8", background: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+              <button className="ing-mobile-btn" onClick={() => setShowFilters(true)} style={{ padding: "9px 14px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 Filtres{filterActive ? " ●" : ""}
               </button>
-              <button className="ing-mobile-btn" onClick={toggleCompact} style={{ padding: "10px 12px", borderRadius: 12, border: "1.5px solid #ddd6c8", background: "white", fontSize: 14, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+              <button className="ing-mobile-btn" onClick={toggleCompact} style={{ padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 14, cursor: "pointer" }}>
                 {compactMode ? "⊞" : "☰"}
               </button>
             </div>
-          </>
+          </div>
+        ) : (
+          <div style={{ display: "flex", justifyContent: "center", padding: "12px 20px" }}>
+            <div style={{ display: "inline-flex", gap: 4, padding: 3, background: "#ece4d4", borderRadius: 10 }}>
+              {TABS_MAIN.map(({ t, label, count }) => (
+                <button key={t} onClick={() => setTab(t)} style={{
+                  flexShrink: 0, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                  borderRadius: 8, whiteSpace: "nowrap", border: "none",
+                  background: tab === t ? "#fff" : "transparent",
+                  color: tab === t ? "#1a1a1a" : "#999",
+                  boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+                  transition: "all 0.15s",
+                }}>{label} ({count})</button>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 
@@ -1459,10 +1462,6 @@ function IngredientsPageInner() {
               options={[{ value: "all", label: "Tous" }, ...suppliers.filter(s => s.is_active).map(s => ({ value: s.id, label: s.name }))]}
             />
           </div>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-            <input type="checkbox" checked={includeNoOffer} onChange={(e) => setIncludeNoOffer(e.target.checked)} style={{ accentColor: "#D4775A" }} />
-            Inclure sans offre
-          </label>
           <button
             type="button"
             onClick={() => { setShowFilters(false); setShowDuplicates(true); }}
