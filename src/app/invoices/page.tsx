@@ -106,6 +106,7 @@ export default function InvoicesPage() {
     if (pending) {
       handleFileUpload(pending);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function getAuthHeader(): string {
