@@ -10,6 +10,8 @@ import {
 import { fetchApi } from "@/lib/fetchApi";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
+import { BottomSheet } from "@/components/layout/BottomSheet";
+import { useRouter } from "next/navigation";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -523,10 +525,16 @@ export default function PilotagePage() {
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState("");
 
+  const router = useRouter();
+
   // Day drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
   const [dayLoading, _setDayLoading] = useState(false);
+
+  // Mobile action drawer
+  const [actionDrawerOpen, setActionDrawerOpen] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const isPiccola = etab.current?.slug?.includes("piccola");
   const currentEtabId = etab.current?.id;
@@ -602,8 +610,10 @@ export default function PilotagePage() {
       <>
         <main style={{ maxWidth: 720, margin: "0 auto", padding: "20px 16px 56px", boxSizing: "border-box" }}>
 
-          {/* ── BLOC 0 : WEEK SELECTOR ─────────────────────────── */}
-          <WeekSelector weekStr={weekStr} currentWeek={currentWeek} onPrev={goPrevWeek} onNext={goNextWeek} />
+          {/* ── BLOC 0 : WEEK SELECTOR (desktop only) ─────────────────────────── */}
+          <div className="desktop-only">
+            <WeekSelector weekStr={weekStr} currentWeek={currentWeek} onPrev={goPrevWeek} onNext={goNextWeek} />
+          </div>
 
           {/* ── BLOC 1 : BANDEAU HAUT ────────────────────────────── */}
           <div style={{
@@ -957,6 +967,117 @@ export default function PilotagePage() {
 
         {/* ── Day Detail Drawer ── */}
         {drawerOpen && <DayDrawer detail={dayDetail} loading={dayLoading} onClose={closeDrawer} />}
+
+        {/* ── Mobile Bottom Bar: week nav + action button ── */}
+        <div className="mobile-only" style={{
+          position: "fixed", bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
+          left: 12, right: 12, zIndex: 100,
+          display: "flex", alignItems: "center", gap: 8,
+          padding: "10px 14px",
+          background: "rgba(255,255,255,0.92)",
+          backdropFilter: "blur(20px) saturate(180%)",
+          WebkitBackdropFilter: "blur(20px) saturate(180%)",
+          borderRadius: 16,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
+          border: "1px solid rgba(0,0,0,0.06)",
+        }}>
+          {/* Prev week */}
+          <button onClick={goPrevWeek} style={{
+            width: 36, height: 36, borderRadius: 10, border: "none",
+            background: ACCENT + "15", color: ACCENT,
+            fontSize: 16, fontWeight: 700, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>←</button>
+
+          {/* Week label */}
+          <div style={{ flex: 1, textAlign: "center", minWidth: 0 }}>
+            <div style={{
+              fontSize: 12, fontWeight: 700, color: "#1a1a1a",
+              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            }}>
+              {getWeekLabel(weekStr).replace("Semaine du ", "S. ")}
+            </div>
+            {weekStr === currentWeek && (
+              <div style={{ fontSize: 9, fontWeight: 700, color: ACCENT, marginTop: 1 }}>Cette semaine</div>
+            )}
+          </div>
+
+          {/* Next week */}
+          <button onClick={goNextWeek} disabled={weekStr === currentWeek} style={{
+            width: 36, height: 36, borderRadius: 10, border: "none",
+            background: weekStr === currentWeek ? "#f0ebe3" : ACCENT + "15",
+            color: weekStr === currentWeek ? "#ccc" : ACCENT,
+            fontSize: 16, fontWeight: 700,
+            cursor: weekStr === currentWeek ? "not-allowed" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>→</button>
+
+          {/* Action button */}
+          <button onClick={() => setActionDrawerOpen(true)} style={{
+            width: 36, height: 36, borderRadius: 10, border: "none",
+            background: ACCENT, color: "#fff",
+            fontSize: 14, fontWeight: 700, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            boxShadow: `0 2px 8px ${ACCENT}40`,
+          }}>
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
+            </svg>
+          </button>
+        </div>
+
+        {/* ── Action Drawer ── */}
+        <BottomSheet open={actionDrawerOpen} onClose={() => setActionDrawerOpen(false)} title="Actions">
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingBottom: 8 }}>
+            <button type="button" onClick={() => { setActionDrawerOpen(false); router.push("/invoices"); }} style={{
+              display: "flex", alignItems: "center", gap: 14,
+              width: "100%", padding: "16px 8px", cursor: "pointer",
+              border: "none", background: "transparent", textAlign: "left",
+              borderBottom: "1px solid rgba(0,0,0,0.06)",
+              fontFamily: "inherit", fontSize: 15, fontWeight: 500, color: "#1a1a1a",
+            }}>
+              <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              Importer une facture
+            </button>
+            <button type="button" disabled={pdfLoading || !stats} onClick={async () => {
+              setPdfLoading(true);
+              try {
+                const monday = isoWeekToMonday(weekStr);
+                const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+                const from = monday.toISOString().slice(0, 10);
+                const to = sunday.toISOString().slice(0, 10);
+                const res = await fetchApi(`/api/ventes/pdf?type=ventes&from=${from}&to=${to}`, {
+                  headers: { "x-etablissement-id": currentEtabId ?? "" },
+                });
+                if (res.ok) {
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  window.open(url, "_blank");
+                }
+              } catch { /* */ }
+              setPdfLoading(false);
+              setActionDrawerOpen(false);
+            }} style={{
+              display: "flex", alignItems: "center", gap: 14,
+              width: "100%", padding: "16px 8px", cursor: stats ? "pointer" : "not-allowed",
+              border: "none", background: "transparent", textAlign: "left",
+              fontFamily: "inherit", fontSize: 15, fontWeight: 500,
+              color: stats ? "#1a1a1a" : "#ccc",
+            }}>
+              <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={stats ? ACCENT : "#ccc"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+              {pdfLoading ? "Generation..." : "Rapport PDF de la semaine"}
+            </button>
+          </div>
+        </BottomSheet>
       </>
     </RequireRole>
   );
