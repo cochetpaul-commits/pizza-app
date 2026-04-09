@@ -127,21 +127,33 @@ async function callGeminiRest(
     generationConfig: { temperature: 0.1 },
   };
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  // Retry up to 3 times for 503 (model overloaded) with increasing delay
+  const MAX_RETRIES = 3;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
 
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`Gemini ${model} (${res.status}): ${errText.slice(0, 200)}`);
+    if (res.status === 503 && attempt < MAX_RETRIES) {
+      // Wait 2s, 4s, 8s before retry
+      await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)));
+      continue;
+    }
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`Gemini ${model} (${res.status}): ${errText.slice(0, 200)}`);
+    }
+
+    const data = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error(`Gemini ${model}: réponse vide`);
+    return text;
   }
 
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error(`Gemini ${model}: réponse vide`);
-  return text;
+  throw new Error(`Gemini ${model}: 503 après ${MAX_RETRIES} tentatives`);
 }
 
 export async function geminiVisionParse(
