@@ -1049,8 +1049,8 @@ function IngredientsPageInner() {
               </div>
             </div>
 
-            {/* Row 2 — Dropdowns (desktop) + Search — same grid for perfect alignment */}
-            <div className="ing-desktop-filters" style={{ gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            {/* Dropdowns + Search — all on one row */}
+            <div className="ing-desktop-filters" style={{ gridTemplateColumns: "1fr 1fr 2fr", gap: 8 }}>
               <Dropdown
                 value={filterCategory}
                 onChange={(v) => setFilterCategory(v as "all" | Category)}
@@ -1061,7 +1061,7 @@ function IngredientsPageInner() {
                 onChange={setFilterSupplier}
                 options={[{ value: "all", label: "Tous fournisseurs" }, ...suppliers.filter(s => s.is_active).map(s => ({ value: s.id, label: s.name }))]}
               />
-              <div style={{ gridColumn: "1 / -1", position: "relative" }}>
+              <div style={{ position: "relative" }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
                   <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
                 </svg>
