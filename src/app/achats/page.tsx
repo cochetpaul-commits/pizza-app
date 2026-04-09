@@ -773,17 +773,7 @@ export default function AchatsPage() {
           }}>
             Factures
           </h1>
-          <a
-            href="/invoices"
-            style={{
-              position: "absolute", right: 0,
-              background: "#D4775A", color: "#fff", textDecoration: "none",
-              padding: "8px 14px", borderRadius: 20, fontSize: 13, fontWeight: 700,
-              fontFamily: "DM Sans, sans-serif", whiteSpace: "nowrap",
-            }}
-          >
-            + Import facture
-          </a>
+{/* Import button removed — use FAB drawer at bottom */}
         </div>
 
         {/* ══════════════════════════════════════════════════ */}

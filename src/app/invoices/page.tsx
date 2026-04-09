@@ -408,7 +408,7 @@ export default function InvoicesPage() {
                 }}>
                   <input
                     type="file"
-                    accept="application/pdf,image/*"
+                    accept="image/*,.pdf"
                     multiple
                     style={{ display: "none" }}
                     onChange={(e) => {
