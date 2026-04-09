@@ -78,7 +78,6 @@ type BatchItem = {
 
 export default function InvoicesPage() {
   const fileRef = useRef<HTMLInputElement>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
   const batchRef = useRef<HTMLInputElement>(null);
   const { etablissements } = useEtablissement();
 
@@ -365,9 +364,9 @@ export default function InvoicesPage() {
         {/* ════════════ STEP 1: Upload ════════════ */}
         {step === "upload" && (
           <>
+            {/* Drop zone — desktop drag & drop */}
             <div
               style={dropZoneStyle}
-              onClick={() => fileRef.current?.click()}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
@@ -379,61 +378,63 @@ export default function InvoicesPage() {
                 }
               }}
             >
-              <input
-                ref={fileRef}
-                type="file"
-                style={{ display: "none" }}
-                accept="application/pdf,image/*"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleFileUpload(f);
-                  e.target.value = "";
-                }}
-              />
-              <input
-                ref={cameraRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleFileUpload(f);
-                  e.target.value = "";
-                }}
-              />
               {loading ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
                   <div style={{ width: 24, height: 24, border: "3px solid #ddd6c8", borderTopColor: "#D4775A", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#D4775A" }}>Analyse en cours...</div>
+                  <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                 </div>
               ) : (
                 <>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
-                    Glisser une facture ici
-                  </div>
-                  <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
-                    PDF ou photo — cliquer pour parcourir
-                  </div>
+                  {/* Label wraps input — iOS-safe, no programmatic .click() */}
+                  <label style={{ cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      style={{ display: "none" }}
+                      accept="application/pdf,image/*"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleFileUpload(f);
+                        e.target.value = "";
+                      }}
+                    />
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
+                      Glisser ou cliquer pour importer
+                    </div>
+                    <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
+                      PDF ou photo
+                    </div>
+                  </label>
                 </>
               )}
             </div>
 
-            {/* Camera button (mobile) */}
+            {/* Camera button — uses <label> for iOS Safari compatibility */}
             <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}>
-              <button type="button" onClick={() => cameraRef.current?.click()}
-                style={{
-                  padding: "10px 20px", borderRadius: 10, border: "none",
-                  background: "#D4775A", color: "#fff", fontSize: 13, fontWeight: 700,
-                  cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6,
-                  boxShadow: "0 2px 8px rgba(212,119,90,0.3)",
-                }}>
+              <label style={{
+                padding: "10px 20px", borderRadius: 10, border: "none",
+                background: "#D4775A", color: "#fff", fontSize: 13, fontWeight: 700,
+                cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6,
+                boxShadow: "0 2px 8px rgba(212,119,90,0.3)",
+              }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFileUpload(f);
+                    e.target.value = "";
+                  }}
+                />
                 <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                   <circle cx="12" cy="13" r="4" />
                 </svg>
                 Scanner une facture
-              </button>
+              </label>
             </div>
 
             <p style={{ fontSize: 12, color: "#999", textAlign: "center", marginTop: 12 }}>
