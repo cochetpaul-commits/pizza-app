@@ -455,6 +455,12 @@ export default function EventForm({ eventId }: { eventId?: string }) {
         @media (max-width: 480px) {
           .ef-grid2-stack { grid-template-columns: 1fr !important; }
         }
+        input[type="date"], input[type="time"] {
+          -webkit-appearance: none;
+          appearance: none;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
       `}</style>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "12px 16px 200px" }}>
 
