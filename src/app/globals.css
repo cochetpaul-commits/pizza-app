@@ -248,10 +248,11 @@ body.bottom-sheet-open .bottom-tab-bar {
 
 /* ── Desktop/Mobile visibility helpers ── */
 .desktop-only { display: block; }
-.mobile-only { display: none; }
+.mobile-only { display: none !important; }
 @media (max-width: 767px) {
   .desktop-only { display: none !important; }
-  .mobile-only { display: block !important; }
+  .mobile-only { display: flex !important; }
+  .mobile-only-block { display: block !important; }
 }
 
 /* selects : même look que les inputs */
