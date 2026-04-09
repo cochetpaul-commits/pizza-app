@@ -235,6 +235,18 @@ function computeOrderUnitPrice(offer: OfferRow | null, orderQty: number | null):
   return null;
 }
 
+// ── Supplier color from name (deterministic) ────────────────────────────────
+const SUPPLIER_COLORS = [
+  "#D4775A", "#4a6741", "#2563EB", "#7C3AED", "#D97706",
+  "#0D9488", "#DC2626", "#0284C7", "#C026D3", "#EA580C",
+  "#16A34A", "#9D174D", "#1E40AF", "#92400E",
+];
+function supplierColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = ((h << 5) - h + name.charCodeAt(i)) | 0;
+  return SUPPLIER_COLORS[Math.abs(h) % SUPPLIER_COLORS.length];
+}
+
 // ── Status config ────────────────────────────────────────────────────────────
 
 const statusLabel: Record<string, string> = {
@@ -1537,21 +1549,29 @@ function CommandesPage() {
             {/* KPI row */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginTop: 8 }}>
               {[
-                { label: "Brouillons", count: activeSessions.filter(s => s.status === "brouillon").length, color: "#A0845C" },
-                { label: "En attente", count: activeSessions.filter(s => s.status === "en_attente").length, color: "#2563EB" },
-                { label: "A recevoir", count: pendingReceptions.length, color: "#4a6741" },
+                { label: "Brouillons", count: activeSessions.filter(s => s.status === "brouillon").length, color: "#A0845C", icon: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" },
+                { label: "En attente", count: activeSessions.filter(s => s.status === "en_attente").length, color: "#2563EB", icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
+                { label: "A recevoir", count: pendingReceptions.length, color: "#4a6741", icon: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" },
                 { label: "Recues ce mois", count: recentOrders.filter(r => {
                   const d = new Date(r.created_at);
                   const now = new Date();
                   return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                }).length, color: "#16a34a" },
+                }).length, color: "#16a34a", icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" },
               ].map((kpi) => (
                 <div key={kpi.label} style={{
-                  background: "#fff", borderRadius: 12, border: "1px solid #ece4d4",
+                  background: "#fff", borderRadius: 12,
+                  borderLeft: `4px solid ${kpi.count > 0 ? kpi.color : "#e0d8ce"}`,
+                  border: "1px solid #ece4d4",
+                  borderLeftWidth: 4, borderLeftColor: kpi.count > 0 ? kpi.color : "#e0d8ce",
                   padding: "16px 18px",
                 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999", marginBottom: 6 }}>
-                    {kpi.label}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={kpi.count > 0 ? kpi.color : "#ccc"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d={kpi.icon} />
+                    </svg>
+                    <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999" }}>
+                      {kpi.label}
+                    </span>
                   </div>
                   <div style={{
                     fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
@@ -1792,6 +1812,7 @@ function CommandesPage() {
                     }
                   }
                 }
+                const color = supplierColor(s.name);
                 return (
                   <button
                     key={s.id}
@@ -1800,34 +1821,56 @@ function CommandesPage() {
                     style={{
                       background: "#fff", borderRadius: 12,
                       border: hasDraft ? "1.5px solid #D4775A" : "1px solid #ece4d4",
-                      padding: "16px 14px", cursor: "pointer",
+                      padding: 0, cursor: "pointer",
                       textAlign: "left", position: "relative",
-                      transition: "border-color 0.15s",
+                      overflow: "hidden",
+                      transition: "border-color 0.15s, box-shadow 0.15s",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                      <span style={{
-                        fontSize: 13, fontWeight: 700, color: "#1a1a1a",
-                        fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                        textTransform: "uppercase", letterSpacing: ".03em",
-                      }}>
-                        {s.name}
-                      </span>
-                      {hasDraft && (
-                        <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#D4775A", flexShrink: 0 }} />
-                      )}
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                      {s.franco_minimum != null && s.franco_minimum > 0 && (
-                        <span style={{ fontSize: 11, color: "#999" }}>
-                          Franco {s.franco_minimum.toFixed(0)} €
-                        </span>
-                      )}
-                      {nextDelivery && (
-                        <span style={{ fontSize: 11, color: "#4a6741", fontWeight: 600 }}>
-                          {nextDelivery}
-                        </span>
-                      )}
+                    {/* Color top bar */}
+                    <div style={{ height: 4, background: color }} />
+                    <div style={{ padding: "12px 14px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                        <div style={{
+                          width: 32, height: 32, borderRadius: 8,
+                          background: `${color}18`, color,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 14, fontWeight: 800,
+                          fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                          flexShrink: 0,
+                        }}>
+                          {s.name.charAt(0)}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{
+                            fontSize: 13, fontWeight: 700, color: "#1a1a1a",
+                            fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                            textTransform: "uppercase", letterSpacing: ".03em",
+                            display: "block",
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          }}>
+                            {s.name}
+                          </span>
+                        </div>
+                        {hasDraft && (
+                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#D4775A", flexShrink: 0 }} />
+                        )}
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingLeft: 42 }}>
+                        {s.franco_minimum != null && s.franco_minimum > 0 && (
+                          <span style={{ fontSize: 11, color: "#999" }}>
+                            Franco {s.franco_minimum.toFixed(0)} €
+                          </span>
+                        )}
+                        {nextDelivery && (
+                          <span style={{ fontSize: 11, color: "#4a6741", fontWeight: 600 }}>
+                            {nextDelivery}
+                          </span>
+                        )}
+                        {!nextDelivery && (s.franco_minimum == null || s.franco_minimum <= 0) && (
+                          <span style={{ fontSize: 11, color: "#ccc" }}>—</span>
+                        )}
+                      </div>
                     </div>
                   </button>
                 );
@@ -1847,40 +1890,42 @@ function CommandesPage() {
               Historique recent
             </div>
             <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #ece4d4", overflow: "hidden" }}>
-              {recentOrders.map((r, idx) => (
-                <div key={r.id} style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "12px 16px",
-                  borderBottom: idx < recentOrders.length - 1 ? "1px solid #f0ebe2" : "none",
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{
-                      fontSize: 13, fontWeight: 700, color: "#1a1a1a", minWidth: 100,
+              {recentOrders.map((r, idx) => {
+                const sc = supplierColor(r.supplier_name);
+                return (
+                  <div key={r.id} style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    padding: "12px 16px",
+                    borderBottom: idx < recentOrders.length - 1 ? "1px solid #f0ebe2" : "none",
+                  }}>
+                    <div style={{
+                      width: 30, height: 30, borderRadius: 8,
+                      background: `${sc}18`, color: sc,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 13, fontWeight: 800,
+                      fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                      flexShrink: 0,
                     }}>
-                      {r.supplier_name}
-                    </span>
-                    <span style={{ fontSize: 11, color: "#999" }}>
-                      {new Date(r.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{
-                      fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 6,
-                      background: "#e8ede6", color: "#16a34a",
-                      textTransform: "uppercase", letterSpacing: ".05em",
-                    }}>
-                      Recue
-                    </span>
+                      {r.supplier_name.charAt(0)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
+                        {r.supplier_name}
+                      </span>
+                      <span style={{ fontSize: 11, color: "#999", marginLeft: 8 }}>
+                        {new Date(r.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                      </span>
+                    </div>
                     <span style={{
                       fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                      fontWeight: 700, fontSize: 13, color: "#1a1a1a",
+                      fontWeight: 700, fontSize: 14, color: "#1a1a1a",
                       fontVariantNumeric: "tabular-nums",
                     }}>
                       {r.total_ht > 0 ? `${r.total_ht.toFixed(2)} €` : "—"}
                     </span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -2143,8 +2188,8 @@ function CommandesPage() {
           })()} />
         )}
 
-        {/* Floating "+ Nouvelle commande" — visible on mobile + desktop */}
-        {!loading && !session && (
+        {/* Floating "+ Nouvelle commande" — hidden on dashboard (supplier grid replaces it) */}
+        {!loading && !session && selectedSupplierId && (
           <button
             type="button"
             onClick={() => setDropdownOpen(true)}
