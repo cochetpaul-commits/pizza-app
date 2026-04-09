@@ -1040,7 +1040,7 @@ function IngredientsPageInner() {
                   <button key={t} onClick={() => setTab(t)} style={{
                     flexShrink: 0, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
                     borderRadius: 8, whiteSpace: "nowrap", border: "none",
-                    background: tab === t ? "#fff" : "transparent",
+                    background: tab === t ? (etab?.couleur ? etab.couleur + "20" : "#fff") : "transparent",
                     color: tab === t ? "#1a1a1a" : "#999",
                     boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
                     transition: "all 0.15s",
@@ -1109,7 +1109,7 @@ function IngredientsPageInner() {
                 <button key={t} onClick={() => setTab(t)} style={{
                   flexShrink: 0, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
                   borderRadius: 8, whiteSpace: "nowrap", border: "none",
-                  background: tab === t ? "#fff" : "transparent",
+                  background: tab === t ? (etab?.couleur ? etab.couleur + "20" : "#fff") : "transparent",
                   color: tab === t ? "#1a1a1a" : "#999",
                   boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
                   transition: "all 0.15s",
