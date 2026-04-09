@@ -172,6 +172,11 @@ function PerformancesPage() {
   const [catTrendData, setCatTrendData] = useState<Record<string, CatTrendDaily[]> | null>(null);
   const [catTrendLoading, setCatTrendLoading] = useState(false);
   const catTrendChartRef = useRef<HTMLCanvasElement>(null);
+  // Drill-down: optional category + product filter
+  const [catTrendFilterCat, setCatTrendFilterCat] = useState<string | null>(null);
+  const [catTrendFilterProd, setCatTrendFilterProd] = useState<string | null>(null);
+  // Single-product trend data (when product is selected)
+  const [prodTrendData, setProdTrendData] = useState<CatTrendDaily[] | null>(null);
 
   // Compute date range from state
   const getRange = useCallback(() => {
@@ -217,21 +222,34 @@ function PerformancesPage() {
 
   useEffect(() => { loadData(); }, [loadData]); // eslint-disable-line react-hooks/set-state-in-effect -- async data fetch
 
-  // Fetch category trend data
+  // Fetch category trend data (all categories for chart + optional product drill-down)
   const loadCatTrend = useCallback(async () => {
     if (!etab) return;
     setCatTrendLoading(true);
     try {
+      // Always fetch all-categories data (for the dropdown + default chart)
       const res = await fetch(
         `/api/ventes/marges/trend?etablissement_id=${etab.id}&from=${catTrendFrom}&to=${catTrendTo}&group_by=category`,
       );
       const json = await res.json();
       setCatTrendData(json.categories ?? null);
+
+      // If a specific product is selected, fetch product-level daily data
+      if (catTrendFilterProd) {
+        const pRes = await fetch(
+          `/api/ventes/marges/trend?etablissement_id=${etab.id}&from=${catTrendFrom}&to=${catTrendTo}&product=${encodeURIComponent(catTrendFilterProd)}`,
+        );
+        const pJson = await pRes.json();
+        setProdTrendData(pJson.daily ?? null);
+      } else {
+        setProdTrendData(null);
+      }
     } catch {
       setCatTrendData(null);
+      setProdTrendData(null);
     }
     setCatTrendLoading(false);
-  }, [etab, catTrendFrom, catTrendTo]);
+  }, [etab, catTrendFrom, catTrendTo, catTrendFilterProd]);
 
   useEffect(() => { loadCatTrend(); }, [loadCatTrend]); // eslint-disable-line react-hooks/set-state-in-effect -- async data fetch
 
@@ -292,16 +310,13 @@ function PerformancesPage() {
     }
 
     const labels = buckets.map(b => b.label);
-    const catNames = Object.keys(catTrendData).sort((a, b) => {
-      const totalA = catTrendData[a].reduce((s, d) => s + d.ca_ttc, 0);
-      const totalB = catTrendData[b].reduce((s, d) => s + d.ca_ttc, 0);
-      return totalB - totalA;
-    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let datasets: any[];
 
-    const datasets = catNames.map((cat) => {
+    // If a product is selected, show single-product chart
+    if (catTrendFilterProd && prodTrendData) {
       const dailyMap = new Map<string, CatTrendDaily>();
-      for (const d of catTrendData[cat]) dailyMap.set(d.date, d);
-
+      for (const d of prodTrendData) dailyMap.set(d.date, d);
       const values = buckets.map(b => {
         let sum = 0;
         for (const ds of b.dates) {
@@ -310,14 +325,61 @@ function PerformancesPage() {
         }
         return Math.round(sum * 100) / 100;
       });
-
-      return {
-        label: cat,
+      datasets = [{
+        label: catTrendFilterProd,
         data: values,
-        backgroundColor: getCategoryColor(cat),
+        backgroundColor: getCategoryColor(catTrendFilterCat ?? ""),
         borderRadius: 4,
-      };
-    });
+      }];
+    }
+    // If only a category is selected, show that category's data only
+    else if (catTrendFilterCat && catTrendData[catTrendFilterCat]) {
+      const dailyMap = new Map<string, CatTrendDaily>();
+      for (const d of catTrendData[catTrendFilterCat]) dailyMap.set(d.date, d);
+      const values = buckets.map(b => {
+        let sum = 0;
+        for (const ds of b.dates) {
+          const row = dailyMap.get(ds);
+          if (row) sum += catTrendMetric === "ca_ttc" ? row.ca_ttc : row.qty;
+        }
+        return Math.round(sum * 100) / 100;
+      });
+      datasets = [{
+        label: catTrendFilterCat,
+        data: values,
+        backgroundColor: getCategoryColor(catTrendFilterCat),
+        borderRadius: 4,
+      }];
+    }
+    // Default: all categories
+    else {
+      const catNames = Object.keys(catTrendData).sort((a, b) => {
+        const totalA = catTrendData[a].reduce((s, d) => s + d.ca_ttc, 0);
+        const totalB = catTrendData[b].reduce((s, d) => s + d.ca_ttc, 0);
+        return totalB - totalA;
+      });
+
+      datasets = catNames.map((cat) => {
+        const dailyMap = new Map<string, CatTrendDaily>();
+        for (const d of catTrendData[cat]) dailyMap.set(d.date, d);
+
+        const values = buckets.map(b => {
+          let sum = 0;
+          for (const ds of b.dates) {
+            const row = dailyMap.get(ds);
+            if (row) sum += catTrendMetric === "ca_ttc" ? row.ca_ttc : row.qty;
+          }
+          return Math.round(sum * 100) / 100;
+        });
+
+        return {
+          label: cat,
+          data: values,
+          backgroundColor: getCategoryColor(cat),
+          borderRadius: 4,
+        };
+      });
+    }
 
     charts[id] = new Chart(catTrendChartRef.current, {
       type: "bar" as const,
@@ -354,7 +416,7 @@ function PerformancesPage() {
     });
 
     return () => { destroyChart(id); };
-  }, [catTrendData, catTrendMetric, catTrendFrom, catTrendTo]);
+  }, [catTrendData, catTrendMetric, catTrendFrom, catTrendTo, catTrendFilterCat, catTrendFilterProd, prodTrendData]);
 
   // Import handler
   const handleImport = async (file: File) => {
@@ -1120,16 +1182,47 @@ function PerformancesPage() {
 
             {/* Tendances par categorie */}
             <div style={S.card}>
-              <div style={S.sec}>Tendances par categorie</div>
-              {/* Filters row */}
+              <div style={S.sec}>Tendances {catTrendFilterProd ? `· ${catTrendFilterProd}` : catTrendFilterCat ? `· ${catTrendFilterCat}` : "par categorie"}</div>
+
+              {/* Category + Product selectors */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                <select
+                  value={catTrendFilterCat ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value || null;
+                    setCatTrendFilterCat(v);
+                    setCatTrendFilterProd(null);
+                  }}
+                  style={{ flex: 1, height: 36, borderRadius: 10, border: "1px solid #e0d8ce", padding: "0 10px", fontSize: 12, background: "#fff", color: "#1a1a1a", cursor: "pointer" }}
+                >
+                  <option value="">Toutes les categories</option>
+                  {catTrendData && Object.keys(catTrendData).sort().map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                {catTrendFilterCat && data && (
+                  <select
+                    value={catTrendFilterProd ?? ""}
+                    onChange={(e) => setCatTrendFilterProd(e.target.value || null)}
+                    style={{ flex: 1, height: 36, borderRadius: 10, border: "1px solid #e0d8ce", padding: "0 10px", fontSize: 12, background: "#fff", color: "#1a1a1a", cursor: "pointer" }}
+                  >
+                    <option value="">Tous les produits</option>
+                    {(data.cat_products[catTrendFilterCat] ?? [])
+                      .sort((a, b) => b.ca_ttc - a.ca_ttc)
+                      .map(p => (
+                        <option key={p.n} value={p.n}>{p.n}</option>
+                      ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Date range + metric toggle */}
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                {/* Date range */}
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <input type="date" value={catTrendFrom} onChange={e => setCatTrendFrom(e.target.value)} style={{ fontSize: 11, border: "1px solid #e0d8ce", borderRadius: 6, padding: "3px 6px", color: "#555" }} />
                   <span style={{ fontSize: 10, color: "#999" }}>-</span>
                   <input type="date" value={catTrendTo} onChange={e => setCatTrendTo(e.target.value)} style={{ fontSize: 11, border: "1px solid #e0d8ce", borderRadius: 6, padding: "3px 6px", color: "#555" }} />
                 </div>
-                {/* Metric toggle */}
                 <div style={{ display: "flex", gap: 0, background: "#f5f0e8", borderRadius: 20, padding: 3, marginLeft: "auto" }}>
                   <button type="button" onClick={() => setCatTrendMetric("ca_ttc")} style={{
                     padding: "4px 12px", borderRadius: 16, border: "none", cursor: "pointer",
