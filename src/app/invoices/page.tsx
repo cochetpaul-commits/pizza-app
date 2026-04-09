@@ -78,6 +78,7 @@ type BatchItem = {
 
 export default function InvoicesPage() {
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const batchRef = useRef<HTMLInputElement>(null);
   const { etablissements } = useEtablissement();
 
@@ -130,9 +131,16 @@ export default function InvoicesPage() {
     )?.id ?? "";
   }
 
+  const isImageFile = (f: File) => {
+    const ext = f.name.split(".").pop()?.toLowerCase() ?? "";
+    return f.type.startsWith("image/") || ["jpg", "jpeg", "png", "webp", "heic", "heif"].includes(ext);
+  };
+
   async function handleFileUpload(f: File) {
-    if (!f.name.toLowerCase().endsWith(".pdf") && f.type !== "application/pdf") {
-      setError("Seuls les fichiers PDF sont acceptes.");
+    const isPdf = f.name.toLowerCase().endsWith(".pdf") || f.type === "application/pdf";
+    const isImage = isImageFile(f);
+    if (!isPdf && !isImage) {
+      setError("Formats acceptes : PDF, JPEG, PNG, WebP.");
       return;
     }
     setFile(f);
@@ -140,16 +148,43 @@ export default function InvoicesPage() {
     setLoading(true);
 
     try {
-      const form = new FormData();
-      form.append("file", f);
-      const res = await fetchApi("/api/invoices/detect", { method: "POST", body: form });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error ?? "Erreur detection");
-      setDetection(data.detection);
-      setSelectedSupplier(data.detection?.supplier?.slug ?? null);
-      if (data.detection?.etablissement?.slug === "bello_mio") setSelectedEtab("bellomio");
-      else if (data.detection?.etablissement?.slug === "piccola_mia") setSelectedEtab("piccola");
-      setStep("confirm");
+      if (isImage || !isPdf) {
+        // Vision scan path — Gemini analyses the image directly
+        const form = new FormData();
+        form.append("file", f);
+        form.append("mode", "preview");
+        const auth = getAuthHeader();
+        const res = await fetchApi("/api/invoices/scan", {
+          method: "POST",
+          headers: {
+            ...(auth ? { Authorization: auth } : {}),
+            "x-etablissement-id": getEtabId(),
+          },
+          body: form,
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error ?? "Erreur scan");
+        // Go directly to preview with scan results
+        setSelectedSupplier("scan");
+        setDetection({
+          supplier: { slug: "scan", name: data.supplier_detected ?? "Scan IA", matchedKeyword: "vision" },
+          etablissement: null,
+        });
+        setPreview(data);
+        setStep("preview");
+      } else {
+        // PDF detection path (existing flow)
+        const form = new FormData();
+        form.append("file", f);
+        const res = await fetchApi("/api/invoices/detect", { method: "POST", body: form });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error ?? "Erreur detection");
+        setDetection(data.detection);
+        setSelectedSupplier(data.detection?.supplier?.slug ?? null);
+        if (data.detection?.etablissement?.slug === "bello_mio") setSelectedEtab("bellomio");
+        else if (data.detection?.etablissement?.slug === "piccola_mia") setSelectedEtab("piccola");
+        setStep("confirm");
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -169,7 +204,8 @@ export default function InvoicesPage() {
       form.append("mode", "preview");
       form.append("establishment", selectedEtab);
       const auth = getAuthHeader();
-      const res = await fetchApi(`/api/invoices/${selectedSupplier}`, {
+      const endpoint = selectedSupplier === "scan" ? "/api/invoices/scan" : `/api/invoices/${selectedSupplier}`;
+      const res = await fetchApi(endpoint, {
         method: "POST",
         headers: {
           ...(auth ? { Authorization: auth } : {}),
@@ -199,7 +235,8 @@ export default function InvoicesPage() {
       form.append("mode", "commit");
       form.append("establishment", selectedEtab);
       const auth = getAuthHeader();
-      const res = await fetchApi(`/api/invoices/${selectedSupplier}`, {
+      const endpoint = selectedSupplier === "scan" ? "/api/invoices/scan" : `/api/invoices/${selectedSupplier}`;
+      const res = await fetchApi(endpoint, {
         method: "POST",
         headers: {
           ...(auth ? { Authorization: auth } : {}),
@@ -343,22 +380,59 @@ export default function InvoicesPage() {
                 ref={fileRef}
                 type="file"
                 style={{ display: "none" }}
-                accept=".pdf,application/pdf"
+                accept=".pdf,application/pdf,image/jpeg,image/png,image/webp,.heic"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (f) handleFileUpload(f);
                 }}
               />
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
-                {loading ? "Analyse en cours..." : "Glisser une facture ici"}
-              </div>
-              <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
-                PDF — cliquer pour parcourir
-              </div>
+              <input
+                ref={cameraRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFileUpload(f);
+                }}
+              />
+              {loading ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 24, height: 24, border: "3px solid #ddd6c8", borderTopColor: "#D4775A", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#D4775A" }}>Analyse en cours...</div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
+                    Glisser une facture ici
+                  </div>
+                  <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
+                    PDF ou photo — cliquer pour parcourir
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Camera button (mobile) */}
+            <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}>
+              <button type="button" onClick={() => cameraRef.current?.click()}
+                style={{
+                  padding: "10px 20px", borderRadius: 10, border: "none",
+                  background: "#D4775A", color: "#fff", fontSize: 13, fontWeight: 700,
+                  cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6,
+                  boxShadow: "0 2px 8px rgba(212,119,90,0.3)",
+                }}>
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+                Scanner une facture
+              </button>
             </div>
 
             <p style={{ fontSize: 12, color: "#999", textAlign: "center", marginTop: 12 }}>
-              Le fournisseur et l&apos;etablissement sont detectes automatiquement.
+              Le fournisseur est detecte automatiquement (IA pour les photos).
             </p>
 
             {/* Batch upload */}
@@ -367,7 +441,7 @@ export default function InvoicesPage() {
                 onChange={(e) => { if (e.target.files && e.target.files.length > 0) handleBatchFiles(e.target.files); }} />
               <button type="button" onClick={() => batchRef.current?.click()}
                 style={{ padding: "10px 24px", borderRadius: 10, border: "1.5px solid #D4775A", background: "#fff", color: "#D4775A", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                Importer plusieurs factures
+                Importer plusieurs factures (PDF)
               </button>
             </div>
 

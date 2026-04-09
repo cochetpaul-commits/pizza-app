@@ -13,6 +13,7 @@
     "clean": "rm -rf .next node_modules/.cache"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@hello-pangea/dnd": "^18.0.1",
     "@react-pdf/renderer": "^4.3.2",
     "@supabase/supabase-js": "^2.89.0",
