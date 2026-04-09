@@ -1132,91 +1132,26 @@ function IngredientsPageInner() {
 
         {!isVariations && (
           <>
-            {/* ── Create form (in drawer) ── */}
+            {/* ── Create form (minimal drawer) ── */}
             <BottomSheet open={showCreateForm} onClose={() => setShowCreateForm(false)} title="Créer un ingrédient">
               <div style={{ padding: "0 4px 16px" }}>
-                <form onSubmit={addIngredient} className="grid gap-3">
-                  <div className="grid gap-3" style={{ gridTemplateColumns: "2fr 1fr" }}>
+                <form onSubmit={addIngredient} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
                     <div><div className={lCls}>Ingrédient</div><input className={iCls} placeholder="Ex: Huile d'olive" value={newName} onChange={(e) => handleNewNameChange(e.target.value)} /></div>
                     <div><div className={lCls}>Catégorie</div>
-                      <select className={sCls} value={newCategory} onChange={(e) => { const next = e.target.value as Category; setNewCategory(next); if (next === "preparation") { setNewSupplierId(""); setPriceKind("unit"); resetCreatePriceBlocks(); } }}>
+                      <select className={sCls} value={newCategory} onChange={(e) => setNewCategory(e.target.value as Category)}>
                         {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
                   </div>
-                  {newCategory !== "preparation" ? (
-                    <div className="grid gap-3" style={{ gridTemplateColumns: "2fr 1fr" }}>
-                      <div><div className={lCls}>Fournisseur</div>
-                        <select className={sCls} value={newSupplierId} onChange={(e) => setNewSupplierId(e.target.value)}>
-                          <option value="">—</option>
-                          {suppliers.filter((s) => s.is_active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="self-end"><button className="btn btnPrimary w-full !h-[44px]" type="submit">Ajouter</button></div>
-                    </div>
-                  ) : (
-                    <div><button className="btn btnPrimary w-full !h-[44px]" type="submit">Ajouter</button></div>
-                  )}
-                  {newCategory !== "preparation" ? (
-                    <>
-                      <div><div className={lCls}>Offre fournisseur</div>
-                        <select className={sCls} value={priceKind} onChange={(e) => setPriceKind(e.target.value as PriceKind)}>
-                          <option value="unit">Unitaire (€/kg, €/L, €/pc)</option>
-                          <option value="pack_simple">Pack simple (sac/caisse)</option>
-                          <option value="pack_composed">Pack composé (ex: 8 × 1.5 L)</option>
-                        </select>
-                      </div>
-                      {priceKind === "unit" && (
-                        <>
-                          <div className="grid grid-cols-2 gap-3 items-end">
-                            <div><div className={lCls}>Unité</div>
-                              <select className={sCls} value={newUnit} onChange={(e) => setNewUnit(e.target.value as "kg" | "l" | "pc")}>
-                                <option value="kg">Kilo (kg)</option><option value="l">Litre (L)</option><option value="pc">Pièce (pc)</option>
-                              </select>
-                            </div>
-                            <div><div className={lCls}>Prix</div><input className={iCls} placeholder={newUnit === "pc" ? "Ex: 1.79" : newUnit === "l" ? "Ex: 2.07" : "Ex: 12.50"} inputMode="decimal" value={newUnitPrice} onChange={(e) => setNewUnitPrice(e.target.value)} /></div>
-                          </div>
-                          {newUnit === "l" && <div><div className={lCls}>Densité (kg/L)</div><input className={iCls} value={newDensity} onChange={(e) => setNewDensity(e.target.value)} /></div>}
-                          {newUnit === "pc" && <><div><div className={lCls}>Poids d&apos;une pièce (g)</div><input className={iCls} placeholder="Ex: 125" inputMode="decimal" value={newPieceWeightG} onChange={(e) => setNewPieceWeightG(e.target.value)} /></div><div><div className={lCls}>Volume pièce (ml)</div><input className={iCls} placeholder="ex: 700 pour 70cl" inputMode="decimal" value={newPieceVolumeMl} onChange={(e) => setNewPieceVolumeMl(e.target.value)} /></div></>}
-                        </>
-                      )}
-                      {priceKind === "pack_simple" && (
-                        <>
-                          <div className="grid grid-cols-2 gap-3 items-end">
-                            <div><div className={lCls}>Unité pack</div>
-                              <select className={sCls} value={newUnit} onChange={(e) => setNewUnit(e.target.value as "kg" | "l" | "pc")}>
-                                <option value="kg">Kilo (kg)</option><option value="l">Litre (L)</option>
-                              </select>
-                            </div>
-                            <div><div className={lCls}>Prix du pack (€)</div><input className={iCls} placeholder="Ex: 53.99" inputMode="decimal" value={packPrice} onChange={(e) => setPackPrice(e.target.value)} /></div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3 items-end">
-                            <div><div className={lCls}>Quantité totale ({newUnit === "kg" ? "kg" : "L"})</div><input className={iCls} placeholder={newUnit === "kg" ? "Ex: 25" : "Ex: 12"} inputMode="decimal" value={packTotalQty} onChange={(e) => setPackTotalQty(e.target.value)} /></div>
-                            <div className="muted text-[12px]">{previewCreatePack || "—"}</div>
-                          </div>
-                          {newUnit === "l" && <div><div className={lCls}>Densité (kg/L)</div><input className={iCls} value={newDensity} onChange={(e) => setNewDensity(e.target.value)} /></div>}
-                        </>
-                      )}
-                      {priceKind === "pack_composed" && (
-                        <>
-                          <div className="grid grid-cols-2 gap-3 items-end">
-                            <div><div className={lCls}>Prix du pack (€)</div><input className={iCls} placeholder="Ex: 18.56" inputMode="decimal" value={packPrice} onChange={(e) => setPackPrice(e.target.value)} /></div>
-                            <div><div className={lCls}>Nombre d&apos;unités</div><input className={iCls} placeholder="Ex: 8" inputMode="decimal" value={packCount} onChange={(e) => setPackCount(e.target.value)} /></div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3 items-end">
-                            <div><div className={lCls}>Unité de chaque élément</div>
-                              <select className={sCls} value={packEachUnit} onChange={(e) => setPackEachUnit(e.target.value as "kg" | "l" | "pc")}>
-                                <option value="l">Litre (L)</option><option value="kg">Kilo (kg)</option><option value="pc">Pièce (pc)</option>
-                              </select>
-                            </div>
-                            {packEachUnit !== "pc" ? <div><div className={lCls}>Quantité par élément ({packEachUnit === "kg" ? "kg" : "L"})</div><input className={iCls} placeholder={packEachUnit === "kg" ? "Ex: 1" : "Ex: 1.5"} inputMode="decimal" value={packEachQty} onChange={(e) => setPackEachQty(e.target.value)} /></div>
-                              : <div><div className={lCls}>Poids d&apos;une pièce (g)</div><input className={iCls} placeholder="Ex: 125" inputMode="decimal" value={packPieceWeightG} onChange={(e) => setPackPieceWeightG(e.target.value)} /></div>}
-                          </div>
-                          {packEachUnit === "l" && <div><div className={lCls}>Densité (kg/L)</div><input className={iCls} value={newDensity} onChange={(e) => setNewDensity(e.target.value)} /></div>}
-                        </>
-                      )}
-                    </>
-                  ) : null}
+                  <button type="submit" style={{
+                    width: "100%", height: 48, borderRadius: 14, border: "none",
+                    background: "#D4775A", color: "#fff",
+                    fontSize: 16, fontWeight: 700, cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}>
+                    Ajouter
+                  </button>
                 </form>
               </div>
             </BottomSheet>
