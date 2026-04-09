@@ -1272,8 +1272,7 @@ function ImportOption({
         style={{
           display: "flex", alignItems: "center", gap: 14,
           width: "100%", padding: "16px 4px",
-          cursor: "pointer",
-          border: "none", cursor: "pointer",
+          cursor: "pointer", border: "none",
           background: "transparent",
           textAlign: "left",
           borderBottom: isLast ? "none" : "1px solid rgba(0,0,0,0.06)",
