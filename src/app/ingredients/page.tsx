@@ -1132,16 +1132,32 @@ function IngredientsPageInner() {
 
         {!isVariations && (
           <>
-            {/* ── Create form (minimal drawer) ── */}
+            {/* ── Create form (drawer) ── */}
             <BottomSheet open={showCreateForm} onClose={() => setShowCreateForm(false)} title="Créer un ingrédient">
               <div style={{ padding: "0 4px 16px" }}>
                 <form onSubmit={addIngredient} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
-                    <div><div className={lCls}>Ingrédient</div><input className={iCls} placeholder="Ex: Huile d'olive" value={newName} onChange={(e) => handleNewNameChange(e.target.value)} /></div>
+                  <div><div className={lCls}>Ingrédient</div><input className={iCls} placeholder="Ex: Huile d'olive" value={newName} onChange={(e) => handleNewNameChange(e.target.value)} /></div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                     <div><div className={lCls}>Catégorie</div>
                       <select className={sCls} value={newCategory} onChange={(e) => setNewCategory(e.target.value as Category)}>
-                        {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                        {CATEGORIES_ALPHA.map((c) => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
                       </select>
+                    </div>
+                    <div><div className={lCls}>Fournisseur</div>
+                      <select className={sCls} value={newSupplierId} onChange={(e) => setNewSupplierId(e.target.value)}>
+                        <option value="">—</option>
+                        {suppliers.filter((s) => s.is_active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div><div className={lCls}>Unité</div>
+                      <select className={sCls} value={newUnit} onChange={(e) => setNewUnit(e.target.value as "kg" | "l" | "pc")}>
+                        <option value="kg">Kilo (kg)</option><option value="l">Litre (L)</option><option value="pc">Pièce (pc)</option>
+                      </select>
+                    </div>
+                    <div><div className={lCls}>Prix ({newUnit === "kg" ? "€/kg" : newUnit === "l" ? "€/L" : "€/pc"})</div>
+                      <input className={iCls} placeholder={newUnit === "pc" ? "Ex: 1.79" : newUnit === "l" ? "Ex: 2.07" : "Ex: 12.50"} inputMode="decimal" value={newUnitPrice} onChange={(e) => setNewUnitPrice(e.target.value)} />
                     </div>
                   </div>
                   <button type="submit" style={{
