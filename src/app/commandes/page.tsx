@@ -241,10 +241,15 @@ const SUPPLIER_COLORS = [
   "#0D9488", "#DC2626", "#0284C7", "#C026D3", "#EA580C",
   "#16A34A", "#9D174D", "#1E40AF", "#92400E",
 ];
+// Map built once: each supplier gets a unique color by sorted index
+const supplierColorMap = new Map<string, string>();
+function buildSupplierColorMap(names: string[]) {
+  supplierColorMap.clear();
+  const sorted = [...names].sort((a, b) => a.localeCompare(b));
+  sorted.forEach((n, i) => supplierColorMap.set(n, SUPPLIER_COLORS[i % SUPPLIER_COLORS.length]));
+}
 function supplierColor(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = ((h << 5) - h + name.charCodeAt(i)) | 0;
-  return SUPPLIER_COLORS[Math.abs(h) % SUPPLIER_COLORS.length];
+  return supplierColorMap.get(name) || SUPPLIER_COLORS[0];
 }
 
 // ── Status config ────────────────────────────────────────────────────────────
@@ -457,6 +462,7 @@ function CommandesPage() {
       }
 
       setSuppliers(list);
+      buildSupplierColorMap(list.map((s) => s.name));
       setSupplierAliases(aliases);
       // Pre-select from URL param only — otherwise show placeholder "Fournisseur"
       const urlSupplierId = searchParams.get("supplier_id");
