@@ -8,7 +8,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { getSupplierColor } from "@/lib/supplierColors";
 import Chart from "chart.js/auto";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
-import { BottomSheet } from "@/components/layout/BottomSheet";
 import { setPendingInvoiceFile } from "@/lib/pendingInvoiceFile";
 
 /* ── Types ── */
@@ -142,7 +141,7 @@ export default function AchatsPage() {
 
   // ── All invoices ──
   const [allInvoices, setAllInvoices] = useState<InvoiceRow[]>([]);
-  const [importDrawerOpen, setImportDrawerOpen] = useState(false);
+  // importDrawerOpen removed — FAB opens iOS picker directly
   const [loading, setLoading] = useState(true);
 
   // ── Accordion state ──
@@ -1191,81 +1190,33 @@ export default function AchatsPage() {
           </>
         )}
 
-        {/* FAB — Import facture */}
-        <button
-          type="button"
-          onClick={() => setImportDrawerOpen(true)}
-          style={{
-            position: "fixed",
-            bottom: "calc(92px + env(safe-area-inset-bottom, 0px))",
-            right: 16, zIndex: 105,
-            height: 44, padding: "0 20px",
-            borderRadius: 22, border: "none",
-            background: "#D4775A", color: "#fff",
-            fontSize: 13, fontWeight: 700, cursor: "pointer",
-            display: "flex", alignItems: "center", gap: 6,
-            boxShadow: "0 4px 14px rgba(212,119,90,0.35), 0 2px 6px rgba(0,0,0,0.1)",
-            fontFamily: "inherit",
-          }}
-        >
+        {/* FAB — Import facture : ouvre directement le picker iOS natif */}
+        <label style={{
+          position: "fixed",
+          bottom: "calc(92px + env(safe-area-inset-bottom, 0px))",
+          right: 16, zIndex: 105,
+          height: 44, padding: "0 20px",
+          borderRadius: 22, border: "none",
+          background: "#D4775A", color: "#fff",
+          fontSize: 13, fontWeight: 700, cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 6,
+          boxShadow: "0 4px 14px rgba(212,119,90,0.35), 0 2px 6px rgba(0,0,0,0.1)",
+          fontFamily: "inherit",
+        }}>
+          <input
+            type="file"
+            accept="image/*,.pdf"
+            multiple
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) { setPendingInvoiceFile(f); router.push("/invoices"); }
+              e.target.value = "";
+            }}
+          />
           <span style={{ fontSize: 18, lineHeight: 1, fontWeight: 300 }}>+</span>
           Import facture
-        </button>
-
-        {/* Hidden file inputs OUTSIDE BottomSheet for iOS compatibility */}
-        <input id="import-camera" type="file" accept="image/*" capture="environment" style={{ display: "none" }}
-          onChange={(e) => { const f = e.target.files?.[0]; setImportDrawerOpen(false); if (f) { setPendingInvoiceFile(f); router.push("/invoices"); } e.target.value = ""; }} />
-        <input id="import-gallery" type="file" accept="image/*" style={{ display: "none" }}
-          onChange={(e) => { const f = e.target.files?.[0]; setImportDrawerOpen(false); if (f) { setPendingInvoiceFile(f); router.push("/invoices"); } e.target.value = ""; }} />
-        <input id="import-documents" type="file" accept=".pdf" style={{ display: "none" }}
-          onChange={(e) => { const f = e.target.files?.[0]; setImportDrawerOpen(false); if (f) { setPendingInvoiceFile(f); router.push("/invoices"); } e.target.value = ""; }} />
-
-        {/* ── Import drawer ── */}
-        <BottomSheet open={importDrawerOpen} onClose={() => setImportDrawerOpen(false)}>
-          <div style={{ display: "flex", flexDirection: "column", paddingBottom: 4 }}>
-            <label htmlFor="import-camera" style={{
-              display: "flex", alignItems: "center", gap: 14,
-              width: "100%", padding: "16px 4px", cursor: "pointer",
-              borderBottom: "1px solid rgba(0,0,0,0.06)",
-              color: "#1a1a1a", fontSize: 15, fontWeight: 500,
-              fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-            }}>
-              <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                <circle cx="12" cy="13" r="4" />
-              </svg>
-              Scanner des justificatifs
-            </label>
-            <label htmlFor="import-gallery" style={{
-              display: "flex", alignItems: "center", gap: 14,
-              width: "100%", padding: "16px 4px", cursor: "pointer",
-              borderBottom: "1px solid rgba(0,0,0,0.06)",
-              color: "#1a1a1a", fontSize: 15, fontWeight: 500,
-              fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-            }}>
-              <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <polyline points="21 15 16 10 5 21" />
-              </svg>
-              Importer depuis la galerie
-            </label>
-            <label htmlFor="import-documents" style={{
-              display: "flex", alignItems: "center", gap: 14,
-              width: "100%", padding: "16px 4px", cursor: "pointer",
-              color: "#1a1a1a", fontSize: 15, fontWeight: 500,
-              fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-            }}>
-              <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-              </svg>
-              Importer depuis les documents
-            </label>
-          </div>
-        </BottomSheet>
+        </label>
       </div>
     </RequireRole>
   );
