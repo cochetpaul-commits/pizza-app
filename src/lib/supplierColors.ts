@@ -63,14 +63,14 @@ export function buildSupplierColorMap(
 let _cache: Record<string, string> = {};
 let _loaded = false;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function loadSupplierColors(
-  supabaseClient: any,
+  supabaseClient: unknown,
 ): Promise<Record<string, string>> {
-  const { data } = await supabaseClient
+  const client = supabaseClient as { from: (t: string) => { select: (s: string) => { eq: (k: string, v: boolean) => Promise<{ data: { name: string; color: string | null }[] | null }> } } };
+  const { data } = await client
     .from("suppliers")
     .select("name, color")
-    .eq("is_active", true) as { data: { name: string; color: string | null }[] | null };
+    .eq("is_active", true);
   _cache = {};
   for (const s of data ?? []) {
     _cache[s.name] = getSupplierColor(s.name, s.color);
