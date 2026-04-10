@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { getSupplierColor } from "@/lib/supplierColors";
+import { ColorPicker } from "@/components/ColorPicker";
 
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -70,6 +71,7 @@ type ModalForm = {
   tva_intra: string;
   etablissement_id: string | null;
   client_code: string;
+  color: string;
 };
 
 function fmtDate(iso: string) {
@@ -115,6 +117,7 @@ const EMPTY_FORM: ModalForm = {
   tva_intra: "",
   etablissement_id: null,
   client_code: "",
+  color: "",
 };
 
 const labelStyle: React.CSSProperties = {
@@ -285,6 +288,7 @@ export default function FournisseursPage() {
       tva_intra: s.tva_intra ?? "",
       etablissement_id: s.etablissement_id,
       client_code: s.client_code ?? "",
+      color: s.color ?? "",
     });
     setSchedule(Array.isArray(s.delivery_schedule) ? s.delivery_schedule : []);
     setDeletedContactIds([]);
@@ -416,6 +420,7 @@ export default function FournisseursPage() {
       tva_intra: form.tva_intra.trim() || null,
       etablissement_id: form.etablissement_id,
       client_code: form.client_code.trim() || null,
+      color: form.color || null,
     };
 
     if (modalMode === "create") {
@@ -607,7 +612,7 @@ export default function FournisseursPage() {
   }
 
   const isModalOpen = modalMode === "create" || modalSupplier !== null;
-  const modalColor = modalSupplier ? getSupplierColor(modalSupplier.name, modalSupplier.color) : "#D4775A";
+  const modalColor = form.color || (modalSupplier ? getSupplierColor(modalSupplier.name, modalSupplier.color) : "#D4775A");
 
   // Etab filter pills
   const bmEtab = etablissements.find(e => e.slug === "bello-mio");
@@ -797,6 +802,14 @@ export default function FournisseursPage() {
                     </label>
                   )}
                 </div>
+              </div>
+
+              {/* Section: Couleur */}
+              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                Couleur
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <ColorPicker value={form.color || modalColor} onChange={(hex) => setForm((f) => ({ ...f, color: hex }))} size={24} />
               </div>
 
               {/* Section: Coordonnees */}
