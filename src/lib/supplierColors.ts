@@ -54,3 +54,33 @@ export function buildSupplierColorMap(
   }
   return map;
 }
+
+/**
+ * Global cache of supplier name→color (loaded from DB).
+ * Call `loadSupplierColors()` once at page init, then use
+ * `cachedSupplierColor(name)` anywhere for fast lookups.
+ */
+let _cache: Record<string, string> = {};
+let _loaded = false;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function loadSupplierColors(
+  supabaseClient: any,
+): Promise<Record<string, string>> {
+  const { data } = await supabaseClient
+    .from("suppliers")
+    .select("name, color")
+    .eq("is_active", true) as { data: { name: string; color: string | null }[] | null };
+  _cache = {};
+  for (const s of data ?? []) {
+    _cache[s.name] = getSupplierColor(s.name, s.color);
+  }
+  _loaded = true;
+  return _cache;
+}
+
+/** Get color from cache (must call loadSupplierColors first). Falls back to hash. */
+export function cachedSupplierColor(name: string): string {
+  if (_loaded && _cache[name]) return _cache[name];
+  return getSupplierColor(name);
+}

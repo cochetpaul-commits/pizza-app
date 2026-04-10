@@ -38,7 +38,7 @@ import { PriceAlertsPanel } from "@/components/PriceAlertsPanel";
 import { parseAllergens } from "@/lib/allergens";
 import { CategoryHeader, IngredientRow, type EditState, type StorageZoneOption } from "@/components/IngredientRow";
 import { useProfile } from "@/lib/ProfileContext";
-import { getSupplierColor } from "@/lib/supplierColors";
+import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
 import { updateDerivedIngredients, computeDerivedPrice, computeRendement } from "@/lib/rendement";
 import DuplicatePanel from "@/components/DuplicatePanel";
 import { detectDuplicates, type DuplicatePair } from "@/lib/duplicateDetection";
@@ -214,6 +214,7 @@ function IngredientsPageInner() {
 
   useEffect(() => {
     (async () => {
+      await loadSupplierColors(supabase);
       let zq = supabase.from("storage_zones").select("id, name").order("display_order").order("name");
       if (etab?.id) zq = zq.eq("etablissement_id", etab.id);
       const { data: zData } = await zq;
@@ -1452,7 +1453,7 @@ function IngredientsPageInner() {
       {modalSupplierId && (() => {
         const sup = suppliersMap.get(modalSupplierId);
         const supName = sup?.name ?? "Fournisseur";
-        const supColor = getSupplierColor(supName);
+        const supColor = cachedSupplierColor(supName);
         const lblSt: CSSProperties = { fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginBottom: 4 };
         const inpSt: CSSProperties = { fontFamily: "DM Sans, sans-serif", fontSize: 14, padding: "10px 12px", border: "1.5px solid #e5ddd0", borderRadius: 10, width: "100%", background: "#fff", color: "#1a1a1a", outline: "none" };
         return (

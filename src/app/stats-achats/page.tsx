@@ -6,7 +6,7 @@ import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { CAT_LABELS, CAT_COLORS, type Category } from "@/types/ingredients";
-import { getSupplierColor } from "@/lib/supplierColors";
+import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
 
 type PeriodKey = "1" | "3" | "6" | "12";
 type ViewTab = "fournisseur" | "categorie";
@@ -85,6 +85,7 @@ export default function StatsAchatsPage() {
   useEffect(() => {
     (async () => {
       setLoading(true);
+      await loadSupplierColors(supabase);
 
       const months = parseInt(period);
       const startDate = getStartDate(months);
@@ -142,7 +143,7 @@ export default function StatsAchatsPage() {
         .map((s) => ({
           ...s,
           pct: total > 0 ? (s.totalHT / total) * 100 : 0,
-          color: getSupplierColor(s.name),
+          color: cachedSupplierColor(s.name),
         }));
       setTopSuppliers(supplierList);
 

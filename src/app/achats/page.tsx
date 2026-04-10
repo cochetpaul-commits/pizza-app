@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
-import { getSupplierColor } from "@/lib/supplierColors";
+import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
 import Chart from "chart.js/auto";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
 import { setPendingInvoiceFile } from "@/lib/pendingInvoiceFile";
@@ -173,6 +173,7 @@ export default function AchatsPage() {
     if (!etabId) return;
     (async () => {
       setLoading(true);
+      await loadSupplierColors(supabase);
       const { data } = await supabase
         .from("supplier_invoices")
         .select("id, invoice_number, invoice_date, total_ht, total_ttc, supplier_id, suppliers(name)")
@@ -334,7 +335,7 @@ export default function AchatsPage() {
         byCat[cat] = (byCat[cat] ?? 0) + (inv.total_ht ?? 0);
       }
       const suppliers = Object.entries(bySupp)
-        .map(([k, v]) => ({ name: v.name, total: v.total, color: getSupplierColor(k) }))
+        .map(([k, v]) => ({ name: v.name, total: v.total, color: cachedSupplierColor(k) }))
         .sort((a, b) => b.total - a.total);
 
       const categories = Object.entries(byCat)
@@ -397,7 +398,7 @@ export default function AchatsPage() {
       for (const inv of invoices) {
         const name = inv.suppliers?.name ?? "Inconnu";
         const k = name.toLowerCase().trim();
-        if (!bySupp[k]) bySupp[k] = { name, color: getSupplierColor(k), invoices: [] };
+        if (!bySupp[k]) bySupp[k] = { name, color: cachedSupplierColor(k), invoices: [] };
         bySupp[k].invoices.push(inv);
       }
       const bySupplier = Object.values(bySupp).sort((a, b) =>
@@ -438,7 +439,7 @@ export default function AchatsPage() {
       bySupp[k].total += inv.total_ht ?? 0;
     }
     const sorted = Object.entries(bySupp)
-      .map(([k, v]) => ({ key: k, name: v.name, total: v.total, color: getSupplierColor(k) }))
+      .map(([k, v]) => ({ key: k, name: v.name, total: v.total, color: cachedSupplierColor(k) }))
       .sort((a, b) => b.total - a.total);
 
     // Max 10 suppliers, group rest as "Autres"
@@ -458,7 +459,7 @@ export default function AchatsPage() {
     for (const inv of rangeInvoices) {
       const name = inv.suppliers?.name ?? "Inconnu";
       const k = name.toLowerCase().trim();
-      if (!bySupp[k]) bySupp[k] = { name, color: getSupplierColor(k), invoices: [] };
+      if (!bySupp[k]) bySupp[k] = { name, color: cachedSupplierColor(k), invoices: [] };
       bySupp[k].invoices.push(inv);
     }
     return Object.values(bySupp).sort((a, b) =>
