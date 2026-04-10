@@ -13,11 +13,12 @@ import type { Category } from "@/types/ingredients";
 import { FloatingActions, FAIconPdf, FAIconMail, FAIconTrash, FAIconCheck, FAIconPause } from "@/components/layout/FloatingActions";
 import type { FloatingAction } from "@/components/layout/FloatingActions";
 import { BottomSheet } from "@/components/layout/BottomSheet";
+import { getSupplierColor } from "@/lib/supplierColors";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type DeliveryRule = { day: string; cutoff: string; delivery_day: string };
-type Supplier = { id: string; name: string; franco_minimum: number | null; delivery_schedule: DeliveryRule[] | null };
+type Supplier = { id: string; name: string; franco_minimum: number | null; delivery_schedule: DeliveryRule[] | null; color: string | null };
 
 type Ligne = {
   id: string;
@@ -235,21 +236,14 @@ function computeOrderUnitPrice(offer: OfferRow | null, orderQty: number | null):
   return null;
 }
 
-// ── Supplier color from name (deterministic) ────────────────────────────────
-const SUPPLIER_COLORS = [
-  "#D4775A", "#4a6741", "#2563EB", "#7C3AED", "#D97706",
-  "#0D9488", "#DC2626", "#0284C7", "#C026D3", "#EA580C",
-  "#16A34A", "#9D174D", "#1E40AF", "#92400E",
-];
-// Map built once: each supplier gets a unique color by sorted index
-const supplierColorMap = new Map<string, string>();
-function buildSupplierColorMap(names: string[]) {
-  supplierColorMap.clear();
-  const sorted = [...names].sort((a, b) => a.localeCompare(b));
-  sorted.forEach((n, i) => supplierColorMap.set(n, SUPPLIER_COLORS[i % SUPPLIER_COLORS.length]));
+// ── Supplier color — uses DB color (preferred) or hash fallback ──────────────
+const supplierColorCache = new Map<string, string>();
+function rebuildSupplierColors(list: Supplier[]) {
+  supplierColorCache.clear();
+  for (const s of list) supplierColorCache.set(s.name, getSupplierColor(s.name, s.color));
 }
 function supplierColor(name: string): string {
-  return supplierColorMap.get(name) || SUPPLIER_COLORS[0];
+  return supplierColorCache.get(name) || getSupplierColor(name);
 }
 
 // ── Status config ────────────────────────────────────────────────────────────
@@ -350,7 +344,7 @@ function CommandesPage() {
       // Load ALL suppliers (not filtered by etablissement) so we can build aliases
       const { data } = await supabase
         .from("suppliers")
-        .select("id, name, franco_minimum, delivery_schedule")
+        .select("id, name, franco_minimum, delivery_schedule, color")
         .eq("is_active", true)
         .order("name");
       // Deduplicate by name (accent+case insensitive) with alias tracking
@@ -462,7 +456,7 @@ function CommandesPage() {
       }
 
       setSuppliers(list);
-      buildSupplierColorMap(list.map((s) => s.name));
+      rebuildSupplierColors(list);
       setSupplierAliases(aliases);
       // Pre-select from URL param only — otherwise show placeholder "Fournisseur"
       const urlSupplierId = searchParams.get("supplier_id");

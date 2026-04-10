@@ -31,6 +31,7 @@ type SupplierRow = {
   tva_intra: string | null;
   etablissement_id: string | null;
   client_code: string | null;
+  color: string | null;
 };
 
 type Contact = {
@@ -129,7 +130,7 @@ const readonlyBadge: React.CSSProperties = {
   padding: "2px 8px", borderRadius: 6, display: "inline-block",
 };
 
-const SELECT_FIELDS = "id,name,is_active,email,phone,contact_name,notes,franco_minimum,franco_obligatoire,mercuriale_only,delivery_schedule,address,city,postal_code,siret,category,payment_terms,delivery_days,website,tva_intra,etablissement_id,client_code";
+const SELECT_FIELDS = "id,name,is_active,email,phone,contact_name,notes,franco_minimum,franco_obligatoire,mercuriale_only,delivery_schedule,address,city,postal_code,siret,category,payment_terms,delivery_days,website,tva_intra,etablissement_id,client_code,color";
 
 export default function FournisseursPage() {
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
@@ -529,7 +530,7 @@ export default function FournisseursPage() {
 
   function renderCard(s: SupplierRow) {
     const st = stats.get(s.id);
-    const sColor = getSupplierColor(s.name);
+    const sColor = getSupplierColor(s.name, s.color);
     return (
       <div key={s.id} style={{
         border: "1px solid #ddd6c8", borderRadius: 12, padding: "14px 16px",
@@ -606,7 +607,7 @@ export default function FournisseursPage() {
   }
 
   const isModalOpen = modalMode === "create" || modalSupplier !== null;
-  const modalColor = modalSupplier ? getSupplierColor(modalSupplier.name) : "#D4775A";
+  const modalColor = modalSupplier ? getSupplierColor(modalSupplier.name, modalSupplier.color) : "#D4775A";
 
   // Etab filter pills
   const bmEtab = etablissements.find(e => e.slug === "bello-mio");

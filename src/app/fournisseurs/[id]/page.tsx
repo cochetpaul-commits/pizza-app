@@ -18,6 +18,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { getSupplierColor } from "@/lib/supplierColors";
+import { ColorPicker } from "@/components/ColorPicker";
 
 /**
  * SQL to add new columns:
@@ -38,6 +40,7 @@ type SupplierFull = {
   address: string | null; city: string | null; postal_code: string | null;
   siret: string | null; category: string | null; payment_terms: string | null;
   delivery_days: string[] | null; website: string | null; tva_intra: string | null;
+  color: string | null;
 };
 
 type Invoice = {
@@ -79,6 +82,7 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
     franco_obligatoire: false, mercuriale_only: false,
     address: "", city: "", postal_code: "", siret: "", category: "",
     payment_terms: "", delivery_days: "", website: "", tva_intra: "",
+    color: "",
   });
   const [schedule, setSchedule] = useState<DeliveryRule[]>([]);
 
@@ -173,6 +177,7 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
           address: s.address ?? "", city: s.city ?? "", postal_code: s.postal_code ?? "",
           siret: s.siret ?? "", category: s.category ?? "", payment_terms: s.payment_terms ?? "",
           delivery_days: (s.delivery_days ?? []).join(", "), website: s.website ?? "", tva_intra: s.tva_intra ?? "",
+          color: s.color ?? "",
         });
         setSchedule(Array.isArray(s.delivery_schedule) ? s.delivery_schedule : []);
 
@@ -242,6 +247,7 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
       delivery_days: deliveryArr,
       website: form.website.trim() || null,
       tva_intra: form.tva_intra.trim() || null,
+      color: form.color || null,
     }).eq("id", id);
 
     if (error) { setSaving(false); alert(error.message); return; }
@@ -326,22 +332,40 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
     </div>
   );
 
+  const supplierColor = form.color || getSupplierColor(supplier?.name ?? "");
+
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
-      {/* Back + title */}
-      <div style={{ marginBottom: 20 }}>
+      {/* Back + title with color band */}
+      <div style={{
+        background: `linear-gradient(135deg, ${supplierColor} 0%, ${supplierColor}DD 100%)`,
+        borderRadius: 16, padding: "24px 20px 20px", marginBottom: 16, color: "#fff",
+      }}>
         <button
           onClick={() => router.push("/fournisseurs")}
           style={{
-            fontFamily: "DM Sans, sans-serif", fontSize: 13, color: "#999",
+            fontFamily: "DM Sans, sans-serif", fontSize: 13, color: "rgba(255,255,255,0.7)",
             background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 8,
           }}
         >
           ← Retour aux fournisseurs
         </button>
-        <h1 style={{ fontFamily: "Oswald, sans-serif", fontWeight: 700, fontSize: 22, color: "#1a1a1a", margin: 0 }}>
+        <h1 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24, color: "#fff", margin: 0, textTransform: "uppercase", letterSpacing: 1 }}>
           {supplier.name}
         </h1>
+        {supplier.category && (
+          <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 10px", borderRadius: 6, background: "rgba(255,255,255,0.2)", color: "#fff", marginTop: 6, display: "inline-block" }}>
+            {CATEGORY_LABELS[supplier.category] ?? supplier.category}
+          </span>
+        )}
+      </div>
+
+      {/* Color picker */}
+      <div style={{ border: "1px solid #ddd6c8", borderRadius: 10, padding: "16px 18px", marginBottom: 16, background: "#fff" }}>
+        <div style={{ fontFamily: "Oswald, sans-serif", fontWeight: 700, fontSize: 15, color: "#1a1a1a", marginBottom: 10 }}>
+          Couleur
+        </div>
+        <ColorPicker value={form.color || supplierColor} onChange={(hex) => setForm((f) => ({ ...f, color: hex }))} />
       </div>
 
       {/* Coordonnées */}
