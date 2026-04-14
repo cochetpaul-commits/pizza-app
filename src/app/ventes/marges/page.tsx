@@ -1841,13 +1841,21 @@ function MargesPage() {
           <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#999", padding: "4px 4px 8px" }}>
             Importer fichier
           </div>
-          <button type="button" onClick={() => { setFileDrawerOpen(false); router.push("/invoices"); }}
-            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 12px", border: "none", cursor: "pointer", borderRadius: 12, background: "rgba(255,255,255,0.55)", textAlign: "left", fontFamily: "inherit" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 12px", border: "none", cursor: "pointer", borderRadius: 12, background: "rgba(255,255,255,0.55)", fontFamily: "inherit" }}>
+            <input type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={(e) => {
+              const f = e.target.files?.[0];
+              setFileDrawerOpen(false);
+              if (f) handleImport(f);
+              e.target.value = "";
+            }} />
             <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
             </svg>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Rapport Popina</span>
-          </button>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Rapport Popina</div>
+              <div style={{ fontSize: 11, color: "#999", fontWeight: 400 }}>{importing ? "Import en cours..." : "Excel ou CSV"}</div>
+            </div>
+          </label>
           <div style={{ height: 1, background: "rgba(0,0,0,0.06)", margin: "8px 0" }} />
           <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#999", padding: "4px 4px 8px" }}>
             Exporter rapport
