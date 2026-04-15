@@ -200,6 +200,8 @@ function PerformancesPage() {
   const [catTrendFilterProd, setCatTrendFilterProd] = useState<string | null>(null);
   // Single-product trend data (when product is selected)
   const [prodTrendData, setProdTrendData] = useState<CatTrendDaily[] | null>(null);
+  // Products list for the selected category (loaded from trend date range)
+  const [trendCatProducts, setTrendCatProducts] = useState<{ n: string; ca_ttc: number }[]>([]);
 
   // Compute date range from state
   const getRange = useCallback(() => {
@@ -244,6 +246,22 @@ function PerformancesPage() {
   }, [etab, getRange]);
 
   useEffect(() => { loadData(); }, [loadData]); // eslint-disable-line react-hooks/set-state-in-effect -- async data fetch
+
+  // Fetch products for selected trend category (uses trend date range, not page date)
+  useEffect(() => {
+    if (!etab || !catTrendFilterCat) { setTrendCatProducts([]); return; }
+    let cancelled = false;
+    fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${catTrendFrom}&to=${catTrendTo}`)
+      .then(r => r.json())
+      .then(json => {
+        if (cancelled || !json.stats?.cat_products) return;
+        const cp = json.stats.cat_products as Record<string, { n: string; ca_ttc: number }[]>;
+        const cpKey = Object.keys(cp).find(k => k.toLowerCase() === catTrendFilterCat.toLowerCase());
+        setTrendCatProducts(cpKey ? cp[cpKey].sort((a, b) => b.ca_ttc - a.ca_ttc) : []);
+      })
+      .catch(() => { if (!cancelled) setTrendCatProducts([]); });
+    return () => { cancelled = true; };
+  }, [etab, catTrendFilterCat, catTrendFrom, catTrendTo]); // eslint-disable-line react-hooks/set-state-in-effect
 
   // Fetch category trend data (all categories for chart + optional product drill-down)
   const loadCatTrend = useCallback(async () => {
@@ -1334,25 +1352,18 @@ function PerformancesPage() {
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
-                {catTrendFilterCat && data && (() => {
-                  // cat_products uses normalized keys ("Alcool") while catTrendData uses raw ("ALCOOL")
-                  const cpKey = Object.keys(data.cat_products).find(k => k.toLowerCase() === catTrendFilterCat.toLowerCase()) ?? catTrendFilterCat;
-                  const products = data.cat_products[cpKey] ?? [];
-                  return (
-                    <select
-                      value={catTrendFilterProd ?? ""}
-                      onChange={(e) => setCatTrendFilterProd(e.target.value || null)}
-                      style={{ flex: 1, height: 36, borderRadius: 10, border: "1px solid #e0d8ce", padding: "0 10px", fontSize: 12, background: "#fff", color: "#1a1a1a", cursor: "pointer" }}
-                    >
-                      <option value="">Tous les produits ({products.length})</option>
-                      {products
-                        .sort((a, b) => b.ca_ttc - a.ca_ttc)
-                        .map(p => (
-                          <option key={p.n} value={p.n}>{p.n}</option>
-                        ))}
-                    </select>
-                  );
-                })()}
+                {catTrendFilterCat && (
+                  <select
+                    value={catTrendFilterProd ?? ""}
+                    onChange={(e) => setCatTrendFilterProd(e.target.value || null)}
+                    style={{ flex: 1, height: 36, borderRadius: 10, border: "1px solid #e0d8ce", padding: "0 10px", fontSize: 12, background: "#fff", color: "#1a1a1a", cursor: "pointer" }}
+                  >
+                    <option value="">Tous les produits ({trendCatProducts.length})</option>
+                    {trendCatProducts.map(p => (
+                      <option key={p.n} value={p.n}>{p.n}</option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* Date range (← date →) + metric toggle */}
