@@ -1476,6 +1476,7 @@ function CommandesPage() {
               boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
             }}
           >
+            <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: supplierColor(currentSupplier.name), flexShrink: 0 }} />
             <span style={{ color: "#999", fontWeight: 500, fontSize: 11 }}>FOURNISSEUR</span>
             <span>{currentSupplier.name}</span>
             {draftSupplierIds.has(currentSupplier.id) && (
@@ -1507,17 +1508,18 @@ function CommandesPage() {
                     width: "100%", padding: "14px 16px",
                     border: "none", cursor: "pointer",
                     borderRadius: 12,
-                    background: isActive ? "rgba(212,119,90,0.12)" : "rgba(255,255,255,0.55)",
-                    borderLeft: isActive ? "4px solid #D4775A" : "4px solid transparent",
+                    background: isActive ? (supplierColor(s.name) + "18") : "rgba(255,255,255,0.55)",
+                    borderLeft: `4px solid ${isActive ? supplierColor(s.name) : "transparent"}`,
                     transition: "background 0.15s",
                     fontFamily: "inherit",
                     textAlign: "left",
                   }}
                 >
+                  <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: "50%", background: supplierColor(s.name), flexShrink: 0 }} />
                   <span style={{
                     fontSize: 15,
                     fontWeight: isActive ? 700 : 500,
-                    color: isActive ? "#D4775A" : "#1a1a1a",
+                    color: isActive ? "#1a1a1a" : "#1a1a1a",
                     flex: 1,
                   }}>
                     {s.name}
