@@ -39,20 +39,20 @@ export const CAT_LABELS: Record<Category, string> = {
 };
 
 export const CAT_COLORS: Record<Category, string> = {
-  cremerie_fromage:   "#D97706", // ambre orange
-  charcuterie_viande: "#DC2626", // rouge vif
-  maree:              "#0284C7", // bleu ciel
-  alcool_spiritueux:  "#7C3AED", // violet
-  boisson:            "#0D9488", // teal
-  legumes_herbes:     "#16A34A", // vert vif
-  fruit:              "#EA580C", // orange vif
-  epicerie_salee:     "#1E40AF", // bleu marine
-  epicerie_sucree:    "#92400E", // brun
-  preparation:        "#C026D3", // magenta/fuchsia
-  sauce:              "#9D174D", // rose foncé/bordeaux
-  antipasti:          "#CA8A04", // jaune doré
-  emballage:          "#78716C", // gris chaud
-  autre:              "#6B7280", // gris neutre
+  cremerie_fromage:   "#D97706", // ambre doré
+  charcuterie_viande: "#b85c3a", // terracotta foncé
+  maree:              "#5e8278", // vert sauge
+  alcool_spiritueux:  "#8a6b3e", // brun doré
+  boisson:            "#6b8f71", // vert sauge clair
+  legumes_herbes:     "#4a6741", // vert forêt
+  fruit:              "#D4775A", // terracotta
+  epicerie_salee:     "#7c5c3a", // brun tabac
+  epicerie_sucree:    "#c9952c", // doré chaud
+  preparation:        "#5e7a5e", // vert mousse
+  sauce:              "#9D6B4D", // brun cuivré
+  antipasti:          "#d4a03c", // jaune miel
+  emballage:          "#a8976b", // sable chaud
+  autre:              "#b0a894", // gris sable
 };
 
 export type Supplier = {

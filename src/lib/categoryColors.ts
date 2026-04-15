@@ -1,21 +1,26 @@
-/** Unified category color map — used across all ventes/marges pages for consistency */
+/** Unified category color map — verts, jaunes, terracotta (palette iFratelli) */
 const CAT_COLORS: Record<string, string> = {
-  PIZZE: "#D4775A",           // terracotta
-  CUISINE: "#46655a",         // dark green
-  VINI: "#8B4513",            // saddle brown
-  BOISSONS: "#5e8278",        // sage
-  "BOISSONS CHAUDES": "#c4a882", // tan
-  SPIRITUEUX: "#7c5c3a",      // brown
-  DOLCI: "#d4a03c",           // gold
-  ANTIPASTI: "#e09070",        // salmon
-  DESSERTS: "#d4a03c",        // gold (alias)
-  MESSAGES: "#999999",        // muted gray
+  PIZZE: "#D4775A",              // terracotta
+  CUCINA: "#4a6741",             // vert forêt
+  CUISINE: "#4a6741",            // vert forêt (alias)
+  DOLCI: "#c9952c",              // doré chaud
+  DESSERTS: "#c9952c",           // doré chaud (alias)
+  ALCOOL: "#b85c3a",             // terracotta foncé
+  VINI: "#8a6b3e",               // brun doré
+  ANTIPASTI: "#d4a03c",          // jaune miel
+  BEVANDE: "#6b8f71",            // vert sauge
+  BOISSONS: "#6b8f71",           // vert sauge (alias)
+  "BEVANDE CALDE": "#a8976b",    // sable chaud
+  "BOISSONS CHAUDES": "#a8976b", // sable chaud (alias)
+  DIGESTIVI: "#7c5c3a",          // brun tabac
+  SPIRITUEUX: "#7c5c3a",         // brun tabac (alias)
+  MESSAGES: "#b0a894",           // gris sable
 };
 
 const FALLBACK_COLORS = [
-  "#D4775A", "#46655a", "#8B4513", "#5e8278", "#c4a882",
-  "#7c5c3a", "#d4a03c", "#e09070", "#5e7a8a", "#a8b89c",
-  "#3a7d44", "#e0b896",
+  "#D4775A", "#4a6741", "#c9952c", "#6b8f71", "#b85c3a",
+  "#8a6b3e", "#d4a03c", "#a8976b", "#7c5c3a", "#5e7a5e",
+  "#c4885a", "#8b9b6b", "#d9a85c", "#5a7d6b",
 ];
 
 /** Get a consistent color for a category name */

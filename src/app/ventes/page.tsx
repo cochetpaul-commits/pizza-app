@@ -190,7 +190,7 @@ function PerformancesPage() {
   const catTrendFrom = catTrendRange.from;
   const catTrendTo = catTrendRange.to;
   // Sync trend range when page range changes
-  useEffect(() => { setCatTrendRange(range); }, [range.from, range.to]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setCatTrendRange(range); }, [range.from, range.to]); // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
   const [catTrendMetric, setCatTrendMetric] = useState<"qty" | "ca_ttc">("ca_ttc");
   const [catTrendData, setCatTrendData] = useState<Record<string, CatTrendDaily[]> | null>(null);
   const [catTrendLoading, setCatTrendLoading] = useState(false);
@@ -561,8 +561,8 @@ function PerformancesPage() {
           </div>
         </div>
 
-        {/* ── Page nav pills: Ventes / Produits ── */}
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
+        {/* ── Page nav pills: Ventes / Produits + TTC/HT (mobile) ── */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 14 }}>
           <div style={{ display: "inline-flex", background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
             <span style={{
               padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "default",
@@ -574,6 +574,19 @@ function PerformancesPage() {
               background: "transparent", color: "#777", border: "none",
               fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
             }}>Produits</button>
+          </div>
+          {/* TTC/HT toggle — mobile */}
+          <div className="mobile-only" style={{ gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 999, padding: 2 }}>
+            <button type="button" onClick={() => setMode("ttc")} style={{
+              padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
+              background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#999",
+              fontSize: 10, fontWeight: 700,
+            }}>TTC</button>
+            <button type="button" onClick={() => setMode("ht")} style={{
+              padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
+              background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#999",
+              fontSize: 10, fontWeight: 700,
+            }}>HT</button>
           </div>
         </div>
 
@@ -611,6 +624,7 @@ function PerformancesPage() {
             </div>
             {[
               { key: "ventes" as const, label: "Ventes", sub: "Rapport detaille des ventes" },
+              { key: "produits" as const, label: "Produits", sub: "Marges et food cost par produit" },
               { key: "complet" as const, label: "Complet", sub: "Ventes + Produits reunis" },
             ].map((opt) => (
               <button key={opt.key} type="button" onClick={() => handleExportPDF(opt.key)} disabled={exporting}
@@ -1160,8 +1174,53 @@ function PerformancesPage() {
             {W.services.length > 0 && (
               <div style={S.card}>
                 <div style={S.sec}>Par service · {mode.toUpperCase()} · couverts</div>
-                <div className="ventes-recap-wrap" style={{ overflow: "hidden", borderRadius: 8, border: "1px solid #e0d8ce" }}>
+                {/* Desktop: table classique */}
+                <div className="desktop-only" style={{ overflow: "hidden", borderRadius: 8, border: "1px solid #e0d8ce" }}>
                   <RecapTable services={W.services} mode={mode} meteo={meteo} dates={W.dates} days={W.days} useWeeks={W.dates.length > 14} />
+                </div>
+                {/* Mobile: cards portrait */}
+                <div className="mobile-only" style={{ flexDirection: "column", gap: 8 }}>
+                  {(() => {
+                    const byDay: Record<string, typeof W.services> = {};
+                    const dayOrder: string[] = [];
+                    for (const s of W.services) {
+                      if (!byDay[s.jour]) { byDay[s.jour] = []; dayOrder.push(s.jour); }
+                      byDay[s.jour].push(s);
+                    }
+                    return dayOrder.map(jour => (
+                      <div key={jour} style={{ background: "#faf7f2", borderRadius: 10, padding: "12px 14px", border: "1px solid #e8e0d0" }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 8 }}>{jour}</div>
+                        {byDay[jour].map(s => {
+                          const z = mode === "ttc" ? s.z_ttc : s.z_ht;
+                          const caVal = mode === "ttc" ? s.ttc : s.ht;
+                          const zones = [
+                            { label: "Salle", val: z?.Salle, color: ZC.Salle },
+                            { label: "Pergolas", val: z?.Pergolas, color: ZC.Pergolas },
+                            { label: "Terrasse", val: z?.Terrasse, color: ZC.Terrasse },
+                            { label: "Emp.", val: z?.emp, color: ZC.emp },
+                          ].filter(x => x.val && x.val > 0);
+                          return (
+                            <div key={s.svc} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid rgba(0,0,0,.06)" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: s.svc === "midi" ? "#5e8278" : "#1a1a1a", letterSpacing: ".08em" }}>{s.svc === "midi" ? "Midi" : "Soir"}</span>
+                                <span style={{ fontSize: 15, fontWeight: 800, color: "#D4775A", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{fmt(caVal)}</span>
+                              </div>
+                              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                                {zones.map(zn => (
+                                  <span key={zn.label} style={{ fontSize: 11, color: zn.color, fontWeight: 600 }}>
+                                    {zn.label} {fmt(zn.val!)}
+                                  </span>
+                                ))}
+                              </div>
+                              <div style={{ fontSize: 11, color: "#777" }}>
+                                {s.cov} cvts · CVT M SP {(mode === "ttc" ? s.tm_sp_ttc : s.tm_sp_ht).toFixed(0)}€
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()}
                 </div>
               </div>
             )}
@@ -1253,14 +1312,39 @@ function PerformancesPage() {
                 })()}
               </div>
 
-              {/* Date range + metric toggle */}
+              {/* Date range (← date →) + metric toggle */}
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                <DateRangePicker
-                  value={catTrendRange}
-                  onChange={(r) => setCatTrendRange(r)}
-                  presets={["last-7-days", "last-30-days", "last-90-days", "this-month", "last-month", "this-year"]}
-                  format="short"
-                />
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <button type="button" onClick={() => {
+                    const nf = new Date(new Date(catTrendRange.from + "T12:00:00").getTime() - 86400000);
+                    const nt = new Date(new Date(catTrendRange.to + "T12:00:00").getTime() - 86400000);
+                    setCatTrendRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
+                  }} style={{
+                    width: 26, height: 26, borderRadius: 6, border: "none",
+                    background: accent + "15", color: accent, fontSize: 12, fontWeight: 700,
+                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>{"←"}</button>
+                  <DateRangePicker
+                    value={catTrendRange}
+                    onChange={(r) => setCatTrendRange(r)}
+                    presets={["today", "yesterday", "this-week", "last-week", "this-month", "last-month", "last-30-days", "last-90-days"]}
+                    format="short"
+                  />
+                  <button type="button" onClick={() => {
+                    const today = new Date().toISOString().slice(0, 10);
+                    if (catTrendRange.to >= today) return;
+                    const nf = new Date(new Date(catTrendRange.from + "T12:00:00").getTime() + 86400000);
+                    const nt = new Date(new Date(catTrendRange.to + "T12:00:00").getTime() + 86400000);
+                    setCatTrendRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
+                  }} style={{
+                    width: 26, height: 26, borderRadius: 6, border: "none",
+                    background: catTrendRange.to >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : accent + "15",
+                    color: catTrendRange.to >= new Date().toISOString().slice(0, 10) ? "#ccc" : accent,
+                    fontSize: 12, fontWeight: 700,
+                    cursor: catTrendRange.to >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>{"→"}</button>
+                </div>
                 <div style={{ display: "flex", gap: 0, background: "#f5f0e8", borderRadius: 20, padding: 3, marginLeft: "auto" }}>
                   <button type="button" onClick={() => setCatTrendMetric("ca_ttc")} style={{
                     padding: "4px 12px", borderRadius: 16, border: "none", cursor: "pointer",
@@ -1394,60 +1478,62 @@ function PerformancesPage() {
       <div className="mobile-only" style={{
         position: "fixed",
         bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
-        left: 12, right: 12, zIndex: 100,
-        height: 48,
-        display: "flex", flexDirection: "row", alignItems: "center", gap: 6,
-        padding: "0 8px",
-        background: "rgba(255,255,255,0.95)",
-        backdropFilter: "blur(20px) saturate(180%)",
-        WebkitBackdropFilter: "blur(20px) saturate(180%)",
-        borderRadius: 14,
-        boxShadow: "0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
-        border: "1px solid rgba(0,0,0,0.06)",
+        left: 0, right: 0, zIndex: 100,
+        display: "flex", justifyContent: "center",
       }}>
-        {/* ← prev day */}
-        <button type="button" onClick={() => {
-          const nf = new Date(new Date(range.from + "T12:00:00").getTime() - 86400000);
-          const nt = new Date(new Date(range.to + "T12:00:00").getTime() - 86400000);
-          setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
-        }} style={{
-          width: 32, height: 32, borderRadius: 8, border: "none",
-          background: accent + "15", color: accent, fontSize: 14, fontWeight: 700,
-          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-        }}>{"←"}</button>
-
-        {/* Date center */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
-        </div>
-
-        {/* → next day */}
-        <button type="button" onClick={() => {
-          const today = new Date().toISOString().slice(0, 10);
-          if (range.from >= today) return;
-          const nf = new Date(new Date(range.from + "T12:00:00").getTime() + 86400000);
-          const nt = new Date(new Date(range.to + "T12:00:00").getTime() + 86400000);
-          setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
-        }} style={{
-          width: 32, height: 32, borderRadius: 8, border: "none",
-          background: from >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : accent + "15",
-          color: from >= new Date().toISOString().slice(0, 10) ? "#ccc" : accent,
-          fontSize: 14, fontWeight: 700,
-          cursor: from >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-        }}>{"→"}</button>
-
-        {/* File icon — opens drawer */}
-        <button type="button" onClick={() => setPdfDrawerOpen(true)} style={{
-          width: 36, height: 36, borderRadius: 10, border: "1px solid #ddd6c8",
-          background: "#fff", cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        <div style={{
+          height: 44,
+          display: "flex", flexDirection: "row", alignItems: "center", gap: 6,
+          padding: "0 8px",
+          background: "rgba(255,255,255,0.95)",
+          backdropFilter: "blur(20px) saturate(180%)",
+          WebkitBackdropFilter: "blur(20px) saturate(180%)",
+          borderRadius: 22,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
+          border: "1px solid rgba(0,0,0,0.06)",
         }}>
-          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-          </svg>
-        </button>
+          {/* ← prev day */}
+          <button type="button" onClick={() => {
+            const nf = new Date(new Date(range.from + "T12:00:00").getTime() - 86400000);
+            const nt = new Date(new Date(range.to + "T12:00:00").getTime() - 86400000);
+            setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
+          }} style={{
+            width: 30, height: 30, borderRadius: 8, border: "none",
+            background: accent + "15", color: accent, fontSize: 13, fontWeight: 700,
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>{"←"}</button>
+
+          {/* Date center */}
+          <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
+
+          {/* → next day */}
+          <button type="button" onClick={() => {
+            const today = new Date().toISOString().slice(0, 10);
+            if (range.from >= today) return;
+            const nf = new Date(new Date(range.from + "T12:00:00").getTime() + 86400000);
+            const nt = new Date(new Date(range.to + "T12:00:00").getTime() + 86400000);
+            setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
+          }} style={{
+            width: 30, height: 30, borderRadius: 8, border: "none",
+            background: from >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : accent + "15",
+            color: from >= new Date().toISOString().slice(0, 10) ? "#ccc" : accent,
+            fontSize: 13, fontWeight: 700,
+            cursor: from >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>{"→"}</button>
+
+          {/* File icon — opens drawer */}
+          <button type="button" onClick={() => setPdfDrawerOpen(true)} style={{
+            width: 32, height: 32, borderRadius: 10, border: "1px solid #ddd6c8",
+            background: "#fff", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+          </button>
+        </div>
       </div>
 
     </RequireRole>

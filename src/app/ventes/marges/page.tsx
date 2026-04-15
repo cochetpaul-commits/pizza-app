@@ -652,8 +652,8 @@ function MargesPage() {
             .marges-toolbar-desktop { display: none !important; }
           }
         `}</style>
-        {/* ── Toolbar: Import | Calendar | PDF | TTC/HT ── */}
-        <div className="ventes-toolbar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 14 }}>
+        {/* ── Toolbar: Import | Calendar | PDF | TTC/HT (desktop only) ── */}
+        <div className="ventes-toolbar desktop-only" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 14 }}>
           <label style={{
             padding: "7px 14px", borderRadius: 8, border: "none",
             background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
@@ -687,8 +687,8 @@ function MargesPage() {
           </div>
         </div>
 
-        {/* ── Page nav pills: Ventes / Produits ── */}
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
+        {/* ── Page nav pills: Ventes / Produits + TTC/HT (mobile) ── */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 14 }}>
           <div style={{ display: "inline-flex", background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
             <button type="button" onClick={() => router.push(`/ventes?from=${from}&to=${to}`)} style={{
               padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "pointer",
@@ -700,6 +700,19 @@ function MargesPage() {
               background: accent, color: "#fff",
               fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
             }}>Produits</span>
+          </div>
+          {/* TTC/HT toggle — mobile */}
+          <div className="mobile-only" style={{ gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 999, padding: 2 }}>
+            <button type="button" onClick={() => setMode("ttc")} style={{
+              padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
+              background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#999",
+              fontSize: 10, fontWeight: 700,
+            }}>TTC</button>
+            <button type="button" onClick={() => setMode("ht")} style={{
+              padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
+              background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#999",
+              fontSize: 10, fontWeight: 700,
+            }}>HT</button>
           </div>
         </div>
         {importMsg && <div style={{ fontSize: 12, color: accent, marginBottom: 10, textAlign: "center" }}>{importMsg}</div>}
@@ -1864,6 +1877,32 @@ function MargesPage() {
             style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2, width: "100%", padding: "14px 12px", border: "none", cursor: "pointer", borderRadius: 12, background: "rgba(255,255,255,0.55)", textAlign: "left", fontFamily: "inherit", opacity: exportingPdf ? 0.5 : 1 }}>
             <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Produits</span>
             <span style={{ fontSize: 11, color: "#777" }}>Marges et food cost par produit</span>
+          </button>
+          <button type="button" onClick={async () => {
+            setFileDrawerOpen(false);
+            if (!etab) return;
+            setExportingPdf(true);
+            try {
+              const { from: f, to: t } = getRange();
+              const sRes = await fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${f}&to=${t}`);
+              const sJson = await sRes.json();
+              if (!sJson.stats) { setExportingPdf(false); return; }
+              const isSingle = f === t;
+              const label = isSingle
+                ? new Date(f + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+                : `Du ${new Date(f + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })} au ${new Date(t + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`;
+              const res = await fetch("/api/ventes/pdf", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ stats: sJson.stats, prev: sJson.prev ?? null, mode, viewTab: "complet", rangeLabel: label, etabName: etab.nom ?? "Etablissement", briefing: null }),
+              });
+              if (res.ok) { const blob = await res.blob(); window.open(URL.createObjectURL(blob), "_blank"); }
+            } catch { /* */ }
+            setExportingPdf(false);
+          }} disabled={exportingPdf}
+            style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2, width: "100%", padding: "14px 12px", border: "none", cursor: "pointer", borderRadius: 12, background: "rgba(255,255,255,0.55)", textAlign: "left", fontFamily: "inherit", opacity: exportingPdf ? 0.5 : 1 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Complet</span>
+            <span style={{ fontSize: 11, color: "#777" }}>Ventes + Produits reunis</span>
           </button>
         </div>
       </BottomSheet>
