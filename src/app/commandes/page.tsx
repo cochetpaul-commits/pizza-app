@@ -307,6 +307,7 @@ function CommandesPage() {
   // Email sending state
   const [sendingEmail, setSendingEmail] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [supplierListOpen, setSupplierListOpen] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
   // Historique
@@ -1784,14 +1785,33 @@ function CommandesPage() {
         {/* Fournisseurs grid */}
         {!loading && !selectedSupplierId && suppliers.length > 0 && (
           <div style={{ marginTop: 16 }}>
-            <div style={{
-              fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
-              color: "#999", marginBottom: 10,
-              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-            }}>
-              Commander par fournisseur
-            </div>
             <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #ece4d4", overflow: "hidden" }}>
+              <button
+                type="button"
+                onClick={() => setSupplierListOpen(!supplierListOpen)}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  width: "100%", padding: "14px 16px",
+                  background: "transparent", border: "none", cursor: "pointer",
+                  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                }}
+              >
+                <span style={{
+                  fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
+                  color: "#999",
+                }}>
+                  Commander par fournisseur
+                </span>
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ transition: "transform 0.2s", transform: supplierListOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+              <div style={{
+                maxHeight: supplierListOpen ? 999 : 0,
+                overflow: "hidden",
+                transition: "max-height 0.25s ease",
+              }}>
               {suppliers.map((s, i) => {
                 const hasDraft = draftSupplierIds.has(s.id);
                 const schedule = s.delivery_schedule;
@@ -1863,6 +1883,7 @@ function CommandesPage() {
                   </button>
                 );
               })}
+              </div>
             </div>
           </div>
         )}
