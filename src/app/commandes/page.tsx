@@ -1791,8 +1791,8 @@ function CommandesPage() {
             }}>
               Commander par fournisseur
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10 }}>
-              {suppliers.map((s) => {
+            <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #ece4d4", overflow: "hidden" }}>
+              {suppliers.map((s, i) => {
                 const hasDraft = draftSupplierIds.has(s.id);
                 const schedule = s.delivery_schedule;
                 let nextDelivery: string | null = null;
@@ -1821,47 +1821,45 @@ function CommandesPage() {
                     type="button"
                     onClick={() => { setSelectedSupplierId(s.id); setDropdownOpen(false); }}
                     style={{
-                      background: "#fff", borderRadius: 12,
-                      border: hasDraft ? "1.5px solid #D4775A" : "1px solid #ece4d4",
-                      padding: 0, cursor: "pointer",
-                      textAlign: "left", position: "relative",
-                      overflow: "hidden",
-                      transition: "border-color 0.15s, box-shadow 0.15s",
+                      display: "flex", alignItems: "center", gap: 12,
+                      width: "100%", padding: "12px 16px",
+                      background: "transparent", border: "none",
+                      borderTop: i > 0 ? "1px solid #f0ebe2" : "none",
+                      cursor: "pointer", textAlign: "left",
+                      fontFamily: "inherit",
+                      transition: "background 0.12s",
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "#f9f5ef"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                   >
-                    {/* Color top bar */}
-                    <div style={{ height: 4, background: color }} />
-                    <div style={{ padding: "12px 14px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                        <span style={{
-                          fontSize: 13, fontWeight: 700, color: "#1a1a1a",
-                          fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                          textTransform: "uppercase", letterSpacing: ".03em",
-                          flex: 1, minWidth: 0,
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                        }}>
-                          {s.name}
-                        </span>
-                        {hasDraft && (
-                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#D4775A", flexShrink: 0 }} />
-                        )}
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        {s.franco_minimum != null && s.franco_minimum > 0 && (
-                          <span style={{ fontSize: 11, color: "#999" }}>
-                            Franco {s.franco_minimum.toFixed(0)} €
-                          </span>
-                        )}
-                        {nextDelivery && (
-                          <span style={{ fontSize: 11, color: "#4a6741", fontWeight: 600 }}>
-                            {nextDelivery}
-                          </span>
-                        )}
-                        {!nextDelivery && (s.franco_minimum == null || s.franco_minimum <= 0) && (
-                          <span style={{ fontSize: 11, color: "#ccc" }}>—</span>
-                        )}
-                      </div>
-                    </div>
+                    <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                    <span style={{
+                      fontSize: 14, fontWeight: 700, color: "#1a1a1a",
+                      fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                      textTransform: "uppercase", letterSpacing: ".03em",
+                      flex: 1, minWidth: 0,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>
+                      {s.name}
+                    </span>
+                    {nextDelivery && (
+                      <span style={{ fontSize: 11, color: "#4a6741", fontWeight: 600, flexShrink: 0 }}>
+                        {nextDelivery}
+                      </span>
+                    )}
+                    {hasDraft && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, color: "#D4775A",
+                        padding: "2px 8px", borderRadius: 6,
+                        background: "rgba(212,119,90,0.12)",
+                        textTransform: "uppercase", letterSpacing: ".05em", flexShrink: 0,
+                      }}>
+                        brouillon
+                      </span>
+                    )}
+                    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
                   </button>
                 );
               })}
