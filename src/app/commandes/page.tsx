@@ -2167,40 +2167,6 @@ function CommandesPage() {
           })()} />
         )}
 
-        {/* Floating "+ Nouvelle commande" — hidden on dashboard (supplier grid replaces it) */}
-        {!loading && !session && selectedSupplierId && (
-          <button
-            type="button"
-            onClick={() => setDropdownOpen(true)}
-            style={{
-              position: "fixed",
-              right: 20,
-              bottom: "calc(96px + env(safe-area-inset-bottom, 0px))",
-              zIndex: 105,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "14px 22px",
-              borderRadius: 999,
-              border: "none",
-              background: "#D4775A",
-              color: "#fff",
-              fontFamily: "var(--font-oswald), Oswald, sans-serif",
-              fontSize: 13, fontWeight: 700,
-              textTransform: "uppercase", letterSpacing: ".05em",
-              cursor: "pointer",
-              boxShadow: "0 6px 24px rgba(212,119,90,0.35), 0 2px 8px rgba(0,0,0,0.10)",
-            }}
-            onTouchStart={(e) => { e.currentTarget.style.transform = "scale(0.96)"; }}
-            onTouchEnd={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
-          >
-            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Nouvelle commande
-          </button>
-        )}
       </div>
     </RequireRole>
   );
