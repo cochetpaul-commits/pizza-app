@@ -249,6 +249,7 @@ function PerformancesPage() {
 
   // Fetch products for selected trend category (uses trend date range, not page date)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- guard clause resets state before async fetch
     if (!etab || !catTrendFilterCat) { setTrendCatProducts([]); return; }
     let cancelled = false;
     fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${catTrendFrom}&to=${catTrendTo}`)
@@ -261,7 +262,7 @@ function PerformancesPage() {
       })
       .catch(() => { if (!cancelled) setTrendCatProducts([]); });
     return () => { cancelled = true; };
-  }, [etab, catTrendFilterCat, catTrendFrom, catTrendTo]); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [etab, catTrendFilterCat, catTrendFrom, catTrendTo]);
 
   // Fetch category trend data (all categories for chart + optional product drill-down)
   const loadCatTrend = useCallback(async () => {
@@ -1262,9 +1263,9 @@ function PerformancesPage() {
                                 <td style={cellSt}>{fmtCell(zS?.emp, ZC.emp)}</td>
                               </tr>
                               <tr style={{ background: "#fff" }}>
-                                <td style={{ ...labelSt, fontWeight: 700, color: ACCENT }}>Total</td>
-                                <td style={{ ...cellSt, fontWeight: 800, color: ACCENT, fontSize: 14, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{midi ? fmt(mode === "ttc" ? midi.ttc : midi.ht) : dash}</td>
-                                <td style={{ ...cellSt, fontWeight: 800, color: ACCENT, fontSize: 14, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{soir ? fmt(mode === "ttc" ? soir.ttc : soir.ht) : dash}</td>
+                                <td style={{ ...labelSt, fontWeight: 700, color: accent }}>Total</td>
+                                <td style={{ ...cellSt, fontWeight: 800, color: accent, fontSize: 14, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{midi ? fmt(mode === "ttc" ? midi.ttc : midi.ht) : dash}</td>
+                                <td style={{ ...cellSt, fontWeight: 800, color: accent, fontSize: 14, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{soir ? fmt(mode === "ttc" ? soir.ttc : soir.ht) : dash}</td>
                               </tr>
                               <tr>
                                 <td style={labelSt}>Cvts</td>
