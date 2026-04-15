@@ -1178,8 +1178,8 @@ function PerformancesPage() {
                 <div className="desktop-only" style={{ overflow: "hidden", borderRadius: 8, border: "1px solid #e0d8ce" }}>
                   <RecapTable services={W.services} mode={mode} meteo={meteo} dates={W.dates} days={W.days} useWeeks={W.dates.length > 14} />
                 </div>
-                {/* Mobile: cards portrait */}
-                <div className="mobile-only" style={{ flexDirection: "column", gap: 8 }}>
+                {/* Mobile: transposed table (rows=zones, cols=midi/soir) per day */}
+                <div className="mobile-only" style={{ flexDirection: "column", gap: 10 }}>
                   {(() => {
                     const byDay: Record<string, typeof W.services> = {};
                     const dayOrder: string[] = [];
@@ -1187,39 +1187,82 @@ function PerformancesPage() {
                       if (!byDay[s.jour]) { byDay[s.jour] = []; dayOrder.push(s.jour); }
                       byDay[s.jour].push(s);
                     }
-                    return dayOrder.map(jour => (
-                      <div key={jour} style={{ background: "#faf7f2", borderRadius: 10, padding: "12px 14px", border: "1px solid #e8e0d0" }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 8 }}>{jour}</div>
-                        {byDay[jour].map(s => {
-                          const z = mode === "ttc" ? s.z_ttc : s.z_ht;
-                          const caVal = mode === "ttc" ? s.ttc : s.ht;
-                          const zones = [
-                            { label: "Salle", val: z?.Salle, color: ZC.Salle },
-                            { label: "Pergolas", val: z?.Pergolas, color: ZC.Pergolas },
-                            { label: "Terrasse", val: z?.Terrasse, color: ZC.Terrasse },
-                            { label: "Emp.", val: z?.emp, color: ZC.emp },
-                          ].filter(x => x.val && x.val > 0);
-                          return (
-                            <div key={s.svc} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid rgba(0,0,0,.06)" }}>
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                                <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: s.svc === "midi" ? "#5e8278" : "#1a1a1a", letterSpacing: ".08em" }}>{s.svc === "midi" ? "Midi" : "Soir"}</span>
-                                <span style={{ fontSize: 15, fontWeight: 800, color: "#D4775A", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{fmt(caVal)}</span>
-                              </div>
-                              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-                                {zones.map(zn => (
-                                  <span key={zn.label} style={{ fontSize: 11, color: zn.color, fontWeight: 600 }}>
-                                    {zn.label} {fmt(zn.val!)}
-                                  </span>
-                                ))}
-                              </div>
-                              <div style={{ fontSize: 11, color: "#777" }}>
-                                {s.cov} cvts · CVT M SP {(mode === "ttc" ? s.tm_sp_ttc : s.tm_sp_ht).toFixed(0)}€
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ));
+                    // Find dayToDate for meteo
+                    const dayToDate: Record<string, string> = {};
+                    for (let i = 0; i < W.days.length; i++) {
+                      if (W.days[i] && W.dates[i]) dayToDate[W.days[i]] = W.dates[i];
+                    }
+                    const cellSt = { padding: "7px 8px", textAlign: "right" as const, fontSize: 12, fontWeight: 600 as const, borderBottom: "1px solid #ede6d9" };
+                    const labelSt = { padding: "7px 8px", textAlign: "left" as const, fontSize: 11, fontWeight: 600 as const, color: "#777", borderBottom: "1px solid #ede6d9" };
+                    return dayOrder.map(jour => {
+                      const svcs = byDay[jour];
+                      const midi = svcs.find(s => s.svc === "midi");
+                      const soir = svcs.find(s => s.svc !== "midi");
+                      const zM = midi ? (mode === "ttc" ? midi.z_ttc : midi.z_ht) : null;
+                      const zS = soir ? (mode === "ttc" ? soir.z_ttc : soir.z_ht) : null;
+                      const dateKey = dayToDate[jour];
+                      const meteoM = dateKey ? meteo[`${dateKey}:midi`] : null;
+                      const meteoS = dateKey ? meteo[`${dateKey}:soir`] : null;
+                      const dash = <span style={{ color: "#ddd" }}>—</span>;
+                      const fmtCell = (v: number | undefined, color?: string) => v && v > 0
+                        ? <span style={{ color: color ?? "#1a1a1a" }}>{fmt(v)}</span>
+                        : dash;
+                      return (
+                        <div key={jour} style={{ background: "#faf7f2", borderRadius: 10, border: "1px solid #e8e0d0", overflow: "hidden" }}>
+                          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                            <thead>
+                              <tr style={{ background: "#f0ebe3" }}>
+                                <th style={{ ...labelSt, fontWeight: 700, color: "#1a1a1a", fontSize: 13 }}>{jour}</th>
+                                <th style={{ ...cellSt, fontSize: 10, color: "#5e8278", textTransform: "uppercase" as const, letterSpacing: ".08em" }}>Midi</th>
+                                <th style={{ ...cellSt, fontSize: 10, color: "#1a1a1a", textTransform: "uppercase" as const, letterSpacing: ".08em" }}>Soir</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td style={labelSt}>Meteo</td>
+                                <td style={{ ...cellSt, textAlign: "center", fontSize: 16 }}>{meteoM ? <span title={`${meteoM.desc} ${meteoM.temp}°`}>{meteoM.emoji}</span> : dash}</td>
+                                <td style={{ ...cellSt, textAlign: "center", fontSize: 16 }}>{meteoS ? <span title={`${meteoS.desc} ${meteoS.temp}°`}>{meteoS.emoji}</span> : dash}</td>
+                              </tr>
+                              <tr>
+                                <td style={{ ...labelSt, color: ZC.Salle }}>Salle</td>
+                                <td style={cellSt}>{fmtCell(zM?.Salle, ZC.Salle)}</td>
+                                <td style={cellSt}>{fmtCell(zS?.Salle, ZC.Salle)}</td>
+                              </tr>
+                              <tr>
+                                <td style={{ ...labelSt, color: ZC.Pergolas }}>Pergolas</td>
+                                <td style={cellSt}>{fmtCell(zM?.Pergolas, ZC.Pergolas)}</td>
+                                <td style={cellSt}>{fmtCell(zS?.Pergolas, ZC.Pergolas)}</td>
+                              </tr>
+                              <tr>
+                                <td style={{ ...labelSt, color: ZC.Terrasse }}>Terrasse</td>
+                                <td style={cellSt}>{fmtCell(zM?.Terrasse, ZC.Terrasse)}</td>
+                                <td style={cellSt}>{fmtCell(zS?.Terrasse, ZC.Terrasse)}</td>
+                              </tr>
+                              <tr>
+                                <td style={{ ...labelSt, color: ZC.emp }}>Emporter</td>
+                                <td style={cellSt}>{fmtCell(zM?.emp, ZC.emp)}</td>
+                                <td style={cellSt}>{fmtCell(zS?.emp, ZC.emp)}</td>
+                              </tr>
+                              <tr style={{ background: "#fff" }}>
+                                <td style={{ ...labelSt, fontWeight: 700, color: ACCENT }}>Total</td>
+                                <td style={{ ...cellSt, fontWeight: 800, color: ACCENT, fontSize: 14, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{midi ? fmt(mode === "ttc" ? midi.ttc : midi.ht) : dash}</td>
+                                <td style={{ ...cellSt, fontWeight: 800, color: ACCENT, fontSize: 14, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{soir ? fmt(mode === "ttc" ? soir.ttc : soir.ht) : dash}</td>
+                              </tr>
+                              <tr>
+                                <td style={labelSt}>Cvts</td>
+                                <td style={{ ...cellSt, fontWeight: 600 }}>{midi?.cov ?? dash}</td>
+                                <td style={{ ...cellSt, fontWeight: 600 }}>{soir?.cov ?? dash}</td>
+                              </tr>
+                              <tr>
+                                <td style={labelSt}>CVT M SP</td>
+                                <td style={cellSt}>{midi ? `${(mode === "ttc" ? midi.tm_sp_ttc : midi.tm_sp_ht).toFixed(0)}€` : dash}</td>
+                                <td style={cellSt}>{soir ? `${(mode === "ttc" ? soir.tm_sp_ttc : soir.tm_sp_ht).toFixed(0)}€` : dash}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    });
                   })()}
                 </div>
               </div>

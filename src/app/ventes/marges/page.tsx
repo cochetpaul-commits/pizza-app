@@ -1795,57 +1795,59 @@ function MargesPage() {
         )}
       </div>
 
-      {/* ── Mobile Bottom Bar: ← date → + file icon ── */}
+      {/* ── Mobile Bottom Bar: ← date → + file icon (compact centré) ── */}
       <div className="mobile-only" style={{
         position: "fixed",
         bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
-        left: 12, right: 12, zIndex: 100,
-        height: 48,
-        display: "flex", flexDirection: "row", alignItems: "center", gap: 6,
-        padding: "0 8px",
-        background: "rgba(255,255,255,0.95)",
-        backdropFilter: "blur(20px) saturate(180%)",
-        WebkitBackdropFilter: "blur(20px) saturate(180%)",
-        borderRadius: 14,
-        boxShadow: "0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
-        border: "1px solid rgba(0,0,0,0.06)",
+        left: 0, right: 0, zIndex: 100,
+        display: "flex", justifyContent: "center",
       }}>
-        <button type="button" onClick={() => {
-          const nf = new Date(new Date(range.from + "T12:00:00").getTime() - 86400000);
-          const nt = new Date(new Date(range.to + "T12:00:00").getTime() - 86400000);
-          setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
-        }} style={{
-          width: 32, height: 32, borderRadius: 8, border: "none",
-          background: COLORS.accent + "15", color: COLORS.accent, fontSize: 14, fontWeight: 700,
-          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-        }}>{"←"}</button>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
-        </div>
-        <button type="button" onClick={() => {
-          const today = new Date().toISOString().slice(0, 10);
-          if (range.from >= today) return;
-          const nf = new Date(new Date(range.from + "T12:00:00").getTime() + 86400000);
-          const nt = new Date(new Date(range.to + "T12:00:00").getTime() + 86400000);
-          setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
-        }} style={{
-          width: 32, height: 32, borderRadius: 8, border: "none",
-          background: range.from >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : COLORS.accent + "15",
-          color: range.from >= new Date().toISOString().slice(0, 10) ? "#ccc" : COLORS.accent,
-          fontSize: 14, fontWeight: 700,
-          cursor: range.from >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-        }}>{"→"}</button>
-        <button type="button" onClick={() => setFileDrawerOpen(true)} style={{
-          width: 36, height: 36, borderRadius: 10, border: "1px solid #ddd6c8",
-          background: "#fff", cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        <div style={{
+          height: 44,
+          display: "flex", flexDirection: "row", alignItems: "center", gap: 6,
+          padding: "0 8px",
+          background: "rgba(255,255,255,0.95)",
+          backdropFilter: "blur(20px) saturate(180%)",
+          WebkitBackdropFilter: "blur(20px) saturate(180%)",
+          borderRadius: 22,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
+          border: "1px solid rgba(0,0,0,0.06)",
         }}>
-          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-          </svg>
-        </button>
+          <button type="button" onClick={() => {
+            const nf = new Date(new Date(range.from + "T12:00:00").getTime() - 86400000);
+            const nt = new Date(new Date(range.to + "T12:00:00").getTime() - 86400000);
+            setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
+          }} style={{
+            width: 30, height: 30, borderRadius: 8, border: "none",
+            background: COLORS.accent + "15", color: COLORS.accent, fontSize: 13, fontWeight: 700,
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>{"←"}</button>
+          <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
+          <button type="button" onClick={() => {
+            const today = new Date().toISOString().slice(0, 10);
+            if (range.from >= today) return;
+            const nf = new Date(new Date(range.from + "T12:00:00").getTime() + 86400000);
+            const nt = new Date(new Date(range.to + "T12:00:00").getTime() + 86400000);
+            setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
+          }} style={{
+            width: 30, height: 30, borderRadius: 8, border: "none",
+            background: range.from >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : COLORS.accent + "15",
+            color: range.from >= new Date().toISOString().slice(0, 10) ? "#ccc" : COLORS.accent,
+            fontSize: 13, fontWeight: 700,
+            cursor: range.from >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>{"→"}</button>
+          <button type="button" onClick={() => setFileDrawerOpen(true)} style={{
+            width: 32, height: 32, borderRadius: 10, border: "1px solid #ddd6c8",
+            background: "#fff", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* ── File actions drawer ── */}
