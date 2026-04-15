@@ -185,12 +185,12 @@ function PerformancesPage() {
 
   // Category trend state
   type CatTrendDaily = { date: string; qty: number; ca_ttc: number; ca_ht: number };
-  const [catTrendRange, setCatTrendRange] = useState<DateRange>(() => {
-    const d = new Date(); d.setMonth(d.getMonth() - 3);
-    return { from: d.toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) };
-  });
+  // Trend range syncs with page range, but can be overridden in the tile
+  const [catTrendRange, setCatTrendRange] = useState<DateRange>(range);
   const catTrendFrom = catTrendRange.from;
   const catTrendTo = catTrendRange.to;
+  // Sync trend range when page range changes
+  useEffect(() => { setCatTrendRange(range); }, [range.from, range.to]); // eslint-disable-line react-hooks/exhaustive-deps
   const [catTrendMetric, setCatTrendMetric] = useState<"qty" | "ca_ttc">("ca_ttc");
   const [catTrendData, setCatTrendData] = useState<Record<string, CatTrendDaily[]> | null>(null);
   const [catTrendLoading, setCatTrendLoading] = useState(false);
