@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, type CSSProperties } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -155,9 +156,14 @@ export default function SimulationPage() {
   const { current: etab } = useEtablissement();
   const accent = etab?.couleur ?? "#D4775A";
 
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const initialTab: Tab = tabParam === "tns" ? "tns" : tabParam === "simulateur" ? "simulateur" : "tns";
+
   const [employes, setEmployes] = useState<Employe[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>("reel");
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [caSimule, setCaSimule] = useState(85000);
   const [simRows, setSimRows] = useState<SimRow[]>([]);
   const [selectedTns, setSelectedTns] = useState<string | null>(null);
@@ -324,8 +330,15 @@ export default function SimulationPage() {
 
         {/* ── Tabs ── */}
         <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, marginBottom: 20 }}>
+          {/* Masse salariale reelle → redirige vers la nouvelle page */}
+          <button type="button" onClick={() => router.push("/rh/masse-salariale")} style={{
+            background: "transparent", border: "none", cursor: "pointer", padding: "8px 16px",
+            fontSize: 13, fontWeight: 600, borderRadius: 10, color: "#999",
+            transition: "all 0.15s", whiteSpace: "nowrap",
+          }}>
+            📊 Masse salariale reelle
+          </button>
           {([
-            { key: "reel" as Tab, label: "Masse salariale reelle", icon: "\uD83D\uDCCA" },
             { key: "tns" as Tab, label: "Statuts TNS", icon: "\uD83D\uDCCB" },
             { key: "simulateur" as Tab, label: "Simulateur d\u2019embauche", icon: "\uD83C\uDFAF" },
           ]).map((t) => (
