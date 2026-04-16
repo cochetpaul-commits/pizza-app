@@ -286,7 +286,8 @@ function UserAvatar() {
   const items: Item[] = [
     { label: "Mon compte", onClick: () => go("/settings/account"), show: true },
     { label: "Etablissements", onClick: () => go("/settings/etablissements"), show: isGroupAdmin },
-    { label: "Employes", onClick: () => go("/settings/employes"), show: isGroupAdmin },
+    { label: "Employes", onClick: () => go("/rh/equipe"), show: isGroupAdmin },
+    { label: "Conges", onClick: () => go("/rh/conges"), show: isGroupAdmin },
     { label: "Fournisseurs", onClick: () => go("/fournisseurs"), show: isGroupAdmin },
     { label: "Planning", onClick: () => go("/settings/planning"), show: isGroupAdmin },
     { label: "Finance", onClick: () => go("/settings/finance"), show: isGroupAdmin },
