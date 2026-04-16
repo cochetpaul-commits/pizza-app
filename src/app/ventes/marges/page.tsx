@@ -892,21 +892,39 @@ function MargesPage() {
                 )}
               </div>
 
-              {/* Date range */}
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
-                <input
-                  type="date"
-                  value={trendFrom}
-                  onChange={(e) => setTrendFrom(e.target.value)}
-                  style={{ height: 32, borderRadius: 8, border: `1px solid ${COLORS.border}`, padding: "0 8px", fontSize: 12 }}
+              {/* Date range (← DateRangePicker →) */}
+              <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 12 }}>
+                <button type="button" onClick={() => {
+                  const nf = new Date(new Date(trendFrom + "T12:00:00").getTime() - 86400000);
+                  const nt = new Date(new Date(trendTo + "T12:00:00").getTime() - 86400000);
+                  setTrendFrom(nf.toISOString().slice(0, 10));
+                  setTrendTo(nt.toISOString().slice(0, 10));
+                }} style={{
+                  width: 26, height: 26, borderRadius: 6, border: "none",
+                  background: accent + "15", color: accent, fontSize: 12, fontWeight: 700,
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                }}>{"←"}</button>
+                <DateRangePicker
+                  value={{ from: trendFrom, to: trendTo }}
+                  onChange={(r) => { setTrendFrom(r.from); setTrendTo(r.to); }}
+                  presets={["today", "yesterday", "this-week", "last-week", "this-month", "last-month", "last-30-days", "last-90-days"]}
+                  format="short"
                 />
-                <span style={{ fontSize: 12, color: COLORS.muted }}>&rarr;</span>
-                <input
-                  type="date"
-                  value={trendTo}
-                  onChange={(e) => setTrendTo(e.target.value)}
-                  style={{ height: 32, borderRadius: 8, border: `1px solid ${COLORS.border}`, padding: "0 8px", fontSize: 12 }}
-                />
+                <button type="button" onClick={() => {
+                  const today = new Date().toISOString().slice(0, 10);
+                  if (trendTo >= today) return;
+                  const nf = new Date(new Date(trendFrom + "T12:00:00").getTime() + 86400000);
+                  const nt = new Date(new Date(trendTo + "T12:00:00").getTime() + 86400000);
+                  setTrendFrom(nf.toISOString().slice(0, 10));
+                  setTrendTo(nt.toISOString().slice(0, 10));
+                }} style={{
+                  width: 26, height: 26, borderRadius: 6, border: "none",
+                  background: trendTo >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : accent + "15",
+                  color: trendTo >= new Date().toISOString().slice(0, 10) ? "#ccc" : accent,
+                  fontSize: 12, fontWeight: 700,
+                  cursor: trendTo >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>{"→"}</button>
               </div>
 
               {/* Mode + Metric toggles */}
