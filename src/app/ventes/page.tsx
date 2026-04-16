@@ -190,18 +190,18 @@ function PerformancesPage() {
   const catTrendFrom = catTrendRange.from;
   const catTrendTo = catTrendRange.to;
   // Sync trend range when page range changes
-  useEffect(() => { setCatTrendRange(range); }, [range.from, range.to]); // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
-  const [catTrendMetric, setCatTrendMetric] = useState<"qty" | "ca_ttc">("ca_ttc");
+  useEffect(() => { setCatTrendRange(range); }, [range.from, range.to]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [catTrendMetric] = useState<"qty" | "ca_ttc">("ca_ttc");
   const [catTrendData, setCatTrendData] = useState<Record<string, CatTrendDaily[]> | null>(null);
-  const [catTrendLoading, setCatTrendLoading] = useState(false);
+  const [, setCatTrendLoading] = useState(false);
   const catTrendChartRef = useRef<HTMLCanvasElement>(null);
   // Drill-down: optional category + product filter
-  const [catTrendFilterCat, setCatTrendFilterCat] = useState<string | null>(null);
-  const [catTrendFilterProd, setCatTrendFilterProd] = useState<string | null>(null);
+  const [catTrendFilterCat] = useState<string | null>(null);
+  const [catTrendFilterProd] = useState<string | null>(null);
   // Single-product trend data (when product is selected)
   const [prodTrendData, setProdTrendData] = useState<CatTrendDaily[] | null>(null);
   // Products list for the selected category (loaded from trend date range)
-  const [trendCatProducts, setTrendCatProducts] = useState<{ n: string; ca_ttc: number }[]>([]);
+  const [, setTrendCatProducts] = useState<{ n: string; ca_ttc: number }[]>([]);
 
   // Compute date range from state
   const getRange = useCallback(() => {
@@ -245,11 +245,10 @@ function PerformancesPage() {
     setLoading(false);
   }, [etab, getRange]);
 
-  useEffect(() => { loadData(); }, [loadData]); // eslint-disable-line react-hooks/set-state-in-effect -- async data fetch
+  useEffect(() => { loadData(); }, [loadData]);
 
   // Fetch products for selected trend category (uses trend date range, not page date)
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- guard clause resets state before async fetch
     if (!etab || !catTrendFilterCat) { setTrendCatProducts([]); return; }
     let cancelled = false;
     fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${catTrendFrom}&to=${catTrendTo}`)
@@ -293,7 +292,7 @@ function PerformancesPage() {
     setCatTrendLoading(false);
   }, [etab, catTrendFrom, catTrendTo, catTrendFilterProd]);
 
-  useEffect(() => { loadCatTrend(); }, [loadCatTrend]); // eslint-disable-line react-hooks/set-state-in-effect -- async data fetch
+  useEffect(() => { loadCatTrend(); }, [loadCatTrend]);
 
   // Draw category trend chart
   useEffect(() => {

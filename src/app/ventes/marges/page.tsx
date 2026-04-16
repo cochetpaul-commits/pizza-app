@@ -227,9 +227,7 @@ function MargesPage() {
   const [trendFrom, setTrendFrom] = useState(range.from);
   const [trendTo, setTrendTo] = useState(range.to);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTrendFrom(range.from);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTrendTo(range.to);
   }, [range.from, range.to]);
   const [trendData, setTrendData] = useState<TrendDaily[] | null>(null);

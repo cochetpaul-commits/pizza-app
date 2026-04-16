@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, type CSSProperties } from "react";
+import { useEffect, useState, useMemo, Suspense, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -153,6 +153,14 @@ function fmtDec(n: number, d = 2): string {
 /* ── Component ─────────────────────────────────────────────────── */
 
 export default function SimulationPage() {
+  return (
+    <Suspense fallback={null}>
+      <SimulationPageInner />
+    </Suspense>
+  );
+}
+
+function SimulationPageInner() {
   const { current: etab } = useEtablissement();
   const accent = etab?.couleur ?? "#D4775A";
 
