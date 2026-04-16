@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -56,6 +57,7 @@ function getMonthOptions(): MonthOption[] {
 // ── Component ────────────────────────────────────────────────────────────
 
 export default function MasseSalarialePage() {
+  const router = useRouter();
   const { current: etab } = useEtablissement();
   const [presences, setPresences] = useState<ComboPresence[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,6 +187,32 @@ export default function MasseSalarialePage() {
           <h1 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, margin: 0, color: "#1a1a1a", textTransform: "uppercase", letterSpacing: "0.04em" }}>
             Masse salariale
           </h1>
+        </div>
+
+        {/* Tabs: Reelle / TNS / Simulateur */}
+        <div style={{ display: "flex", gap: 4, padding: 4, background: "#f0ebe2", borderRadius: 12, marginBottom: 18, border: "1px solid #e8e0d0" }}>
+          <button type="button" style={{
+            flex: 1, padding: "8px 10px", borderRadius: 10, border: "none",
+            background: "#fff", color: "#1a1a1a",
+            fontSize: 12, fontWeight: 700, cursor: "default",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.08)", whiteSpace: "nowrap",
+          }}>
+            Masse salariale reelle
+          </button>
+          <button type="button" onClick={() => router.push("/ventes/simulation?tab=tns")} style={{
+            flex: 1, padding: "8px 10px", borderRadius: 10, border: "none",
+            background: "transparent", color: "#777",
+            fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+          }}>
+            Statuts TNS
+          </button>
+          <button type="button" onClick={() => router.push("/ventes/simulation?tab=simulateur")} style={{
+            flex: 1, padding: "8px 10px", borderRadius: 10, border: "none",
+            background: "transparent", color: "#777",
+            fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+          }}>
+            Simulateur d&apos;embauche
+          </button>
         </div>
 
         {/* Month selector */}
