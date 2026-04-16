@@ -185,6 +185,35 @@ export default function InvoicesPage() {
         setSelectedSupplier(data.detection?.supplier?.slug ?? null);
         if (data.detection?.etablissement?.slug === "bello_mio") setSelectedEtab("bellomio");
         else if (data.detection?.etablissement?.slug === "piccola_mia") setSelectedEtab("piccola");
+
+        // Auto-fallback : si aucun fournisseur connu détecté → route vers Gemini Vision
+        // qui créera auto le fournisseur avec ses coordonnées (SIRET, adresse, tél, email)
+        if (!data.detection?.supplier?.slug) {
+          const scanForm = new FormData();
+          scanForm.append("file", f);
+          scanForm.append("mode", "preview");
+          const auth = getAuthHeader();
+          const scanRes = await fetchApi("/api/invoices/scan", {
+            method: "POST",
+            headers: {
+              ...(auth ? { Authorization: auth } : {}),
+              "x-etablissement-id": getEtabId(),
+            },
+            body: scanForm,
+          });
+          const scanData = await scanRes.json();
+          if (scanData.ok) {
+            setSelectedSupplier("scan");
+            setDetection({
+              supplier: { slug: "scan", name: scanData.supplier_detected ?? "Nouveau fournisseur", matchedKeyword: "IA vision" },
+              etablissement: data.detection?.etablissement ?? null,
+            });
+            setPreview(scanData);
+            setStep("preview");
+            return;
+          }
+          // Si Gemini échoue, rester sur le flow de confirmation manuelle
+        }
         setStep("confirm");
       }
     } catch (e: unknown) {
