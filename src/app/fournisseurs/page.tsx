@@ -658,50 +658,6 @@ export default function FournisseursPage() {
           </h1>
         </div>
 
-        {/* Etab filter pills */}
-        {etablissements.length > 1 && (
-          <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-            {[
-              { id: null, label: "Tous" },
-              ...(bmEtab ? [{ id: bmEtab.id, label: "Bello Mio" }] : []),
-              ...(pmEtab ? [{ id: pmEtab.id, label: "Piccola Mia" }] : []),
-            ].map((pill) => {
-              const isActive = etabFilter === pill.id;
-              return (
-                <button
-                  key={pill.label}
-                  onClick={() => setEtabFilter(pill.id)}
-                  style={{
-                    fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 600,
-                    padding: "6px 14px", borderRadius: 20, cursor: "pointer",
-                    border: isActive ? "1.5px solid #D4775A" : "1.5px solid #ddd6c8",
-                    background: isActive ? "rgba(212,119,90,0.1)" : "#fff",
-                    color: isActive ? "#D4775A" : "#666",
-                  }}
-                >
-                  {pill.label}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Search */}
-        <div style={{ marginBottom: 16 }}>
-          <input
-            style={{
-              ...inputStyle,
-              maxWidth: 360,
-              padding: "9px 14px",
-              fontSize: 13,
-              background: "#faf8f4",
-            }}
-            placeholder="Rechercher un fournisseur..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
         {loading && <p style={{ color: "#999", fontSize: 14, textAlign: "center", marginTop: 40 }}>Chargement...</p>}
 
         {!loading && (
