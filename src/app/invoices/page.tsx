@@ -211,8 +211,11 @@ export default function InvoicesPage() {
             setPreview(scanData);
             setStep("preview");
             return;
+          } else {
+            // Gemini failed — show error for debug
+            console.warn("Gemini Vision fallback failed:", scanData.error);
+            setError(`Scan IA indisponible : ${scanData.error ?? "erreur"}. Choisissez le fournisseur manuellement.`);
           }
-          // Si Gemini échoue, rester sur le flow de confirmation manuelle
         }
         setStep("confirm");
       }
