@@ -25,7 +25,37 @@ type ComboPresence = {
   periode_fin: string;
 };
 
-type MonthOption = { value: string; label: string; from: string; to: string };
+type PeriodMode = "month" | "week";
+type PeriodOption = { value: string; label: string; from: string; to: string };
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+function toISO(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function getWeekKey(d: Date): string {
+  // ISO week: monday-based, year-week
+  const t = new Date(d);
+  t.setDate(t.getDate() + 4 - (t.getDay() || 7));
+  const yearStart = new Date(t.getFullYear(), 0, 1);
+  const w = Math.ceil((((t.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${t.getFullYear()}-W${String(w).padStart(2, "0")}`;
+}
+
+function getWeekBounds(d: Date): { from: string; to: string; label: string } {
+  const dow = d.getDay() || 7;
+  const mon = new Date(d); mon.setDate(d.getDate() - dow + 1); mon.setHours(0,0,0,0);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const mDay = mon.getDate();
+  const sDay = sun.getDate();
+  const mMonth = mon.toLocaleDateString("fr-FR", { month: "short" });
+  const sMonth = sun.toLocaleDateString("fr-FR", { month: "short" });
+  const label = mon.getMonth() === sun.getMonth()
+    ? `Sem. ${mDay}–${sDay} ${sMonth} ${sun.getFullYear()}`
+    : `Sem. ${mDay} ${mMonth} – ${sDay} ${sMonth} ${sun.getFullYear()}`;
+  return { from: toISO(mon), to: toISO(sun), label };
+}
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -38,8 +68,8 @@ const LABEL = { fontSize: 10, fontWeight: 700 as const, color: "#999", textTrans
 function fmt(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
 function fmtDec(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
-function getMonthOptions(): MonthOption[] {
-  const opts: MonthOption[] = [];
+function getMonthOptions(): PeriodOption[] {
+  const opts: PeriodOption[] = [];
   const now = new Date();
   for (let i = 0; i < 12; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -50,6 +80,22 @@ function getMonthOptions(): MonthOption[] {
     const to = `${y}-${String(m + 1).padStart(2, "0")}-${String(last.getDate()).padStart(2, "0")}`;
     const label = d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" }).replace(/^\w/, c => c.toUpperCase());
     opts.push({ value: `${y}-${String(m + 1).padStart(2, "0")}`, label, from, to });
+  }
+  return opts;
+}
+
+function getWeekOptions(): PeriodOption[] {
+  const opts: PeriodOption[] = [];
+  const now = new Date();
+  // 12 weeks back including current
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() - i * 7);
+    const { from, to, label } = getWeekBounds(d);
+    const value = getWeekKey(d);
+    if (!opts.find(o => o.value === value)) {
+      opts.push({ value, label, from, to });
+    }
   }
   return opts;
 }
@@ -65,9 +111,20 @@ export default function MasseSalarialePage() {
   const [importMsg, setImportMsg] = useState("");
   const [caMonth, setCaMonth] = useState<number | null>(null);
 
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("month");
   const monthOptions = useMemo(() => getMonthOptions(), []);
+  const weekOptions = useMemo(() => getWeekOptions(), []);
+  const options = periodMode === "month" ? monthOptions : weekOptions;
   const [selectedMonth, setSelectedMonth] = useState(monthOptions[0]?.value ?? "");
-  const selected = monthOptions.find(m => m.value === selectedMonth);
+  const [selectedWeek, setSelectedWeek] = useState(weekOptions[0]?.value ?? "");
+  const selectedValue = periodMode === "month" ? selectedMonth : selectedWeek;
+  const selected = options.find(o => o.value === selectedValue);
+  const setSelectedValue = (v: string) => {
+    if (periodMode === "month") setSelectedMonth(v); else setSelectedWeek(v);
+  };
+  const currentIdx = options.findIndex(o => o.value === selectedValue);
+  const goPrev = () => { if (currentIdx < options.length - 1) setSelectedValue(options[currentIdx + 1].value); };
+  const goNext = () => { if (currentIdx > 0) setSelectedValue(options[currentIdx - 1].value); };
 
   // Load presences for selected month
   const loadPresences = useCallback(async () => {
@@ -215,21 +272,52 @@ export default function MasseSalarialePage() {
           </button>
         </div>
 
-        {/* Month selector */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+        {/* Mode toggle Mois / Semaine */}
+        <div style={{ display: "flex", gap: 4, padding: 3, background: "#f0ebe2", borderRadius: 10, marginBottom: 10, border: "1px solid #e8e0d0", width: "fit-content" }}>
+          {(["month", "week"] as const).map(m => (
+            <button key={m} type="button" onClick={() => setPeriodMode(m)} style={{
+              padding: "6px 16px", borderRadius: 8, border: "none", cursor: "pointer",
+              background: periodMode === m ? "#fff" : "transparent",
+              color: periodMode === m ? ACCENT : "#777",
+              fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em",
+              boxShadow: periodMode === m ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+            }}>
+              {m === "month" ? "Mois" : "Semaine"}
+            </button>
+          ))}
+        </div>
+
+        {/* Period selector with arrows */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+          <button type="button" onClick={goPrev} disabled={currentIdx >= options.length - 1} style={{
+            width: 40, height: 40, borderRadius: 10, border: "none",
+            background: currentIdx >= options.length - 1 ? "#f0ebe3" : ACCENT + "15",
+            color: currentIdx >= options.length - 1 ? "#ccc" : ACCENT,
+            fontSize: 16, fontWeight: 700,
+            cursor: currentIdx >= options.length - 1 ? "not-allowed" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>{"←"}</button>
           <select
-            value={selectedMonth}
-            onChange={e => setSelectedMonth(e.target.value)}
+            value={selectedValue}
+            onChange={e => setSelectedValue(e.target.value)}
             style={{
               height: 40, borderRadius: 10, border: "1px solid #ddd6c8",
               padding: "0 14px", fontSize: 14, fontWeight: 600, background: "#fff",
-              color: "#1a1a1a", cursor: "pointer", flex: 1,
+              color: "#1a1a1a", cursor: "pointer", flex: 1, textAlign: "center",
             }}
           >
-            {monthOptions.map(m => (
-              <option key={m.value} value={m.value}>{m.label}</option>
+            {options.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
+          <button type="button" onClick={goNext} disabled={currentIdx <= 0} style={{
+            width: 40, height: 40, borderRadius: 10, border: "none",
+            background: currentIdx <= 0 ? "#f0ebe3" : ACCENT + "15",
+            color: currentIdx <= 0 ? "#ccc" : ACCENT,
+            fontSize: 16, fontWeight: 700,
+            cursor: currentIdx <= 0 ? "not-allowed" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>{"→"}</button>
         </div>
 
         {importMsg && <div style={{ fontSize: 12, color: ACCENT, marginBottom: 10 }}>{importMsg}</div>}
@@ -242,7 +330,7 @@ export default function MasseSalarialePage() {
             <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>{fmtDec(totals.hPlan)}h planifiees</div>
           </div>
           <div style={CARD}>
-            <div style={LABEL}>CA du mois</div>
+            <div style={LABEL}>{periodMode === "week" ? "CA de la semaine" : "CA du mois"}</div>
             <div style={KPI}>{caMonth ? `${fmt(caMonth)}€` : "—"}</div>
           </div>
           <div style={CARD}>
@@ -277,7 +365,7 @@ export default function MasseSalarialePage() {
             <div style={{ textAlign: "center", padding: 40, color: "#999", fontSize: 13 }}>Chargement...</div>
           ) : aggregated.length === 0 ? (
             <div style={{ textAlign: "center", padding: 40, color: "#bbb", fontSize: 13 }}>
-              Aucune donnee Combo pour ce mois.
+              Aucune donnee Combo pour cette {periodMode === "week" ? "semaine" : "periode"}.
               <br />Importez une feuille de presence.
             </div>
           ) : (
