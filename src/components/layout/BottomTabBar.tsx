@@ -180,19 +180,19 @@ const SECTION_PERSONNEL: TabSection = {
   tabs: [
     { label: "Employes", href: "/rh/equipe", match: ["/rh/equipe", "/rh/employe"], icon: (a) => <IconUsers active={a} /> },
     { label: "Conges", href: "/rh/conges", match: ["/rh/conges"], icon: (a) => <IconBeach active={a} /> },
-    { label: "Masse sal.", href: "/rh/masse-salariale", match: ["/rh/masse-salariale", "/ventes/simulation"], icon: (a) => <IconTrendingUp active={a} /> },
   ],
 };
 
 const SECTION_PILOTAGE: TabSection = {
   label: "Pilotage",
   href: "/ventes",
-  match: ["/ventes", "/tresorerie"],
+  match: ["/ventes", "/tresorerie", "/rh/masse-salariale"],
   icon: (a) => <IconWallet active={a} />,
   roles: ["group_admin"],
   tabs: [
     { label: "Ventes", href: "/ventes", match: ["/ventes"], icon: (a) => <IconWallet active={a} /> },
     { label: "Produits", href: "/ventes/marges", match: ["/ventes/marges"], icon: (a) => <IconTag active={a} /> },
+    { label: "Masse sal.", href: "/rh/masse-salariale", match: ["/rh/masse-salariale", "/ventes/simulation"], icon: (a) => <IconTrendingUp active={a} /> },
     { label: "Tresorerie", href: "/tresorerie", match: ["/tresorerie"], icon: (a) => <IconTrendingUp active={a} /> },
   ],
 };

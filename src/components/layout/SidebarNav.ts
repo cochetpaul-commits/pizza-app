@@ -73,6 +73,7 @@ export type SidebarEntry = NavEtabGroup | NavSettingsGroup | NavStandaloneItem |
 const PILOTAGE_ITEMS: NavItemV2[] = [
   { label: "Ventes", href: "/ventes", icon: "barChart" },
   { label: "Produits", href: "/ventes/marges", icon: "wallet" },
+  { label: "Masse salariale", href: "/rh/masse-salariale", icon: "calculator" },
   { label: "Tresorerie", href: "/tresorerie", icon: "wallet" },
 ];
 
@@ -80,7 +81,6 @@ const PILOTAGE_ITEMS: NavItemV2[] = [
 export const PLANNING_ITEMS: NavItemV2[] = [
   { label: "Employes", href: "/rh/equipe", icon: "users" },
   { label: "Conges", href: "/rh/conges", icon: "beach" },
-  { label: "Masse salariale", href: "/rh/masse-salariale", icon: "calculator" },
 ];
 
 // PRODUCTION (fiches techniques, catalogue, articles de vente)
@@ -291,7 +291,8 @@ export const PAGE_TITLES: Record<string, string> = {
   "/rh/pointage": "Personnel",
   "/rh/conges": "Personnel",
   "/rh/emargement": "Personnel",
-  "/ventes/simulation": "Personnel",
+  "/ventes/simulation": "Pilotage",
+  "/rh/masse-salariale": "Pilotage",
   "/rh/rapports": "Personnel",
   "/settings/planning": "Gestion du planning",
   "/settings/etablissements": "Établissements",
@@ -342,7 +343,8 @@ const PAGE_SECTIONS: Record<string, string> = {
   "/rh/pointage": "Personnel",
   "/rh/conges": "Personnel",
   "/rh/emargement": "Personnel",
-  "/ventes/simulation": "Personnel",
+  "/ventes/simulation": "Pilotage",
+  "/rh/masse-salariale": "Pilotage",
   "/ventes/marges": "Pilotage",
   "/rh/rapports": "Personnel",
   "/settings/planning": "Paramètres",
