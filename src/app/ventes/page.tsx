@@ -297,9 +297,17 @@ function PerformancesPage() {
 
   // Draw category trend chart
   useEffect(() => {
-    if (!catTrendChartRef.current || !catTrendData) return;
+    if (!catTrendChartRef.current || !catTrendData || Object.keys(catTrendData).length === 0) return;
     const id = "catTrend";
     destroyChart(id);
+    // Wait for canvas to be fully mounted (avoid race on conditional render)
+    const raf = requestAnimationFrame(() => { renderCatTrendChart(); });
+    return () => {
+      cancelAnimationFrame(raf);
+      destroyChart(id);
+    };
+    function renderCatTrendChart() {
+      if (!catTrendChartRef.current || !catTrendData) return;
 
     // Determine time grouping: <= 3 months → weeks, > 3 months → months
     const fromD = new Date(catTrendFrom + "T12:00:00");
@@ -456,8 +464,7 @@ function PerformancesPage() {
         },
       },
     });
-
-    return () => { destroyChart(id); };
+    }
   }, [catTrendData, catTrendMetric, catTrendFrom, catTrendTo, catTrendFilterCat, catTrendFilterProd, prodTrendData]);
 
   // Import handler
@@ -1441,7 +1448,7 @@ function PerformancesPage() {
               )}
               {!catTrendLoading && catTrendData && Object.keys(catTrendData).length > 0 && (
                 <>
-                  <div style={{ position: "relative", height: 320 }}><canvas ref={catTrendChartRef} /></div>
+                  <div style={{ position: "relative", height: 320 }}><canvas key={`${catTrendFrom}-${catTrendTo}-${catTrendFilterCat ?? "all"}-${catTrendFilterProd ?? "all"}`} ref={catTrendChartRef} /></div>
                   {/* Summary line */}
                   <div style={{ marginTop: 10, fontSize: 12, color: "#777", textAlign: "right" }}>
                     Total periode : <strong style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", color: "#1a1a1a" }}>
