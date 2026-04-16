@@ -223,11 +223,15 @@ function MargesPage() {
   const [trendCategory, setTrendCategory] = useState<string | null>(null);
   const [trendMode, setTrendMode] = useState<TrendMode>("par_jour_semaine");
   const [trendMetric, setTrendMetric] = useState<"qty" | "ca_ht">("qty");
-  const [trendFrom, setTrendFrom] = useState(() => {
-    const d = new Date(); d.setMonth(d.getMonth() - 3);
-    return d.toISOString().slice(0, 10);
-  });
-  const [trendTo, setTrendTo] = useState(() => new Date().toISOString().slice(0, 10));
+  // Trend dates sync avec la page par défaut
+  const [trendFrom, setTrendFrom] = useState(range.from);
+  const [trendTo, setTrendTo] = useState(range.to);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTrendFrom(range.from);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTrendTo(range.to);
+  }, [range.from, range.to]);
   const [trendData, setTrendData] = useState<TrendDaily[] | null>(null);
   const [trendLoading, setTrendLoading] = useState(false);
   const trendChartRef = useRef<HTMLCanvasElement>(null);
@@ -893,7 +897,7 @@ function MargesPage() {
               </div>
 
               {/* Date range (← DateRangePicker →) */}
-              <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 12 }}>
+              <div style={{ display: "flex", gap: 4, alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
                 <button type="button" onClick={() => {
                   const nf = new Date(new Date(trendFrom + "T12:00:00").getTime() - 86400000);
                   const nt = new Date(new Date(trendTo + "T12:00:00").getTime() - 86400000);
@@ -928,7 +932,7 @@ function MargesPage() {
               </div>
 
               {/* Mode + Metric toggles */}
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16, justifyContent: "center" }}>
                 {([["par_jour_semaine", "Jours semaine"], ["par_mois", "Jours du mois"]] as const).map(([mode, label]) => (
                   <button
                     key={mode}
