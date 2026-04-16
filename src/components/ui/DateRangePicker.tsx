@@ -486,7 +486,7 @@ export function DateRangePicker({ value, onChange, presets = DEFAULT_PRESETS, fo
         </div>
       )}
 
-      {/* Mobile: full width popover with grid presets */}
+      {/* Mobile: popover large comme la page rapport (single column, pas tronqué) */}
       <style>{`
         @media (max-width: 720px) {
           .daterange-popover {
@@ -499,26 +499,25 @@ export function DateRangePicker({ value, onChange, presets = DEFAULT_PRESETS, fo
             flex-direction: column !important;
             max-height: 85dvh;
             overflow-y: auto;
-            padding: 14px !important;
-            gap: 12px !important;
+            padding: 16px !important;
+            gap: 14px !important;
           }
           .daterange-popover > div:first-child {
             border-right: none !important;
             border-bottom: 1px solid #f0ebe3;
             padding-right: 0 !important;
             padding-bottom: 12px;
-            display: grid !important;
-            grid-template-columns: 1fr 1fr;
-            gap: 6px !important;
+            display: flex !important;
+            flex-direction: column;
+            gap: 4px !important;
             min-width: 0 !important;
           }
           .daterange-popover > div:first-child > button {
-            text-align: center !important;
-            padding: 9px 8px !important;
-            font-size: 12px !important;
+            text-align: left !important;
+            padding: 10px 14px !important;
+            font-size: 13px !important;
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            width: 100%;
           }
           .daterange-popover > div:first-child > div {
             display: none !important;
