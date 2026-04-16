@@ -135,6 +135,24 @@ const readonlyBadge: React.CSSProperties = {
 
 const SELECT_FIELDS = "id,name,is_active,email,phone,contact_name,notes,franco_minimum,franco_obligatoire,mercuriale_only,delivery_schedule,address,city,postal_code,siret,category,payment_terms,delivery_days,website,tva_intra,etablissement_id,client_code,color";
 
+// Accordion header pour la fiche fournisseur
+function AccordionHeader({ label, isOpen, onToggle }: { label: string; isOpen: boolean; onToggle: () => void }) {
+  return (
+    <button type="button" onClick={onToggle} style={{
+      width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+      padding: "12px 14px", marginBottom: 8,
+      background: isOpen ? "#f0ebe3" : "#fff",
+      border: "1.5px solid #e5ddd0", borderRadius: 10,
+      cursor: "pointer",
+      fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700,
+      color: "#8a7e6b", textTransform: "uppercase", letterSpacing: "0.08em",
+    }}>
+      <span>{label}</span>
+      <span style={{ fontSize: 10, transition: "transform 0.2s", transform: isOpen ? "rotate(0)" : "rotate(-90deg)" }}>{"▼"}</span>
+    </button>
+  );
+}
+
 export default function FournisseursPage() {
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [stats, setStats] = useState<Map<string, SupplierStats>>(new Map());
@@ -148,6 +166,9 @@ export default function FournisseursPage() {
   // Modal state
   const [modalSupplier, setModalSupplier] = useState<SupplierRow | null>(null);
   const [modalMode, setModalMode] = useState<"edit" | "create">("edit");
+  // Accordion: which section is open ("coord" by default)
+  const [openSection, setOpenSection] = useState<string>("coord");
+  const toggleSection = (k: string) => setOpenSection(prev => prev === k ? "" : k);
   const [form, setForm] = useState<ModalForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [schedule, setSchedule] = useState<{day:string;cutoff:string;delivery_day:string}[]>([]);
@@ -785,85 +806,87 @@ export default function FournisseursPage() {
                 <ColorPicker value={form.color || modalColor} onChange={(hex) => setForm((f) => ({ ...f, color: hex }))} size={24} />
               </div>
 
-              {/* Section: Coordonnees */}
-              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-                Coordonnees
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                <div>
-                  <div style={labelStyle}>Contact</div>
-                  <input style={inputStyle} value={form.contact_name} onChange={(e) => setForm((f) => ({ ...f, contact_name: e.target.value }))} placeholder="Prenom Nom" />
+              {/* ── Accordion: Coordonnees ── */}
+              <AccordionHeader label="Coordonnees" isOpen={openSection === "coord"} onToggle={() => toggleSection("coord")} />
+              {openSection === "coord" && (
+                <div style={{ padding: "0 2px 16px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                    <div>
+                      <div style={labelStyle}>Contact</div>
+                      <input style={inputStyle} value={form.contact_name} onChange={(e) => setForm((f) => ({ ...f, contact_name: e.target.value }))} placeholder="Prenom Nom" />
+                    </div>
+                    <div>
+                      <div style={labelStyle}>Telephone</div>
+                      <input style={inputStyle} value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="06 xx xx xx xx" type="tel" />
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 0 }}>
+                    <div>
+                      <div style={labelStyle}>Email</div>
+                      <input style={inputStyle} value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="contact@fournisseur.fr" type="email" />
+                    </div>
+                    <div>
+                      <div style={labelStyle}>Site web</div>
+                      <input style={inputStyle} value={form.website} onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))} placeholder="fournisseur.fr" />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div style={labelStyle}>Telephone</div>
-                  <input style={inputStyle} value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="06 xx xx xx xx" type="tel" />
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                <div>
-                  <div style={labelStyle}>Email</div>
-                  <input style={inputStyle} value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="contact@fournisseur.fr" type="email" />
-                </div>
-                <div>
-                  <div style={labelStyle}>Site web</div>
-                  <input style={inputStyle} value={form.website} onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))} placeholder="fournisseur.fr" />
-                </div>
-              </div>
+              )}
 
-              {/* Section: Adresse */}
-              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8, marginTop: 16 }}>
-                Adresse
-              </div>
-              <div style={{ marginBottom: 12 }}>
-                <div style={labelStyle}>Adresse</div>
-                <input style={inputStyle} value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} placeholder="Rue, numero" />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                <div>
-                  <div style={labelStyle}>Code postal</div>
-                  <input style={inputStyle} value={form.postal_code} onChange={(e) => setForm((f) => ({ ...f, postal_code: e.target.value }))} placeholder="35400" />
+              {/* ── Accordion: Adresse ── */}
+              <AccordionHeader label="Adresse" isOpen={openSection === "addr"} onToggle={() => toggleSection("addr")} />
+              {openSection === "addr" && (
+                <div style={{ padding: "0 2px 16px" }}>
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={labelStyle}>Adresse</div>
+                    <input style={inputStyle} value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} placeholder="Rue, numero" />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div>
+                      <div style={labelStyle}>Code postal</div>
+                      <input style={inputStyle} value={form.postal_code} onChange={(e) => setForm((f) => ({ ...f, postal_code: e.target.value }))} placeholder="35400" />
+                    </div>
+                    <div>
+                      <div style={labelStyle}>Ville</div>
+                      <input style={inputStyle} value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} placeholder="Saint-Malo" />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div style={labelStyle}>Ville</div>
-                  <input style={inputStyle} value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} placeholder="Saint-Malo" />
-                </div>
-              </div>
+              )}
 
-              {/* Section: Infos commerciales */}
-              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8, marginTop: 16 }}>
-                Infos commerciales
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                <div>
-                  <div style={labelStyle}>Categorie</div>
-                  <select
-                    style={{ ...inputStyle, cursor: "pointer" }}
-                    value={form.category}
-                    onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                  >
-                    <option value="">--</option>
-                    {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
-                      <option key={k} value={k}>{v}</option>
-                    ))}
-                  </select>
+              {/* ── Accordion: Infos commerciales ── */}
+              <AccordionHeader label="Infos commerciales" isOpen={openSection === "infos"} onToggle={() => toggleSection("infos")} />
+              {openSection === "infos" && (
+                <div style={{ padding: "0 2px 16px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                    <div>
+                      <div style={labelStyle}>Categorie</div>
+                      <select
+                        style={{ ...inputStyle, cursor: "pointer" }}
+                        value={form.category}
+                        onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                      >
+                        <option value="">--</option>
+                        {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
+                          <option key={k} value={k}>{v}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>Conditions paiement</div>
+                      <input style={inputStyle} value={form.payment_terms} onChange={(e) => setForm((f) => ({ ...f, payment_terms: e.target.value }))} placeholder="30 jours fin de mois" />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={labelStyle}>Code client</div>
+                    <input style={inputStyle} value={form.client_code} onChange={(e) => setForm((f) => ({ ...f, client_code: e.target.value }))} placeholder="CL-12345" />
+                  </div>
                 </div>
-                <div>
-                  <div style={labelStyle}>Conditions paiement</div>
-                  <input style={inputStyle} value={form.payment_terms} onChange={(e) => setForm((f) => ({ ...f, payment_terms: e.target.value }))} placeholder="30 jours fin de mois" />
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                <div>
-                  <div style={labelStyle}>Code client</div>
-                  <input style={inputStyle} value={form.client_code} onChange={(e) => setForm((f) => ({ ...f, client_code: e.target.value }))} placeholder="CL-12345" />
-                </div>
-                <div />
-              </div>
+              )}
 
-              {/* Section: Franco & Livraison */}
-              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8, marginTop: 16 }}>
-                Franco & Livraison
-              </div>
+              {/* ── Accordion: Franco & Livraison ── */}
+              <AccordionHeader label="Franco & Livraison" isOpen={openSection === "franco"} onToggle={() => toggleSection("franco")} />
+              {openSection === "franco" && (<>
               <div style={{ background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 12, padding: 14, marginBottom: 16 }}>
                 {/* Franco row */}
                 <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
@@ -934,36 +957,38 @@ export default function FournisseursPage() {
                 })}
               </div>
 
-              {/* Section: Admin */}
-              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8, marginTop: 16 }}>
-                Administratif
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                <div>
-                  <div style={labelStyle}>SIRET</div>
-                  <input style={inputStyle} value={form.siret} onChange={(e) => setForm((f) => ({ ...f, siret: e.target.value }))} placeholder="123 456 789 00012" />
-                </div>
-                <div>
-                  <div style={labelStyle}>N TVA intra.</div>
-                  <input style={inputStyle} value={form.tva_intra} onChange={(e) => setForm((f) => ({ ...f, tva_intra: e.target.value }))} placeholder="FR12345678901" />
-                </div>
-              </div>
+              </>)}
 
-              <div style={{ marginBottom: 16 }}>
-                <div style={labelStyle}>Notes</div>
-                <textarea
-                  style={{ ...inputStyle, resize: "vertical" }}
-                  value={form.notes}
-                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                  placeholder="Informations complementaires..."
-                  rows={2}
-                />
-              </div>
+              {/* ── Accordion: Administratif ── */}
+              <AccordionHeader label="Administratif" isOpen={openSection === "admin"} onToggle={() => toggleSection("admin")} />
+              {openSection === "admin" && (
+                <div style={{ padding: "0 2px 16px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                    <div>
+                      <div style={labelStyle}>SIRET</div>
+                      <input style={inputStyle} value={form.siret} onChange={(e) => setForm((f) => ({ ...f, siret: e.target.value }))} placeholder="123 456 789 00012" />
+                    </div>
+                    <div>
+                      <div style={labelStyle}>N TVA intra.</div>
+                      <input style={inputStyle} value={form.tva_intra} onChange={(e) => setForm((f) => ({ ...f, tva_intra: e.target.value }))} placeholder="FR12345678901" />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={labelStyle}>Notes</div>
+                    <textarea
+                      style={{ ...inputStyle, resize: "vertical" }}
+                      value={form.notes}
+                      onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                      placeholder="Informations complementaires..."
+                      rows={2}
+                    />
+                  </div>
+                </div>
+              )}
 
-              {/* Section: Contacts / Destinataires */}
-              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8, marginTop: 16 }}>
-                Contacts / Destinataires
-              </div>
+              {/* ── Accordion: Contacts / Destinataires ── */}
+              <AccordionHeader label="Contacts / Destinataires" isOpen={openSection === "contacts"} onToggle={() => toggleSection("contacts")} />
+              {openSection === "contacts" && (<div style={{ padding: "0 2px 16px" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
                 {contacts.map((c, idx) => (
                   <div
@@ -1033,6 +1058,7 @@ export default function FournisseursPage() {
               >
                 + Ajouter un contact
               </button>
+              </div>)}
 
               {/* Carton config (edit mode only) */}
               {modalMode === "edit" && modalSupplier && (
