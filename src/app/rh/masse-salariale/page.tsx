@@ -6,6 +6,7 @@ import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
+import { PilotageNavBar } from "@/components/layout/PilotageNavBar";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -245,9 +246,15 @@ export default function MasseSalarialePage() {
 
   const etabColor = etab?.couleur ?? ACCENT;
 
+  // Range factice pour le PilotageNavBar — représente la période sélectionnée (mois/semaine)
+  const navRange = { from: selected?.from ?? "", to: selected?.to ?? "" };
+
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "20px 16px 100px" }}>
+        {/* Pilotage nav (toggle pages, pas de DatePicker — la page a son propre mois/semaine) */}
+        <PilotageNavBar range={navRange} onRangeChange={() => { /* géré localement */ }} accent={etabColor} showDatePicker={false} />
+
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
           <span style={{ width: 10, height: 10, borderRadius: "50%", background: etabColor }} />

@@ -7,6 +7,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { AiInsightCard } from "@/components/AiInsightCard";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
 import { BottomSheet } from "@/components/layout/BottomSheet";
+import { PilotageNavBar } from "@/components/layout/PilotageNavBar";
 
 import Chart from "chart.js/auto";
 import { getCategoryColor, getCategoryColors } from "@/lib/categoryColors";
@@ -654,10 +655,25 @@ function MargesPage() {
             .marges-toolbar-desktop { display: none !important; }
           }
         `}</style>
-        {/* ── Toolbar: Import | Calendar | PDF | TTC/HT (desktop only) ── */}
-        <div className="ventes-toolbar desktop-only" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 14 }}>
-          <label style={{
-            padding: "7px 14px", borderRadius: 8, border: "none",
+        {/* ── Pilotage nav bar unifiée (toggle + DateRangePicker) ── */}
+        <PilotageNavBar range={range} onRangeChange={(r) => setRange(r)} accent={accent} />
+
+        {/* TTC/HT toggle + actions desktop */}
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 999, padding: 2 }}>
+            <button type="button" onClick={() => setMode("ttc")} style={{
+              padding: "4px 14px", borderRadius: 999, border: "none", cursor: "pointer",
+              background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#999",
+              fontSize: 11, fontWeight: 700, letterSpacing: ".03em",
+            }}>TTC</button>
+            <button type="button" onClick={() => setMode("ht")} style={{
+              padding: "4px 14px", borderRadius: 999, border: "none", cursor: "pointer",
+              background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#999",
+              fontSize: 11, fontWeight: 700, letterSpacing: ".03em",
+            }}>HT</button>
+          </div>
+          <label className="desktop-only" style={{
+            padding: "6px 14px", borderRadius: 8, border: "none",
             background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
           }}>
             {importing ? "Import..." : "Import"}
@@ -667,55 +683,13 @@ function MargesPage() {
               e.target.value = "";
             }} />
           </label>
-          <DateRangePicker value={range} onChange={(r) => setRange(r)} />
-          <button type="button" onClick={handleExportPDF} disabled={exportingPdf} style={{
-            padding: "7px 14px", borderRadius: 8, border: "1px solid #e0d8ce",
+          <button className="desktop-only" type="button" onClick={handleExportPDF} disabled={exportingPdf} style={{
+            padding: "6px 14px", borderRadius: 8, border: "1px solid #e0d8ce",
             background: "#fff", color: "#1a1a1a", fontSize: 12, fontWeight: 700, cursor: "pointer",
             opacity: exportingPdf ? 0.5 : 1,
           }}>
             {exportingPdf ? "Export..." : "PDF"}
           </button>
-          <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 999, padding: 2 }}>
-            <button type="button" onClick={() => setMode("ttc")} style={{
-              padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
-              background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#999",
-              fontSize: 10, fontWeight: 700, letterSpacing: ".03em",
-            }}>TTC</button>
-            <button type="button" onClick={() => setMode("ht")} style={{
-              padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
-              background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#999",
-              fontSize: 10, fontWeight: 700, letterSpacing: ".03em",
-            }}>HT</button>
-          </div>
-        </div>
-
-        {/* ── Page nav pills: Ventes / Produits + TTC/HT (mobile) ── */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 14 }}>
-          <div style={{ display: "inline-flex", background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 20, padding: 3 }}>
-            <button type="button" onClick={() => router.push(`/ventes?from=${from}&to=${to}`)} style={{
-              padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "pointer",
-              background: "transparent", color: "#777", border: "none",
-              fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-            }}>Ventes</button>
-            <span style={{
-              padding: "5px 16px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "default",
-              background: accent, color: "#fff",
-              fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-            }}>Produits</span>
-          </div>
-          {/* TTC/HT toggle — mobile */}
-          <div className="mobile-only" style={{ gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 999, padding: 2 }}>
-            <button type="button" onClick={() => setMode("ttc")} style={{
-              padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
-              background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#999",
-              fontSize: 10, fontWeight: 700,
-            }}>TTC</button>
-            <button type="button" onClick={() => setMode("ht")} style={{
-              padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
-              background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#999",
-              fontSize: 10, fontWeight: 700,
-            }}>HT</button>
-          </div>
         </div>
         {importMsg && <div style={{ fontSize: 12, color: accent, marginBottom: 10, textAlign: "center" }}>{importMsg}</div>}
 

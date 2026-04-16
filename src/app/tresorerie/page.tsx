@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
 import { NavBar } from "@/components/NavBar";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
+import { PilotageNavBar } from "@/components/layout/PilotageNavBar";
 
 /* ══════════════════════════════════════════════════════
    TYPES
@@ -688,10 +689,8 @@ function TresoreriePage() {
           Tresorerie
         </h1>
 
-        {/* ══════ Period Picker ══════ */}
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
-          <DateRangePicker value={range} onChange={(r) => setRange(r)} />
-        </div>
+        {/* ══════ Pilotage nav bar unifiée (toggle + DateRangePicker) ══════ */}
+        <PilotageNavBar range={range} onRangeChange={(r) => setRange(r)} />
 
         {loading && (
           <div style={{ textAlign: "center", padding: 60, color: "#999", fontSize: 13 }}>
