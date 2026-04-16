@@ -549,20 +549,23 @@ export default function FournisseursPage() {
     const st = stats.get(s.id);
     const sColor = getSupplierColor(s.name, s.color);
     return (
-      <div key={s.id} style={{
-        border: "1px solid #ddd6c8", borderRadius: 12, padding: "14px 16px",
-        background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-        borderLeft: `4px solid ${sColor}`,
-      }}>
+      <div key={s.id}
+        onClick={() => openModal(s)}
+        style={{
+          border: "1px solid #ddd6c8", borderRadius: 12, padding: "14px 16px",
+          background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          borderLeft: `4px solid ${sColor}`,
+          cursor: "pointer", transition: "all 0.15s",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 2px 8px ${sColor}22`; e.currentTarget.style.borderColor = `${sColor}60`; }}
+        onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor = "#ddd6c8"; }}
+      >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <button
-                onClick={() => openModal(s)}
-                style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 700, fontSize: 15, color: sColor, background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}
-              >
+              <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 700, fontSize: 15, color: sColor }}>
                 {s.name}
-              </button>
+              </span>
               <EtabBadge etablissementId={s.etablissement_id} />
               {!s.is_active && (
                 <span style={{
@@ -608,16 +611,6 @@ export default function FournisseursPage() {
           </div>
 
           <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-            <button
-              onClick={() => openModal(s)}
-              style={{
-                fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600,
-                background: "#D4775A", color: "#fff", borderRadius: 20, border: "none",
-                padding: "7px 16px", cursor: "pointer", whiteSpace: "nowrap",
-              }}
-            >
-              Fiche
-            </button>
             <button
               type="button"
               onClick={(e) => handleDeleteSupplier(s, e)}
