@@ -622,23 +622,13 @@ export default function FournisseursPage() {
     <RequireRole allowedRoles={["group_admin", "equipier"]}>
       <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
         {/* Header row */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
           <h1 style={{
             fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24,
             color: "#1a1a1a", margin: 0, textTransform: "uppercase", letterSpacing: "0.04em",
           }}>
             Achats
           </h1>
-          <button
-            onClick={openCreateModal}
-            style={{
-              fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600,
-              background: "#D4775A", color: "#fff", borderRadius: 20, border: "none",
-              padding: "8px 18px", cursor: "pointer", whiteSpace: "nowrap",
-            }}
-          >
-            + Nouveau fournisseur
-          </button>
         </div>
 
         {/* Etab filter pills */}
@@ -1191,6 +1181,30 @@ export default function FournisseursPage() {
           </div>
         </div>
       )}
+
+      {/* FAB centré : + Nouveau fournisseur */}
+      <button
+        type="button"
+        onClick={openCreateModal}
+        style={{
+          position: "fixed",
+          bottom: "calc(92px + env(safe-area-inset-bottom, 0px))",
+          left: "50%", transform: "translateX(-50%)",
+          zIndex: 105,
+          height: 48, padding: "0 22px",
+          borderRadius: 24, border: "none",
+          background: "#D4775A", color: "#fff",
+          fontSize: 13, fontWeight: 700, cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 8,
+          boxShadow: "0 4px 16px rgba(212,119,90,0.4), 0 2px 6px rgba(0,0,0,0.1)",
+          fontFamily: "inherit",
+          textTransform: "uppercase", letterSpacing: "0.04em",
+          whiteSpace: "nowrap",
+        }}
+      >
+        <span style={{ fontSize: 18, lineHeight: 1, fontWeight: 300 }}>+</span>
+        Nouveau fournisseur
+      </button>
     </RequireRole>
   );
 }

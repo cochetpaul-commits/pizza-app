@@ -265,6 +265,10 @@ export default function InvoicesPage() {
       form.append("file", file);
       form.append("mode", "commit");
       form.append("establishment", selectedEtab);
+      // Si scan IA avec nom édité, passer le nom au backend via le champ "supplier"
+      if (selectedSupplier === "scan" && detection?.supplier?.name) {
+        form.append("supplier", detection.supplier.name);
+      }
       const auth = getAuthHeader();
       const endpoint = selectedSupplier === "scan" ? "/api/invoices/scan" : `/api/invoices/${selectedSupplier}`;
       const res = await fetchApi(endpoint, {
@@ -381,7 +385,10 @@ export default function InvoicesPage() {
   }
 
   const etabName = ETABS.find((e) => e.value === selectedEtab)?.name ?? selectedEtab;
-  const supplierName = SUPPLIERS.find((s) => s.slug === selectedSupplier)?.name ?? selectedSupplier;
+  const supplierName = selectedSupplier === "scan"
+    ? (detection?.supplier?.name ?? "Nouveau fournisseur")
+    : (SUPPLIERS.find((s) => s.slug === selectedSupplier)?.name ?? selectedSupplier);
+  const isScanned = selectedSupplier === "scan";
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
@@ -585,14 +592,35 @@ export default function InvoicesPage() {
         {step === "preview" && preview?.parsed && (
           <>
             <div style={cardStyle}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1 }}>
-                    {supplierName} → {etabName}
+              {/* Fournisseur — éditable si scan IA */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+                {isScanned ? (
+                  <>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: "#D4775A", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                      Fournisseur (IA — editable) :
+                    </label>
+                    <input
+                      type="text"
+                      value={detection?.supplier?.name ?? ""}
+                      onChange={(e) => setDetection(prev => prev ? { ...prev, supplier: prev.supplier ? { ...prev.supplier, name: e.target.value } : null } : null)}
+                      style={{
+                        flex: 1, minWidth: 180, height: 36, padding: "0 12px",
+                        border: "1.5px solid #D4775A", borderRadius: 8, fontSize: 14, fontWeight: 700,
+                        background: "#fff", color: "#1a1a1a",
+                      }}
+                    />
+                  </>
+                ) : (
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>
+                    {supplierName}
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>
-                    Facture {preview.parsed.invoice_number ?? "—"} du {preview.parsed.invoice_date ?? "—"}
-                  </div>
+                )}
+                <span style={{ fontSize: 12, color: "#999" }}>→ {etabName}</span>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#555" }}>
+                  Facture {preview.parsed.invoice_number ?? "—"} du {preview.parsed.invoice_date ?? "—"}
                 </div>
                 <div style={{ textAlign: "right", fontSize: 13 }}>
                   {preview.parsed.total_ht != null && (
@@ -603,7 +631,7 @@ export default function InvoicesPage() {
               </div>
 
               {preview.invoice?.already_imported && (
-                <div style={{ ...errorBox, background: "#FFF3E0", color: "#E65100", border: "1px solid #FFCC80" }}>
+                <div style={{ ...errorBox, background: "#FFF3E0", color: "#E65100", border: "1px solid #FFCC80", marginTop: 10 }}>
                   Cette facture a deja ete importee.
                 </div>
               )}

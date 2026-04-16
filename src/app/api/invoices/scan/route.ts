@@ -84,11 +84,14 @@ export async function POST(req: Request) {
       });
     }
 
+    // Override supplier name if user edited it in preview
+    const finalSupplierName = supplierHint && supplierHint.trim().length > 0 ? supplierHint.trim() : supplierName;
+
     // Commit
     const result = await runImport({
       supabase,
       userId,
-      supplierName,
+      supplierName: finalSupplierName,
       payload: invoice,
       sourceFileName: file.name,
       rawText: `[vision-scan] ${JSON.stringify(invoice)}`,
