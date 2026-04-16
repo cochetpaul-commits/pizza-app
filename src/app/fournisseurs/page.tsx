@@ -265,6 +265,18 @@ export default function FournisseursPage() {
     return e?.slug ?? null;
   }
 
+  async function handleDeleteSupplier(s: SupplierRow, e?: React.MouseEvent) {
+    if (e) e.stopPropagation();
+    if (!window.confirm(`Supprimer le fournisseur "${s.name}" ?\n\nLes factures et commandes liées seront conservées mais plus rattachées.`)) return;
+    // Désactive au lieu de supprimer (is_active = false) pour préserver l'intégrité
+    const { error } = await supabase.from("suppliers").update({ is_active: false }).eq("id", s.id);
+    if (error) {
+      alert(`Erreur : ${error.message}`);
+      return;
+    }
+    setSuppliers(prev => prev.filter(x => x.id !== s.id));
+  }
+
   async function openModal(s: SupplierRow) {
     setModalSupplier(s);
     setModalMode("edit");
@@ -595,17 +607,39 @@ export default function FournisseursPage() {
             </div>
           </div>
 
-          <button
-            onClick={() => openModal(s)}
-            style={{
-              fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600,
-              background: "#D4775A", color: "#fff", borderRadius: 20, border: "none",
-              padding: "7px 16px", cursor: "pointer", whiteSpace: "nowrap",
-              flexShrink: 0,
-            }}
-          >
-            Fiche
-          </button>
+          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            <button
+              onClick={() => openModal(s)}
+              style={{
+                fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600,
+                background: "#D4775A", color: "#fff", borderRadius: 20, border: "none",
+                padding: "7px 16px", cursor: "pointer", whiteSpace: "nowrap",
+              }}
+            >
+              Fiche
+            </button>
+            <button
+              type="button"
+              onClick={(e) => handleDeleteSupplier(s, e)}
+              title="Supprimer le fournisseur"
+              aria-label="Supprimer"
+              style={{
+                width: 34, height: 34, borderRadius: 10, border: "1px solid rgba(220,38,38,0.2)",
+                background: "rgba(220,38,38,0.06)", color: "#DC2626", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#DC2626"; e.currentTarget.style.color = "#fff"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(220,38,38,0.06)"; e.currentTarget.style.color = "#DC2626"; }}
+            >
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -627,7 +661,7 @@ export default function FournisseursPage() {
             fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24,
             color: "#1a1a1a", margin: 0, textTransform: "uppercase", letterSpacing: "0.04em",
           }}>
-            Achats
+            Fournisseurs
           </h1>
         </div>
 
