@@ -110,6 +110,10 @@ export default function MasseSalarialePage() {
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState("");
   const [caMonth, setCaMonth] = useState<number | null>(null);
+  const [caHtMonth, setCaHtMonth] = useState<number | null>(null);
+  const [couvertsMonth, setCouvertsMonth] = useState<number | null>(null);
+  const [ticketsMonth, setTicketsMonth] = useState<number | null>(null);
+  const [tauxHoraire, setTauxHoraire] = useState<number>(15);
 
   const [periodMode, setPeriodMode] = useState<PeriodMode>("month");
   const monthOptions = useMemo(() => getMonthOptions(), []);
@@ -141,20 +145,20 @@ export default function MasseSalarialePage() {
     setLoading(false);
   }, [etab, selected]);
 
-  // Load CA for selected month
+  // Load CA + stats for selected period
   const loadCA = useCallback(async () => {
     if (!etab || !selected) return;
     try {
       const res = await fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${selected.from}&to=${selected.to}`);
       const json = await res.json();
-      if (json.stats?.total_ttc) {
-        setCaMonth(json.stats.total_ttc);
-      } else if (json.stats?.semaine?.totalSales) {
-        setCaMonth(json.stats.semaine.totalSales);
-      } else {
-        setCaMonth(null);
-      }
-    } catch { setCaMonth(null); }
+      const s = json.stats;
+      setCaMonth(s?.ca_ttc ?? s?.total_ttc ?? null);
+      setCaHtMonth(s?.ca_ht ?? s?.total_ht ?? null);
+      setCouvertsMonth(s?.couverts ?? null);
+      setTicketsMonth(s?.tickets ?? null);
+    } catch {
+      setCaMonth(null); setCaHtMonth(null); setCouvertsMonth(null); setTicketsMonth(null);
+    }
   }, [etab, selected]);
 
   useEffect(() => { loadPresences(); loadCA(); }, [loadPresences, loadCA]); // eslint-disable-line react-hooks/set-state-in-effect
@@ -195,10 +199,16 @@ export default function MasseSalarialePage() {
     jours: aggregated.reduce((s, e) => s + e.jours, 0),
   }), [aggregated]);
 
-  // Masse salariale estimée (heures × taux moyen)
-  // TODO: utiliser les vrais taux depuis contrats
-  const masseSalarialeEstimee = totals.hTrav * 15; // placeholder 15€/h brut moyen
-  const ratioCA = caMonth && caMonth > 0 ? (masseSalarialeEstimee / caMonth) * 100 : null;
+  // Masse salariale estimée (heures × taux horaire brut moyen configurable)
+  // Charges patronales ~ 42% sur restauration
+  const masseSalarialeBrute = totals.hTrav * tauxHoraire;
+  const chargesPatronales = masseSalarialeBrute * 0.42;
+  const masseSalarialeChargee = masseSalarialeBrute + chargesPatronales;
+  const ratioCA = caMonth && caMonth > 0 ? (masseSalarialeChargee / caMonth) * 100 : null;
+  const productivite = totals.hTrav > 0 && caMonth ? caMonth / totals.hTrav : null;
+  const ticketMoyen = couvertsMonth && couvertsMonth > 0 && caMonth ? caMonth / couvertsMonth : null;
+  const heuresSup = aggregated.reduce((s, e) => s + Math.max(0, e.ecart), 0);
+  const heuresManquantes = aggregated.reduce((s, e) => s + Math.max(0, -e.ecart), 0);
 
   // Import handler
   const handleImport = async (file: File) => {
@@ -322,39 +332,93 @@ export default function MasseSalarialePage() {
 
         {importMsg && <div style={{ fontSize: 12, color: ACCENT, marginBottom: 10 }}>{importMsg}</div>}
 
-        {/* KPIs */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
-          <div style={CARD}>
-            <div style={LABEL}>Heures travaillees</div>
-            <div style={KPI}>{fmtDec(totals.hTrav)}h</div>
-            <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>{fmtDec(totals.hPlan)}h planifiees</div>
-          </div>
-          <div style={CARD}>
-            <div style={LABEL}>{periodMode === "week" ? "CA de la semaine" : "CA du mois"}</div>
-            <div style={KPI}>{caMonth ? `${fmt(caMonth)}€` : "—"}</div>
-          </div>
-          <div style={CARD}>
-            <div style={LABEL}>Masse salariale est.</div>
-            <div style={KPI}>{fmt(masseSalarialeEstimee)}€</div>
-            <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>Base 15€/h brut moy.</div>
-          </div>
-          <div style={CARD}>
-            <div style={LABEL}>Ratio masse / CA</div>
-            <div style={{ ...KPI, color: ratioCA && ratioCA < 35 ? GREEN : ratioCA && ratioCA < 45 ? "#D97706" : "#DC2626" }}>
+        {/* ── KPIs RH + Popina ── */}
+
+        {/* Highlight card : Ratio masse / CA */}
+        <div style={{
+          ...CARD,
+          background: `linear-gradient(135deg, ${etab?.couleur ?? ACCENT} 0%, ${etab?.couleur ?? ACCENT}dd 100%)`,
+          border: "none", color: "#fff", marginBottom: 14,
+        }}>
+          <div style={{ ...LABEL, color: "rgba(255,255,255,0.75)" }}>Ratio masse salariale / CA</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 40, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif", color: "#fff" }}>
               {ratioCA ? `${ratioCA.toFixed(1)}%` : "—"}
             </div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.85)" }}>
+              cible &lt; 35% · {ratioCA && ratioCA < 35 ? "OK" : ratioCA && ratioCA < 45 ? "Vigilance" : ratioCA ? "Alerte" : ""}
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", marginTop: 8 }}>
+            {fmt(masseSalarialeChargee)}€ chargee · {caMonth ? `${fmt(caMonth)}€ CA TTC` : "CA non disponible"}
           </div>
         </div>
 
-        {/* Repas + Jours */}
+        {/* Row 1 — CA Popina */}
+        <div style={{ ...LABEL, marginBottom: 8, marginTop: 4 }}>Chiffre d&apos;affaires</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+          <div style={CARD}>
+            <div style={LABEL}>CA TTC</div>
+            <div style={KPI}>{caMonth ? `${fmt(caMonth)}€` : "—"}</div>
+            {caHtMonth && <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>{fmt(caHtMonth)}€ HT</div>}
+          </div>
+          <div style={CARD}>
+            <div style={LABEL}>Ticket moyen</div>
+            <div style={KPI}>{ticketMoyen ? `${fmt(ticketMoyen)}€` : "—"}</div>
+            {couvertsMonth && <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>{couvertsMonth} cvts · {ticketsMonth} tickets</div>}
+          </div>
+        </div>
+
+        {/* Row 2 — Heures */}
+        <div style={{ ...LABEL, marginBottom: 8 }}>Heures</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+          <div style={CARD}>
+            <div style={LABEL}>Travaillees</div>
+            <div style={KPI}>{fmtDec(totals.hTrav)}h</div>
+            <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>
+              <span style={{ color: heuresSup > 0 ? GREEN : "#999" }}>+{fmtDec(heuresSup)}h sup.</span>
+              {" · "}
+              <span style={{ color: heuresManquantes > 0 ? "#DC2626" : "#999" }}>-{fmtDec(heuresManquantes)}h</span>
+            </div>
+          </div>
+          <div style={CARD}>
+            <div style={LABEL}>Productivite</div>
+            <div style={KPI}>{productivite ? `${fmt(productivite)}€/h` : "—"}</div>
+            <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>CA / heure travaillee</div>
+          </div>
+        </div>
+
+        {/* Row 3 — Masse salariale */}
+        <div style={{ ...LABEL, marginBottom: 8 }}>Masse salariale</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+          <div style={CARD}>
+            <div style={LABEL}>Brute estimee</div>
+            <div style={KPI}>{fmt(masseSalarialeBrute)}€</div>
+            <div style={{ fontSize: 11, color: "#999", marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
+              Taux:
+              <input type="number" value={tauxHoraire} onChange={e => setTauxHoraire(Number(e.target.value) || 15)}
+                style={{ width: 48, border: "1px solid #ddd6c8", borderRadius: 6, padding: "2px 6px", fontSize: 11, textAlign: "center" }} />€/h
+            </div>
+          </div>
+          <div style={CARD}>
+            <div style={LABEL}>Chargee (~42%)</div>
+            <div style={KPI}>{fmt(masseSalarialeChargee)}€</div>
+            <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>+ {fmt(chargesPatronales)}€ charges</div>
+          </div>
+        </div>
+
+        {/* Row 4 — Repas & Jours */}
+        <div style={{ ...LABEL, marginBottom: 8 }}>Avantages</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
           <div style={CARD}>
             <div style={LABEL}>Repas</div>
             <div style={KPI}>{totals.repas}</div>
+            <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>Avantage en nature</div>
           </div>
           <div style={CARD}>
             <div style={LABEL}>Jours travailles</div>
             <div style={KPI}>{totals.jours}</div>
+            <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>{aggregated.length} collaborateur{aggregated.length > 1 ? "s" : ""}</div>
           </div>
         </div>
 
