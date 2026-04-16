@@ -282,52 +282,56 @@ export default function MasseSalarialePage() {
           </button>
         </div>
 
-        {/* Mode toggle Mois / Semaine */}
-        <div style={{ display: "flex", gap: 4, padding: 3, background: "#f0ebe2", borderRadius: 10, marginBottom: 10, border: "1px solid #e8e0d0", width: "fit-content" }}>
-          {(["month", "week"] as const).map(m => (
-            <button key={m} type="button" onClick={() => setPeriodMode(m)} style={{
-              padding: "6px 16px", borderRadius: 8, border: "none", cursor: "pointer",
-              background: periodMode === m ? "#fff" : "transparent",
-              color: periodMode === m ? ACCENT : "#777",
-              fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em",
-              boxShadow: periodMode === m ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-            }}>
-              {m === "month" ? "Mois" : "Semaine"}
-            </button>
-          ))}
+        {/* Mode toggle Mois / Semaine — centré */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
+          <div style={{ display: "inline-flex", gap: 4, padding: 3, background: "#f0ebe2", borderRadius: 10, border: "1px solid #e8e0d0" }}>
+            {(["month", "week"] as const).map(m => (
+              <button key={m} type="button" onClick={() => setPeriodMode(m)} style={{
+                padding: "6px 16px", borderRadius: 8, border: "none", cursor: "pointer",
+                background: periodMode === m ? "#fff" : "transparent",
+                color: periodMode === m ? ACCENT : "#777",
+                fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em",
+                boxShadow: periodMode === m ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+              }}>
+                {m === "month" ? "Mois" : "Semaine"}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Period selector with arrows */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
-          <button type="button" onClick={goPrev} disabled={currentIdx >= options.length - 1} style={{
-            width: 40, height: 40, borderRadius: 10, border: "none",
-            background: currentIdx >= options.length - 1 ? "#f0ebe3" : ACCENT + "15",
-            color: currentIdx >= options.length - 1 ? "#ccc" : ACCENT,
-            fontSize: 16, fontWeight: 700,
-            cursor: currentIdx >= options.length - 1 ? "not-allowed" : "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-          }}>{"←"}</button>
-          <select
-            value={selectedValue}
-            onChange={e => setSelectedValue(e.target.value)}
-            style={{
-              height: 40, borderRadius: 10, border: "1px solid #ddd6c8",
-              padding: "0 14px", fontSize: 14, fontWeight: 600, background: "#fff",
-              color: "#1a1a1a", cursor: "pointer", flex: 1, textAlign: "center",
-            }}
-          >
-            {options.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-          <button type="button" onClick={goNext} disabled={currentIdx <= 0} style={{
-            width: 40, height: 40, borderRadius: 10, border: "none",
-            background: currentIdx <= 0 ? "#f0ebe3" : ACCENT + "15",
-            color: currentIdx <= 0 ? "#ccc" : ACCENT,
-            fontSize: 16, fontWeight: 700,
-            cursor: currentIdx <= 0 ? "not-allowed" : "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-          }}>{"→"}</button>
+        {/* Period selector with arrows — centré */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", maxWidth: 420 }}>
+            <button type="button" onClick={goPrev} disabled={currentIdx >= options.length - 1} style={{
+              width: 40, height: 40, borderRadius: 10, border: "none",
+              background: currentIdx >= options.length - 1 ? "#f0ebe3" : ACCENT + "15",
+              color: currentIdx >= options.length - 1 ? "#ccc" : ACCENT,
+              fontSize: 16, fontWeight: 700,
+              cursor: currentIdx >= options.length - 1 ? "not-allowed" : "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            }}>{"←"}</button>
+            <select
+              value={selectedValue}
+              onChange={e => setSelectedValue(e.target.value)}
+              style={{
+                height: 40, borderRadius: 10, border: "1px solid #ddd6c8",
+                padding: "0 14px", fontSize: 14, fontWeight: 600, background: "#fff",
+                color: "#1a1a1a", cursor: "pointer", flex: 1, textAlign: "center",
+              }}
+            >
+              {options.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <button type="button" onClick={goNext} disabled={currentIdx <= 0} style={{
+              width: 40, height: 40, borderRadius: 10, border: "none",
+              background: currentIdx <= 0 ? "#f0ebe3" : ACCENT + "15",
+              color: currentIdx <= 0 ? "#ccc" : ACCENT,
+              fontSize: 16, fontWeight: 700,
+              cursor: currentIdx <= 0 ? "not-allowed" : "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            }}>{"→"}</button>
+          </div>
         </div>
 
         {importMsg && <div style={{ fontSize: 12, color: ACCENT, marginBottom: 10 }}>{importMsg}</div>}
@@ -479,18 +483,21 @@ export default function MasseSalarialePage() {
           )}
         </div>
 
-        {/* FAB Import Combo */}
+        {/* FAB Import Combo — centré */}
         <label style={{
           position: "fixed",
           bottom: "calc(92px + env(safe-area-inset-bottom, 0px))",
-          right: 16, zIndex: 105,
-          height: 44, padding: "0 20px",
-          borderRadius: 22, border: "none",
+          left: "50%", transform: "translateX(-50%)",
+          zIndex: 105,
+          height: 48, padding: "0 22px",
+          borderRadius: 24, border: "none",
           background: ACCENT, color: "#fff",
           fontSize: 13, fontWeight: 700, cursor: "pointer",
-          display: "flex", alignItems: "center", gap: 6,
-          boxShadow: "0 4px 14px rgba(212,119,90,0.35), 0 2px 6px rgba(0,0,0,0.1)",
+          display: "flex", alignItems: "center", gap: 8,
+          boxShadow: "0 4px 16px rgba(212,119,90,0.4), 0 2px 6px rgba(0,0,0,0.1)",
           fontFamily: "inherit",
+          textTransform: "uppercase", letterSpacing: "0.04em",
+          whiteSpace: "nowrap",
         }}>
           <input type="file" accept=".pdf" style={{ display: "none" }} onChange={(e) => {
             const f = e.target.files?.[0];
