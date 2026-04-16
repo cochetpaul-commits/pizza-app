@@ -1211,8 +1211,8 @@ function PerformancesPage() {
                     for (let i = 0; i < W.days.length; i++) {
                       if (W.days[i] && W.dates[i]) dayToDate[W.days[i]] = W.dates[i];
                     }
-                    const cellSt = { padding: "7px 8px", textAlign: "right" as const, fontSize: 12, fontWeight: 600 as const, borderBottom: "1px solid #ede6d9" };
-                    const labelSt = { padding: "7px 8px", textAlign: "left" as const, fontSize: 11, fontWeight: 600 as const, color: "#777", borderBottom: "1px solid #ede6d9" };
+                    const cellSt = { padding: "10px 8px", textAlign: "center" as const, fontSize: 13, fontWeight: 600 as const, borderBottom: "1px solid rgba(0,0,0,0.04)" };
+                    const labelSt = { padding: "10px 12px", textAlign: "left" as const, fontSize: 12, fontWeight: 600 as const, color: "#777", borderBottom: "1px solid rgba(0,0,0,0.04)" };
                     return dayOrder.map(jour => {
                       const svcs = byDay[jour];
                       const midi = svcs.find(s => s.svc === "midi");
@@ -1224,25 +1224,45 @@ function PerformancesPage() {
                       const meteoS = dateKey ? meteo[`${dateKey}:soir`] : null;
                       const dash = <span style={{ color: "#ddd" }}>—</span>;
                       const fmtCell = (v: number | undefined, color?: string) => v && v > 0
-                        ? <span style={{ color: color ?? "#1a1a1a" }}>{fmt(v)}</span>
+                        ? <span style={{ color: color ?? "#1a1a1a" }}>{fmt(v)}€</span>
                         : dash;
                       return (
-                        <div key={jour} style={{ background: "#faf7f2", borderRadius: 10, border: "1px solid #e8e0d0", overflow: "hidden" }}>
+                        <div key={jour} style={{
+                          background: "#fff", borderRadius: 14, border: "1px solid #e8e0d0",
+                          overflow: "hidden",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
+                        }}>
                           <table style={{ width: "100%", borderCollapse: "collapse" }}>
                             <thead>
-                              <tr style={{ background: "#f0ebe3" }}>
-                                <th style={{ ...labelSt, fontWeight: 700, color: "#1a1a1a", fontSize: 13 }}>{jour}</th>
-                                <th style={{ ...cellSt, fontSize: 10, color: "#5e8278", textTransform: "uppercase" as const, letterSpacing: ".08em" }}>Midi</th>
-                                <th style={{ ...cellSt, fontSize: 10, color: "#1a1a1a", textTransform: "uppercase" as const, letterSpacing: ".08em" }}>Soir</th>
+                              <tr style={{ background: "linear-gradient(180deg, #faf7f2 0%, #f5f0e8 100%)" }}>
+                                <th style={{
+                                  padding: "12px 12px", textAlign: "left",
+                                  fontSize: 14, fontWeight: 800, color: "#1a1a1a",
+                                  fontFamily: "var(--font-oswald), Oswald, sans-serif",
+                                  textTransform: "uppercase", letterSpacing: "0.04em",
+                                  borderBottom: "1px solid rgba(0,0,0,0.06)",
+                                }}>{jour}</th>
+                                <th style={{
+                                  padding: "12px 8px", textAlign: "center",
+                                  fontSize: 10, fontWeight: 700, color: "#5e8278",
+                                  textTransform: "uppercase", letterSpacing: "0.12em",
+                                  borderBottom: "1px solid rgba(0,0,0,0.06)",
+                                }}>Midi</th>
+                                <th style={{
+                                  padding: "12px 8px", textAlign: "center",
+                                  fontSize: 10, fontWeight: 700, color: "#1a1a1a",
+                                  textTransform: "uppercase", letterSpacing: "0.12em",
+                                  borderBottom: "1px solid rgba(0,0,0,0.06)",
+                                }}>Soir</th>
                               </tr>
                             </thead>
                             <tbody>
                               <tr>
                                 <td style={labelSt}>Meteo</td>
-                                <td style={{ ...cellSt, textAlign: "center", fontSize: 16 }}>{meteoM ? <span title={`${meteoM.desc} ${meteoM.temp}°`}>{meteoM.emoji}</span> : dash}</td>
-                                <td style={{ ...cellSt, textAlign: "center", fontSize: 16 }}>{meteoS ? <span title={`${meteoS.desc} ${meteoS.temp}°`}>{meteoS.emoji}</span> : dash}</td>
+                                <td style={{ ...cellSt, fontSize: 18 }}>{meteoM ? <span title={`${meteoM.desc} ${meteoM.temp}°`}>{meteoM.emoji}</span> : dash}</td>
+                                <td style={{ ...cellSt, fontSize: 18 }}>{meteoS ? <span title={`${meteoS.desc} ${meteoS.temp}°`}>{meteoS.emoji}</span> : dash}</td>
                               </tr>
-                              <tr>
+                              <tr style={{ background: "rgba(94,130,120,0.03)" }}>
                                 <td style={{ ...labelSt, color: ZC.Salle }}>Salle</td>
                                 <td style={cellSt}>{fmtCell(zM?.Salle, ZC.Salle)}</td>
                                 <td style={cellSt}>{fmtCell(zS?.Salle, ZC.Salle)}</td>
@@ -1252,7 +1272,7 @@ function PerformancesPage() {
                                 <td style={cellSt}>{fmtCell(zM?.Pergolas, ZC.Pergolas)}</td>
                                 <td style={cellSt}>{fmtCell(zS?.Pergolas, ZC.Pergolas)}</td>
                               </tr>
-                              <tr>
+                              <tr style={{ background: "rgba(196,168,130,0.04)" }}>
                                 <td style={{ ...labelSt, color: ZC.Terrasse }}>Terrasse</td>
                                 <td style={cellSt}>{fmtCell(zM?.Terrasse, ZC.Terrasse)}</td>
                                 <td style={cellSt}>{fmtCell(zS?.Terrasse, ZC.Terrasse)}</td>
@@ -1262,20 +1282,20 @@ function PerformancesPage() {
                                 <td style={cellSt}>{fmtCell(zM?.emp, ZC.emp)}</td>
                                 <td style={cellSt}>{fmtCell(zS?.emp, ZC.emp)}</td>
                               </tr>
-                              <tr style={{ background: "#fff" }}>
-                                <td style={{ ...labelSt, fontWeight: 700, color: accent }}>Total</td>
-                                <td style={{ ...cellSt, fontWeight: 800, color: accent, fontSize: 14, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{midi ? fmt(mode === "ttc" ? midi.ttc : midi.ht) : dash}</td>
-                                <td style={{ ...cellSt, fontWeight: 800, color: accent, fontSize: 14, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{soir ? fmt(mode === "ttc" ? soir.ttc : soir.ht) : dash}</td>
+                              <tr style={{ background: "rgba(212,119,90,0.08)" }}>
+                                <td style={{ ...labelSt, fontWeight: 800, color: accent, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em" }}>Total</td>
+                                <td style={{ ...cellSt, fontWeight: 800, color: accent, fontSize: 15, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{midi ? `${fmt(mode === "ttc" ? midi.ttc : midi.ht)}€` : dash}</td>
+                                <td style={{ ...cellSt, fontWeight: 800, color: accent, fontSize: 15, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{soir ? `${fmt(mode === "ttc" ? soir.ttc : soir.ht)}€` : dash}</td>
                               </tr>
                               <tr>
                                 <td style={labelSt}>Cvts</td>
-                                <td style={{ ...cellSt, fontWeight: 600 }}>{midi?.cov ?? dash}</td>
-                                <td style={{ ...cellSt, fontWeight: 600 }}>{soir?.cov ?? dash}</td>
+                                <td style={{ ...cellSt, fontWeight: 700, color: "#1a1a1a" }}>{midi?.cov ?? dash}</td>
+                                <td style={{ ...cellSt, fontWeight: 700, color: "#1a1a1a" }}>{soir?.cov ?? dash}</td>
                               </tr>
-                              <tr>
-                                <td style={labelSt}>CVT M SP</td>
-                                <td style={cellSt}>{midi ? `${(mode === "ttc" ? midi.tm_sp_ttc : midi.tm_sp_ht).toFixed(0)}€` : dash}</td>
-                                <td style={cellSt}>{soir ? `${(mode === "ttc" ? soir.tm_sp_ttc : soir.tm_sp_ht).toFixed(0)}€` : dash}</td>
+                              <tr style={{ background: "rgba(0,0,0,0.015)" }}>
+                                <td style={{ ...labelSt, borderBottom: "none" }}>CVT M SP</td>
+                                <td style={{ ...cellSt, borderBottom: "none", color: "#444" }}>{midi ? `${(mode === "ttc" ? midi.tm_sp_ttc : midi.tm_sp_ht).toFixed(0)}€` : dash}</td>
+                                <td style={{ ...cellSt, borderBottom: "none", color: "#444" }}>{soir ? `${(mode === "ttc" ? soir.tm_sp_ttc : soir.tm_sp_ht).toFixed(0)}€` : dash}</td>
                               </tr>
                             </tbody>
                           </table>
