@@ -225,6 +225,29 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     await doLoad(searchQuery, id);
   }, [searchQuery, doLoad]);
 
+  /** Reload a single ingredient + its offer without refetching the whole list */
+  const mutateOne = useCallback(async (ingredientId: string) => {
+    const { data: row, error: err } = await supabase
+      .from("ingredients")
+      .select(INGREDIENT_COLS)
+      .eq("id", ingredientId)
+      .single();
+    if (err || !row) {
+      // Ingredient deleted or error — fall back to full reload
+      const id = ++fetchIdRef.current;
+      await doLoad(searchQuery, id);
+      return;
+    }
+    const updated = row as Ingredient;
+    const newOffers = await fetchOffersForIds([ingredientId]);
+
+    setItems((prev) => prev.map((i) => (i.id === ingredientId ? updated : i)));
+    setOffers((prev) => {
+      const without = prev.filter((o) => o.ingredient_id !== ingredientId);
+      return newOffers.length > 0 ? [...without, ...newOffers] : without;
+    });
+  }, [searchQuery, doLoad]);
+
   return {
     items,
     suppliers,
@@ -238,5 +261,6 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     loadMore,
     error,
     mutate,
+    mutateOne,
   };
 }

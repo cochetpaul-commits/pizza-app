@@ -183,7 +183,7 @@ function IngredientsPageInner() {
 
   const [q, setQ] = useState("");
   const debouncedQ = useDebounce(q, 300);
-  const { items, suppliers, supplierAliases, offers, alertMap, loading, loadingMore, hasMore, totalCount, loadMore, error: dataError, mutate } = useIngredientsData(debouncedQ, etab?.id, etab?.slug);
+  const { items, suppliers, supplierAliases, offers, alertMap, loading, loadingMore, hasMore, totalCount, loadMore, error: dataError, mutate, mutateOne } = useIngredientsData(debouncedQ, etab?.id, etab?.slug);
 
   const [session, setSession] = useState<Session | null>(null);
 
@@ -356,9 +356,9 @@ function IngredientsPageInner() {
     const r = await supabase.from("ingredients").update(patch).eq("id", id);
     if (r.error) { alert(r.error.message); return; }
     const sy = window.scrollY;
-    await mutate();
+    await mutateOne(id);
     requestAnimationFrame(() => window.scrollTo(0, sy));
-  }, [items, offersByIngredientId, userId, mutate]);
+  }, [items, offersByIngredientId, userId, mutateOne]);
 
   const openDeriveModal = useCallback((x: Ingredient) => {
     setRcIngredientId(x.id);
@@ -891,13 +891,14 @@ function IngredientsPageInner() {
         }).eq("id", editingId);
       }
     }
+    const savedId = editingId;
     const scrollY = window.scrollY;
     setEditingId(null); setEdit(null);
     if (backUrl) { router.push(backUrl); return; }
-    await mutate();
+    await mutateOne(savedId);
     requestAnimationFrame(() => window.scrollTo(0, scrollY));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingId, edit, userId, items, offersByIngredientId, backUrl, router, mutate]);
+  }, [editingId, edit, userId, items, offersByIngredientId, backUrl, router, mutate, mutateOne]);
 
   const del = useCallback(async (id: string, name: string) => {
     if (!confirm(`Supprimer "${name}" ?`)) return;

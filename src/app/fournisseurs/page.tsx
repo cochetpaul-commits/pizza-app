@@ -160,8 +160,8 @@ export default function FournisseursPage() {
   const { current: etab, etablissements } = useEtablissement();
 
   // Filter state
-  const [etabFilter, setEtabFilter] = useState<string | null>(null); // null = "Tous"
-  const [search, setSearch] = useState("");
+  const [etabFilter] = useState<string | null>(null); // null = "Tous"
+  const [search] = useState("");
 
   // Modal state
   const [modalSupplier, setModalSupplier] = useState<SupplierRow | null>(null);
@@ -566,95 +566,568 @@ export default function FournisseursPage() {
     return null;
   }
 
+  function renderFormBody() {
+    const bodyColor = form.color || (modalSupplier ? getSupplierColor(modalSupplier.name, modalSupplier.color) : "#D4775A");
+    return (
+      <>
+        {/* Name (only in create mode) */}
+        {modalMode === "create" && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={labelStyle}>Nom du fournisseur *</div>
+            <input
+              style={{ ...inputStyle, borderColor: "#D4775A" }}
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="Nom du fournisseur"
+              autoFocus
+            />
+          </div>
+        )}
+
+        {/* Etablissement selector */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+            Etablissement
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {bmEtab && (
+              <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontFamily: "DM Sans, sans-serif", fontSize: 13 }}>
+                <input
+                  type="radio"
+                  name="modal_etab"
+                  checked={form.etablissement_id === bmEtab.id}
+                  onChange={() => setForm(f => ({ ...f, etablissement_id: bmEtab.id }))}
+                  style={{ accentColor: "#D4775A" }}
+                />
+                Bello Mio
+              </label>
+            )}
+            {pmEtab && (
+              <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontFamily: "DM Sans, sans-serif", fontSize: 13 }}>
+                <input
+                  type="radio"
+                  name="modal_etab"
+                  checked={form.etablissement_id === pmEtab.id}
+                  onChange={() => setForm(f => ({ ...f, etablissement_id: pmEtab.id }))}
+                  style={{ accentColor: "#D4775A" }}
+                />
+                Piccola Mia
+              </label>
+            )}
+          </div>
+        </div>
+
+        {/* Section: Couleur */}
+        <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+          Couleur
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <ColorPicker value={form.color || bodyColor} onChange={(hex) => setForm((f) => ({ ...f, color: hex }))} size={24} />
+        </div>
+
+        {/* ── Accordion: Coordonnees ── */}
+        <AccordionHeader label="Coordonnees" isOpen={openSection === "coord"} onToggle={() => toggleSection("coord")} />
+        {openSection === "coord" && (
+          <div style={{ padding: "0 2px 16px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+              <div>
+                <div style={labelStyle}>Contact</div>
+                <input style={inputStyle} value={form.contact_name} onChange={(e) => setForm((f) => ({ ...f, contact_name: e.target.value }))} placeholder="Prenom Nom" />
+              </div>
+              <div>
+                <div style={labelStyle}>Telephone</div>
+                <input style={inputStyle} value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="06 xx xx xx xx" type="tel" />
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 0 }}>
+              <div>
+                <div style={labelStyle}>Email</div>
+                <input style={inputStyle} value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="contact@fournisseur.fr" type="email" />
+              </div>
+              <div>
+                <div style={labelStyle}>Site web</div>
+                <input style={inputStyle} value={form.website} onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))} placeholder="fournisseur.fr" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Accordion: Adresse ── */}
+        <AccordionHeader label="Adresse" isOpen={openSection === "addr"} onToggle={() => toggleSection("addr")} />
+        {openSection === "addr" && (
+          <div style={{ padding: "0 2px 16px" }}>
+            <div style={{ marginBottom: 12 }}>
+              <div style={labelStyle}>Adresse</div>
+              <input style={inputStyle} value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} placeholder="Rue, numero" />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <div style={labelStyle}>Code postal</div>
+                <input style={inputStyle} value={form.postal_code} onChange={(e) => setForm((f) => ({ ...f, postal_code: e.target.value }))} placeholder="35400" />
+              </div>
+              <div>
+                <div style={labelStyle}>Ville</div>
+                <input style={inputStyle} value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} placeholder="Saint-Malo" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Accordion: Infos commerciales ── */}
+        <AccordionHeader label="Infos commerciales" isOpen={openSection === "infos"} onToggle={() => toggleSection("infos")} />
+        {openSection === "infos" && (
+          <div style={{ padding: "0 2px 16px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+              <div>
+                <div style={labelStyle}>Categorie</div>
+                <select
+                  style={{ ...inputStyle, cursor: "pointer" }}
+                  value={form.category}
+                  onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                >
+                  <option value="">--</option>
+                  {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
+                    <option key={k} value={k}>{v}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <div style={labelStyle}>Conditions paiement</div>
+                <input style={inputStyle} value={form.payment_terms} onChange={(e) => setForm((f) => ({ ...f, payment_terms: e.target.value }))} placeholder="30 jours fin de mois" />
+              </div>
+            </div>
+            <div>
+              <div style={labelStyle}>Code client</div>
+              <input style={inputStyle} value={form.client_code} onChange={(e) => setForm((f) => ({ ...f, client_code: e.target.value }))} placeholder="CL-12345" />
+            </div>
+          </div>
+        )}
+
+        {/* ── Accordion: Franco & Livraison ── */}
+        <AccordionHeader label="Franco & Livraison" isOpen={openSection === "franco"} onToggle={() => toggleSection("franco")} />
+        {openSection === "franco" && (
+          <div style={{ background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 12, padding: 14, marginBottom: 16 }}>
+            {/* Franco row */}
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+              <div>
+                <div style={labelStyle}>Franco de port (EUR HT)</div>
+                <input style={{ ...inputStyle, width: 110 }} value={form.franco_minimum} onChange={(e) => setForm((f) => ({ ...f, franco_minimum: e.target.value }))} placeholder="ex: 200" type="number" min="0" step="10" />
+              </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", paddingTop: 14 }}>
+                <input type="checkbox" checked={form.mercuriale_only} onChange={(e) => setForm((f) => ({ ...f, mercuriale_only: e.target.checked }))} style={{ accentColor: bodyColor }} />
+                <span style={{ fontSize: 11, color: "#666" }}>Mercuriale uniquement</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", paddingTop: 14 }}>
+                <input type="checkbox" checked={form.franco_obligatoire} onChange={(e) => setForm((f) => ({ ...f, franco_obligatoire: e.target.checked }))} style={{ accentColor: bodyColor }} />
+                <span style={{ fontSize: 11, color: "#666" }}>Franco obligatoire</span>
+              </label>
+            </div>
+
+            {/* Schedule table */}
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+              Planning commande → livraison
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 3, marginBottom: 3 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", padding: "3px 6px" }}>Jour cde</div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", padding: "3px 6px" }}>Heure lim.</div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", padding: "3px 6px" }}>Jour livr.</div>
+            </div>
+            {JOURS_FULL.map((jour) => {
+              const rule = schedule.find(r => r.day === jour);
+              return (
+                <div key={jour} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 3, marginBottom: 1 }}>
+                  <div style={{ padding: "6px", fontSize: 12, color: rule ? "#1a1a1a" : "#ccc", fontWeight: rule ? 600 : 400, background: rule ? "#faf8f4" : "transparent", borderRadius: 5 }}>
+                    {jour.charAt(0).toUpperCase() + jour.slice(1)}
+                  </div>
+                  <input
+                    style={{ ...inputStyle, padding: "5px 6px", fontSize: 12, background: rule ? "#faf8f4" : "#fff" }}
+                    value={rule?.cutoff ?? ""}
+                    placeholder="hh:mm"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSchedule(prev => {
+                        const existing = prev.find(r => r.day === jour);
+                        if (existing) return prev.map(r => r.day === jour ? { ...r, cutoff: val } : r);
+                        if (val) return [...prev, { day: jour, cutoff: val, delivery_day: "" }];
+                        return prev;
+                      });
+                    }}
+                  />
+                  <select
+                    style={{ ...inputStyle, padding: "5px 6px", fontSize: 12, cursor: "pointer", background: rule ? "#faf8f4" : "#fff" }}
+                    value={rule?.delivery_day ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSchedule(prev => {
+                        const existing = prev.find(r => r.day === jour);
+                        if (existing) return prev.map(r => r.day === jour ? { ...r, delivery_day: val } : r);
+                        if (val) return [...prev, { day: jour, cutoff: "", delivery_day: val }];
+                        return prev;
+                      });
+                    }}
+                  >
+                    <option value="">--</option>
+                    {JOURS_FULL.map(j => (
+                      <option key={j} value={j}>{j.charAt(0).toUpperCase() + j.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Accordion: Administratif ── */}
+        <AccordionHeader label="Administratif" isOpen={openSection === "admin"} onToggle={() => toggleSection("admin")} />
+        {openSection === "admin" && (
+          <div style={{ padding: "0 2px 16px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+              <div>
+                <div style={labelStyle}>SIRET</div>
+                <input style={inputStyle} value={form.siret} onChange={(e) => setForm((f) => ({ ...f, siret: e.target.value }))} placeholder="123 456 789 00012" />
+              </div>
+              <div>
+                <div style={labelStyle}>N TVA intra.</div>
+                <input style={inputStyle} value={form.tva_intra} onChange={(e) => setForm((f) => ({ ...f, tva_intra: e.target.value }))} placeholder="FR12345678901" />
+              </div>
+            </div>
+            <div>
+              <div style={labelStyle}>Notes</div>
+              <textarea
+                style={{ ...inputStyle, resize: "vertical" }}
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                placeholder="Informations complementaires..."
+                rows={2}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ── Accordion: Contacts / Destinataires ── */}
+        <AccordionHeader label="Contacts / Destinataires" isOpen={openSection === "contacts"} onToggle={() => toggleSection("contacts")} />
+        {openSection === "contacts" && (
+          <div style={{ padding: "0 2px 16px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+              {contacts.map((c, idx) => (
+                <div
+                  key={c.id}
+                  style={{
+                    border: "1px solid #ddd6c8", borderRadius: 8, padding: "8px 10px",
+                    background: "#faf8f4", position: "relative",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => removeContact(idx)}
+                    title="Supprimer"
+                    style={{
+                      position: "absolute", top: 4, right: 6,
+                      fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700,
+                      color: "#c44", background: "none", border: "none", cursor: "pointer",
+                      padding: "0 4px", lineHeight: 1,
+                    }}
+                  >
+                    X
+                  </button>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
+                    <div>
+                      <div style={{ ...labelStyle, marginBottom: 2 }}>Nom</div>
+                      <input style={{ ...inputStyle, padding: "6px 8px", fontSize: 12 }} value={c.name} onChange={(e) => updateContact(idx, "name", e.target.value)} placeholder="Prenom Nom" />
+                    </div>
+                    <div>
+                      <div style={{ ...labelStyle, marginBottom: 2 }}>Role</div>
+                      <input style={{ ...inputStyle, padding: "6px 8px", fontSize: 12 }} value={c.role} onChange={(e) => updateContact(idx, "role", e.target.value)} placeholder="Commercial..." />
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 6, alignItems: "end" }}>
+                    <div>
+                      <div style={{ ...labelStyle, marginBottom: 2 }}>Email</div>
+                      <input style={{ ...inputStyle, padding: "6px 8px", fontSize: 12 }} value={c.email} onChange={(e) => updateContact(idx, "email", e.target.value)} placeholder="email@fournisseur.fr" type="email" />
+                    </div>
+                    <div>
+                      <div style={{ ...labelStyle, marginBottom: 2 }}>Tel</div>
+                      <input style={{ ...inputStyle, padding: "6px 8px", fontSize: 12 }} value={c.phone} onChange={(e) => updateContact(idx, "phone", e.target.value)} placeholder="06 xx xx xx xx" type="tel" />
+                    </div>
+                    <label style={{
+                      display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap",
+                      fontFamily: "DM Sans, sans-serif", fontSize: 11, color: "#666",
+                      paddingBottom: 8, cursor: "pointer",
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={c.send_orders}
+                        onChange={(e) => updateContact(idx, "send_orders", e.target.checked)}
+                        style={{ accentColor: bodyColor }}
+                      />
+                      Cdes
+                    </label>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={addContact}
+              style={{
+                fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 600,
+                color: bodyColor, background: "none", border: `1.5px solid ${bodyColor}`,
+                borderRadius: 20, padding: "5px 12px", cursor: "pointer", marginBottom: 16,
+              }}
+            >
+              + Ajouter un contact
+            </button>
+          </div>
+        )}
+
+        {/* Carton config (edit mode only) */}
+        {modalMode === "edit" && modalSupplier && (
+          <div style={{ marginBottom: 16, marginTop: 8 }}>
+            <button
+              type="button"
+              onClick={() => {
+                const next = !showCartonConfig;
+                setShowCartonConfig(next);
+                if (next && !cartonPreview) loadCartonPreview(modalSupplier.id);
+              }}
+              style={{
+                fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700,
+                color: "#7C3AED", background: "none", border: "1.5px solid #7C3AED",
+                borderRadius: 20, padding: "5px 14px", cursor: "pointer",
+              }}
+            >
+              {showCartonConfig ? "Masquer config cartons" : "Configurer les cartons"}
+            </button>
+
+            {showCartonConfig && (
+              <div style={{
+                marginTop: 10, padding: 14, border: "1.5px solid #e5ddd0",
+                borderRadius: 12, background: "#faf8f4",
+              }}>
+                <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
+                  Configuration cartons
+                </div>
+
+                {/* Preview stats */}
+                {cartonLoading && (
+                  <div style={{ fontSize: 12, color: "#999", marginBottom: 8 }}>Chargement...</div>
+                )}
+                {cartonPreview && !cartonLoading && (
+                  <div style={{ fontSize: 12, color: "#666", marginBottom: 10, lineHeight: 1.5 }}>
+                    {cartonPreview.total} offre(s) au total — {cartonPreview.without_pack} sans config carton, {cartonPreview.with_pack} deja configuree(s)
+                  </div>
+                )}
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
+                  <div>
+                    <div style={labelStyle}>Bouteilles / carton</div>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={cartonPackCount}
+                      onChange={(e) => setCartonPackCount(Number(e.target.value) || 1)}
+                      style={{ ...inputStyle, padding: "8px 10px" }}
+                    />
+                  </div>
+                  <div>
+                    <div style={labelStyle}>Volume unitaire</div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.05"
+                      value={cartonEachQty}
+                      onChange={(e) => setCartonEachQty(Number(e.target.value) || 0)}
+                      style={{ ...inputStyle, padding: "8px 10px" }}
+                    />
+                  </div>
+                  <div>
+                    <div style={labelStyle}>Unite</div>
+                    <select
+                      value={cartonEachUnit}
+                      onChange={(e) => setCartonEachUnit(e.target.value)}
+                      style={{ ...inputStyle, padding: "8px 10px" }}
+                    >
+                      <option value="l">litres (l)</option>
+                      <option value="pc">pieces (pc)</option>
+                      <option value="kg">kilos (kg)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <button
+                    type="button"
+                    onClick={applyCartonConfig}
+                    disabled={cartonApplying || (cartonPreview?.without_pack === 0)}
+                    style={{
+                      fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 600,
+                      background: "#7C3AED", color: "#fff", border: "none", borderRadius: 20,
+                      padding: "7px 16px", cursor: "pointer",
+                      opacity: (cartonApplying || cartonPreview?.without_pack === 0) ? 0.5 : 1,
+                    }}
+                  >
+                    {cartonApplying ? "..." : `Appliquer a ${cartonPreview?.without_pack ?? "?"} offre(s)`}
+                  </button>
+                  {cartonResult && (
+                    <span style={{ fontSize: 11, color: cartonResult.startsWith("Erreur") ? "#c44" : "#16A34A", fontWeight: 600 }}>
+                      {cartonResult}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <button
+            onClick={saveModal}
+            disabled={saving}
+            style={{
+              fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600,
+              background: bodyColor, color: "#fff", border: "none", borderRadius: 20,
+              padding: "8px 20px", cursor: "pointer", opacity: saving ? 0.6 : 1,
+            }}
+          >
+            {saving ? "..." : modalMode === "create" ? "Creer" : "Enregistrer"}
+          </button>
+
+          {modalMode === "edit" && modalSupplier && (
+            <Link
+              href={`/ingredients?supplier=${modalSupplier.id}`}
+              style={{
+                fontFamily: "DM Sans, sans-serif", fontSize: 12, color: bodyColor,
+                textDecoration: "none", fontWeight: 600,
+              }}
+            >
+              Voir les articles →
+            </Link>
+          )}
+        </div>
+      </>
+    );
+  }
+
   function renderCard(s: SupplierRow) {
     const st = stats.get(s.id);
     const sColor = getSupplierColor(s.name, s.color);
+    const isExpanded = modalMode === "edit" && modalSupplier?.id === s.id;
     return (
-      <div key={s.id}
-        onClick={() => openModal(s)}
-        style={{
-          border: "1px solid #ddd6c8", borderRadius: 12, padding: "14px 16px",
-          background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-          borderLeft: `4px solid ${sColor}`,
-          cursor: "pointer", transition: "all 0.15s",
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 2px 8px ${sColor}22`; e.currentTarget.style.borderColor = `${sColor}60`; }}
-        onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor = "#ddd6c8"; }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 700, fontSize: 15, color: sColor }}>
-                {s.name}
+      <div key={s.id} style={{ display: "flex", flexDirection: "column" }}>
+        <div
+          onClick={() => isExpanded ? closeModal() : openModal(s)}
+          style={{
+            border: "1px solid #ddd6c8",
+            borderRadius: isExpanded ? "12px 12px 0 0" : 12,
+            padding: "14px 16px",
+            background: "#fff", boxShadow: isExpanded ? "none" : "0 1px 3px rgba(0,0,0,0.04)",
+            borderLeft: `4px solid ${sColor}`,
+            borderBottom: isExpanded ? "none" : "1px solid #ddd6c8",
+            cursor: "pointer", transition: "all 0.15s",
+          }}
+          onMouseEnter={(e) => { if (!isExpanded) { e.currentTarget.style.boxShadow = `0 2px 8px ${sColor}22`; e.currentTarget.style.borderColor = `${sColor}60`; } }}
+          onMouseLeave={(e) => { if (!isExpanded) { e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor = "#ddd6c8"; } }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 700, fontSize: 15, color: sColor }}>
+                  {s.name}
+                </span>
+                <EtabBadge etablissementId={s.etablissement_id} />
+                {!s.is_active && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 6,
+                    background: "rgba(0,0,0,0.08)", color: "#999",
+                  }}>inactif</span>
+                )}
+              </div>
+
+              {/* Category + delivery badges */}
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                {s.category && (
+                  <span style={{ ...readonlyBadge, background: `${sColor}18`, color: sColor }}>
+                    {CATEGORY_LABELS[s.category] ?? s.category}
+                  </span>
+                )}
+                {s.city && (
+                  <span style={{ ...readonlyBadge, background: "#f0ede6", color: "#999" }}>
+                    {s.city}{s.postal_code ? ` (${s.postal_code})` : ""}
+                  </span>
+                )}
+              </div>
+
+              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginTop: 4 }}>
+                {s.contact_name || s.email || s.phone
+                  ? [s.contact_name, s.email, s.phone].filter(Boolean).join(" · ")
+                  : "Coordonnees non renseignees"}
+              </div>
+
+              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, marginTop: 6, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                <span><strong>{st?.refCount ?? 0}</strong> <span style={{ color: "#999" }}>ref.</span></span>
+                {s.delivery_days && s.delivery_days.length > 0 && (
+                  <span style={{ fontSize: 11, color: "#16A34A", fontWeight: 600 }}>
+                    Livr. {s.delivery_days.map(d => d.slice(0, 3)).join(", ")}
+                  </span>
+                )}
+                <span style={{ color: "#999", fontSize: 12 }}>
+                  {st?.lastImport
+                    ? `Import : ${fmtDate(st.lastImport)}${st.lastImportNumber ? ` · ${st.lastImportNumber}` : ""}`
+                    : "Aucun import"}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
+              <button
+                type="button"
+                onClick={(e) => handleDeleteSupplier(s, e)}
+                title="Supprimer le fournisseur"
+                aria-label="Supprimer"
+                style={{
+                  width: 34, height: 34, borderRadius: 10, border: "1px solid rgba(220,38,38,0.2)",
+                  background: "rgba(220,38,38,0.06)", color: "#DC2626", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#DC2626"; e.currentTarget.style.color = "#fff"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(220,38,38,0.06)"; e.currentTarget.style.color = "#DC2626"; }}
+              >
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  <path d="M10 11v6M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+              </button>
+              <span style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: 22, height: 22, color: "#999",
+                transition: "transform 0.2s",
+                transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+              }}>
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
               </span>
-              <EtabBadge etablissementId={s.etablissement_id} />
-              {!s.is_active && (
-                <span style={{
-                  fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 6,
-                  background: "rgba(0,0,0,0.08)", color: "#999",
-                }}>inactif</span>
-              )}
             </div>
-
-            {/* Category + delivery badges */}
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
-              {s.category && (
-                <span style={{ ...readonlyBadge, background: `${sColor}18`, color: sColor }}>
-                  {CATEGORY_LABELS[s.category] ?? s.category}
-                </span>
-              )}
-              {s.city && (
-                <span style={{ ...readonlyBadge, background: "#f0ede6", color: "#999" }}>
-                  {s.city}{s.postal_code ? ` (${s.postal_code})` : ""}
-                </span>
-              )}
-            </div>
-
-            <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginTop: 4 }}>
-              {s.contact_name || s.email || s.phone
-                ? [s.contact_name, s.email, s.phone].filter(Boolean).join(" · ")
-                : "Coordonnees non renseignees"}
-            </div>
-
-            <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, marginTop: 6, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-              <span><strong>{st?.refCount ?? 0}</strong> <span style={{ color: "#999" }}>ref.</span></span>
-              {s.delivery_days && s.delivery_days.length > 0 && (
-                <span style={{ fontSize: 11, color: "#16A34A", fontWeight: 600 }}>
-                  Livr. {s.delivery_days.map(d => d.slice(0, 3)).join(", ")}
-                </span>
-              )}
-              <span style={{ color: "#999", fontSize: 12 }}>
-                {st?.lastImport
-                  ? `Import : ${fmtDate(st.lastImport)}${st.lastImportNumber ? ` · ${st.lastImportNumber}` : ""}`
-                  : "Aucun import"}
-              </span>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-            <button
-              type="button"
-              onClick={(e) => handleDeleteSupplier(s, e)}
-              title="Supprimer le fournisseur"
-              aria-label="Supprimer"
-              style={{
-                width: 34, height: 34, borderRadius: 10, border: "1px solid rgba(220,38,38,0.2)",
-                background: "rgba(220,38,38,0.06)", color: "#DC2626", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "#DC2626"; e.currentTarget.style.color = "#fff"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(220,38,38,0.06)"; e.currentTarget.style.color = "#DC2626"; }}
-            >
-              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                <path d="M10 11v6M14 11v6" />
-                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-              </svg>
-            </button>
           </div>
         </div>
+        {isExpanded && (
+          <div style={{
+            border: "1px solid #ddd6c8",
+            borderTop: "none",
+            borderLeft: `4px solid ${sColor}`,
+            borderRadius: "0 0 12px 12px",
+            background: "#faf8f4",
+            padding: "16px 16px 20px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+          }}>
+            {renderFormBody()}
+          </div>
+        )}
       </div>
     );
   }
@@ -707,8 +1180,8 @@ export default function FournisseursPage() {
         )}
       </main>
 
-      {/* ══ MODALE FICHE FOURNISSEUR (create + edit) ══ */}
-      {isModalOpen && (
+      {/* ══ FICHE FOURNISSEUR — create mode (overlay) OR edit mode (inline) ══ */}
+      {isModalOpen && modalMode === "create" && (
         <div
           onClick={closeModal}
           style={{
@@ -751,445 +1224,12 @@ export default function FournisseursPage() {
 
             {/* Form */}
             <div style={{ padding: "0 20px 20px" }}>
-              {/* Name (only in create mode) */}
-              {modalMode === "create" && (
-                <div style={{ marginBottom: 16 }}>
-                  <div style={labelStyle}>Nom du fournisseur *</div>
-                  <input
-                    style={{ ...inputStyle, borderColor: "#D4775A" }}
-                    value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    placeholder="Nom du fournisseur"
-                    autoFocus
-                  />
-                </div>
-              )}
-
-              {/* Etablissement selector */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-                  Etablissement
-                </div>
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  {bmEtab && (
-                    <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontFamily: "DM Sans, sans-serif", fontSize: 13 }}>
-                      <input
-                        type="radio"
-                        name="modal_etab"
-                        checked={form.etablissement_id === bmEtab.id}
-                        onChange={() => setForm(f => ({ ...f, etablissement_id: bmEtab.id }))}
-                        style={{ accentColor: "#D4775A" }}
-                      />
-                      Bello Mio
-                    </label>
-                  )}
-                  {pmEtab && (
-                    <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontFamily: "DM Sans, sans-serif", fontSize: 13 }}>
-                      <input
-                        type="radio"
-                        name="modal_etab"
-                        checked={form.etablissement_id === pmEtab.id}
-                        onChange={() => setForm(f => ({ ...f, etablissement_id: pmEtab.id }))}
-                        style={{ accentColor: "#D4775A" }}
-                      />
-                      Piccola Mia
-                    </label>
-                  )}
-                </div>
-              </div>
-
-              {/* Section: Couleur */}
-              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-                Couleur
-              </div>
-              <div style={{ marginBottom: 16 }}>
-                <ColorPicker value={form.color || modalColor} onChange={(hex) => setForm((f) => ({ ...f, color: hex }))} size={24} />
-              </div>
-
-              {/* ── Accordion: Coordonnees ── */}
-              <AccordionHeader label="Coordonnees" isOpen={openSection === "coord"} onToggle={() => toggleSection("coord")} />
-              {openSection === "coord" && (
-                <div style={{ padding: "0 2px 16px" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                    <div>
-                      <div style={labelStyle}>Contact</div>
-                      <input style={inputStyle} value={form.contact_name} onChange={(e) => setForm((f) => ({ ...f, contact_name: e.target.value }))} placeholder="Prenom Nom" />
-                    </div>
-                    <div>
-                      <div style={labelStyle}>Telephone</div>
-                      <input style={inputStyle} value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="06 xx xx xx xx" type="tel" />
-                    </div>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 0 }}>
-                    <div>
-                      <div style={labelStyle}>Email</div>
-                      <input style={inputStyle} value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="contact@fournisseur.fr" type="email" />
-                    </div>
-                    <div>
-                      <div style={labelStyle}>Site web</div>
-                      <input style={inputStyle} value={form.website} onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))} placeholder="fournisseur.fr" />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ── Accordion: Adresse ── */}
-              <AccordionHeader label="Adresse" isOpen={openSection === "addr"} onToggle={() => toggleSection("addr")} />
-              {openSection === "addr" && (
-                <div style={{ padding: "0 2px 16px" }}>
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={labelStyle}>Adresse</div>
-                    <input style={inputStyle} value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} placeholder="Rue, numero" />
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div>
-                      <div style={labelStyle}>Code postal</div>
-                      <input style={inputStyle} value={form.postal_code} onChange={(e) => setForm((f) => ({ ...f, postal_code: e.target.value }))} placeholder="35400" />
-                    </div>
-                    <div>
-                      <div style={labelStyle}>Ville</div>
-                      <input style={inputStyle} value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} placeholder="Saint-Malo" />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ── Accordion: Infos commerciales ── */}
-              <AccordionHeader label="Infos commerciales" isOpen={openSection === "infos"} onToggle={() => toggleSection("infos")} />
-              {openSection === "infos" && (
-                <div style={{ padding: "0 2px 16px" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                    <div>
-                      <div style={labelStyle}>Categorie</div>
-                      <select
-                        style={{ ...inputStyle, cursor: "pointer" }}
-                        value={form.category}
-                        onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                      >
-                        <option value="">--</option>
-                        {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
-                          <option key={k} value={k}>{v}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <div style={labelStyle}>Conditions paiement</div>
-                      <input style={inputStyle} value={form.payment_terms} onChange={(e) => setForm((f) => ({ ...f, payment_terms: e.target.value }))} placeholder="30 jours fin de mois" />
-                    </div>
-                  </div>
-                  <div>
-                    <div style={labelStyle}>Code client</div>
-                    <input style={inputStyle} value={form.client_code} onChange={(e) => setForm((f) => ({ ...f, client_code: e.target.value }))} placeholder="CL-12345" />
-                  </div>
-                </div>
-              )}
-
-              {/* ── Accordion: Franco & Livraison ── */}
-              <AccordionHeader label="Franco & Livraison" isOpen={openSection === "franco"} onToggle={() => toggleSection("franco")} />
-              {openSection === "franco" && (<>
-              <div style={{ background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 12, padding: 14, marginBottom: 16 }}>
-                {/* Franco row */}
-                <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
-                  <div>
-                    <div style={labelStyle}>Franco de port (EUR HT)</div>
-                    <input style={{ ...inputStyle, width: 110 }} value={form.franco_minimum} onChange={(e) => setForm((f) => ({ ...f, franco_minimum: e.target.value }))} placeholder="ex: 200" type="number" min="0" step="10" />
-                  </div>
-                  <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", paddingTop: 14 }}>
-                    <input type="checkbox" checked={form.mercuriale_only} onChange={(e) => setForm((f) => ({ ...f, mercuriale_only: e.target.checked }))} style={{ accentColor: modalColor }} />
-                    <span style={{ fontSize: 11, color: "#666" }}>Mercuriale uniquement</span>
-                  </label>
-                  <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", paddingTop: 14 }}>
-                    <input type="checkbox" checked={form.franco_obligatoire} onChange={(e) => setForm((f) => ({ ...f, franco_obligatoire: e.target.checked }))} style={{ accentColor: modalColor }} />
-                    <span style={{ fontSize: 11, color: "#666" }}>Franco obligatoire</span>
-                  </label>
-                </div>
-
-                {/* Schedule table */}
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
-                  Planning commande → livraison
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 3, marginBottom: 3 }}>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", padding: "3px 6px" }}>Jour cde</div>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", padding: "3px 6px" }}>Heure lim.</div>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", padding: "3px 6px" }}>Jour livr.</div>
-                </div>
-                {JOURS_FULL.map((jour) => {
-                  const rule = schedule.find(r => r.day === jour);
-                  return (
-                    <div key={jour} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 3, marginBottom: 1 }}>
-                      <div style={{ padding: "6px", fontSize: 12, color: rule ? "#1a1a1a" : "#ccc", fontWeight: rule ? 600 : 400, background: rule ? "#faf8f4" : "transparent", borderRadius: 5 }}>
-                        {jour.charAt(0).toUpperCase() + jour.slice(1)}
-                      </div>
-                      <input
-                        style={{ ...inputStyle, padding: "5px 6px", fontSize: 12, background: rule ? "#faf8f4" : "#fff" }}
-                        value={rule?.cutoff ?? ""}
-                        placeholder="hh:mm"
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setSchedule(prev => {
-                            const existing = prev.find(r => r.day === jour);
-                            if (existing) return prev.map(r => r.day === jour ? { ...r, cutoff: val } : r);
-                            if (val) return [...prev, { day: jour, cutoff: val, delivery_day: "" }];
-                            return prev;
-                          });
-                        }}
-                      />
-                      <select
-                        style={{ ...inputStyle, padding: "5px 6px", fontSize: 12, cursor: "pointer", background: rule ? "#faf8f4" : "#fff" }}
-                        value={rule?.delivery_day ?? ""}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setSchedule(prev => {
-                            const existing = prev.find(r => r.day === jour);
-                            if (existing) return prev.map(r => r.day === jour ? { ...r, delivery_day: val } : r);
-                            if (val) return [...prev, { day: jour, cutoff: "", delivery_day: val }];
-                            return prev;
-                          });
-                        }}
-                      >
-                        <option value="">--</option>
-                        {JOURS_FULL.map(j => (
-                          <option key={j} value={j}>{j.charAt(0).toUpperCase() + j.slice(1)}</option>
-                        ))}
-                      </select>
-                    </div>
-                  );
-                })}
-              </div>
-
-              </>)}
-
-              {/* ── Accordion: Administratif ── */}
-              <AccordionHeader label="Administratif" isOpen={openSection === "admin"} onToggle={() => toggleSection("admin")} />
-              {openSection === "admin" && (
-                <div style={{ padding: "0 2px 16px" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                    <div>
-                      <div style={labelStyle}>SIRET</div>
-                      <input style={inputStyle} value={form.siret} onChange={(e) => setForm((f) => ({ ...f, siret: e.target.value }))} placeholder="123 456 789 00012" />
-                    </div>
-                    <div>
-                      <div style={labelStyle}>N TVA intra.</div>
-                      <input style={inputStyle} value={form.tva_intra} onChange={(e) => setForm((f) => ({ ...f, tva_intra: e.target.value }))} placeholder="FR12345678901" />
-                    </div>
-                  </div>
-                  <div>
-                    <div style={labelStyle}>Notes</div>
-                    <textarea
-                      style={{ ...inputStyle, resize: "vertical" }}
-                      value={form.notes}
-                      onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                      placeholder="Informations complementaires..."
-                      rows={2}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* ── Accordion: Contacts / Destinataires ── */}
-              <AccordionHeader label="Contacts / Destinataires" isOpen={openSection === "contacts"} onToggle={() => toggleSection("contacts")} />
-              {openSection === "contacts" && (<div style={{ padding: "0 2px 16px" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
-                {contacts.map((c, idx) => (
-                  <div
-                    key={c.id}
-                    style={{
-                      border: "1px solid #ddd6c8", borderRadius: 8, padding: "8px 10px",
-                      background: "#faf8f4", position: "relative",
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => removeContact(idx)}
-                      title="Supprimer"
-                      style={{
-                        position: "absolute", top: 4, right: 6,
-                        fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700,
-                        color: "#c44", background: "none", border: "none", cursor: "pointer",
-                        padding: "0 4px", lineHeight: 1,
-                      }}
-                    >
-                      X
-                    </button>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
-                      <div>
-                        <div style={{ ...labelStyle, marginBottom: 2 }}>Nom</div>
-                        <input style={{ ...inputStyle, padding: "6px 8px", fontSize: 12 }} value={c.name} onChange={(e) => updateContact(idx, "name", e.target.value)} placeholder="Prenom Nom" />
-                      </div>
-                      <div>
-                        <div style={{ ...labelStyle, marginBottom: 2 }}>Role</div>
-                        <input style={{ ...inputStyle, padding: "6px 8px", fontSize: 12 }} value={c.role} onChange={(e) => updateContact(idx, "role", e.target.value)} placeholder="Commercial..." />
-                      </div>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 6, alignItems: "end" }}>
-                      <div>
-                        <div style={{ ...labelStyle, marginBottom: 2 }}>Email</div>
-                        <input style={{ ...inputStyle, padding: "6px 8px", fontSize: 12 }} value={c.email} onChange={(e) => updateContact(idx, "email", e.target.value)} placeholder="email@fournisseur.fr" type="email" />
-                      </div>
-                      <div>
-                        <div style={{ ...labelStyle, marginBottom: 2 }}>Tel</div>
-                        <input style={{ ...inputStyle, padding: "6px 8px", fontSize: 12 }} value={c.phone} onChange={(e) => updateContact(idx, "phone", e.target.value)} placeholder="06 xx xx xx xx" type="tel" />
-                      </div>
-                      <label style={{
-                        display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap",
-                        fontFamily: "DM Sans, sans-serif", fontSize: 11, color: "#666",
-                        paddingBottom: 8, cursor: "pointer",
-                      }}>
-                        <input
-                          type="checkbox"
-                          checked={c.send_orders}
-                          onChange={(e) => updateContact(idx, "send_orders", e.target.checked)}
-                          style={{ accentColor: modalColor }}
-                        />
-                        Cdes
-                      </label>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={addContact}
-                style={{
-                  fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 600,
-                  color: modalColor, background: "none", border: `1.5px solid ${modalColor}`,
-                  borderRadius: 20, padding: "5px 12px", cursor: "pointer", marginBottom: 16,
-                }}
-              >
-                + Ajouter un contact
-              </button>
-              </div>)}
-
-              {/* Carton config (edit mode only) */}
-              {modalMode === "edit" && modalSupplier && (
-                <div style={{ marginBottom: 16, marginTop: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = !showCartonConfig;
-                      setShowCartonConfig(next);
-                      if (next && !cartonPreview) loadCartonPreview(modalSupplier.id);
-                    }}
-                    style={{
-                      fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700,
-                      color: "#7C3AED", background: "none", border: "1.5px solid #7C3AED",
-                      borderRadius: 20, padding: "5px 14px", cursor: "pointer",
-                    }}
-                  >
-                    {showCartonConfig ? "Masquer config cartons" : "Configurer les cartons"}
-                  </button>
-
-                  {showCartonConfig && (
-                    <div style={{
-                      marginTop: 10, padding: 14, border: "1.5px solid #e5ddd0",
-                      borderRadius: 12, background: "#faf8f4",
-                    }}>
-                      <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
-                        Configuration cartons
-                      </div>
-
-                      {/* Preview stats */}
-                      {cartonLoading && (
-                        <div style={{ fontSize: 12, color: "#999", marginBottom: 8 }}>Chargement...</div>
-                      )}
-                      {cartonPreview && !cartonLoading && (
-                        <div style={{ fontSize: 12, color: "#666", marginBottom: 10, lineHeight: 1.5 }}>
-                          {cartonPreview.total} offre(s) au total — {cartonPreview.without_pack} sans config carton, {cartonPreview.with_pack} deja configuree(s)
-                        </div>
-                      )}
-
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
-                        <div>
-                          <div style={labelStyle}>Bouteilles / carton</div>
-                          <input
-                            type="number"
-                            min="1"
-                            step="1"
-                            value={cartonPackCount}
-                            onChange={(e) => setCartonPackCount(Number(e.target.value) || 1)}
-                            style={{ ...inputStyle, padding: "8px 10px" }}
-                          />
-                        </div>
-                        <div>
-                          <div style={labelStyle}>Volume unitaire</div>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.05"
-                            value={cartonEachQty}
-                            onChange={(e) => setCartonEachQty(Number(e.target.value) || 0)}
-                            style={{ ...inputStyle, padding: "8px 10px" }}
-                          />
-                        </div>
-                        <div>
-                          <div style={labelStyle}>Unite</div>
-                          <select
-                            value={cartonEachUnit}
-                            onChange={(e) => setCartonEachUnit(e.target.value)}
-                            style={{ ...inputStyle, padding: "8px 10px" }}
-                          >
-                            <option value="l">litres (l)</option>
-                            <option value="pc">pieces (pc)</option>
-                            <option value="kg">kilos (kg)</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <button
-                          type="button"
-                          onClick={applyCartonConfig}
-                          disabled={cartonApplying || (cartonPreview?.without_pack === 0)}
-                          style={{
-                            fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 600,
-                            background: "#7C3AED", color: "#fff", border: "none", borderRadius: 20,
-                            padding: "7px 16px", cursor: "pointer",
-                            opacity: (cartonApplying || cartonPreview?.without_pack === 0) ? 0.5 : 1,
-                          }}
-                        >
-                          {cartonApplying ? "..." : `Appliquer a ${cartonPreview?.without_pack ?? "?"} offre(s)`}
-                        </button>
-                        {cartonResult && (
-                          <span style={{ fontSize: 11, color: cartonResult.startsWith("Erreur") ? "#c44" : "#16A34A", fontWeight: 600 }}>
-                            {cartonResult}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Actions */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <button
-                  onClick={saveModal}
-                  disabled={saving}
-                  style={{
-                    fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600,
-                    background: modalColor, color: "#fff", border: "none", borderRadius: 20,
-                    padding: "8px 20px", cursor: "pointer", opacity: saving ? 0.6 : 1,
-                  }}
-                >
-                  {saving ? "..." : modalMode === "create" ? "Creer" : "Enregistrer"}
-                </button>
-
-                {modalMode === "edit" && modalSupplier && (
-                  <Link
-                    href={`/ingredients?supplier=${modalSupplier.id}`}
-                    style={{
-                      fontFamily: "DM Sans, sans-serif", fontSize: 12, color: modalColor,
-                      textDecoration: "none", fontWeight: 600,
-                    }}
-                  >
-                    Voir les articles →
-                  </Link>
-                )}
-              </div>
+              {renderFormBody()}
             </div>
           </div>
         </div>
       )}
+
 
       {/* FAB centré : + Nouveau fournisseur */}
       <button
