@@ -115,30 +115,6 @@ export function PilotageSwipeWrapper({ children, mode, onModeChange, accent = "#
           </div>
         )}
 
-        {/* Page dots */}
-        <div style={{
-          display: "flex", gap: 6, alignItems: "center",
-          pointerEvents: "auto",
-        }}>
-          {PILOTAGE_PAGES.map((p, i) => (
-            <button
-              key={p.href}
-              type="button"
-              onClick={() => navigateTo(i)}
-              aria-label={p.label}
-              style={{
-                width: i === currentIndex ? 18 : 6,
-                height: 6,
-                borderRadius: 3,
-                border: "none",
-                background: i === currentIndex ? accent : "rgba(0,0,0,0.15)",
-                cursor: "pointer",
-                padding: 0,
-                transition: "all 0.25s cubic-bezier(.34,1.56,.64,1)",
-              }}
-            />
-          ))}
-        </div>
       </div>
     </div>
   );
