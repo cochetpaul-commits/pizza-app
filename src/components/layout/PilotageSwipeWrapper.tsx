@@ -77,13 +77,13 @@ export function PilotageSwipeWrapper({ children, mode, onModeChange, accent = "#
       {/* ── Floating bottom bar: dots + optional TTC/HT toggle ── */}
       <div className="pilotage-swipe-bar" style={{
         position: "fixed",
-        bottom: "calc(72px + env(safe-area-inset-bottom, 0px))",
+        bottom: "calc(130px + env(safe-area-inset-bottom, 0px))",
         left: 0, right: 0,
         zIndex: 99,
         display: "none", /* shown via CSS on mobile */
         flexDirection: "column",
         alignItems: "center",
-        gap: 8,
+        gap: 6,
         pointerEvents: "none",
       }}>
         {/* TTC/HT toggle */}

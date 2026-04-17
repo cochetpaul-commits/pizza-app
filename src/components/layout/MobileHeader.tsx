@@ -27,42 +27,6 @@ function timeAgo(iso: string): string {
   return `${days}j`;
 }
 
-/* ── Sub: Establishment label (tap opens BottomTabBar etab drawer) ── */
-
-function EtabLabel() {
-  const { current, isGroupView, isGroupAdmin, etablissements } = useEtablissement();
-  const label = isGroupView ? "iFratelli Group" : (current?.nom ?? "");
-  const color = isGroupView ? "#b45f57" : (current?.couleur ?? "#b45f57");
-  const canSwitch = isGroupAdmin || etablissements.length > 1;
-
-  return (
-    <button
-      type="button"
-      onClick={() => { if (canSwitch) window.dispatchEvent(new CustomEvent("open-etab-drawer")); }}
-      style={{
-        display: "inline-flex", alignItems: "center", gap: 6,
-        padding: "7px 14px", borderRadius: 999,
-        background: "#fff",
-        border: "1px solid rgba(0,0,0,0.06)",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
-        cursor: canSwitch ? "pointer" : "default",
-        fontFamily: "var(--font-oswald), Oswald, sans-serif",
-        fontSize: 12, fontWeight: 700,
-        color: "#1a1a1a", textTransform: "uppercase", letterSpacing: ".05em",
-        maxWidth: 220,
-      }}
-    >
-      <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
-      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
-      {canSwitch && (
-        <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      )}
-    </button>
-  );
-}
-
 /* ── Sub: Notification bell ──────────────────────── */
 
 function NotifBell() {
@@ -320,17 +284,9 @@ export function MobileHeader() {
       borderBottom: "1px solid rgba(0,0,0,0.06)",
     }}>
       <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
+        display: "flex", alignItems: "center", justifyContent: "flex-end",
         height: 52, padding: "0 12px", gap: 10,
       }}>
-        {/* Left spacer (keeps the dropdown centered) */}
-        <div style={{ width: 36 }} />
-
-        {/* Center: establishment label */}
-        <div style={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0 }}>
-          <EtabLabel />
-        </div>
-
         {/* Right: bell + avatar */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
           <NotifBell />

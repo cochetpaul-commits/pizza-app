@@ -508,36 +508,7 @@ export function BottomTabBar() {
         display: "none",
         padding: "0 12px",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
-          {/* Etab FAB */}
-          {canSwitchEtab && (
-            <button
-              type="button"
-              onClick={() => setEtabDrawerOpen(true)}
-              style={{
-                width: 46, height: 46,
-                borderRadius: "50%",
-                border: `2px solid ${etabColor}`,
-                background: "rgba(245,240,232,0.85)",
-                backdropFilter: "blur(24px) saturate(180%)",
-                WebkitBackdropFilter: "blur(24px) saturate(180%)",
-                boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
-                cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: etabColor,
-                flexShrink: 0,
-                transition: "transform 0.15s",
-              }}
-              onTouchStart={e => { e.currentTarget.style.transform = "scale(0.92)"; }}
-              onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
-              aria-label="Changer d'etablissement"
-            >
-              <span style={{ width: 12, height: 12, borderRadius: "50%", background: etabColor }} />
-            </button>
-          )}
-
-          {/* Section pills */}
-          {showNavPill && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{
             display: "flex", alignItems: "center", gap: 2,
             padding: "5px 6px",
@@ -550,7 +521,26 @@ export function BottomTabBar() {
             overflowX: "auto",
             scrollbarWidth: "none",
           }}>
-            {sections.map((section) => {
+            {/* Etab button — same style as section pills */}
+            {canSwitchEtab && (
+              <button
+                type="button"
+                onClick={() => setEtabDrawerOpen(true)}
+                style={{
+                  ...toggleStyle(false),
+                  padding: "10px 12px",
+                  color: etabColor,
+                  borderRight: showNavPill ? "1px solid rgba(0,0,0,0.06)" : "none",
+                  marginRight: showNavPill ? 2 : 0,
+                }}
+                onTouchStart={e => { e.currentTarget.style.transform = "scale(0.94)"; }}
+                onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
+                aria-label="Changer d'etablissement"
+              >
+                <IconBuilding />
+              </button>
+            )}
+            {showNavPill && sections.map((section) => {
               const isActive = activeSection === section;
               const label = SECTION_SHORT_LABEL[section.label] ?? section.label;
               return (
@@ -567,7 +557,6 @@ export function BottomTabBar() {
               );
             })}
           </div>
-          )}
         </div>
       </nav>
     </>
