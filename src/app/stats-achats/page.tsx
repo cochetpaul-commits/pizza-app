@@ -281,9 +281,6 @@ export default function StatsAchatsPage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
-        <h1 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24, color: "#1a1a1a", margin: "0 0 20px" }}>
-          Repartition des achats
-        </h1>
 
         {/* Period selector */}
         <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>

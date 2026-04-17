@@ -225,10 +225,14 @@ html, body{
   .bottom-tab-bar {
     display: block !important;
   }
+  .pilotage-swipe-bar {
+    display: flex !important;
+  }
 }
 
 /* Hide bottom tab bar pill when a bottom sheet drawer is open */
-body.bottom-sheet-open .bottom-tab-bar {
+body.bottom-sheet-open .bottom-tab-bar,
+body.bottom-sheet-open .pilotage-swipe-bar {
   display: none !important;
 }
 

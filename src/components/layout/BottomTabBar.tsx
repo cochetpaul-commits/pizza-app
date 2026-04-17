@@ -8,6 +8,18 @@ import type { Role } from "@/lib/rbac";
 import { ChefHat, ShoppingBasket } from "lucide-react";
 import { BottomSheet } from "./BottomSheet";
 
+/* ── Icon: Building ────────────────────────────────── */
+function IconBuilding() {
+  return (
+    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <path d="M9 22V12h6v10" />
+      <path d="M8 6h.01" /><path d="M16 6h.01" />
+      <path d="M8 10h.01" /><path d="M16 10h.01" />
+    </svg>
+  );
+}
+
 /* ── Icons ────────────────────────────────────────── */
 
 function IconCalendar({ active: _active }: { active: boolean }) {
@@ -171,7 +183,7 @@ const SECTION_MY_PLANNING: TabSection = {
   tabs: [],
 };
 
-const SECTION_PERSONNEL: TabSection = {
+const _SECTION_PERSONNEL: TabSection = {
   label: "Personnel",
   href: "/rh/equipe",
   match: ["/rh/", "/mes-shifts", "/plannings", "/personnel"],
@@ -311,8 +323,9 @@ export function BottomTabBar() {
   const pathname = usePathname();
   const router = useRouter();
   const { role } = useProfile();
-  const { current } = useEtablissement();
+  const { current, setCurrent, etablissements, isGroupView, setGroupView, isGroupAdmin } = useEtablissement();
   const [drawerSection, setDrawerSection] = useState<TabSection | null>(null);
+  const [etabDrawerOpen, setEtabDrawerOpen] = useState(false);
 
   // Hide entirely until an establishment is selected
   if (!role || !current) return null;
@@ -322,6 +335,7 @@ export function BottomTabBar() {
   const sections = allSections.filter(s => !s.roles || s.roles.includes(role));
   const activeSection = getActiveSection(pathname, sections);
   const etabColor = current?.couleur ?? "#b45f57";
+  const canSwitchEtab = isGroupAdmin || etablissements.length > 1;
 
   const handleSectionClick = (section: TabSection) => {
     if (section.tabs.length === 0) {
@@ -405,44 +419,143 @@ export function BottomTabBar() {
         })()}
       </BottomSheet>
 
+      {/* ── Etab drawer ── */}
+      <BottomSheet
+        open={etabDrawerOpen}
+        onClose={() => setEtabDrawerOpen(false)}
+        title="Etablissement"
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {isGroupAdmin && (
+            <button type="button" onClick={() => {
+              setGroupView(true); setCurrent(null); setEtabDrawerOpen(false);
+              router.push("/groupe");
+            }} style={{
+              display: "flex", alignItems: "center", gap: 14,
+              width: "100%", padding: "16px 18px",
+              border: "none", cursor: "pointer", borderRadius: 16,
+              background: isGroupView ? "rgba(180,95,87,0.10)" : "rgba(255,255,255,0.55)",
+              borderLeft: isGroupView ? "4px solid #b45f57" : "4px solid transparent",
+            }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 12,
+                background: isGroupView ? "rgba(180,95,87,0.20)" : "rgba(0,0,0,0.04)",
+                color: isGroupView ? "#b45f57" : "#666",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <IconBuilding />
+              </div>
+              <span style={{
+                fontSize: 15, fontWeight: isGroupView ? 700 : 500,
+                color: isGroupView ? "#b45f57" : "#1a1a1a",
+                fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+              }}>
+                iFratelli Group
+              </span>
+            </button>
+          )}
+          {etablissements.map(e => {
+            const isSelected = !isGroupView && current?.id === e.id;
+            const clr = e.couleur ?? "#b45f57";
+            return (
+              <button key={e.id} type="button" onClick={() => {
+                setGroupView(false); setCurrent(e); setEtabDrawerOpen(false);
+                const slug = e.slug?.includes("piccola") ? "/piccola-mia" : "/bello-mio";
+                router.push(slug);
+              }} style={{
+                display: "flex", alignItems: "center", gap: 14,
+                width: "100%", padding: "16px 18px",
+                border: "none", cursor: "pointer", borderRadius: 16,
+                background: isSelected ? `${clr}15` : "rgba(255,255,255,0.55)",
+                borderLeft: isSelected ? `4px solid ${clr}` : "4px solid transparent",
+              }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 12,
+                  background: isSelected ? `${clr}25` : "rgba(0,0,0,0.04)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <span style={{ width: 14, height: 14, borderRadius: "50%", background: clr }} />
+                </div>
+                <span style={{
+                  fontSize: 15, fontWeight: isSelected ? 700 : 500,
+                  color: isSelected ? clr : "#1a1a1a",
+                  fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+                }}>
+                  {e.nom}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </BottomSheet>
+
       {/* ── Floating section pill ── */}
       <nav className="bottom-tab-bar" style={{
         position: "fixed",
         bottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
-        left: "50%",
-        transform: "translateX(-50%)",
+        left: 0, right: 0,
         zIndex: 100,
         display: "none",
-        maxWidth: "calc(100vw - 24px)",
+        padding: "0 12px",
       }}>
-        <div style={{
-          display: "flex", alignItems: "center", gap: 2,
-          padding: "5px 6px",
-          borderRadius: 999,
-          background: "rgba(245,240,232,0.85)",
-          backdropFilter: "blur(24px) saturate(180%)",
-          WebkitBackdropFilter: "blur(24px) saturate(180%)",
-          border: "1px solid rgba(0,0,0,0.06)",
-          boxShadow: "0 6px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)",
-          overflowX: "auto",
-          scrollbarWidth: "none",
-        }}>
-          {sections.map((section) => {
-            const isActive = activeSection === section;
-            const label = SECTION_SHORT_LABEL[section.label] ?? section.label;
-            return (
-              <button
-                key={section.label}
-                type="button"
-                onClick={() => handleSectionClick(section)}
-                style={toggleStyle(isActive)}
-                onTouchStart={e => { e.currentTarget.style.transform = "scale(0.94)"; }}
-                onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
-              >
-                {label}
-              </button>
-            );
-          })}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
+          {/* Etab FAB */}
+          {canSwitchEtab && (
+            <button
+              type="button"
+              onClick={() => setEtabDrawerOpen(true)}
+              style={{
+                width: 46, height: 46,
+                borderRadius: "50%",
+                border: `2px solid ${etabColor}`,
+                background: "rgba(245,240,232,0.85)",
+                backdropFilter: "blur(24px) saturate(180%)",
+                WebkitBackdropFilter: "blur(24px) saturate(180%)",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
+                cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: etabColor,
+                flexShrink: 0,
+                transition: "transform 0.15s",
+              }}
+              onTouchStart={e => { e.currentTarget.style.transform = "scale(0.92)"; }}
+              onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
+              aria-label="Changer d'etablissement"
+            >
+              <span style={{ width: 12, height: 12, borderRadius: "50%", background: etabColor }} />
+            </button>
+          )}
+
+          {/* Section pills */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 2,
+            padding: "5px 6px",
+            borderRadius: 999,
+            background: "rgba(245,240,232,0.85)",
+            backdropFilter: "blur(24px) saturate(180%)",
+            WebkitBackdropFilter: "blur(24px) saturate(180%)",
+            border: "1px solid rgba(0,0,0,0.06)",
+            boxShadow: "0 6px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)",
+            overflowX: "auto",
+            scrollbarWidth: "none",
+          }}>
+            {sections.map((section) => {
+              const isActive = activeSection === section;
+              const label = SECTION_SHORT_LABEL[section.label] ?? section.label;
+              return (
+                <button
+                  key={section.label}
+                  type="button"
+                  onClick={() => handleSectionClick(section)}
+                  style={toggleStyle(isActive)}
+                  onTouchStart={e => { e.currentTarget.style.transform = "scale(0.94)"; }}
+                  onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </nav>
     </>

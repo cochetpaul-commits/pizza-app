@@ -53,14 +53,6 @@ type EmployeRow = Employe & {
 
 /* ── Styles ────────────────────────────────────────────────────── */
 
-const h1Style: React.CSSProperties = {
-  fontFamily: "var(--font-oswald), Oswald, sans-serif",
-  fontSize: 22,
-  fontWeight: 700,
-  letterSpacing: 1,
-  marginBottom: 16,
-  color: "#1a1a1a",
-};
 
 const STATUS_COLORS: Record<RowStatus, { bg: string; fg: string }> = {
   traitee: { bg: "#e8ede6", fg: "#4a6741" },
@@ -437,7 +429,6 @@ export default function PointagePage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
-        <h1 style={h1Style}>Personnel</h1>
 
         {/* Date navigator */}
         <div

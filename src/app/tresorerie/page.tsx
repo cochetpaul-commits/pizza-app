@@ -6,8 +6,8 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
 import { NavBar } from "@/components/NavBar";
-import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
-import { PilotageNavBar } from "@/components/layout/PilotageNavBar";
+import { type DateRange } from "@/components/ui/DateRangePicker";
+import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 
 /* ══════════════════════════════════════════════════════
    TYPES
@@ -675,22 +675,8 @@ function TresoreriePage() {
     <>
       <NavBar backHref="/" backLabel="Accueil" />
 
+      <PilotageSwipeWrapper dateFrom={range.from} dateTo={range.to}>
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "24px 16px 60px" }}>
-        {/* ── Title ── */}
-        <h1
-          style={{
-            fontFamily: OSWALD,
-            fontSize: 22,
-            fontWeight: 700,
-            color: "#1a1a1a",
-            marginBottom: 20,
-          }}
-        >
-          Tresorerie
-        </h1>
-
-        {/* ══════ Pilotage nav bar unifiée (toggle + DateRangePicker) ══════ */}
-        <PilotageNavBar range={range} onRangeChange={(r) => setRange(r)} />
 
         {loading && (
           <div style={{ textAlign: "center", padding: 60, color: "#999", fontSize: 13 }}>
@@ -1526,6 +1512,7 @@ function TresoreriePage() {
           )}
         </div>
       </div>
+      </PilotageSwipeWrapper>
     </>
   );
 }

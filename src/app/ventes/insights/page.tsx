@@ -108,10 +108,6 @@ export default function InsightsPage() {
         {/* Pulse animation */}
         <style>{`@keyframes pulse { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
 
-        {/* Header */}
-        <div style={S.header}>
-          <h1 style={S.title}>Pilotage</h1>
-        </div>
 
         <div style={{ ...S.dateRow, marginBottom: 20 }}>
           <label style={{ fontSize: 14, color: "#666" }}>Du</label>

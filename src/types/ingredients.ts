@@ -1,18 +1,18 @@
 export const CATEGORIES = [
-  "cremerie_fromage",
+  "antipasti",
+  "autre",
+  "boisson",
   "charcuterie_viande",
-  "maree",
-  "legumes_herbes",
-  "fruit",
+  "cremerie_fromage",
+  "emballage",
   "epicerie_salee",
   "epicerie_sucree",
-  "alcool_spiritueux",
-  "boisson",
-  "sauce",
-  "autre",
+  "fruit",
+  "legumes_herbes",
+  "maree",
   "preparation",
-  "antipasti",
-  "emballage",
+  "sauce",
+  "alcool_spiritueux",
 ] as const;
 
 export type Category = (typeof CATEGORIES)[number];

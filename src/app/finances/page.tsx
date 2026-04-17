@@ -357,14 +357,6 @@ export default function FinancesPage() {
       <>
         <main style={{ maxWidth: 720, margin: "0 auto", padding: "20px 16px 56px", boxSizing: "border-box" }}>
 
-          {/* Title */}
-          <h1 style={{
-            margin: "0 0 20px", fontSize: 20, fontWeight: 800, letterSpacing: 2,
-            textTransform: "uppercase", color: "#1a1a1a",
-            fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-          }}>
-            Contr&ocirc;le financier
-          </h1>
 
           {/* Period selector */}
           <PeriodSelector

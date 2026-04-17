@@ -1142,15 +1142,6 @@ export default function FournisseursPage() {
   return (
     <RequireRole allowedRoles={["group_admin", "equipier"]}>
       <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
-        {/* Header row */}
-        <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
-          <h1 style={{
-            fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24,
-            color: "#1a1a1a", margin: 0, textTransform: "uppercase", letterSpacing: "0.04em",
-          }}>
-            Fournisseurs
-          </h1>
-        </div>
 
         {loading && <p style={{ color: "#999", fontSize: 14, textAlign: "center", marginTop: 40 }}>Chargement...</p>}
 

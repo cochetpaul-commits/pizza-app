@@ -1,14 +1,12 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
+import type { DateRange } from "@/components/ui/DateRangePicker";
 
 type PilotageNavBarProps = {
   range: DateRange;
-  onRangeChange: (r: DateRange) => void;
+  onRangeChange?: (r: DateRange) => void;
   accent?: string;
-  /** Si false, n'affiche que le toggle de navigation (pas le DateRangePicker) */
-  showDatePicker?: boolean;
 };
 
 const ACCENT = "#D4775A";
@@ -20,7 +18,7 @@ const TABS = [
   { label: "Trésorerie", href: "/tresorerie", match: (p: string) => p.startsWith("/tresorerie") },
 ];
 
-export function PilotageNavBar({ range, onRangeChange, accent = ACCENT, showDatePicker = true }: PilotageNavBarProps) {
+export function PilotageNavBar({ range, accent = ACCENT }: PilotageNavBarProps) {
   const router = useRouter();
   const pathname = usePathname() ?? "";
 
@@ -64,13 +62,6 @@ export function PilotageNavBar({ range, onRangeChange, accent = ACCENT, showDate
           })}
         </div>
       </div>
-
-      {/* DateRangePicker partagé — centré */}
-      {showDatePicker && (
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          <DateRangePicker value={range} onChange={onRangeChange} format="short" />
-        </div>
-      )}
     </div>
   );
 }

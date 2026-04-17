@@ -27,108 +27,27 @@ function timeAgo(iso: string): string {
   return `${days}j`;
 }
 
-/* ── Sub: Establishment dropdown ─────────────────── */
+/* ── Sub: Establishment label (static — switching is via BottomTabBar drawer) ── */
 
-function EtabDropdown() {
-  const router = useRouter();
-  const { current, setCurrent, etablissements, isGroupView, setGroupView, isGroupAdmin } = useEtablissement();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  // Only group admins (or users with multiple etabs) can switch
-  const canSwitch = isGroupAdmin || etablissements.length > 1;
-
-  useEffect(() => {
-    if (!open) return;
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  const label = isGroupView ? "iFratelli Group" : (current?.nom ?? "Choisir...");
+function EtabLabel() {
+  const { current, isGroupView } = useEtablissement();
+  const label = isGroupView ? "iFratelli Group" : (current?.nom ?? "");
   const color = isGroupView ? "#b45f57" : (current?.couleur ?? "#b45f57");
 
   return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <button
-        type="button"
-        onClick={() => { if (canSwitch) setOpen(v => !v); }}
-        style={{
-          display: "inline-flex", alignItems: "center", gap: 6,
-          padding: "7px 14px", borderRadius: 999,
-          background: "#fff",
-          border: "1px solid rgba(0,0,0,0.06)",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
-          cursor: canSwitch ? "pointer" : "default",
-          fontFamily: "var(--font-oswald), Oswald, sans-serif",
-          fontSize: 12, fontWeight: 700,
-          color: "#1a1a1a", textTransform: "uppercase", letterSpacing: ".05em",
-          maxWidth: 220,
-        }}
-      >
-        <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
-        {canSwitch && (
-          <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "rotate(0)", transition: "transform .2s" }}>
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        )}
-      </button>
-
-      {open && canSwitch && (
-        <div style={{
-          position: "absolute", top: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)",
-          minWidth: 220,
-          background: "rgba(255,255,255,0.97)",
-          backdropFilter: "blur(20px) saturate(180%)",
-          WebkitBackdropFilter: "blur(20px) saturate(180%)",
-          border: "1px solid rgba(0,0,0,0.08)",
-          borderRadius: 14, overflow: "hidden",
-          boxShadow: "0 12px 36px rgba(0,0,0,0.16)",
-          zIndex: 320,
-        }}>
-          {isGroupAdmin && (
-            <button type="button" onClick={() => {
-              setGroupView(true); setCurrent(null); setOpen(false);
-              router.push("/groupe");
-            }} style={{
-              display: "flex", alignItems: "center", gap: 10,
-              width: "100%", padding: "12px 14px", border: "none", cursor: "pointer",
-              background: isGroupView ? "rgba(180,95,87,0.10)" : "transparent",
-              color: "#1a1a1a", fontSize: 13, fontWeight: isGroupView ? 700 : 500,
-              textAlign: "left",
-              borderBottom: "1px solid rgba(0,0,0,0.06)",
-            }}>
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#b45f57" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="4" y="2" width="16" height="20" rx="2" /><path d="M9 22V12h6v10" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M8 10h.01" /><path d="M16 10h.01" />
-              </svg>
-              iFratelli Group
-            </button>
-          )}
-          {etablissements.map(e => {
-            const isSelected = !isGroupView && current?.id === e.id;
-            const clr = e.couleur ?? "#b45f57";
-            return (
-              <button key={e.id} type="button" onClick={() => {
-                setGroupView(false); setCurrent(e); setOpen(false);
-                const slug = e.slug?.includes("piccola") ? "/piccola-mia" : "/bello-mio";
-                router.push(slug);
-              }} style={{
-                display: "flex", alignItems: "center", gap: 10,
-                width: "100%", padding: "12px 14px", border: "none", cursor: "pointer",
-                background: isSelected ? `${clr}15` : "transparent",
-                color: "#1a1a1a", fontSize: 13, fontWeight: isSelected ? 700 : 500,
-                textAlign: "left",
-              }}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: clr, flexShrink: 0 }} />
-                {e.nom}
-              </button>
-            );
-          })}
-        </div>
-      )}
+    <div style={{
+      display: "inline-flex", alignItems: "center", gap: 6,
+      padding: "7px 14px", borderRadius: 999,
+      background: "#fff",
+      border: "1px solid rgba(0,0,0,0.06)",
+      boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+      fontFamily: "var(--font-oswald), Oswald, sans-serif",
+      fontSize: 12, fontWeight: 700,
+      color: "#1a1a1a", textTransform: "uppercase", letterSpacing: ".05em",
+      maxWidth: 220,
+    }}>
+      <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
     </div>
   );
 }
@@ -396,9 +315,9 @@ export function MobileHeader() {
         {/* Left spacer (keeps the dropdown centered) */}
         <div style={{ width: 36 }} />
 
-        {/* Center: establishment dropdown */}
+        {/* Center: establishment label */}
         <div style={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0 }}>
-          <EtabDropdown />
+          <EtabLabel />
         </div>
 
         {/* Right: bell + avatar */}

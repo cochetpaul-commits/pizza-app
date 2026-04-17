@@ -202,9 +202,6 @@ export default function EpiceriePage() {
     <main style={{ minHeight: "100vh", background: "#FAF7F2", padding: 16, fontFamily: "inherit", overflowX: "hidden" as const, maxWidth: "100vw", position: "relative", boxSizing: "border-box" }}>
       <div style={{ maxWidth: 1400, margin: "0 auto", width: "100%" }}>
 
-        <div style={{ marginBottom: 20 }}>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "#1A1A1A" }}>Production</h1>
-        </div>
 
         <div className="epicerie-grid">
 

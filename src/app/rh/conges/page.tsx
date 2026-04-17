@@ -690,20 +690,6 @@ export default function CongesPage() {
   return (
     <RequireRole allowedRoles={["group_admin", "equipier"]}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px" }}>
-        {/* ── Header ──────────────────────────────────────────── */}
-        <h1
-          style={{
-            fontFamily: "var(--font-oswald), Oswald, sans-serif",
-            fontSize: 22,
-            fontWeight: 700,
-            letterSpacing: 1,
-            marginBottom: 20,
-            color: "#1a1a1a",
-            textTransform: "uppercase",
-          }}
-        >
-          {isEquipier ? "Mes conges" : "Conges"}
-        </h1>
 
         {/* ── KPI Cards ───────────────────────────────────────── */}
         {!loading && etab && (

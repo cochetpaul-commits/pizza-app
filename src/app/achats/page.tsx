@@ -765,15 +765,6 @@ export default function AchatsPage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 20, position: "relative" }}>
-          <h1 style={{
-            fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24,
-            color: "#1a1a1a", margin: 0, textTransform: "uppercase", letterSpacing: "0.04em",
-          }}>
-            Factures
-          </h1>
-{/* Import button removed — use FAB drawer at bottom */}
-        </div>
 
         {/* ══════════════════════════════════════════════════ */}
         {/*  DATE RANGE PICKER — centered                    */}

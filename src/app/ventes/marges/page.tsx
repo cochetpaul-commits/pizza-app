@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback, Suspense, type CSSProperties } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { AiInsightCard } from "@/components/AiInsightCard";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
 import { BottomSheet } from "@/components/layout/BottomSheet";
-import { PilotageNavBar } from "@/components/layout/PilotageNavBar";
+import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 
 import Chart from "chart.js/auto";
 import { getCategoryColor, getCategoryColors } from "@/lib/categoryColors";
@@ -189,7 +189,6 @@ export default function MargesPageWrapper() {
 
 function MargesPage() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const { current: etab } = useEtablissement();
   const accent = etab?.couleur ?? COLORS.accent;
 
@@ -326,8 +325,6 @@ function MargesPage() {
     } catch { /* ignore */ }
     setExportingPdf(false);
   };
-
-  const { from, to } = getRange();
 
   // Charts
   useEffect(() => {
@@ -640,6 +637,7 @@ function MargesPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
+      <PilotageSwipeWrapper mode={mode} onModeChange={setMode} accent={accent} dateFrom={range.from} dateTo={range.to}>
       <div
         className="ventes-marges-container"
         style={{
@@ -655,23 +653,8 @@ function MargesPage() {
             .marges-toolbar-desktop { display: none !important; }
           }
         `}</style>
-        {/* ── Pilotage nav bar unifiée (toggle + DateRangePicker) ── */}
-        <PilotageNavBar range={range} onRangeChange={(r) => setRange(r)} accent={accent} />
-
-        {/* TTC/HT toggle + actions desktop */}
+        {/* Actions desktop */}
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", gap: 0, background: "#fff", border: "1px solid rgba(0,0,0,.08)", borderRadius: 999, padding: 2 }}>
-            <button type="button" onClick={() => setMode("ttc")} style={{
-              padding: "4px 14px", borderRadius: 999, border: "none", cursor: "pointer",
-              background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#999",
-              fontSize: 11, fontWeight: 700, letterSpacing: ".03em",
-            }}>TTC</button>
-            <button type="button" onClick={() => setMode("ht")} style={{
-              padding: "4px 14px", borderRadius: 999, border: "none", cursor: "pointer",
-              background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#999",
-              fontSize: 11, fontWeight: 700, letterSpacing: ".03em",
-            }}>HT</button>
-          </div>
           <label className="desktop-only" style={{
             padding: "6px 14px", borderRadius: 8, border: "none",
             background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
@@ -1902,7 +1885,7 @@ function MargesPage() {
           </button>
         </div>
       </BottomSheet>
-
+      </PilotageSwipeWrapper>
     </RequireRole>
   );
 }

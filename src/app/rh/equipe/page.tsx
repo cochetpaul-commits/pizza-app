@@ -172,10 +172,6 @@ export default function EquipePage() {
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={pageStyle}>
-        {/* ── Header ── */}
-        <div style={{ marginBottom: 20 }}>
-          <h1 style={h1Style}>Personnel</h1>
-        </div>
 
         {/* ── Table ── */}
         {loading ? (
@@ -325,15 +321,6 @@ const pageStyle: React.CSSProperties = {
   padding: "16px 16px 60px",
 };
 
-const h1Style: React.CSSProperties = {
-  margin: 0,
-  fontSize: 28,
-  fontWeight: 700,
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-  textTransform: "uppercase",
-  letterSpacing: 1.5,
-  color: "#1a1a1a",
-};
 
 const tableStyle: React.CSSProperties = {
   width: "100%",

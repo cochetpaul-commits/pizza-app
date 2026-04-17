@@ -6,7 +6,7 @@ import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
-import { PilotageNavBar } from "@/components/layout/PilotageNavBar";
+import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -251,17 +251,9 @@ export default function MasseSalarialePage() {
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
+      <PilotageSwipeWrapper accent={etabColor} dateFrom={navRange.from} dateTo={navRange.to}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "20px 16px 100px" }}>
-        {/* Pilotage nav (toggle pages, pas de DatePicker — la page a son propre mois/semaine) */}
-        <PilotageNavBar range={navRange} onRangeChange={() => { /* géré localement */ }} accent={etabColor} showDatePicker={false} />
 
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-          <span style={{ width: 10, height: 10, borderRadius: "50%", background: etabColor }} />
-          <h1 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, margin: 0, color: "#1a1a1a", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-            Masse salariale
-          </h1>
-        </div>
 
         {/* Tabs: Reelle / TNS / Simulateur */}
         <div style={{ display: "flex", gap: 4, padding: 4, background: "#f0ebe2", borderRadius: 12, marginBottom: 18, border: "1px solid #e8e0d0" }}>
@@ -515,6 +507,7 @@ export default function MasseSalarialePage() {
           {importing ? "Import..." : "Import Combo"}
         </label>
       </div>
+      </PilotageSwipeWrapper>
     </RequireRole>
   );
 }

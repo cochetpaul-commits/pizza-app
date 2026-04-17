@@ -263,23 +263,6 @@ export default function EventsPage() {
     <>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "12px 16px 100px" }}>
 
-        {/* ═══ HEADER ═══ */}
-        <div style={{ marginBottom: 20 }}>
-          <h1 style={{
-            fontSize: "1.5rem", fontWeight: 700,
-            fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-            letterSpacing: 1.5, textTransform: "uppercase" as const,
-            color: "#1a1a1a", margin: 0,
-          }}>
-            Événementiel
-          </h1>
-          <p style={{ margin: "4px 0 0", fontSize: 13, color: "#9a8f84" }}>
-            {kpiCount > 0
-              ? `${kpiCount} événement${kpiCount > 1 ? "s" : ""} à venir`
-              : "Aucun événement prévu"
-            }
-          </p>
-        </div>
 
         {/* ═══ KPI CARDS ═══ */}
         {!loading && (
