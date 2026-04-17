@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -327,8 +327,18 @@ export function BottomTabBar() {
   const [drawerSection, setDrawerSection] = useState<TabSection | null>(null);
   const [etabDrawerOpen, setEtabDrawerOpen] = useState(false);
 
-  // Hide entirely until an establishment is selected
-  if (!role || !current) return null;
+  // Listen for "open-etab-drawer" event from MobileHeader
+  useEffect(() => {
+    const handler = () => setEtabDrawerOpen(true);
+    window.addEventListener("open-etab-drawer", handler);
+    return () => window.removeEventListener("open-etab-drawer", handler);
+  }, []);
+
+  // Hide until role is known; show even in group view (for etab FAB)
+  if (!role) return null;
+
+  // In group view (no current etab), show only the etab FAB
+  const showNavPill = !!current;
 
   const isPiccola = current?.slug?.includes("piccola");
   const allSections = isPiccola ? SECTIONS_PICCOLA : SECTIONS_BELLO;
@@ -527,6 +537,7 @@ export function BottomTabBar() {
           )}
 
           {/* Section pills */}
+          {showNavPill && (
           <div style={{
             display: "flex", alignItems: "center", gap: 2,
             padding: "5px 6px",
@@ -556,6 +567,7 @@ export function BottomTabBar() {
               );
             })}
           </div>
+          )}
         </div>
       </nav>
     </>
