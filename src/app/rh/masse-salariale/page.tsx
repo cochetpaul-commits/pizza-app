@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
 import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
+import Chart from "chart.js/auto";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -210,6 +211,50 @@ export default function MasseSalarialePage() {
   const ticketMoyen = couvertsMonth && couvertsMonth > 0 && caMonth ? caMonth / couvertsMonth : null;
   const heuresSup = aggregated.reduce((s, e) => s + Math.max(0, e.ecart), 0);
   const heuresManquantes = aggregated.reduce((s, e) => s + Math.max(0, -e.ecart), 0);
+
+  // Team breakdown
+  const teams = useMemo(() => {
+    const map = new Map<string, { label: string; hTrav: number; hPlan: number; repas: number; jours: number; count: number; ecart: number }>();
+    for (const e of aggregated) {
+      const key = e.equipe ?? "Autre";
+      const prev = map.get(key);
+      if (prev) {
+        prev.hTrav += e.hTrav; prev.hPlan += e.hPlan; prev.repas += e.repas; prev.jours += e.jours; prev.count++; prev.ecart += e.ecart;
+      } else {
+        map.set(key, { label: key, hTrav: e.hTrav, hPlan: e.hPlan, repas: e.repas, jours: e.jours, count: 1, ecart: e.ecart });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.hTrav - a.hTrav);
+  }, [aggregated]);
+
+  // Chart ref
+  const chartRef = useRef<HTMLCanvasElement>(null);
+  const chartInstance = useRef<Chart | null>(null);
+
+  useEffect(() => {
+    if (!chartRef.current || teams.length === 0) return;
+    if (chartInstance.current) chartInstance.current.destroy();
+    const TEAM_COLORS: Record<string, string> = { Cuisine: "#D97706", Salle: "#5e8278", Bar: "#8a6b3e", Autre: "#b0a894" };
+    chartInstance.current = new Chart(chartRef.current, {
+      type: "bar",
+      data: {
+        labels: teams.map(t => t.label),
+        datasets: [
+          { label: "Planifiees", data: teams.map(t => t.hPlan), backgroundColor: teams.map(t => (TEAM_COLORS[t.label] ?? "#999") + "40"), borderRadius: 6 },
+          { label: "Travaillees", data: teams.map(t => t.hTrav), backgroundColor: teams.map(t => TEAM_COLORS[t.label] ?? "#999"), borderRadius: 6 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom", labels: { font: { size: 11 }, padding: 12 } } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, ticks: { callback: (v) => `${v}h` }, grid: { color: "rgba(0,0,0,0.04)" } },
+        },
+      },
+    });
+    return () => { chartInstance.current?.destroy(); chartInstance.current = null; };
+  }, [teams]);
 
   // Import handler
   const handleImport = async (file: File) => {
@@ -424,6 +469,54 @@ export default function MasseSalarialePage() {
             <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>{aggregated.length} collaborateur{aggregated.length > 1 ? "s" : ""}</div>
           </div>
         </div>
+
+        {/* Row 5 — Team breakdown */}
+        {teams.length > 0 && (<>
+          <div style={{ ...LABEL, marginBottom: 8 }}>Par equipe</div>
+          <div style={{ display: "grid", gridTemplateColumns: teams.length === 1 ? "1fr" : "1fr 1fr", gap: 10, marginBottom: 14 }}>
+            {teams.map(t => {
+              const teamColor = t.label === "Cuisine" ? "#D97706" : t.label === "Salle" ? "#5e8278" : t.label === "Bar" ? "#8a6b3e" : "#999";
+              const teamProductivite = t.hTrav > 0 && caMonth ? caMonth / totals.hTrav * (t.hTrav / totals.hTrav) : null;
+              return (
+                <div key={t.label} style={{ ...CARD, borderLeft: `4px solid ${teamColor}` }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: teamColor, fontFamily: "var(--font-oswald), Oswald, sans-serif", textTransform: "uppercase" }}>{t.label}</span>
+                    <span style={{ fontSize: 11, color: "#999" }}>{t.count} emp.</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: "#999", fontWeight: 600 }}>Heures</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{fmtDec(t.hTrav)}h</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: "#999", fontWeight: 600 }}>Ecart</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: t.ecart >= 0 ? GREEN : "#DC2626", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
+                        {t.ecart >= 0 ? "+" : ""}{fmtDec(t.ecart)}h
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: "#999", fontWeight: 600 }}>Repas</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{t.repas}</div>
+                    </div>
+                  </div>
+                  {teamProductivite != null && caMonth != null && (
+                    <div style={{ fontSize: 11, color: "#999", marginTop: 8 }}>
+                      {Math.round(t.hTrav / totals.hTrav * 100)}% des heures · ratio {totals.hTrav > 0 ? fmtDec(caMonth / totals.hTrav) : "—"}€/h
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Hours bar chart by team */}
+          <div style={{ ...CARD, marginBottom: 24 }}>
+            <div style={{ ...LABEL, marginBottom: 12 }}>Heures par equipe</div>
+            <div style={{ height: 200 }}>
+              <canvas ref={chartRef} />
+            </div>
+          </div>
+        </>)}
 
         {/* Employee table */}
         <div style={CARD}>
