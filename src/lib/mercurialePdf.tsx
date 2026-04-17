@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
 
 import { CAT_LABELS } from "@/types/ingredients";
 
-const CAT_ORDER = ["cremerie_fromage","charcuterie_viande","maree","alcool_spiritueux","boisson","legumes_herbes","fruit","epicerie_salee","epicerie_sucree","preparation","sauce","antipasti","emballage","autre"];
+const CAT_ORDER = ["cremerie_fromage","charcuterie_viande","maree","alcool_spiritueux","boisson","legumes_herbes","fruit","epicerie_salee","epicerie_sucree","surgele","preparation","sauce","antipasti","emballage","autre"];
 
 function groupRows(rows: MercurialeRow[], groupBy: "category" | "supplier" | "alpha") {
   const sorted = [...rows].sort((a, b) => {

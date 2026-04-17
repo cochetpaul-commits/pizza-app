@@ -12,6 +12,7 @@ export const CATEGORIES = [
   "maree",
   "preparation",
   "sauce",
+  "surgele",
   "alcool_spiritueux",
 ] as const;
 
@@ -35,6 +36,7 @@ export const CAT_LABELS: Record<Category, string> = {
   sauce:              "Sauce",
   antipasti:          "Antipasti",
   emballage:          "Emballage",
+  surgele:            "Surgelé",
   autre:              "Autre",
 };
 
@@ -52,6 +54,7 @@ export const CAT_COLORS: Record<Category, string> = {
   sauce:              "#9D6B4D", // brun cuivré
   antipasti:          "#d4a03c", // jaune miel
   emballage:          "#a8976b", // sable chaud
+  surgele:            "#5b8fa8", // bleu glacé
   autre:              "#b0a894", // gris sable
 };
 

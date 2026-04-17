@@ -38,8 +38,10 @@ const RULES: Rule[] = [
 { keywords: ["sachet", "barquette", "emballage", "couvercle", "film", "gant", "conteneur", "boîte à pizza", "papier cuisson", "feuille ingraissable", "sac poubelle", "eponge", "éponge", "spatule", "fouet"], category: "emballage" },
 // Épicerie Sucrée (biscuits, confiserie, pâtisserie)
 { keywords: ["miel", "confiture", "nutella", "chocolat", "cacao", "vanille", "sucre", "cereale", "muesli", "granola", "biscuit", "cookie", "crackers", "brioche", "amarena", "amaretti", "cantucci", "nocciolata", "panettone", "panforte", "praliné", "praline", "savoiardi", "fagottini", "caramel", "speculoos", "meringue"], category: "epicerie_sucree" },
+// Surgelé
+{ keywords: ["surgelé", "surgele", "surgeles", "congelé", "congele", "ivp"], category: "surgele" },
 // Épicerie Salée (pâtes, farines, grains — en dernier car mots génériques)
-{ keywords: ["aragostine", "farine", "farina", "sel", "poivre", "huile", "pates", "pâtes", "riz", "quinoa", "lentille", "pois chiche", "chapelure", "panure", "levure chimique", "bicarbonate", "cannelle", "curry", "paprika", "cumin", "noix", "amande", "noisette", "pignon", "raisin sec", "olive", "câpre", "capre", "cornichon", "sardine", "thon en boite", "conserve", "bouillon", "demi glace", "nescafe", "cafe soluble", "pain", "foccacia", "focaccia", "focaccina", "mafaldine", "orecchiette", "tagliatelle", "lasagne", "gnocchi", "coquillette", "couscous", "semoule", "polenta", "surgelé", "surgele", "congelé", "congele", "surgeles", "cannelloni", "casareccia", "fettuccine", "fettucine", "linguine", "pappardelle", "pennette", "spaghetti", "rigatoni", "mezzi rigatoni", "pane carasau", "sésame", "sesame", "pistache", "filotea", "pâte de toscane", "orge perlé", "riso carnaroli", "chips"], category: "epicerie_salee" },
+{ keywords: ["aragostine", "farine", "farina", "sel", "poivre", "huile", "pates", "pâtes", "riz", "quinoa", "lentille", "pois chiche", "chapelure", "panure", "levure chimique", "bicarbonate", "cannelle", "curry", "paprika", "cumin", "noix", "amande", "noisette", "pignon", "raisin sec", "olive", "câpre", "capre", "cornichon", "sardine", "thon en boite", "conserve", "bouillon", "demi glace", "nescafe", "cafe soluble", "pain", "foccacia", "focaccia", "focaccina", "mafaldine", "orecchiette", "tagliatelle", "lasagne", "gnocchi", "coquillette", "couscous", "semoule", "polenta", "cannelloni", "casareccia", "fettuccine", "fettucine", "linguine", "pappardelle", "pennette", "spaghetti", "rigatoni", "mezzi rigatoni", "pane carasau", "sésame", "sesame", "pistache", "filotea", "pâte de toscane", "orge perlé", "riso carnaroli", "chips"], category: "epicerie_salee" },
 ];
 
 // Sections Metro → catégorie
@@ -49,7 +51,7 @@ const METRO_SECTIONS: { pattern: RegExp; category: Category }[] = [
 { pattern: /FROMAGE/i, category: "cremerie_fromage" },
 { pattern: /BEURRE|OEUF|CREMERIE/i, category: "cremerie_fromage" },
 { pattern: /FRUITS?\s+ET\s+LEGUMES?/i, category: "legumes_herbes" },
-{ pattern: /SURGELES?/i, category: "epicerie_salee" },
+{ pattern: /SURGELES?/i, category: "surgele" },
 { pattern: /EPICERIE\s+SUCREE/i, category: "epicerie_sucree" },
 { pattern: /EPICERIE\s+SECHE/i, category: "epicerie_salee" },
 { pattern: /POISSONNERIE|MAREE/i, category: "maree" },
