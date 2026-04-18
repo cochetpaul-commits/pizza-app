@@ -307,6 +307,7 @@ function IngredientsPageInner() {
   const [showFilters, setShowFilters] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showDuplicates, setShowDuplicates] = useState(false);
+  const [showSearchSheet, setShowSearchSheet] = useState(false);
 
   // Supplier modal
   const [modalSupplierId, setModalSupplierId] = useState<string | null>(null);
@@ -1018,10 +1019,13 @@ function IngredientsPageInner() {
       <style>{`
         .ing-desktop-filters { display: grid; }
         .ing-mobile-search { display: none !important; }
+        .ing-mobile-toolbar { display: none; }
         @media (max-width: 767px) {
           .ing-desktop-filters { display: none !important; }
-          .ing-mobile-search { display: flex !important; }
+          .ing-mobile-search { display: none !important; }
           .ing-add-btn { padding: 6px 12px !important; font-size: 12px !important; }
+          .ing-floating-add { display: none !important; }
+          .ing-mobile-toolbar { display: flex !important; }
         }
       `}</style>
 
@@ -1036,8 +1040,8 @@ function IngredientsPageInner() {
             display: "flex", flexDirection: "column", gap: 12,
           }}>
             {/* Row 1 — Tabs */}
-            <div style={{ display: "flex", justifyContent: "center" }}>
-              <div style={{ display: "inline-flex", gap: 4, padding: 3, background: "#ece4d4", borderRadius: 10 }}>
+            <div style={{ display: "flex", justifyContent: "center", overflowX: "auto", scrollbarWidth: "none" }}>
+              <div style={{ display: "inline-flex", gap: 4, padding: 3, background: "#ece4d4", borderRadius: 10, flexShrink: 0 }}>
                 {TABS_MAIN.map(({ t, label, count }) => (
                   <button key={t} onClick={() => setTab(t)} style={{
                     flexShrink: 0, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
@@ -1486,18 +1490,12 @@ function IngredientsPageInner() {
         );
       })()}
 
-      {/* ── Floating "+ Produits" pill (mobile, sits above section pill) ── */}
+      {/* ── Floating "+ Produits" pill (desktop only) ── */}
       {userCanWrite && !isVariations && (
         <button
           type="button"
           className="ing-floating-add"
-          onClick={() => {
-            setShowCreateForm(v => {
-              const next = !v;
-              if (next) setTimeout(() => document.getElementById("create-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
-              return next;
-            });
-          }}
+          onClick={() => setShowCreateForm(true)}
           style={{
             position: "fixed",
             right: 16,
@@ -1519,6 +1517,89 @@ function IngredientsPageInner() {
           + Produits
         </button>
       )}
+
+      {/* ── Mobile toolbar: search + filter + add (centered above bottom nav) ── */}
+      <div
+        className="ing-mobile-toolbar"
+        style={{
+          position: "fixed",
+          bottom: "calc(72px + env(safe-area-inset-bottom, 0px))",
+          left: "50%", transform: "translateX(-50%)",
+          zIndex: 105,
+          alignItems: "center", gap: 6,
+          padding: "6px 8px",
+          borderRadius: 999,
+          background: "rgba(245,240,232,0.90)",
+          backdropFilter: "blur(20px) saturate(180%)",
+          WebkitBackdropFilter: "blur(20px) saturate(180%)",
+          border: "1px solid rgba(0,0,0,0.06)",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+        }}
+      >
+        {/* Search */}
+        <button type="button" onClick={() => setShowSearchSheet(true)} style={{
+          width: 40, height: 40, borderRadius: 999, border: "none",
+          background: q ? `${etab?.couleur ?? "#D4775A"}20` : "transparent",
+          color: q ? (etab?.couleur ?? "#D4775A") : "#666",
+          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+          </svg>
+        </button>
+        {/* Filter */}
+        <button type="button" onClick={() => setShowFilters(true)} style={{
+          width: 40, height: 40, borderRadius: 999, border: "none",
+          background: filterActive ? `${etab?.couleur ?? "#D4775A"}20` : "transparent",
+          color: filterActive ? (etab?.couleur ?? "#D4775A") : "#666",
+          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+          position: "relative",
+        }}>
+          <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+          </svg>
+          {filterActive && <span style={{ position: "absolute", top: 6, right: 6, width: 6, height: 6, borderRadius: "50%", background: etab?.couleur ?? "#D4775A" }} />}
+        </button>
+        {/* Add */}
+        {userCanWrite && (
+          <button type="button" onClick={() => setShowCreateForm(true)} style={{
+            width: 40, height: 40, borderRadius: 999, border: "none",
+            background: etab?.couleur ?? "#D4775A",
+            color: "#fff",
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* ── Search BottomSheet (mobile) ── */}
+      <BottomSheet open={showSearchSheet} onClose={() => setShowSearchSheet(false)} title="Rechercher">
+        <div style={{ padding: "0 4px 8px" }}>
+          <input
+            autoFocus
+            placeholder="Rechercher un ingredient..."
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            style={{
+              width: "100%", borderRadius: 12, border: "1.5px solid #e5ddd0",
+              padding: "12px 16px", fontSize: 15, background: "#fff",
+              outline: "none", color: "#1a1a1a", boxSizing: "border-box",
+            }}
+          />
+          {q && (
+            <button type="button" onClick={() => { setQ(""); setShowSearchSheet(false); }} style={{
+              marginTop: 10, width: "100%", padding: "10px 0", borderRadius: 10,
+              border: "1px solid #ddd6c8", background: "#fff", color: "#999",
+              fontSize: 13, fontWeight: 600, cursor: "pointer",
+            }}>
+              Effacer la recherche
+            </button>
+          )}
+        </div>
+      </BottomSheet>
     </div>
   );
 }
