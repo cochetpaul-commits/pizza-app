@@ -6,6 +6,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import type { Role } from "@/lib/rbac";
 import { ChefHat, ShoppingBasket } from "lucide-react";
+import { useBottomBar } from "@/lib/BottomBarContext";
 import { BottomSheet } from "./BottomSheet";
 
 /* ── Icon: Building ────────────────────────────────── */
@@ -337,6 +338,7 @@ export function BottomTabBar() {
   const { current, setCurrent, etablissements, isGroupView, setGroupView, isGroupAdmin } = useEtablissement();
   const [drawerSection, setDrawerSection] = useState<TabSection | null>(null);
   const [etabDrawerOpen, setEtabDrawerOpen] = useState(false);
+  const { actions: contextActions } = useBottomBar();
 
   // Listen for "open-etab-drawer" event from MobileHeader
   useEffect(() => {
@@ -511,7 +513,7 @@ export function BottomTabBar() {
         </div>
       </BottomSheet>
 
-      {/* ── Floating section pill ── */}
+      {/* ── Floating bottom bar: nav pill (left) + context actions (right) ── */}
       <nav className="bottom-tab-bar" style={{
         position: "fixed",
         bottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
@@ -520,7 +522,8 @@ export function BottomTabBar() {
         display: "none",
         padding: "0 12px",
       }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: contextActions ? "space-between" : "center" }}>
+          {/* Nav pill */}
           <div style={{
             display: "flex", alignItems: "center", gap: 2,
             padding: "5px 6px",
@@ -530,10 +533,11 @@ export function BottomTabBar() {
             WebkitBackdropFilter: "blur(24px) saturate(180%)",
             border: "1px solid rgba(0,0,0,0.06)",
             boxShadow: "0 6px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)",
-            overflowX: "auto",
-            scrollbarWidth: "none",
+            overflow: "hidden",
+            flexShrink: contextActions ? 1 : 0,
+            minWidth: 0,
           }}>
-            {/* Etab button — same style as section pills */}
+            {/* Etab button */}
             {canSwitchEtab && (
               <button
                 type="button"
@@ -569,6 +573,23 @@ export function BottomTabBar() {
               );
             })}
           </div>
+
+          {/* Context actions slot (right side) */}
+          {contextActions && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 4,
+              padding: "5px 6px",
+              borderRadius: 999,
+              background: "rgba(245,240,232,0.85)",
+              backdropFilter: "blur(24px) saturate(180%)",
+              WebkitBackdropFilter: "blur(24px) saturate(180%)",
+              border: "1px solid rgba(0,0,0,0.06)",
+              boxShadow: "0 6px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)",
+              flexShrink: 0,
+            }}>
+              {contextActions}
+            </div>
+          )}
         </div>
       </nav>
     </>

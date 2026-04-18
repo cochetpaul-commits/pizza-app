@@ -43,6 +43,7 @@ import { updateDerivedIngredients, computeDerivedPrice, computeRendement } from 
 import DuplicatePanel from "@/components/DuplicatePanel";
 import { detectDuplicates, type DuplicatePair } from "@/lib/duplicateDetection";
 import { BottomSheet } from "@/components/layout/BottomSheet";
+import { useBottomBarActions } from "@/lib/BottomBarContext";
 
 type OfferPayload = Record<string, unknown>;
 
@@ -1014,18 +1015,49 @@ function IngredientsPageInner() {
     { t: "to_check"  as Tab, label: "À contrôler",  count: counts.to_check },
   ] as const;
 
+  // Register contextual actions in the bottom bar
+  const accentColor = etab?.couleur ?? "#D4775A";
+  const btnSt = (active: boolean, bg?: string): React.CSSProperties => ({
+    width: 38, height: 38, borderRadius: 999, border: "none",
+    background: bg ?? (active ? `${accentColor}20` : "transparent"),
+    color: bg ? "#fff" : (active ? accentColor : "#666"),
+    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+    flexShrink: 0, position: "relative",
+  });
+
+  useBottomBarActions(() => !isVariations ? (
+    <>
+      <button type="button" onClick={() => setShowSearchSheet(true)} style={btnSt(!!q)}>
+        <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+        </svg>
+      </button>
+      <button type="button" onClick={() => setShowFilters(true)} style={btnSt(filterActive)}>
+        <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+        </svg>
+        {filterActive && <span style={{ position: "absolute", top: 5, right: 5, width: 6, height: 6, borderRadius: "50%", background: accentColor }} />}
+      </button>
+      {userCanWrite && (
+        <button type="button" onClick={() => setShowCreateForm(true)} style={btnSt(false, accentColor)}>
+          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+      )}
+    </>
+  ) : null, [q, filterActive, userCanWrite, isVariations, accentColor]);
+
   return (
     <div style={{ background: "#f2ede4", minHeight: "100vh" }}>
       <style>{`
         .ing-desktop-filters { display: grid; }
         .ing-mobile-search { display: none !important; }
-        .ing-mobile-toolbar { display: none; }
         @media (max-width: 767px) {
           .ing-desktop-filters { display: none !important; }
           .ing-mobile-search { display: none !important; }
           .ing-add-btn { padding: 6px 12px !important; font-size: 12px !important; }
           .ing-floating-add { display: none !important; }
-          .ing-mobile-toolbar { display: flex !important; }
         }
       `}</style>
 
@@ -1518,62 +1550,6 @@ function IngredientsPageInner() {
         </button>
       )}
 
-      {/* ── Mobile toolbar: search + filter + add (centered above bottom nav) ── */}
-      <div
-        className="ing-mobile-toolbar"
-        style={{
-          position: "fixed",
-          bottom: "calc(72px + env(safe-area-inset-bottom, 0px))",
-          left: "50%", transform: "translateX(-50%)",
-          zIndex: 105,
-          alignItems: "center", gap: 6,
-          padding: "6px 8px",
-          borderRadius: 999,
-          background: "rgba(245,240,232,0.90)",
-          backdropFilter: "blur(20px) saturate(180%)",
-          WebkitBackdropFilter: "blur(20px) saturate(180%)",
-          border: "1px solid rgba(0,0,0,0.06)",
-          boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-        }}
-      >
-        {/* Search */}
-        <button type="button" onClick={() => setShowSearchSheet(true)} style={{
-          width: 40, height: 40, borderRadius: 999, border: "none",
-          background: q ? `${etab?.couleur ?? "#D4775A"}20` : "transparent",
-          color: q ? (etab?.couleur ?? "#D4775A") : "#666",
-          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-          </svg>
-        </button>
-        {/* Filter */}
-        <button type="button" onClick={() => setShowFilters(true)} style={{
-          width: 40, height: 40, borderRadius: 999, border: "none",
-          background: filterActive ? `${etab?.couleur ?? "#D4775A"}20` : "transparent",
-          color: filterActive ? (etab?.couleur ?? "#D4775A") : "#666",
-          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-          position: "relative",
-        }}>
-          <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-          </svg>
-          {filterActive && <span style={{ position: "absolute", top: 6, right: 6, width: 6, height: 6, borderRadius: "50%", background: etab?.couleur ?? "#D4775A" }} />}
-        </button>
-        {/* Add */}
-        {userCanWrite && (
-          <button type="button" onClick={() => setShowCreateForm(true)} style={{
-            width: 40, height: 40, borderRadius: 999, border: "none",
-            background: etab?.couleur ?? "#D4775A",
-            color: "#fff",
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-          </button>
-        )}
-      </div>
 
       {/* ── Search BottomSheet (mobile) ── */}
       <BottomSheet open={showSearchSheet} onClose={() => setShowSearchSheet(false)} title="Rechercher">
