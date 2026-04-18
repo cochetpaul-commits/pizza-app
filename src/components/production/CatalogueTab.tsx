@@ -7,11 +7,12 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
 import { calculerPate, type EmpatementType, type FlourMixItem, type PateResult } from "@/lib/pateEngine";
 import { AiInsightCard } from "@/components/AiInsightCard";
+import { BottomSheet } from "@/components/layout/BottomSheet";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type RecipeType = "pizza" | "cuisine" | "cocktail" | "production";
-type MainFilter = "tous" | "pizza" | "cuisine" | "cocktail" | "empatement";
+type RecipeType = "pizza" | "cuisine" | "cocktail" | "production" | "produit";
+type MainFilter = "tous" | "pizza" | "cuisine" | "cocktail" | "empatement" | "produit";
 // "all" or any category id (built-in or custom-discovered)
 type CuisineCatFilter = string;
 
@@ -57,6 +58,7 @@ const TYPE_COLORS: Record<RecipeType, string> = {
   cuisine: "#4a6741",
   cocktail: "#D4775A",
   production: "#6b5b3e",
+  produit: "#8a6b3e",
 };
 
 const TYPE_LABELS: Record<RecipeType, string> = {
@@ -64,6 +66,16 @@ const TYPE_LABELS: Record<RecipeType, string> = {
   cuisine: "Cuisine",
   cocktail: "Cocktail",
   production: "Production",
+  produit: "Produit",
+};
+
+const PRODUIT_CATEGORIES = ["produit_vin", "produit_spiritueux", "produit_biere", "produit_soft", "produit_autre"] as const;
+const PRODUIT_CAT_LABELS: Record<string, string> = {
+  produit_vin: "Vin",
+  produit_spiritueux: "Spiritueux",
+  produit_biere: "Biere",
+  produit_soft: "Soft / Sans alcool",
+  produit_autre: "Autre produit",
 };
 
 const CUISINE_CAT_LABELS: Record<string, string> = {
@@ -212,8 +224,9 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
 
   for (const k of (kitchens ?? [])) {
     if (!matchEstab(k.establishments)) continue;
-    // Skip if category is "preparation" — those go to Production
+    // Skip if category is "preparation" — those go to Production section below
     if (k.category === "preparation") continue;
+    const isProduit = k.category?.startsWith("produit_");
     const kIngs = (kitchenIngs ?? []).filter((i: Record<string, unknown>) => i.recipe_id === k.id);
     const allergenSet = new Set<string>();
     const lines: RecipeLine[] = kIngs.map((i: Record<string, unknown>) => {
@@ -229,7 +242,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
     if (k.portions_count) yieldInfo = `${k.portions_count} portion${k.portions_count > 1 ? "s" : ""}`;
     else if (k.yield_grams) yieldInfo = `${k.yield_grams} g`;
     recipes.push({
-      id: k.id, type: "cuisine", name: k.name, category: k.category,
+      id: k.id, type: isProduit ? "produit" : "cuisine", name: k.name, category: k.category,
       photo_url: k.photo_url, lines, steps: parseJsonSteps(k.procedure),
       pivot_ingredient_id: k.pivot_ingredient_id, yield_info: yieldInfo,
       portions_count: k.portions_count ?? null,
@@ -434,7 +447,7 @@ export function CatalogueContent() {
       });
   }, [etab]);
 
-  const recipeTypeMap: Record<RecipeType, string> = { pizza: "pizza", cuisine: "kitchen", cocktail: "cocktail", production: "kitchen" };
+  const recipeTypeMap: Record<RecipeType, string> = { pizza: "pizza", cuisine: "kitchen", cocktail: "cocktail", production: "kitchen", produit: "kitchen" };
 
   const linkArticle = async (recipe: Recipe, nomVente: string) => {
     if (!etab) return;
@@ -461,6 +474,31 @@ export function CatalogueContent() {
     setArticleSaving(false);
   };
 
+  // Produit creation
+  const [showProduitForm, setShowProduitForm] = useState(false);
+  const [produitName, setProduitName] = useState("");
+  const [produitCat, setProduitCat] = useState("produit_vin");
+  const [produitNotes, setProduitNotes] = useState("");
+  const [produitSaving, setProduitSaving] = useState(false);
+
+  const createProduit = async () => {
+    if (!etab || !produitName.trim()) return;
+    setProduitSaving(true);
+    const slug = etab.slug?.includes("piccola") ? "piccola" : "bellomio";
+    const { error } = await supabase.from("kitchen_recipes").insert({
+      name: produitName.trim(),
+      category: produitCat,
+      etablissement_id: etab.id,
+      establishments: [slug],
+      is_active: true,
+      is_draft: false,
+      procedure: produitNotes.trim() ? JSON.stringify([produitNotes.trim()]) : null,
+    });
+    if (error) { alert(error.message); setProduitSaving(false); return; }
+    setProduitName(""); setProduitNotes(""); setShowProduitForm(false); setProduitSaving(false);
+    fetchAllRecipes(etabSlug).then(r => setRecipes(r));
+  };
+
   useEffect(() => {
     fetchAllRecipes(etabSlug).then(r => { setRecipes(r); setLoading(false); });
   }, [etabSlug]);
@@ -474,6 +512,7 @@ export function CatalogueContent() {
       if (cuisineCatFilter !== "all") arr = arr.filter(r => r.category === cuisineCatFilter);
     }
     else if (mainFilter === "cocktail") arr = arr.filter(r => r.type === "cocktail");
+    else if (mainFilter === "produit") arr = arr.filter(r => r.type === "produit");
     else if (mainFilter === "empatement") arr = arr.filter(r => r.type === "production" && r.category === "empatement");
     // Production toggle (preps only, not empâtement)
     if (prodFilter) arr = arr.filter(r => r.type === "production" && r.category !== "empatement");
@@ -509,6 +548,7 @@ export function CatalogueContent() {
       pizza: recipes.filter(r => r.type === "pizza").length,
       cuisine: recipes.filter(r => r.type === "cuisine").length,
       cocktail: recipes.filter(r => r.type === "cocktail").length,
+      produit: recipes.filter(r => r.type === "produit").length,
       empatement: recipes.filter(r => r.type === "production" && r.category === "empatement").length,
       production: prodPreps,
     };
@@ -528,7 +568,7 @@ export function CatalogueContent() {
       if (!map[key]) map[key] = [];
       map[key].push(r);
     }
-    const typeOrder: RecipeType[] = ["pizza", "cuisine", "cocktail", "production"];
+    const typeOrder: RecipeType[] = ["pizza", "cuisine", "cocktail", "produit", "production"];
     const prodCatOrder = ["preparation", "prep", "empatement"];
     return Object.entries(map).sort(([a], [b]) => {
       const ta = a.split(":")[0];
@@ -565,7 +605,7 @@ export function CatalogueContent() {
         await supabase.from("pizza_ingredients").delete().eq("recipe_id", recipe.id);
         const { error } = await supabase.from("pizza_recipes").delete().eq("id", recipe.id);
         if (error) throw error;
-      } else if (recipe.type === "cuisine") {
+      } else if (recipe.type === "cuisine" || recipe.type === "produit") {
         await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", recipe.id);
         const { error } = await supabase.from("kitchen_recipes").delete().eq("id", recipe.id);
         if (error) throw error;
@@ -604,6 +644,7 @@ export function CatalogueContent() {
     const [type, cat] = key.split(":");
     if (!cat) return TYPE_LABELS[type as RecipeType] ?? type;
     if (type === "cuisine") return cuisineCatLabel(cat);
+    if (type === "produit") return PRODUIT_CAT_LABELS[cat] ?? cat;
     if (cat === "empatement") return "Empâtement";
     if (cat === "prep" || cat === "preparation") return "Préparations";
     return cat;
@@ -623,8 +664,8 @@ export function CatalogueContent() {
     display: "flex", alignItems: "center", gap: 8,
   });
 
-  const activeColor = mainFilter === "pizza" ? TYPE_COLORS.pizza : mainFilter === "cuisine" ? TYPE_COLORS.cuisine : mainFilter === "cocktail" ? TYPE_COLORS.cocktail : mainFilter === "empatement" ? EMP_COLOR : null;
-  const activeLabel = mainFilter === "tous" ? "Toutes" : mainFilter === "pizza" ? "Pizza" : mainFilter === "cuisine" ? (cuisineCatFilter !== "all" ? dynamicCuisineCats.find(f => f.id === cuisineCatFilter)?.label ?? "Cuisine" : "Cuisine") : mainFilter === "cocktail" ? "Cocktail" : "Empât.";
+  const activeColor = mainFilter === "pizza" ? TYPE_COLORS.pizza : mainFilter === "cuisine" ? TYPE_COLORS.cuisine : mainFilter === "cocktail" ? TYPE_COLORS.cocktail : mainFilter === "produit" ? TYPE_COLORS.produit : mainFilter === "empatement" ? EMP_COLOR : null;
+  const activeLabel = mainFilter === "tous" ? "Toutes" : mainFilter === "pizza" ? "Pizza" : mainFilter === "cuisine" ? (cuisineCatFilter !== "all" ? dynamicCuisineCats.find(f => f.id === cuisineCatFilter)?.label ?? "Cuisine" : "Cuisine") : mainFilter === "cocktail" ? "Cocktail" : mainFilter === "produit" ? "Produit" : "Empât.";
 
   return (
     <main className="container" style={{ paddingBottom: 80 }}>
@@ -718,6 +759,13 @@ export function CatalogueContent() {
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: TYPE_COLORS.cocktail, flexShrink: 0 }} />
                     Cocktail
                     <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{filterCounts.cocktail}</span>
+                  </button>
+                  {/* Produit */}
+                  <button type="button" onClick={() => { setMainFilter("produit"); setCuisineCatFilter("all"); setShowTypePop(false); }}
+                    style={menuItem(mainFilter === "produit", TYPE_COLORS.produit)}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: TYPE_COLORS.produit, flexShrink: 0 }} />
+                    Produit
+                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{filterCounts.produit}</span>
                   </button>
                   {/* Empâtement */}
                   <button type="button" onClick={() => { setMainFilter("empatement"); setCuisineCatFilter("all"); setShowTypePop(false); }}
@@ -1465,6 +1513,80 @@ export function CatalogueContent() {
           </div>
         );
       })()}
+
+      {/* ── Nouveau produit BottomSheet ── */}
+      <BottomSheet open={showProduitForm} onClose={() => setShowProduitForm(false)} title="Nouveau produit">
+        <div style={{ display: "flex", flexDirection: "column", gap: 14, padding: "0 4px 8px" }}>
+          <div>
+            <div style={{ fontSize: 12, color: "#999", marginBottom: 4 }}>Nom *</div>
+            <input
+              value={produitName}
+              onChange={e => setProduitName(e.target.value)}
+              placeholder="Ex: Chateau Margaux 2018"
+              style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e5ddd0", fontSize: 14, background: "#fff", outline: "none", boxSizing: "border-box" }}
+              autoFocus
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: "#999", marginBottom: 4 }}>Type</div>
+            <select
+              value={produitCat}
+              onChange={e => setProduitCat(e.target.value)}
+              style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e5ddd0", fontSize: 14, background: "#fff", cursor: "pointer", boxSizing: "border-box" }}
+            >
+              {PRODUIT_CATEGORIES.map(c => (
+                <option key={c} value={c}>{PRODUIT_CAT_LABELS[c]}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: "#999", marginBottom: 4 }}>Notes / Description</div>
+            <textarea
+              value={produitNotes}
+              onChange={e => setProduitNotes(e.target.value)}
+              placeholder="Cepage, region, temperature de service..."
+              rows={3}
+              style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e5ddd0", fontSize: 14, background: "#fff", outline: "none", resize: "vertical", boxSizing: "border-box" }}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={createProduit}
+            disabled={produitSaving || !produitName.trim()}
+            style={{
+              width: "100%", padding: "12px 0", borderRadius: 10, border: "none",
+              background: TYPE_COLORS.produit, color: "#fff", fontSize: 14, fontWeight: 700,
+              cursor: produitSaving || !produitName.trim() ? "not-allowed" : "pointer",
+              opacity: produitSaving || !produitName.trim() ? 0.5 : 1,
+            }}
+          >
+            {produitSaving ? "..." : "Creer la fiche produit"}
+          </button>
+        </div>
+      </BottomSheet>
+
+      {/* ── FAB: Nouveau produit (visible quand filtre = produit) ── */}
+      {canWrite && mainFilter === "produit" && (
+        <button
+          type="button"
+          onClick={() => setShowProduitForm(true)}
+          style={{
+            position: "fixed", right: 16,
+            bottom: "calc(80px + env(safe-area-inset-bottom, 0px))",
+            zIndex: 105,
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "12px 18px", borderRadius: 999, border: "none",
+            background: TYPE_COLORS.produit, color: "#fff",
+            fontFamily: "var(--font-oswald), Oswald, sans-serif",
+            fontSize: 13, fontWeight: 700,
+            textTransform: "uppercase", letterSpacing: ".05em",
+            boxShadow: "0 6px 24px rgba(138,107,62,0.35), 0 2px 8px rgba(0,0,0,0.10)",
+            cursor: "pointer",
+          }}
+        >
+          + Produit
+        </button>
+      )}
     </main>
   );
 }
