@@ -401,6 +401,66 @@ export function CatalogueContent() {
   // Pivot modal (any recipe with pivot or emp_data)
   const [modalRecipe, setModalRecipe] = useState<Recipe | null>(null);
 
+  // Article de vente linking
+  const [articleLinks, setArticleLinks] = useState<Map<string, string>>(new Map()); // recipeId → nom_vente
+  const [availableArticles, setAvailableArticles] = useState<string[]>([]);
+  const [articleSearch, setArticleSearch] = useState("");
+  const [articleSaving, setArticleSaving] = useState(false);
+
+  // Load articles_vente links for all recipes
+  useEffect(() => {
+    if (!etab) return;
+    supabase
+      .from("articles_vente")
+      .select("recette_id,nom_vente")
+      .eq("etablissement_id", etab.id)
+      .not("recette_id", "is", null)
+      .then(({ data }) => {
+        const m = new Map<string, string>();
+        for (const r of data ?? []) if (r.recette_id) m.set(r.recette_id, r.nom_vente);
+        setArticleLinks(m);
+      });
+    // Load unique product names from ventes_lignes
+    supabase
+      .from("ventes_lignes")
+      .select("description")
+      .eq("etablissement_id", etab.id)
+      .eq("type_ligne", "Produit")
+      .eq("annule", false)
+      .then(({ data }) => {
+        const names = new Set<string>();
+        for (const r of data ?? []) if (r.description) names.add(r.description);
+        setAvailableArticles(Array.from(names).sort((a, b) => a.localeCompare(b, "fr")));
+      });
+  }, [etab]);
+
+  const recipeTypeMap: Record<RecipeType, string> = { pizza: "pizza", cuisine: "kitchen", cocktail: "cocktail", production: "kitchen" };
+
+  const linkArticle = async (recipe: Recipe, nomVente: string) => {
+    if (!etab) return;
+    setArticleSaving(true);
+    // Upsert: delete existing link for this recipe, insert new
+    await supabase.from("articles_vente").delete().eq("etablissement_id", etab.id).eq("recette_id", recipe.id);
+    await supabase.from("articles_vente").upsert({
+      etablissement_id: etab.id,
+      nom_vente: nomVente,
+      recette_type: recipeTypeMap[recipe.type],
+      recette_id: recipe.id,
+      source: "manual",
+    }, { onConflict: "etablissement_id,nom_vente" });
+    setArticleLinks(prev => { const m = new Map(prev); m.set(recipe.id, nomVente); return m; });
+    setArticleSaving(false);
+    setArticleSearch("");
+  };
+
+  const unlinkArticle = async (recipe: Recipe) => {
+    if (!etab) return;
+    setArticleSaving(true);
+    await supabase.from("articles_vente").delete().eq("etablissement_id", etab.id).eq("recette_id", recipe.id);
+    setArticleLinks(prev => { const m = new Map(prev); m.delete(recipe.id); return m; });
+    setArticleSaving(false);
+  };
+
   useEffect(() => {
     fetchAllRecipes(etabSlug).then(r => { setRecipes(r); setLoading(false); });
   }, [etabSlug]);
@@ -1334,6 +1394,73 @@ export function CatalogueContent() {
                   ))}
                 </div>
               )}
+
+              {/* Article de vente linking */}
+              <div style={{
+                padding: "14px 20px 18px",
+                borderTop: "1px solid #ede6d9",
+              }}>
+                <div style={{
+                  fontSize: 11, fontWeight: 700, color: "#999",
+                  textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8,
+                }}>
+                  Article de vente (caisse)
+                </div>
+                {articleLinks.has(modalRecipe.id) ? (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "10px 14px", borderRadius: 10,
+                    background: "rgba(74,103,65,0.06)", border: "1.5px solid rgba(74,103,65,0.2)",
+                  }}>
+                    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#4a6741" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
+                      {articleLinks.get(modalRecipe.id)}
+                    </span>
+                    <button type="button" onClick={() => unlinkArticle(modalRecipe)} disabled={articleSaving} style={{
+                      fontSize: 11, color: "#DC2626", background: "none", border: "none", cursor: "pointer", fontWeight: 600,
+                    }}>
+                      Retirer
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <input
+                      placeholder="Rechercher un article de la caisse..."
+                      value={articleSearch}
+                      onChange={e => setArticleSearch(e.target.value)}
+                      style={{
+                        width: "100%", padding: "9px 12px", borderRadius: 10,
+                        border: "1.5px solid #e5ddd0", fontSize: 13, background: "#fff",
+                        outline: "none", color: "#1a1a1a", boxSizing: "border-box",
+                        marginBottom: 6,
+                      }}
+                    />
+                    {articleSearch.length >= 2 && (() => {
+                      const q = articleSearch.toLowerCase();
+                      const matches = availableArticles.filter(a => a.toLowerCase().includes(q)).slice(0, 8);
+                      if (matches.length === 0) return <div style={{ fontSize: 12, color: "#999", padding: "4px 0" }}>Aucun article trouve</div>;
+                      return (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: 200, overflowY: "auto" }}>
+                          {matches.map(name => (
+                            <button key={name} type="button" onClick={() => linkArticle(modalRecipe, name)} disabled={articleSaving} style={{
+                              textAlign: "left", padding: "8px 12px", borderRadius: 8,
+                              border: "none", background: "transparent", cursor: "pointer",
+                              fontSize: 13, color: "#1a1a1a",
+                            }}
+                            onMouseOver={e => { e.currentTarget.style.background = "#f5f0e8"; }}
+                            onMouseOut={e => { e.currentTarget.style.background = "transparent"; }}
+                            >
+                              {name}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         );
