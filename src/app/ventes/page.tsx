@@ -1188,7 +1188,7 @@ function PerformancesPage() {
                       const meteoS = dateKey ? meteo[`${dateKey}:soir`] : null;
                       const dash = <span style={{ color: "#ddd" }}>—</span>;
                       const fmtCell = (v: number | undefined, color?: string) => v && v > 0
-                        ? <span style={{ color: color ?? "#1a1a1a" }}>{fmt(v)}€</span>
+                        ? <span style={{ color: color ?? "#1a1a1a" }}>{fmt(v)}</span>
                         : dash;
                       return (
                         <div key={jour} style={{
@@ -1248,8 +1248,8 @@ function PerformancesPage() {
                               </tr>
                               <tr style={{ background: "rgba(212,119,90,0.08)" }}>
                                 <td style={{ ...labelSt, fontWeight: 800, color: accent, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em" }}>Total</td>
-                                <td style={{ ...cellSt, fontWeight: 800, color: accent, fontSize: 15, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{midi ? `${fmt(mode === "ttc" ? midi.ttc : midi.ht)}€` : dash}</td>
-                                <td style={{ ...cellSt, fontWeight: 800, color: accent, fontSize: 15, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{soir ? `${fmt(mode === "ttc" ? soir.ttc : soir.ht)}€` : dash}</td>
+                                <td style={{ ...cellSt, fontWeight: 800, color: accent, fontSize: 15, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{midi ? fmt(mode === "ttc" ? midi.ttc : midi.ht) : dash}</td>
+                                <td style={{ ...cellSt, fontWeight: 800, color: accent, fontSize: 15, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{soir ? fmt(mode === "ttc" ? soir.ttc : soir.ht) : dash}</td>
                               </tr>
                               <tr>
                                 <td style={labelSt}>Cvts</td>

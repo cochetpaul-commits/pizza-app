@@ -459,7 +459,7 @@ export function DateRangePicker({ value, onChange, presets = DEFAULT_PRESETS, fo
             </div>
 
             {/* Two-month grid */}
-            <div style={{ display: "flex", gap: 24 }} onMouseLeave={() => setHover(null)}>
+            <div className="daterange-cal-grid" style={{ display: "flex", gap: 24 }} onMouseLeave={() => setHover(null)}>
               <MonthGrid month={monthLeft} draftFrom={draftFrom} draftTo={draftTo} hover={hover} onPick={handlePick} onHover={setHover} />
               <MonthGrid month={monthRight} draftFrom={draftFrom} draftTo={draftTo} hover={hover} onPick={handlePick} onHover={setHover} />
             </div>
@@ -486,41 +486,48 @@ export function DateRangePicker({ value, onChange, presets = DEFAULT_PRESETS, fo
         </div>
       )}
 
-      {/* Mobile: popover large comme la page rapport (single column, pas tronqué) */}
+      {/* Mobile responsive */}
       <style>{`
         @media (max-width: 720px) {
           .daterange-popover {
             position: fixed !important;
-            left: 12px !important;
-            right: 12px !important;
+            left: 8px !important;
+            right: 8px !important;
             top: auto !important;
-            bottom: 12px !important;
+            bottom: 8px !important;
             min-width: 0 !important;
             flex-direction: column !important;
             max-height: 85dvh;
             overflow-y: auto;
-            padding: 16px !important;
-            gap: 14px !important;
+            padding: 14px !important;
+            gap: 12px !important;
+            border-radius: 20px !important;
           }
+          /* Presets: horizontal scroll row */
           .daterange-popover > div:first-child {
             border-right: none !important;
             border-bottom: 1px solid #f0ebe3;
             padding-right: 0 !important;
-            padding-bottom: 12px;
+            padding-bottom: 10px;
             display: flex !important;
-            flex-direction: column;
+            flex-direction: row !important;
+            flex-wrap: wrap;
             gap: 4px !important;
             min-width: 0 !important;
           }
           .daterange-popover > div:first-child > button {
-            text-align: left !important;
-            padding: 10px 14px !important;
-            font-size: 13px !important;
+            text-align: center !important;
+            padding: 6px 10px !important;
+            font-size: 11px !important;
             white-space: nowrap;
-            width: 100%;
           }
           .daterange-popover > div:first-child > div {
             display: none !important;
+          }
+          /* Calendar grid: single column */
+          .daterange-cal-grid {
+            flex-direction: column !important;
+            gap: 12px !important;
           }
         }
       `}</style>
