@@ -4,14 +4,12 @@ import { useState } from "react";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { RecettesContent } from "@/components/production/RecettesTab";
 import { CatalogueContent } from "@/components/production/CatalogueTab";
-import { ArticlesContent } from "@/components/production/ArticlesTab";
 
-type TabKey = "recettes" | "catalogue" | "articles";
+type TabKey = "recettes" | "catalogue";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "recettes", label: "Recettes" },
   { key: "catalogue", label: "Catalogue" },
-  { key: "articles", label: "Articles de vente" },
 ];
 
 export default function FichesTechniquesPage() {
@@ -52,7 +50,6 @@ export default function FichesTechniquesPage() {
       {/* Tab content — lazy render (only mount active tab) */}
       {tab === "recettes" && <RecettesContent />}
       {tab === "catalogue" && <CatalogueContent />}
-      {tab === "articles" && <ArticlesContent />}
     </div>
   );
 }

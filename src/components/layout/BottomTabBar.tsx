@@ -238,12 +238,11 @@ const SECTION_ACHATS: TabSection = {
 const SECTION_PRODUCTION: TabSection = {
   label: "Prod.",
   href: "/recettes",
-  match: ["/catalogue", "/recettes", "/inventaire", "/prep", "/ventes/articles"],
+  match: ["/catalogue", "/recettes", "/inventaire", "/prep"],
   icon: (a) => <IconPackage active={a} />,
   tabs: [
     { label: "Fiches", href: "/recettes", match: ["/recettes", "/prep"], icon: (a) => <IconBook active={a} /> },
     { label: "Catalogue", href: "/catalogue", match: ["/catalogue"], icon: (a) => <IconGrid active={a} /> },
-    { label: "Articles", href: "/ventes/articles", match: ["/ventes/articles"], icon: (a) => <IconTag active={a} /> },
     { label: "Inventaire", href: "/inventaire", match: ["/inventaire"], icon: (a) => <IconBox active={a} /> },
   ],
 };
@@ -251,12 +250,11 @@ const SECTION_PRODUCTION: TabSection = {
 const SECTION_PRODUCTION_PICCOLA: TabSection = {
   label: "Prod.",
   href: "/recettes",
-  match: ["/catalogue", "/recettes", "/inventaire", "/epicerie", "/prep", "/ventes/articles"],
+  match: ["/catalogue", "/recettes", "/inventaire", "/epicerie", "/prep"],
   icon: (a) => <IconPackage active={a} />,
   tabs: [
     { label: "Fiches", href: "/recettes", match: ["/recettes", "/prep"], icon: (a) => <IconBook active={a} /> },
     { label: "Catalogue", href: "/catalogue", match: ["/catalogue"], icon: (a) => <IconGrid active={a} /> },
-    { label: "Articles", href: "/ventes/articles", match: ["/ventes/articles"], icon: (a) => <IconTag active={a} /> },
     { label: "Prix vente", href: "/epicerie", match: ["/epicerie"], icon: (a) => <IconTag active={a} /> },
     { label: "Inventaire", href: "/inventaire", match: ["/inventaire"], icon: (a) => <IconBox active={a} /> },
   ],
