@@ -499,6 +499,37 @@ export function CatalogueContent() {
     fetchAllRecipes(etabSlug).then(r => setRecipes(r));
   };
 
+  // CSV Import
+  const [importingCsv, setImportingCsv] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
+
+  const handleCsvImport = async (file: File) => {
+    if (!etab) return;
+    setImportingCsv(true);
+    setImportMsg("");
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("etablissement_id", etab.id);
+    fd.append("mode", "commit");
+    try {
+      const res = await fetch("/api/ventes/articles/import", { method: "POST", body: fd });
+      const json = await res.json();
+      if (json.ok) {
+        setImportMsg(`${json.inserted} nouveaux + ${json.updated} mis a jour (${json.nb_products} produits)`);
+        // Refresh available articles for linking
+        supabase.from("articles_vente").select("recette_id,nom_vente").eq("etablissement_id", etab.id).not("recette_id", "is", null)
+          .then(({ data }) => { const m = new Map<string, string>(); for (const r of data ?? []) if (r.recette_id) m.set(r.recette_id, r.nom_vente); setArticleLinks(m); });
+        supabase.from("articles_vente").select("nom_vente").eq("etablissement_id", etab.id)
+          .then(({ data }) => { setAvailableArticles((data ?? []).map(r => r.nom_vente).sort((a, b) => a.localeCompare(b, "fr"))); });
+      } else {
+        setImportMsg("Erreur : " + (json.error ?? "inconnue"));
+      }
+    } catch (e) {
+      setImportMsg("Erreur : " + String(e));
+    }
+    setImportingCsv(false);
+  };
+
   useEffect(() => {
     fetchAllRecipes(etabSlug).then(r => { setRecipes(r); setLoading(false); });
   }, [etabSlug]);
@@ -791,7 +822,25 @@ export function CatalogueContent() {
               Production ({filterCounts.production})
             </button>
           )}
+
+          {/* Import CSV articles */}
+          {canWrite && (
+            <label style={{
+              padding: "7px 10px", borderRadius: 10, fontSize: 11, fontWeight: 700,
+              border: "1.5px solid #ddd6c8", background: "#fff", color: "#999",
+              cursor: "pointer", whiteSpace: "nowrap",
+              display: "inline-flex", alignItems: "center", gap: 4,
+            }}>
+              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              {importingCsv ? "Import..." : "Import CSV"}
+              <input type="file" accept=".csv" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) handleCsvImport(f); e.target.value = ""; }} />
+            </label>
+          )}
         </div>
+
+        {importMsg && <div style={{ padding: "8px 20px", fontSize: 12, color: "#4a6741", fontWeight: 600 }}>{importMsg}</div>}
 
         {/* Loading */}
         {loading && <p style={{ textAlign: "center", color: "#999", padding: 40 }}>Chargement...</p>}
