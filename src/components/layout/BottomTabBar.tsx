@@ -379,18 +379,20 @@ export function BottomTabBar() {
     router.push(href);
   };
 
-  const toggleStyle = (isActive: boolean): React.CSSProperties => ({
-    display: "flex", alignItems: "center", justifyContent: "center",
-    cursor: "pointer", padding: "10px 14px",
-    border: "none", borderRadius: 999,
-    background: isActive ? etabColor : "transparent",
-    color: isActive ? "#fff" : "#666",
-    fontSize: 11, fontWeight: 700,
-    fontFamily: "var(--font-oswald), Oswald, sans-serif",
-    textTransform: "uppercase", letterSpacing: ".05em",
-    transition: "all 0.2s cubic-bezier(.34,1.56,.64,1)",
+  const tabStyle = (isActive: boolean): React.CSSProperties => ({
+    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+    cursor: "pointer", padding: "6px 12px 4px",
+    border: "none", borderRadius: 12,
+    background: isActive ? `${etabColor}18` : "transparent",
+    color: isActive ? etabColor : "#999",
+    fontSize: 9, fontWeight: 600,
+    fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+    letterSpacing: ".02em",
+    transition: "all 0.15s",
     flexShrink: 0,
     whiteSpace: "nowrap",
+    gap: 2,
+    minWidth: 48,
   });
 
   return (
@@ -531,15 +533,13 @@ export function BottomTabBar() {
           {/* Nav pill */}
           <div style={{
             display: "flex", alignItems: "center", gap: 2,
-            padding: "5px 6px",
-            borderRadius: 999,
-            background: "rgba(245,240,232,0.85)",
-            backdropFilter: "blur(24px) saturate(180%)",
-            WebkitBackdropFilter: "blur(24px) saturate(180%)",
-            border: "1px solid rgba(0,0,0,0.06)",
-            boxShadow: "0 6px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)",
-            overflowX: "auto",
-            scrollbarWidth: "none",
+            padding: "4px 8px",
+            borderRadius: 22,
+            background: "rgba(245,240,232,0.82)",
+            backdropFilter: "blur(28px) saturate(200%)",
+            WebkitBackdropFilter: "blur(28px) saturate(200%)",
+            border: "1px solid rgba(255,255,255,0.5)",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.08), 0 0 1px rgba(0,0,0,0.06)",
           }}>
             {/* Etab button */}
             {canSwitchEtab && (
@@ -547,17 +547,13 @@ export function BottomTabBar() {
                 type="button"
                 onClick={() => setEtabDrawerOpen(true)}
                 style={{
-                  ...toggleStyle(false),
-                  padding: "10px 12px",
+                  ...tabStyle(false),
                   color: etabColor,
-                  borderRight: showNavPill ? "1px solid rgba(0,0,0,0.06)" : "none",
-                  marginRight: showNavPill ? 2 : 0,
                 }}
-                onTouchStart={e => { e.currentTarget.style.transform = "scale(0.94)"; }}
-                onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
                 aria-label="Changer d'etablissement"
               >
                 <IconStore />
+                <span>Etab.</span>
               </button>
             )}
             {showNavPill && sections.map((section) => {
@@ -568,11 +564,12 @@ export function BottomTabBar() {
                   key={section.label}
                   type="button"
                   onClick={() => handleSectionClick(section)}
-                  style={toggleStyle(isActive)}
-                  onTouchStart={e => { e.currentTarget.style.transform = "scale(0.94)"; }}
-                  onTouchEnd={e => { e.currentTarget.style.transform = "scale(1)"; }}
+                  style={tabStyle(isActive)}
                 >
-                  {label}
+                  <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22 }}>
+                    {section.icon(isActive)}
+                  </span>
+                  <span>{label}</span>
                 </button>
               );
             })}

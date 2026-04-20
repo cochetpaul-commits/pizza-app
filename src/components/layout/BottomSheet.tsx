@@ -40,7 +40,6 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
     currentY.current = 0;
   }, [onClose]);
 
-  // Close on escape key
   useEffect(() => {
     if (!open) return;
     function handleKey(e: KeyboardEvent) {
@@ -50,7 +49,6 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
     return () => document.removeEventListener("keydown", handleKey);
   }, [open, onClose]);
 
-  // Prevent body scroll + hide bottom tab bar when open
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
@@ -70,9 +68,9 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
         position: "fixed",
         inset: 0,
         zIndex: 200,
-        background: "rgba(0,0,0,0.25)",
-        backdropFilter: "blur(4px)",
-        WebkitBackdropFilter: "blur(4px)",
+        background: "rgba(0,0,0,0.18)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
         transition: "opacity 0.2s",
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
@@ -85,17 +83,16 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
         style={{
           position: "fixed",
           bottom: 0,
-          left: 0,
-          right: 0,
+          left: 8,
+          right: 8,
           maxHeight: "82dvh",
-          background: "rgba(252,248,240,0.96)",
-          backdropFilter: "blur(28px) saturate(180%)",
-          WebkitBackdropFilter: "blur(28px) saturate(180%)",
-          borderRadius: "32px 32px 0 0",
-          border: "1px solid rgba(255,255,255,0.45)",
-          borderBottom: "none",
-          boxShadow: "0 -8px 40px rgba(0,0,0,0.14), 0 -2px 12px rgba(0,0,0,0.06)",
-          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          background: "rgba(252,248,240,0.88)",
+          backdropFilter: "blur(40px) saturate(200%)",
+          WebkitBackdropFilter: "blur(40px) saturate(200%)",
+          borderRadius: 20,
+          border: "1px solid rgba(255,255,255,0.5)",
+          boxShadow: "0 -4px 30px rgba(0,0,0,0.10), 0 0 1px rgba(0,0,0,0.08)",
+          marginBottom: "calc(8px + env(safe-area-inset-bottom, 0px))",
           overflowY: "auto",
           transform: "translateY(0)",
           transition: "transform 0.25s ease",
@@ -103,30 +100,49 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
         }}
       >
         {/* Handle bar */}
-        <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px" }}>
+        <div style={{ display: "flex", justifyContent: "center", padding: "8px 0 2px" }}>
           <div style={{
             width: 36,
-            height: 4,
-            borderRadius: 2,
-            background: "rgba(0,0,0,0.18)",
+            height: 5,
+            borderRadius: 3,
+            background: "rgba(0,0,0,0.15)",
           }} />
         </div>
 
+        {/* Header: title + close */}
         {title && (
           <div style={{
-            padding: "4px 20px 12px",
-            fontSize: 15,
-            fontWeight: 700,
-            fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-            textTransform: "uppercase",
-            letterSpacing: 1,
-            color: "#2c2c2c",
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "6px 18px 10px",
           }}>
-            {title}
+            <span style={{
+              fontSize: 15,
+              fontWeight: 700,
+              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+              textTransform: "uppercase",
+              letterSpacing: 1,
+              color: "#2c2c2c",
+            }}>
+              {title}
+            </span>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                width: 28, height: 28, borderRadius: "50%",
+                background: "rgba(0,0,0,0.06)", border: "none",
+                color: "#999", fontSize: 14, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
           </div>
         )}
 
-        <div style={{ padding: "0 16px 16px" }}>
+        <div style={{ padding: "0 14px 14px" }}>
           {children}
         </div>
       </div>
