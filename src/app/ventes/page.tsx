@@ -546,11 +546,23 @@ function PerformancesPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
-      <PilotageSwipeWrapper mode={mode} onModeChange={setMode} accent={accent} dateFrom={range.from} dateTo={range.to}>
+      <PilotageSwipeWrapper dateFrom={range.from} dateTo={range.to}>
       <div className="ventes-container" style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 16px 120px" }}>
 
-        {/* Actions desktop */}
+        {/* TTC/HT toggle + actions desktop */}
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 0, background: "#f0ebe2", border: "1px solid #e8e0d0", borderRadius: 999, padding: 2 }}>
+            <button type="button" onClick={() => setMode("ttc")} style={{
+              padding: "4px 14px", borderRadius: 999, border: "none", cursor: "pointer",
+              background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#999",
+              fontSize: 11, fontWeight: 700, letterSpacing: ".03em",
+            }}>TTC</button>
+            <button type="button" onClick={() => setMode("ht")} style={{
+              padding: "4px 14px", borderRadius: 999, border: "none", cursor: "pointer",
+              background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#999",
+              fontSize: 11, fontWeight: 700, letterSpacing: ".03em",
+            }}>HT</button>
+          </div>
           <label className="desktop-only" style={{
             padding: "6px 14px", borderRadius: 8, border: "none",
             background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
