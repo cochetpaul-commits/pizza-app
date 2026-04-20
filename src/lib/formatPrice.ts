@@ -62,6 +62,8 @@ function fromLegacy(x: IngredientPriceFields): string {
   const lbl = (x.purchase_unit_label ?? "").toLowerCase().trim();
 
   if (cpu != null && Number.isFinite(cpu) && cpu > 0) {
+    if (lbl === "kg") return `${fmtMoney(cpu)} €/kg`;
+    if (lbl === "l") return `${fmtMoney(cpu)} €/L`;
     if (lbl === "g") return `${fmtMoney(cpu * 1000)} €/kg`;
     if (lbl === "ml") return `${fmtMoney(cpu * 1000)} €/L`;
     if (lbl === "pc") {
