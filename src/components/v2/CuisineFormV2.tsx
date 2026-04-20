@@ -341,11 +341,26 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         }
 
         // Check if ingredient in catalog linked to this recipe
-        const { data: linkedIng } = await supabase
+        // Try 3 strategies: source+recipe_id, output_ingredient_id, name match
+        const recRow = rec as Record<string, unknown>;
+        let linkedIngId: string | null = null;
+        const { data: bySource } = await supabase
           .from("ingredients").select("id")
           .eq("source", "recette_maison").eq("recipe_id", recipeId)
           .maybeSingle<{ id: string }>();
-        if (linkedIng) setIndexIngredientId(linkedIng.id);
+        if (bySource) {
+          linkedIngId = bySource.id;
+        } else if (recRow.output_ingredient_id) {
+          linkedIngId = String(recRow.output_ingredient_id);
+        } else {
+          const { data: byName } = await supabase
+            .from("ingredients").select("id")
+            .eq("name", recRow.name).in("category", ["preparation", "sauce"])
+            .eq("is_active", true)
+            .maybeSingle<{ id: string }>();
+          if (byName) linkedIngId = byName.id;
+        }
+        if (linkedIngId) setIndexIngredientId(linkedIngId);
       }
 
       setStatus("ok");
@@ -447,30 +462,50 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
           preparation: "preparation", sauce: "sauce", autre: "autre",
         };
         const ingCat: Category = CAT_MAP[category] ?? "preparation";
-        const { data: existingIng } = await supabase
-          .from("ingredients").select("id")
-          .eq("source", "recette_maison").eq("recipe_id", rid!)
-          .maybeSingle<{ id: string }>();
-        if (existingIng) {
-          await supabase.from("ingredients").update({
-            name: name || "Nouvelle recette",
-            category: ingCat,
-            purchase_price: costPerKg ?? null,
-            purchase_unit: 1,
-            purchase_unit_label: "kg",
-            purchase_unit_name: "kg",
-          }).eq("id", existingIng.id);
-          setIndexIngredientId(existingIng.id);
+        const ingPayload = {
+          name: name || "Nouvelle recette",
+          category: ingCat,
+          purchase_price: costPerKg ?? null,
+          purchase_unit: 1,
+          purchase_unit_label: "kg" as const,
+          purchase_unit_name: "kg" as const,
+          source: "recette_maison",
+          recipe_id: rid!,
+        };
+
+        // Find existing linked ingredient: by indexIngredientId, source+recipe_id, output_ingredient_id, or name
+        let existingId = indexIngredientId;
+        if (!existingId) {
+          const { data: bySource } = await supabase
+            .from("ingredients").select("id")
+            .eq("source", "recette_maison").eq("recipe_id", rid!)
+            .maybeSingle<{ id: string }>();
+          existingId = bySource?.id ?? null;
+        }
+        if (!existingId) {
+          // Check output_ingredient_id on the recipe
+          const { data: kr } = await supabase
+            .from("kitchen_recipes").select("output_ingredient_id")
+            .eq("id", rid!).single<{ output_ingredient_id: string | null }>();
+          if (kr?.output_ingredient_id) existingId = kr.output_ingredient_id;
+        }
+        if (!existingId) {
+          const { data: byName } = await supabase
+            .from("ingredients").select("id")
+            .eq("name", name || "Nouvelle recette").in("category", ["preparation", "sauce"])
+            .eq("is_active", true)
+            .maybeSingle<{ id: string }>();
+          existingId = byName?.id ?? null;
+        }
+
+        if (existingId) {
+          await supabase.from("ingredients").update(ingPayload).eq("id", existingId);
+          setIndexIngredientId(existingId);
+          // Ensure bidirectional link
+          await supabase.from("kitchen_recipes").update({ output_ingredient_id: existingId }).eq("id", rid!);
         } else if (costPerKg && costPerKg > 0) {
           const { data: newIng } = await supabase.from("ingredients").insert({
-            name: name || "Nouvelle recette",
-            category: ingCat,
-            purchase_price: costPerKg,
-            purchase_unit: 1,
-            purchase_unit_label: "kg",
-            purchase_unit_name: "kg",
-            source: "recette_maison",
-            recipe_id: rid!,
+            ...ingPayload,
             is_active: true,
             allergens: null,
             default_unit: "g",
