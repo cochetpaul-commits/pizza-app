@@ -382,7 +382,8 @@ export const IngredientRow = React.memo(function IngredientRow({
         </div>
 
         {/* Actions */}
-        <div style={{ width: 90, display: "flex", gap: 5, alignItems: "center", justifyContent: "flex-end" }}>
+        <div style={{ width: 110, display: "flex", gap: 5, alignItems: "center", justifyContent: "flex-end" }}>
+          <a href={`/ingredients/${x.id}`} onClick={(e) => e.stopPropagation()} title="Fiche détail" style={{ ...BTN_ACTION, background: "rgba(26,26,26,0.06)", color: "#1a1a1a", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>→</a>
           {!x.is_derived && onCreateDerived && (
             <button onClick={(e) => { e.stopPropagation(); onCreateDerived(x); }} title="Créer un dérivé" style={{ ...BTN_ACTION, background: "rgba(124,58,237,0.10)", color: "#7C3AED", fontSize: 12, fontWeight: 700 }}>⚗</button>
           )}
