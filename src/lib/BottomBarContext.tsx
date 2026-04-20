@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, type CSSProperties } from "react";
 
 type BottomBarContextType = {
   actions: React.ReactNode;
@@ -46,4 +46,53 @@ export function useBottomBarActions(renderActions: () => React.ReactNode, deps: 
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
+}
+
+/**
+ * Standard FAB button for the bottom bar context slot.
+ * Ensures consistent size, shape, and styling across all pages.
+ */
+export function BottomBarButton({
+  onClick, icon, accent, active, label, as = "button",
+  ...rest
+}: {
+  onClick?: () => void;
+  icon: React.ReactNode;
+  accent: string;
+  active?: boolean;
+  label?: string;
+  as?: "button" | "label";
+  children?: React.ReactNode;
+}) {
+  const style: CSSProperties = {
+    width: 50, height: 50,
+    borderRadius: "50%",
+    border: "none",
+    background: accent,
+    color: "#fff",
+    cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
+    flexShrink: 0,
+    position: "relative",
+    padding: 0,
+  };
+  if (active) {
+    style.boxShadow = `0 0 0 3px ${accent}40, 0 4px 16px rgba(0,0,0,0.18)`;
+  }
+
+  if (as === "label") {
+    return (
+      <label style={style} aria-label={label}>
+        {icon}
+        {rest.children}
+      </label>
+    );
+  }
+
+  return (
+    <button type="button" onClick={onClick} style={style} aria-label={label}>
+      {icon}
+    </button>
+  );
 }

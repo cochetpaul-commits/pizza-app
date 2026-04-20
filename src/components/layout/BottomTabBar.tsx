@@ -630,15 +630,16 @@ export function BottomTabBar() {
                 {actionsFabOpen && (
                   <div
                     onClick={() => setActionsFabOpen(false)}
+                    className="bottom-bar-fab-expanded"
                     style={{
-                      display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-                      padding: "8px",
-                      borderRadius: 20,
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+                      padding: "10px",
+                      borderRadius: 28,
                       background: "rgba(245,240,232,0.92)",
-                      backdropFilter: "blur(20px) saturate(180%)",
-                      WebkitBackdropFilter: "blur(20px) saturate(180%)",
-                      border: "1px solid rgba(0,0,0,0.06)",
-                      boxShadow: "0 6px 24px rgba(0,0,0,0.12)",
+                      backdropFilter: "blur(28px) saturate(200%)",
+                      WebkitBackdropFilter: "blur(28px) saturate(200%)",
+                      border: "1px solid rgba(255,255,255,0.5)",
+                      boxShadow: "0 4px 20px rgba(0,0,0,0.10)",
                       animation: "fabExpand 0.2s ease",
                     }}
                   >
