@@ -487,11 +487,8 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
           recipe_id: rid!,
         };
 
-        console.log("[SYNC] costPerKg =", costPerKg, "totalCost =", totalCost, "yieldGrams =", yieldGrams);
-
         // Strategy 1: already known from load or previous save
         let existingId = indexIngredientId;
-        console.log("[SYNC] strategy1 indexIngredientId =", existingId);
 
         // Strategy 2: source + recipe_id
         if (!existingId) {
@@ -500,7 +497,6 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
             .eq("source", "recette_maison").eq("recipe_id", rid!)
             .limit(1);
           existingId = data?.[0]?.id ?? null;
-          console.log("[SYNC] strategy2 recipe_id =", rid, "→", existingId);
         }
 
         // Strategy 3: name match in preparation/sauce categories
@@ -512,21 +508,14 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
             .eq("is_active", true)
             .limit(1);
           existingId = data?.[0]?.id ?? null;
-          console.log("[SYNC] strategy3 name =", recipeName, "→", existingId);
         }
 
         if (existingId) {
-          console.log("[SYNC] updating ingredient", existingId, "with", ingUpdate);
-          const { data: updData, error: updErr } = await supabase.from("ingredients").update(ingUpdate).eq("id", existingId).select("id,purchase_price,purchase_unit,purchase_unit_label,cost_per_unit");
-          if (updErr) console.warn("[SYNC] update FAILED:", updErr);
-          else {
-            const r = updData?.[0] as Record<string, unknown> | undefined;
-            console.log("[SYNC] update OK — purchase_price:", r?.purchase_price, "purchase_unit:", r?.purchase_unit, "purchase_unit_label:", r?.purchase_unit_label, "cost_per_unit:", r?.cost_per_unit);
-          }
+          const { error: updErr } = await supabase.from("ingredients").update(ingUpdate).eq("id", existingId);
+          if (updErr) console.warn("Ingredient sync update failed:", updErr);
           setIndexIngredientId(existingId);
           await supabase.from("kitchen_recipes").update({ output_ingredient_id: existingId }).eq("id", rid!);
         } else if (costPerKg && costPerKg > 0) {
-          console.log("[SYNC] inserting new ingredient");
           const { data: newIng, error: insErr } = await supabase.from("ingredients").insert({
             ...ingUpdate,
             is_active: true,
@@ -538,14 +527,11 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
             supplier_id: null,
             ...(etab ? { etablissement_id: etab.id } : {}),
           }).select("id").single<{ id: string }>();
-          if (insErr) console.warn("[SYNC] insert FAILED:", insErr);
+          if (insErr) console.warn("Ingredient sync insert failed:", insErr);
           if (newIng) {
-            console.log("[SYNC] insert OK, id =", newIng.id);
             setIndexIngredientId(newIng.id);
             await supabase.from("kitchen_recipes").update({ output_ingredient_id: newIng.id }).eq("id", rid!);
           }
-        } else {
-          console.warn("[SYNC] skipped — no existingId and costPerKg is", costPerKg);
         }
       } catch (e) {
         console.warn("[SYNC] failed:", e);

@@ -78,6 +78,26 @@ function fromLegacy(x: IngredientPriceFields): string {
     }
   }
 
+  // Fallback : purchase_price directement (quand cost_per_unit GENERATED est null)
+  const pp = x.purchase_price;
+  if (pp != null && Number.isFinite(pp) && pp > 0) {
+    if (lbl === "kg") return `${fmtMoney(pp)} €/kg`;
+    if (lbl === "l") return `${fmtMoney(pp)} €/L`;
+    if (lbl === "g") return `${fmtMoney(pp * 1000)} €/kg`;
+    if (lbl === "ml") return `${fmtMoney(pp * 1000)} €/L`;
+    if (lbl === "pc") {
+      const pw = n2(x.piece_weight_g);
+      if (pw > 0) return `${fmtMoney((pp / pw) * 1000)} €/kg`;
+      const volMl = x.piece_volume_ml;
+      if (volMl != null && volMl > 0) {
+        return `${fmtMoney(pp)} €/pc · ${fmtMoney((pp / volMl) * 1000)} €/L`;
+      }
+      return `${fmtMoney(pp)} €/pc`;
+    }
+    // Label inconnu — affiche en €/kg par défaut
+    return `${fmtMoney(pp)} €/kg`;
+  }
+
   return "Prix ND";
 }
 
