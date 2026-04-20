@@ -697,6 +697,8 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
               onVatChange={setVatRate}
               multiplier={fcMultiplier}
               onMultiplierChange={setFcMultiplier}
+              costPerKg={costPerKg}
+              yieldGrams={typeof yieldGrams === "number" ? yieldGrams : null}
             />
             <GestionFoodCost
               lines={lines}

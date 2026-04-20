@@ -80,13 +80,17 @@ export interface RecipeKpisProps {
   /** Portions multiplier (×1, ×2, …) — controls the Cost card */
   multiplier?: number;
   onMultiplierChange?: (m: number) => void;
+  /** Cost per kg (for preparations/cuisine) — shown as a dedicated card */
+  costPerKg?: number | null;
+  /** Yield in grams (for context display) */
+  yieldGrams?: number | null;
 }
 
 export function RecipeKpis({
   costPerPortion, foodCostPct, sellPriceHT, sellPriceTTC, margeBrute,
   foodCostTarget = 30, portionLabel = "portion", accent = "#D4775A",
   onSellPriceChange, vatRate, onVatChange, onFoodCostTargetChange,
-  multiplier = 1, onMultiplierChange,
+  multiplier = 1, onMultiplierChange, costPerKg, yieldGrams,
 }: RecipeKpisProps) {
   // Food cost color: green ≤ target, orange ≤ target+5, red >
   const fcColor = foodCostPct == null
@@ -138,6 +142,16 @@ export function RecipeKpis({
             <PortionsToggle value={multiplier} onChange={onMultiplierChange} accent={accent} />
           ) : undefined}
         />
+
+        {/* PRIX AU KILO — affiché uniquement si rendement connu */}
+        {costPerKg != null && (
+          <BigKpiCard
+            label="Prix au kilo"
+            color="#5b8fa8"
+            valueNode={<span>{`${fmtMoney(costPerKg)}€`}</span>}
+            subNode={<span>{yieldGrams ? `rendement ${(yieldGrams / 1000).toFixed(2)} kg` : "par kg"}</span>}
+          />
+        )}
 
         {/* FOOD COST — cible éditable inline */}
         <BigKpiCard
