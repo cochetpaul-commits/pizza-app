@@ -149,16 +149,23 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
     }, 0);
   }, [lines, priceByIngredient, ingredients]);
 
-  // Poids total ingrédients (g uniquement — pas de conversion implicite cL→g)
+  // Poids total ingrédients (g + conversion cL/mL/L via densité, défaut 1g/mL)
   const totalWeightG = useMemo(() => {
     return lines.reduce((acc, l) => {
       if (!l.ingredient_id || l.qty === "" || !(Number(l.qty) > 0)) return acc;
       const qty = Number(l.qty);
       const unit = l.unit.toLowerCase();
       if (unit === "g") return acc + qty;
+      if (unit === "kg") return acc + qty * 1000;
+      if (unit === "cl" || unit === "ml" || unit === "l") {
+        const ing = ingredients.find(i => i.id === l.ingredient_id);
+        const dens = ing?.density_g_per_ml ?? 1; // défaut 1g/mL (eau)
+        const ml = unit === "cl" ? qty * 10 : unit === "l" ? qty * 1000 : qty;
+        return acc + ml * dens;
+      }
       return acc;
     }, 0);
-  }, [lines]);
+  }, [lines, ingredients]);
 
   const yieldG = yieldGrams !== "" ? Number(yieldGrams) : null;
   const portions = portionsCount !== "" ? Number(portionsCount) : null;
