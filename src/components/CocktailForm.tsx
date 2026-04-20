@@ -315,7 +315,7 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
     if (missingIngIds.size > 0) {
       const [{ data: krAll }, { data: prAll }] = await Promise.all([
         supabase.from("kitchen_recipes").select("name,output_ingredient_id,total_cost,yield_grams,cost_per_kg"),
-        supabase.from("prep_recipes").select("name,output_ingredient_id,yield_grams"),
+        supabase.from("prep_recipes").select("name,output_ingredient_id"),
       ]);
       for (const kr of (krAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; total_cost: number | null; yield_grams: number | null; cost_per_kg: number | null }>) {
         let cpuG = 0;
@@ -334,7 +334,7 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
           missingIngIds.delete(ingNameToId[nk]);
         }
       }
-      for (const pr of (prAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; yield_grams: number | null }>) {
+      for (const pr of (prAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null }>) {
         let cpuG = 0;
         if (pr.output_ingredient_id) {
           const linked = ingList.find(i => i.id === pr.output_ingredient_id);

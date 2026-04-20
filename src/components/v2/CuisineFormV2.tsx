@@ -254,7 +254,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         }
         if (missingIds.size > 0) {
           const krQ = supabase.from("kitchen_recipes").select("name,output_ingredient_id,total_cost,yield_grams,cost_per_kg");
-          const prQ = supabase.from("prep_recipes").select("name,output_ingredient_id,yield_grams");
+          const prQ = supabase.from("prep_recipes").select("name,output_ingredient_id");
           const [{ data: krAll, error: krErr }, { data: prAll, error: prErr }] = await Promise.all([krQ, prQ]);
           if (krErr) { console.error("kitchen_recipes query:", krErr); }
           if (prErr) { console.error("prep_recipes query:", prErr); }
@@ -272,7 +272,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
             }
           }
           // prep_recipes n'a pas total_cost — on résout le coût via l'ingrédient lié (purchase_price)
-          for (const pr of (prAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; yield_grams: number | null }>) {
+          for (const pr of (prAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null }>) {
             // Try to get cost from the linked ingredient's purchase_price
             let cpuG = 0;
             if (pr.output_ingredient_id) {

@@ -302,7 +302,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         }
         if (missingIds.size > 0) {
           const krQ = supabase.from("kitchen_recipes").select("name,output_ingredient_id,total_cost,yield_grams,cost_per_kg");
-          const prQ = supabase.from("prep_recipes").select("name,output_ingredient_id,yield_grams");
+          const prQ = supabase.from("prep_recipes").select("name,output_ingredient_id");
           const [{ data: krAll }, { data: prAll }] = await Promise.all([krQ, prQ]);
           if (cancelled) return;
           for (const kr of (krAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; total_cost: number | null; yield_grams: number | null; cost_per_kg: number | null }>) {
@@ -318,7 +318,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
               pm[ingNameToId[nk]] = { g: cpuG }; supplierByIng[ingNameToId[nk]] = "maison"; missingIds.delete(ingNameToId[nk]);
             }
           }
-          for (const pr of (prAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; yield_grams: number | null }>) {
+          for (const pr of (prAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null }>) {
             let cpuG = 0;
             if (pr.output_ingredient_id) {
               const ing = ingList.find(i => i.id === pr.output_ingredient_id);
