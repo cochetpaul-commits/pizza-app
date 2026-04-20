@@ -338,6 +338,7 @@ export function BottomTabBar() {
   const { current, setCurrent, etablissements, isGroupView, setGroupView, isGroupAdmin } = useEtablissement();
   const [drawerSection, setDrawerSection] = useState<TabSection | null>(null);
   const [etabDrawerOpen, setEtabDrawerOpen] = useState(false);
+  const [actionsFabOpen, setActionsFabOpen] = useState(false);
   const { actions: contextActions } = useBottomBar();
 
   // Listen for "open-etab-drawer" event from MobileHeader
@@ -346,6 +347,10 @@ export function BottomTabBar() {
     window.addEventListener("open-etab-drawer", handler);
     return () => window.removeEventListener("open-etab-drawer", handler);
   }, []);
+
+  // Close FAB when context actions change (page navigation)
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setActionsFabOpen(false); }, [contextActions]);
 
   // Hide until role is known; show even in group view (for etab FAB)
   if (!role) return null;
@@ -522,7 +527,7 @@ export function BottomTabBar() {
         display: "none",
         padding: "0 12px",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: contextActions ? "space-between" : "center" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
           {/* Nav pill */}
           <div style={{
             display: "flex", alignItems: "center", gap: 2,
@@ -533,9 +538,8 @@ export function BottomTabBar() {
             WebkitBackdropFilter: "blur(24px) saturate(180%)",
             border: "1px solid rgba(0,0,0,0.06)",
             boxShadow: "0 6px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)",
-            overflow: "hidden",
-            flexShrink: contextActions ? 1 : 0,
-            minWidth: 0,
+            overflowX: "auto",
+            scrollbarWidth: "none",
           }}>
             {/* Etab button */}
             {canSwitchEtab && (
@@ -573,24 +577,68 @@ export function BottomTabBar() {
               );
             })}
           </div>
-
-          {/* Context actions slot (right side) */}
-          {contextActions && (
-            <div style={{
-              display: "flex", alignItems: "center", gap: 4,
-              padding: "5px 6px",
-              borderRadius: 999,
-              background: "rgba(245,240,232,0.85)",
-              backdropFilter: "blur(24px) saturate(180%)",
-              WebkitBackdropFilter: "blur(24px) saturate(180%)",
-              border: "1px solid rgba(0,0,0,0.06)",
-              boxShadow: "0 6px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)",
-              flexShrink: 0,
-            }}>
-              {contextActions}
-            </div>
-          )}
         </div>
+
+        {/* Context FAB (right side, expands upward) */}
+        {contextActions && (
+          <div style={{
+            position: "fixed",
+            right: 16,
+            bottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
+            zIndex: 101,
+            display: "flex", flexDirection: "column-reverse", alignItems: "center", gap: 10,
+          }}>
+            {/* Main FAB trigger */}
+            <button
+              type="button"
+              onClick={() => setActionsFabOpen(v => !v)}
+              style={{
+                width: 50, height: 50,
+                borderRadius: 16,
+                border: "none",
+                background: actionsFabOpen ? "#1a1a1a" : (etabColor),
+                color: "#fff",
+                cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
+                transition: "all 0.2s cubic-bezier(.34,1.56,.64,1)",
+                transform: actionsFabOpen ? "rotate(45deg)" : "rotate(0)",
+              }}
+            >
+              <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+
+            {/* Expanded actions */}
+            {actionsFabOpen && (
+              <div
+                onClick={() => setActionsFabOpen(false)}
+                style={{
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                  padding: "8px",
+                  borderRadius: 20,
+                  background: "rgba(245,240,232,0.92)",
+                  backdropFilter: "blur(20px) saturate(180%)",
+                  WebkitBackdropFilter: "blur(20px) saturate(180%)",
+                  border: "1px solid rgba(0,0,0,0.06)",
+                  boxShadow: "0 6px 24px rgba(0,0,0,0.12)",
+                  animation: "fabExpand 0.2s ease",
+                }}
+              >
+                {contextActions}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Overlay to close FAB */}
+        {actionsFabOpen && contextActions && (
+          <div
+            onClick={() => setActionsFabOpen(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 99, background: "transparent" }}
+          />
+        )}
       </nav>
     </>
   );

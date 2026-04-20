@@ -236,6 +236,11 @@ body.bottom-sheet-open .pilotage-swipe-bar {
   display: none !important;
 }
 
+@keyframes fabExpand {
+  from { opacity: 0; transform: scale(0.8) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
 /* Achats page: responsive charts grid + top achats table */
 @media (max-width: 767px) {
   .achats-charts-grid {
