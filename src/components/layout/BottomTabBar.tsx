@@ -579,66 +579,86 @@ export function BottomTabBar() {
           </div>
         </div>
 
-        {/* Context FAB (right side, expands upward) */}
-        {contextActions && (
-          <div style={{
-            position: "fixed",
-            right: 16,
-            bottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
-            zIndex: 101,
-            display: "flex", flexDirection: "column-reverse", alignItems: "center", gap: 10,
-          }}>
-            {/* Main FAB trigger */}
-            <button
-              type="button"
-              onClick={() => setActionsFabOpen(v => !v)}
-              style={{
-                width: 50, height: 50,
-                borderRadius: "50%",
-                border: "none",
-                background: actionsFabOpen ? "#1a1a1a" : (etabColor),
-                color: "#fff",
-                cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
-                transition: "all 0.2s cubic-bezier(.34,1.56,.64,1)",
-                transform: actionsFabOpen ? "rotate(45deg)" : "rotate(0)",
-              }}
-            >
-              <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-            </button>
+        {/* Context FAB (right side) */}
+        {contextActions && (() => {
+          // Count children to decide: single action = direct FAB, multiple = expandable
+          const children = React.Children.toArray(contextActions).filter(Boolean);
+          const isSingle = children.length === 1;
 
-            {/* Expanded actions */}
-            {actionsFabOpen && (
-              <div
-                onClick={() => setActionsFabOpen(false)}
-                style={{
-                  display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-                  padding: "8px",
-                  borderRadius: 20,
-                  background: "rgba(245,240,232,0.92)",
-                  backdropFilter: "blur(20px) saturate(180%)",
-                  WebkitBackdropFilter: "blur(20px) saturate(180%)",
-                  border: "1px solid rgba(0,0,0,0.06)",
-                  boxShadow: "0 6px 24px rgba(0,0,0,0.12)",
-                  animation: "fabExpand 0.2s ease",
-                }}
-              >
+          if (isSingle) {
+            // Render the single action directly as a round FAB
+            return (
+              <div className="bottom-bar-fab" style={{
+                position: "fixed", right: 16,
+                bottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
+                zIndex: 101,
+              }}>
                 {contextActions}
               </div>
-            )}
-          </div>
-        )}
+            );
+          }
 
-        {/* Overlay to close FAB */}
-        {actionsFabOpen && contextActions && (
-          <div
-            onClick={() => setActionsFabOpen(false)}
-            style={{ position: "fixed", inset: 0, zIndex: 99, background: "transparent" }}
-          />
-        )}
+          // Multiple actions: expandable FAB
+          return (
+            <>
+              <div className="bottom-bar-fab" style={{
+                position: "fixed", right: 16,
+                bottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
+                zIndex: 101,
+                display: "flex", flexDirection: "column-reverse", alignItems: "center", gap: 10,
+              }}>
+                {/* Main FAB trigger */}
+                <button
+                  type="button"
+                  onClick={() => setActionsFabOpen(v => !v)}
+                  style={{
+                    width: 50, height: 50,
+                    borderRadius: "50%",
+                    border: "none",
+                    background: actionsFabOpen ? "#1a1a1a" : etabColor,
+                    color: "#fff",
+                    cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
+                    transition: "all 0.2s cubic-bezier(.34,1.56,.64,1)",
+                    transform: actionsFabOpen ? "rotate(45deg)" : "rotate(0)",
+                  }}
+                >
+                  <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                </button>
+
+                {/* Expanded actions */}
+                {actionsFabOpen && (
+                  <div
+                    onClick={() => setActionsFabOpen(false)}
+                    style={{
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                      padding: "8px",
+                      borderRadius: 20,
+                      background: "rgba(245,240,232,0.92)",
+                      backdropFilter: "blur(20px) saturate(180%)",
+                      WebkitBackdropFilter: "blur(20px) saturate(180%)",
+                      border: "1px solid rgba(0,0,0,0.06)",
+                      boxShadow: "0 6px 24px rgba(0,0,0,0.12)",
+                      animation: "fabExpand 0.2s ease",
+                    }}
+                  >
+                    {contextActions}
+                  </div>
+                )}
+              </div>
+              {/* Overlay to close FAB */}
+              {actionsFabOpen && (
+                <div
+                  onClick={() => setActionsFabOpen(false)}
+                  style={{ position: "fixed", inset: 0, zIndex: 99, background: "transparent" }}
+                />
+              )}
+            </>
+          );
+        })()}
       </nav>
     </>
   );

@@ -767,12 +767,12 @@ export default function AchatsPage() {
   const accentColor = etab.current?.couleur ?? "#D4775A";
   useBottomBarActions(() => (
     <label style={{
-      width: 38, height: 38, borderRadius: "50%", border: "none",
+      width: 50, height: 50, borderRadius: "50%", border: "none",
       background: accentColor, color: "#fff",
       cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-      flexShrink: 0,
+      boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
     }}>
-      <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
       </svg>
       <input type="file" accept="image/*,.pdf" multiple style={{ display: "none" }} onChange={(e) => {
