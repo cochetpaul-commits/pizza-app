@@ -517,9 +517,12 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
 
         if (existingId) {
           console.log("[SYNC] updating ingredient", existingId, "with", ingUpdate);
-          const { data: updData, error: updErr, count: updCount } = await supabase.from("ingredients").update(ingUpdate).eq("id", existingId).select("id,purchase_price,purchase_unit,purchase_unit_label,cost_per_unit");
+          const { data: updData, error: updErr } = await supabase.from("ingredients").update(ingUpdate).eq("id", existingId).select("id,purchase_price,purchase_unit,purchase_unit_label,cost_per_unit");
           if (updErr) console.warn("[SYNC] update FAILED:", updErr);
-          else console.log("[SYNC] update OK, returned:", updData, "count:", updCount);
+          else {
+            const r = updData?.[0] as Record<string, unknown> | undefined;
+            console.log("[SYNC] update OK — purchase_price:", r?.purchase_price, "purchase_unit:", r?.purchase_unit, "purchase_unit_label:", r?.purchase_unit_label, "cost_per_unit:", r?.cost_per_unit);
+          }
           setIndexIngredientId(existingId);
           await supabase.from("kitchen_recipes").update({ output_ingredient_id: existingId }).eq("id", rid!);
         } else if (costPerKg && costPerKg > 0) {
