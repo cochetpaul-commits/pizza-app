@@ -84,14 +84,17 @@ export interface RecipeKpisProps {
   costPerKg?: number | null;
   /** Yield in grams (for context display) */
   yieldGrams?: number | null;
+  /** Mode: "preparation" shows only cost + prix/kg + rendement, hides food cost / vente / marge */
+  mode?: "default" | "preparation";
 }
 
 export function RecipeKpis({
   costPerPortion, foodCostPct, sellPriceHT, sellPriceTTC, margeBrute,
   foodCostTarget = 30, portionLabel = "portion", accent = "#D4775A",
   onSellPriceChange, vatRate, onVatChange, onFoodCostTargetChange,
-  multiplier = 1, onMultiplierChange, costPerKg, yieldGrams,
+  multiplier = 1, onMultiplierChange, costPerKg, yieldGrams, mode = "default",
 }: RecipeKpisProps) {
+  const isPrep = mode === "preparation";
   // Food cost color: green ≤ target, orange ≤ target+5, red >
   const fcColor = foodCostPct == null
     ? "#999"
@@ -153,110 +156,115 @@ export function RecipeKpis({
           />
         )}
 
-        {/* FOOD COST — cible éditable inline */}
-        <BigKpiCard
-          label="Food cost"
-          color={fcColor}
-          valueNode={
-            <span>{foodCostPct != null ? `${foodCostPct.toFixed(0)}%` : "-"}</span>
-          }
-          subNode={
-            onFoodCostTargetChange ? (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                cible
-                <input
-                  type="number"
-                  min={5} max={80} step={1}
-                  value={foodCostTarget}
-                  onChange={(e) => onFoodCostTargetChange(Number(e.target.value))}
-                  style={{
-                    width: 38, padding: "1px 4px", borderRadius: 5,
-                    border: "1px solid #d9d2c4", background: "#fff",
-                    fontSize: 12, fontWeight: 700, textAlign: "right",
-                    color: "#1a1a1a",
-                  }}
-                />
-                %
-              </span>
-            ) : <span>{`cible ${foodCostTarget}%`}</span>
-          }
-          bottomNode={
-            <div style={{
-              height: 6, background: "#ece4d4",
-              borderRadius: 999, overflow: "hidden",
-            }}>
-              <div style={{
-                width: `${Math.min(100, fcRatio * 100)}%`,
-                height: "100%", background: fcColor,
-                borderRadius: 999, transition: "width 0.3s",
-              }} />
-            </div>
-          }
-        />
+        {/* Les cartes ci-dessous sont masquées en mode "preparation" */}
+        {!isPrep && (
+          <>
+            {/* FOOD COST — cible éditable inline */}
+            <BigKpiCard
+              label="Food cost"
+              color={fcColor}
+              valueNode={
+                <span>{foodCostPct != null ? `${foodCostPct.toFixed(0)}%` : "-"}</span>
+              }
+              subNode={
+                onFoodCostTargetChange ? (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    cible
+                    <input
+                      type="number"
+                      min={5} max={80} step={1}
+                      value={foodCostTarget}
+                      onChange={(e) => onFoodCostTargetChange(Number(e.target.value))}
+                      style={{
+                        width: 38, padding: "1px 4px", borderRadius: 5,
+                        border: "1px solid #d9d2c4", background: "#fff",
+                        fontSize: 12, fontWeight: 700, textAlign: "right",
+                        color: "#1a1a1a",
+                      }}
+                    />
+                    %
+                  </span>
+                ) : <span>{`cible ${foodCostTarget}%`}</span>
+              }
+              bottomNode={
+                <div style={{
+                  height: 6, background: "#ece4d4",
+                  borderRadius: 999, overflow: "hidden",
+                }}>
+                  <div style={{
+                    width: `${Math.min(100, fcRatio * 100)}%`,
+                    height: "100%", background: fcColor,
+                    borderRadius: 999, transition: "width 0.3s",
+                  }} />
+                </div>
+              }
+            />
 
-        {/* PRIX DE VENTE — input éditable + TVA inline */}
-        <BigKpiCard
-          label="Prix de vente"
-          color="#1a1a1a"
-          valueNode={
-            onSellPriceChange ? (
-              <EditablePrice value={dispSell} onChange={(v) => onSellPriceChange(v / multiplier)} />
-            ) : (
-              <span>{dispSell != null ? `${fmtMoney(dispSell)}€` : "-"}</span>
-            )
-          }
-          subNode={
-            onVatChange && vatPct != null ? (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                TVA
-                <select
-                  value={vatPct}
-                  onChange={(e) => onVatChange(Number(e.target.value) / 100)}
-                  style={{
-                    padding: "1px 4px", borderRadius: 5, border: "1px solid #d9d2c4",
-                    background: "#fff", fontSize: 12, fontWeight: 700, color: "#1a1a1a",
-                    cursor: "pointer",
-                  }}
-                >
-                  {[0, 5.5, 10, 20].map((v) => (
-                    <option key={v} value={v}>{v}%</option>
-                  ))}
-                </select>
-                {dispTTC != null && <span>· {fmtMoney(dispTTC)}€ TTC</span>}
-              </span>
-            ) : (
-              <span>{dispTTC != null ? `HT · ${fmtMoney(dispTTC)}€ TTC` : "HT"}</span>
-            )
-          }
-        />
+            {/* PRIX DE VENTE — input éditable + TVA inline */}
+            <BigKpiCard
+              label="Prix de vente"
+              color="#1a1a1a"
+              valueNode={
+                onSellPriceChange ? (
+                  <EditablePrice value={dispSell} onChange={(v) => onSellPriceChange(v / multiplier)} />
+                ) : (
+                  <span>{dispSell != null ? `${fmtMoney(dispSell)}€` : "-"}</span>
+                )
+              }
+              subNode={
+                onVatChange && vatPct != null ? (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    TVA
+                    <select
+                      value={vatPct}
+                      onChange={(e) => onVatChange(Number(e.target.value) / 100)}
+                      style={{
+                        padding: "1px 4px", borderRadius: 5, border: "1px solid #d9d2c4",
+                        background: "#fff", fontSize: 12, fontWeight: 700, color: "#1a1a1a",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {[0, 5.5, 10, 20].map((v) => (
+                        <option key={v} value={v}>{v}%</option>
+                      ))}
+                    </select>
+                    {dispTTC != null && <span>· {fmtMoney(dispTTC)}€ TTC</span>}
+                  </span>
+                ) : (
+                  <span>{dispTTC != null ? `HT · ${fmtMoney(dispTTC)}€ TTC` : "HT"}</span>
+                )
+              }
+            />
 
-        {/* MARGE BRUTE */}
-        <BigKpiCard
-          label="Marge brute"
-          color={margeColor}
-          valueNode={<span>{dispMarge != null ? `${fmtMoney(dispMarge)}€` : "-"}</span>}
-          subNode={<span>{multiplier === 1 ? `par ${portionLabel}` : `pour ${multiplier} ${portionLabel}s`}</span>}
-          bottomNode={dispMarge != null && dispMarge > 0 ? (
-            <div style={{
-              height: 6, background: "#ece4d4",
-              borderRadius: 999, overflow: "hidden",
-            }}>
-              <div style={{
-                width: `${Math.min(100, margeRatio * 100)}%`,
-                height: "100%", background: margeColor,
-                borderRadius: 999, transition: "width 0.3s",
-              }} />
-            </div>
-          ) : undefined}
-        />
+            {/* MARGE BRUTE */}
+            <BigKpiCard
+              label="Marge brute"
+              color={margeColor}
+              valueNode={<span>{dispMarge != null ? `${fmtMoney(dispMarge)}€` : "-"}</span>}
+              subNode={<span>{multiplier === 1 ? `par ${portionLabel}` : `pour ${multiplier} ${portionLabel}s`}</span>}
+              bottomNode={dispMarge != null && dispMarge > 0 ? (
+                <div style={{
+                  height: 6, background: "#ece4d4",
+                  borderRadius: 999, overflow: "hidden",
+                }}>
+                  <div style={{
+                    width: `${Math.min(100, margeRatio * 100)}%`,
+                    height: "100%", background: margeColor,
+                    borderRadius: 999, transition: "width 0.3s",
+                  }} />
+                </div>
+              ) : undefined}
+            />
 
-        {/* COEFFICIENT — info pure */}
-        <BigKpiCard
-          label="Coefficient"
-          color="#7C3AED"
-          valueNode={<span>{coefficient != null ? `×${coefficient.toFixed(2)}` : "-"}</span>}
-          subNode={<span>prix / coût</span>}
-        />
+            {/* COEFFICIENT — info pure */}
+            <BigKpiCard
+              label="Coefficient"
+              color="#7C3AED"
+              valueNode={<span>{coefficient != null ? `×${coefficient.toFixed(2)}` : "-"}</span>}
+              subNode={<span>prix / coût</span>}
+            />
+          </>
+        )}
       </div>
     </div>
   );

@@ -477,33 +477,35 @@ export function KitchenPdfDocument({ data }: { data: KitchenPdfData }) {
           )}
         </View>
 
-        {/* KPI BANNER */}
-        <View style={styles.kpiBanner}>
-          <View style={styles.kpiBox}>
-            <Text style={styles.kpiLabel}>Cout revient</Text>
-            <Text style={[styles.kpiValue, { color: accent }]}>
-              {fmtMoney(costPerPortion)}
-            </Text>
+        {/* KPI BANNER — masqué pour les préparations/sauces (fiche prod) */}
+        {data.category !== "preparation" && data.category !== "sauce" && (
+          <View style={styles.kpiBanner}>
+            <View style={styles.kpiBox}>
+              <Text style={styles.kpiLabel}>Cout revient</Text>
+              <Text style={[styles.kpiValue, { color: accent }]}>
+                {fmtMoney(costPerPortion)}
+              </Text>
+            </View>
+            <View style={styles.kpiBox}>
+              <Text style={styles.kpiLabel}>Food cost</Text>
+              <Text style={[styles.kpiValue, { color: foodCostColor(foodCostPct) }]}>
+                {fmtPercent(foodCostPct)}
+              </Text>
+            </View>
+            <View style={styles.kpiBox}>
+              <Text style={styles.kpiLabel}>Prix de vente HT</Text>
+              <Text style={[styles.kpiValue, { color: accent }]}>
+                {fmtMoney(sellPrice)}
+              </Text>
+            </View>
+            <View style={styles.kpiBox}>
+              <Text style={styles.kpiLabel}>Marge brute</Text>
+              <Text style={[styles.kpiValue, { color: accent }]}>
+                {fmtMoney(margeBrute)}
+              </Text>
+            </View>
           </View>
-          <View style={styles.kpiBox}>
-            <Text style={styles.kpiLabel}>Food cost</Text>
-            <Text style={[styles.kpiValue, { color: foodCostColor(foodCostPct) }]}>
-              {fmtPercent(foodCostPct)}
-            </Text>
-          </View>
-          <View style={styles.kpiBox}>
-            <Text style={styles.kpiLabel}>Prix de vente HT</Text>
-            <Text style={[styles.kpiValue, { color: accent }]}>
-              {fmtMoney(sellPrice)}
-            </Text>
-          </View>
-          <View style={styles.kpiBox}>
-            <Text style={styles.kpiLabel}>Marge brute</Text>
-            <Text style={[styles.kpiValue, { color: accent }]}>
-              {fmtMoney(margeBrute)}
-            </Text>
-          </View>
-        </View>
+        )}
 
         {/* INGREDIENTS TABLE */}
         <View style={styles.sectionTitleRow}>
@@ -537,10 +539,12 @@ export function KitchenPdfDocument({ data }: { data: KitchenPdfData }) {
             </View>
           );
         })}
-        <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>TOTAL COUT MATIERE</Text>
-          <Text style={styles.totalValue}>{fmtMoney(data.totalCost)}</Text>
-        </View>
+        {data.category !== "preparation" && data.category !== "sauce" && (
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>TOTAL COUT MATIERE</Text>
+            <Text style={styles.totalValue}>{fmtMoney(data.totalCost)}</Text>
+          </View>
+        )}
 
         {/* PROCEDURE */}
         {steps.length > 0 && (

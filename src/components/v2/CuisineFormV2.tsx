@@ -699,6 +699,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
               onMultiplierChange={setFcMultiplier}
               costPerKg={costPerKg}
               yieldGrams={typeof yieldGrams === "number" ? yieldGrams : null}
+              mode={category === "preparation" || category === "sauce" ? "preparation" : "default"}
             />
             <GestionFoodCost
               lines={lines}
