@@ -14,6 +14,7 @@ import { FloatingActions, FAIconPdf, FAIconMail, FAIconTrash, FAIconCheck, FAIco
 import type { FloatingAction } from "@/components/layout/FloatingActions";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { getSupplierColor } from "@/lib/supplierColors";
+import { useBottomBarActions } from "@/lib/BottomBarContext";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1442,6 +1443,22 @@ function CommandesPage() {
     );
   }
 
+  // ── Bottom bar FAB: commander par fournisseur ──
+  const accentColor = etab?.couleur ?? "#D4775A";
+  useBottomBarActions(() => !loading && !selectedSupplierId && suppliers.length > 0 ? (
+    <button type="button" onClick={() => setSupplierListOpen(true)} style={{
+      width: 38, height: 38, borderRadius: "50%", border: "none",
+      background: accentColor, color: "#fff",
+      cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+      flexShrink: 0,
+    }}>
+      <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+      </svg>
+    </button>
+  ) : null, [loading, selectedSupplierId, suppliers.length, accentColor]);
+
   // ── Main render ───────────────────────────────────────────────────────
 
   return (
@@ -1861,35 +1878,6 @@ function CommandesPage() {
           </BottomSheet>
         )}
 
-        {/* FAB: Commander par fournisseur */}
-        {!loading && !selectedSupplierId && suppliers.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setSupplierListOpen(true)}
-            style={{
-              position: "fixed",
-              bottom: "calc(92px + env(safe-area-inset-bottom, 0px))",
-              left: "50%", transform: "translateX(-50%)",
-              zIndex: 105,
-              height: 48, padding: "0 22px",
-              borderRadius: 24, border: "none",
-              background: "#D4775A", color: "#fff",
-              fontSize: 13, fontWeight: 700, cursor: "pointer",
-              display: "flex", alignItems: "center", gap: 8,
-              boxShadow: "0 4px 16px rgba(212,119,90,0.4), 0 2px 6px rgba(0,0,0,0.1)",
-              fontFamily: "inherit",
-              textTransform: "uppercase", letterSpacing: "0.04em",
-              whiteSpace: "nowrap",
-            }}
-          >
-            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="9" cy="21" r="1" />
-              <circle cx="20" cy="21" r="1" />
-              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-            </svg>
-            Commander par fournisseur
-          </button>
-        )}
 
         {/* Historique recent */}
         {!loading && !selectedSupplierId && recentOrders.length > 0 && (
