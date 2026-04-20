@@ -341,24 +341,29 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         }
 
         // Check if ingredient in catalog linked to this recipe
-        // Try 3 strategies: source+recipe_id, output_ingredient_id, name match
         const recRow = rec as Record<string, unknown>;
         let linkedIngId: string | null = null;
+        // 1) source + recipe_id
         const { data: bySource } = await supabase
           .from("ingredients").select("id")
           .eq("source", "recette_maison").eq("recipe_id", recipeId)
-          .maybeSingle<{ id: string }>();
-        if (bySource) {
-          linkedIngId = bySource.id;
-        } else if (recRow.output_ingredient_id) {
+          .limit(1);
+        if (bySource?.[0]) {
+          linkedIngId = bySource[0].id;
+        }
+        // 2) output_ingredient_id on the recipe
+        if (!linkedIngId && recRow.output_ingredient_id) {
           linkedIngId = String(recRow.output_ingredient_id);
-        } else {
+        }
+        // 3) name match (case-insensitive)
+        if (!linkedIngId && recRow.name) {
           const { data: byName } = await supabase
             .from("ingredients").select("id")
-            .eq("name", recRow.name).in("category", ["preparation", "sauce"])
+            .ilike("name", String(recRow.name))
+            .in("category", ["preparation", "sauce"])
             .eq("is_active", true)
-            .maybeSingle<{ id: string }>();
-          if (byName) linkedIngId = byName.id;
+            .limit(1);
+          if (byName?.[0]) linkedIngId = byName[0].id;
         }
         if (linkedIngId) setIndexIngredientId(linkedIngId);
       }
@@ -456,14 +461,15 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         }
       }
 
-      // Sync ingredient catalog — silent failure
+      // Sync ingredient catalog — update linked ingredient with cost/kg
       try {
         const CAT_MAP: Record<string, Category> = {
           preparation: "preparation", sauce: "sauce", autre: "autre",
         };
         const ingCat: Category = CAT_MAP[category] ?? "preparation";
-        const ingPayload = {
-          name: name || "Nouvelle recette",
+        const recipeName = name || "Nouvelle recette";
+        const ingUpdate = {
+          name: recipeName,
           category: ingCat,
           purchase_price: costPerKg ?? null,
           purchase_unit: 1,
@@ -473,39 +479,37 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
           recipe_id: rid!,
         };
 
-        // Find existing linked ingredient: by indexIngredientId, source+recipe_id, output_ingredient_id, or name
+        // Strategy 1: already known from load or previous save
         let existingId = indexIngredientId;
+
+        // Strategy 2: source + recipe_id
         if (!existingId) {
-          const { data: bySource } = await supabase
+          const { data } = await supabase
             .from("ingredients").select("id")
             .eq("source", "recette_maison").eq("recipe_id", rid!)
-            .maybeSingle<{ id: string }>();
-          existingId = bySource?.id ?? null;
+            .limit(1);
+          existingId = data?.[0]?.id ?? null;
         }
+
+        // Strategy 3: name match in preparation/sauce categories
         if (!existingId) {
-          // Check output_ingredient_id on the recipe
-          const { data: kr } = await supabase
-            .from("kitchen_recipes").select("output_ingredient_id")
-            .eq("id", rid!).single<{ output_ingredient_id: string | null }>();
-          if (kr?.output_ingredient_id) existingId = kr.output_ingredient_id;
-        }
-        if (!existingId) {
-          const { data: byName } = await supabase
+          const { data } = await supabase
             .from("ingredients").select("id")
-            .eq("name", name || "Nouvelle recette").in("category", ["preparation", "sauce"])
+            .ilike("name", recipeName)
+            .in("category", ["preparation", "sauce"])
             .eq("is_active", true)
-            .maybeSingle<{ id: string }>();
-          existingId = byName?.id ?? null;
+            .limit(1);
+          existingId = data?.[0]?.id ?? null;
         }
 
         if (existingId) {
-          await supabase.from("ingredients").update(ingPayload).eq("id", existingId);
+          const { error: updErr } = await supabase.from("ingredients").update(ingUpdate).eq("id", existingId);
+          if (updErr) console.warn("Ingredient sync update failed:", updErr);
           setIndexIngredientId(existingId);
-          // Ensure bidirectional link
           await supabase.from("kitchen_recipes").update({ output_ingredient_id: existingId }).eq("id", rid!);
         } else if (costPerKg && costPerKg > 0) {
-          const { data: newIng } = await supabase.from("ingredients").insert({
-            ...ingPayload,
+          const { data: newIng, error: insErr } = await supabase.from("ingredients").insert({
+            ...ingUpdate,
             is_active: true,
             allergens: null,
             default_unit: "g",
@@ -515,6 +519,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
             supplier_id: null,
             ...(etab ? { etablissement_id: etab.id } : {}),
           }).select("id").single<{ id: string }>();
+          if (insErr) console.warn("Ingredient sync insert failed:", insErr);
           if (newIng) {
             setIndexIngredientId(newIng.id);
             await supabase.from("kitchen_recipes").update({ output_ingredient_id: newIng.id }).eq("id", rid!);
