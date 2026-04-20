@@ -269,7 +269,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
         }
         if (missingIds.size > 0) {
           const krQ = supabase.from("kitchen_recipes").select("name,output_ingredient_id,total_cost,yield_grams,cost_per_kg");
-          const prQ = supabase.from("prep_recipes").select("name,output_ingredient_id,total_cost,yield_grams");
+          const prQ = supabase.from("prep_recipes").select("name,output_ingredient_id,yield_grams");
           const [{ data: krAll }, { data: prAll }] = await Promise.all([krQ, prQ]);
           for (const kr of (krAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; total_cost: number | null; yield_grams: number | null; cost_per_kg: number | null }>) {
             let cpuG = 0;
@@ -284,9 +284,13 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
               pm[ingNameToId[nk]] = { g: cpuG }; supplierByIng[ingNameToId[nk]] = "maison"; missingIds.delete(ingNameToId[nk]);
             }
           }
-          for (const pr of (prAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; total_cost: number | null; yield_grams: number | null }>) {
-            if (!pr.total_cost || pr.total_cost <= 0 || !pr.yield_grams || pr.yield_grams <= 0) continue;
-            const cpuG = pr.total_cost / pr.yield_grams;
+          for (const pr of (prAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; yield_grams: number | null }>) {
+            let cpuG = 0;
+            if (pr.output_ingredient_id) {
+              const ing = ingList.find(i => i.id === pr.output_ingredient_id);
+              if (ing?.purchase_price && ing.purchase_price > 0 && ing.purchase_unit_label === "kg") cpuG = ing.purchase_price / 1000;
+            }
+            if (cpuG <= 0) continue;
             if (pr.output_ingredient_id && missingIds.has(pr.output_ingredient_id)) {
               pm[pr.output_ingredient_id] = { g: cpuG }; supplierByIng[pr.output_ingredient_id] = "maison"; missingIds.delete(pr.output_ingredient_id);
             }

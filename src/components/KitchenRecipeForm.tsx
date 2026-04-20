@@ -368,7 +368,7 @@ export default function KitchenRecipeForm(props: { recipeId?: string }) {
 
     const { data: ing, error: ingErr } = await supabase
       .from("ingredients")
-      .select("id,name,category,allergens,is_active,cost_per_unit,piece_volume_ml,purchase_price,purchase_unit")
+      .select("id,name,category,allergens,is_active,cost_per_unit,piece_volume_ml,purchase_price,purchase_unit,purchase_unit_label")
       .order("name", { ascending: true });
 
     if (ingErr) {
@@ -485,7 +485,7 @@ if (supplierIds.length) {
     if (missingIngIds.size > 0) {
       const [{ data: krAll }, { data: prAll }] = await Promise.all([
         supabase.from("kitchen_recipes").select("name,output_ingredient_id,total_cost,yield_grams,cost_per_kg"),
-        supabase.from("prep_recipes").select("name,output_ingredient_id,total_cost,yield_grams"),
+        supabase.from("prep_recipes").select("name,output_ingredient_id,yield_grams"),
       ]);
       for (const kr of (krAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; total_cost: number | null; yield_grams: number | null; cost_per_kg: number | null }>) {
         let cpuG = 0;
@@ -506,9 +506,13 @@ if (supplierIds.length) {
           missingIngIds.delete(ingNameToId[nk]);
         }
       }
-      for (const pr of (prAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; total_cost: number | null; yield_grams: number | null }>) {
-        if (!pr.total_cost || pr.total_cost <= 0 || !pr.yield_grams || pr.yield_grams <= 0) continue;
-        const cpuG = pr.total_cost / pr.yield_grams;
+      for (const pr of (prAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; yield_grams: number | null }>) {
+        let cpuG = 0;
+        if (pr.output_ingredient_id) {
+          const linked = ingList.find(i => i.id === pr.output_ingredient_id);
+          if (linked?.purchase_price && linked.purchase_price > 0 && (linked.purchase_unit_label ?? "").toLowerCase().trim() === "kg") cpuG = linked.purchase_price / 1000;
+        }
+        if (cpuG <= 0) continue;
         if (pr.output_ingredient_id && missingIngIds.has(pr.output_ingredient_id)) {
           priceMapCpu[pr.output_ingredient_id] = { g: cpuG };
           supplierByIng[pr.output_ingredient_id] = "maison";

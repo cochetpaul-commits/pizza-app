@@ -8,6 +8,8 @@ export type Ingredient = {
   is_active: boolean;
   cost_per_unit?: number | null;
   density_g_per_ml?: number | null;
+  purchase_price?: number | null;
+  purchase_unit_label?: string | null;
 };
 
 export type PizzaIngredientRow = {

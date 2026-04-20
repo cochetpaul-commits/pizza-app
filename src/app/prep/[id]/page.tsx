@@ -17,6 +17,8 @@ type Ingredient = {
   id: string;
   name: string;
   cost_per_unit: number | null;
+  purchase_price?: number | null;
+  purchase_unit_label?: string | null;
   is_active?: boolean;
   category?: string | null;
   allergens?: string | null;
@@ -277,7 +279,7 @@ export default function PrepRecipeDetailPage() {
 
       const { data: ing, error: eI } = await supabase
         .from("ingredients")
-        .select("id,name,cost_per_unit,is_active,category,piece_weight_g,piece_volume_ml,allergens,purchase_price,purchase_unit")
+        .select("id,name,cost_per_unit,is_active,category,piece_weight_g,piece_volume_ml,allergens,purchase_price,purchase_unit,purchase_unit_label")
         .eq("is_active", true)
         .order("name");
 
@@ -377,7 +379,7 @@ export default function PrepRecipeDetailPage() {
       if (missingIngIds.size > 0) {
         const [{ data: krAll }, { data: prAll }] = await Promise.all([
           supabase.from("kitchen_recipes").select("name,output_ingredient_id,total_cost,yield_grams,cost_per_kg"),
-          supabase.from("prep_recipes").select("name,output_ingredient_id,total_cost,yield_grams"),
+          supabase.from("prep_recipes").select("name,output_ingredient_id,yield_grams"),
         ]);
         for (const kr of (krAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; total_cost: number | null; yield_grams: number | null; cost_per_kg: number | null }>) {
           let cpuG = 0;
@@ -397,9 +399,13 @@ export default function PrepRecipeDetailPage() {
             missingIngIds.delete(iid);
           }
         }
-        for (const pr of (prAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; total_cost: number | null; yield_grams: number | null }>) {
-          if (!pr.total_cost || pr.total_cost <= 0 || !pr.yield_grams || pr.yield_grams <= 0) continue;
-          const cpuG = pr.total_cost / pr.yield_grams;
+        for (const pr of (prAll ?? []) as Array<{ name: string | null; output_ingredient_id: string | null; yield_grams: number | null }>) {
+          let cpuG = 0;
+          if (pr.output_ingredient_id) {
+            const linked = ingList.find(i => i.id === pr.output_ingredient_id);
+            if (linked?.purchase_price && linked.purchase_price > 0 && (linked.purchase_unit_label ?? "").toLowerCase().trim() === "kg") cpuG = linked.purchase_price / 1000;
+          }
+          if (cpuG <= 0) continue;
           if (pr.output_ingredient_id && missingIngIds.has(pr.output_ingredient_id)) {
             priceMap[pr.output_ingredient_id] = { g: cpuG };
             infoMap[pr.output_ingredient_id] = { supplier: "maison", eurPerKg: cpuG * 1000 };
