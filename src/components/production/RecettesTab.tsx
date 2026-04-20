@@ -922,6 +922,7 @@ function RecettesInner() {
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 8, marginBottom: 8 }}>
                     {kitchenByCat[cat.id].map(r => {
+                      const isPrep = cat.id === "preparation" || cat.id === "sauce";
                       const hasPortion = r.cost_per_portion != null && r.cost_per_portion > 0;
                       const hasKg = r.cost_per_kg != null && r.cost_per_kg > 0;
                       return (
@@ -934,11 +935,11 @@ function RecettesInner() {
                           photoUrl={r.photo_url}
                           subtitle={cat.label}
                           subtitleColor={catColor}
-                          cost={hasPortion ? r.cost_per_portion! : hasKg ? r.cost_per_kg! : null}
-                          costLabel={hasPortion ? "/portion" : hasKg ? "/kg" : undefined}
-                          pv={r.sell_price}
-                          pvConseille={pvTTCKitchen(r)}
-                          pvLabel={hasPortion ? "TTC" : hasKg ? "TTC/kg" : undefined}
+                          cost={isPrep ? (hasKg ? r.cost_per_kg! : null) : (hasPortion ? r.cost_per_portion! : hasKg ? r.cost_per_kg! : null)}
+                          costLabel={isPrep ? (hasKg ? "/kg" : undefined) : (hasPortion ? "/portion" : hasKg ? "/kg" : undefined)}
+                          pv={isPrep ? null : r.sell_price}
+                          pvConseille={isPrep ? null : pvTTCKitchen(r)}
+                          pvLabel={isPrep ? undefined : (hasPortion ? "TTC" : hasKg ? "TTC/kg" : undefined)}
                         />
                       );
                     })}
