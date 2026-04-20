@@ -594,7 +594,7 @@ export function BottomTabBar() {
               onClick={() => setActionsFabOpen(v => !v)}
               style={{
                 width: 50, height: 50,
-                borderRadius: 16,
+                borderRadius: "50%",
                 border: "none",
                 background: actionsFabOpen ? "#1a1a1a" : (etabColor),
                 color: "#fff",
