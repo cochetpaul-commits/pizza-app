@@ -605,6 +605,7 @@ export function BottomTabBar() {
               }}>
                 <button
                   type="button"
+                  className="bottom-bar-btn"
                   onClick={() => setActionsFabOpen(v => !v)}
                   style={{
                     width: 50, height: 50,

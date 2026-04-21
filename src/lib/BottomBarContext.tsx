@@ -83,7 +83,7 @@ export function BottomBarButton({
 
   if (as === "label") {
     return (
-      <label style={style} aria-label={label}>
+      <label className="bottom-bar-btn" style={style} aria-label={label}>
         {icon}
         {rest.children}
       </label>
@@ -91,7 +91,7 @@ export function BottomBarButton({
   }
 
   return (
-    <button type="button" onClick={onClick} style={style} aria-label={label}>
+    <button type="button" className="bottom-bar-btn" onClick={onClick} style={style} aria-label={label}>
       {icon}
     </button>
   );

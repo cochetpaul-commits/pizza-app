@@ -233,6 +233,13 @@ body.bottom-sheet-open .bottom-bar-fab {
   display: none !important;
 }
 
+.bottom-bar-btn {
+  border-radius: 50% !important;
+  min-width: 50px !important;
+  min-height: 50px !important;
+  box-sizing: border-box !important;
+}
+
 @keyframes fabExpand {
   from { opacity: 0; transform: scale(0.8) translateY(8px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
