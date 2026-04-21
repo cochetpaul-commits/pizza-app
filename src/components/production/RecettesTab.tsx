@@ -361,6 +361,8 @@ function RecettesInner() {
   const [prodModal, setProdModal] = useState<{ type: "pizza" | "cuisine" | "cocktail" | "empatement"; id: string; name: string; pivotId: string } | null>(null);
   const [showFab, setShowFab] = useState(false);
   const [showNewSheet, setShowNewSheet] = useState(false);
+  const [newSheetStep, setNewSheetStep] = useState<"category" | "sub">("category");
+  const [newSheetCat, setNewSheetCat] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const [showCuisinePop, setShowCuisinePop] = useState(false);
@@ -1010,52 +1012,129 @@ function RecettesInner() {
       </main>
 
       {/* ── New recipe BottomSheet ── */}
-      <BottomSheet open={showNewSheet} onClose={() => setShowNewSheet(false)} title="Nouvelle fiche">
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {[
-            { label: "Pizza", href: "/recettes/new/pizza", color: PIZZA_COLOR },
-            { label: "Cuisine", href: "/recettes/new/cuisine", color: CUISINE_COLOR },
-            { label: "Cocktail", href: "/recettes/new/cocktail", color: COCKTAIL_COLOR },
-            { label: "Empatement", href: "/recettes/new/empatement", color: EMP_COLOR },
-          ].map(item => (
-            <Link key={item.href} href={item.href} onClick={() => setShowNewSheet(false)} style={{
+      <BottomSheet
+        open={showNewSheet}
+        onClose={() => { setShowNewSheet(false); setNewSheetStep("category"); setNewSheetCat(""); }}
+        title={newSheetStep === "category" ? "Nouvelle fiche" : newSheetCat === "pizza" ? "Pizza" : newSheetCat === "cuisine" ? "Cuisine" : "Bar"}
+      >
+        {newSheetStep === "category" ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {([
+              { key: "pizza", label: "Pizza", color: PIZZA_COLOR, desc: "Pizza, empâtement" },
+              { key: "cuisine", label: "Cuisine", color: CUISINE_COLOR, desc: "Entrée, plat, dessert, sauce, préparation..." },
+              { key: "bar", label: "Bar", color: COCKTAIL_COLOR, desc: "Cocktail, vin, bière, spiritueux, soft..." },
+            ] as const).map(cat => (
+              <button key={cat.key} type="button" onClick={() => { setNewSheetCat(cat.key); setNewSheetStep("sub"); }} style={{
+                display: "flex", alignItems: "center", gap: 14,
+                padding: "14px 16px", borderRadius: 14, width: "100%",
+                border: "none", background: "rgba(255,255,255,0.55)", cursor: "pointer",
+                borderLeft: `4px solid ${cat.color}`, textAlign: "left",
+              }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  background: `${cat.color}15`, display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: cat.color }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{cat.label}</div>
+                  <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>{cat.desc}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {/* Back button */}
+            <button type="button" onClick={() => setNewSheetStep("category")} style={{
+              display: "flex", alignItems: "center", gap: 6, padding: "6px 0", marginBottom: 4,
+              border: "none", background: "none", cursor: "pointer", fontSize: 12, color: "#999", fontWeight: 600,
+            }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>
+              Retour
+            </button>
+
+            {/* Sub-categories per main category */}
+            {newSheetCat === "pizza" && ([
+              { label: "Pizza", href: "/recettes/new/pizza", color: PIZZA_COLOR, category: "" },
+              { label: "Empâtement", href: "/recettes/new/empatement", color: EMP_COLOR, category: "" },
+            ] as const).map(item => (
+              <Link key={item.href} href={item.href} onClick={() => { setShowNewSheet(false); setNewSheetStep("category"); }} style={{
+                display: "flex", alignItems: "center", gap: 14,
+                padding: "14px 16px", borderRadius: 14, textDecoration: "none",
+                background: "rgba(255,255,255,0.55)", borderLeft: `4px solid ${item.color}`,
+              }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${item.color}15`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: item.color }} />
+                </div>
+                <span style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{item.label}</span>
+              </Link>
+            ))}
+
+            {newSheetCat === "cuisine" && ([
+              { label: "Entrée", category: "entree" },
+              { label: "Plat", category: "plat_cuisine" },
+              { label: "Dessert", category: "dessert" },
+              { label: "Sauce", category: "sauce" },
+              { label: "Accompagnement", category: "accompagnement" },
+              { label: "Préparation", category: "preparation" },
+            ]).map(item => (
+              <Link key={item.category} href={`/recettes/new/cuisine?category=${item.category}`} onClick={() => { setShowNewSheet(false); setNewSheetStep("category"); }} style={{
+                display: "flex", alignItems: "center", gap: 14,
+                padding: "14px 16px", borderRadius: 14, textDecoration: "none",
+                background: "rgba(255,255,255,0.55)", borderLeft: `4px solid ${CUISINE_COLOR}`,
+              }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${CUISINE_COLOR}15`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: CUISINE_COLOR }} />
+                </div>
+                <span style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{item.label}</span>
+              </Link>
+            ))}
+
+            {newSheetCat === "bar" && ([
+              { label: "Cocktail", href: "/recettes/new/cocktail", ficheType: "cocktail", category: "cocktail" },
+              { label: "Vin", href: "/recettes/new/cuisine?category=vin&ficheType=vin", ficheType: "vin", category: "vin" },
+              { label: "Spiritueux", href: "/recettes/new/cuisine?category=spiritueux&ficheType=vin", ficheType: "vin", category: "spiritueux" },
+              { label: "Bière", href: "/recettes/new/cuisine?category=biere&ficheType=boisson", ficheType: "boisson", category: "biere" },
+              { label: "Soft / Sans alcool", href: "/recettes/new/cuisine?category=soft&ficheType=boisson", ficheType: "boisson", category: "soft" },
+              { label: "Sirop maison", href: "/recettes/new/cuisine?category=sirop&ficheType=recette", ficheType: "recette", category: "sirop" },
+            ]).map(item => (
+              <Link key={item.category} href={item.href} onClick={() => { setShowNewSheet(false); setNewSheetStep("category"); }} style={{
+                display: "flex", alignItems: "center", gap: 14,
+                padding: "14px 16px", borderRadius: 14, textDecoration: "none",
+                background: "rgba(255,255,255,0.55)", borderLeft: `4px solid ${COCKTAIL_COLOR}`,
+              }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${COCKTAIL_COLOR}15`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: COCKTAIL_COLOR }} />
+                </div>
+                <span style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{item.label}</span>
+              </Link>
+            ))}
+
+            {/* Custom sub-category */}
+            <div style={{ height: 1, background: "rgba(0,0,0,0.06)", margin: "4px 0" }} />
+            <button type="button" onClick={() => {
+              const nom = prompt("Nom de la sous-categorie :");
+              if (nom && nom.trim()) {
+                const slug = nom.trim().toLowerCase().replace(/\s+/g, "_").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                const formType = newSheetCat === "bar" ? "cocktail" : "cuisine";
+                router.push(`/recettes/new/${formType}?category=${encodeURIComponent(slug)}&categoryLabel=${encodeURIComponent(nom.trim())}`);
+                setShowNewSheet(false); setNewSheetStep("category");
+              }
+            }} style={{
               display: "flex", alignItems: "center", gap: 14,
-              padding: "14px 16px", borderRadius: 14, textDecoration: "none",
-              background: "rgba(255,255,255,0.55)",
-              borderLeft: `4px solid ${item.color}`,
+              padding: "14px 16px", borderRadius: 14, width: "100%",
+              border: "none", background: "rgba(255,255,255,0.55)", cursor: "pointer", textAlign: "left",
             }}>
               <div style={{
                 width: 36, height: 36, borderRadius: 10,
-                background: `${item.color}15`, display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: item.color }} />
-              </div>
-              <span style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{item.label}</span>
-            </Link>
-          ))}
-          <div style={{ height: 1, background: "rgba(0,0,0,0.06)", margin: "4px 0" }} />
-          <button type="button" onClick={() => {
-            const nom = prompt("Nom de la nouvelle categorie :");
-            if (nom && nom.trim()) {
-              const slug = nom.trim().toLowerCase().replace(/\s+/g, "_").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-              router.push(`/recettes/new/cuisine?category=${encodeURIComponent(slug)}&categoryLabel=${encodeURIComponent(nom.trim())}`);
-              setShowNewSheet(false);
-            }
-          }} style={{
-            display: "flex", alignItems: "center", gap: 14,
-            padding: "14px 16px", borderRadius: 14, width: "100%",
-            border: "none", background: "rgba(255,255,255,0.55)", cursor: "pointer",
-            textAlign: "left",
-          }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: 10,
-              background: "rgba(212,119,90,0.1)", color: "#D4775A",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 18, fontWeight: 300,
-            }}>+</div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: "#D4775A" }}>Nouvelle categorie</span>
-          </button>
-        </div>
+                background: "rgba(212,119,90,0.1)", color: "#D4775A",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 300,
+              }}>+</div>
+              <span style={{ fontSize: 15, fontWeight: 600, color: "#D4775A" }}>Autre sous-categorie</span>
+            </button>
+          </div>
+        )}
       </BottomSheet>
       {prodModal && (
         <ProductionModal
