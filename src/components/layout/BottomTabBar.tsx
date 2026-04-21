@@ -626,19 +626,34 @@ export function BottomTabBar() {
                 </button>
               </div>
               <BottomSheet open={actionsFabOpen} onClose={() => setActionsFabOpen(false)} title="Actions">
-                <div onClick={() => setActionsFabOpen(false)} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {React.Children.map(contextActions, (child) => {
                     if (!React.isValidElement(child)) return child;
-                    const label = (child.props as { label?: string }).label ?? "";
+                    const props = child.props as { label?: string; accent?: string; onClick?: () => void; icon?: React.ReactNode };
+                    const label = props.label ?? "";
+                    const accent = props.accent ?? etabColor;
                     return (
-                      <div style={{
-                        display: "flex", alignItems: "center", gap: 14,
-                        padding: "12px 16px", borderRadius: 14,
-                        background: "rgba(255,255,255,0.55)",
-                      }}>
-                        <div style={{ flexShrink: 0 }}>{child}</div>
+                      <button
+                        type="button"
+                        onClick={() => { setActionsFabOpen(false); props.onClick?.(); }}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 14,
+                          padding: "14px 16px", borderRadius: 14, width: "100%",
+                          border: "none", background: "rgba(255,255,255,0.55)",
+                          borderLeft: `4px solid ${accent}`, cursor: "pointer",
+                          textAlign: "left",
+                        }}
+                      >
+                        <div style={{
+                          width: 36, height: 36, borderRadius: 10,
+                          background: `${accent}15`, color: accent,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          flexShrink: 0,
+                        }}>
+                          {props.icon}
+                        </div>
                         {label && <span style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{label}</span>}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
