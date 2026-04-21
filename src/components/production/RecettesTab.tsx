@@ -42,7 +42,7 @@ type EmpRow = {
   pivot_ingredient_id: string | null;
 };
 
-type MainTab = "tous" | "pizza" | "cuisine" | "cocktail" | "empatement";
+type MainTab = "tous" | "pizza" | "cuisine" | "cocktail" | "empatement" | "bar";
 type SortKey = "name" | "cost" | "fc" | "price";
 type SortDir = "asc" | "desc";
 // "all" or any category id (built-in or custom-discovered)
@@ -329,13 +329,6 @@ const filterPill = (active: boolean, activeColor?: string): React.CSSProperties 
   cursor: "pointer",
 });
 
-const filterMenuItemStyle = (active: boolean, color: string): React.CSSProperties => ({
-  width: "100%", padding: "8px 12px", borderRadius: 8,
-  border: "none", background: active ? color + "14" : "transparent",
-  color: active ? color : "#1a1a1a", fontSize: 13, fontWeight: active ? 700 : 500,
-  cursor: "pointer", textAlign: "left" as const,
-  display: "flex", alignItems: "center", gap: 8,
-});
 
 // ─── Main inner component ─────────────────────────────────────────────────────
 
@@ -365,7 +358,6 @@ function RecettesInner() {
   const [newSheetCat, setNewSheetCat] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
   const [showSort, setShowSort] = useState(false);
-  const [showCuisinePop, setShowCuisinePop] = useState(false);
   const [showNewCatModal, setShowNewCatModal] = useState(false);
   const [newCatName, setNewCatName] = useState("");
 
@@ -530,14 +522,6 @@ function RecettesInner() {
   const totalCount = filteredPizzas.length + filteredKitchens.length + filteredCocktails.length + filteredEmps.length;
 
   // Food cost alert counts
-  const alertCount = useMemo(() => {
-    let count = 0;
-    for (const r of pizzas) { const fc = pizzaFc(r); if (fc != null && fc > 32) count++; }
-    for (const r of kitchens) { const fc = kitchenFc(r); if (fc != null && fc > 32) count++; }
-    for (const r of cocktails) { const fc = cocktailFc(r); if (fc != null && fc > 32) count++; }
-    return count;
-  }, [pizzas, kitchens, cocktails]);
-
   const prodCount = useMemo(() => {
     return pizzas.filter(r => r.pivot_ingredient_id).length
       + kitchens.filter(r => r.pivot_ingredient_id).length
@@ -548,9 +532,10 @@ function RecettesInner() {
   // Tab counts
   const tabCounts = useMemo(() => ({
     tous: filteredPizzas.length + filteredKitchens.length + filteredCocktails.length + filteredEmps.length,
-    pizza: filteredPizzas.length,
+    pizza: filteredPizzas.length + filteredEmps.length,
     cuisine: filteredKitchens.length,
     cocktail: filteredCocktails.length,
+    bar: filteredCocktails.length,
     empatement: filteredEmps.length,
   }), [filteredPizzas, filteredKitchens, filteredCocktails, filteredEmps]);
 
@@ -583,10 +568,10 @@ function RecettesInner() {
     );
   }
 
-  const showPizza = mainTab === "tous" || mainTab === "pizza";
+  const showPizza = mainTab === "tous" || mainTab === "pizza" || mainTab === "empatement";
   const showCuisine = mainTab === "tous" || mainTab === "cuisine";
-  const showCocktail = mainTab === "tous" || mainTab === "cocktail";
-  const showEmp = mainTab === "tous" || mainTab === "empatement";
+  const showCocktail = mainTab === "tous" || mainTab === "cocktail" || mainTab === "bar";
+  const showEmp = mainTab === "tous" || mainTab === "pizza" || mainTab === "empatement";
 
   const hasActiveFilter = foodCostFilter !== "all" || cuisineCatFilter !== "all" || prodFilter;
 
@@ -601,100 +586,69 @@ function RecettesInner() {
           </div>
         )}
 
-        {/* ── Single-line header: title + search + filters + CTA ── */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: "#1a1a1a", textTransform: "uppercase", letterSpacing: 1, whiteSpace: "nowrap", flexShrink: 0 }}>
-            Fiches techniques <span style={{ fontSize: 13, fontWeight: 500, color: "#999", letterSpacing: 0, textTransform: "none" }}>({totalCount})</span>
-          </h1>
-          {alertCount > 0 && (
-            <button type="button" onClick={() => { setFoodCostFilter("alerte"); }}
-              style={{ padding: "4px 10px", borderRadius: 8, border: "none", background: "rgba(139,26,26,0.10)", color: "#8B1A1A", fontSize: 11, fontWeight: 800, cursor: "pointer", flexShrink: 0 }}>
-              {alertCount} alerte{alertCount > 1 ? "s" : ""}
-            </button>
-          )}
-          <div style={{ position: "relative", flex: 1, minWidth: 120 }}>
-            <input
-              type="search"
-              placeholder="Rechercher..."
-              value={q}
-              onChange={e => setQ(e.target.value)}
-              style={{
-                width: "100%", padding: "7px 12px", borderRadius: 10,
-                border: "1.5px solid #ddd6c8", background: "#fff",
-                fontSize: 13, outline: "none", boxSizing: "border-box",
-              }}
-            />
-          </div>
-          {/* Category dropdown + sort + filters — grouped */}
-          <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#f0ebe2", borderRadius: 12, alignItems: "center", flexShrink: 0, border: "1px solid #e8e0d0" }}>
-          <div style={{ position: "relative", flexShrink: 0 }}>
-            <button type="button" onClick={() => setShowCuisinePop(p => !p)}
-              style={{
-                padding: "6px 10px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                border: "none",
-                background: mainTab !== "tous" ? (etabCtx?.couleur ? etabCtx.couleur + "25" : "#fff") : "transparent",
-                color: mainTab !== "tous" ? "#1a1a1a" : "#999",
-                boxShadow: mainTab !== "tous" ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
-                cursor: "pointer", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
+        {/* ── Header: search bar ── */}
+        <div style={{ marginBottom: 12 }}>
+          <input
+            type="search"
+            placeholder="Rechercher une fiche..."
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            style={{
+              width: "100%", padding: "10px 14px", borderRadius: 12,
+              border: "1.5px solid #ddd6c8", background: "#fff",
+              fontSize: 14, outline: "none", boxSizing: "border-box",
+            }}
+          />
+        </div>
+
+        {/* ── Category tabs (centered, scrollable) ── */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
+          <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#f0ebe2", borderRadius: 12, border: "1px solid #e8e0d0", overflowX: "auto", scrollbarWidth: "none", maxWidth: "100%" }}>
+            {([
+              { key: "tous" as MainTab, label: "Toutes", count: tabCounts.tous, color: "#1a1a1a" },
+              { key: "pizza" as MainTab, label: "Pizza", count: tabCounts.pizza, color: PIZZA_COLOR },
+              { key: "cuisine" as MainTab, label: "Cuisine", count: tabCounts.cuisine, color: CUISINE_COLOR },
+              { key: "bar" as MainTab, label: "Bar", count: tabCounts.bar, color: COCKTAIL_COLOR },
+            ]).map(t => (
+              <button key={t.key} type="button" onClick={() => { setMainTab(t.key); setCuisineCatFilter("all"); }} style={{
+                padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer",
+                background: mainTab === t.key ? (etabCtx?.couleur ? etabCtx.couleur + "25" : "#fff") : "transparent",
+                color: mainTab === t.key ? t.color : "#999",
+                fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0,
+                boxShadow: mainTab === t.key ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
                 transition: "all 0.15s",
               }}>
-              {mainTab === "tous" ? "Toutes" : mainTab === "pizza" ? "Pizza" : mainTab === "cuisine" ? (cuisineCatFilter !== "all" ? dynamicCuisineCats.find(f => f.id === cuisineCatFilter)?.label ?? "Cuisine" : "Cuisine") : mainTab === "cocktail" ? "Cocktail" : "Empât."}
-              <span style={{ fontSize: 10, opacity: 0.6 }}>({tabCounts[mainTab]})</span>
-              <span style={{ fontSize: 8, opacity: 0.5 }}>{"▼"}</span>
-            </button>
-            {showCuisinePop && (
-              <>
-                <div onClick={() => setShowCuisinePop(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
-                <div style={{
-                  position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 200,
-                  background: "#fff", borderRadius: 14, padding: 6,
-                  boxShadow: "0 8px 30px rgba(0,0,0,0.15)", border: "1px solid #e0d8ce",
-                  minWidth: 220,
-                }}>
-                  <button type="button" onClick={() => { setMainTab("tous"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
-                    style={filterMenuItemStyle(mainTab === "tous", "#1a1a1a")}>
-                    Toutes les fiches
-                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.tous}</span>
-                  </button>
-                  <div style={{ height: 1, background: "#f0ebe2", margin: "4px 0" }} />
-                  <button type="button" onClick={() => { setMainTab("pizza"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
-                    style={filterMenuItemStyle(mainTab === "pizza", PIZZA_COLOR)}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: PIZZA_COLOR, flexShrink: 0 }} />
-                    Pizza
-                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.pizza}</span>
-                  </button>
-                  <button type="button" onClick={() => { setMainTab("cuisine"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
-                    style={filterMenuItemStyle(mainTab === "cuisine" && cuisineCatFilter === "all", CUISINE_COLOR)}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: CUISINE_COLOR, flexShrink: 0 }} />
-                    Cuisine (tous)
-                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.cuisine}</span>
-                  </button>
-                  {dynamicCuisineCats.map(f => {
-                    const color = CUISINE_CAT_COLORS[f.id] ?? CUISINE_COLOR;
-                    return (
-                      <button key={f.id} type="button" onClick={() => { setMainTab("cuisine"); setCuisineCatFilter(f.id); setShowCuisinePop(false); }}
-                        style={{ ...filterMenuItemStyle(mainTab === "cuisine" && cuisineCatFilter === f.id, color), paddingLeft: 32 }}>
-                        {f.label}
-                      </button>
-                    );
-                  })}
-                  <div style={{ height: 1, background: "#f0ebe2", margin: "4px 0" }} />
-                  <button type="button" onClick={() => { setMainTab("cocktail"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
-                    style={filterMenuItemStyle(mainTab === "cocktail", COCKTAIL_COLOR)}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: COCKTAIL_COLOR, flexShrink: 0 }} />
-                    Cocktail
-                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.cocktail}</span>
-                  </button>
-                  <button type="button" onClick={() => { setMainTab("empatement"); setCuisineCatFilter("all"); setShowCuisinePop(false); }}
-                    style={filterMenuItemStyle(mainTab === "empatement", EMP_COLOR)}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: EMP_COLOR, flexShrink: 0 }} />
-                    Empâtement
-                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{tabCounts.empatement}</span>
-                  </button>
-                </div>
-              </>
-            )}
+                {t.label} <span style={{ fontSize: 10, opacity: 0.6 }}>({t.count})</span>
+              </button>
+            ))}
           </div>
+        </div>
+
+        {/* ── Sub-category filter (shown for cuisine) ── */}
+        {mainTab === "cuisine" && dynamicCuisineCats.length > 0 && (
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "center" }}>
+              <button type="button" onClick={() => setCuisineCatFilter("all")} style={{
+                padding: "4px 10px", borderRadius: 8, border: "none", cursor: "pointer",
+                background: cuisineCatFilter === "all" ? `${CUISINE_COLOR}20` : "transparent",
+                color: cuisineCatFilter === "all" ? CUISINE_COLOR : "#999",
+                fontSize: 11, fontWeight: 600,
+              }}>Tous</button>
+              {dynamicCuisineCats.map(f => (
+                <button key={f.id} type="button" onClick={() => setCuisineCatFilter(f.id)} style={{
+                  padding: "4px 10px", borderRadius: 8, border: "none", cursor: "pointer",
+                  background: cuisineCatFilter === f.id ? `${(CUISINE_CAT_COLORS[f.id] ?? CUISINE_COLOR)}20` : "transparent",
+                  color: cuisineCatFilter === f.id ? (CUISINE_CAT_COLORS[f.id] ?? CUISINE_COLOR) : "#999",
+                  fontSize: 11, fontWeight: 600,
+                }}>{f.label}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Filters row ── */}
+        <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#f0ebe2", borderRadius: 12, alignItems: "center", flexShrink: 0, border: "1px solid #e8e0d0", marginBottom: 10 }}>
+          <div style={{ position: "relative", flexShrink: 0 }}>
           {/* Production toggle */}
           {prodCount > 0 && (
             <button type="button"
