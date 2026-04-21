@@ -1049,7 +1049,6 @@ function IngredientsPageInner() {
           .ing-desktop-filters { display: none !important; }
           .ing-mobile-search { display: none !important; }
           .ing-add-btn { padding: 6px 12px !important; font-size: 12px !important; }
-          .ing-floating-add { display: none !important; }
         }
       `}</style>
 
@@ -1514,33 +1513,6 @@ function IngredientsPageInner() {
         );
       })()}
 
-      {/* ── Floating "+ Produits" pill (desktop only) ── */}
-      {userCanWrite && !isVariations && (
-        <button
-          type="button"
-          className="ing-floating-add"
-          onClick={() => setShowCreateForm(true)}
-          style={{
-            position: "fixed",
-            right: 16,
-            bottom: "calc(80px + env(safe-area-inset-bottom, 0px))",
-            zIndex: 105,
-            display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "12px 18px",
-            borderRadius: 999,
-            border: "none",
-            background: "#D4775A",
-            color: "#fff",
-            fontFamily: "var(--font-oswald), Oswald, sans-serif",
-            fontSize: 13, fontWeight: 700,
-            textTransform: "uppercase", letterSpacing: ".05em",
-            boxShadow: "0 6px 24px rgba(212,119,90,0.35), 0 2px 8px rgba(0,0,0,0.10)",
-            cursor: "pointer",
-          }}
-        >
-          + Produits
-        </button>
-      )}
 
 
       {/* ── Search BottomSheet (mobile) ── */}

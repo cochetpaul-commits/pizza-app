@@ -225,12 +225,20 @@ html, body{
   .bottom-tab-bar {
     display: block !important;
   }
+  .bottom-bar-fab {
+    display: block !important;
+  }
 }
 
 /* Hide bottom tab bar pill when a bottom sheet drawer is open */
 body.bottom-sheet-open .bottom-tab-bar,
 body.bottom-sheet-open .bottom-bar-fab {
   display: none !important;
+}
+
+/* FAB hidden by default (desktop) */
+.bottom-bar-fab {
+  display: none;
 }
 
 .bottom-bar-btn {
