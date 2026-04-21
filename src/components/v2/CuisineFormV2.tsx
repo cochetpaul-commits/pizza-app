@@ -675,6 +675,8 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
 
   const ficheLabel = ficheType === "vin" ? "vin" : ficheType === "boisson" ? "boisson" : ficheType === "cocktail" ? "cocktail" : "cuisine";
   const title = name || `Nouvelle fiche ${ficheLabel}`;
+  const isBarType = ficheType === "vin" || ficheType === "boisson" || ficheType === "cocktail";
+  const ficheAccent = isBarType ? "#D4775A" : ACCENT;
 
   // ── Production mode computations ───────────────────────────────────────
   const prodPivotLine = pivotIngredientId
@@ -725,11 +727,11 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
 
         <RecipeHero
           title={title}
-          accent={ACCENT}
+          accent={ficheAccent}
           isEdit={true}
           photoPreview={photoPreview}
           etabName={etab?.nom}
-          typeLabel={categoryLabel}
+          typeLabel={ficheType === "vin" || ficheType === "boisson" ? ficheLabel : categoryLabel}
           onBack={() => router.push("/recettes")}
           actions={<>
             {isEdit && pivotIngredientId && <HeroBtn onClick={() => setShowProdModal(true)}>Production</HeroBtn>}
@@ -840,7 +842,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
               <>
                 {/* Banner */}
                 <div style={{
-                  background: "#4a6741", color: "white", borderRadius: 12,
+                  background: ficheAccent, color: "white", borderRadius: 12,
                   padding: "12px 16px", marginBottom: 16,
                 }}>
                   <div style={{ fontSize: 15, fontWeight: 800 }}>Mode Production</div>
@@ -989,7 +991,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
                   )}
 
                   {/* Stats inline */}
-                  <div style={{
+                  {ficheType !== "vin" && ficheType !== "boisson" && <div style={{
                     display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center",
                     paddingBottom: 14, marginBottom: 14, borderBottom: "1px solid #f0ebe2",
                   }}>
@@ -1017,9 +1019,10 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
                         </span>
                       } />
                     )}
-                  </div>
+                  </div>}
 
-                  {/* Categorie pills */}
+                  {/* Categorie pills — hidden for vin/boisson */}
+                  {ficheType !== "vin" && ficheType !== "boisson" && (
                   <div style={{ display: "inline-flex", flexWrap: "wrap", gap: 4, padding: 4, background: "#f5f0e8", borderRadius: 12 }}>
                     {CATEGORIES.map(c => (
                       <button
@@ -1035,10 +1038,11 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
                       >{c.label}</button>
                     ))}
                   </div>
+                  )}
                 </div>
 
-                {/* Ingrédients */}
-                <div style={{ background: "#fff", borderRadius: 16, padding: "20px 24px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
+                {/* Ingrédients — hidden for vin/boisson */}
+                {ficheType !== "vin" && ficheType !== "boisson" && <div style={{ background: "#fff", borderRadius: 16, padding: "20px 24px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                     <h3 style={{ margin: 0, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                       Ingrédients
@@ -1060,10 +1064,10 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
                     pivotId={pivotIngredientId}
                     onPivotChange={setPivotIngredientId}
                   />
-                </div>
+                </div>}
 
-                {/* Étapes */}
-                <div style={{ background: "#fff", borderRadius: 16, padding: "20px 24px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
+                {/* Étapes — hidden for vin/boisson */}
+                {ficheType !== "vin" && ficheType !== "boisson" && <div style={{ background: "#fff", borderRadius: 16, padding: "20px 24px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <h3 style={{ margin: "0 0 14px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Étapes
                   </h3>
@@ -1072,7 +1076,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
                   ) : (
                     <StepsList steps={steps} onChange={setSteps} />
                   )}
-                </div>
+                </div>}
 
                 {/* Index button for preparations */}
                 {category === "preparation" && isEdit && (
