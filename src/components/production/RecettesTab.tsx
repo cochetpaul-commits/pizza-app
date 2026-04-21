@@ -10,7 +10,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import ProductionModal from "@/components/ProductionModal";
 import { BottomSheet } from "@/components/layout/BottomSheet";
-import { useBottomBarActions, BottomBarButton } from "@/lib/BottomBarContext";
+import { useBottomBarActions } from "@/lib/BottomBarContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -540,13 +540,11 @@ function RecettesInner() {
   }), [filteredPizzas, filteredKitchens, filteredCocktails, filteredEmps]);
 
   // Bottom bar FAB
-  useBottomBarActions(() => canWrite ? (
-    <BottomBarButton onClick={() => setShowNewSheet(true)} accent="#D4775A" label="Nouvelle fiche" icon={
-      <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-      </svg>
-    } />
-  ) : null, [canWrite]);
+  useBottomBarActions(() => canWrite ? [{
+    key: "new", label: "Nouvelle fiche", accent: "#D4775A",
+    onClick: () => setShowNewSheet(true),
+    icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>,
+  }] : [], [canWrite]);
 
   if (authOk === null || loading) {
     return (

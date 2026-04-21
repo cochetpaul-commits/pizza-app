@@ -14,7 +14,7 @@ import { FloatingActions, FAIconPdf, FAIconMail, FAIconTrash, FAIconCheck, FAIco
 import type { FloatingAction } from "@/components/layout/FloatingActions";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { getSupplierColor } from "@/lib/supplierColors";
-import { useBottomBarActions, BottomBarButton } from "@/lib/BottomBarContext";
+import { useBottomBarActions } from "@/lib/BottomBarContext";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1445,14 +1445,11 @@ function CommandesPage() {
 
   // ── Bottom bar FAB: commander par fournisseur ──
   const accentColor = etab?.couleur ?? "#D4775A";
-  useBottomBarActions(() => !loading && !selectedSupplierId && suppliers.length > 0 ? (
-    <BottomBarButton onClick={() => setSupplierListOpen(true)} accent={accentColor} label="Commander" icon={
-      <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
-        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-      </svg>
-    } />
-  ) : null, [loading, selectedSupplierId, suppliers.length, accentColor]);
+  useBottomBarActions(() => !loading && !selectedSupplierId && suppliers.length > 0 ? [{
+    key: "order", label: "Commander", accent: accentColor,
+    onClick: () => setSupplierListOpen(true),
+    icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></svg>,
+  }] : [], [loading, selectedSupplierId, suppliers.length, accentColor]);
 
   // ── Main render ───────────────────────────────────────────────────────
 

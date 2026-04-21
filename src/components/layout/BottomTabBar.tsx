@@ -6,7 +6,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import type { Role } from "@/lib/rbac";
 import { ChefHat, ShoppingBasket } from "lucide-react";
-import { useBottomBar } from "@/lib/BottomBarContext";
+import { useBottomBar, type BottomBarAction } from "@/lib/BottomBarContext";
 import { BottomSheet } from "./BottomSheet";
 
 /* ── Icon: Building ────────────────────────────────── */
@@ -329,6 +329,49 @@ const SECTION_SHORT_LABEL: Record<string, string> = {
   Events: "Events",
 };
 
+/* ── Action row for drawer ── */
+function ActionRow({ action, onDone, etabColor }: { action: BottomBarAction; onDone: () => void; etabColor: string }) {
+  const accent = action.accent || etabColor;
+  if (action.fileAccept && action.onFileChange) {
+    return (
+      <label style={{
+        display: "flex", alignItems: "center", gap: 14,
+        padding: "14px 16px", borderRadius: 14, width: "100%",
+        background: "rgba(255,255,255,0.55)",
+        borderLeft: `4px solid ${accent}`, cursor: "pointer",
+      }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: `${accent}15`, color: accent,
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>{action.icon}</div>
+        <span style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{action.label}</span>
+        <input type="file" accept={action.fileAccept} style={{ display: "none" }} onChange={e => {
+          const f = e.target.files?.[0];
+          if (f) action.onFileChange?.(f);
+          e.target.value = "";
+          onDone();
+        }} />
+      </label>
+    );
+  }
+  return (
+    <button type="button" onClick={() => { onDone(); action.onClick(); }} style={{
+      display: "flex", alignItems: "center", gap: 14,
+      padding: "14px 16px", borderRadius: 14, width: "100%",
+      border: "none", background: "rgba(255,255,255,0.55)",
+      borderLeft: `4px solid ${accent}`, cursor: "pointer", textAlign: "left",
+    }}>
+      <div style={{
+        width: 36, height: 36, borderRadius: 10,
+        background: `${accent}15`, color: accent,
+        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+      }}>{action.icon}</div>
+      <span style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{action.label}</span>
+    </button>
+  );
+}
+
 /* ── Component ────────────────────────────────────── */
 
 export function BottomTabBar() {
@@ -340,6 +383,7 @@ export function BottomTabBar() {
   const [etabDrawerOpen, setEtabDrawerOpen] = useState(false);
   const [actionsFabOpen, setActionsFabOpen] = useState(false);
   const { actions: contextActions } = useBottomBar();
+  const hasActions = contextActions.length > 0;
 
   // Listen for "open-etab-drawer" event from MobileHeader
   useEffect(() => {
@@ -576,91 +620,54 @@ export function BottomTabBar() {
           </div>
         </div>
 
-        {/* Context FAB (right side) */}
-        {contextActions && (() => {
-          // Count children to decide: single action = direct FAB, multiple = expandable
-          const children = React.Children.toArray(contextActions).filter(Boolean);
-          const isSingle = children.length === 1;
-
-          if (isSingle) {
-            // Render the single action directly as a round FAB
-            return (
-              <div className="bottom-bar-fab" style={{
-                position: "fixed", right: 16,
-                bottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
-                zIndex: 101,
-              }}>
-                {contextActions}
-              </div>
-            );
-          }
-
-          // Multiple actions: FAB trigger + BottomSheet drawer
-          return (
-            <>
-              <div className="bottom-bar-fab" style={{
-                position: "fixed", right: 16,
-                bottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
-                zIndex: 101,
-              }}>
-                <button
-                  type="button"
-                  className="bottom-bar-btn"
-                  onClick={() => setActionsFabOpen(v => !v)}
-                  style={{
-                    width: 50, height: 50,
-                    borderRadius: "50%",
-                    border: "none",
-                    background: etabColor,
-                    color: "#fff",
-                    cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
-                    transition: "transform 0.2s cubic-bezier(.34,1.56,.64,1)",
-                    transform: actionsFabOpen ? "rotate(45deg)" : "rotate(0)",
-                  }}
-                >
+        {/* Context FAB (right side) — single FAB, opens drawer with actions */}
+        {hasActions && (
+          <>
+            <div className="bottom-bar-fab" style={{
+              position: "fixed", right: 16,
+              bottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
+              zIndex: 101,
+            }}>
+              <button
+                type="button"
+                className="bottom-bar-btn"
+                onClick={() => {
+                  if (contextActions.length === 1) {
+                    // Single action: execute directly
+                    contextActions[0].onClick();
+                  } else {
+                    setActionsFabOpen(v => !v);
+                  }
+                }}
+                style={{
+                  width: 50, height: 50,
+                  borderRadius: "50%",
+                  border: "none",
+                  background: etabColor,
+                  color: "#fff",
+                  cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
+                  transition: "transform 0.2s cubic-bezier(.34,1.56,.64,1)",
+                  transform: actionsFabOpen ? "rotate(45deg)" : "rotate(0)",
+                }}
+              >
+                {contextActions.length === 1 ? contextActions[0].icon : (
                   <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                     <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
-                </button>
+                )}
+              </button>
+            </div>
+            <BottomSheet open={actionsFabOpen} onClose={() => setActionsFabOpen(false)} title="Actions">
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {contextActions.map((action: BottomBarAction) => (
+                  <ActionRow key={action.key} action={action} onDone={() => setActionsFabOpen(false)} etabColor={etabColor} />
+                ))}
               </div>
-              <BottomSheet open={actionsFabOpen} onClose={() => setActionsFabOpen(false)} title="Actions">
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {React.Children.map(contextActions, (child) => {
-                    if (!React.isValidElement(child)) return child;
-                    const props = child.props as { label?: string; accent?: string; onClick?: () => void; icon?: React.ReactNode };
-                    const label = props.label ?? "";
-                    const accent = props.accent ?? etabColor;
-                    return (
-                      <button
-                        type="button"
-                        onClick={() => { setActionsFabOpen(false); props.onClick?.(); }}
-                        style={{
-                          display: "flex", alignItems: "center", gap: 14,
-                          padding: "14px 16px", borderRadius: 14, width: "100%",
-                          border: "none", background: "rgba(255,255,255,0.55)",
-                          borderLeft: `4px solid ${accent}`, cursor: "pointer",
-                          textAlign: "left",
-                        }}
-                      >
-                        <div style={{
-                          width: 36, height: 36, borderRadius: 10,
-                          background: `${accent}15`, color: accent,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          flexShrink: 0,
-                        }}>
-                          {props.icon}
-                        </div>
-                        {label && <span style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{label}</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </BottomSheet>
-            </>
-          );
-        })()}
+            </BottomSheet>
+          </>
+        )}
       </nav>
     </>
   );

@@ -8,7 +8,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { calculerPate, type EmpatementType, type FlourMixItem, type PateResult } from "@/lib/pateEngine";
 import { AiInsightCard } from "@/components/AiInsightCard";
 import { BottomSheet } from "@/components/layout/BottomSheet";
-import { useBottomBarActions, BottomBarButton } from "@/lib/BottomBarContext";
+import { useBottomBarActions } from "@/lib/BottomBarContext";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -705,13 +705,11 @@ export function CatalogueContent() {
 
   // Register FAB in bottom bar for "produit" mode
   const produitAccent = TYPE_COLORS.produit;
-  useBottomBarActions(() => canWrite && mainFilter === "produit" ? (
-    <BottomBarButton onClick={() => setShowProduitForm(true)} accent={produitAccent} label="Nouveau produit" icon={
-      <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-      </svg>
-    } />
-  ) : null, [canWrite, mainFilter, produitAccent]);
+  useBottomBarActions(() => canWrite && mainFilter === "produit" ? [{
+    key: "new-produit", label: "Nouveau produit", accent: produitAccent,
+    onClick: () => setShowProduitForm(true),
+    icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>,
+  }] : [], [canWrite, mainFilter, produitAccent]);
 
   return (
     <main className="container" style={{ paddingBottom: 80 }}>
