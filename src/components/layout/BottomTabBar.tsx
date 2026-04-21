@@ -626,8 +626,21 @@ export function BottomTabBar() {
                 </button>
               </div>
               <BottomSheet open={actionsFabOpen} onClose={() => setActionsFabOpen(false)} title="Actions">
-                <div onClick={() => setActionsFabOpen(false)} style={{ display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
-                  {contextActions}
+                <div onClick={() => setActionsFabOpen(false)} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {React.Children.map(contextActions, (child) => {
+                    if (!React.isValidElement(child)) return child;
+                    const label = (child.props as { label?: string }).label ?? "";
+                    return (
+                      <div style={{
+                        display: "flex", alignItems: "center", gap: 14,
+                        padding: "12px 16px", borderRadius: 14,
+                        background: "rgba(255,255,255,0.55)",
+                      }}>
+                        <div style={{ flexShrink: 0 }}>{child}</div>
+                        {label && <span style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{label}</span>}
+                      </div>
+                    );
+                  })}
                 </div>
               </BottomSheet>
             </>
