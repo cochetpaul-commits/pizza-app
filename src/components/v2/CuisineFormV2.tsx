@@ -673,7 +673,8 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
     }
   }
 
-  const title = name || "Nouvelle fiche cuisine";
+  const ficheLabel = ficheType === "vin" ? "vin" : ficheType === "boisson" ? "boisson" : ficheType === "cocktail" ? "cocktail" : "cuisine";
+  const title = name || `Nouvelle fiche ${ficheLabel}`;
 
   // ── Production mode computations ───────────────────────────────────────
   const prodPivotLine = pivotIngredientId
@@ -947,7 +948,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
                     fontSize: 10, fontWeight: 700, color: "#999",
                     textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 8,
                   }}>
-                    {CATEGORIES.find(c => c.id === category)?.label ?? "Recette"}
+                    {ficheType === "vin" ? "Vin" : ficheType === "boisson" ? "Boisson" : (CATEGORIES.find(c => c.id === category)?.label ?? "Recette")}
                   </div>
                   <input
                     value={name}
