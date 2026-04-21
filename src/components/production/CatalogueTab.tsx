@@ -1489,6 +1489,41 @@ export function CatalogueContent() {
                 </div>
               )}
 
+              {/* Metadata (vin, boisson) */}
+              {modalRecipe.metadata && Object.keys(modalRecipe.metadata).length > 0 && (
+                <div style={{ padding: "0 20px 16px" }}>
+                  <div style={{
+                    fontSize: 12, fontWeight: 700, color: mColor,
+                    textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10,
+                  }}>
+                    {modalRecipe.fiche_type === "vin" ? "Fiche vin" : "Details"}
+                  </div>
+                  <div style={{
+                    display: "flex", flexDirection: "column", gap: 6,
+                    padding: "14px 16px", borderRadius: 12,
+                    background: modalRecipe.fiche_type === "vin" ? "rgba(138,107,62,0.06)" : "rgba(0,0,0,0.02)",
+                    border: `1.5px solid ${modalRecipe.fiche_type === "vin" ? "rgba(138,107,62,0.15)" : "rgba(0,0,0,0.06)"}`,
+                  }}>
+                    {Object.entries(modalRecipe.metadata).filter(([, v]) => v && String(v).trim()).map(([key, val]) => {
+                      const labels: Record<string, string> = {
+                        domaine: "Domaine", region: "Region", cepage: "Cepage",
+                        appellation: "Appellation", accords: "Accords", descriptif: "Descriptif",
+                        anecdote: "Anecdote", temperature: "Temperature", millesime: "Millesime",
+                        type_boisson: "Type", provenance: "Provenance", volume: "Volume",
+                      };
+                      return (
+                        <div key={key} style={{ display: "flex", gap: 8, fontSize: 13, lineHeight: 1.5 }}>
+                          <span style={{ fontWeight: 700, color: "#1a1a1a", minWidth: 90, flexShrink: 0 }}>
+                            {labels[key] ?? key}
+                          </span>
+                          <span style={{ color: "#555" }}>{String(val)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Footer: allergens */}
               {modalRecipe.allergens.length > 0 && (
                 <div style={{

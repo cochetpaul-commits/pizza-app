@@ -44,6 +44,26 @@ function n2(v: unknown) { const x = Number(v); return Number.isFinite(x) ? x : 0
 function round2(v: number) { return Math.round(v * 100) / 100; }
 function fmtMoney(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
+function MetaField({ label, value, onChange, placeholder, full }: {
+  label: string; value?: string; onChange: (v: string) => void; placeholder?: string; full?: boolean;
+}) {
+  return (
+    <div style={full ? { gridColumn: "1 / -1" } : {}}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>{label}</div>
+      <input
+        value={value ?? ""}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          width: "100%", padding: "8px 10px", borderRadius: 8,
+          border: "1.5px solid #e5ddd0", fontSize: 13, background: "#fff",
+          outline: "none", color: "#1a1a1a", boxSizing: "border-box",
+        }}
+      />
+    </div>
+  );
+}
+
 interface Props { recipeId?: string; initialProdMode?: boolean; initialCategory?: string; initialFicheType?: string; }
 
 function truncate(s: string, n: number) { return s.length > n ? s.slice(0, n) + "…" : s; }
@@ -77,6 +97,10 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
 
   // Steps
   const [steps, setSteps] = useState<string[]>([]);
+
+  // Metadata (vin/boisson specific fields)
+  const [meta, setMeta] = useState<Record<string, string>>({});
+  const updateMeta = (k: string, v: string) => setMeta(prev => ({ ...prev, [k]: v }));
 
   // Pricing — marginRate as string "75" = 75%
   const [vatRate, setVatRate] = useState(0.1);
@@ -330,6 +354,13 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
           setName(String(r.name ?? ""));
           setCategory(String(r.category ?? "plat_cuisine"));
           if (r.fiche_type) setFicheType(String(r.fiche_type));
+          if (r.metadata && typeof r.metadata === "object") {
+            const m: Record<string, string> = {};
+            for (const [k, v] of Object.entries(r.metadata as Record<string, unknown>)) {
+              if (typeof v === "string") m[k] = v;
+            }
+            setMeta(m);
+          }
           setYieldGrams(r.yield_grams ? Number(r.yield_grams) : "");
           setPortionsCount(r.portions_count ? Number(r.portions_count) : "");
           // establishments auto-assigned from current etab context
@@ -428,6 +459,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         name: name || "Nouvelle recette",
         category,
         fiche_type: ficheType,
+        metadata: Object.keys(meta).length > 0 ? meta : {},
         yield_grams: yieldGrams !== "" ? Math.round(Number(yieldGrams)) : 0,
         portions_count: portionsCount !== "" ? Math.round(Number(portionsCount)) : 0,
         establishments: etab ? [etab.slug] : ["bellomio"],
@@ -928,6 +960,32 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
                       padding: 0, marginBottom: 14,
                     }}
                   />
+
+                  {/* Vin/Boisson metadata fields */}
+                  {(ficheType === "vin" || ficheType === "boisson") && (
+                    <div style={{
+                      display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
+                      marginBottom: 14, paddingBottom: 14, borderBottom: "1px solid #f0ebe2",
+                    }}>
+                      {ficheType === "vin" && (<>
+                        <MetaField label="Domaine" value={meta.domaine} onChange={v => updateMeta("domaine", v)} placeholder="Ex: Scrimaglio" />
+                        <MetaField label="Region" value={meta.region} onChange={v => updateMeta("region", v)} placeholder="Ex: Piémont" />
+                        <MetaField label="Cepage" value={meta.cepage} onChange={v => updateMeta("cepage", v)} placeholder="Ex: 100% Arneis" />
+                        <MetaField label="Appellation" value={meta.appellation} onChange={v => updateMeta("appellation", v)} placeholder="Ex: Langhe DOC" />
+                        <MetaField label="Accords" value={meta.accords} onChange={v => updateMeta("accords", v)} placeholder="Ex: Fruits de mer, fromages" full />
+                        <MetaField label="Descriptif" value={meta.descriptif} onChange={v => updateMeta("descriptif", v)} placeholder="Notes de dégustation..." full />
+                        <MetaField label="Anecdote" value={meta.anecdote} onChange={v => updateMeta("anecdote", v)} placeholder="Histoire du vin..." full />
+                        <MetaField label="Temperature" value={meta.temperature} onChange={v => updateMeta("temperature", v)} placeholder="Ex: 8-10°C" />
+                        <MetaField label="Millesime" value={meta.millesime} onChange={v => updateMeta("millesime", v)} placeholder="Ex: 2022" />
+                      </>)}
+                      {ficheType === "boisson" && (<>
+                        <MetaField label="Type" value={meta.type_boisson} onChange={v => updateMeta("type_boisson", v)} placeholder="Ex: IPA, Lager, Limonade" />
+                        <MetaField label="Provenance" value={meta.provenance} onChange={v => updateMeta("provenance", v)} placeholder="Ex: Bretagne" />
+                        <MetaField label="Volume" value={meta.volume} onChange={v => updateMeta("volume", v)} placeholder="Ex: 33cL, 75cL" />
+                        <MetaField label="Descriptif" value={meta.descriptif} onChange={v => updateMeta("descriptif", v)} placeholder="Description..." full />
+                      </>)}
+                    </div>
+                  )}
 
                   {/* Stats inline */}
                   <div style={{
