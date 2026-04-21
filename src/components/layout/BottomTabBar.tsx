@@ -595,16 +595,14 @@ export function BottomTabBar() {
             );
           }
 
-          // Multiple actions: expandable FAB
+          // Multiple actions: FAB trigger + BottomSheet drawer
           return (
             <>
               <div className="bottom-bar-fab" style={{
                 position: "fixed", right: 16,
                 bottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
                 zIndex: 101,
-                display: "flex", flexDirection: "column-reverse", alignItems: "center", gap: 10,
               }}>
-                {/* Main FAB trigger */}
                 <button
                   type="button"
                   onClick={() => setActionsFabOpen(v => !v)}
@@ -612,12 +610,12 @@ export function BottomTabBar() {
                     width: 50, height: 50,
                     borderRadius: "50%",
                     border: "none",
-                    background: actionsFabOpen ? "#1a1a1a" : etabColor,
+                    background: etabColor,
                     color: "#fff",
                     cursor: "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
-                    transition: "all 0.2s cubic-bezier(.34,1.56,.64,1)",
+                    transition: "transform 0.2s cubic-bezier(.34,1.56,.64,1)",
                     transform: actionsFabOpen ? "rotate(45deg)" : "rotate(0)",
                   }}
                 >
@@ -625,35 +623,12 @@ export function BottomTabBar() {
                     <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
                 </button>
-
-                {/* Expanded actions */}
-                {actionsFabOpen && (
-                  <div
-                    onClick={() => setActionsFabOpen(false)}
-                    className="bottom-bar-fab-expanded"
-                    style={{
-                      display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
-                      padding: "10px",
-                      borderRadius: 28,
-                      background: "rgba(245,240,232,0.92)",
-                      backdropFilter: "blur(28px) saturate(200%)",
-                      WebkitBackdropFilter: "blur(28px) saturate(200%)",
-                      border: "1px solid rgba(255,255,255,0.5)",
-                      boxShadow: "0 4px 20px rgba(0,0,0,0.10)",
-                      animation: "fabExpand 0.2s ease",
-                    }}
-                  >
-                    {contextActions}
-                  </div>
-                )}
               </div>
-              {/* Overlay to close FAB */}
-              {actionsFabOpen && (
-                <div
-                  onClick={() => setActionsFabOpen(false)}
-                  style={{ position: "fixed", inset: 0, zIndex: 99, background: "transparent" }}
-                />
-              )}
+              <BottomSheet open={actionsFabOpen} onClose={() => setActionsFabOpen(false)} title="Actions">
+                <div onClick={() => setActionsFabOpen(false)} style={{ display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
+                  {contextActions}
+                </div>
+              </BottomSheet>
             </>
           );
         })()}
