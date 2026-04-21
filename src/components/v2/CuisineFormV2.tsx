@@ -44,11 +44,11 @@ function n2(v: unknown) { const x = Number(v); return Number.isFinite(x) ? x : 0
 function round2(v: number) { return Math.round(v * 100) / 100; }
 function fmtMoney(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
-interface Props { recipeId?: string; initialProdMode?: boolean; initialCategory?: string; }
+interface Props { recipeId?: string; initialProdMode?: boolean; initialCategory?: string; initialFicheType?: string; }
 
 function truncate(s: string, n: number) { return s.length > n ? s.slice(0, n) + "…" : s; }
 
-export default function CuisineFormV2({ recipeId, initialProdMode, initialCategory }: Props) {
+export default function CuisineFormV2({ recipeId, initialProdMode, initialCategory, initialFicheType }: Props) {
   const router = useRouter();
   const { can } = useProfile();
   const userCanWrite = can("operations.edit_recettes");
@@ -61,6 +61,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
   // Form state
   const [name, setName] = useState("");
   const [category, setCategory] = useState(initialCategory ?? "plat_cuisine");
+  const [ficheType, setFicheType] = useState(initialFicheType ?? "recette");
   const [yieldGrams, setYieldGrams] = useState<number | "">("");
   const [portionsCount, setPortionsCount] = useState<number | "">("");
   const [photoUrl, setPhotoUrl] = useState("");
@@ -328,6 +329,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
           const r = rec as Record<string, unknown>;
           setName(String(r.name ?? ""));
           setCategory(String(r.category ?? "plat_cuisine"));
+          if (r.fiche_type) setFicheType(String(r.fiche_type));
           setYieldGrams(r.yield_grams ? Number(r.yield_grams) : "");
           setPortionsCount(r.portions_count ? Number(r.portions_count) : "");
           // establishments auto-assigned from current etab context
@@ -425,6 +427,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
       const payload: Record<string, unknown> = {
         name: name || "Nouvelle recette",
         category,
+        fiche_type: ficheType,
         yield_grams: yieldGrams !== "" ? Math.round(Number(yieldGrams)) : 0,
         portions_count: portionsCount !== "" ? Math.round(Number(portionsCount)) : 0,
         establishments: etab ? [etab.slug] : ["bellomio"],

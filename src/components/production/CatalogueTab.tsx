@@ -42,6 +42,7 @@ type Recipe = {
   type: RecipeType;
   name: string;
   category: string | null;
+  fiche_type: string;
   photo_url: string | null;
   lines: RecipeLine[];
   steps: string[];
@@ -49,6 +50,7 @@ type Recipe = {
   yield_info: string | null; // "8 portions" or "1200 g"
   portions_count: number | null;
   allergens: string[];
+  metadata?: Record<string, unknown>;
   emp_data?: EmpData;
 };
 
@@ -201,7 +203,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
       return { ingredient_id: (i.ingredient_id as string) ?? null, ingredient_name: (ing?.name as string) ?? "?", qty: Number(i.qty) || 0, unit: String(i.unit ?? "g") };
     });
     recipes.push({
-      id: p.id, type: "pizza", name: p.name, category: null,
+      id: p.id, type: "pizza", name: p.name, category: null, fiche_type: "recette",
       photo_url: p.photo_url, lines, steps: parseJsonSteps(p.notes),
       pivot_ingredient_id: p.pivot_ingredient_id,
       yield_info: p.ball_weight_g ? `Pâton ${p.ball_weight_g} g` : null,
@@ -213,7 +215,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
   // ── Cuisine ──
   const { data: kitchens } = await supabase
     .from("kitchen_recipes")
-    .select("id, name, category, photo_url, procedure, pivot_ingredient_id, yield_grams, portions_count, establishments")
+    .select("id, name, category, fiche_type, metadata, photo_url, procedure, pivot_ingredient_id, yield_grams, portions_count, establishments")
     .eq("is_active", true)
     .order("name");
   const kitchenIds = (kitchens ?? []).map(k => k.id);
@@ -244,6 +246,8 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
     else if (k.yield_grams) yieldInfo = `${k.yield_grams} g`;
     recipes.push({
       id: k.id, type: isProduit ? "produit" : "cuisine", name: k.name, category: k.category,
+      fiche_type: k.fiche_type ?? "recette",
+      metadata: (k.metadata as Record<string, unknown>) ?? {},
       photo_url: k.photo_url, lines, steps: parseJsonSteps(k.procedure),
       pivot_ingredient_id: k.pivot_ingredient_id, yield_info: yieldInfo,
       portions_count: k.portions_count ?? null,
@@ -273,7 +277,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
       return { ingredient_id: (i.ingredient_id as string) ?? null, ingredient_name: (ing?.name as string) ?? "?", qty: Number(i.qty) || 0, unit: String(i.unit ?? "cL") };
     });
     recipes.push({
-      id: c.id, type: "cocktail", name: c.name, category: null,
+      id: c.id, type: "cocktail", name: c.name, category: null, fiche_type: "cocktail",
       photo_url: c.image_url, lines, steps: parseJsonSteps(c.steps),
       pivot_ingredient_id: c.pivot_ingredient_id,
       yield_info: c.glass ? `Verre : ${c.glass}` : null,
@@ -308,7 +312,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
       return { ingredient_id: (i.ingredient_id as string) ?? null, ingredient_name: (ing?.name as string) ?? "?", qty, unit };
     });
     recipes.push({
-      id: `prep-${p.id}`, type: "production", name: p.name, category: "prep",
+      id: `prep-${p.id}`, type: "production", name: p.name, category: "prep", fiche_type: "recette",
       photo_url: p.photo_url, lines, steps: parseJsonSteps(p.procedure),
       pivot_ingredient_id: p.pivot_ingredient_id,
       yield_info: p.yield_grams ? `${p.yield_grams} g` : null,
@@ -333,7 +337,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
       return { ingredient_id: (i.ingredient_id as string) ?? null, ingredient_name: (ing?.name as string) ?? "?", qty, unit };
     });
     recipes.push({
-      id: k.id, type: "production", name: k.name, category: "preparation",
+      id: k.id, type: "production", name: k.name, category: "preparation", fiche_type: "recette",
       photo_url: k.photo_url, lines, steps: parseJsonSteps(k.procedure),
       pivot_ingredient_id: k.pivot_ingredient_id,
       yield_info: k.yield_grams ? `${k.yield_grams} g` : null,
@@ -374,7 +378,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
     const lines = resultToLines(result);
 
     recipes.push({
-      id: `emp-${e.id}`, type: "production", name: e.name, category: "empatement",
+      id: `emp-${e.id}`, type: "production", name: e.name, category: "empatement", fiche_type: "empatement",
       photo_url: null, lines, steps: parseJsonSteps(e.procedure),
       pivot_ingredient_id: e.pivot_ingredient_id,
       yield_info: `${bc} pâton${bc > 1 ? "s" : ""} × ${bw} g`,

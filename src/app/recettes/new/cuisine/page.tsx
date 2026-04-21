@@ -7,7 +7,8 @@ import CuisineFormV2 from "@/components/v2/CuisineFormV2";
 function Inner() {
   const params = useSearchParams();
   const initialCategory = params.get("category") ?? undefined;
-  return <CuisineFormV2 initialCategory={initialCategory} />;
+  const initialFicheType = params.get("ficheType") ?? undefined;
+  return <CuisineFormV2 initialCategory={initialCategory} initialFicheType={initialFicheType} />;
 }
 
 export default function NewCuisineV2Page() {
