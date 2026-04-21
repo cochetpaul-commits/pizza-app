@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
 import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 import Chart from "chart.js/auto";
+import { useBottomBarActions, BottomBarButton } from "@/lib/BottomBarContext";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -109,7 +110,7 @@ export default function MasseSalarialePage() {
   const { current: etab } = useEtablissement();
   const [presences, setPresences] = useState<ComboPresence[]>([]);
   const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(false);
+  const [, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState("");
   const [caMonth, setCaMonth] = useState<number | null>(null);
   const [caHtMonth, setCaHtMonth] = useState<number | null>(null);
@@ -290,6 +291,21 @@ export default function MasseSalarialePage() {
   };
 
   const etabColor = etab?.couleur ?? ACCENT;
+
+  // Bottom bar FAB: Import Combo
+  useBottomBarActions(() => (
+    <BottomBarButton as="label" accent={ACCENT} label="Import Combo" icon={
+      <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+      </svg>
+    }>
+      <input type="file" accept=".pdf" style={{ display: "none" }} onChange={(e) => {
+        const f = e.target.files?.[0];
+        if (f) handleImport(f);
+        e.target.value = "";
+      }} />
+    </BottomBarButton>
+  ), [handleImport]);
 
   // Range factice pour le PilotageNavBar — représente la période sélectionnée (mois/semaine)
   const navRange = { from: selected?.from ?? "", to: selected?.to ?? "" };
@@ -575,30 +591,6 @@ export default function MasseSalarialePage() {
           )}
         </div>
 
-        {/* FAB Import Combo — centré */}
-        <label style={{
-          position: "fixed",
-          bottom: "calc(92px + env(safe-area-inset-bottom, 0px))",
-          left: "50%", transform: "translateX(-50%)",
-          zIndex: 105,
-          height: 48, padding: "0 22px",
-          borderRadius: 24, border: "none",
-          background: ACCENT, color: "#fff",
-          fontSize: 13, fontWeight: 700, cursor: "pointer",
-          display: "flex", alignItems: "center", gap: 8,
-          boxShadow: "0 4px 16px rgba(212,119,90,0.4), 0 2px 6px rgba(0,0,0,0.1)",
-          fontFamily: "inherit",
-          textTransform: "uppercase", letterSpacing: "0.04em",
-          whiteSpace: "nowrap",
-        }}>
-          <input type="file" accept=".pdf" style={{ display: "none" }} onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) handleImport(f);
-            e.target.value = "";
-          }} />
-          <span style={{ fontSize: 18, lineHeight: 1, fontWeight: 300 }}>+</span>
-          {importing ? "Import..." : "Import Combo"}
-        </label>
       </div>
       </PilotageSwipeWrapper>
     </RequireRole>

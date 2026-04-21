@@ -8,6 +8,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { calculerPate, type EmpatementType, type FlourMixItem, type PateResult } from "@/lib/pateEngine";
 import { AiInsightCard } from "@/components/AiInsightCard";
 import { BottomSheet } from "@/components/layout/BottomSheet";
+import { useBottomBarActions, BottomBarButton } from "@/lib/BottomBarContext";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -697,6 +698,16 @@ export function CatalogueContent() {
 
   const activeColor = mainFilter === "pizza" ? TYPE_COLORS.pizza : mainFilter === "cuisine" ? TYPE_COLORS.cuisine : mainFilter === "cocktail" ? TYPE_COLORS.cocktail : mainFilter === "produit" ? TYPE_COLORS.produit : mainFilter === "empatement" ? EMP_COLOR : null;
   const activeLabel = mainFilter === "tous" ? "Toutes" : mainFilter === "pizza" ? "Pizza" : mainFilter === "cuisine" ? (cuisineCatFilter !== "all" ? dynamicCuisineCats.find(f => f.id === cuisineCatFilter)?.label ?? "Cuisine" : "Cuisine") : mainFilter === "cocktail" ? "Cocktail" : mainFilter === "produit" ? "Produit" : "Empât.";
+
+  // Register FAB in bottom bar for "produit" mode
+  const produitAccent = TYPE_COLORS.produit;
+  useBottomBarActions(() => canWrite && mainFilter === "produit" ? (
+    <BottomBarButton onClick={() => setShowProduitForm(true)} accent={produitAccent} label="Nouveau produit" icon={
+      <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+      </svg>
+    } />
+  ) : null, [canWrite, mainFilter, produitAccent]);
 
   return (
     <main className="container" style={{ paddingBottom: 80 }}>
@@ -1614,28 +1625,6 @@ export function CatalogueContent() {
         </div>
       </BottomSheet>
 
-      {/* ── FAB: Nouveau produit (visible quand filtre = produit) ── */}
-      {canWrite && mainFilter === "produit" && (
-        <button
-          type="button"
-          onClick={() => setShowProduitForm(true)}
-          style={{
-            position: "fixed", right: 16,
-            bottom: "calc(80px + env(safe-area-inset-bottom, 0px))",
-            zIndex: 105,
-            display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "12px 18px", borderRadius: 999, border: "none",
-            background: TYPE_COLORS.produit, color: "#fff",
-            fontFamily: "var(--font-oswald), Oswald, sans-serif",
-            fontSize: 13, fontWeight: 700,
-            textTransform: "uppercase", letterSpacing: ".05em",
-            boxShadow: "0 6px 24px rgba(138,107,62,0.35), 0 2px 8px rgba(0,0,0,0.10)",
-            cursor: "pointer",
-          }}
-        >
-          + Produit
-        </button>
-      )}
     </main>
   );
 }

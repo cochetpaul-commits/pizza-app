@@ -8,6 +8,7 @@ import { ColorPicker } from "@/components/ColorPicker";
 
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { useBottomBarActions, BottomBarButton } from "@/lib/BottomBarContext";
 
 type SupplierRow = {
   id: string;
@@ -1139,6 +1140,15 @@ export default function FournisseursPage() {
   const bmEtab = etablissements.find(e => e.slug === "bello-mio");
   const pmEtab = etablissements.find(e => e.slug === "piccola-mia");
 
+  // Bottom bar FAB
+  useBottomBarActions(() => (
+    <BottomBarButton onClick={openCreateModal} accent="#D4775A" label="Nouveau fournisseur" icon={
+      <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+      </svg>
+    } />
+  ), []);
+
   return (
     <RequireRole allowedRoles={["group_admin", "equipier"]}>
       <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
@@ -1222,29 +1232,6 @@ export default function FournisseursPage() {
       )}
 
 
-      {/* FAB centré : + Nouveau fournisseur */}
-      <button
-        type="button"
-        onClick={openCreateModal}
-        style={{
-          position: "fixed",
-          bottom: "calc(92px + env(safe-area-inset-bottom, 0px))",
-          left: "50%", transform: "translateX(-50%)",
-          zIndex: 105,
-          height: 48, padding: "0 22px",
-          borderRadius: 24, border: "none",
-          background: "#D4775A", color: "#fff",
-          fontSize: 13, fontWeight: 700, cursor: "pointer",
-          display: "flex", alignItems: "center", gap: 8,
-          boxShadow: "0 4px 16px rgba(212,119,90,0.4), 0 2px 6px rgba(0,0,0,0.1)",
-          fontFamily: "inherit",
-          textTransform: "uppercase", letterSpacing: "0.04em",
-          whiteSpace: "nowrap",
-        }}
-      >
-        <span style={{ fontSize: 18, lineHeight: 1, fontWeight: 300 }}>+</span>
-        Nouveau fournisseur
-      </button>
     </RequireRole>
   );
 }
