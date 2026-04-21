@@ -9,6 +9,8 @@ import { TopNav } from "@/components/TopNav";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import ProductionModal from "@/components/ProductionModal";
+import { BottomSheet } from "@/components/layout/BottomSheet";
+import { useBottomBarActions, BottomBarButton } from "@/lib/BottomBarContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -358,6 +360,7 @@ function RecettesInner() {
   const [prodFilter, setProdFilter] = useState(false);
   const [prodModal, setProdModal] = useState<{ type: "pizza" | "cuisine" | "cocktail" | "empatement"; id: string; name: string; pivotId: string } | null>(null);
   const [showFab, setShowFab] = useState(false);
+  const [showNewSheet, setShowNewSheet] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const [showCuisinePop, setShowCuisinePop] = useState(false);
@@ -548,6 +551,15 @@ function RecettesInner() {
     cocktail: filteredCocktails.length,
     empatement: filteredEmps.length,
   }), [filteredPizzas, filteredKitchens, filteredCocktails, filteredEmps]);
+
+  // Bottom bar FAB
+  useBottomBarActions(() => canWrite ? (
+    <BottomBarButton onClick={() => setShowNewSheet(true)} accent="#D4775A" label="Nouvelle fiche" icon={
+      <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+      </svg>
+    } />
+  ) : null, [canWrite]);
 
   if (authOk === null || loading) {
     return (
@@ -997,62 +1009,54 @@ function RecettesInner() {
         )}
       </main>
 
-      {/* ── FAB — new recipe button (mobile only) ── */}
-      {canWrite && (
-        <div className="mobile-only" style={{ position: "fixed", bottom: "calc(140px + env(safe-area-inset-bottom, 0px))", right: 16, zIndex: 100 }}>
-          {showFab && (
-            <div style={{
-              position: "absolute", bottom: 58, right: 0,
-              background: "rgba(255,255,255,0.97)",
-              backdropFilter: "blur(20px) saturate(180%)",
-              WebkitBackdropFilter: "blur(20px) saturate(180%)",
-              borderRadius: 14, padding: 8,
-              boxShadow: "0 8px 32px rgba(0,0,0,0.14)", border: "1px solid rgba(0,0,0,0.08)",
-              display: "flex", flexDirection: "column", gap: 2, minWidth: 180,
+      {/* ── New recipe BottomSheet ── */}
+      <BottomSheet open={showNewSheet} onClose={() => setShowNewSheet(false)} title="Nouvelle fiche">
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {[
+            { label: "Pizza", href: "/recettes/new/pizza", color: PIZZA_COLOR },
+            { label: "Cuisine", href: "/recettes/new/cuisine", color: CUISINE_COLOR },
+            { label: "Cocktail", href: "/recettes/new/cocktail", color: COCKTAIL_COLOR },
+            { label: "Empatement", href: "/recettes/new/empatement", color: EMP_COLOR },
+          ].map(item => (
+            <Link key={item.href} href={item.href} onClick={() => setShowNewSheet(false)} style={{
+              display: "flex", alignItems: "center", gap: 14,
+              padding: "14px 16px", borderRadius: 14, textDecoration: "none",
+              background: "rgba(255,255,255,0.55)",
+              borderLeft: `4px solid ${item.color}`,
             }}>
-              {[
-                { label: "Pizza", href: "/recettes/new/pizza", color: PIZZA_COLOR },
-                { label: "Cuisine", href: "/recettes/new/cuisine", color: CUISINE_COLOR },
-                { label: "Cocktail", href: "/recettes/new/cocktail", color: COCKTAIL_COLOR },
-                { label: "Empatement", href: "/recettes/new/empatement", color: EMP_COLOR },
-              ].map(item => (
-                <Link key={item.href} href={item.href} style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "10px 14px", borderRadius: 10, textDecoration: "none",
-                  fontSize: 13, fontWeight: 600, color: item.color,
-                  borderLeft: `3px solid ${item.color}`,
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = `${item.color}10`}
-                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                >
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: item.color }} />
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          )}
-          <button
-            type="button"
-            className="etab-fab"
-            onClick={() => setShowFab(f => !f)}
-            style={{
-              width: 50, height: 50,
-              border: "2px solid #D4775A",
-              background: "#fff",
-              color: "#D4775A", fontSize: 24, fontWeight: 300,
-              cursor: "pointer",
-              boxShadow: "0 4px 14px rgba(212,119,90,0.3), 0 2px 6px rgba(0,0,0,0.1)",
-              transition: "transform 0.2s, background 0.2s, color 0.2s",
-              transform: showFab ? "rotate(45deg)" : "none",
+              <div style={{
+                width: 36, height: 36, borderRadius: 10,
+                background: `${item.color}15`, display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: item.color }} />
+              </div>
+              <span style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{item.label}</span>
+            </Link>
+          ))}
+          <div style={{ height: 1, background: "rgba(0,0,0,0.06)", margin: "4px 0" }} />
+          <button type="button" onClick={() => {
+            const nom = prompt("Nom de la nouvelle categorie :");
+            if (nom && nom.trim()) {
+              const slug = nom.trim().toLowerCase().replace(/\s+/g, "_").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+              router.push(`/recettes/new/cuisine?category=${encodeURIComponent(slug)}&categoryLabel=${encodeURIComponent(nom.trim())}`);
+              setShowNewSheet(false);
+            }
+          }} style={{
+            display: "flex", alignItems: "center", gap: 14,
+            padding: "14px 16px", borderRadius: 14, width: "100%",
+            border: "none", background: "rgba(255,255,255,0.55)", cursor: "pointer",
+            textAlign: "left",
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: "rgba(212,119,90,0.1)", color: "#D4775A",
               display: "flex", alignItems: "center", justifyContent: "center",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = "#D4775A"; e.currentTarget.style.color = "#fff"; }}
-            onMouseLeave={e => { if (!showFab) { e.currentTarget.style.background = "#fff"; e.currentTarget.style.color = "#D4775A"; }}}
-          >
-            +
+              fontSize: 18, fontWeight: 300,
+            }}>+</div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: "#D4775A" }}>Nouvelle categorie</span>
           </button>
         </div>
-      )}
+      </BottomSheet>
       {prodModal && (
         <ProductionModal
           recipeType={prodModal.type}
