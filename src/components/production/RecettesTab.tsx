@@ -301,29 +301,46 @@ function RecipeCard({
 }
 
 function SectionHeader({
-  title, color, count,
+  title, color, count, collapsed, onToggle,
 }: {
-  title: string; color: string; count: number;
+  title: string; color: string; count: number; collapsed?: boolean; onToggle?: () => void;
 }) {
   return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 10,
-      padding: "14px 0 10px", marginBottom: 8,
-      borderBottom: `2px solid ${color}`,
-    }}>
-      <div style={{
-        width: 4, height: 22, borderRadius: 2, background: color, flexShrink: 0,
-      }} />
+    <button
+      type="button"
+      onClick={onToggle}
+      style={{
+        width: "100%", display: "flex", alignItems: "center", gap: 12,
+        padding: "14px 18px", background: "#fff",
+        border: "1px solid #ede6d9",
+        boxShadow: `inset 4px 0 0 ${color}, 0 1px 3px rgba(0,0,0,0.04)`,
+        borderRadius: 14, cursor: onToggle ? "pointer" : "default",
+        textAlign: "left", fontFamily: "inherit",
+        marginBottom: 8,
+      }}
+    >
       <span style={{
-        fontSize: 15, fontWeight: 700, color,
-        textTransform: "uppercase", letterSpacing: 2,
-        fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-        flex: 1,
+        fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 14, fontWeight: 800,
+        letterSpacing: "0.12em", textTransform: "uppercase", color,
       }}>
         {title}
-        <span style={{ fontWeight: 500, fontSize: 12, marginLeft: 8, color: "#999", letterSpacing: 0 }}>{count} fiche{count > 1 ? "s" : ""}</span>
       </span>
-    </div>
+      <span style={{
+        fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20,
+        background: `${color}15`, color,
+      }}>
+        {count}
+      </span>
+      {onToggle && (
+        <span style={{
+          marginLeft: "auto", fontSize: 10, color: "#b0a894",
+          transition: "transform 0.2s",
+          transform: collapsed ? "rotate(-90deg)" : "rotate(0)",
+        }}>
+          {"▼"}
+        </span>
+      )}
+    </button>
   );
 }
 
@@ -347,6 +364,12 @@ function RecettesInner() {
   const canWrite = can("operations.edit_recettes");
   const { current: etabCtx } = useEtablissement();
   const [authOk, setAuthOk] = useState<boolean | null>(null);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const toggleSection = (key: string) => setCollapsedSections(prev => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
   const [pizzas,    setPizzas]    = useState<PizzaRow[]>([]);
   const [kitchens,  setKitchens]  = useState<KitchenRow[]>([]);
   const [cocktails, setCocktails] = useState<CocktailRow[]>([]);
@@ -814,10 +837,10 @@ function RecettesInner() {
 
         {/* ── Pizza ── */}
         {showPizza && filteredPizzas.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
+          <div style={{ marginBottom: 16 }}>
             <SectionHeader title="Pizza" color={PIZZA_COLOR} count={filteredPizzas.length}
-              />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 8 }}>
+              collapsed={collapsedSections.has("pizza")} onToggle={() => toggleSection("pizza")} />
+            {!collapsedSections.has("pizza") && <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {filteredPizzas.map(r => (
                 <RecipeCard
                   key={r.id}
@@ -834,16 +857,16 @@ function RecettesInner() {
                   pvLabel="TTC"
                 />
               ))}
-            </div>
+            </div>}
           </div>
         )}
 
         {/* ── Cuisine ── */}
         {showCuisine && filteredKitchens.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
+          <div style={{ marginBottom: 16 }}>
             <SectionHeader title="Cuisine" color={CUISINE_COLOR} count={filteredKitchens.length}
-              />
-            {dynamicCuisineCats.filter(cat => (kitchenByCat[cat.id]?.length ?? 0) > 0).map(cat => {
+              collapsed={collapsedSections.has("cuisine")} onToggle={() => toggleSection("cuisine")} />
+            {!collapsedSections.has("cuisine") && dynamicCuisineCats.filter(cat => (kitchenByCat[cat.id]?.length ?? 0) > 0).map(cat => {
               const catColor = CUISINE_CAT_COLORS[cat.id] ?? CUISINE_COLOR;
               const isCustom = !KNOWN_CAT_IDS.has(cat.id);
               return (
@@ -895,7 +918,7 @@ function RecettesInner() {
                       </button>
                     )}
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 8, marginBottom: 8 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
                     {kitchenByCat[cat.id].map(r => {
                       const isPrep = cat.id === "preparation" || cat.id === "sauce";
                       const hasPortion = r.cost_per_portion != null && r.cost_per_portion > 0;
@@ -927,10 +950,10 @@ function RecettesInner() {
 
         {/* ── Cocktail ── */}
         {showCocktail && filteredCocktails.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
-            <SectionHeader title="Cocktail" color={COCKTAIL_COLOR} count={filteredCocktails.length}
-              />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 8 }}>
+          <div style={{ marginBottom: 16 }}>
+            <SectionHeader title="Bar" color={COCKTAIL_COLOR} count={filteredCocktails.length}
+              collapsed={collapsedSections.has("cocktail")} onToggle={() => toggleSection("cocktail")} />
+            {!collapsedSections.has("cocktail") && <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {filteredCocktails.map(r => (
                 <RecipeCard
                   key={r.id}
@@ -946,16 +969,16 @@ function RecettesInner() {
                   pvLabel="TTC"
                 />
               ))}
-            </div>
+            </div>}
           </div>
         )}
 
         {/* ── Empatement ── */}
         {showEmp && filteredEmps.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
-            <SectionHeader title="Empâtement" color={EMP_COLOR} count={filteredEmps.length}
-              />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 8 }}>
+          <div style={{ marginBottom: 16 }}>
+            <SectionHeader title="Empatement" color={EMP_COLOR} count={filteredEmps.length}
+              collapsed={collapsedSections.has("emp")} onToggle={() => toggleSection("emp")} />
+            {!collapsedSections.has("emp") && <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {filteredEmps.map(r => (
                 <RecipeCard
                   key={r.id}
@@ -967,7 +990,7 @@ function RecettesInner() {
                   subtitleColor={EMP_COLOR}
                 />
               ))}
-            </div>
+            </div>}
           </div>
         )}
       </main>
