@@ -642,8 +642,8 @@ export function BottomTabBar() {
                 }}
                 style={{
                   ...tabStyle(false),
-                  background: etabColor,
-                  color: "#fff",
+                  background: "rgba(0,0,0,0.06)",
+                  color: "#1a1a1a",
                   borderRadius: 16,
                   padding: "6px 14px 4px",
                   minWidth: 44,
