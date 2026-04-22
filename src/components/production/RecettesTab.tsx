@@ -364,7 +364,7 @@ function RecettesInner() {
   const canWrite = can("operations.edit_recettes");
   const { current: etabCtx } = useEtablissement();
   const [authOk, setAuthOk] = useState<boolean | null>(null);
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [openSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const toggleSection = (key: string) => setCollapsedSections(prev => {
     const next = new Set(prev);
     if (next.has(key)) next.delete(key); else next.add(key);
@@ -788,8 +788,8 @@ function RecettesInner() {
         {showPizza && filteredPizzas.length > 0 && (
           <div style={{ marginBottom: 16 }}>
             <SectionHeader title="Pizza" color={PIZZA_COLOR} count={filteredPizzas.length}
-              collapsed={collapsedSections.has("pizza")} onToggle={() => toggleSection("pizza")} />
-            {!collapsedSections.has("pizza") && <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              collapsed={!openSections.has("pizza")} onToggle={() => toggleSection("pizza")} />
+            {openSections.has("pizza") && <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {filteredPizzas.map(r => (
                 <RecipeCard
                   key={r.id}
@@ -814,8 +814,8 @@ function RecettesInner() {
         {showCuisine && filteredKitchens.length > 0 && (
           <div style={{ marginBottom: 16 }}>
             <SectionHeader title="Cuisine" color={CUISINE_COLOR} count={filteredKitchens.length}
-              collapsed={collapsedSections.has("cuisine")} onToggle={() => toggleSection("cuisine")} />
-            {!collapsedSections.has("cuisine") && dynamicCuisineCats.filter(cat => (kitchenByCat[cat.id]?.length ?? 0) > 0).map(cat => {
+              collapsed={!openSections.has("cuisine")} onToggle={() => toggleSection("cuisine")} />
+            {openSections.has("cuisine") && dynamicCuisineCats.filter(cat => (kitchenByCat[cat.id]?.length ?? 0) > 0).map(cat => {
               const catColor = CUISINE_CAT_COLORS[cat.id] ?? CUISINE_COLOR;
               const isCustom = !KNOWN_CAT_IDS.has(cat.id);
               return (
@@ -901,8 +901,8 @@ function RecettesInner() {
         {showCocktail && filteredCocktails.length > 0 && (
           <div style={{ marginBottom: 16 }}>
             <SectionHeader title="Bar" color={COCKTAIL_COLOR} count={filteredCocktails.length}
-              collapsed={collapsedSections.has("cocktail")} onToggle={() => toggleSection("cocktail")} />
-            {!collapsedSections.has("cocktail") && <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              collapsed={!openSections.has("cocktail")} onToggle={() => toggleSection("cocktail")} />
+            {openSections.has("cocktail") && <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {filteredCocktails.map(r => (
                 <RecipeCard
                   key={r.id}
@@ -926,8 +926,8 @@ function RecettesInner() {
         {showEmp && filteredEmps.length > 0 && (
           <div style={{ marginBottom: 16 }}>
             <SectionHeader title="Empatement" color={EMP_COLOR} count={filteredEmps.length}
-              collapsed={collapsedSections.has("emp")} onToggle={() => toggleSection("emp")} />
-            {!collapsedSections.has("emp") && <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              collapsed={!openSections.has("emp")} onToggle={() => toggleSection("emp")} />
+            {openSections.has("emp") && <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {filteredEmps.map(r => (
                 <RecipeCard
                   key={r.id}
