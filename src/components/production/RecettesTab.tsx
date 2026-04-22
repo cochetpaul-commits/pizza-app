@@ -378,8 +378,8 @@ function RecettesInner() {
   const [loadErrors, setLoadErrors] = useState<string[]>([]);
   const [q, setQ]         = useState("");
   const [mainTab, setMainTab] = useState<MainTab>("tous");
-  const [sortKey, setSortKey] = useState<SortKey>("name");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [sortKey] = useState<SortKey>("name");
+  const [sortDir] = useState<SortDir>("asc");
   const [cuisineCatFilter, setCuisineCatFilter] = useState<CuisineCatFilter>("all");
   const [foodCostFilter, setFoodCostFilter] = useState<FoodCostFilter>("all");
   const [prodFilter, setProdFilter] = useState(false);
@@ -389,7 +389,6 @@ function RecettesInner() {
   const [newSheetStep, setNewSheetStep] = useState<"category" | "sub">("category");
   const [newSheetCat, setNewSheetCat] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
-  const [showSort, setShowSort] = useState(false);
   const [showNewCatModal, setShowNewCatModal] = useState(false);
   const [newCatName, setNewCatName] = useState("");
 
@@ -636,9 +635,9 @@ function RecettesInner() {
           <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#f0ebe2", borderRadius: 12, border: "1px solid #e8e0d0", overflowX: "auto", scrollbarWidth: "none", maxWidth: "100%" }}>
             {([
               { key: "tous" as MainTab, label: "Toutes", count: tabCounts.tous, color: "#1a1a1a" },
-              { key: "pizza" as MainTab, label: "Pizza", count: tabCounts.pizza, color: PIZZA_COLOR },
-              { key: "cuisine" as MainTab, label: "Cuisine", count: tabCounts.cuisine, color: CUISINE_COLOR },
               { key: "bar" as MainTab, label: "Bar", count: tabCounts.bar, color: COCKTAIL_COLOR },
+              { key: "cuisine" as MainTab, label: "Cuisine", count: tabCounts.cuisine, color: CUISINE_COLOR },
+              { key: "pizza" as MainTab, label: "Pizza", count: tabCounts.pizza, color: PIZZA_COLOR },
             ]).map(t => (
               <button key={t.key} type="button" onClick={() => { setMainTab(t.key); setCuisineCatFilter("all"); }} style={{
                 padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer",
@@ -694,56 +693,6 @@ function RecettesInner() {
               Prod. ({prodCount})
             </button>
           )}
-          {/* Sort */}
-          <div style={{ position: "relative", flexShrink: 0 }}>
-            <button type="button" onClick={() => setShowSort(s => !s)}
-              style={{
-                height: 30, padding: "0 10px", borderRadius: 10,
-                border: "none", background: "transparent",
-                fontSize: 11, fontWeight: 700, color: "#999", cursor: "pointer",
-                display: "flex", alignItems: "center", gap: 3,
-                transition: "all 0.15s",
-              }}>
-              {sortKey === "name" ? (sortDir === "asc" ? "A-Z" : "Z-A") : sortKey === "cost" ? "Coût" : sortKey === "fc" ? "FC" : "Prix"}
-              <span style={{ fontSize: 8, opacity: 0.5 }}>{"▼"}</span>
-            </button>
-            {showSort && (
-              <>
-                <div onClick={() => setShowSort(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
-                <div style={{
-                  position: "absolute", top: 40, right: 0, zIndex: 200,
-                  background: "#fff", borderRadius: 12, padding: 6,
-                  boxShadow: "0 4px 20px rgba(0,0,0,0.12)", border: "1px solid #ddd6c8",
-                  minWidth: 130,
-                }}>
-                  {([
-                    { k: "name" as SortKey, d: "asc" as SortDir, label: "A → Z" },
-                    { k: "name" as SortKey, d: "desc" as SortDir, label: "Z → A" },
-                    { k: "cost" as SortKey, d: "asc" as SortDir, label: "Coût ↑" },
-                    { k: "cost" as SortKey, d: "desc" as SortDir, label: "Coût ↓" },
-                    { k: "fc" as SortKey, d: "asc" as SortDir, label: "FC ↑" },
-                    { k: "fc" as SortKey, d: "desc" as SortDir, label: "FC ↓" },
-                    { k: "price" as SortKey, d: "asc" as SortDir, label: "Prix ↑" },
-                    { k: "price" as SortKey, d: "desc" as SortDir, label: "Prix ↓" },
-                  ]).map(opt => {
-                    const active = sortKey === opt.k && sortDir === opt.d;
-                    return (
-                      <button key={`${opt.k}-${opt.d}`} type="button"
-                        onClick={() => { setSortKey(opt.k); setSortDir(opt.d); setShowSort(false); }}
-                        style={{
-                          width: "100%", padding: "8px 12px", borderRadius: 8,
-                          border: "none", background: active ? "#D4775A14" : "transparent",
-                          color: active ? "#D4775A" : "#1a1a1a", fontSize: 13, fontWeight: active ? 700 : 500,
-                          cursor: "pointer", textAlign: "left",
-                        }}>
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </div>
           {/* Filters toggle */}
           <button type="button" onClick={() => setShowFilters(f => !f)}
             style={{

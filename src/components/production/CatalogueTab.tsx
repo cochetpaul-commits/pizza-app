@@ -416,7 +416,7 @@ export function CatalogueContent() {
   const [cuisineCatFilter, setCuisineCatFilter] = useState<CuisineCatFilter>("all");
   const [prodFilter, setProdFilter] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
+  const [openCats, setOpenCats] = useState<Set<string>>(new Set());
   const [showTypePop, setShowTypePop] = useState(false);
 
   // Pivot overrides: { recipeId: qty }
@@ -633,7 +633,7 @@ export function CatalogueContent() {
   }, [filtered, cuisineCatLabel]);
 
   const toggleCat = useCallback((key: string) => {
-    setCollapsedCats(prev => {
+    setOpenCats(prev => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
@@ -876,7 +876,7 @@ export function CatalogueContent() {
         {/* Groups */}
         {groups.map(([key, items]) => {
           const color = groupColor(key);
-          const isCollapsed = collapsedCats.has(key);
+          const isCollapsed = !openCats.has(key);
           return (
             <div key={key} style={{ marginBottom: 18 }}>
               {/* Category header */}
