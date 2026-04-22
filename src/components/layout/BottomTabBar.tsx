@@ -623,6 +623,13 @@ export function BottomTabBar() {
           {hasActions && (
             <div className="bottom-bar-fab" style={{
               display: "flex", alignItems: "center", justifyContent: "center",
+              padding: "4px 8px",
+              borderRadius: 22,
+              background: "rgba(245,240,232,0.82)",
+              backdropFilter: "blur(28px) saturate(200%)",
+              WebkitBackdropFilter: "blur(28px) saturate(200%)",
+              border: "1px solid rgba(255,255,255,0.5)",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.08), 0 0 1px rgba(0,0,0,0.06)",
             }}>
               <button
                 type="button"
