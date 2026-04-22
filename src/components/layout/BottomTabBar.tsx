@@ -13,7 +13,7 @@ import { BottomSheet } from "./BottomSheet";
 /* Store icon for establishments */
 function IconStore() {
   return (
-    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 9l1-4h16l1 4" />
       <path d="M3 9c0 1.1.9 2 2 2s2-.9 2-2 .9-2 2-2 2 .9 2 2-.9 2-2 2-2-.9-2-2 .9-2 2-2 2 .9 2 2-.9 2-2 2-2-.9-2-2" />
       <path d="M5 11v10h14V11" />
@@ -623,13 +623,6 @@ export function BottomTabBar() {
           {hasActions && (
             <div className="bottom-bar-fab" style={{
               display: "flex", alignItems: "center", justifyContent: "center",
-              padding: "4px",
-              borderRadius: 22,
-              background: "rgba(245,240,232,0.82)",
-              backdropFilter: "blur(28px) saturate(200%)",
-              WebkitBackdropFilter: "blur(28px) saturate(200%)",
-              border: "1px solid rgba(255,255,255,0.5)",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.08), 0 0 1px rgba(0,0,0,0.06)",
             }}>
               <button
                 type="button"
@@ -641,24 +634,18 @@ export function BottomTabBar() {
                   }
                 }}
                 style={{
-                  ...tabStyle(false),
-                  background: "rgba(0,0,0,0.06)",
-                  color: "#1a1a1a",
-                  borderRadius: 16,
-                  padding: "6px 14px 4px",
-                  minWidth: 44,
+                  width: 46, height: 46, borderRadius: "50%",
+                  border: "none", background: "transparent",
+                  color: "#999", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "color 0.15s",
                 }}
               >
-                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22 }}>
-                  {contextActions.length === 1 ? contextActions[0].icon : (
-                    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                  )}
-                </span>
-                <span style={{ fontSize: 9, fontWeight: 600 }}>
-                  {contextActions.length === 1 ? contextActions[0].label : "Actions"}
-                </span>
+                {contextActions.length === 1 ? contextActions[0].icon : (
+                  <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                )}
               </button>
             </div>
           )}
