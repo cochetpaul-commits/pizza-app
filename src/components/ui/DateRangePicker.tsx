@@ -427,13 +427,13 @@ export function DateRangePicker({ value, onChange, presets = DEFAULT_PRESETS, fo
                 type="date"
                 value={draftFrom ? toISO(draftFrom) : ""}
                 onChange={(e) => { if (e.target.value) { const d = fromISO(e.target.value); setDraftFrom(d); setMonthLeft(startOfMonth(d)); } }}
-                style={{ flex: 1, padding: "8px 12px", border: "1px solid #e0d8ce", borderRadius: 8, fontSize: 13, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}
+                style={{ flex: 1, minWidth: 0, padding: "8px 12px", border: "1px solid #e0d8ce", borderRadius: 8, fontSize: 13, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}
               />
               <input
                 type="date"
                 value={draftTo ? toISO(draftTo) : ""}
                 onChange={(e) => { if (e.target.value) setDraftTo(fromISO(e.target.value)); }}
-                style={{ flex: 1, padding: "8px 12px", border: "1px solid #e0d8ce", borderRadius: 8, fontSize: 13, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}
+                style={{ flex: 1, minWidth: 0, padding: "8px 12px", border: "1px solid #e0d8ce", borderRadius: 8, fontSize: 13, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}
               />
             </div>
 
@@ -523,6 +523,11 @@ export function DateRangePicker({ value, onChange, presets = DEFAULT_PRESETS, fo
           }
           .daterange-popover > div:first-child > div {
             display: none !important;
+          }
+          /* Date inputs: ensure full width */
+          .daterange-popover input[type="date"] {
+            font-size: 14px !important;
+            padding: 8px 8px !important;
           }
           /* Calendar grid: single column */
           .daterange-cal-grid {

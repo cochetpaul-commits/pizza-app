@@ -563,6 +563,32 @@ function PerformancesPage() {
               fontSize: 11, fontWeight: 700, letterSpacing: ".03em",
             }}>HT</button>
           </div>
+          <div className="desktop-only" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <button type="button" onClick={() => {
+              const nf = new Date(new Date(range.from + "T12:00:00").getTime() - 86400000);
+              const nt = new Date(new Date(range.to + "T12:00:00").getTime() - 86400000);
+              setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
+            }} style={{
+              width: 30, height: 30, borderRadius: 8, border: "1px solid #e0d8ce",
+              background: "#fff", color: accent, fontSize: 13, fontWeight: 700,
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            }}>{"←"}</button>
+            <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
+            <button type="button" onClick={() => {
+              const today = new Date().toISOString().slice(0, 10);
+              if (range.from >= today) return;
+              const nf = new Date(new Date(range.from + "T12:00:00").getTime() + 86400000);
+              const nt = new Date(new Date(range.to + "T12:00:00").getTime() + 86400000);
+              setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
+            }} style={{
+              width: 30, height: 30, borderRadius: 8, border: "1px solid #e0d8ce",
+              background: range.from >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : "#fff",
+              color: range.from >= new Date().toISOString().slice(0, 10) ? "#ccc" : accent,
+              fontSize: 13, fontWeight: 700,
+              cursor: range.from >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>{"→"}</button>
+          </div>
           <label className="desktop-only" style={{
             padding: "6px 14px", borderRadius: 8, border: "none",
             background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",

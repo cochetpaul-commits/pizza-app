@@ -8,6 +8,7 @@ const c = {
   text: "#1a1a1a", muted: "#777", faint: "#bbb",
   border: "#e0d8ce", bg: "#f2ede4", white: "#fff",
   good: "#2e7d32", bad: "#c62828",
+  pergolas: "#5e8278", salle: "#46655a", terrasse: "#c4a882", emp: "#D4775A",
 };
 
 const s = StyleSheet.create({
@@ -44,6 +45,7 @@ const s = StyleSheet.create({
 
 const fmt = (v: number) => Math.round(v).toLocaleString("fr-FR") + "\u20AC";
 const fmtNum = (v: number) => Math.round(v).toLocaleString("fr-FR");
+const fmtSp = (v: number) => v.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
 
 type Props = {
   stats: any;
@@ -55,6 +57,45 @@ type Props = {
   briefing?: string[] | null;
   exportType?: "ventes" | "produits" | "complet";
 };
+
+/* ── Helpers ── */
+
+type WeekBucket = { label: string; indices: number[] };
+
+function buildWeekBuckets(dates: string[]): WeekBucket[] {
+  if (!dates.length) return [];
+  const buckets: WeekBucket[] = [];
+  let cur: WeekBucket | null = null;
+  for (let i = 0; i < dates.length; i++) {
+    const d = new Date(dates[i] + "T12:00:00");
+    const dow = d.getDay() || 7;
+    const mon = new Date(d);
+    mon.setDate(d.getDate() - dow + 1);
+    const key = `S.${mon.getDate()}/${mon.getMonth() + 1}`;
+    if (!cur || cur.label !== key) {
+      cur = { label: key, indices: [i] };
+      buckets.push(cur);
+    } else {
+      cur.indices.push(i);
+    }
+  }
+  return buckets;
+}
+
+function sumByBuckets(vals: number[], buckets: WeekBucket[]): number[] {
+  return buckets.map(b => b.indices.reduce((sum, i) => sum + (vals[i] ?? 0), 0));
+}
+
+function deltaPct(cur: number, prev: number): string {
+  if (!prev || prev === 0) return "";
+  const pct = ((cur - prev) / prev) * 100;
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+}
+
+function deltaAbs(cur: number, prev: number): string {
+  const diff = cur - prev;
+  return `${diff >= 0 ? "+" : ""}${fmtNum(diff)}`;
+}
 
 /* ══════════════════════════════════════════════════
    SECTION BUILDERS
@@ -75,7 +116,6 @@ function HeroCard({ stats, prev, mode }: { stats: any; prev: any; mode: string }
   const W = stats;
   const ca = mode === "ttc" ? W.ca_ttc : W.ca_ht;
   const prevCA = prev ? (mode === "ttc" ? prev.ca_ttc : prev.ca_ht) : null;
-  const tm = W.couverts > 0 ? ca / W.couverts : (W.tickets > 0 ? ca / W.tickets : 0);
   return (
     <View style={s.hero}>
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -84,21 +124,505 @@ function HeroCard({ stats, prev, mode }: { stats: any; prev: any; mode: string }
           <Text style={s.heroBig}>{fmt(ca)}</Text>
           {mode === "ttc" && <Text style={s.heroSub}>HT {fmt(W.ca_ht)}</Text>}
         </View>
-        {prevCA && prevCA > 0 && (
+        {prevCA != null && prevCA > 0 && (
           <View style={{ alignItems: "flex-end" as const }}>
             <Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold", color: ca >= prevCA ? "#a5d6a7" : "#ef9a9a" }}>
-              {ca >= prevCA ? "+" : ""}{((ca - prevCA) / prevCA * 100).toFixed(1)}%
+              {deltaPct(ca, prevCA)}
             </Text>
             <Text style={{ fontSize: 6, color: "rgba(255,255,255,0.5)", marginTop: 1 }}>vs A-1</Text>
           </View>
         )}
       </View>
       <View style={s.heroRow}>
-        <View><Text style={s.heroKpiLabel}>Couverts</Text><Text style={s.heroKpiVal}>{W.couverts || W.tickets}</Text></View>
-        <View><Text style={s.heroKpiLabel}>CVT moyen</Text><Text style={s.heroKpiVal}>{tm.toFixed(1)}{"\u20AC"}</Text></View>
-        <View><Text style={s.heroKpiLabel}>Tickets</Text><Text style={s.heroKpiVal}>{W.tickets}</Text></View>
+        <View><Text style={s.heroKpiLabel}>Couverts</Text><Text style={s.heroKpiVal}>{fmtNum(W.couverts || W.tickets)}</Text></View>
+        <View><Text style={s.heroKpiLabel}>CVT moyen</Text><Text style={s.heroKpiVal}>{W.couverts > 0 ? (ca / W.couverts).toFixed(1) : "0"}{"\u20AC"}</Text></View>
+        <View><Text style={s.heroKpiLabel}>Tickets</Text><Text style={s.heroKpiVal}>{fmtNum(W.tickets)}</Text></View>
         <View><Text style={s.heroKpiLabel}>Annulations</Text><Text style={s.heroKpiVal}>{W.ann_pct?.toFixed(1) ?? "0"}%</Text></View>
       </View>
+    </View>
+  );
+}
+
+/* KPI cards row: Couverts / CVT Moyen / VS A-1 with deltas */
+function KpiCardsRow({ stats, prev, mode }: { stats: any; prev: any; mode: string }) {
+  const W = stats;
+  const ca = mode === "ttc" ? W.ca_ttc : W.ca_ht;
+  const prevCA = prev ? (mode === "ttc" ? prev.ca_ttc : prev.ca_ht) : null;
+  const prevCov = prev?.couverts ?? 0;
+  const tm = W.couverts > 0 ? ca / W.couverts : 0;
+  const prevTm = prevCov > 0 && prevCA ? prevCA / prevCov : 0;
+  const tmSP = W.cov_sur > 0 ? (mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur : 0;
+
+  return (
+    <View style={{ ...s.row, marginBottom: 8 }}>
+      <View style={{ ...s.kpi, flex: 1 }}>
+        <Text style={{ fontSize: 5, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>Couverts</Text>
+        <Text style={{ ...s.kpiVal, fontSize: 14 }}>{fmtNum(W.couverts)}</Text>
+        <Text style={{ fontSize: 6, color: c.muted }}>{fmtNum(W.tickets)} tickets</Text>
+        {prevCov > 0 && (
+          <Text style={{ fontSize: 6, color: W.couverts >= prevCov ? c.good : c.bad, marginTop: 2 }}>
+            {deltaAbs(W.couverts, prevCov)} ({deltaPct(W.couverts, prevCov)})
+          </Text>
+        )}
+      </View>
+      <View style={{ ...s.kpi, flex: 1 }}>
+        <Text style={{ fontSize: 5, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>CVT Moyen</Text>
+        <Text style={{ ...s.kpiVal, fontSize: 14 }}>{fmtSp(tm)}{"\u20AC"}</Text>
+        <Text style={{ fontSize: 6, color: c.muted }}>CVT M SP {fmtSp(tmSP)}{"\u20AC"}</Text>
+        {prevTm > 0 && (
+          <Text style={{ fontSize: 6, color: tm >= prevTm ? c.good : c.bad, marginTop: 2 }}>
+            {(tm - prevTm) >= 0 ? "+" : ""}{(tm - prevTm).toFixed(1)}{"\u20AC"} ({deltaPct(tm, prevTm)})
+          </Text>
+        )}
+      </View>
+      {prevCA != null && prevCA > 0 && (
+        <View style={{ ...s.kpi, flex: 1 }}>
+          <Text style={{ fontSize: 5, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>VS A-1</Text>
+          <Text style={{ ...s.kpiVal, fontSize: 14, color: ca >= prevCA ? c.good : c.bad }}>{deltaAbs(Math.round(ca), Math.round(prevCA))}{"\u20AC"}</Text>
+          <Text style={{ fontSize: 6, color: c.muted }}>A-1: {fmt(prevCA)}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+/* Upsell performance — detailed cards */
+function UpsellCard({ stats }: { stats: any }) {
+  const W = stats;
+  if (!W.ratios) return null;
+  const mainItems = [
+    { label: "Antipasti", data: W.ratios.anti, color: c.accent },
+    { label: "Desserts", data: W.ratios.dolci, color: "#b5904a" },
+    { label: "Vins", data: W.ratios.vin, color: "#7c5c3a" },
+  ];
+  const secondaryItems = [
+    { label: "Alcool", data: W.ratios.alcool, color: "#c15f2e" },
+    { label: "Boissons", data: W.ratios.boissons, color: c.green },
+    { label: "Cafe", data: W.ratios.cafe, color: "#6f5c3a" },
+    { label: "Digestifs", data: W.ratios.digestif, color: "#8b6914" },
+  ];
+
+  return (
+    <View style={s.card}>
+      <Text style={s.sec}>Upsell · Performance de la periode</Text>
+      {/* Main 3 cards */}
+      <View style={{ flexDirection: "row", gap: 6, marginBottom: 6 }}>
+        {mainItems.map((u) => {
+          const tables = u.data?.tables ?? 0;
+          const coverts = u.data?.coverts ?? 0;
+          const caTtc = u.data?.ca_ttc ?? 0;
+          const pct = W.tickets > 0 ? Math.round((tables / W.tickets) * 100) : 0;
+          return (
+            <View key={u.label} style={{ flex: 1, backgroundColor: c.white, borderRadius: 5, padding: 6, borderWidth: 0.5, borderColor: c.border }}>
+              <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold", marginBottom: 3 }}>{u.label}</Text>
+              <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: u.color }}>{pct}%</Text>
+              <Text style={{ fontSize: 5, color: c.muted, marginTop: 1 }}>des tables</Text>
+              <View style={{ flexDirection: "row", gap: 4, marginTop: 4 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 5, color: c.muted }}>Tables</Text>
+                  <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold" }}>{tables}/{W.tickets}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 5, color: c.muted }}>Couverts</Text>
+                  <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold" }}>{coverts}</Text>
+                </View>
+              </View>
+              <View style={{ marginTop: 3 }}>
+                <Text style={{ fontSize: 5, color: c.muted }}>CA TTC</Text>
+                <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold", color: u.color }}>{fmt(caTtc)}</Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+      {/* Secondary row */}
+      <View style={{ flexDirection: "row", gap: 6 }}>
+        {secondaryItems.map((u) => {
+          const tables = u.data?.tables ?? 0;
+          const caTtc = u.data?.ca_ttc ?? 0;
+          const pct = W.tickets > 0 ? Math.round((tables / W.tickets) * 100) : 0;
+          return (
+            <View key={u.label} style={{ flex: 1, alignItems: "center" as const, backgroundColor: c.white, borderRadius: 5, padding: 5, borderWidth: 0.5, borderColor: c.border }}>
+              <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold", color: u.color }}>{pct}%</Text>
+              <Text style={{ fontSize: 5, color: c.muted, marginTop: 1 }}>{u.label}</Text>
+              <Text style={{ fontSize: 6, fontFamily: "Helvetica-Bold", color: u.color, marginTop: 2 }}>{fmt(caTtc)}</Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+/* Duration & rotation with zone breakdown */
+function DurationCard({ stats, prev }: { stats: any; prev: any }) {
+  const W = stats;
+  if (!W.duration || !W.duration.totalOrders || W.duration.totalOrders === 0) return null;
+  const prevDur = prev?.duration;
+  const zoneColors: Record<string, string> = { Pergolas: c.pergolas, Salle: c.salle, Terrasse: c.terrasse };
+
+  return (
+    <View style={s.card}>
+      <Text style={s.sec}>Duree & rotation des tables</Text>
+      {/* Global KPIs */}
+      <View style={{ flexDirection: "row", gap: 6, marginBottom: 6 }}>
+        <View style={{ ...s.kpi, flex: 1 }}>
+          <Text style={{ ...s.kpiVal, color: c.accent }}>{W.duration.avgDurMin}<Text style={{ fontSize: 7, color: c.muted }}>min</Text></Text>
+          <Text style={s.kpiLabel}>Duree moy. / table</Text>
+          {prevDur?.avgDurMin > 0 && (
+            <Text style={{ fontSize: 5, color: W.duration.avgDurMin <= prevDur.avgDurMin ? c.good : c.bad, marginTop: 1 }}>
+              {deltaAbs(W.duration.avgDurMin, prevDur.avgDurMin)}min vs A-1
+            </Text>
+          )}
+        </View>
+        <View style={{ ...s.kpi, flex: 1 }}>
+          <Text style={{ ...s.kpiVal, color: c.green }}>{W.duration.avgRotation}x</Text>
+          <Text style={s.kpiLabel}>Rotation moy. / table</Text>
+          {prevDur?.avgRotation > 0 && (
+            <Text style={{ fontSize: 5, color: W.duration.avgRotation >= prevDur.avgRotation ? c.good : c.bad, marginTop: 1 }}>
+              {(W.duration.avgRotation - prevDur.avgRotation) >= 0 ? "+" : ""}{(W.duration.avgRotation - prevDur.avgRotation).toFixed(1)}x vs A-1
+            </Text>
+          )}
+        </View>
+        <View style={{ ...s.kpi, flex: 1 }}>
+          <Text style={{ ...s.kpiVal, color: "#7c5c3a" }}>{fmtNum(W.duration.totalOrders)}</Text>
+          <Text style={s.kpiLabel}>Tables servies</Text>
+          {prevDur?.totalOrders > 0 && (
+            <Text style={{ fontSize: 5, color: W.duration.totalOrders >= prevDur.totalOrders ? c.good : c.bad, marginTop: 1 }}>
+              {deltaAbs(W.duration.totalOrders, prevDur.totalOrders)} ({deltaPct(W.duration.totalOrders, prevDur.totalOrders)})
+            </Text>
+          )}
+        </View>
+      </View>
+      {/* Per zone */}
+      {W.duration.byZone && W.duration.byZone.length > 0 && (
+        <View style={{ flexDirection: "row", gap: 6, marginBottom: 6 }}>
+          {W.duration.byZone.map((z: any) => {
+            const rot = W.duration.rotByZone?.find((r: any) => r.zone === z.zone);
+            return (
+              <View key={z.zone} style={{ flex: 1, backgroundColor: c.white, borderRadius: 5, padding: 6, borderWidth: 0.5, borderColor: c.border }}>
+                <Text style={{ fontSize: 5, textTransform: "uppercase", letterSpacing: 0.6, color: zoneColors[z.zone] ?? c.muted, fontFamily: "Helvetica-Bold", marginBottom: 3 }}>{z.zone}</Text>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <View>
+                    <Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold", color: c.accent }}>{z.avgDur}<Text style={{ fontSize: 6, color: c.muted }}>min</Text></Text>
+                    <Text style={{ fontSize: 5, color: c.muted }}>duree moy.</Text>
+                  </View>
+                  {rot && (
+                    <View style={{ alignItems: "flex-end" as const }}>
+                      <Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold", color: c.green }}>{rot.avgRotation}x</Text>
+                      <Text style={{ fontSize: 5, color: c.muted }}>rotation</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={{ fontSize: 5, color: c.muted, marginTop: 2 }}>{z.tables} tables · {z.couverts} cvts</Text>
+                {rot?.maxRotation && <Text style={{ fontSize: 5, color: zoneColors[z.zone] ?? c.muted }}>max {rot.maxRotation}x rotation</Text>}
+              </View>
+            );
+          })}
+        </View>
+      )}
+      {/* MIDI / SOIR */}
+      {W.duration.bySvc && W.duration.bySvc.length > 0 && (
+        <View style={{ flexDirection: "row", gap: 6 }}>
+          {W.duration.bySvc.map((sv: any) => (
+            <View key={sv.svc} style={{ flex: 1, backgroundColor: "#faf7f2", borderRadius: 5, padding: 6, borderWidth: 0.5, borderColor: c.border }}>
+              <Text style={{ fontSize: 6, fontFamily: "Helvetica-Bold", color: sv.svc === "midi" ? c.pergolas : c.text }}>{sv.svc === "midi" ? "MIDI" : "SOIR"} {sv.tables} tables</Text>
+              <Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold", marginTop: 2 }}>{sv.avgDur}<Text style={{ fontSize: 6, color: c.muted }}>min</Text></Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/* Sur place vs A emporter — enhanced */
+function SurPlaceEmporterCard({ stats, mode }: { stats: any; mode: string }) {
+  const W = stats;
+  if (!W.place_emp_ttc && !W.place_sur_ttc) return null;
+  const surCA = mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht;
+  const empCA = mode === "ttc" ? W.place_emp_ttc : W.place_emp_ht;
+  const total = surCA + empCA;
+  const surPct = total > 0 ? Math.round((surCA / total) * 100) : 0;
+  const empPct = total > 0 ? 100 - surPct : 0;
+  const surTM = W.cov_sur > 0 ? surCA / W.cov_sur : 0;
+  const empTM = W.cov_emp > 0 ? empCA / W.cov_emp : 0;
+
+  return (
+    <View style={s.card}>
+      <Text style={s.sec}>Sur place vs a emporter</Text>
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 3 }}>
+            <Text style={{ fontSize: 6, textTransform: "uppercase", letterSpacing: 0.6, color: c.green, fontFamily: "Helvetica-Bold" }}>Sur place</Text>
+            <Text style={{ fontSize: 6, color: c.muted }}>{surPct}% du CA</Text>
+          </View>
+          <View style={{ ...s.barBg, height: 4, marginBottom: 4 }}>
+            <View style={{ ...s.barFill, height: 4, width: `${surPct}%`, backgroundColor: c.green }} />
+          </View>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <View><Text style={{ fontSize: 5, color: c.muted }}>CA</Text><Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold" }}>{fmt(surCA)}</Text></View>
+            <View><Text style={{ fontSize: 5, color: c.muted }}>CVT</Text><Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold" }}>{fmtNum(W.cov_sur)}</Text></View>
+            <View><Text style={{ fontSize: 5, color: c.muted }}>TM</Text><Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold", color: c.green }}>{fmtSp(surTM)}{"\u20AC"}</Text></View>
+          </View>
+        </View>
+        <View style={{ width: 0.5, backgroundColor: c.border }} />
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 3 }}>
+            <Text style={{ fontSize: 6, textTransform: "uppercase", letterSpacing: 0.6, color: c.accent, fontFamily: "Helvetica-Bold" }}>A emporter</Text>
+            <Text style={{ fontSize: 6, color: c.muted }}>{empPct}% du CA</Text>
+          </View>
+          <View style={{ ...s.barBg, height: 4, marginBottom: 4 }}>
+            <View style={{ ...s.barFill, height: 4, width: `${empPct}%`, backgroundColor: c.accent }} />
+          </View>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <View><Text style={{ fontSize: 5, color: c.muted }}>CA</Text><Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold" }}>{fmt(empCA)}</Text></View>
+            <View><Text style={{ fontSize: 5, color: c.muted }}>CVT</Text><Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold" }}>{fmtNum(W.cov_emp)}</Text></View>
+            <View><Text style={{ fontSize: 5, color: c.muted }}>TM</Text><Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold", color: c.accent }}>{fmtSp(empTM)}{"\u20AC"}</Text></View>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/* Zone cards with weekly breakdown */
+function ZonesDetailCard({ stats, mode }: { stats: any; mode: string }) {
+  const W = stats;
+  if (!W.zones_ttc) return null;
+  const zones = mode === "ttc" ? W.zones_ttc : W.zones_ht;
+  const entries = Object.entries(zones).filter(([, vals]: [string, any]) => vals.some((v: number) => v > 0));
+  if (!entries.length) return null;
+
+  const zoneColors: Record<string, string> = { Salle: c.salle, Pergolas: c.pergolas, Terrasse: c.terrasse, "\u00C0 emporter": c.accent };
+  const totalCA = entries.reduce((sum, [, vals]: [string, any]) => sum + vals.reduce((a: number, b: number) => a + b, 0), 0);
+  const buckets = W.dates?.length > 7 ? buildWeekBuckets(W.dates) : null;
+
+  return (
+    <View style={{ flexDirection: "row", gap: 6, marginBottom: 8 }}>
+      {entries.map(([zone, vals]: [string, any]) => {
+        const zoneTotal = vals.reduce((a: number, b: number) => a + b, 0);
+        const pct = totalCA > 0 ? Math.round((zoneTotal / totalCA) * 100) : 0;
+        const weekTotals = buckets ? sumByBuckets(vals, buckets) : null;
+        const maxWeek = weekTotals ? Math.max(...weekTotals, 1) : 1;
+
+        return (
+          <View key={zone} style={{ flex: 1, backgroundColor: c.white, borderRadius: 5, padding: 6, borderWidth: 0.5, borderColor: c.border }}>
+            <Text style={{ fontSize: 5, textTransform: "uppercase", letterSpacing: 0.6, color: zoneColors[zone] ?? c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>{zone}</Text>
+            <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold", color: zoneColors[zone] ?? c.text }}>{fmt(zoneTotal)}</Text>
+            <Text style={{ fontSize: 5, color: c.muted }}>{pct}% du CA</Text>
+            {weekTotals && buckets && (
+              <View style={{ marginTop: 4 }}>
+                {weekTotals.map((wv, wi) => (
+                  <View key={wi} style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
+                    <Text style={{ width: 22, fontSize: 5, color: c.muted }}>{buckets[wi].label}</Text>
+                    <View style={{ flex: 1, ...s.barBg, height: 3 }}>
+                      <View style={{ ...s.barFill, height: 3, width: `${(wv / maxWeek) * 100}%`, backgroundColor: zoneColors[zone] ?? c.accent }} />
+                    </View>
+                    <Text style={{ width: 30, textAlign: "right", fontSize: 6, fontFamily: "Helvetica-Bold" }}>{fmt(wv)}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+/* Comparatif weekly */
+function ComparatifCard({ stats, prev, mode }: { stats: any; prev: any; mode: string }) {
+  const W = stats;
+  if (!W.days || W.days.length < 2) return null;
+  const curVals: number[] = (mode === "ttc" ? W.day_ttc : W.day_ht) ?? [];
+  const prevVals: number[] = prev ? ((mode === "ttc" ? prev.day_ttc : prev.day_ht) ?? []) : [];
+  if (!curVals.length) return null;
+
+  const useWeeks = W.dates && W.dates.length > 14;
+  let labels: string[];
+  let curData: number[];
+  let prevData: number[];
+
+  if (useWeeks) {
+    const buckets = buildWeekBuckets(W.dates);
+    labels = buckets.map(b => b.label);
+    curData = sumByBuckets(curVals, buckets);
+    prevData = prevVals.length > 0 ? sumByBuckets(prevVals, buckets) : [];
+  } else {
+    labels = W.days ?? [];
+    curData = curVals.slice(0, 14);
+    prevData = prevVals.slice(0, 14);
+  }
+
+  const maxVal = Math.max(...curData, ...prevData, 1);
+
+  return (
+    <View style={s.card}>
+      <Text style={s.sec}>Comparatif · CA {mode.toUpperCase()} {useWeeks ? "par semaine" : ""} vs A-1</Text>
+      {curData.map((cur, i) => {
+        const prv = prevData[i] ?? 0;
+        const diff = cur - prv;
+        return (
+          <View key={i} style={{ marginBottom: 4 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 1 }}>
+              <Text style={{ width: 30, fontSize: 6, fontFamily: "Helvetica-Bold" }}>{labels[i] ?? ""}</Text>
+              <View style={{ flex: 1, ...s.barBg, height: 4 }}>
+                <View style={{ ...s.barFill, height: 4, width: `${(cur / maxVal) * 100}%`, backgroundColor: c.accent }} />
+              </View>
+              <Text style={{ width: 42, textAlign: "right", fontSize: 6, fontFamily: "Helvetica-Bold", color: c.accent }}>{fmt(cur)}</Text>
+              <Text style={{ width: 38, textAlign: "right", fontSize: 6, fontFamily: "Helvetica-Bold", color: diff >= 0 ? c.good : c.bad }}>
+                {prv > 0 ? `${diff >= 0 ? "+" : ""}${fmt(Math.abs(diff))}` : "\u2014"}
+              </Text>
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text style={{ width: 30, fontSize: 5, color: c.muted }}>A-1</Text>
+              <View style={{ flex: 1, ...s.barBg, height: 3 }}>
+                <View style={{ ...s.barFill, height: 3, width: `${(prv / maxVal) * 100}%`, backgroundColor: c.green, opacity: 0.6 }} />
+              </View>
+              <Text style={{ width: 42, textAlign: "right", fontSize: 5, color: c.muted }}>{prv > 0 ? fmt(prv) : "\u2014"}</Text>
+              <Text style={{ width: 38 }} />
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+/* Services table with zone columns */
+function ServicesTable({ stats, mode }: { stats: any; mode: string }) {
+  const W = stats;
+  const services = W.services ?? [];
+  if (!services.length) return null;
+
+  const useWeeks = W.dates && W.dates.length > 14;
+
+  // Build groups
+  type GroupEntry = { groupLabel: string; services: any[] };
+  const groups: GroupEntry[] = [];
+
+  if (useWeeks) {
+    const buckets = buildWeekBuckets(W.dates);
+    const days: string[] = W.days ?? [];
+    const dates: string[] = W.dates ?? [];
+    // Map each service to its date
+    const serviceDateMap: string[] = [];
+    let dateIdx = 0;
+    for (let si = 0; si < services.length; si++) {
+      const sv = services[si];
+      while (dateIdx < dates.length && days[dateIdx] !== sv.jour) dateIdx++;
+      serviceDateMap[si] = dates[dateIdx] ?? "";
+      const next = services[si + 1];
+      if (next && next.jour !== sv.jour) dateIdx++;
+    }
+    const dateToWeek: Record<string, string> = {};
+    for (const b of buckets) for (const idx of b.indices) if (dates[idx]) dateToWeek[dates[idx]] = b.label;
+
+    const weekMap: Record<string, any[]> = {};
+    const weekOrder: string[] = [];
+    for (let si = 0; si < services.length; si++) {
+      const sv = services[si];
+      const date = serviceDateMap[si];
+      const wk = date ? (dateToWeek[date] ?? sv.jour) : sv.jour;
+      if (!weekMap[wk]) { weekMap[wk] = []; weekOrder.push(wk); }
+      weekMap[wk].push(sv);
+    }
+    const sumZ = (arr: any[], key: string) => {
+      const r: Record<string, number> = {};
+      for (const sv of arr) for (const [zn, zv] of Object.entries(sv[key] ?? {})) r[zn] = (r[zn] ?? 0) + (zv as number);
+      return r;
+    };
+    for (const wk of weekOrder) {
+      const svcs = weekMap[wk];
+      const midi = svcs.filter((sv: any) => sv.svc === "midi");
+      const soir = svcs.filter((sv: any) => sv.svc !== "midi");
+      const agg: any[] = [];
+      for (const [label, arr] of [["Midi", midi], ["Soir", soir]] as const) {
+        if (arr.length === 0) continue;
+        const ttc = arr.reduce((sum: number, x: any) => sum + x.ttc, 0);
+        const ht = arr.reduce((sum: number, x: any) => sum + x.ht, 0);
+        const cov = arr.reduce((sum: number, x: any) => sum + x.cov, 0);
+        const spCov = arr.reduce((sum: number, x: any) => sum + x.sp_cov, 0);
+        const spTtc = arr.reduce((sum: number, x: any) => sum + x.sp_ttc, 0);
+        const spHt = arr.reduce((sum: number, x: any) => sum + x.sp_ht, 0);
+        agg.push({
+          jour: label, svc: label === "Midi" ? "midi" : "soir", ttc, ht, cov,
+          tm_sp_ttc: spCov > 0 ? spTtc / spCov : 0,
+          tm_sp_ht: spCov > 0 ? spHt / spCov : 0,
+          z_ttc: sumZ(arr, "z_ttc"), z_ht: sumZ(arr, "z_ht"),
+        });
+      }
+      groups.push({ groupLabel: wk, services: agg });
+    }
+  } else {
+    const byDay: Record<string, any[]> = {};
+    const dayOrder: string[] = [];
+    for (const sv of services) {
+      if (!byDay[sv.jour]) { byDay[sv.jour] = []; dayOrder.push(sv.jour); }
+      byDay[sv.jour].push(sv);
+    }
+    for (const d of dayOrder) groups.push({ groupLabel: d, services: byDay[d] });
+  }
+
+  return (
+    <View style={s.card} wrap>
+      <Text style={s.sec}>Par service · {mode.toUpperCase()} · couverts</Text>
+      <View style={s.tHead}>
+        <Text style={{ ...s.tH, width: 30 }}>{useWeeks ? "Sem." : "Jour"}</Text>
+        <Text style={{ ...s.tH, width: 22 }}>Svc</Text>
+        <Text style={{ ...s.tH, width: 40, textAlign: "right", color: c.salle }}>Salle</Text>
+        <Text style={{ ...s.tH, width: 40, textAlign: "right", color: c.pergolas }}>Pergolas</Text>
+        <Text style={{ ...s.tH, width: 40, textAlign: "right", color: c.terrasse }}>Terrasse</Text>
+        <Text style={{ ...s.tH, width: 35, textAlign: "right", color: c.emp }}>Emp.</Text>
+        <Text style={{ ...s.tH, width: 42, textAlign: "right", color: c.accent }}>Total</Text>
+        <Text style={{ ...s.tH, width: 25, textAlign: "right" }}>Cvts</Text>
+        <Text style={{ ...s.tH, width: 30, textAlign: "right" }}>CVT M</Text>
+      </View>
+      {groups.map((group, di) =>
+        group.services.map((sv: any, si: number) => {
+          const caVal = mode === "ttc" ? sv.ttc : sv.ht;
+          const z = mode === "ttc" ? sv.z_ttc : sv.z_ht;
+          const tmSp = mode === "ttc" ? sv.tm_sp_ttc : sv.tm_sp_ht;
+          const tmColor = tmSp >= 80 ? c.good : tmSp >= 65 ? "#e65100" : c.bad;
+          return (
+            <View key={`${di}-${si}`} style={{ ...s.tRow, backgroundColor: di % 2 === 0 ? c.white : "#faf7f2" }} wrap={false}>
+              {si === 0 && <Text style={{ ...s.tCellBold, width: 30 }}>{group.groupLabel}</Text>}
+              {si > 0 && <Text style={{ width: 30 }} />}
+              <Text style={{ ...s.tCellMuted, width: 22, fontSize: 6 }}>{sv.svc === "midi" ? "Midi" : "Soir"}</Text>
+              <Text style={{ ...s.tCellBold, width: 40, textAlign: "right", color: z?.Salle ? c.salle : c.faint }}>{z?.Salle ? fmt(z.Salle) : "\u2014"}</Text>
+              <Text style={{ ...s.tCellBold, width: 40, textAlign: "right", color: z?.Pergolas ? c.pergolas : c.faint }}>{z?.Pergolas ? fmt(z.Pergolas) : "\u2014"}</Text>
+              <Text style={{ ...s.tCellBold, width: 40, textAlign: "right", color: z?.Terrasse ? c.terrasse : c.faint }}>{z?.Terrasse ? fmt(z.Terrasse) : "\u2014"}</Text>
+              <Text style={{ ...s.tCellBold, width: 35, textAlign: "right", color: z?.emp ? c.emp : c.faint }}>{z?.emp ? fmt(z.emp) : "\u2014"}</Text>
+              <Text style={{ ...s.tCellAccent, width: 42, textAlign: "right" }}>{fmt(caVal)}</Text>
+              <Text style={{ ...s.tCell, width: 25, textAlign: "right" }}>{sv.cov}</Text>
+              <Text style={{ width: 30, textAlign: "right", fontSize: 7, fontFamily: "Helvetica-Bold", color: tmColor }}>{tmSp.toFixed(0)}{"\u20AC"}</Text>
+            </View>
+          );
+        })
+      )}
+    </View>
+  );
+}
+
+/* Zones row (simple totals) */
+function ZonesRow({ stats, mode }: { stats: any; mode: string }) {
+  const W = stats;
+  if (!W.zones_ttc) return null;
+  const entries = Object.entries(mode === "ttc" ? W.zones_ttc : W.zones_ht).filter(([, vals]: [string, any]) => vals.some((v: number) => v > 0));
+  if (!entries.length) return null;
+  const zoneColors: Record<string, string> = { Salle: c.salle, Pergolas: c.pergolas, Terrasse: c.terrasse, "\u00C0 emporter": c.emp };
+  return (
+    <View style={{ ...s.row, marginBottom: 8 }}>
+      {entries.map(([zone, vals]: [string, any]) => {
+        const tot = vals.reduce((a: number, b: number) => a + b, 0);
+        return (
+          <View key={zone} style={{ ...s.kpi, flex: 1 }}>
+            <Text style={{ fontSize: 5, textTransform: "uppercase", letterSpacing: 0.6, color: zoneColors[zone] ?? c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>{zone}</Text>
+            <Text style={{ ...s.kpiVal, color: c.text }}>{fmt(tot)}</Text>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -187,167 +711,6 @@ function HourlyCard({ stats }: { stats: any }) {
   );
 }
 
-function ZonesRow({ stats, mode }: { stats: any; mode: string }) {
-  const W = stats;
-  if (!W.zones_ttc) return null;
-  const entries = Object.entries(mode === "ttc" ? W.zones_ttc : W.zones_ht).filter(([, vals]: [string, any]) => vals.some((v: number) => v > 0));
-  if (!entries.length) return null;
-  return (
-    <View style={{ ...s.row, marginBottom: 8 }}>
-      {entries.map(([zone, vals]: [string, any]) => {
-        const tot = vals.reduce((a: number, b: number) => a + b, 0);
-        const zc: Record<string, string> = { Salle: c.green, Pergolas: "#5e8278", Terrasse: c.gold, "\u00C0 emporter": c.accent };
-        return (
-          <View key={zone} style={{ ...s.kpi, flex: 1 }}>
-            <Text style={{ fontSize: 5, textTransform: "uppercase", letterSpacing: 0.6, color: zc[zone] ?? c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>{zone}</Text>
-            <Text style={{ ...s.kpiVal, color: c.text }}>{fmt(tot)}</Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
-function SurPlaceEmporterCard({ stats, mode }: { stats: any; mode: string }) {
-  const W = stats;
-  if (!W.place_emp_ttc && !W.place_sur_ttc) return null;
-  return (
-    <View style={{ ...s.card, flexDirection: "row" }}>
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 6, textTransform: "uppercase", letterSpacing: 0.6, color: c.green, fontFamily: "Helvetica-Bold", marginBottom: 3 }}>Sur place</Text>
-        <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold" }}>{fmt(mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht)}</Text>
-        <Text style={{ fontSize: 6, color: c.muted, marginTop: 1 }}>{W.cov_sur} cvts</Text>
-      </View>
-      <View style={{ width: 0.5, backgroundColor: c.border, marginHorizontal: 10 }} />
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 6, textTransform: "uppercase", letterSpacing: 0.6, color: c.accent, fontFamily: "Helvetica-Bold", marginBottom: 3 }}>A emporter</Text>
-        <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold" }}>{fmt(mode === "ttc" ? W.place_emp_ttc : W.place_emp_ht)}</Text>
-        <Text style={{ fontSize: 6, color: c.muted, marginTop: 1 }}>{W.cov_emp} cvts</Text>
-      </View>
-    </View>
-  );
-}
-
-function ComparatifCard({ stats, prev, mode }: { stats: any; prev: any; mode: string }) {
-  const W = stats;
-  if (!prev || !prev.day_ttc || prev.day_ttc.length === 0 || !W.days || W.days.length < 2) return null;
-  const curVals: number[] = (mode === "ttc" ? W.day_ttc : W.day_ht) ?? [];
-  const prevVals: number[] = (mode === "ttc" ? prev.day_ttc : prev.day_ht) ?? [];
-  if (!curVals.length) return null;
-  const maxVal = Math.max(...curVals, ...prevVals, 1);
-  const labels: string[] = W.days ?? [];
-  const limited = curVals.slice(0, 14);
-
-  return (
-    <View style={s.card}>
-      <Text style={s.sec}>Comparatif · CA {mode.toUpperCase()} vs A-1</Text>
-      {limited.map((cur, i) => {
-        const prv = prevVals[i] ?? 0;
-        const diff = cur - prv;
-        return (
-          <View key={i} style={{ marginBottom: 4 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 1 }}>
-              <Text style={{ width: 40, fontSize: 6 }}>{labels[i] ?? ""}</Text>
-              <View style={{ flex: 1, ...s.barBg, height: 4 }}>
-                <View style={{ ...s.barFill, height: 4, width: `${(cur / maxVal) * 100}%`, backgroundColor: c.accent }} />
-              </View>
-              <Text style={{ width: 42, textAlign: "right", fontSize: 6, fontFamily: "Helvetica-Bold", color: c.accent }}>{fmt(cur)}</Text>
-              <Text style={{ width: 38, textAlign: "right", fontSize: 6, fontFamily: "Helvetica-Bold", color: diff >= 0 ? c.good : c.bad }}>
-                {diff >= 0 ? "+" : ""}{fmt(Math.abs(diff))}
-              </Text>
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ width: 40, fontSize: 5, color: c.muted }}>A-1</Text>
-              <View style={{ flex: 1, ...s.barBg, height: 3 }}>
-                <View style={{ ...s.barFill, height: 3, width: `${(prv / maxVal) * 100}%`, backgroundColor: c.green, opacity: 0.6 }} />
-              </View>
-              <Text style={{ width: 42, textAlign: "right", fontSize: 5, color: c.muted }}>{prv > 0 ? fmt(prv) : "\u2014"}</Text>
-              <Text style={{ width: 38 }} />
-            </View>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
-function ServicesTable({ stats, mode, viewTab }: { stats: any; mode: string; viewTab: string }) {
-  const W = stats;
-  const maxServices = viewTab === "mois" || viewTab === "perso" ? 40 : 20;
-  const services = (W.services ?? []).slice(0, maxServices);
-  if (!services.length) return null;
-  return (
-    <View style={s.card} wrap>
-      <Text style={s.sec}>Par service · {mode.toUpperCase()} · couverts</Text>
-      <View style={s.tHead}>
-        <Text style={{ ...s.tH, width: 50 }}>Jour</Text>
-        <Text style={{ ...s.tH, width: 25 }}>Svc</Text>
-        <Text style={{ ...s.tH, width: 45, textAlign: "right" }}>CA</Text>
-        <Text style={{ ...s.tH, width: 20, textAlign: "right" }}>Cvt</Text>
-        <Text style={{ ...s.tH, width: 30, textAlign: "right" }}>CVT M</Text>
-      </View>
-      {services.map((svc: any, i: number) => (
-        <View key={i} style={s.tRow} wrap={false}>
-          <Text style={{ ...s.tCellBold, width: 50 }}>{svc.jour}</Text>
-          <Text style={{ ...s.tCellMuted, width: 25 }}>{svc.svc === "midi" ? "M" : "S"}</Text>
-          <Text style={{ ...s.tCellAccent, width: 45, textAlign: "right" }}>{fmt(mode === "ttc" ? svc.ttc : svc.ht)}</Text>
-          <Text style={{ ...s.tCell, width: 20, textAlign: "right" }}>{svc.cov}</Text>
-          <Text style={{ ...s.tCell, width: 30, textAlign: "right" }}>{(mode === "ttc" ? svc.tm_sp_ttc : svc.tm_sp_ht).toFixed(0)}{"\u20AC"}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function UpsellCard({ stats }: { stats: any }) {
-  const W = stats;
-  if (!W.ratios) return null;
-  const items = [
-    { label: "Antipasti", data: W.ratios.anti, color: c.accent },
-    { label: "Desserts", data: W.ratios.dolci, color: "#b5904a" },
-    { label: "Vins", data: W.ratios.vin, color: "#7c5c3a" },
-    { label: "Alcool", data: W.ratios.alcool, color: "#c15f2e" },
-    { label: "Boissons", data: W.ratios.boissons, color: "#5e7a8a" },
-    { label: "Cafe", data: W.ratios.cafe, color: "#6f5c3a" },
-  ];
-  return (
-    <View style={{ ...s.card, flexDirection: "row", gap: 6 }}>
-      {items.map((u) => {
-        const tables = u.data?.tables ?? 0;
-        const pct = W.tickets > 0 ? Math.round((tables / W.tickets) * 100) : 0;
-        return (
-          <View key={u.label} style={{ flex: 1, alignItems: "center" as const }}>
-            <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold", color: u.color }}>{pct}%</Text>
-            <Text style={{ fontSize: 5, color: c.muted, marginTop: 1 }}>{u.label}</Text>
-            <Text style={{ fontSize: 5, color: c.faint }}>{tables}/{W.tickets}t</Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
-function DurationCard({ stats }: { stats: any }) {
-  const W = stats;
-  if (!W.duration || !W.duration.totalOrders || W.duration.totalOrders === 0) return null;
-  return (
-    <View style={{ ...s.card, flexDirection: "row", gap: 12 }}>
-      <View style={{ flex: 1, alignItems: "center" as const }}>
-        <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: c.accent }}>{W.duration.avgDurMin}<Text style={{ fontSize: 8, color: c.muted }}>min</Text></Text>
-        <Text style={{ fontSize: 5, color: c.muted }}>Duree moy.</Text>
-      </View>
-      <View style={{ flex: 1, alignItems: "center" as const }}>
-        <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: c.green }}>{W.duration.avgRotation}x</Text>
-        <Text style={{ fontSize: 5, color: c.muted }}>Rotation</Text>
-      </View>
-      <View style={{ flex: 1, alignItems: "center" as const }}>
-        <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: "#7c5c3a" }}>{W.duration.totalOrders}</Text>
-        <Text style={{ fontSize: 5, color: c.muted }}>Tables servies</Text>
-      </View>
-    </View>
-  );
-}
-
 function MixCategoriesCard({ stats, mode }: { stats: any; mode: string }) {
   const W = stats;
   if (!W.mix_labels || !W.mix_labels.length) return null;
@@ -419,6 +782,12 @@ function Top3CatsCard({ stats, mode }: { stats: any; mode: string }) {
                 <Text style={{ fontSize: 6, fontFamily: "Helvetica-Bold", color: c.accent }}>{mode === "ttc" ? r.ca_ttc : r.ca_ht}</Text>
               </View>
             ))}
+            {cat.flop && (
+              <View style={{ ...s.top3Row, borderTopWidth: 0.3, borderTopColor: "#f0ebe3", marginTop: 2, paddingTop: 2 }}>
+                <Text style={{ fontSize: 5, color: c.bad }}>&#9660; {cat.flop.n}</Text>
+                <Text style={{ fontSize: 5, color: c.bad }}>{mode === "ttc" ? cat.flop.ca_ttc : cat.flop.ca_ht}</Text>
+              </View>
+            )}
           </View>
         ))}
       </View>
@@ -430,12 +799,17 @@ function ServeursCard({ stats, mode }: { stats: any; mode: string }) {
   const W = stats;
   if (!W.serveurs || !W.serveurs.length) return null;
   const vals: number[] = (mode === "ttc" ? W.serv_ca_ttc : W.serv_ca_ht) ?? [];
+  const totalCA = mode === "ttc" ? W.ca_ttc : W.ca_ht;
   const maxV = Math.max(...vals, 1);
   return (
     <View style={s.card}>
       <Text style={s.sec}>Performance serveurs · CA {mode.toUpperCase()}</Text>
       {W.serveurs.map((name: string, i: number) => {
         const v = vals[i] ?? 0;
+        const tkt = W.serv_tickets?.[i] ?? 0;
+        const cov = W.serv_cov?.[i] ?? 0;
+        const cvtM = cov > 0 ? (v / cov).toFixed(1) : "\u2014";
+        const pctCA = totalCA > 0 ? ((v / totalCA) * 100).toFixed(1) : "0";
         return (
           <View key={name} style={{ flexDirection: "row", alignItems: "center", marginBottom: 3 }}>
             <Text style={{ width: 50, fontSize: 7, fontFamily: "Helvetica-Bold" }}>{name}</Text>
@@ -443,6 +817,8 @@ function ServeursCard({ stats, mode }: { stats: any; mode: string }) {
               <View style={{ ...s.barFill, width: `${(v / maxV) * 100}%`, backgroundColor: c.green }} />
             </View>
             <Text style={{ width: 40, textAlign: "right", fontSize: 7, fontFamily: "Helvetica-Bold" }}>{fmt(v)}</Text>
+            <Text style={{ width: 22, textAlign: "right", fontSize: 5, color: c.muted }}>{pctCA}%</Text>
+            <Text style={{ width: 50, textAlign: "right", fontSize: 5, color: c.muted }}>{tkt}t · {cov}c · {cvtM}{"\u20AC"}</Text>
           </View>
         );
       })}
@@ -495,55 +871,92 @@ function BriefingCard({ briefing }: { briefing: string[] }) {
    ══════════════════════════════════════════════════ */
 
 export function VentesPDF({ stats, prev, mode, viewTab, rangeLabel, etabName, briefing, exportType = "ventes" }: Props) {
-  const _ = fmtNum; void _;
+  const _ = fmtNum; void _; void viewTab;
   const isVentes = exportType === "ventes";
   const isProduits = exportType === "produits";
   const isComplet = exportType === "complet";
 
   return (
     <Document>
-      {/* ─── PAGE 1 ─── */}
+      {/* ─── PAGE 1: Overview ─── */}
       {(isVentes || isComplet) && (
         <Page size="A4" style={s.page} wrap>
           <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
           <HeroCard stats={stats} prev={prev} mode={mode} />
+          <KpiCardsRow stats={stats} prev={prev} mode={mode} />
           <ZonesRow stats={stats} mode={mode} />
-          <SurPlaceEmporterCard stats={stats} mode={mode} />
-          <ComparatifCard stats={stats} prev={prev} mode={mode} />
-          <ServicesTable stats={stats} mode={mode} viewTab={viewTab} />
         </Page>
       )}
 
-      {/* ─── PAGE 2 (Ventes focus) ─── */}
+      {/* ─── PAGE 2: Upsell + Duration ─── */}
       {(isVentes || isComplet) && (
         <Page size="A4" style={s.page} wrap>
           <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
           <UpsellCard stats={stats} />
-          <DurationCard stats={stats} />
+          <DurationCard stats={stats} prev={prev} />
+        </Page>
+      )}
+
+      {/* ─── PAGE 3: Sur place / Emporter + Zones detail ─── */}
+      {(isVentes || isComplet) && (
+        <Page size="A4" style={s.page} wrap>
+          <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
+          <SurPlaceEmporterCard stats={stats} mode={mode} />
+          <ZonesDetailCard stats={stats} mode={mode} />
+        </Page>
+      )}
+
+      {/* ─── PAGE 4: Comparatif ─── */}
+      {(isVentes || isComplet) && (
+        <Page size="A4" style={s.page} wrap>
+          <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
+          <ComparatifCard stats={stats} prev={prev} mode={mode} />
+        </Page>
+      )}
+
+      {/* ─── PAGE 5: Services table ─── */}
+      {(isVentes || isComplet) && (
+        <Page size="A4" style={s.page} wrap>
+          <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
+          <ServicesTable stats={stats} mode={mode} />
+        </Page>
+      )}
+
+      {/* ─── PAGE 6: Top 10 + Top 3 categories ─── */}
+      {(isVentes || isComplet || isProduits) && (
+        <Page size="A4" style={s.page} wrap>
+          <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
+          {isProduits && <HeroCard stats={stats} prev={prev} mode={mode} />}
+          <Top10Card stats={stats} mode={mode} />
+          <Top3CatsCard stats={stats} mode={mode} />
+        </Page>
+      )}
+
+      {/* ─── PAGE 7: Categories + Serveurs + Paiements ─── */}
+      {(isVentes || isComplet || isProduits) && (
+        <Page size="A4" style={s.page} wrap>
+          <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
+          <MixCategoriesCard stats={stats} mode={mode} />
           <ServeursCard stats={stats} mode={mode} />
           <PaiementsCard stats={stats} />
+        </Page>
+      )}
+
+      {/* ─── PAGE 8: Marge + Hourly + Briefing ─── */}
+      {(isProduits || isComplet) && (
+        <Page size="A4" style={s.page} wrap>
+          <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
+          <MargeCard stats={stats} />
+          <HourlyCard stats={stats} />
           {briefing && briefing.length > 0 && <BriefingCard briefing={briefing} />}
         </Page>
       )}
 
-      {/* ─── PAGE 3 (Produits focus) ─── */}
-      {(isProduits || isComplet) && (
+      {/* Briefing on ventes export */}
+      {isVentes && briefing && briefing.length > 0 && (
         <Page size="A4" style={s.page} wrap>
           <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
-          {isProduits && <HeroCard stats={stats} prev={prev} mode={mode} />}
-          <MargeCard stats={stats} />
-          <MixCategoriesCard stats={stats} mode={mode} />
-          <Top10Card stats={stats} mode={mode} />
-        </Page>
-      )}
-
-      {/* ─── PAGE 4 (Produits detail + hourly) ─── */}
-      {(isProduits || isComplet) && (
-        <Page size="A4" style={s.page} wrap>
-          <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
-          <Top3CatsCard stats={stats} mode={mode} />
-          <HourlyCard stats={stats} />
-          {isProduits && briefing && briefing.length > 0 && <BriefingCard briefing={briefing} />}
+          <BriefingCard briefing={briefing} />
         </Page>
       )}
     </Document>
