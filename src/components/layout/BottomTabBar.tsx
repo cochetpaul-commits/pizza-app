@@ -632,10 +632,11 @@ export function BottomTabBar() {
                 type="button"
                 className="bottom-bar-btn"
                 onClick={() => {
-                  if (contextActions.length === 1) {
-                    // Single action: execute directly
+                  if (contextActions.length === 1 && !contextActions[0].fileAccept) {
+                    // Single non-file action: execute directly
                     contextActions[0].onClick();
                   } else {
+                    // Multiple actions or file action: open drawer
                     setActionsFabOpen(v => !v);
                   }
                 }}
