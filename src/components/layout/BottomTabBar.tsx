@@ -660,16 +660,20 @@ export function BottomTabBar() {
                 )}
               </button>
             </div>
-            <BottomSheet open={actionsFabOpen} onClose={() => setActionsFabOpen(false)} title="Actions">
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {contextActions.map((action: BottomBarAction) => (
-                  <ActionRow key={action.key} action={action} onDone={() => setActionsFabOpen(false)} etabColor={etabColor} />
-                ))}
-              </div>
-            </BottomSheet>
           </>
         )}
       </nav>
+
+      {/* Actions drawer — outside <nav> so it doesn't get hidden by bottom-sheet-open CSS */}
+      {hasActions && (
+        <BottomSheet open={actionsFabOpen} onClose={() => setActionsFabOpen(false)} title="Actions">
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {contextActions.map((action: BottomBarAction) => (
+              <ActionRow key={action.key} action={action} onDone={() => setActionsFabOpen(false)} etabColor={etabColor} />
+            ))}
+          </div>
+        </BottomSheet>
+      )}
     </>
   );
 }
