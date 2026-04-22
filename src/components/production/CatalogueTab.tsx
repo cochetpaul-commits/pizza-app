@@ -89,6 +89,13 @@ const CUISINE_CAT_LABELS: Record<string, string> = {
   accompagnement: "Accompagnement",
   dessert: "Dessert",
   autre: "Autre",
+  // Bar sub-categories (stored as kitchen_recipes with these categories)
+  vin: "Vin",
+  spiritueux: "Spiritueux",
+  biere: "Biere",
+  soft: "Soft",
+  sirop: "Sirop",
+  cocktail: "Cocktail",
 };
 
 const EMP_COLOR = "#8a7b6b";
@@ -97,6 +104,9 @@ const CUISINE_CAT_COLORS: Record<string, string> = {
   all: "#4a6741", plat_cuisine: "#B45309", preparation: "#7C3AED",
   entree: "#0284C7", sauce: "#DC2626", dessert: "#D4775A",
   accompagnement: "#16A34A", autre: "#6B7280",
+  // Bar sub-categories
+  cocktail: "#D4775A", vin: "#8a6b3e", spiritueux: "#6b5b3e",
+  biere: "#B45309", soft: "#16A34A", sirop: "#7C3AED",
 };
 
 function fmtQty(v: number): string {

@@ -72,6 +72,15 @@ const CUISINE_CAT_COLORS: Record<string, string> = {
   accompagnement: "#16A34A", autre: "#6B7280",
 };
 
+const BAR_SUB_COLORS: Record<string, string> = {
+  cocktail: "#D4775A",
+  vin: "#8a6b3e",
+  spiritueux: "#6b5b3e",
+  biere: "#B45309",
+  soft: "#16A34A",
+  sirop: "#7C3AED",
+};
+
 const FOOD_COST_FILTERS: { id: FoodCostFilter; label: string }[] = [
   { id: "all",       label: "Tous" },
   { id: "bon",       label: "≤28%" },
@@ -1030,38 +1039,44 @@ function RecettesInner() {
               { label: "Sauce", category: "sauce" },
               { label: "Accompagnement", category: "accompagnement" },
               { label: "Préparation", category: "preparation" },
-            ]).map(item => (
+            ]).map(item => {
+              const color = CUISINE_CAT_COLORS[item.category] ?? CUISINE_COLOR;
+              return (
               <Link key={item.category} href={`/recettes/new/cuisine?category=${item.category}`} onClick={() => { setShowNewSheet(false); setNewSheetStep("category"); }} style={{
                 display: "flex", alignItems: "center", gap: 14,
                 padding: "14px 16px", borderRadius: 14, textDecoration: "none",
-                background: "rgba(255,255,255,0.55)", borderLeft: `4px solid ${CUISINE_COLOR}`,
+                background: "rgba(255,255,255,0.55)", borderLeft: `4px solid ${color}`,
               }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${CUISINE_COLOR}15`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: CUISINE_COLOR }} />
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${color}15`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: color }} />
                 </div>
                 <span style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{item.label}</span>
               </Link>
-            ))}
+              );
+            })}
 
             {newSheetCat === "bar" && ([
-              { label: "Cocktail", href: "/recettes/new/cocktail", ficheType: "cocktail", category: "cocktail" },
-              { label: "Vin", href: "/recettes/new/cuisine?category=vin&ficheType=vin", ficheType: "vin", category: "vin" },
-              { label: "Spiritueux", href: "/recettes/new/cuisine?category=spiritueux&ficheType=vin", ficheType: "vin", category: "spiritueux" },
-              { label: "Bière", href: "/recettes/new/cuisine?category=biere&ficheType=boisson", ficheType: "boisson", category: "biere" },
-              { label: "Soft / Sans alcool", href: "/recettes/new/cuisine?category=soft&ficheType=boisson", ficheType: "boisson", category: "soft" },
-              { label: "Sirop maison", href: "/recettes/new/cuisine?category=sirop&ficheType=recette", ficheType: "recette", category: "sirop" },
-            ]).map(item => (
+              { label: "Cocktail", href: "/recettes/new/cocktail", category: "cocktail" },
+              { label: "Vin", href: "/recettes/new/cuisine?category=vin&ficheType=vin", category: "vin" },
+              { label: "Spiritueux", href: "/recettes/new/cuisine?category=spiritueux&ficheType=vin", category: "spiritueux" },
+              { label: "Biere", href: "/recettes/new/cuisine?category=biere&ficheType=boisson", category: "biere" },
+              { label: "Soft / Sans alcool", href: "/recettes/new/cuisine?category=soft&ficheType=boisson", category: "soft" },
+              { label: "Sirop maison", href: "/recettes/new/cuisine?category=sirop&ficheType=recette", category: "sirop" },
+            ]).map(item => {
+              const color = BAR_SUB_COLORS[item.category] ?? COCKTAIL_COLOR;
+              return (
               <Link key={item.category} href={item.href} onClick={() => { setShowNewSheet(false); setNewSheetStep("category"); }} style={{
                 display: "flex", alignItems: "center", gap: 14,
                 padding: "14px 16px", borderRadius: 14, textDecoration: "none",
-                background: "rgba(255,255,255,0.55)", borderLeft: `4px solid ${COCKTAIL_COLOR}`,
+                background: "rgba(255,255,255,0.55)", borderLeft: `4px solid ${color}`,
               }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${COCKTAIL_COLOR}15`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: COCKTAIL_COLOR }} />
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${color}15`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: color }} />
                 </div>
                 <span style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{item.label}</span>
               </Link>
-            ))}
+              );
+            })}
 
             {/* Custom sub-category */}
             <div style={{ height: 1, background: "rgba(0,0,0,0.06)", margin: "4px 0" }} />
