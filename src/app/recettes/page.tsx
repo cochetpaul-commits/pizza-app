@@ -18,26 +18,29 @@ export default function FichesTechniquesPage() {
   const ec = etab?.couleur;
 
   return (
-    <div>
-      {/* Tab bar — segment control */}
+    <div style={{ background: "#f2ede4", minHeight: "100vh" }}>
+      {/* Tab bar — centered segment control */}
       <div style={{
-        padding: "12px 16px", position: "sticky", top: 0,
-        background: "#f2ede4", zIndex: 50,
+        position: "sticky", top: 0, zIndex: 50,
+        background: "#f2ede4",
+        padding: "12px 16px",
+        display: "flex", justifyContent: "center",
       }}>
         <div style={{
           display: "inline-flex", gap: 4, padding: 4,
-          background: "#e8e0d0", borderRadius: 12,
+          background: "#ece4d4", borderRadius: 12,
+          border: "1px solid #e8e0d0",
         }}>
           {TABS.map(t => {
             const active = tab === t.key;
             return (
               <button key={t.key} onClick={() => setTab(t.key)} style={{
-                padding: "8px 20px", fontSize: 13, fontWeight: 600,
-                cursor: "pointer", border: "none", borderRadius: 10,
-                background: active ? (ec ? ec + "25" : "#fff") : "transparent",
+                padding: "7px 20px", fontSize: 12, fontWeight: 700,
+                cursor: "pointer", border: "none", borderRadius: 8,
+                background: active ? (ec ? ec + "20" : "#fff") : "transparent",
                 color: active ? "#1a1a1a" : "#999",
                 fontFamily: "inherit", whiteSpace: "nowrap",
-                boxShadow: active ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+                boxShadow: active ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
                 transition: "all 0.15s",
               }}>
                 {t.label}

@@ -573,7 +573,7 @@ export function BottomTabBar() {
         display: "none",
         padding: "0 12px",
       }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ display: "flex", alignItems: "stretch", justifyContent: "center", gap: 8 }}>
           {/* Nav pill */}
           <div style={{
             display: "flex", alignItems: "center", gap: 2,
@@ -618,50 +618,51 @@ export function BottomTabBar() {
               );
             })}
           </div>
-        </div>
 
-        {/* Context FAB (right side) — single FAB, opens drawer with actions */}
-        {hasActions && (
-          <>
+          {/* Context FAB — same glass style as navbar */}
+          {hasActions && (
             <div className="bottom-bar-fab" style={{
-              position: "fixed", right: 16,
-              bottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
-              zIndex: 101,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              padding: "4px",
+              borderRadius: 22,
+              background: "rgba(245,240,232,0.82)",
+              backdropFilter: "blur(28px) saturate(200%)",
+              WebkitBackdropFilter: "blur(28px) saturate(200%)",
+              border: "1px solid rgba(255,255,255,0.5)",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.08), 0 0 1px rgba(0,0,0,0.06)",
             }}>
               <button
                 type="button"
-                className="bottom-bar-btn"
                 onClick={() => {
                   if (contextActions.length === 1 && !contextActions[0].fileAccept) {
-                    // Single non-file action: execute directly
                     contextActions[0].onClick();
                   } else {
-                    // Multiple actions or file action: open drawer
                     setActionsFabOpen(v => !v);
                   }
                 }}
                 style={{
-                  width: 50, height: 50,
-                  borderRadius: "50%",
-                  border: "none",
+                  ...tabStyle(false),
                   background: etabColor,
                   color: "#fff",
-                  cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
-                  transition: "transform 0.2s cubic-bezier(.34,1.56,.64,1)",
-                  transform: actionsFabOpen ? "rotate(45deg)" : "rotate(0)",
+                  borderRadius: 16,
+                  padding: "6px 14px 4px",
+                  minWidth: 44,
                 }}
               >
-                {contextActions.length === 1 ? contextActions[0].icon : (
-                  <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                )}
+                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22 }}>
+                  {contextActions.length === 1 ? contextActions[0].icon : (
+                    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  )}
+                </span>
+                <span style={{ fontSize: 9, fontWeight: 600 }}>
+                  {contextActions.length === 1 ? contextActions[0].label : "Actions"}
+                </span>
               </button>
             </div>
-          </>
-        )}
+          )}
+        </div>
       </nav>
 
       {/* Actions drawer — outside <nav> so it doesn't get hidden by bottom-sheet-open CSS */}
