@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 /* ── Types ────────────────────────────────────────── */
 
@@ -278,6 +279,8 @@ export function DateRangePicker({ value, onChange, presets = DEFAULT_PRESETS, fo
     return startOfMonth(base);
   });
   const rootRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
 
   const monthRight = useMemo(() => addMonths(monthLeft, 1), [monthLeft]);
   const activePreset = useMemo(() => detectPreset(value, presets), [value, presets]);
@@ -293,14 +296,22 @@ export function DateRangePicker({ value, onChange, presets = DEFAULT_PRESETS, fo
     setDraftTo(value.to ? fromISO(value.to) : null);
     setHover(null);
     setMonthLeft(startOfMonth(value.from ? fromISO(value.from) : new Date()));
+    // Calculate position from trigger button
+    if (rootRef.current) {
+      const rect = rootRef.current.getBoundingClientRect();
+      setPopoverPos({ top: rect.bottom + 6, left: rect.left });
+    }
     setOpen(true);
   };
 
-  // Close on outside click
+  // Close on outside click — check both rootRef and popoverRef
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const inRoot = rootRef.current?.contains(target);
+      const inPopover = popoverRef.current?.contains(target);
+      if (!inRoot && !inPopover) {
         setOpen(false);
       }
     }
@@ -368,14 +379,27 @@ export function DateRangePicker({ value, onChange, presets = DEFAULT_PRESETS, fo
         </svg>
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
+          ref={popoverRef}
           className="daterange-popover"
           style={{
+            position: "fixed",
+            top: 0, left: 0, right: 0, bottom: 0,
+            zIndex: 9999,
+          }}
+          onMouseDown={(e) => {
+            // Click on backdrop → close
+            if (e.target === e.currentTarget) { setOpen(false); }
+          }}
+        >
+        <div
+          className="daterange-popover-inner"
+          style={{
             position: "absolute",
-            top: "calc(100% + 6px)",
-            left: 0,
-            zIndex: 300,
+            top: popoverPos.top,
+            left: popoverPos.left,
+            zIndex: 9999,
             background: "#fff",
             border: "1px solid #e0d8ce",
             borderRadius: 14,
@@ -484,12 +508,17 @@ export function DateRangePicker({ value, onChange, presets = DEFAULT_PRESETS, fo
             </div>
           </div>
         </div>
+        </div>,
+        document.body,
       )}
 
       {/* Mobile responsive */}
       <style>{`
         @media (max-width: 720px) {
           .daterange-popover {
+            background: rgba(0,0,0,0.18) !important;
+          }
+          .daterange-popover-inner {
             position: fixed !important;
             left: 8px !important;
             right: 8px !important;
@@ -503,7 +532,7 @@ export function DateRangePicker({ value, onChange, presets = DEFAULT_PRESETS, fo
             border-radius: 20px !important;
           }
           /* Presets: horizontal scroll row */
-          .daterange-popover > div:first-child {
+          .daterange-popover-inner > div:first-child {
             border-right: none !important;
             border-bottom: 1px solid #f0ebe3;
             padding-right: 0 !important;
@@ -514,17 +543,17 @@ export function DateRangePicker({ value, onChange, presets = DEFAULT_PRESETS, fo
             gap: 4px !important;
             min-width: 0 !important;
           }
-          .daterange-popover > div:first-child > button {
+          .daterange-popover-inner > div:first-child > button {
             text-align: center !important;
             padding: 6px 10px !important;
             font-size: 11px !important;
             white-space: nowrap;
           }
-          .daterange-popover > div:first-child > div {
+          .daterange-popover-inner > div:first-child > div {
             display: none !important;
           }
           /* Date inputs: ensure full width */
-          .daterange-popover input[type="date"] {
+          .daterange-popover-inner input[type="date"] {
             font-size: 14px !important;
             padding: 8px 8px !important;
           }
