@@ -957,7 +957,7 @@ export function CatalogueContent() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{
                           fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 15,
-                          color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          color: "#1a1a1a",
                           textTransform: "uppercase", letterSpacing: "0.03em",
                         }}>
                           {recipe.name}
