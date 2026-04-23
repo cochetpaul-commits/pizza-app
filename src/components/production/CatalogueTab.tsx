@@ -12,8 +12,8 @@ import { useBottomBarActions } from "@/lib/BottomBarContext";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type RecipeType = "pizza" | "cuisine" | "cocktail" | "production" | "produit";
-type MainFilter = "tous" | "pizza" | "cuisine" | "cocktail" | "empatement" | "produit";
+type RecipeType = "pizza" | "cuisine" | "cocktail" | "vin" | "production" | "produit";
+type MainFilter = "tous" | "pizza" | "cuisine" | "cocktail" | "vin" | "empatement" | "produit";
 // "all" or any category id (built-in or custom-discovered)
 type CuisineCatFilter = string;
 
@@ -60,6 +60,7 @@ const TYPE_COLORS: Record<RecipeType, string> = {
   pizza: "#8B1A1A",
   cuisine: "#4a6741",
   cocktail: "#D4775A",
+  vin: "#8a6b3e",
   production: "#6b5b3e",
   produit: "#8a6b3e",
 };
@@ -68,12 +69,17 @@ const TYPE_LABELS: Record<RecipeType, string> = {
   pizza: "Pizza",
   cuisine: "Cuisine",
   cocktail: "Cocktail",
+  vin: "Vin",
   production: "Production",
   produit: "Produit",
 };
 
 const PRODUIT_CATEGORIES = ["produit_vin", "produit_spiritueux", "produit_biere", "produit_soft", "produit_autre"] as const;
 const PRODUIT_CAT_LABELS: Record<string, string> = {
+  blanc: "Blanc",
+  "rosé": "Rosé",
+  rouge: "Rouge",
+  orange: "Orange",
   produit_vin: "Vin",
   produit_spiritueux: "Spiritueux",
   produit_biere: "Biere",
@@ -106,6 +112,8 @@ const CUISINE_CAT_COLORS: Record<string, string> = {
   accompagnement: "#16A34A", autre: "#6B7280",
   // Bar sub-categories
   cocktail: "#D4775A", vin: "#8a6b3e", spiritueux: "#6b5b3e",
+  // Wine color categories
+  blanc: "#c4a040", rosé: "#D4775A", rouge: "#8B1A1A", orange: "#c8720a",
   biere: "#B45309", soft: "#16A34A", sirop: "#7C3AED",
 };
 
@@ -296,6 +304,29 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
     });
   }
 
+  // ── Vins ──
+  const { data: wines } = await supabase
+    .from("wines")
+    .select("id, name, domaine, region, cepages, color, accords, descriptif, anecdote, sell_price, establishments")
+    .order("name");
+
+  for (const w of (wines ?? [])) {
+    if (!matchEstab(w.establishments)) continue;
+    const meta: string[] = [];
+    if (w.domaine) meta.push(w.domaine);
+    if (w.region) meta.push(w.region);
+    if (w.cepages) meta.push(w.cepages);
+    recipes.push({
+      id: `wine-${w.id}`, type: "vin", name: w.name, category: w.color ?? "rouge", fiche_type: "vin",
+      photo_url: null, lines: [], steps: [],
+      pivot_ingredient_id: null,
+      yield_info: meta.join(" · "),
+      portions_count: null,
+      allergens: ["sulfites"],
+      metadata: { domaine: w.domaine, region: w.region, cepages: w.cepages, color: w.color, accords: w.accords, descriptif: w.descriptif, anecdote: w.anecdote, sell_price: w.sell_price },
+    });
+  }
+
   // ── Production (prep_recipes + kitchen_recipes with category "preparation") ──
   const { data: preps } = await supabase
     .from("prep_recipes")
@@ -462,7 +493,7 @@ export function CatalogueContent() {
       });
   }, [etab]);
 
-  const recipeTypeMap: Record<RecipeType, string> = { pizza: "pizza", cuisine: "kitchen", cocktail: "cocktail", production: "kitchen", produit: "kitchen" };
+  const recipeTypeMap: Record<RecipeType, string> = { pizza: "pizza", cuisine: "kitchen", cocktail: "cocktail", vin: "wine", production: "kitchen", produit: "kitchen" };
 
   const linkArticle = async (recipe: Recipe, nomVente: string) => {
     if (!etab) return;
@@ -558,6 +589,7 @@ export function CatalogueContent() {
       if (cuisineCatFilter !== "all") arr = arr.filter(r => r.category === cuisineCatFilter);
     }
     else if (mainFilter === "cocktail") arr = arr.filter(r => r.type === "cocktail");
+    else if (mainFilter === "vin") arr = arr.filter(r => r.type === "vin");
     else if (mainFilter === "produit") arr = arr.filter(r => r.type === "produit");
     else if (mainFilter === "empatement") arr = arr.filter(r => r.type === "production" && r.category === "empatement");
     // Production toggle (preps only, not empâtement)
@@ -594,6 +626,7 @@ export function CatalogueContent() {
       pizza: recipes.filter(r => r.type === "pizza").length,
       cuisine: recipes.filter(r => r.type === "cuisine").length,
       cocktail: recipes.filter(r => r.type === "cocktail").length,
+      vin: recipes.filter(r => r.type === "vin").length,
       produit: recipes.filter(r => r.type === "produit").length,
       empatement: recipes.filter(r => r.type === "production" && r.category === "empatement").length,
       production: prodPreps,
@@ -614,7 +647,7 @@ export function CatalogueContent() {
       if (!map[key]) map[key] = [];
       map[key].push(r);
     }
-    const typeOrder: RecipeType[] = ["pizza", "cuisine", "cocktail", "produit", "production"];
+    const typeOrder: RecipeType[] = ["pizza", "cuisine", "cocktail", "vin", "produit", "production"];
     const prodCatOrder = ["preparation", "prep", "empatement"];
     return Object.entries(map).sort(([a], [b]) => {
       const ta = a.split(":")[0];
@@ -658,6 +691,10 @@ export function CatalogueContent() {
       } else if (recipe.type === "cocktail") {
         await supabase.from("cocktail_ingredients").delete().eq("recipe_id", recipe.id);
         const { error } = await supabase.from("cocktails").delete().eq("id", recipe.id);
+        if (error) throw error;
+      } else if (recipe.type === "vin") {
+        const realId = recipe.id.replace(/^wine-/, "");
+        const { error } = await supabase.from("wines").delete().eq("id", realId);
         if (error) throw error;
       } else if (recipe.type === "production") {
         if (recipe.category === "empatement") {
@@ -710,8 +747,8 @@ export function CatalogueContent() {
     display: "flex", alignItems: "center", gap: 8,
   });
 
-  const activeColor = mainFilter === "pizza" ? TYPE_COLORS.pizza : mainFilter === "cuisine" ? TYPE_COLORS.cuisine : mainFilter === "cocktail" ? TYPE_COLORS.cocktail : mainFilter === "produit" ? TYPE_COLORS.produit : mainFilter === "empatement" ? EMP_COLOR : null;
-  const activeLabel = mainFilter === "tous" ? "Toutes" : mainFilter === "pizza" ? "Pizza" : mainFilter === "cuisine" ? (cuisineCatFilter !== "all" ? dynamicCuisineCats.find(f => f.id === cuisineCatFilter)?.label ?? "Cuisine" : "Cuisine") : mainFilter === "cocktail" ? "Cocktail" : mainFilter === "produit" ? "Produit" : "Empât.";
+  const activeColor = mainFilter === "pizza" ? TYPE_COLORS.pizza : mainFilter === "cuisine" ? TYPE_COLORS.cuisine : mainFilter === "cocktail" ? TYPE_COLORS.cocktail : mainFilter === "vin" ? TYPE_COLORS.vin : mainFilter === "produit" ? TYPE_COLORS.produit : mainFilter === "empatement" ? EMP_COLOR : null;
+  const activeLabel = mainFilter === "tous" ? "Toutes" : mainFilter === "pizza" ? "Pizza" : mainFilter === "cuisine" ? (cuisineCatFilter !== "all" ? dynamicCuisineCats.find(f => f.id === cuisineCatFilter)?.label ?? "Cuisine" : "Cuisine") : mainFilter === "cocktail" ? "Cocktail" : mainFilter === "vin" ? "Vins" : mainFilter === "produit" ? "Produit" : "Empât.";
 
   // Register FAB in bottom bar for "produit" mode
   const produitAccent = TYPE_COLORS.produit;
@@ -813,6 +850,13 @@ export function CatalogueContent() {
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: TYPE_COLORS.cocktail, flexShrink: 0 }} />
                     Cocktail
                     <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{filterCounts.cocktail}</span>
+                  </button>
+                  {/* Vins */}
+                  <button type="button" onClick={() => { setMainFilter("vin"); setCuisineCatFilter("all"); setShowTypePop(false); }}
+                    style={menuItem(mainFilter === "vin", TYPE_COLORS.vin)}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: TYPE_COLORS.vin, flexShrink: 0 }} />
+                    Vins
+                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{filterCounts.vin}</span>
                   </button>
                   {/* Produit */}
                   <button type="button" onClick={() => { setMainFilter("produit"); setCuisineCatFilter("all"); setShowTypePop(false); }}
