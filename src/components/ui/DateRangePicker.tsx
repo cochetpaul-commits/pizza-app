@@ -531,20 +531,19 @@ export function DateRangePicker({ value, onChange, presets = DEFAULT_PRESETS, fo
             gap: 12px !important;
             border-radius: 20px !important;
           }
-          /* Presets: horizontal scroll row */
+          /* Presets: 2-column grid */
           .daterange-popover-inner > div:first-child {
             border-right: none !important;
             border-bottom: 1px solid #f0ebe3;
             padding-right: 0 !important;
             padding-bottom: 10px;
-            display: flex !important;
-            flex-direction: row !important;
-            flex-wrap: wrap;
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
             gap: 4px !important;
             min-width: 0 !important;
           }
           .daterange-popover-inner > div:first-child > button {
-            text-align: center !important;
+            text-align: left !important;
             padding: 6px 10px !important;
             font-size: 11px !important;
             white-space: nowrap;
