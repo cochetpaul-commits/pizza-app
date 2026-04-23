@@ -1512,8 +1512,6 @@ function PerformancesPage() {
 
       </div>
 
-      {/* PDF FAB is now in the BottomTabBar via useBottomBarActions */}
-
       <style>{`
         .ventes-nav-btn:hover, .ventes-nav-btn:active {
           background: rgba(0,0,0,0.06) !important;

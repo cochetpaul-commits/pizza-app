@@ -871,7 +871,7 @@ function BriefingCard({ briefing }: { briefing: string[] }) {
    ══════════════════════════════════════════════════ */
 
 export function VentesPDF({ stats, prev, mode, viewTab, rangeLabel, etabName, briefing, exportType = "ventes" }: Props) {
-  const _ = fmtNum; void _; void viewTab;
+  void viewTab;
   const isVentes = exportType === "ventes";
   const isProduits = exportType === "produits";
   const isComplet = exportType === "complet";
