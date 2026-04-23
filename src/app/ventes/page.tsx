@@ -10,6 +10,7 @@ import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 import { supabase } from "@/lib/supabaseClient";
+import { useBottomBarActions } from "@/lib/BottomBarContext";
 
 /* ── Types ── */
 type WeekData = {
@@ -543,6 +544,13 @@ function PerformancesPage() {
   const W = data;
   const activePrev = prev;
   const ca = W ? (mode === "ttc" ? W.ca_ttc : W.ca_ht) : 0;
+
+  // Register PDF action in the bottom tab bar FAB
+  useBottomBarActions(() => [{
+    key: "pdf", label: "PDF / Export", accent,
+    onClick: () => setPdfDrawerOpen(true),
+    icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>,
+  }], [accent]);
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
@@ -1504,30 +1512,7 @@ function PerformancesPage() {
 
       </div>
 
-      {/* ── Mobile FAB: PDF/Export — positioned above tab bar, right side ── */}
-      <div className="mobile-only" style={{
-        position: "fixed",
-        bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
-        right: 12, zIndex: 101,
-        display: "flex", alignItems: "center", height: 44,
-      }}>
-        <button type="button" className="ventes-nav-btn" onClick={() => setPdfDrawerOpen(true)} style={{
-          width: 40, height: 40, borderRadius: 20,
-          background: "rgba(255,255,255,0.85)",
-          backdropFilter: "blur(20px) saturate(180%)",
-          WebkitBackdropFilter: "blur(20px) saturate(180%)",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
-          border: "1px solid rgba(0,0,0,0.06)",
-          cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          transition: "background .15s",
-        }}>
-          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-          </svg>
-        </button>
-      </div>
+      {/* PDF FAB is now in the BottomTabBar via useBottomBarActions */}
 
       <style>{`
         .ventes-nav-btn:hover, .ventes-nav-btn:active {
