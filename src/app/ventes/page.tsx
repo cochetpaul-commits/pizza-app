@@ -1502,7 +1502,15 @@ function PerformancesPage() {
           </button>
         </div>
 
-        {/* PDF button — separate pill next to date bar */}
+      </div>
+
+      {/* ── Mobile FAB: PDF/Export — positioned above tab bar, right side ── */}
+      <div className="mobile-only" style={{
+        position: "fixed",
+        bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
+        right: 12, zIndex: 101,
+        display: "flex", alignItems: "center", height: 44,
+      }}>
         <button type="button" className="ventes-nav-btn" onClick={() => setPdfDrawerOpen(true)} style={{
           width: 40, height: 40, borderRadius: 20,
           background: "rgba(255,255,255,0.85)",
@@ -1511,8 +1519,7 @@ function PerformancesPage() {
           boxShadow: "0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
           border: "1px solid rgba(0,0,0,0.06)",
           cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-          marginLeft: 6,
+          display: "flex", alignItems: "center", justifyContent: "center",
           transition: "background .15s",
         }}>
           <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
