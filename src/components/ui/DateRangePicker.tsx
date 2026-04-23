@@ -493,11 +493,10 @@ export function DateRangePicker({ value, onChange, presets = DEFAULT_PRESETS, fo
             position: fixed !important;
             left: 8px !important;
             right: 8px !important;
-            top: auto !important;
-            bottom: 8px !important;
+            top: 60px !important;
+            bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
             min-width: 0 !important;
             flex-direction: column !important;
-            max-height: 85dvh;
             overflow-y: auto;
             padding: 14px !important;
             gap: 12px !important;

@@ -1447,7 +1447,7 @@ function PerformancesPage() {
         )}
       </div>
 
-      {/* ── Mobile Bottom Bar: ← date → + file icon ── */}
+      {/* ── Mobile Bottom Bar: ← date → ── */}
       <div className="mobile-only" style={{
         position: "fixed",
         bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
@@ -1456,9 +1456,9 @@ function PerformancesPage() {
       }}>
         <div style={{
           height: 44,
-          display: "flex", flexDirection: "row", alignItems: "center", gap: 6,
-          padding: "0 8px",
-          background: "rgba(255,255,255,0.95)",
+          display: "flex", flexDirection: "row", alignItems: "center", gap: 4,
+          padding: "0 6px",
+          background: "rgba(255,255,255,0.85)",
           backdropFilter: "blur(20px) saturate(180%)",
           WebkitBackdropFilter: "blur(20px) saturate(180%)",
           borderRadius: 22,
@@ -1466,48 +1466,67 @@ function PerformancesPage() {
           border: "1px solid rgba(0,0,0,0.06)",
         }}>
           {/* ← prev day */}
-          <button type="button" onClick={() => {
+          <button type="button" className="ventes-nav-btn" onClick={() => {
             const nf = new Date(new Date(range.from + "T12:00:00").getTime() - 86400000);
             const nt = new Date(new Date(range.to + "T12:00:00").getTime() - 86400000);
             setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
           }} style={{
-            width: 30, height: 30, borderRadius: 8, border: "none",
-            background: accent + "15", color: accent, fontSize: 13, fontWeight: 700,
+            width: 32, height: 32, borderRadius: 16, border: "none",
+            background: "transparent", color: accent, fontSize: 15, fontWeight: 700,
             cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-          }}>{"←"}</button>
+            transition: "background .15s",
+          }}>
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
 
           {/* Date center */}
           <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
 
           {/* → next day */}
-          <button type="button" onClick={() => {
+          <button type="button" className="ventes-nav-btn" onClick={() => {
             const today = new Date().toISOString().slice(0, 10);
             if (range.from >= today) return;
             const nf = new Date(new Date(range.from + "T12:00:00").getTime() + 86400000);
             const nt = new Date(new Date(range.to + "T12:00:00").getTime() + 86400000);
             setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
           }} style={{
-            width: 30, height: 30, borderRadius: 8, border: "none",
-            background: from >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : accent + "15",
+            width: 32, height: 32, borderRadius: 16, border: "none",
+            background: "transparent",
             color: from >= new Date().toISOString().slice(0, 10) ? "#ccc" : accent,
-            fontSize: 13, fontWeight: 700,
+            fontSize: 15, fontWeight: 700,
             cursor: from >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
             display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-          }}>{"→"}</button>
-
-          {/* File icon — opens drawer */}
-          <button type="button" onClick={() => setPdfDrawerOpen(true)} style={{
-            width: 32, height: 32, borderRadius: 10, border: "1px solid #ddd6c8",
-            background: "#fff", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            transition: "background .15s",
           }}>
-            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-            </svg>
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
           </button>
         </div>
       </div>
+
+      {/* ── Mobile FAB: PDF/Export ── */}
+      <button type="button" className="mobile-only" onClick={() => setPdfDrawerOpen(true)} style={{
+        position: "fixed",
+        bottom: "calc(126px + env(safe-area-inset-bottom, 0px))",
+        right: 16, zIndex: 100,
+        width: 44, height: 44, borderRadius: 22, border: "none",
+        background: "rgba(255,255,255,0.85)",
+        backdropFilter: "blur(20px) saturate(180%)",
+        WebkitBackdropFilter: "blur(20px) saturate(180%)",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
+        cursor: "pointer",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+        </svg>
+      </button>
+
+      <style>{`
+        .ventes-nav-btn:hover, .ventes-nav-btn:active {
+          background: rgba(0,0,0,0.06) !important;
+        }
+      `}</style>
       </PilotageSwipeWrapper>
     </RequireRole>
   );
