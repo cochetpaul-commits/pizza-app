@@ -5,6 +5,7 @@ export type CommandePdfLine = {
   name: string;
   qty: number;
   unit: string;
+  sku: string | null;
 };
 
 export type CommandePdfCategory = {
@@ -74,6 +75,7 @@ const s = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: "#E5DDD0",
   },
+  rowSku: { width: 70, fontSize: 9, color: MUTED },
   rowName: { flex: 1, fontSize: 11 },
   rowQty: { width: 30, textAlign: "right" as const, fontSize: 11, fontWeight: "bold" },
   rowUnit: { width: 80, textAlign: "left" as const, fontSize: 10, color: MUTED, paddingLeft: 6 },
@@ -141,6 +143,7 @@ export function CommandePdfDocument({ data }: { data: CommandePdfData }) {
             </View>
             {cat.items.map((item, i) => (
               <View key={i} style={s.row}>
+                {item.sku ? <Text style={s.rowSku}>{item.sku}</Text> : null}
                 <Text style={s.rowName}>{item.name}</Text>
                 <Text style={s.rowQty}>{item.qty}</Text>
                 <Text style={s.rowUnit}>{item.unit}</Text>

@@ -66,10 +66,10 @@ type LigneRow = {
   unite: string | null;
   prix_unitaire_ht: number | null;
   total_ligne_ht: number | null;
-  ingredients: { name: string; category: string | null; default_unit: string | null } | null;
+  ingredients: { name: string; category: string | null; default_unit: string | null; supplier_sku: string | null } | null;
 };
 
-function getIng(row: LigneRow): { name: string; category: string | null; default_unit: string | null } | null {
+function getIng(row: LigneRow): { name: string; category: string | null; default_unit: string | null; supplier_sku: string | null } | null {
   const raw = row.ingredients;
   if (!raw) return null;
   if (Array.isArray(raw)) return raw[0] ?? null;
@@ -105,23 +105,27 @@ export async function GET(req: NextRequest) {
   // Fetch lines with qty > 0
   const { data: lignes } = await supabaseAdmin
     .from("commande_lignes")
-    .select("quantite, unite, prix_unitaire_ht, total_ligne_ht, ingredients(name, category, default_unit)")
+    .select("quantite, unite, prix_unitaire_ht, total_ligne_ht, ingredients(name, category, default_unit, supplier_sku)")
     .eq("session_id", sessionId)
     .gt("quantite", 0);
 
   const rows = (lignes ?? []) as unknown as LigneRow[];
 
-  // Group by category
-  const byCat: Record<string, { name: string; qty: number; unit: string }[]> = {};
+  // Group by category, consolidating duplicate ingredients
+  const byCat: Record<string, { name: string; qty: number; unit: string; sku: string | null }[]> = {};
   for (const l of rows) {
     const ing = getIng(l);
     const cat = ing?.category ?? "autre";
     if (!byCat[cat]) byCat[cat] = [];
-    byCat[cat].push({
-      name: ing?.name ?? "?",
-      qty: l.quantite,
-      unit: l.unite ?? ing?.default_unit ?? "",
-    });
+    const name = ing?.name ?? "?";
+    const unit = l.unite ?? ing?.default_unit ?? "";
+    const sku = ing?.supplier_sku ?? null;
+    const existing = byCat[cat].find((item) => item.name === name && item.unit === unit);
+    if (existing) {
+      existing.qty += l.quantite;
+    } else {
+      byCat[cat].push({ name, qty: l.quantite, unit, sku });
+    }
   }
 
   // Sort categories and items
