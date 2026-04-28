@@ -19,7 +19,7 @@ type Props = { wineId: string | null };
 export default function WineFormV2({ wineId }: Props) {
   const router = useRouter();
   const { current: etab } = useEtablissement();
-  const isEdit = !!wineId;
+  const _isEdit = !!wineId;
 
   const [name, setName] = useState("");
   const [domaine, setDomaine] = useState("");
