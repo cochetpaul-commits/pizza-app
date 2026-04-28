@@ -117,6 +117,75 @@ const CUISINE_CAT_COLORS: Record<string, string> = {
   biere: "#B45309", soft: "#16A34A", sirop: "#7C3AED",
 };
 
+const WINE_COLOR_LABELS: Record<string, string> = {
+  bollicine: "Bollicine", blanc: "Blanc", "rosé": "Rosé", orange: "Orange", rouge: "Rouge",
+};
+const WINE_COLOR_COLORS: Record<string, string> = {
+  bollicine: "#c4a040", blanc: "#c4a040", "rosé": "#D4775A", orange: "#c8720a", rouge: "#8B1A1A",
+};
+
+function WineCardContent({ recipe, color }: { recipe: Recipe; color: string; }) {
+  const m = recipe.metadata ?? {};
+  const wineColor = String(m.color ?? "rouge");
+  const wc = WINE_COLOR_COLORS[wineColor] ?? color;
+  const fields: { label: string; value: string }[] = [];
+  if (m.domaine) fields.push({ label: "Domaine", value: String(m.domaine) });
+  if (m.region) fields.push({ label: "Region", value: String(m.region) });
+  if (m.cepages) fields.push({ label: "Cepages", value: String(m.cepages) });
+  if (m.descriptif) fields.push({ label: "Descriptif", value: String(m.descriptif) });
+  if (m.accords) fields.push({ label: "Accords", value: String(m.accords) });
+  if (m.anecdote) fields.push({ label: "Anecdote", value: String(m.anecdote) });
+
+  return (
+    <>
+      {/* Color badge */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+        <span style={{
+          fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 6,
+          background: wc + "15", color: wc, textTransform: "uppercase", letterSpacing: "0.06em",
+        }}>
+          {WINE_COLOR_LABELS[wineColor] ?? wineColor}
+        </span>
+        {m.sell_price != null && Number(m.sell_price) > 0 && (
+          <span style={{
+            fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 6,
+            background: "#f0ebe3", color: "#1a1a1a",
+          }}>
+            {Number(m.sell_price).toFixed(0)}{"\u20AC"}
+          </span>
+        )}
+      </div>
+      {/* Fields */}
+      {fields.map((f, i) => (
+        <div key={i} style={{ marginBottom: 10 }}>
+          <div style={{
+            fontFamily: "DM Sans, sans-serif", fontSize: 10, fontWeight: 700,
+            color: wc, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3,
+          }}>
+            {f.label}
+          </div>
+          <div style={{ fontSize: 13, color: "#333", lineHeight: 1.5 }}>
+            {f.value}
+          </div>
+        </div>
+      ))}
+      {/* Edit link */}
+      <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid #ede6d9" }}>
+        <a href={`/recettes/vin/${recipe.id.replace("wine-", "")}`} style={{
+          fontSize: 12, fontWeight: 700, color, textDecoration: "none",
+          display: "inline-flex", alignItems: "center", gap: 6,
+        }}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+          </svg>
+          Modifier la fiche
+        </a>
+      </div>
+    </>
+  );
+}
+
 function fmtQty(v: number): string {
   if (v === 0) return "0";
   if (v >= 100) return Math.round(v).toLocaleString("fr-FR");
@@ -312,17 +381,13 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
 
   for (const w of (wines ?? [])) {
     if (!matchEstab(w.establishments)) continue;
-    const meta: string[] = [];
-    if (w.domaine) meta.push(w.domaine);
-    if (w.region) meta.push(w.region);
-    if (w.cepages) meta.push(w.cepages);
     recipes.push({
-      id: `wine-${w.id}`, type: "vin", name: w.name, category: w.color ?? "rouge", fiche_type: "vin",
+      id: `wine-${w.id}`, type: "vin", name: w.name, category: null, fiche_type: "vin",
       photo_url: null, lines: [], steps: [],
       pivot_ingredient_id: null,
-      yield_info: meta.join(" · "),
+      yield_info: w.domaine ? `${w.domaine}` : null,
       portions_count: null,
-      allergens: ["sulfites"],
+      allergens: [],
       metadata: { domaine: w.domaine, region: w.region, cepages: w.cepages, color: w.color, accords: w.accords, descriptif: w.descriptif, anecdote: w.anecdote, sell_price: w.sell_price },
     });
   }
@@ -1007,9 +1072,26 @@ export function CatalogueContent() {
                           {recipe.name}
                         </div>
                         <div style={{ fontSize: 11, color: "#999", marginTop: 3 }}>
-                          {recipe.lines.length} ingr.
-                          {recipe.steps.length > 0 && ` · ${recipe.steps.length} étape${recipe.steps.length > 1 ? "s" : ""}`}
-                          {recipe.yield_info && ` · ${recipe.yield_info}`}
+                          {recipe.type === "vin" ? (
+                            <>
+                              <span style={{
+                                fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 4,
+                                background: (WINE_COLOR_COLORS[String(recipe.metadata?.color ?? "")] ?? "#8a6b3e") + "15",
+                                color: WINE_COLOR_COLORS[String(recipe.metadata?.color ?? "")] ?? "#8a6b3e",
+                                textTransform: "uppercase", marginRight: 4,
+                              }}>
+                                {WINE_COLOR_LABELS[String(recipe.metadata?.color ?? "")] ?? ""}
+                              </span>
+                              {recipe.metadata?.domaine && String(recipe.metadata.domaine)}
+                              {recipe.metadata?.region && ` · ${String(recipe.metadata.region)}`}
+                            </>
+                          ) : (
+                            <>
+                              {recipe.lines.length} ingr.
+                              {recipe.steps.length > 0 && ` · ${recipe.steps.length} étape${recipe.steps.length > 1 ? "s" : ""}`}
+                              {recipe.yield_info && ` · ${recipe.yield_info}`}
+                            </>
+                          )}
                         </div>
                       </div>
 
@@ -1096,6 +1178,10 @@ export function CatalogueContent() {
                         padding: "16px 20px 20px", marginBottom: 4,
                         borderLeft: `3px solid ${color}`,
                       }}>
+                        {recipe.type === "vin" ? (
+                          <WineCardContent recipe={recipe} color={color} />
+                        ) : (
+                        <>
                         {/* Photo banner */}
                         {recipe.photo_url && (
                           <div style={{
@@ -1182,6 +1268,8 @@ export function CatalogueContent() {
                             </span>
                           ))}
                         </div>
+                        </>
+                        )}
                       </div>
                     )}
                   </div>
