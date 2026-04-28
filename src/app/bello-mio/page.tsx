@@ -329,10 +329,10 @@ function BelloMioContent() {
           marginBottom: 20,
         }}
       >
-        <NavCard href="/plannings" label="Planning" color={COLOR} />
         <NavCard href="/recettes" label="Recettes" color={COLOR} />
         <NavCard href="/commandes" label="Commandes" color={COLOR} />
-        <NavCard href="/ventes" label="Ventes" color={COLOR} />
+        <NavCard href="/ingredients" label="Produits" color={COLOR} />
+        <NavCard href="/inventaire" label="Inventaire" color={COLOR} />
       </div>
 
       {/* Retour groupe */}

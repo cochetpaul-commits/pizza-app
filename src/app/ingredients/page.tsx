@@ -179,7 +179,8 @@ function SkeletonTable() {
 
 function IngredientsPageInner() {
   const router = useRouter();
-  const { canWrite: userCanWrite } = useProfile();
+  const { can } = useProfile();
+  const userCanWrite = can("achats.edit");
   const { current: etab } = useEtablissement();
 
   const [q, setQ] = useState("");
@@ -525,7 +526,9 @@ function IngredientsPageInner() {
     const ins = await supabase.from("ingredients").insert(baseIngredient).select("id").single();
     if (ins.error) {
       if (ins.error.message.includes("ingredients_etab_name")) {
-        alert(`Un ingredient "${name}" existe deja. Choisissez un autre nom.`);
+        alert(`Un ingredient "${name}" existe déjà. Choisissez un autre nom.`);
+      } else if (ins.error.message.includes("unique_supplier_sku_per_user")) {
+        alert(`Un ingrédient avec le même code article (SKU) existe déjà pour ce fournisseur.`);
       } else {
         alert(ins.error.message);
       }
@@ -854,7 +857,9 @@ function IngredientsPageInner() {
     const u1 = await supabase.from("ingredients").update(up).eq("id", editingId);
     if (u1.error) {
       if (u1.error.message.includes("ingredients_etab_name")) {
-        alert(`Un ingredient "${name}" existe deja. Choisissez un autre nom.`);
+        alert(`Un ingrédient "${name}" existe déjà. Choisissez un autre nom.`);
+      } else if (u1.error.message.includes("unique_supplier_sku_per_user")) {
+        alert(`Un ingrédient avec le même code article (SKU) existe déjà pour ce fournisseur.`);
       } else {
         alert(u1.error.message);
       }

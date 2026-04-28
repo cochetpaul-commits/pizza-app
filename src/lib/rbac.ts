@@ -10,25 +10,26 @@ const ALL: Role[] = ["group_admin", "equipier"];
 
 /** Routes and which roles can access them (prefix match) */
 export const ROUTE_ACCESS: Record<string, Role[]> = {
-  // Équipier: production, catalogue, inventaire, base produits, commandes, fournisseurs
+  // Équipier: prod (recettes, catalogue, inventaire) + achats (ingredients, commandes)
   "/recettes":     ALL,
   "/catalogue":    ALL,
   "/ingredients":  ALL,
   "/commandes":    ALL,
-  "/fournisseurs": ALL,
   "/inventaire":   ALL,
-  "/plannings":    ALL,
   "/session":      ALL,
   "/settings/account": ALL,
   // Hub routes
   "/bello-mio":    ALL,
   "/piccola-mia":  ALL,
   "/dashboard":    ALL,
+  "/fournisseurs": ALL,
+  "/rh/conges":    ALL,
   // Group admin only
+  "/plannings":    ["group_admin"],
   "/groupe":       ["group_admin"],
   "/admin":        ["group_admin"],
   "/invoices":     ["group_admin"],
-  "/evenements":   ALL,
+  "/evenements":   ["group_admin"],
   "/pilotage":     ["group_admin"],
   "/mercuriale":   ["group_admin"],
   "/epicerie":     ["group_admin"],

@@ -389,10 +389,10 @@ function PiccolaMiaContent() {
           marginBottom: 20,
         }}
       >
-        <NavCard href="/plannings" label="Planning" color={COLOR} />
         <NavCard href="/recettes" label="Recettes" color={COLOR} />
         <NavCard href="/commandes" label="Commandes" color={COLOR} />
-        <NavCard href="/evenements" label="Evenements" color={COLOR} />
+        <NavCard href="/ingredients" label="Produits" color={COLOR} />
+        <NavCard href="/inventaire" label="Inventaire" color={COLOR} />
       </div>
 
       {/* Retour groupe */}
