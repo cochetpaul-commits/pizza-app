@@ -778,10 +778,24 @@ export default function AchatsPage() {
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px" }}>
 
         {/* ══════════════════════════════════════════════════ */}
-        {/*  DATE RANGE PICKER — centered                    */}
+        {/*  HEADER — date picker + import button            */}
         {/* ══════════════════════════════════════════════════ */}
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginBottom: 24 }}>
           <DateRangePicker value={range} onChange={(r) => setRange(r)} />
+          <button
+            type="button"
+            onClick={() => router.push("/invoices")}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "8px 16px", borderRadius: 20, border: "none",
+              background: accentColor, color: "#fff",
+              fontSize: 13, fontWeight: 700, cursor: "pointer",
+              whiteSpace: "nowrap", flexShrink: 0,
+            }}
+          >
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            Nouvelle facture
+          </button>
         </div>
 
         {loading ? (
