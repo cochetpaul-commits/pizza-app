@@ -643,7 +643,7 @@ export function BottomTabBar() {
                 style={{
                   width: 46, height: 46, borderRadius: "50%",
                   border: "none", background: "transparent",
-                  color: "#999", cursor: "pointer",
+                  color: etabColor, cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   transition: "color 0.15s",
                 }}

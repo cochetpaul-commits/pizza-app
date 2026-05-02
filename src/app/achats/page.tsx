@@ -784,6 +784,7 @@ export default function AchatsPage() {
           <DateRangePicker value={range} onChange={(r) => setRange(r)} />
           <button
             type="button"
+            className="desktop-only"
             onClick={() => router.push("/invoices")}
             style={{
               display: "inline-flex", alignItems: "center", gap: 6,
