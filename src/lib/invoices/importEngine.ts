@@ -392,7 +392,7 @@ export async function runImport(options: {
 
       // piece_volume_ml : valeur parsée, ou 750ml par défaut pour les boissons/alcools
       let pieceVolumeMl: number | null = l.piece_volume_ml ?? null;
-      if (pieceVolumeMl == null && l.unit === "pc" && (cat === "alcool_spiritueux" || cat === "boisson")) {
+      if (pieceVolumeMl == null && l.unit === "pc" && (cat === "vins" || cat === "spiritueux" || cat === "biere" || cat === "liqueurs" || cat === "soft")) {
         pieceVolumeMl = 750;
       }
 
@@ -408,9 +408,11 @@ export async function runImport(options: {
       let storageZone: string | null = null;
       if (cat === "cremerie_fromage" || cat === "maree" || cat === "charcuterie_viande" || cat === "legumes_herbes" || cat === "fruit") {
         storageZone = "FRIGO";
-      } else if (cat === "alcool_spiritueux") {
+      } else if (cat === "vins") {
         storageZone = "CAVE A VIN";
-      } else if (cat === "boisson") {
+      } else if (cat === "spiritueux" || cat === "liqueurs") {
+        storageZone = "BAR";
+      } else if (cat === "soft" || cat === "biere" || cat === "cafeteria" || cat === "sirops") {
         storageZone = "BAR";
       }
 

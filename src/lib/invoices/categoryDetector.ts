@@ -29,9 +29,20 @@ const RULES: Rule[] = [
 // Viande — mots génériques (après légume/fruit pour éviter les faux positifs)
 { keywords: ["steak", "entrecote", "filet", "flt", "lomo", "tartare", "haché", "hache", "boucherie", "chipolata", "saucisse", "osso bucco"], category: "charcuterie_viande" },
 // Boisson
-{ keywords: ["jus", "nectar", "sirop", "cafe", "café", "the", "thé", "lait de coco", "boisson", "eau minérale", "eau plate", "eau gazeuse", "eau", "limonade", "molecola", "tonic water", "soda", "coca", "orangina", "perrier", "san pellegrino"], category: "boisson" },
-// Alcool / Spiritueux (vins italiens, liqueurs, bières)
-{ keywords: ["vin", "biere", "bière", "champagne", "prosecco", "amaretto", "whisky", "vodka", "rhum", "liqueur", "alcool", "spiritueux", "cognac", "calvados", "gin", "grappa", "aperol", "campari", "vermouth", "limoncello", "sambuca", "tequila", "marsala", "chianti", "pinot grigio", "falanghina", "negroamaro", "nero d avola", "grillo", "etna", "rosso di montalcino", "moretti", "italicus", "noces royales", "sarti rosa", "fiasco"], category: "alcool_spiritueux" },
+// Vins
+{ keywords: ["vin", "champagne", "prosecco", "chianti", "pinot grigio", "falanghina", "negroamaro", "nero d avola", "grillo", "etna", "rosso di montalcino", "marsala", "fiasco", "noces royales"], category: "vins" },
+// Spiritueux
+{ keywords: ["whisky", "vodka", "rhum", "cognac", "calvados", "gin", "grappa", "tequila", "spiritueux", "alcool"], category: "spiritueux" },
+// Bière
+{ keywords: ["biere", "bière", "moretti", "ipa", "lager", "stout", "ale"], category: "biere" },
+// Liqueurs
+{ keywords: ["liqueur", "amaretto", "aperol", "campari", "vermouth", "limoncello", "sambuca", "italicus", "sarti rosa"], category: "liqueurs" },
+// Sirops
+{ keywords: ["sirop"], category: "sirops" },
+// Cafétéria
+{ keywords: ["cafe", "café", "the", "thé", "nescafe", "cafe soluble", "tisane", "infusion"], category: "cafeteria" },
+// Softs
+{ keywords: ["jus", "nectar", "boisson", "eau minérale", "eau plate", "eau gazeuse", "eau", "limonade", "molecola", "tonic water", "soda", "coca", "orangina", "perrier", "san pellegrino", "lait de coco"], category: "soft" },
 // Sauce
 { keywords: ["sauce", "ketchup", "mayonnaise", "moutarde", "vinaigre", "tabasco", "pesto", "tapenade", "coulis", "pulpe", "concentré", "concentre", "truffe", "passata", "sugo", "huile basilic"], category: "sauce" },
 // Emballage / Matériel
@@ -55,8 +66,10 @@ const METRO_SECTIONS: { pattern: RegExp; category: Category }[] = [
 { pattern: /EPICERIE\s+SUCREE/i, category: "epicerie_sucree" },
 { pattern: /EPICERIE\s+SECHE/i, category: "epicerie_salee" },
 { pattern: /POISSONNERIE|MAREE/i, category: "maree" },
-{ pattern: /BOISSONS?/i, category: "boisson" },
-{ pattern: /SPIRITUEUX|ALCOOL/i, category: "alcool_spiritueux" },
+{ pattern: /BOISSONS?/i, category: "soft" },
+{ pattern: /SPIRITUEUX|ALCOOL/i, category: "spiritueux" },
+{ pattern: /VINS?/i, category: "vins" },
+{ pattern: /BI[EÈ]RES?/i, category: "biere" },
 { pattern: /DROGUERIE|HYGIENE/i, category: "autre" },
 { pattern: /TRAITEUR/i, category: "charcuterie_viande" },
 ];

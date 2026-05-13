@@ -147,7 +147,7 @@ export function parseLmdw(text: string, etablissement: string): ParseResult {
             volume_unitaire: volume ?? undefined,
             prix_unitaire: puNet,
             prix_commande: puNet * qty,
-            categorie: detectCategorieFromName(rawName) === "autre" ? "boissons" : detectCategorieFromName(rawName),
+            categorie: detectCategorieFromName(rawName) === "autre" ? "spiritueux" : detectCategorieFromName(rawName),
             fournisseur_slug: "lmdw",
             etablissement_id: etab,
             raw_line: line.slice(0, 200),
@@ -192,9 +192,9 @@ export function parseLmdw(text: string, etablissement: string): ParseResult {
       }
     }
 
-    // LMDW only sells alcohol — force "boissons" if no better match
+    // LMDW only sells alcohol — force "spiritueux" if no better match
     const detected = detectCategorieFromName(rawName);
-    const cat = detected === "autre" ? "boissons" : detected;
+    const cat = detected === "autre" ? "spiritueux" : detected;
 
     ingredients.push({
       name: rawName,

@@ -271,12 +271,13 @@ export type IngredientRowProps = {
   onEditImportName: (id: string, current: string) => void;
   onCreateDerived?: (x: Ingredient) => void;
   onOpenSupplier?: (supplierId: string) => void;
+  onToggleEstablishment?: (id: string, estab: "bellomio" | "piccola", current: string[]) => void;
 };
 
 export const IngredientRow = React.memo(function IngredientRow({
   item: x, offer, supplierName, supplierIdForDisplay, alert, isEditing, compactMode, edit,
   suppliers, storageZones,
-  onStartEdit, onSaveEdit, onDelete, onSetStatus, onEditChange, onEditImportName, onCreateDerived, onOpenSupplier,
+  onStartEdit, onSaveEdit, onDelete, onSetStatus, onEditChange, onEditImportName, onCreateDerived, onOpenSupplier, onToggleEstablishment,
 }: IngredientRowProps) {
   const [mobileSection, setMobileSection] = React.useState<string>("prix"); // mobile accordion: only one open at a time
   const toggleMobileSection = React.useCallback((key: string) => {
@@ -377,8 +378,8 @@ export const IngredientRow = React.memo(function IngredientRow({
           {supplierName && supplierIdForDisplay ? (
             <button onClick={(e) => { e.stopPropagation(); onOpenSupplier?.(supplierIdForDisplay); }} style={{ color: "inherit", textDecoration: "underline dotted", textUnderlineOffset: 2, background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit", fontSize: "inherit" }}>{supplierName}</button>
           ) : "—"}
-          <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: hasBM ? "rgba(212,119,90,0.1)" : "rgba(0,0,0,0.04)", color: hasBM ? "#D4775A" : "#ccc" }}>BM</span>
-          <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: hasPM ? "rgba(212,160,60,0.1)" : "rgba(0,0,0,0.04)", color: hasPM ? "#D4A03C" : "#ccc" }}>PM</span>
+          <button onClick={(e) => { e.stopPropagation(); onToggleEstablishment?.(x.id, "bellomio", ingEstabs); }} style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: hasBM ? "rgba(212,119,90,0.1)" : "rgba(0,0,0,0.04)", color: hasBM ? "#D4775A" : "#ccc", border: "none", cursor: "pointer" }}>BM</button>
+          <button onClick={(e) => { e.stopPropagation(); onToggleEstablishment?.(x.id, "piccola", ingEstabs); }} style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: hasPM ? "rgba(212,160,60,0.1)" : "rgba(0,0,0,0.04)", color: hasPM ? "#D4A03C" : "#ccc", border: "none", cursor: "pointer" }}>PM</button>
         </div>
 
         {/* Actions */}

@@ -40,17 +40,33 @@ const CATEGORIE_KEYWORDS: Record<Categorie, string[]> = {
     "spaghetti", "fettuccine", "linguine", "tagliolini", "pennette",
     "filotea",
   ],
-  boissons: [
-    "vin", "bière", "biere", "eau", "jus", "sirop",
-    "prosecco", "limoncello", "marsala", "rioba",
-    "cranberry", "pomme", "spiritueux",
-    "acqua", "nectar", "montepulciano", "molecola", "bianco",
-    "barolo", "chianti", "amarone", "grappa", "campari",
-    "aperol", "vermouth", "gin ", "vodka", "rhum", "rum",
-    "whisky", "whiskey", "tequila", "mezcal", "liqueur",
+  vins: [
+    "vin", "prosecco", "marsala", "montepulciano", "bianco",
+    "barolo", "chianti", "amarone", "champagne", "cava",
+    "spumante", "lambrusco", "dolcetto",
+  ],
+  spiritueux: [
+    "spiritueux", "grappa", "gin ", "vodka", "rhum", "rum",
+    "whisky", "whiskey", "tequila", "mezcal", "cognac", "calvados",
+  ],
+  biere: [
+    "bière", "biere", "ipa", "lager", "stout", "ale",
+  ],
+  liqueurs: [
+    "liqueur", "limoncello", "campari", "aperol", "vermouth",
     "amaro", "sambuca", "fernet", "spritz", "bitter",
-    "champagne", "cava", "spumante", "lambrusco",
-    "frangelico", "amaretto", "dolcetto", "aperitivo",
+    "frangelico", "amaretto", "aperitivo", "italicus", "sarti rosa",
+  ],
+  sirops: [
+    "sirop",
+  ],
+  cafeteria: [
+    "cafe", "café", "the", "thé", "rioba", "tisane", "infusion",
+  ],
+  soft: [
+    "eau", "jus", "nectar", "cranberry", "pomme",
+    "acqua", "molecola", "soda", "coca", "orangina",
+    "perrier", "san pellegrino", "limonade", "tonic",
   ],
   surgele: [
     "surgelé", "surgele", "congelé", "congele", "ivp",
@@ -65,8 +81,8 @@ const CATEGORIE_KEYWORDS: Record<Categorie, string[]> = {
 
 // Metro section headers → category mapping
 const METRO_SECTION_MAP: Record<string, Categorie> = {
-  "SPIRITUEUX": "boissons",
-  "BRASSERIE": "boissons",
+  "SPIRITUEUX": "spiritueux",
+  "BRASSERIE": "biere",
   "EPICERIE SECHE": "epicerie",
   "EPICERIE SUCREE": "epicerie",
   "BEURRE": "cremerie_fromage",

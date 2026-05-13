@@ -227,7 +227,7 @@ export function parseCozigou(text: string, etablissement: string): ParseResult {
       volume_unitaire: volumeCl ?? undefined,
       prix_unitaire: p.puNet,
       prix_commande: p.montHt,
-      categorie: "boissons",
+      categorie: "soft",
       fournisseur_slug: "cozigou",
       etablissement_id: etab,
       raw_line: p.rawLine.replace(/\s+/g, " ").slice(0, 200),

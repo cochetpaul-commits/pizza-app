@@ -1,7 +1,8 @@
 export const CATEGORIES = [
   "antipasti",
   "autre",
-  "boisson",
+  "biere",
+  "cafeteria",
   "charcuterie_viande",
   "cremerie_fromage",
   "emballage",
@@ -9,11 +10,15 @@ export const CATEGORIES = [
   "epicerie_sucree",
   "fruit",
   "legumes_herbes",
+  "liqueurs",
   "maree",
   "preparation",
   "sauce",
+  "sirops",
+  "soft",
+  "spiritueux",
   "surgele",
-  "alcool_spiritueux",
+  "vins",
 ] as const;
 
 export type Category = (typeof CATEGORIES)[number];
@@ -26,8 +31,13 @@ export const CAT_LABELS: Record<Category, string> = {
   cremerie_fromage:   "Crémerie / Fromage",
   charcuterie_viande: "Charcuterie / Viande",
   maree:              "Marée",
-  alcool_spiritueux:  "Vins / Spiritueux",
-  boisson:            "Boissons",
+  vins:               "Vins",
+  spiritueux:         "Spiritueux",
+  biere:              "Bière",
+  soft:               "Softs",
+  cafeteria:          "Cafétéria",
+  liqueurs:           "Liqueurs",
+  sirops:             "Sirops",
   legumes_herbes:     "Légumes / Herbes",
   fruit:              "Fruits",
   epicerie_salee:     "Épicerie Salée",
@@ -44,8 +54,13 @@ export const CAT_COLORS: Record<Category, string> = {
   cremerie_fromage:   "#D97706", // ambre doré
   charcuterie_viande: "#b85c3a", // terracotta foncé
   maree:              "#5e8278", // vert sauge
-  alcool_spiritueux:  "#8a6b3e", // brun doré
-  boisson:            "#6b8f71", // vert sauge clair
+  vins:               "#8a6b3e", // brun doré
+  spiritueux:         "#7C3AED", // violet
+  biere:              "#D4A017", // doré bière
+  soft:               "#6b8f71", // vert sauge clair
+  cafeteria:          "#8B6914", // brun café
+  liqueurs:           "#9B59B6", // violet clair
+  sirops:             "#E67E22", // orange
   legumes_herbes:     "#4a6741", // vert forêt
   fruit:              "#D4775A", // terracotta
   epicerie_salee:     "#7c5c3a", // brun tabac

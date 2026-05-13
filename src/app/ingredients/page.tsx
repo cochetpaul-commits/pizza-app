@@ -14,6 +14,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import {
   CATEGORIES,
   CAT_LABELS,
+  CAT_COLORS,
   type Category,
   type Ingredient,
   type IngredientStatus,
@@ -307,6 +308,7 @@ function IngredientsPageInner() {
     return next;
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [filterDropdown, setFilterDropdown] = useState<"supplier" | "category" | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showDuplicates, setShowDuplicates] = useState(false);
   const [showSearchSheet, setShowSearchSheet] = useState(false);
@@ -516,7 +518,7 @@ function IngredientsPageInner() {
         if (fromForm != null && fromForm > 0) return fromForm;
         const fromName = extractVolumeFromName(name);
         if (fromName != null) return fromName;
-        if (newCategory === "alcool_spiritueux" || newCategory === "boisson") return 750;
+        if (newCategory === "vins" || newCategory === "spiritueux" || newCategory === "biere" || newCategory === "liqueurs" || newCategory === "soft") return 750;
         return null;
       })(),
       supplier_id,
@@ -936,6 +938,16 @@ function IngredientsPageInner() {
     requestAnimationFrame(() => window.scrollTo(0, sy));
   }, [mutate]);
 
+  const toggleEstablishment = useCallback(async (id: string, estab: "bellomio" | "piccola", current: string[]) => {
+    const has = current.includes(estab);
+    const next = has ? current.filter(e => e !== estab) : [...current, estab];
+    // Prevent removing all establishments
+    if (next.length === 0) return;
+    const { error: err } = await supabase.from("ingredients").update({ establishments: next }).eq("id", id);
+    if (err) { alert(err.message); return; }
+    await mutateOne(id);
+  }, [mutateOne]);
+
   const onEditChange = useCallback((next: EditState) => {
     setEdit(next);
   }, []);
@@ -1245,6 +1257,7 @@ function IngredientsPageInner() {
                             onEditImportName={onEditImportName}
                             onCreateDerived={userCanWrite ? openDeriveModal : undefined}
                             onOpenSupplier={openSupplierModal}
+                            onToggleEstablishment={userCanWrite ? toggleEstablishment : undefined}
                           />
                         </div>
                       );
@@ -1430,23 +1443,106 @@ function IngredientsPageInner() {
         );
       })()}
 
-      <BottomSheet open={showFilters} onClose={() => setShowFilters(false)} title="Filtres">
+      <BottomSheet open={showFilters} onClose={() => { setShowFilters(false); setFilterDropdown(null); }} title="Filtres">
         <div style={{ display: "grid", gap: 14 }}>
+          {/* ── Fournisseur dropdown ── */}
           <div>
-            <div style={{ fontSize: 12, color: "#999", marginBottom: 6 }}>Categorie</div>
-            <Dropdown
-              value={filterCategory}
-              onChange={(v) => setFilterCategory(v as "all" | Category)}
-              options={[{ value: "all", label: "Tous" }, ...CATEGORIES_ALPHA.map(c => ({ value: c, label: CAT_LABELS[c] }))]}
-            />
+            <button
+              type="button"
+              onClick={() => setFilterDropdown(filterDropdown === "supplier" ? null : "supplier")}
+              style={{
+                display: "flex", alignItems: "center", width: "100%", padding: "14px 16px",
+                background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 12, cursor: "pointer",
+              }}
+            >
+              {filterSupplier !== "all" && (() => {
+                const s = suppliers.find(x => x.id === filterSupplier);
+                return s ? <span style={{ width: 10, height: 10, borderRadius: "50%", background: cachedSupplierColor(s.name), flexShrink: 0, marginRight: 10 }} /> : null;
+              })()}
+              <span style={{ flex: 1, textAlign: "left", fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 15, color: filterSupplier === "all" ? "#999" : "#1a1a1a", textTransform: "uppercase" }}>
+                {filterSupplier === "all" ? "Fournisseur" : suppliers.find(s => s.id === filterSupplier)?.name ?? "Fournisseur"}
+              </span>
+              <span style={{ color: "#999", fontSize: 12, transition: "transform .2s", transform: filterDropdown === "supplier" ? "rotate(180deg)" : "rotate(0)" }}>▼</span>
+            </button>
+            {filterDropdown === "supplier" && (
+              <div style={{ background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 12px 12px", maxHeight: 300, overflowY: "auto", marginTop: -2 }}>
+                <button
+                  type="button"
+                  onClick={() => { setFilterSupplier("all"); setFilterDropdown(null); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", width: "100%",
+                    background: filterSupplier === "all" ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer",
+                  }}
+                >
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ccc", flexShrink: 0 }} />
+                  <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 14, color: "#1a1a1a", textTransform: "uppercase", flex: 1, textAlign: "left" }}>Tous</span>
+                  {filterSupplier === "all" && <span style={{ color: "#D4775A", fontSize: 15, fontWeight: 700 }}>✓</span>}
+                </button>
+                {suppliers.filter(s => s.is_active).map(s => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => { setFilterSupplier(s.id); setFilterDropdown(null); }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", width: "100%",
+                      background: filterSupplier === s.id ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer",
+                    }}
+                  >
+                    <span style={{ width: 10, height: 10, borderRadius: "50%", background: cachedSupplierColor(s.name), flexShrink: 0 }} />
+                    <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 14, color: "#1a1a1a", textTransform: "uppercase", flex: 1, textAlign: "left" }}>{s.name}</span>
+                    {filterSupplier === s.id && <span style={{ color: "#D4775A", fontSize: 15, fontWeight: 700 }}>✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+          {/* ── Categorie dropdown ── */}
           <div>
-            <div style={{ fontSize: 12, color: "#999", marginBottom: 6 }}>Fournisseur</div>
-            <Dropdown
-              value={filterSupplier}
-              onChange={setFilterSupplier}
-              options={[{ value: "all", label: "Tous" }, ...suppliers.filter(s => s.is_active).map(s => ({ value: s.id, label: s.name }))]}
-            />
+            <button
+              type="button"
+              onClick={() => setFilterDropdown(filterDropdown === "category" ? null : "category")}
+              style={{
+                display: "flex", alignItems: "center", width: "100%", padding: "14px 16px",
+                background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 12, cursor: "pointer",
+              }}
+            >
+              {filterCategory !== "all" && <span style={{ width: 10, height: 10, borderRadius: "50%", background: CAT_COLORS[filterCategory as Category], flexShrink: 0, marginRight: 10 }} />}
+              <span style={{ flex: 1, textAlign: "left", fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 15, color: filterCategory === "all" ? "#999" : "#1a1a1a", textTransform: "uppercase" }}>
+                {filterCategory === "all" ? "Categorie" : CAT_LABELS[filterCategory as Category]}
+              </span>
+              <span style={{ color: "#999", fontSize: 12, transition: "transform .2s", transform: filterDropdown === "category" ? "rotate(180deg)" : "rotate(0)" }}>▼</span>
+            </button>
+            {filterDropdown === "category" && (
+              <div style={{ background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 12px 12px", maxHeight: 300, overflowY: "auto", marginTop: -2 }}>
+                <button
+                  type="button"
+                  onClick={() => { setFilterCategory("all"); setFilterDropdown(null); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", width: "100%",
+                    background: filterCategory === "all" ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer",
+                  }}
+                >
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ccc", flexShrink: 0 }} />
+                  <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 14, color: "#1a1a1a", textTransform: "uppercase", flex: 1, textAlign: "left" }}>Toutes</span>
+                  {filterCategory === "all" && <span style={{ color: "#D4775A", fontSize: 15, fontWeight: 700 }}>✓</span>}
+                </button>
+                {CATEGORIES_ALPHA.map(c => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => { setFilterCategory(c); setFilterDropdown(null); }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", width: "100%",
+                      background: filterCategory === c ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer",
+                    }}
+                  >
+                    <span style={{ width: 10, height: 10, borderRadius: "50%", background: CAT_COLORS[c], flexShrink: 0 }} />
+                    <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 14, color: "#1a1a1a", textTransform: "uppercase", flex: 1, textAlign: "left" }}>{CAT_LABELS[c]}</span>
+                    {filterCategory === c && <span style={{ color: "#D4775A", fontSize: 15, fontWeight: 700 }}>✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <button
             type="button"

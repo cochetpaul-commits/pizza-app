@@ -42,7 +42,8 @@ const ETABLISSEMENTS = [
 
 const CATEGORIES: Categorie[] = [
   "cremerie_fromage", "charcuterie_viande", "maree",
-  "legumes_herbes", "epicerie", "boissons",
+  "legumes_herbes", "epicerie", "vins", "spiritueux", "biere",
+  "soft", "cafeteria", "liqueurs", "sirops",
   "surgele", "emballage_entretien", "autre",
 ];
 
