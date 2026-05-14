@@ -1085,8 +1085,8 @@ function IngredientsPageInner() {
               </div>
             </div>
 
-            {/* Dropdowns + Search — all on one row */}
-            <div className="ing-desktop-filters" style={{ gridTemplateColumns: "1fr 1fr 2fr", gap: 8 }}>
+            {/* Dropdowns + Search + Add — all on one row */}
+            <div className="ing-desktop-filters" style={{ gridTemplateColumns: "1fr 1fr 2fr auto", gap: 8 }}>
               <Dropdown
                 value={filterCategory}
                 onChange={(v) => setFilterCategory(v as "all" | Category)}
@@ -1112,6 +1112,19 @@ function IngredientsPageInner() {
                   }}
                 />
               </div>
+              {userCanWrite && (
+                <button
+                  onClick={() => setShowCreateForm(true)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6, padding: "9px 16px",
+                    borderRadius: 10, border: "none", background: accentColor,
+                    color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+                  }}
+                >
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                  Ajouter
+                </button>
+              )}
             </div>
             {/* Mobile only: Search + Filtres + compact */}
             <div className="ing-mobile-search" style={{ display: "none", gap: 8 }}>
