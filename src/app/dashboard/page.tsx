@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
+import Chart from "chart.js/auto";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { T } from "@/lib/tokens";
@@ -169,7 +170,7 @@ async function fetchAllVentesRows(
 }
 
 function GroupContent() {
-  const { etablissements, setGroupView } = useEtablissement();
+  const { etablissements, setGroupView, setCurrent } = useEtablissement();
   const [period, setPeriod] = useState<Period>("mois");
 
   const todayStr = useMemo(
@@ -209,11 +210,15 @@ function GroupContent() {
   }, [period, todayStr, today]);
 
   const [etabData, setEtabData] = useState<Record<string, EtabKpis>>({});
+  const [dailyCa, setDailyCa] = useState<{ date: string; total: number; byEtab: Record<string, number> }[]>([]);
+  const [mixCats, setMixCats] = useState<{ cat: string; ca: number }[]>([]);
   const [caExercice, setCaExercice] = useState(0);
   const [achatsMonth, setAchatsMonth] = useState(0);
   const [topFournisseurs, setTopFournisseurs] = useState<SupplierTotal[]>([]);
   const [tresoBalance, setTresoBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const chartRef = useRef<HTMLCanvasElement | null>(null);
+  const chartInstance = useRef<Chart | null>(null);
 
   // Set group view
   useEffect(() => {
@@ -250,6 +255,34 @@ function GroupContent() {
       const couverts = new Set(rows.map((r) => r.num_fiscal).filter(Boolean)).size;
       return { id: etab.id, ca, couverts };
     });
+
+    // 2c. Daily CA breakdown for chart + mix categories
+    const dailyPromise = (async () => {
+      const byDate: Record<string, Record<string, number>> = {};
+      const mixCats: Record<string, number> = {};
+      for (const etab of etablissements) {
+        const rows = await fetchAllVentesRows(etab.id, range.start, range.end, "ttc, date_service, categorie");
+        for (const r of rows) {
+          const d = String(r.date_service);
+          if (!byDate[d]) byDate[d] = {};
+          byDate[d][etab.id] = (byDate[d][etab.id] ?? 0) + (Number(r.ttc) || 0);
+          const cat = String(r.categorie || "Autre");
+          mixCats[cat] = (mixCats[cat] ?? 0) + (Number(r.ttc) || 0);
+        }
+      }
+      const daily = Object.entries(byDate)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, etabs]) => ({
+          date,
+          total: Object.values(etabs).reduce((s, v) => s + v, 0),
+          byEtab: etabs,
+        }));
+      const mix = Object.entries(mixCats)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 10)
+        .map(([cat, ca]) => ({ cat, ca }));
+      return { daily, mix };
+    })();
 
     // 3. CA exercice (cumulative fiscal year)
     const fyPromise = (async () => {
@@ -306,10 +339,11 @@ function GroupContent() {
     })();
 
     // Execute all in parallel
-    const [caResults, caPrevResults, caA1Results, fy, achats, treso] = await Promise.all([
+    const [caResults, caPrevResults, caA1Results, dailyResult, fy, achats, treso] = await Promise.all([
       Promise.all(caPromises),
       Promise.all(caPrevPromises),
       Promise.all(caA1Promises),
+      dailyPromise,
       fyPromise,
       achatsPromise,
       tresoPromise,
@@ -330,6 +364,8 @@ function GroupContent() {
       };
     }
     setEtabData(result);
+    setDailyCa(dailyResult.daily);
+    setMixCats(dailyResult.mix);
     setCaExercice(fy);
     setAchatsMonth(achats.total);
     setTopFournisseurs(achats.top3);
@@ -340,6 +376,49 @@ function GroupContent() {
   useEffect(() => {
     fetchData(); // eslint-disable-line react-hooks/set-state-in-effect
   }, [fetchData]);
+
+  // Draw chart
+  useEffect(() => {
+    if (!chartRef.current || dailyCa.length === 0) return;
+    if (chartInstance.current) chartInstance.current.destroy();
+
+    const etabIds = etablissements.map(e => e.id);
+    const etabColors: Record<string, string> = {};
+    for (const e of etablissements) {
+      etabColors[e.id] = e.slug?.includes("bello") ? T.belloMio : T.piccolaMia;
+    }
+
+    const labels = dailyCa.map(d => {
+      const dt = new Date(d.date + "T12:00:00");
+      return dt.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" });
+    });
+
+    const datasets = etabIds.map(id => ({
+      label: etablissements.find(e => e.id === id)?.nom ?? "",
+      data: dailyCa.map(d => Math.round(d.byEtab[id] ?? 0)),
+      backgroundColor: etabColors[id] + "CC",
+      borderRadius: 4,
+    }));
+
+    chartInstance.current = new Chart(chartRef.current, {
+      type: "bar",
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: etabIds.length > 1, position: "top", labels: { boxWidth: 10, font: { size: 11 } } },
+          tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${(ctx.parsed.y ?? 0).toLocaleString("fr-FR")} \u20AC` } },
+        },
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+          y: { stacked: true, grid: { color: "#f0ebe2" }, ticks: { font: { size: 10 }, callback: (v) => `${Number(v).toLocaleString("fr-FR")}` } },
+        },
+      },
+    });
+
+    return () => { chartInstance.current?.destroy(); chartInstance.current = null; };
+  }, [dailyCa, etablissements]);
 
   // Derived totals
   const totalCa = Object.values(etabData).reduce((s, d) => s + d.ca, 0);
@@ -570,6 +649,67 @@ function GroupContent() {
         />
       </div>
 
+      {/* ── Graphique CA par jour ── */}
+      {dailyCa.length > 0 && (
+        <>
+          <SectionTitle>CA par jour</SectionTitle>
+          <div
+            style={{
+              background: T.white,
+              borderRadius: 12,
+              padding: "14px 16px",
+              border: "1px solid #e0d8ce",
+              marginBottom: 24,
+            }}
+          >
+            <canvas ref={chartRef} height={200} />
+          </div>
+        </>
+      )}
+
+      {/* ── Mix catégories ── */}
+      {mixCats.length > 0 && (
+        <>
+          <SectionTitle>Mix categories</SectionTitle>
+          <div
+            style={{
+              background: T.white,
+              borderRadius: 12,
+              padding: "14px 16px",
+              border: "1px solid #e0d8ce",
+              marginBottom: 24,
+            }}
+          >
+            {mixCats.map((m, i) => {
+              const pct = totalCa > 0 ? (m.ca / totalCa) * 100 : 0;
+              return (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "5px 0",
+                    borderBottom: i < mixCats.length - 1 ? "1px solid #f0ebe2" : "none",
+                  }}
+                >
+                  <span style={{ flex: 1, fontSize: 12, color: T.dark }}>{m.cat}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, fontFamily: OSWALD, color: T.dark, minWidth: 70, textAlign: "right" }}>
+                    {fmtEur(m.ca)} {"\u20AC"}
+                  </span>
+                  <span style={{ fontSize: 11, color: T.muted, minWidth: 45, textAlign: "right" }}>
+                    {fmtPct(pct)}%
+                  </span>
+                  <div style={{ width: 60, height: 6, background: "#f0ebe2", borderRadius: 3, overflow: "hidden" }}>
+                    <div style={{ width: `${Math.min(pct, 100)}%`, height: "100%", background: GROUP_COLOR, borderRadius: 3 }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
       {/* ── Par etablissement ── */}
       <SectionTitle>Par etablissement</SectionTitle>
       <div
@@ -586,10 +726,10 @@ function GroupContent() {
           const delta = d.caPrev > 0 ? Math.round(((d.ca - d.caPrev) / d.caPrev) * 100) : null;
           const deltaA1 = d.caA1 > 0 ? Math.round(((d.ca - d.caA1) / d.caA1) * 100) : null;
           const color = etab.slug?.includes("bello") ? T.belloMio : T.piccolaMia;
-          const slug = etab.slug?.includes("bello") ? "/bello-mio" : "/piccola-mia";
+          const ventesHref = `/ventes?from=${range.start}&to=${range.end}`;
 
           return (
-            <Link key={etab.id} href={slug} style={{ textDecoration: "none" }}>
+            <Link key={etab.id} href={ventesHref} onClick={() => { const target = etablissements.find(e => e.id === etab.id); if (target) { setCurrent(target); setGroupView(false); } }} style={{ textDecoration: "none" }}>
               <div
                 style={{
                   background: T.white,
