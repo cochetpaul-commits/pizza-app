@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef, type CSSProperties } from "react";
+import Chart from "chart.js/auto";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -557,6 +558,62 @@ function TresoreriePage() {
       .slice(0, 20);
   }, [ops, period.months.length]);
 
+  // Marge par mois (CA - achats fournisseurs)
+  const margeParMois = useMemo(() => {
+    return period.months.map(pm => {
+      const from = ymToFrom(pm.y, pm.m);
+      const to = ymToTo(pm.y, pm.m);
+      let ca = 0;
+      for (const v of venteLines) {
+        if (v.date_service >= from && v.date_service <= to) ca += Number(v.ttc);
+      }
+      let achats = 0;
+      for (const inv of invoices) {
+        if (inv.invoice_date && inv.invoice_date >= from && inv.invoice_date <= to) achats += Number(inv.total_ht ?? 0);
+      }
+      // Sorties banque (debits)
+      let sorties = 0;
+      for (const op of ops) {
+        if (op.operation_date >= from && op.operation_date <= to && Number(op.amount) < 0) sorties += Math.abs(Number(op.amount));
+      }
+      return {
+        label: getMonthLabel(pm.y, pm.m),
+        ca: Math.round(ca),
+        achats: Math.round(achats),
+        marge: Math.round(ca - achats),
+        sorties: Math.round(sorties),
+        tresoNette: Math.round(ca - sorties),
+      };
+    });
+  }, [period.months, venteLines, invoices, ops]);
+
+  // Chart refs for marge
+  const margeChartRef = useRef<HTMLCanvasElement | null>(null);
+  const margeChartInstance = useRef<Chart | null>(null);
+  useEffect(() => {
+    if (!margeChartRef.current || margeParMois.length === 0) return;
+    if (margeChartInstance.current) margeChartInstance.current.destroy();
+    margeChartInstance.current = new Chart(margeChartRef.current, {
+      type: "bar",
+      data: {
+        labels: margeParMois.map(m => m.label),
+        datasets: [
+          { label: "CA TTC", data: margeParMois.map(m => m.ca), backgroundColor: "#4a674180", borderRadius: 4, order: 2 },
+          { label: "Achats HT", data: margeParMois.map(m => m.achats), backgroundColor: "#DC262680", borderRadius: 4, order: 2 },
+          { label: "Sorties banque", data: margeParMois.map(m => m.sorties), backgroundColor: "#D4775A80", borderRadius: 4, order: 2 },
+          { label: "Marge (CA-Achats)", data: margeParMois.map(m => m.marge), type: "line" as const, borderColor: "#4a6741", backgroundColor: "#4a674120", pointRadius: 4, pointBackgroundColor: "#4a6741", borderWidth: 2, fill: false, order: 1 },
+          { label: "Treso nette (CA-Sorties)", data: margeParMois.map(m => m.tresoNette), type: "line" as const, borderColor: "#D4775A", backgroundColor: "#D4775A20", pointRadius: 4, pointBackgroundColor: "#D4775A", borderWidth: 2, borderDash: [5, 3], fill: false, order: 1 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 10 } } }, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${(ctx.parsed.y ?? 0).toLocaleString("fr-FR")} \u20AC` } } },
+        scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } }, y: { grid: { color: "#f0ebe2" }, ticks: { font: { size: 10 }, callback: v => `${(Number(v) / 1000).toFixed(0)}k` } } },
+      },
+    });
+    return () => { margeChartInstance.current?.destroy(); margeChartInstance.current = null; };
+  }, [margeParMois]);
+
   // Top 10 depenses
   const topDepenses = useMemo(() => {
     return ops
@@ -940,6 +997,43 @@ function TresoreriePage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </>
+            )}
+
+            {/* ══════ Croisement Tresorerie vs Marge ══════ */}
+            {margeParMois.length > 0 && margeParMois.some(m => m.ca > 0 || m.sorties > 0) && (
+              <>
+                <div style={S.sec}>Tresorerie reelle vs marge globale</div>
+                <div style={{ ...S.card, padding: "16px 14px", marginBottom: 16 }}>
+                  <canvas ref={margeChartRef} height={220} />
+                </div>
+                {/* Summary table */}
+                <div style={{ ...S.card, padding: 0, overflow: "hidden", marginBottom: 16 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                    <thead>
+                      <tr style={{ background: "#f5f0e8" }}>
+                        <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, fontSize: 9, letterSpacing: ".08em", textTransform: "uppercase", color: "#777" }}>Mois</th>
+                        <th style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700, fontSize: 9, color: "#4a6741" }}>CA TTC</th>
+                        <th style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700, fontSize: 9, color: "#DC2626" }}>Achats</th>
+                        <th style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700, fontSize: 9, color: "#4a6741" }}>Marge</th>
+                        <th style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700, fontSize: 9, color: "#D4775A" }}>Sorties</th>
+                        <th style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700, fontSize: 9, color: "#D4775A" }}>Treso nette</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {margeParMois.map((m, i) => (
+                        <tr key={i} style={{ borderTop: "1px solid #f0ebe2" }}>
+                          <td style={{ padding: "8px 10px", fontWeight: 600 }}>{m.label}</td>
+                          <td style={{ padding: "8px 10px", textAlign: "right", fontFamily: OSWALD, color: "#4a6741" }}>{fmtEur(m.ca)}</td>
+                          <td style={{ padding: "8px 10px", textAlign: "right", fontFamily: OSWALD, color: "#DC2626" }}>{fmtEur(m.achats)}</td>
+                          <td style={{ padding: "8px 10px", textAlign: "right", fontFamily: OSWALD, fontWeight: 700, color: m.marge >= 0 ? "#4a6741" : "#DC2626" }}>{fmtEur(m.marge)}{m.ca > 0 ? ` (${Math.round((m.marge / m.ca) * 100)}%)` : ""}</td>
+                          <td style={{ padding: "8px 10px", textAlign: "right", fontFamily: OSWALD, color: "#D4775A" }}>{fmtEur(m.sorties)}</td>
+                          <td style={{ padding: "8px 10px", textAlign: "right", fontFamily: OSWALD, fontWeight: 700, color: m.tresoNette >= 0 ? "#4a6741" : "#DC2626" }}>{fmtEur(m.tresoNette)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </>
             )}
