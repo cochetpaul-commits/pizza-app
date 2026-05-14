@@ -701,6 +701,7 @@ function IngredientsPageInner() {
       name: x.name, category: x.category, is_active: x.is_active, supplierId,
       importName: x.import_name ?? x.name,
       popinaName: x.popina_name ?? "",
+      popinaDoseCl: x.popina_dose_cl != null ? String(x.popina_dose_cl) : "",
       useOffer: !isPrep,
       baseUnit, baseUnitLabel, pieceContentQty, pieceContentUnit,
       hasConditionnement, conditionnementLabel, qtyPerConditionnement,
@@ -847,6 +848,7 @@ function IngredientsPageInner() {
     const up: Partial<IngredientUpsert> = {
       name, category: edit.category, is_active: edit.is_active, supplier_id,
       popina_name: edit.popinaName.trim() || null,
+      popina_dose_cl: edit.popinaDoseCl ? parseFloat(edit.popinaDoseCl) || null : null,
       piece_volume_ml: pieceVolumeMl,
       purchase_unit_label: purchaseUnitLabel,
       allergens: edit.allergens.length ? edit.allergens : null,

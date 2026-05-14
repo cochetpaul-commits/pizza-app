@@ -101,6 +101,8 @@ export type Ingredient = {
   import_name?: string | null;
   /** Nom du produit dans Popina (caisse) pour le matching ventes → food cost */
   popina_name?: string | null;
+  /** Dose servie en cl (ex: 5cl pour un verre de liqueur) — null = produit vendu entier */
+  popina_dose_cl?: number | null;
   category: Category;
     allergens: unknown | null;
   is_active: boolean;
@@ -179,6 +181,7 @@ export type IngredientUpsert = {
   name: string;
   import_name?: string | null;
   popina_name?: string | null;
+  popina_dose_cl?: number | null;
   category: Category;
     allergens: unknown | null;
   is_active: boolean;

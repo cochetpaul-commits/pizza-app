@@ -143,7 +143,7 @@ export async function GET(req: NextRequest) {
   /* ── 2b. Ingredients with popina_name → fallback matching ── */
   const { data: popinaIngredients } = await supabaseAdmin
     .from("ingredients")
-    .select("id, popina_name, cost_per_unit, cost_per_kg, name")
+    .select("id, popina_name, popina_dose_cl, piece_volume_ml, cost_per_unit, cost_per_kg, name")
     .not("popina_name", "is", null)
     .eq("is_active", true);
 
@@ -164,13 +164,21 @@ export async function GET(req: NextRequest) {
 
   for (const ing of popinaIngredients ?? []) {
     if (!ing.popina_name) continue;
-    const cost = ing.cost_per_unit ?? ing.cost_per_kg ?? offerPriceMap.get(ing.id) ?? 0;
-    if (cost <= 0) continue;
+    let unitCost = ing.cost_per_unit ?? ing.cost_per_kg ?? offerPriceMap.get(ing.id) ?? 0;
+    if (unitCost <= 0) continue;
+
+    // If dose is configured, compute cost per dose: (dose_cl × 10 / volume_ml) × unit_price
+    const doseCl = Number(ing.popina_dose_cl) || 0;
+    const volumeMl = Number(ing.piece_volume_ml) || 0;
+    if (doseCl > 0 && volumeMl > 0) {
+      unitCost = (doseCl * 10 / volumeMl) * unitCost;
+    }
+
     const key = normalize(ing.popina_name);
     if (!recipeCosts.has(key)) {
       recipeCosts.set(key, {
         name: ing.popina_name,
-        cost,
+        cost: Math.round(unitCost * 100) / 100,
         type: "ingredient",
         recipeCategory: "Ingredients",
       });
