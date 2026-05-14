@@ -140,16 +140,31 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  /* ── 2b. Ingredients with popina_name → fallback matching by cost_per_unit ── */
+  /* ── 2b. Ingredients with popina_name → fallback matching ── */
   const { data: popinaIngredients } = await supabaseAdmin
     .from("ingredients")
-    .select("popina_name, cost_per_unit, cost_per_kg, name")
+    .select("id, popina_name, cost_per_unit, cost_per_kg, name")
     .not("popina_name", "is", null)
     .eq("is_active", true);
 
+  // Also fetch supplier offers for these ingredients to get prices
+  const popinaIds = (popinaIngredients ?? []).map(i => i.id);
+  const { data: popinaOffers } = popinaIds.length > 0
+    ? await supabaseAdmin.from("supplier_offers").select("ingredient_id, unit_price, pack_price, pack_count, pack_each_qty, price_kind").eq("is_active", true).in("ingredient_id", popinaIds)
+    : { data: [] };
+  const offerPriceMap = new Map<string, number>();
+  for (const o of popinaOffers ?? []) {
+    if (offerPriceMap.has(o.ingredient_id)) continue;
+    if (o.unit_price && o.unit_price > 0) { offerPriceMap.set(o.ingredient_id, o.unit_price); continue; }
+    if (o.pack_price && o.pack_count) {
+      const perUnit = o.pack_price / (o.pack_count * (o.pack_each_qty ?? 1));
+      if (perUnit > 0) offerPriceMap.set(o.ingredient_id, perUnit);
+    }
+  }
+
   for (const ing of popinaIngredients ?? []) {
     if (!ing.popina_name) continue;
-    const cost = ing.cost_per_unit ?? ing.cost_per_kg ?? 0;
+    const cost = ing.cost_per_unit ?? ing.cost_per_kg ?? offerPriceMap.get(ing.id) ?? 0;
     if (cost <= 0) continue;
     const key = normalize(ing.popina_name);
     if (!recipeCosts.has(key)) {
