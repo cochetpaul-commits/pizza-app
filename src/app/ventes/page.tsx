@@ -1777,6 +1777,8 @@ function RecapTable({ services, mode, meteo, dates, days, useWeeks: useWeeksProp
           <th style={{ ...thSt(), color: ZC.emp }}>Emp.</th>
           <th style={{ ...thSt(), color: "#D4775A" }}>Total</th>
           <th style={thSt()}>Cvts</th>
+          <th style={{ ...thSt(), color: "#46655a" }}>SP</th>
+          <th style={{ ...thSt(), color: "#D4775A" }}>EMP</th>
           <th style={thSt()}>CVT M SP</th>
           <th style={{ ...thSt("center"), width: 40 }}>Meteo</th>
         </tr>
@@ -1801,6 +1803,8 @@ function RecapTable({ services, mode, meteo, dates, days, useWeeks: useWeeksProp
                 {zCell(z?.emp, ZC.emp)}
                 <td style={{ ...tdSt, fontWeight: 700, fontSize: 13, color: "#D4775A" }}>{fmt(caVal)}</td>
                 <td style={{ ...tdSt, fontWeight: 600 }}>{s.cov}</td>
+                <td style={{ ...tdSt, fontSize: 11, color: "#46655a" }}>{s.sp_cov || "\u2014"}</td>
+                <td style={{ ...tdSt, fontSize: 11, color: "#D4775A" }}>{s.cov - s.sp_cov > 0 ? s.cov - s.sp_cov : "\u2014"}</td>
                 <td style={tdSt}><span style={{ background: tmBg, color: tmColor, padding: "3px 9px", borderRadius: 5, fontSize: 11, fontWeight: 700 }}>{tmSp.toFixed(0)}{"\u20AC"}</span></td>
                 {(() => {
                   const dateKey = dayToDate[s.jour];
