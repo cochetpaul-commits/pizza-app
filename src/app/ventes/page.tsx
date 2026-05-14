@@ -557,6 +557,34 @@ function PerformancesPage() {
       <PilotageSwipeWrapper dateFrom={range.from} dateTo={range.to}>
       <div className="ventes-container" style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 16px 120px" }}>
 
+        {/* DateRangePicker — centered (desktop) */}
+        <div className="desktop-only" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginBottom: 10 }}>
+          <button type="button" onClick={() => {
+            const nf = new Date(new Date(range.from + "T12:00:00").getTime() - 86400000);
+            const nt = new Date(new Date(range.to + "T12:00:00").getTime() - 86400000);
+            setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
+          }} style={{
+            width: 30, height: 30, borderRadius: 8, border: "1px solid #e0d8ce",
+            background: "#fff", color: accent, fontSize: 13, fontWeight: 700,
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+          }}>{"←"}</button>
+          <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
+          <button type="button" onClick={() => {
+            const today = new Date().toISOString().slice(0, 10);
+            if (range.from >= today) return;
+            const nf = new Date(new Date(range.from + "T12:00:00").getTime() + 86400000);
+            const nt = new Date(new Date(range.to + "T12:00:00").getTime() + 86400000);
+            setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
+          }} style={{
+            width: 30, height: 30, borderRadius: 8, border: "1px solid #e0d8ce",
+            background: range.from >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : "#fff",
+            color: range.from >= new Date().toISOString().slice(0, 10) ? "#ccc" : accent,
+            fontSize: 13, fontWeight: 700,
+            cursor: range.from >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>{"→"}</button>
+        </div>
+
         {/* TTC/HT toggle + actions desktop */}
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
           <div style={{ display: "flex", gap: 0, background: "#f0ebe2", border: "1px solid #e8e0d0", borderRadius: 999, padding: 2 }}>
@@ -570,32 +598,6 @@ function PerformancesPage() {
               background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#999",
               fontSize: 11, fontWeight: 700, letterSpacing: ".03em",
             }}>HT</button>
-          </div>
-          <div className="desktop-only" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <button type="button" onClick={() => {
-              const nf = new Date(new Date(range.from + "T12:00:00").getTime() - 86400000);
-              const nt = new Date(new Date(range.to + "T12:00:00").getTime() - 86400000);
-              setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
-            }} style={{
-              width: 30, height: 30, borderRadius: 8, border: "1px solid #e0d8ce",
-              background: "#fff", color: accent, fontSize: 13, fontWeight: 700,
-              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>{"←"}</button>
-            <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
-            <button type="button" onClick={() => {
-              const today = new Date().toISOString().slice(0, 10);
-              if (range.from >= today) return;
-              const nf = new Date(new Date(range.from + "T12:00:00").getTime() + 86400000);
-              const nt = new Date(new Date(range.to + "T12:00:00").getTime() + 86400000);
-              setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
-            }} style={{
-              width: 30, height: 30, borderRadius: 8, border: "1px solid #e0d8ce",
-              background: range.from >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : "#fff",
-              color: range.from >= new Date().toISOString().slice(0, 10) ? "#ccc" : accent,
-              fontSize: 13, fontWeight: 700,
-              cursor: range.from >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>{"→"}</button>
           </div>
           <label className="desktop-only" style={{
             padding: "6px 14px", borderRadius: 8, border: "none",

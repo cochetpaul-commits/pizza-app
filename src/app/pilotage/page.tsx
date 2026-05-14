@@ -226,6 +226,21 @@ function WeekSelector({ weekStr, currentWeek, onPrev, onNext }: {
         cursor: isNow ? "not-allowed" : "pointer",
         padding: "0 4px", fontWeight: 700, lineHeight: 1,
       }}>→</button>
+      {(() => {
+        const mon = isoWeekToMonday(weekStr);
+        const sun = new Date(mon);
+        sun.setDate(mon.getDate() + 6);
+        const fmt = (d: Date) => d.toISOString().slice(0, 10);
+        return (
+          <a href={`/ventes?from=${fmt(mon)}&to=${fmt(sun)}`} style={{
+            fontSize: 11, fontWeight: 700, color: ACCENT, textDecoration: "none",
+            padding: "5px 12px", borderRadius: 8, border: `1px solid ${ACCENT}`,
+            whiteSpace: "nowrap", flexShrink: 0,
+          }}>
+            Rapport détaillé →
+          </a>
+        );
+      })()}
     </div>
   );
 }
