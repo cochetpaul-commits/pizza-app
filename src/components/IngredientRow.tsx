@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
+
+const LIQUID_CATS = new Set<string>(["vins", "spiritueux", "biere", "liqueurs", "soft", "sirops", "cafeteria"]);
 import type { CSSProperties } from "react";
 import {
   CATEGORIES,
@@ -781,14 +783,16 @@ export const IngredientRow = React.memo(function IngredientRow({
                 placeholder="Nom dans la caisse"
                 style={{ flex: 1, fontSize: 11, padding: "6px 10px", border: "1.5px solid #e5ddd0", borderRadius: 8, background: "#fff", outline: "none", color: "#1a1a1a", height: 32 }}
               />
-              <input
-                value={edit.popinaDoseCl}
-                onChange={(e) => onEditChange({ ...edit, popinaDoseCl: e.target.value })}
-                placeholder="Dose cl"
-                inputMode="decimal"
-                style={{ width: 70, fontSize: 11, padding: "6px 10px", border: "1.5px solid #e5ddd0", borderRadius: 8, background: "#fff", outline: "none", color: "#1a1a1a", height: 32, textAlign: "center" }}
-              />
-              {edit.popinaDoseCl && <span style={{ fontSize: 10, color: "#aaa", flexShrink: 0 }}>cl</span>}
+              {LIQUID_CATS.has(edit.category) && <>
+                <input
+                  value={edit.popinaDoseCl}
+                  onChange={(e) => onEditChange({ ...edit, popinaDoseCl: e.target.value })}
+                  placeholder="Dose cl"
+                  inputMode="decimal"
+                  style={{ width: 70, fontSize: 11, padding: "6px 10px", border: "1.5px solid #e5ddd0", borderRadius: 8, background: "#fff", outline: "none", color: "#1a1a1a", height: 32, textAlign: "center" }}
+                />
+                {edit.popinaDoseCl && <span style={{ fontSize: 10, color: "#aaa", flexShrink: 0 }}>cl</span>}
+              </>}
             </div>
           </div>
 
@@ -836,13 +840,13 @@ export const IngredientRow = React.memo(function IngredientRow({
                 placeholder="Nom Popina (caisse)"
                 style={{ flex: 1, fontSize: 11, padding: "8px 10px", border: "1.5px solid #e5ddd0", borderRadius: 8, background: "#fff", outline: "none", color: "#1a1a1a" }}
               />
-              <input
+              {LIQUID_CATS.has(edit.category) && <input
                 value={edit.popinaDoseCl}
                 onChange={(e) => onEditChange({ ...edit, popinaDoseCl: e.target.value })}
                 placeholder="cl"
                 inputMode="decimal"
                 style={{ width: 55, fontSize: 11, padding: "8px 6px", border: "1.5px solid #e5ddd0", borderRadius: 8, background: "#fff", outline: "none", color: "#1a1a1a", textAlign: "center" }}
-              />
+              />}
             </div>
           </div>
 
