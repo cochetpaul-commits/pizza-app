@@ -1159,6 +1159,32 @@ export default function FournisseursPage() {
     <RequireRole allowedRoles={["group_admin", "equipier"]}>
       <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
 
+        {/* Desktop action buttons */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          <Link
+            href="/commandes"
+            style={{
+              display: "flex", alignItems: "center", gap: 6, padding: "10px 18px",
+              borderRadius: 10, border: "none", background: "#D4775A",
+              color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", textDecoration: "none",
+            }}
+          >
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+            Commander
+          </Link>
+          <button
+            onClick={openCreateModal}
+            style={{
+              display: "flex", alignItems: "center", gap: 6, padding: "10px 18px",
+              borderRadius: 10, border: "1.5px solid #ddd6c8", background: "#fff",
+              color: "#1a1a1a", fontSize: 14, fontWeight: 700, cursor: "pointer",
+            }}
+          >
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            Nouveau fournisseur
+          </button>
+        </div>
+
         {loading && <p style={{ color: "#999", fontSize: 14, textAlign: "center", marginTop: 40 }}>Chargement...</p>}
 
         {!loading && (
