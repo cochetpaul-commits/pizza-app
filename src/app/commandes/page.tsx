@@ -1059,15 +1059,21 @@ function CommandesPage() {
     const obj = item.stock_objectif;
     if (obj == null || obj <= 0) return null;
     const min = item.stock_min ?? 0;
+    const packCount = item.pack_count ?? 0;
     const rawQty = Number(quantities[item.id] ?? 0);
-    // Color: green if qty >= objectif, orange if between min and objectif, red if below min
-    let color = "#DC2626"; // red by default (no quantity)
+    // Color based on raw qty (in individual units) vs objectives
+    let color = "#DC2626";
     let bg = "#ffebee";
     if (rawQty >= obj) { color = "#2e7d32"; bg = "#e8f5e9"; }
     else if (rawQty > 0 && rawQty >= min) { color = "#e65100"; bg = "#fff3e0"; }
+    // Display: show stock in individual units + carton equivalent if applicable
+    const indiv = individualUnitLabel(item);
+    const label = packCount > 0
+      ? `obj. ${obj} ${indiv}s (${Math.ceil(obj / packCount)} crt)`
+      : `obj. ${obj}`;
     return (
       <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: bg, color, whiteSpace: "nowrap" }}>
-        obj. {obj}
+        {label}
       </span>
     );
   }
