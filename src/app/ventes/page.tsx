@@ -1780,6 +1780,7 @@ function RecapTable({ services, mode, meteo, dates, days, useWeeks: useWeeksProp
           <th style={{ ...thSt(), color: "#46655a" }}>SP</th>
           <th style={{ ...thSt(), color: "#D4775A" }}>EMP</th>
           <th style={thSt()}>CVT M SP</th>
+          <th style={thSt()}>CVT M EMP</th>
           <th style={{ ...thSt("center"), width: 40 }}>Meteo</th>
         </tr>
       </thead>
@@ -1806,6 +1807,13 @@ function RecapTable({ services, mode, meteo, dates, days, useWeeks: useWeeksProp
                 <td style={{ ...tdSt, fontSize: 11, color: "#46655a" }}>{s.sp_cov || "\u2014"}</td>
                 <td style={{ ...tdSt, fontSize: 11, color: "#D4775A" }}>{s.cov - s.sp_cov > 0 ? s.cov - s.sp_cov : "\u2014"}</td>
                 <td style={tdSt}><span style={{ background: tmBg, color: tmColor, padding: "3px 9px", borderRadius: 5, fontSize: 11, fontWeight: 700 }}>{tmSp.toFixed(0)}{"\u20AC"}</span></td>
+                {(() => {
+                  const empCov = s.cov - s.sp_cov;
+                  const empCa = mode === "ttc" ? s.emp_ttc : s.emp_ht;
+                  const tmEmp = empCov > 0 ? empCa / empCov : 0;
+                  if (empCov <= 0) return <td style={tdSt}>{"\u2014"}</td>;
+                  return <td style={tdSt}><span style={{ background: "#FFF0EB", color: "#D4775A", padding: "3px 9px", borderRadius: 5, fontSize: 11, fontWeight: 700 }}>{tmEmp.toFixed(0)}{"\u20AC"}</span></td>;
+                })()}
                 {(() => {
                   const dateKey = dayToDate[s.jour];
                   const m = dateKey ? meteo[`${dateKey}:${s.svc}`] : null;
