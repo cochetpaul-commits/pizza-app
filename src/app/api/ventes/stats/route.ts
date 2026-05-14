@@ -455,6 +455,8 @@ function aggregate(rows: Row[]) {
 
   const anti = upsellStats(cats => cats.has("Antipasti"));
   const dolci = upsellStats(cats => cats.has("Dolci"));
+  const pizze = upsellStats(cats => cats.has("Pizze"));
+  const plats = upsellStats(cats => cats.has("Plats") || cats.has("Cuisine"));
   const vin = upsellStats(cats => cats.has("Vins"));
   const alcool = upsellStats(cats => cats.has("Alcool"));
   const boissons = upsellStats(cats => cats.has("Boissons") || cats.has("Alcool") || cats.has("Vins"));
@@ -590,7 +592,7 @@ function aggregate(rows: Row[]) {
     top3_cats,
     serveurs, serv_ca_ttc, serv_ca_ht, serv_tickets, serv_cov,
     ratios: {
-      anti, dolci, vin, alcool, boissons, digestif, cafe,
+      anti, dolci, pizze, plats, vin, alcool, boissons, digestif, cafe,
       avgCovPerTable,
     },
     pay,
@@ -938,7 +940,7 @@ async function buildFromDailySales(etabId: string, from: string, to: string) {
     serv_tickets: [] as number[],
     serv_cov: [] as number[],
     ratios: {
-      anti: emptyUpsell, dolci: emptyUpsell, vin: emptyUpsell,
+      anti: emptyUpsell, dolci: emptyUpsell, pizze: emptyUpsell, plats: emptyUpsell, vin: emptyUpsell,
       alcool: emptyUpsell, boissons: emptyUpsell, digestif: emptyUpsell, cafe: emptyUpsell,
       avgCovPerTable: 0,
     },

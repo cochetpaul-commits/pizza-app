@@ -299,7 +299,10 @@ export function DateRangePicker({ value, onChange, presets = DEFAULT_PRESETS, fo
     // Calculate position from trigger button
     if (rootRef.current) {
       const rect = rootRef.current.getBoundingClientRect();
-      setPopoverPos({ top: rect.bottom + 6, left: rect.left });
+      const popoverWidth = 620; // approximate width of the popover
+      const centerLeft = rect.left + rect.width / 2 - popoverWidth / 2;
+      const clampedLeft = Math.max(8, Math.min(centerLeft, window.innerWidth - popoverWidth - 8));
+      setPopoverPos({ top: rect.bottom + 6, left: clampedLeft });
     }
     setOpen(true);
   };

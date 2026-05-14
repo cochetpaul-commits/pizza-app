@@ -41,6 +41,8 @@ type WeekData = {
   ratios: {
     anti: { tables: number; coverts: number; ca_ttc: number; ca_ht: number };
     dolci: { tables: number; coverts: number; ca_ttc: number; ca_ht: number };
+    pizze: { tables: number; coverts: number; ca_ttc: number; ca_ht: number };
+    plats: { tables: number; coverts: number; ca_ttc: number; ca_ht: number };
     vin: { tables: number; coverts: number; ca_ttc: number; ca_ht: number };
     alcool: { tables: number; coverts: number; ca_ttc: number; ca_ht: number };
     boissons: { tables: number; coverts: number; ca_ttc: number; ca_ht: number };
@@ -876,6 +878,8 @@ function PerformancesPage() {
               <div style={S.sec}>Upsell · performance de la periode</div>
               <div className="ventes-upsell-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
                 <UpsellCard label="Antipasti" emoji="🥗" data={W.ratios.anti} totalTables={W.tickets} totalCov={W.couverts} color="#D4775A" targets={{ ok: 30, good: 50, avgPrice: 12 }} mode={mode} action="Suggerer en debut de service" onClick={() => setExpandedCat(expandedCat === "Antipasti" ? null : "Antipasti")} active={expandedCat === "Antipasti"} />
+                <UpsellCard label="Pizzas" emoji="🍕" data={W.ratios.pizze} totalTables={W.tickets} totalCov={W.couverts} color="#c94c2c" targets={{ ok: 50, good: 70, avgPrice: 14 }} mode={mode} action="Plat principal" onClick={() => setExpandedCat(expandedCat === "Pizze" ? null : "Pizze")} active={expandedCat === "Pizze"} />
+                <UpsellCard label="Plats / Pasta" emoji="🍝" data={W.ratios.plats} totalTables={W.tickets} totalCov={W.couverts} color="#8a6b3e" targets={{ ok: 40, good: 60, avgPrice: 16 }} mode={mode} action="Plat principal" onClick={() => setExpandedCat(expandedCat === "Plats" ? null : "Plats")} active={expandedCat === "Plats"} />
                 <UpsellCard label="Desserts" emoji="🍮" data={W.ratios.dolci} totalTables={W.tickets} totalCov={W.couverts} color="#b5904a" targets={{ ok: 80, good: 100, avgPrice: 9 }} mode={mode} action="Proposer systematiquement en fin de plat" onClick={() => setExpandedCat(expandedCat === "Dolci" ? null : "Dolci")} active={expandedCat === "Dolci"} />
                 <UpsellCard label="Vins" emoji="🍷" data={W.ratios.vin} totalTables={W.tickets} totalCov={W.couverts} color="#7c5c3a" targets={{ ok: 60, good: 80, avgPrice: 6 }} mode={mode} action="Suggerer un verre a l'ouverture du menu" onClick={() => setExpandedCat(expandedCat === "Vins" ? null : "Vins")} active={expandedCat === "Vins"} />
               </div>
