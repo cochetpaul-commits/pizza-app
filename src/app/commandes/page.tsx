@@ -1476,7 +1476,13 @@ function CommandesPage() {
                         color: Number(quantities[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0,
                       }}>{item.name}</span>
+                      {stockBadge(item)}
                     </div>
+                    {conditionLabel(item) && (
+                      <div style={{ paddingLeft: 28, fontSize: 10, color: "#999", marginTop: -2 }}>
+                        Cond. : {conditionLabel(item)}
+                      </div>
+                    )}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: 28 }}>
                       {unitPriceBadge(item)}
                       <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
