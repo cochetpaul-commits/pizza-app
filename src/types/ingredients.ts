@@ -99,6 +99,8 @@ export type Ingredient = {
   /** Clé stable utilisée pour le matching lors des imports de factures.
    *  Ne jamais modifier automatiquement. Fallback sur `name` si null. */
   import_name?: string | null;
+  /** Nom du produit dans Popina (caisse) pour le matching ventes → food cost */
+  popina_name?: string | null;
   category: Category;
     allergens: unknown | null;
   is_active: boolean;
@@ -176,6 +178,7 @@ export type LatestOffer = {
 export type IngredientUpsert = {
   name: string;
   import_name?: string | null;
+  popina_name?: string | null;
   category: Category;
     allergens: unknown | null;
   is_active: boolean;

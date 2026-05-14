@@ -30,7 +30,7 @@ type VenteLigne = {
 type RecipeCost = {
   name: string;
   cost: number;
-  type: "pizza" | "kitchen" | "cocktail";
+  type: "pizza" | "kitchen" | "cocktail" | "ingredient";
   recipeCategory: string;
 };
 
@@ -136,6 +136,28 @@ export async function GET(req: NextRequest) {
         cost: r.total_cost,
         type: "cocktail",
         recipeCategory: "Cocktails",
+      });
+    }
+  }
+
+  /* ── 2b. Ingredients with popina_name → fallback matching by cost_per_unit ── */
+  const { data: popinaIngredients } = await supabaseAdmin
+    .from("ingredients")
+    .select("popina_name, cost_per_unit, cost_per_kg, name")
+    .not("popina_name", "is", null)
+    .eq("is_active", true);
+
+  for (const ing of popinaIngredients ?? []) {
+    if (!ing.popina_name) continue;
+    const cost = ing.cost_per_unit ?? ing.cost_per_kg ?? 0;
+    if (cost <= 0) continue;
+    const key = normalize(ing.popina_name);
+    if (!recipeCosts.has(key)) {
+      recipeCosts.set(key, {
+        name: ing.popina_name,
+        cost,
+        type: "ingredient",
+        recipeCategory: "Ingredients",
       });
     }
   }
