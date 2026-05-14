@@ -808,7 +808,8 @@ function IngredientsPageInner() {
     if (edit.hasConditionnement) {
       const cp = parseNum(edit.pricePerConditionnement);
       const cq = parseNum(edit.qtyPerConditionnement);
-      if (cp != null && cp > 0) summary += ` -- ${cp.toFixed(2)}EUR/${edit.conditionnementLabel || "cond."}${cq ? ` (${cq} ${baseLabel})` : ""}`;
+      const contentInfo = edit.baseUnit === "piece" && edit.pieceContentQty ? ` de ${edit.pieceContentQty}${edit.pieceContentUnit}` : "";
+      if (cp != null && cp > 0) summary += ` -- ${cp.toFixed(2)}EUR/${edit.conditionnementLabel || "cond."}${cq ? ` (${cq} ${baseLabel}${contentInfo})` : ""}`;
     }
     if (edit.baseUnit === "piece" && (parseNum(edit.pieceContentQty) ?? 0) > 0) {
       const kp = parseNum(edit.pricePerKgOrL);

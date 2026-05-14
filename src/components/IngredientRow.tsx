@@ -622,7 +622,12 @@ export const IngredientRow = React.memo(function IngredientRow({
                     onChange={(e) => { const next = { ...edit, qtyPerConditionnement: numVal(e.target.value) }; if (edit.priceSource) autoCalc(next); onEditChange(next); }}
                     placeholder="ex: 6" />
                 </div>
-                <span style={{ fontSize: 11, color: "#888", paddingBottom: 8 }}>{baseLabel}(s)</span>
+                <span style={{ fontSize: 11, color: "#888", paddingBottom: 8 }}>
+                  {baseLabel}{baseLabel !== "kg" && baseLabel !== "litre" ? "(s)" : ""}
+                  {edit.baseUnit === "piece" && edit.pieceContentQty && (
+                    <span style={{ color: "#bbb" }}> de {edit.pieceContentQty}{edit.pieceContentUnit}</span>
+                  )}
+                </span>
               </div>
             )}
           </div>
