@@ -1050,6 +1050,17 @@ function CommandesPage() {
 
   // ── Render: unit toggle (individual/carton) ──────────────────────────
 
+  function conditionLabel(item: CatalogItem): string | null {
+    const packCount = item.pack_count ?? 0;
+    if (packCount <= 0) return null;
+    const indiv = individualUnitLabel(item);
+    const packEachQty = item.pack_each_qty ?? 1;
+    if (packEachQty > 1) {
+      return `${packCount} × ${packEachQty} ${indiv}s`;
+    }
+    return `${packCount} ${indiv}${packCount > 1 ? "s" : ""}`;
+  }
+
   function individualUnitLabel(item: CatalogItem): string {
     const u = (item.order_unit ?? item.default_unit ?? "").toLowerCase();
     if (u === "pc" || u === "pcs" || u === "piece" || u === "pièce") return "unité";
@@ -1417,6 +1428,11 @@ function CommandesPage() {
                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0,
                           }}>{item.name}</span>
                         </div>
+                        {conditionLabel(item) && (
+                          <div style={{ paddingLeft: 28, fontSize: 10, color: "#999", marginTop: -2 }}>
+                            Cond. : {conditionLabel(item)}
+                          </div>
+                        )}
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: 28 }}>
                           {unitPriceBadge(item)}
                           <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
