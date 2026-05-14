@@ -71,6 +71,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} ${dmSans.variable} ${oswald.variable} ${cormorantGaramond.variable} antialiased`}>
         <Providers>{children}</Providers>
+        <script dangerouslySetInnerHTML={{ __html: `
+          if ("serviceWorker" in navigator) {
+            window.addEventListener("load", function() {
+              navigator.serviceWorker.register("/sw.js").catch(function() {});
+            });
+          }
+        `}} />
       </body>
     </html>
   );
