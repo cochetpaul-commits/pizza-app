@@ -223,7 +223,7 @@ function MargesPage() {
   const [trendFilter, setTrendFilter] = useState<"all" | "product" | "category">("all");
   const [trendProduct, setTrendProduct] = useState<string | null>(null);
   const [trendCategory, setTrendCategory] = useState<string | null>(null);
-  const [trendMode, setTrendMode] = useState<TrendMode>("par_jour_semaine");
+  const [trendMode, setTrendMode] = useState<TrendMode>("par_mois");
   const [trendMetric, setTrendMetric] = useState<"qty" | "ca_ht">("qty");
   const [trendService, setTrendService] = useState<"all" | "midi" | "soir">("all");
   // Trend dates sync avec la page par défaut
