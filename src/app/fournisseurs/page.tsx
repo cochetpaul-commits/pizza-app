@@ -299,8 +299,13 @@ export default function FournisseursPage() {
       // Inactive supplier → delete permanently
       if (!window.confirm(`Supprimer définitivement "${s.name}" ?\n\nCette action est irréversible.`)) return;
       // Clean up related data
-      await supabase.from("supplier_contacts").delete().eq("supplier_id", s.id);
-      await supabase.from("supplier_offers").delete().eq("supplier_id", s.id);
+      await Promise.all([
+        supabase.from("supplier_contacts").delete().eq("supplier_id", s.id),
+        supabase.from("supplier_offers").delete().eq("supplier_id", s.id),
+        supabase.from("supplier_invoice_lines").update({ supplier_id: null }).eq("supplier_id", s.id),
+        supabase.from("ingredients").update({ supplier_id: null }).eq("supplier_id", s.id),
+        supabase.from("ingredients").update({ default_supplier_id: null }).eq("default_supplier_id", s.id),
+      ]);
       const { error } = await supabase.from("suppliers").delete().eq("id", s.id);
       if (error) { alert(`Erreur : ${error.message}`); return; }
       setSuppliers(prev => prev.filter(x => x.id !== s.id));
