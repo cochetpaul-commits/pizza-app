@@ -1095,16 +1095,64 @@ function IngredientsPageInner() {
 
             {/* Dropdowns + Search + Add — all on one row */}
             <div className="ing-desktop-filters" style={{ gridTemplateColumns: "1fr 1fr 2fr auto", gap: 8 }}>
-              <Dropdown
-                value={filterCategory}
-                onChange={(v) => setFilterCategory(v as "all" | Category)}
-                options={[{ value: "all", label: "Toutes categories" }, ...CATEGORIES_ALPHA.map(c => ({ value: c, label: CAT_LABELS[c] }))]}
-              />
-              <Dropdown
-                value={filterSupplier}
-                onChange={setFilterSupplier}
-                options={[{ value: "all", label: "Tous fournisseurs" }, ...suppliers.filter(s => s.is_active).map(s => ({ value: s.id, label: s.name }))]}
-              />
+              {/* Fournisseur dropdown desktop */}
+              <div style={{ position: "relative" }}>
+                <button type="button" onClick={() => setFilterDropdown(filterDropdown === "supplier" ? null : "supplier")}
+                  style={{ display: "flex", alignItems: "center", width: "100%", padding: "9px 14px", background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 10, cursor: "pointer" }}>
+                  {filterSupplier !== "all" && (() => { const s = suppliers.find(x => x.id === filterSupplier); return s ? <span style={{ width: 8, height: 8, borderRadius: "50%", background: cachedSupplierColor(s.name), flexShrink: 0, marginRight: 8 }} /> : null; })()}
+                  <span style={{ flex: 1, textAlign: "left", fontSize: 13, fontWeight: 600, color: filterSupplier === "all" ? "#999" : "#1a1a1a" }}>
+                    {filterSupplier === "all" ? "Tous fournisseurs" : suppliers.find(s => s.id === filterSupplier)?.name ?? "Fournisseur"}
+                  </span>
+                  <span style={{ color: "#999", fontSize: 10, transform: filterDropdown === "supplier" ? "rotate(180deg)" : "rotate(0)", transition: "transform .2s" }}>▼</span>
+                </button>
+                {filterDropdown === "supplier" && (
+                  <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50, background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: 280, overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
+                    <button type="button" onClick={() => { setFilterSupplier("all"); setFilterDropdown(null); }}
+                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", width: "100%", background: filterSupplier === "all" ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer" }}>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ccc", flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", flex: 1, textAlign: "left" }}>Tous</span>
+                      {filterSupplier === "all" && <span style={{ color: "#D4775A", fontWeight: 700, fontSize: 13 }}>✓</span>}
+                    </button>
+                    {suppliers.filter(s => s.is_active).map(s => (
+                      <button key={s.id} type="button" onClick={() => { setFilterSupplier(s.id); setFilterDropdown(null); }}
+                        style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", width: "100%", background: filterSupplier === s.id ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer" }}>
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: cachedSupplierColor(s.name), flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", flex: 1, textAlign: "left" }}>{s.name}</span>
+                        {filterSupplier === s.id && <span style={{ color: "#D4775A", fontWeight: 700, fontSize: 13 }}>✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* Categorie dropdown desktop */}
+              <div style={{ position: "relative" }}>
+                <button type="button" onClick={() => setFilterDropdown(filterDropdown === "category" ? null : "category")}
+                  style={{ display: "flex", alignItems: "center", width: "100%", padding: "9px 14px", background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 10, cursor: "pointer" }}>
+                  {filterCategory !== "all" && <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAT_COLORS[filterCategory as Category], flexShrink: 0, marginRight: 8 }} />}
+                  <span style={{ flex: 1, textAlign: "left", fontSize: 13, fontWeight: 600, color: filterCategory === "all" ? "#999" : "#1a1a1a" }}>
+                    {filterCategory === "all" ? "Toutes categories" : CAT_LABELS[filterCategory as Category]}
+                  </span>
+                  <span style={{ color: "#999", fontSize: 10, transform: filterDropdown === "category" ? "rotate(180deg)" : "rotate(0)", transition: "transform .2s" }}>▼</span>
+                </button>
+                {filterDropdown === "category" && (
+                  <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50, background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: 280, overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
+                    <button type="button" onClick={() => { setFilterCategory("all"); setFilterDropdown(null); }}
+                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", width: "100%", background: filterCategory === "all" ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer" }}>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ccc", flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", flex: 1, textAlign: "left" }}>Toutes</span>
+                      {filterCategory === "all" && <span style={{ color: "#D4775A", fontWeight: 700, fontSize: 13 }}>✓</span>}
+                    </button>
+                    {CATEGORIES_ALPHA.map(c => (
+                      <button key={c} type="button" onClick={() => { setFilterCategory(c); setFilterDropdown(null); }}
+                        style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", width: "100%", background: filterCategory === c ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer" }}>
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAT_COLORS[c], flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", flex: 1, textAlign: "left" }}>{CAT_LABELS[c]}</span>
+                        {filterCategory === c && <span style={{ color: "#D4775A", fontWeight: 700, fontSize: 13 }}>✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div style={{ position: "relative" }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
                   <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
