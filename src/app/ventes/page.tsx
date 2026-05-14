@@ -1562,15 +1562,41 @@ function UpsellCard({ label, emoji, data, totalTables, totalCov, color, targets,
   const pct = totalTables > 0 ? Math.round(data.tables / totalTables * 100) : 0;
   const pctCov = totalCov > 0 ? Math.round(data.coverts / totalCov * 100) : 0;
   const ca = mode === "ttc" ? data.ca_ttc : data.ca_ht;
-  void action; // kept for API compat
+  void action;
+
+  // Ratio couverts lisible
+  const covRatio = data.coverts > 0 && totalCov > 0 ? (() => {
+    const r = data.coverts / totalCov;
+    if (r >= 0.9) return "9 cvt sur 10";
+    if (r >= 0.8) return "4 cvt sur 5";
+    if (r >= 0.65) return "2 cvt sur 3";
+    if (r >= 0.45) return "1 cvt sur 2";
+    if (r >= 0.3) return "1 cvt sur 3";
+    if (r >= 0.2) return "1 cvt sur 5";
+    return `1 cvt sur ${Math.round(1 / r)}`;
+  })() : null;
+
+  // Arrow vs objectif
+  const aboveObj = pct >= targets.ok;
+  const arrowColor = aboveObj ? "#2e7d32" : "#DC2626";
+  const arrow = aboveObj ? "↑" : "↓";
+  const diff = pct - targets.ok;
 
   return (
     <div onClick={onClick} style={{ padding: "12px 14px", background: active ? `${color}10` : "#f9f6f0", borderRadius: 10, cursor: onClick ? "pointer" : "default", border: active ? `1.5px solid ${color}30` : "1.5px solid transparent", transition: "all 0.15s" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
         <span style={{ fontSize: 14 }}>{emoji}</span>
         <span style={{ fontSize: 11, fontWeight: 600 }}>{label}</span>
+        {pct > 0 && (
+          <span style={{ fontSize: 10, fontWeight: 700, color: arrowColor, marginLeft: "auto" }}>
+            {arrow} {diff > 0 ? "+" : ""}{diff}%
+          </span>
+        )}
       </div>
-      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color, lineHeight: 1, marginBottom: 4 }}>{pct}%</div>
+      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color, lineHeight: 1, marginBottom: 2 }}>{pct}%</div>
+      {covRatio && (
+        <div style={{ fontSize: 9, color: "#999", marginBottom: 4 }}>{covRatio}</div>
+      )}
       <div style={{ fontSize: 10, color: "#777", marginBottom: 6 }}>
         {data.tables}/{totalTables} tables · {data.coverts} cvt ({pctCov}%)
       </div>
