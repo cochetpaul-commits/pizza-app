@@ -54,6 +54,8 @@ type CatalogItem = {
   favori_commande?: boolean;
   pack_count: number | null;
   pack_each_qty: number | null;
+  stock_objectif: number | null;
+  stock_min: number | null;
 };
 
 type HistItem = {
@@ -546,7 +548,7 @@ function CommandesPage() {
     let items: CatalogItem[] = [];
     if (allIds.length > 0) {
       // Try with favori_commande, fallback without if column doesn't exist
-      const selectCols = "id, name, category, default_unit, favori_commande, order_unit_label, order_quantity";
+      const selectCols = "id, name, category, default_unit, favori_commande, order_unit_label, order_quantity, stock_objectif, stock_min";
       let ingDataQ = supabase
         .from("ingredients")
         .select(selectCols)
@@ -561,7 +563,7 @@ function CommandesPage() {
         console.warn("[commandes] ingredient query error, retrying without favori_commande:", ingErr.message);
         let fallbackQ = supabase
           .from("ingredients")
-          .select("id, name, category, default_unit, order_unit_label, order_quantity")
+          .select("id, name, category, default_unit, order_unit_label, order_quantity, stock_objectif, stock_min")
           .in("id", allIds)
           .order("category")
           .order("name");
@@ -573,7 +575,8 @@ function CommandesPage() {
 
       if (ingErr) console.error("[commandes] ingredient query error:", ingErr.message);
 
-      items = (ingData ?? []).map((ing: { id: string; name: string; category: string | null; default_unit: string | null; favori_commande?: boolean; order_unit_label?: string | null; order_quantity?: number | null }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      items = (ingData ?? []).map((ing: any) => {
         const offer = (offerMap.get(ing.id) ?? null) as OfferRow | null;
         const oq = ing.order_quantity ?? null;
         return {
@@ -585,6 +588,8 @@ function CommandesPage() {
           prix_commande: computeOrderUnitPrice(offer, oq),
           pack_count: offer?.pack_count ?? null,
           pack_each_qty: offer?.pack_each_qty ?? null,
+          stock_objectif: ing.stock_objectif ?? null,
+          stock_min: ing.stock_min ?? null,
         };
       });
     }
@@ -1050,6 +1055,23 @@ function CommandesPage() {
 
   // ── Render: unit toggle (individual/carton) ──────────────────────────
 
+  function stockBadge(item: CatalogItem) {
+    const obj = item.stock_objectif;
+    if (obj == null || obj <= 0) return null;
+    const min = item.stock_min ?? 0;
+    const rawQty = Number(quantities[item.id] ?? 0);
+    // Color: green if qty >= objectif, orange if between min and objectif, red if below min
+    let color = "#DC2626"; // red by default (no quantity)
+    let bg = "#ffebee";
+    if (rawQty >= obj) { color = "#2e7d32"; bg = "#e8f5e9"; }
+    else if (rawQty > 0 && rawQty >= min) { color = "#e65100"; bg = "#fff3e0"; }
+    return (
+      <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: bg, color, whiteSpace: "nowrap" }}>
+        obj. {obj}
+      </span>
+    );
+  }
+
   function conditionLabel(item: CatalogItem): string | null {
     const packCount = item.pack_count ?? 0;
     if (packCount <= 0) return null;
@@ -1427,6 +1449,7 @@ function CommandesPage() {
                             color: Number(quantities[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0,
                           }}>{item.name}</span>
+                          {stockBadge(item)}
                         </div>
                         {conditionLabel(item) && (
                           <div style={{ paddingLeft: 28, fontSize: 10, color: "#999", marginTop: -2 }}>
