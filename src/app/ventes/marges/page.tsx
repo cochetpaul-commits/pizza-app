@@ -653,6 +653,11 @@ function MargesPage() {
             .marges-toolbar-desktop { display: none !important; }
           }
         `}</style>
+        {/* DateRangePicker — centered (desktop) */}
+        <div className="desktop-only" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginBottom: 10 }}>
+          <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
+        </div>
+
         {/* TTC/HT toggle + actions desktop */}
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
           <div style={{ display: "flex", gap: 0, background: "#f0ebe2", border: "1px solid #e8e0d0", borderRadius: 999, padding: 2 }}>

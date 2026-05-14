@@ -880,6 +880,8 @@ function PerformancesPage() {
                 <UpsellCard label="Antipasti" emoji="🥗" data={W.ratios.anti} totalTables={W.tickets} totalCov={W.couverts} color="#D4775A" targets={{ ok: 30, good: 50, avgPrice: 12 }} mode={mode} action="Suggerer en debut de service" onClick={() => setExpandedCat(expandedCat === "Antipasti" ? null : "Antipasti")} active={expandedCat === "Antipasti"} />
                 <UpsellCard label="Pizzas" emoji="🍕" data={W.ratios.pizze} totalTables={W.tickets} totalCov={W.couverts} color="#c94c2c" targets={{ ok: 50, good: 70, avgPrice: 14 }} mode={mode} action="Plat principal" onClick={() => setExpandedCat(expandedCat === "Pizze" ? null : "Pizze")} active={expandedCat === "Pizze"} />
                 <UpsellCard label="Plats / Pasta" emoji="🍝" data={W.ratios.plats} totalTables={W.tickets} totalCov={W.couverts} color="#8a6b3e" targets={{ ok: 40, good: 60, avgPrice: 16 }} mode={mode} action="Plat principal" onClick={() => setExpandedCat(expandedCat === "Plats" ? null : "Plats")} active={expandedCat === "Plats"} />
+              </div>
+              <div className="ventes-upsell-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14, maxWidth: "66%" }}>
                 <UpsellCard label="Desserts" emoji="🍮" data={W.ratios.dolci} totalTables={W.tickets} totalCov={W.couverts} color="#b5904a" targets={{ ok: 80, good: 100, avgPrice: 9 }} mode={mode} action="Proposer systematiquement en fin de plat" onClick={() => setExpandedCat(expandedCat === "Dolci" ? null : "Dolci")} active={expandedCat === "Dolci"} />
                 <UpsellCard label="Vins" emoji="🍷" data={W.ratios.vin} totalTables={W.tickets} totalCov={W.couverts} color="#7c5c3a" targets={{ ok: 60, good: 80, avgPrice: 6 }} mode={mode} action="Suggerer un verre a l'ouverture du menu" onClick={() => setExpandedCat(expandedCat === "Vins" ? null : "Vins")} active={expandedCat === "Vins"} />
               </div>
@@ -1580,7 +1582,16 @@ function UpsellCard({ label, emoji, data, totalTables, totalCov, color, targets,
       </div>
       <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 28, fontWeight: 700, color, lineHeight: 1, marginBottom: 4 }}>{pct}%</div>
       <div style={{ fontSize: 11, color: "#777", marginBottom: 6 }}>
-        des tables · <strong style={{ color: "#1a1a1a" }}>{data.coverts > 0 ? `1 cvt sur ${Math.round(totalCov / data.coverts)}` : "\u2014"}</strong>
+        des tables · <strong style={{ color: "#1a1a1a" }}>{data.coverts > 0 && totalCov > 0 ? (() => {
+          const ratio = data.coverts / totalCov;
+          if (ratio >= 0.9) return "9 cvt sur 10";
+          if (ratio >= 0.8) return "4 cvt sur 5";
+          if (ratio >= 0.65) return "2 cvt sur 3";
+          if (ratio >= 0.45) return "1 cvt sur 2";
+          if (ratio >= 0.3) return "1 cvt sur 3";
+          if (ratio >= 0.2) return "1 cvt sur 5";
+          return `1 cvt sur ${Math.round(1 / ratio)}`;
+        })() : "\u2014"}</strong>
       </div>
       {/* Tables + Couverts */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8, fontSize: 10 }}>
