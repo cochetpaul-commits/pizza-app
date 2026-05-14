@@ -289,14 +289,22 @@ export default function FournisseursPage() {
 
   async function handleDeleteSupplier(s: SupplierRow, e?: React.MouseEvent) {
     if (e) e.stopPropagation();
-    if (!window.confirm(`Supprimer le fournisseur "${s.name}" ?\n\nLes factures et commandes liées seront conservées mais plus rattachées.`)) return;
-    // Désactive au lieu de supprimer (is_active = false) pour préserver l'intégrité
-    const { error } = await supabase.from("suppliers").update({ is_active: false }).eq("id", s.id);
-    if (error) {
-      alert(`Erreur : ${error.message}`);
-      return;
+    if (s.is_active) {
+      // Active supplier → deactivate
+      if (!window.confirm(`Désactiver le fournisseur "${s.name}" ?`)) return;
+      const { error } = await supabase.from("suppliers").update({ is_active: false }).eq("id", s.id);
+      if (error) { alert(`Erreur : ${error.message}`); return; }
+      setSuppliers(prev => prev.map(x => x.id === s.id ? { ...x, is_active: false } : x));
+    } else {
+      // Inactive supplier → delete permanently
+      if (!window.confirm(`Supprimer définitivement "${s.name}" ?\n\nCette action est irréversible.`)) return;
+      // Clean up related data
+      await supabase.from("supplier_contacts").delete().eq("supplier_id", s.id);
+      await supabase.from("supplier_offers").delete().eq("supplier_id", s.id);
+      const { error } = await supabase.from("suppliers").delete().eq("id", s.id);
+      if (error) { alert(`Erreur : ${error.message}`); return; }
+      setSuppliers(prev => prev.filter(x => x.id !== s.id));
     }
-    setSuppliers(prev => prev.filter(x => x.id !== s.id));
   }
 
   async function openModal(s: SupplierRow) {
