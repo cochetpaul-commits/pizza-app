@@ -299,10 +299,18 @@ export default function FournisseursPage() {
       // Inactive supplier → delete permanently
       if (!window.confirm(`Supprimer définitivement "${s.name}" ?\n\nCette action est irréversible.`)) return;
       // Clean up related data
+      // First: delete invoice lines that reference invoices of this supplier
+      const { data: invIds } = await supabase.from("supplier_invoices").select("id").eq("supplier_id", s.id);
+      if (invIds?.length) {
+        await supabase.from("supplier_invoice_lines").delete().in("invoice_id", invIds.map(i => i.id));
+      }
       await Promise.all([
+        supabase.from("supplier_invoices").delete().eq("supplier_id", s.id),
         supabase.from("supplier_contacts").delete().eq("supplier_id", s.id),
         supabase.from("supplier_offers").delete().eq("supplier_id", s.id),
-        supabase.from("supplier_invoice_lines").update({ supplier_id: null }).eq("supplier_id", s.id),
+        supabase.from("commande_lignes").delete().in("session_id",
+          (await supabase.from("commande_sessions").select("id").eq("supplier_id", s.id)).data?.map(x => x.id) ?? []),
+        supabase.from("commande_sessions").delete().eq("supplier_id", s.id),
         supabase.from("ingredients").update({ supplier_id: null }).eq("supplier_id", s.id),
         supabase.from("ingredients").update({ default_supplier_id: null }).eq("default_supplier_id", s.id),
       ]);
