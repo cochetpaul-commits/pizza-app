@@ -65,6 +65,13 @@ function getPreviousPeriodRange(
   return getPeriodRange(period, prevRef);
 }
 
+/** Same period one year ago */
+function getA1Range(period: Period, ref: string): { start: string; end: string } {
+  const y = parseInt(ref.slice(0, 4));
+  const a1Ref = `${y - 1}${ref.slice(4)}`;
+  return getPeriodRange(period, a1Ref);
+}
+
 function getPeriodRange(period: Period, ref: string): { start: string; end: string } {
   if (period === "semaine") {
     const mon = getMonday(ref);
@@ -89,8 +96,10 @@ function getPeriodRange(period: Period, ref: string): { start: string; end: stri
 type EtabKpis = {
   ca: number;
   caPrev: number;
+  caA1: number;
   couverts: number;
   couvertsPrev: number;
+  couvertsA1: number;
 };
 
 type SupplierTotal = { name: string; total: number };
@@ -192,6 +201,7 @@ function GroupContent() {
 
   const range = useMemo(() => getPeriodRange(period, today), [period, today]);
   const prevRange = useMemo(() => getPreviousPeriodRange(period, today), [period, today]);
+  const a1Range = useMemo(() => getA1Range(period, today), [period, today]);
   const fiscalStart = useMemo(() => getFiscalYearStart(today), [today]);
 
   const isCurrentPeriod = useMemo(() => {
@@ -228,6 +238,14 @@ function GroupContent() {
     // 2. CA for previous period per etab
     const caPrevPromises = etablissements.map(async (etab) => {
       const rows = await fetchAllVentesRows(etab.id, prevRange.start, prevRange.end);
+      const ca = rows.reduce((s, r) => s + (Number(r.ttc) || 0), 0);
+      const couverts = new Set(rows.map((r) => r.num_fiscal).filter(Boolean)).size;
+      return { id: etab.id, ca, couverts };
+    });
+
+    // 2b. CA for same period A-1 (year ago)
+    const caA1Promises = etablissements.map(async (etab) => {
+      const rows = await fetchAllVentesRows(etab.id, a1Range.start, a1Range.end);
       const ca = rows.reduce((s, r) => s + (Number(r.ttc) || 0), 0);
       const couverts = new Set(rows.map((r) => r.num_fiscal).filter(Boolean)).size;
       return { id: etab.id, ca, couverts };
@@ -288,9 +306,10 @@ function GroupContent() {
     })();
 
     // Execute all in parallel
-    const [caResults, caPrevResults, fy, achats, treso] = await Promise.all([
+    const [caResults, caPrevResults, caA1Results, fy, achats, treso] = await Promise.all([
       Promise.all(caPromises),
       Promise.all(caPrevPromises),
+      Promise.all(caA1Promises),
       fyPromise,
       achatsPromise,
       tresoPromise,
@@ -300,11 +319,14 @@ function GroupContent() {
     const result: Record<string, EtabKpis> = {};
     for (const cur of caResults) {
       const prev = caPrevResults.find((p) => p.id === cur.id);
+      const a1 = caA1Results.find((p) => p.id === cur.id);
       result[cur.id] = {
         ca: cur.ca,
         caPrev: prev?.ca ?? 0,
+        caA1: a1?.ca ?? 0,
         couverts: cur.couverts,
         couvertsPrev: prev?.couverts ?? 0,
+        couvertsA1: a1?.couverts ?? 0,
       };
     }
     setEtabData(result);
@@ -313,7 +335,7 @@ function GroupContent() {
     setTopFournisseurs(achats.top3);
     setTresoBalance(treso);
     setLoading(false);
-  }, [etablissements, range, prevRange, fiscalStart, today]);
+  }, [etablissements, range, prevRange, a1Range, fiscalStart, today]);
 
   useEffect(() => {
     fetchData(); // eslint-disable-line react-hooks/set-state-in-effect
@@ -322,8 +344,10 @@ function GroupContent() {
   // Derived totals
   const totalCa = Object.values(etabData).reduce((s, d) => s + d.ca, 0);
   const totalCaPrev = Object.values(etabData).reduce((s, d) => s + d.caPrev, 0);
+  const totalCaA1 = Object.values(etabData).reduce((s, d) => s + d.caA1, 0);
   const totalCouverts = Object.values(etabData).reduce((s, d) => s + d.couverts, 0);
   const totalCouvertsPrev = Object.values(etabData).reduce((s, d) => s + d.couvertsPrev, 0);
+  const totalCouvertsA1 = Object.values(etabData).reduce((s, d) => s + d.couvertsA1, 0);
   const ticketMoyen = totalCouverts > 0 ? totalCa / totalCouverts : 0;
   const ticketMoyenPrev = totalCouvertsPrev > 0 ? totalCaPrev / totalCouvertsPrev : 0;
   const margeGlobale = totalCa > 0 ? totalCa - achatsMonth : 0;
@@ -514,6 +538,7 @@ function GroupContent() {
           accent={GROUP_COLOR}
           delta={totalCaPrev > 0 ? ((totalCa - totalCaPrev) / totalCaPrev) * 100 : null}
           deltaLabel={prevLabel}
+          deltaA1={totalCaA1 > 0 ? ((totalCa - totalCaA1) / totalCaA1) * 100 : null}
           loading={loading}
         />
         <KpiCard
@@ -522,6 +547,7 @@ function GroupContent() {
           accent={T.dark}
           delta={totalCouvertsPrev > 0 ? ((totalCouverts - totalCouvertsPrev) / totalCouvertsPrev) * 100 : null}
           deltaLabel={prevLabel}
+          deltaA1={totalCouvertsA1 > 0 ? ((totalCouverts - totalCouvertsA1) / totalCouvertsA1) * 100 : null}
           loading={loading}
         />
         <KpiCard
@@ -530,6 +556,7 @@ function GroupContent() {
           accent={T.dore}
           delta={ticketMoyenPrev > 0 ? ((ticketMoyen - ticketMoyenPrev) / ticketMoyenPrev) * 100 : null}
           deltaLabel={prevLabel}
+          deltaA1={totalCouvertsA1 > 0 ? (() => { const tmA1 = totalCaA1 / totalCouvertsA1; return tmA1 > 0 ? ((ticketMoyen - tmA1) / tmA1) * 100 : null; })() : null}
           loading={loading}
         />
         <KpiCard
@@ -554,9 +581,10 @@ function GroupContent() {
         }}
       >
         {etablissements.map((etab) => {
-          const d = etabData[etab.id] ?? { ca: 0, caPrev: 0, couverts: 0, couvertsPrev: 0 };
+          const d = etabData[etab.id] ?? { ca: 0, caPrev: 0, caA1: 0, couverts: 0, couvertsPrev: 0, couvertsA1: 0 };
           const ticket = d.couverts > 0 ? d.ca / d.couverts : 0;
           const delta = d.caPrev > 0 ? Math.round(((d.ca - d.caPrev) / d.caPrev) * 100) : null;
+          const deltaA1 = d.caA1 > 0 ? Math.round(((d.ca - d.caA1) / d.caA1) * 100) : null;
           const color = etab.slug?.includes("bello") ? T.belloMio : T.piccolaMia;
           const slug = etab.slug?.includes("bello") ? "/bello-mio" : "/piccola-mia";
 
@@ -602,16 +630,13 @@ function GroupContent() {
                   value={`${ticket.toFixed(1).replace(".", ",")} \u20AC`}
                 />
                 {delta != null && (
-                  <div
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: delta >= 0 ? T.sauge : "#DC2626",
-                      marginTop: 2,
-                    }}
-                  >
-                    {delta > 0 ? "+" : ""}
-                    {delta}% vs {prevLabel}
+                  <div style={{ fontSize: 11, fontWeight: 600, color: delta >= 0 ? T.sauge : "#DC2626", marginTop: 2 }}>
+                    {delta > 0 ? "+" : ""}{delta}% vs {prevLabel}
+                  </div>
+                )}
+                {deltaA1 != null && (
+                  <div style={{ fontSize: 11, fontWeight: 600, color: deltaA1 >= 0 ? T.sauge : "#DC2626", marginTop: 1 }}>
+                    {deltaA1 > 0 ? "+" : ""}{deltaA1}% vs A-1
                   </div>
                 )}
               </div>
@@ -808,6 +833,7 @@ function KpiCard({
   accent,
   delta,
   deltaLabel,
+  deltaA1,
   loading,
   subtitle,
 }: {
@@ -816,6 +842,7 @@ function KpiCard({
   accent: string;
   delta: number | null;
   deltaLabel: string;
+  deltaA1?: number | null;
   loading: boolean;
   subtitle?: string;
 }) {
@@ -870,6 +897,19 @@ function KpiCard({
         >
           {delta > 0 ? "+" : ""}
           {Math.round(delta)}% vs {deltaLabel}
+        </span>
+      )}
+      {deltaA1 != null && (
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: deltaA1 >= 0 ? T.sauge : "#DC2626",
+            marginTop: 1,
+          }}
+        >
+          {deltaA1 > 0 ? "+" : ""}
+          {Math.round(deltaA1)}% vs A-1
         </span>
       )}
     </div>
