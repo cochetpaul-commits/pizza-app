@@ -876,20 +876,16 @@ function PerformancesPage() {
             {/* Upsell ratios */}
             {W.ratios.anti.tables > 0 && <div style={S.card}>
               <div style={S.sec}>Upsell · performance de la periode</div>
-              <div className="ventes-upsell-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
-                <UpsellCard label="Antipasti" emoji="🥗" data={W.ratios.anti} totalTables={W.tickets} totalCov={W.couverts} color="#D4775A" targets={{ ok: 30, good: 50, avgPrice: 12 }} mode={mode} action="Suggerer en debut de service" onClick={() => setExpandedCat(expandedCat === "Antipasti" ? null : "Antipasti")} active={expandedCat === "Antipasti"} />
-                <UpsellCard label="Pizzas" emoji="🍕" data={W.ratios.pizze} totalTables={W.tickets} totalCov={W.couverts} color="#c94c2c" targets={{ ok: 50, good: 70, avgPrice: 14 }} mode={mode} action="Plat principal" onClick={() => setExpandedCat(expandedCat === "Pizze" ? null : "Pizze")} active={expandedCat === "Pizze"} />
-                <UpsellCard label="Plats / Pasta" emoji="🍝" data={W.ratios.plats} totalTables={W.tickets} totalCov={W.couverts} color="#8a6b3e" targets={{ ok: 40, good: 60, avgPrice: 16 }} mode={mode} action="Plat principal" onClick={() => setExpandedCat(expandedCat === "Plats" ? null : "Plats")} active={expandedCat === "Plats"} />
-              </div>
-              <div className="ventes-upsell-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14, maxWidth: "66%" }}>
-                <UpsellCard label="Desserts" emoji="🍮" data={W.ratios.dolci} totalTables={W.tickets} totalCov={W.couverts} color="#b5904a" targets={{ ok: 80, good: 100, avgPrice: 9 }} mode={mode} action="Proposer systematiquement en fin de plat" onClick={() => setExpandedCat(expandedCat === "Dolci" ? null : "Dolci")} active={expandedCat === "Dolci"} />
-                <UpsellCard label="Vins" emoji="🍷" data={W.ratios.vin} totalTables={W.tickets} totalCov={W.couverts} color="#7c5c3a" targets={{ ok: 60, good: 80, avgPrice: 6 }} mode={mode} action="Suggerer un verre a l'ouverture du menu" onClick={() => setExpandedCat(expandedCat === "Vins" ? null : "Vins")} active={expandedCat === "Vins"} />
-              </div>
-              <div className="ventes-upsell-mini-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 14 }}>
-                <UpsellCardMini label="Alcool (hors vin)" emoji="🍹" data={W.ratios.alcool} totalTables={W.tickets} color="#c15f2e" mode={mode} onClick={() => setExpandedCat(expandedCat === "Alcool" ? null : "Alcool")} active={expandedCat === "Alcool"} />
-                <UpsellCardMini label="Boissons (tout)" emoji="🥤" data={W.ratios.boissons} totalTables={W.tickets} color="#5e7a8a" mode={mode} onClick={() => setExpandedCat(expandedCat === "Boissons" ? null : "Boissons")} active={expandedCat === "Boissons"} />
-                <UpsellCardMini label="Cafe / Chaud" emoji="☕" data={W.ratios.cafe} totalTables={W.tickets} color="#6f5c3a" mode={mode} onClick={() => setExpandedCat(expandedCat === "Boissons chaudes" ? null : "Boissons chaudes")} active={expandedCat === "Boissons chaudes"} />
-                <UpsellCardMini label="Digestifs" emoji="🥃" data={W.ratios.digestif} totalTables={W.tickets} color="#46655a" mode={mode} onClick={() => setExpandedCat(expandedCat === "Digestifs" ? null : "Digestifs")} active={expandedCat === "Digestifs"} />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 14 }}>
+                <UpsellCard label="Antipasti" emoji="🥗" data={W.ratios.anti} totalTables={W.tickets} totalCov={W.couverts} color="#D4775A" targets={{ ok: 30, good: 50, avgPrice: 12 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Antipasti" ? null : "Antipasti")} active={expandedCat === "Antipasti"} />
+                <UpsellCard label="Pizzas" emoji="🍕" data={W.ratios.pizze} totalTables={W.tickets} totalCov={W.couverts} color="#c94c2c" targets={{ ok: 50, good: 70, avgPrice: 14 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Pizze" ? null : "Pizze")} active={expandedCat === "Pizze"} />
+                <UpsellCard label="Plats / Pasta" emoji="🍝" data={W.ratios.plats} totalTables={W.tickets} totalCov={W.couverts} color="#8a6b3e" targets={{ ok: 40, good: 60, avgPrice: 16 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Plats" ? null : "Plats")} active={expandedCat === "Plats"} />
+                <UpsellCard label="Desserts" emoji="🍮" data={W.ratios.dolci} totalTables={W.tickets} totalCov={W.couverts} color="#b5904a" targets={{ ok: 80, good: 100, avgPrice: 9 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Dolci" ? null : "Dolci")} active={expandedCat === "Dolci"} />
+                <UpsellCard label="Vins" emoji="🍷" data={W.ratios.vin} totalTables={W.tickets} totalCov={W.couverts} color="#7c5c3a" targets={{ ok: 60, good: 80, avgPrice: 6 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Vins" ? null : "Vins")} active={expandedCat === "Vins"} />
+                <UpsellCard label="Alcool" emoji="🍹" data={W.ratios.alcool} totalTables={W.tickets} totalCov={W.couverts} color="#c15f2e" targets={{ ok: 30, good: 50, avgPrice: 8 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Alcool" ? null : "Alcool")} active={expandedCat === "Alcool"} />
+                <UpsellCard label="Boissons" emoji="🥤" data={W.ratios.boissons} totalTables={W.tickets} totalCov={W.couverts} color="#5e7a8a" targets={{ ok: 70, good: 90, avgPrice: 5 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Boissons" ? null : "Boissons")} active={expandedCat === "Boissons"} />
+                <UpsellCard label="Cafe / Chaud" emoji="☕" data={W.ratios.cafe} totalTables={W.tickets} totalCov={W.couverts} color="#6f5c3a" targets={{ ok: 25, good: 40, avgPrice: 3 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Boissons chaudes" ? null : "Boissons chaudes")} active={expandedCat === "Boissons chaudes"} />
+                <UpsellCard label="Digestifs" emoji="🥃" data={W.ratios.digestif} totalTables={W.tickets} totalCov={W.couverts} color="#46655a" targets={{ ok: 10, good: 20, avgPrice: 6 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Digestifs" ? null : "Digestifs")} active={expandedCat === "Digestifs"} />
               </div>
               {/* Expanded category detail */}
               {expandedCat && W.cat_products[expandedCat] && (() => {
@@ -1565,67 +1561,27 @@ function UpsellCard({ label, emoji, data, totalTables, totalCov, color, targets,
 }) {
   const pct = totalTables > 0 ? Math.round(data.tables / totalTables * 100) : 0;
   const pctCov = totalCov > 0 ? Math.round(data.coverts / totalCov * 100) : 0;
-  const missing = Math.max(0, totalTables - data.tables);
-  const gain = missing * targets.avgPrice;
   const ca = mode === "ttc" ? data.ca_ttc : data.ca_ht;
-  const _tmPerCov = data.coverts > 0 ? ca / data.coverts : 0;
-
-  const status = pct >= targets.good ? { t: "\u2713 Objectif atteint", c: "#2e7d32", bg: "#e8f5e9" }
-    : pct >= targets.ok ? { t: "\u2192 En progression", c: "#e65100", bg: "#fff3e0" }
-    : { t: "\u2191 A travailler", c: "#c62828", bg: "#ffebee" };
+  void action; // kept for API compat
 
   return (
-    <div onClick={onClick} style={{ padding: "14px 16px", background: active ? `${color}10` : "#f9f6f0", borderRadius: 10, height: "100%", cursor: onClick ? "pointer" : "default", border: active ? `1.5px solid ${color}30` : "1.5px solid transparent", transition: "all 0.15s" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <span style={{ fontSize: 18 }}>{emoji}</span>
-        <span style={{ fontSize: 12, fontWeight: 600 }}>{label}</span>
+    <div onClick={onClick} style={{ padding: "12px 14px", background: active ? `${color}10` : "#f9f6f0", borderRadius: 10, cursor: onClick ? "pointer" : "default", border: active ? `1.5px solid ${color}30` : "1.5px solid transparent", transition: "all 0.15s" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+        <span style={{ fontSize: 14 }}>{emoji}</span>
+        <span style={{ fontSize: 11, fontWeight: 600 }}>{label}</span>
       </div>
-      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 28, fontWeight: 700, color, lineHeight: 1, marginBottom: 4 }}>{pct}%</div>
-      <div style={{ fontSize: 11, color: "#777", marginBottom: 6 }}>
-        des tables · <strong style={{ color: "#1a1a1a" }}>{data.coverts > 0 && totalCov > 0 ? (() => {
-          const ratio = data.coverts / totalCov;
-          if (ratio >= 0.9) return "9 cvt sur 10";
-          if (ratio >= 0.8) return "4 cvt sur 5";
-          if (ratio >= 0.65) return "2 cvt sur 3";
-          if (ratio >= 0.45) return "1 cvt sur 2";
-          if (ratio >= 0.3) return "1 cvt sur 3";
-          if (ratio >= 0.2) return "1 cvt sur 5";
-          return `1 cvt sur ${Math.round(1 / ratio)}`;
-        })() : "\u2014"}</strong>
+      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color, lineHeight: 1, marginBottom: 4 }}>{pct}%</div>
+      <div style={{ fontSize: 10, color: "#777", marginBottom: 6 }}>
+        {data.tables}/{totalTables} tables · {data.coverts} cvt ({pctCov}%)
       </div>
-      {/* Tables + Couverts */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8, fontSize: 10 }}>
-        <div style={{ background: "#fff", borderRadius: 6, padding: "5px 8px" }}>
-          <div style={{ color: "#777" }}>Tables</div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{data.tables}<span style={{ color: "#bbb", fontWeight: 400 }}>/{totalTables}</span></div>
-        </div>
-        <div style={{ background: "#fff", borderRadius: 6, padding: "5px 8px" }}>
-          <div style={{ color: "#777" }}>Couverts</div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{data.coverts}<span style={{ color: "#bbb", fontWeight: 400 }}> ({pctCov}%)</span></div>
-        </div>
+      <div style={{ position: "relative", height: 6, background: "rgba(0,0,0,.07)", borderRadius: 3, overflow: "hidden", marginBottom: 4 }}>
+        <div style={{ position: "absolute", top: 0, left: 0, height: "100%", width: `${Math.min(100, pct)}%`, background: color, borderRadius: 3, transition: "width .5s" }} />
+        <div style={{ position: "absolute", top: 0, left: `${targets.ok}%`, height: "100%", width: 1.5, background: "rgba(0,0,0,.15)" }} />
       </div>
-      {/* CA + TM/couvert */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8, fontSize: 10 }}>
-        <div style={{ background: "#fff", borderRadius: 6, padding: "5px 8px" }}>
-          <div style={{ color: "#777" }}>CA {mode.toUpperCase()}</div>
-          <div style={{ fontWeight: 700, fontSize: 13, color }}>{fmt(ca)}</div>
-        </div>
-        <div style={{ background: "#fff", borderRadius: 6, padding: "5px 8px" }}>
-          <div style={{ color: "#777" }}>Potentiel</div>
-          <div style={{ fontWeight: 700, fontSize: 13, color }}>{gain > 0 ? `+${fmt(gain)}` : "\u2014"}</div>
-        </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color }}>{fmt(ca)}</span>
+        <span style={{ fontSize: 9, color: "#bbb" }}>obj. {targets.ok}%</span>
       </div>
-      {/* Progress bar */}
-      <div style={{ position: "relative", height: 8, background: "rgba(0,0,0,.07)", borderRadius: 4, overflow: "hidden", marginBottom: 6 }}>
-        <div style={{ position: "absolute", top: 0, left: 0, height: "100%", width: `${Math.min(100, pct)}%`, background: color, borderRadius: 4, transition: "width .5s" }} />
-        <div style={{ position: "absolute", top: 0, left: `${targets.ok}%`, height: "100%", width: 2, background: "rgba(0,0,0,.15)" }} />
-        <div style={{ position: "absolute", top: 0, left: `${Math.min(100, targets.good)}%`, height: "100%", width: 2, background: "rgba(0,0,0,.25)" }} />
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#bbb", marginBottom: 8 }}>
-        <span>0%</span><span>obj. {targets.ok}%</span><span>top {targets.good}%</span>
-      </div>
-      <div style={{ display: "inline-block", padding: "2px 8px", borderRadius: 6, fontSize: 10, fontWeight: 500, background: status.bg, color: status.c, marginBottom: 4 }}>{status.t}</div>
-      <div style={{ fontSize: 10, color: "#777", lineHeight: 1.5, fontStyle: "italic" }}>{action}</div>
     </div>
   );
 }
@@ -1638,13 +1594,13 @@ function UpsellCardMini({ label, emoji, data, totalTables, color, mode, onClick,
   const ca = mode === "ttc" ? data.ca_ttc : data.ca_ht;
   return (
     <div onClick={onClick} style={{ padding: "12px 14px", background: active ? `${color}10` : "#f9f6f0", borderRadius: 10, cursor: onClick ? "pointer" : "default", border: active ? `1.5px solid ${color}30` : "1.5px solid transparent", transition: "all 0.15s" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
         <span style={{ fontSize: 14 }}>{emoji}</span>
-        <span style={{ fontSize: 10, fontWeight: 600 }}>{label}</span>
+        <span style={{ fontSize: 11, fontWeight: 600 }}>{label}</span>
       </div>
       <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color, lineHeight: 1, marginBottom: 4 }}>{pct}%</div>
       <div style={{ fontSize: 10, color: "#777", marginBottom: 6 }}>{data.tables}/{totalTables} tables</div>
-      <div style={{ height: 5, background: "rgba(0,0,0,.07)", borderRadius: 3, overflow: "hidden", marginBottom: 6 }}>
+      <div style={{ height: 5, background: "rgba(0,0,0,.07)", borderRadius: 3, overflow: "hidden", marginBottom: 4 }}>
         <div style={{ height: "100%", width: `${Math.min(100, pct)}%`, background: color, borderRadius: 3 }} />
       </div>
       <div style={{ fontSize: 11, fontWeight: 600, color }}>{fmt(ca)}</div>
