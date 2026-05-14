@@ -198,9 +198,11 @@ function MargesPage() {
     if (qf && qt && /^\d{4}-\d{2}-\d{2}$/.test(qf) && /^\d{4}-\d{2}-\d{2}$/.test(qt)) {
       return { from: qf, to: qt };
     }
+    // Default to yesterday (skip weekends)
     const d = new Date();
-    if (d.getDay() === 6) d.setDate(d.getDate() - 1);
+    d.setDate(d.getDate() - 1);
     if (d.getDay() === 0) d.setDate(d.getDate() - 2);
+    if (d.getDay() === 6) d.setDate(d.getDate() - 1);
     const iso = d.toISOString().slice(0, 10);
     return { from: iso, to: iso };
   });
@@ -917,25 +919,8 @@ function MargesPage() {
                 </div>
               </div>
 
-              {/* Mode + Metric toggles */}
+              {/* Metric toggles */}
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16, justifyContent: "center" }}>
-                {([["par_jour_semaine", "Sem."], ["par_mois", "Mois"]] as const).map(([mode, label]) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setTrendMode(mode)}
-                    style={{
-                      height: 30, padding: "0 14px", borderRadius: 15,
-                      border: trendMode === mode ? "none" : `1px solid ${COLORS.border}`,
-                      background: trendMode === mode ? accent : "#fff",
-                      color: trendMode === mode ? "#fff" : COLORS.dark,
-                      fontSize: 12, fontWeight: 600, cursor: "pointer",
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
-                <div style={{ width: 1, height: 24, background: COLORS.border, margin: "3px 4px" }} />
                 {([["qty", "Quantite"], ["ca_ht", "CA HT"]] as const).map(([m, label]) => (
                   <button
                     key={m}
