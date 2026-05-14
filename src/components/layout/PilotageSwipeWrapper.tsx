@@ -63,11 +63,7 @@ export function PilotageSwipeWrapper({ children, dateFrom, dateTo }: Props) {
   }, [currentIndex, navigateTo]);
 
   return (
-    <div
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      style={{ minHeight: "100dvh" }}
-    >
+    <div style={{ minHeight: "100dvh" }}>
       {children}
     </div>
   );
