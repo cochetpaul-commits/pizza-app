@@ -22,6 +22,8 @@ export type CommandePdfData = {
   notes: string | null;
   logoBase64: string | null;
   exportedAt: string;
+  etabName?: string;
+  showSku?: boolean;
 };
 
 const ACCENT = "#D4775A";
@@ -143,7 +145,7 @@ export function CommandePdfDocument({ data }: { data: CommandePdfData }) {
             </View>
             {cat.items.map((item, i) => (
               <View key={i} style={s.row}>
-                {item.sku ? <Text style={s.rowSku}>{item.sku}</Text> : null}
+                {data.showSku ? <Text style={s.rowSku}>{item.sku ?? ""}</Text> : null}
                 <Text style={s.rowName}>{item.name}</Text>
                 <Text style={s.rowQty}>{item.qty}</Text>
                 <Text style={s.rowUnit}>{item.unit}</Text>
@@ -167,7 +169,7 @@ export function CommandePdfDocument({ data }: { data: CommandePdfData }) {
 
         {/* Footer */}
         <View style={s.footer} fixed>
-          <Text>iFratelli Group — Bello Mio</Text>
+          <Text>{data.etabName ?? "iFratelli Group"}</Text>
           <Text>Export {data.exportedAt}</Text>
         </View>
       </Page>

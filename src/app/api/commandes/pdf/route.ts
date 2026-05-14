@@ -149,6 +149,15 @@ export async function GET(req: NextRequest) {
 
   const supplierObj = session.suppliers as { name: string } | null;
 
+  // Fetch etablissement name
+  const { data: etabRow } = await supabaseAdmin.from("etablissements").select("nom").eq("id", etabId).single();
+  const etabName = etabRow?.nom ?? "Restaurant";
+
+  // Show SKU column only if most items have one
+  const allItems = categories.flatMap(c => c.items);
+  const skuCount = allItems.filter(i => i.sku).length;
+  const showSku = skuCount > 0 && skuCount >= allItems.length * 0.5;
+
   const data: CommandePdfData = {
     supplierName: supplierObj?.name ?? "—",
     sessionDate: new Date(session.created_at).toLocaleDateString("fr-FR", {
@@ -161,6 +170,8 @@ export async function GET(req: NextRequest) {
     exportedAt: new Date().toLocaleDateString("fr-FR", {
       day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
     }),
+    showSku,
+    etabName: `iFratelli Group — ${etabName}`,
   };
 
   const docElement = CommandePdfDocument({ data }) as unknown as React.ReactElement<DocumentProps>;
