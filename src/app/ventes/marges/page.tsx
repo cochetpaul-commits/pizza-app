@@ -636,7 +636,10 @@ function MargesPage() {
   const paginatedProducts = filtered.slice((safePage - 1) * perPage, safePage * perPage);
   const insights = getInsights();
   const allCategories = data
-    ? [...new Set(data.products.map((p) => p.categorie))].sort()
+    ? [...new Set([
+        ...data.products.map((p) => p.categorie),
+        ...data.categories.map((c) => c.cat),
+      ])].filter(Boolean).sort()
     : [];
 
 
