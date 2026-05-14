@@ -248,6 +248,11 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     });
   }, [searchQuery, doLoad]);
 
+  const removeItem = useCallback((id: string) => {
+    setItems((prev) => prev.filter((i) => i.id !== id));
+    setOffers((prev) => prev.filter((o) => o.ingredient_id !== id));
+  }, []);
+
   return {
     items,
     suppliers,
@@ -262,5 +267,6 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     error,
     mutate,
     mutateOne,
+    removeItem,
   };
 }

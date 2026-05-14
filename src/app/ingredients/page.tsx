@@ -186,7 +186,7 @@ function IngredientsPageInner() {
 
   const [q, setQ] = useState("");
   const debouncedQ = useDebounce(q, 300);
-  const { items, suppliers, supplierAliases, offers, alertMap, loading, loadingMore, hasMore, totalCount, loadMore, error: dataError, mutate, mutateOne } = useIngredientsData(debouncedQ, etab?.id, etab?.slug);
+  const { items, suppliers, supplierAliases, offers, alertMap, loading, loadingMore, hasMore, totalCount, loadMore, error: dataError, mutate, mutateOne, removeItem } = useIngredientsData(debouncedQ, etab?.id, etab?.slug);
 
   const [session, setSession] = useState<Session | null>(null);
 
@@ -911,7 +911,7 @@ function IngredientsPageInner() {
 
   const del = useCallback(async (id: string, name: string) => {
     if (!confirm(`Supprimer "${name}" ?`)) return;
-    // Check if ingredient is used in any recipe
+    // Check all recipe tables in parallel
     const recipeTables = [
       { table: "pizza_ingredients", label: "pizza" },
       { table: "kitchen_recipe_lines", label: "recette cuisine" },
@@ -919,24 +919,27 @@ function IngredientsPageInner() {
       { table: "cocktail_ingredients", label: "cocktail" },
       { table: "recipe_ingredients", label: "empâtement" },
     ] as const;
-    for (const { table, label } of recipeTables) {
-      const { count } = await supabase.from(table).select("id", { count: "exact", head: true }).eq("ingredient_id", id);
-      if (count && count > 0) {
-        alert(`Impossible de supprimer "${name}" : utilisé dans ${count} ${label}(s).`);
-        return;
-      }
+    const checks = await Promise.all(
+      recipeTables.map(async ({ table, label }) => {
+        const { count } = await supabase.from(table).select("id", { count: "exact", head: true }).eq("ingredient_id", id);
+        return { count: count ?? 0, label };
+      }),
+    );
+    const used = checks.find(c => c.count > 0);
+    if (used) {
+      alert(`Impossible de supprimer "${name}" : utilisé dans ${used.count} ${used.label}(s).`);
+      return;
     }
-    // Cascade delete related rows that are not recipes
-    await supabase.from("commande_lignes").delete().eq("ingredient_id", id);
-    await supabase.from("supplier_invoice_lines").delete().eq("ingredient_id", id);
-    const d1 = await supabase.from("supplier_offers").delete().eq("ingredient_id", id);
-    if (d1.error) { alert(d1.error.message); return; }
+    // Cascade delete related rows in parallel
+    await Promise.all([
+      supabase.from("commande_lignes").delete().eq("ingredient_id", id),
+      supabase.from("supplier_invoice_lines").delete().eq("ingredient_id", id),
+      supabase.from("supplier_offers").delete().eq("ingredient_id", id),
+    ]);
     const d2 = await supabase.from("ingredients").delete().eq("id", id);
     if (d2.error) { alert(d2.error.message); return; }
-    const sy = window.scrollY;
-    await mutate();
-    requestAnimationFrame(() => window.scrollTo(0, sy));
-  }, [mutate]);
+    removeItem(id);
+  }, [removeItem]);
 
   const toggleEstablishment = useCallback(async (id: string, estab: "bellomio" | "piccola", current: string[]) => {
     const has = current.includes(estab);
