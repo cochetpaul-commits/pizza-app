@@ -132,6 +132,33 @@ function periodDisplayLabel(period: Period, ref: string): string {
   return `Oct ${fyY} — Sep ${fyY + 1}`;
 }
 
+async function fetchAllVentesRows(
+  etabId: string,
+  from: string,
+  to: string,
+  cols = "ttc, num_fiscal",
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let all: any[] = [];
+  let offset = 0;
+  while (true) {
+    const { data } = await supabase
+      .from("ventes_lignes")
+      .select(cols)
+      .eq("etablissement_id", etabId)
+      .gte("date_service", from)
+      .lte("date_service", to)
+      .eq("type_ligne", "Produit")
+      .range(offset, offset + 999);
+    if (!data || data.length === 0) break;
+    all = all.concat(data);
+    if (data.length < 1000) break;
+    offset += 1000;
+  }
+  return all;
+}
+
 function GroupContent() {
   const { etablissements, setGroupView } = useEtablissement();
   const [period, setPeriod] = useState<Period>("mois");
@@ -190,32 +217,18 @@ function GroupContent() {
 
     const etabIds = etablissements.map((e) => e.id);
 
-    // 1. CA for current period per etab
+    // 1. CA for current period per etab (paginated to avoid 1000-row limit)
     const caPromises = etablissements.map(async (etab) => {
-      const { data } = await supabase
-        .from("ventes_lignes")
-        .select("ttc, num_fiscal")
-        .eq("etablissement_id", etab.id)
-        .gte("date_service", range.start)
-        .lte("date_service", range.end)
-        .eq("type_ligne", "Produit");
-      const rows = data ?? [];
-      const ca = rows.reduce((s, r) => s + (r.ttc ?? 0), 0);
+      const rows = await fetchAllVentesRows(etab.id, range.start, range.end);
+      const ca = rows.reduce((s, r) => s + (Number(r.ttc) || 0), 0);
       const couverts = new Set(rows.map((r) => r.num_fiscal).filter(Boolean)).size;
       return { id: etab.id, ca, couverts };
     });
 
     // 2. CA for previous period per etab
     const caPrevPromises = etablissements.map(async (etab) => {
-      const { data } = await supabase
-        .from("ventes_lignes")
-        .select("ttc, num_fiscal")
-        .eq("etablissement_id", etab.id)
-        .gte("date_service", prevRange.start)
-        .lte("date_service", prevRange.end)
-        .eq("type_ligne", "Produit");
-      const rows = data ?? [];
-      const ca = rows.reduce((s, r) => s + (r.ttc ?? 0), 0);
+      const rows = await fetchAllVentesRows(etab.id, prevRange.start, prevRange.end);
+      const ca = rows.reduce((s, r) => s + (Number(r.ttc) || 0), 0);
       const couverts = new Set(rows.map((r) => r.num_fiscal).filter(Boolean)).size;
       return { id: etab.id, ca, couverts };
     });
@@ -224,14 +237,8 @@ function GroupContent() {
     const fyPromise = (async () => {
       let total = 0;
       for (const etab of etablissements) {
-        const { data } = await supabase
-          .from("ventes_lignes")
-          .select("ttc")
-          .eq("etablissement_id", etab.id)
-          .gte("date_service", fiscalStart)
-          .lte("date_service", today)
-          .eq("type_ligne", "Produit");
-        total += (data ?? []).reduce((s, r) => s + (r.ttc ?? 0), 0);
+        const rows = await fetchAllVentesRows(etab.id, fiscalStart, today, "ttc");
+        total += rows.reduce((s, r) => s + (Number(r.ttc) || 0), 0);
       }
       return total;
     })();
