@@ -223,6 +223,7 @@ function MargesPage() {
   const [trendCategory, setTrendCategory] = useState<string | null>(null);
   const [trendMode, setTrendMode] = useState<TrendMode>("par_jour_semaine");
   const [trendMetric, setTrendMetric] = useState<"qty" | "ca_ht">("qty");
+  const [trendService, setTrendService] = useState<"all" | "midi" | "soir">("all");
   // Trend dates sync avec la page par défaut
   const [trendFrom, setTrendFrom] = useState(range.from);
   const [trendTo, setTrendTo] = useState(range.to);
@@ -553,7 +554,9 @@ function MargesPage() {
     } else if (trendFilter === "category" && trendCategory) {
       params.set("category", trendCategory);
     }
-    // When trendFilter === "all", no product/category param → API returns all
+    if (trendService !== "all") {
+      params.set("service", trendService);
+    }
 
     fetch(`/api/ventes/marges/trend?${params.toString()}`)
       .then((r) => r.json())
@@ -561,7 +564,7 @@ function MargesPage() {
       .catch(() => { if (!cancelled) setTrendData([]); })
       .finally(() => { if (!cancelled) setTrendLoading(false); });
     return () => { cancelled = true; };
-  }, [trendFilter, trendProduct, trendCategory, etab, trendFrom, trendTo]);
+  }, [trendFilter, trendProduct, trendCategory, trendService, etab, trendFrom, trendTo]);
 
   // Aggregate trend data for chart
   const aggregateTrend = useCallback((daily: TrendDaily[], mode: TrendMode, metric: "qty" | "ca_ht") => {
@@ -868,8 +871,8 @@ function MargesPage() {
                 )}
               </div>
 
-              {/* Date range (← DateRangePicker →) */}
-              <div style={{ display: "flex", gap: 4, alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+              {/* Date range + Service filter */}
+              <div style={{ display: "flex", gap: 6, alignItems: "center", justifyContent: "center", marginBottom: 10, flexWrap: "wrap" }}>
                 <button type="button" onClick={() => {
                   const nf = new Date(new Date(trendFrom + "T12:00:00").getTime() - 86400000);
                   const nt = new Date(new Date(trendTo + "T12:00:00").getTime() - 86400000);
@@ -901,11 +904,22 @@ function MargesPage() {
                   cursor: trendTo >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}>{"→"}</button>
+                <div style={{ width: 1, height: 20, background: COLORS.border, margin: "0 2px" }} />
+                <div style={{ display: "flex", gap: 0, background: "#f0ebe2", borderRadius: 999, padding: 2 }}>
+                  {([["all", "Tous"], ["midi", "Midi"], ["soir", "Soir"]] as const).map(([s, label]) => (
+                    <button key={s} type="button" onClick={() => setTrendService(s)} style={{
+                      padding: "4px 12px", borderRadius: 999, border: "none", cursor: "pointer",
+                      background: trendService === s ? accent : "transparent",
+                      color: trendService === s ? "#fff" : "#999",
+                      fontSize: 11, fontWeight: 700,
+                    }}>{label}</button>
+                  ))}
+                </div>
               </div>
 
               {/* Mode + Metric toggles */}
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16, justifyContent: "center" }}>
-                {([["par_jour_semaine", "Jours semaine"], ["par_mois", "Jours du mois"]] as const).map(([mode, label]) => (
+                {([["par_jour_semaine", "Sem."], ["par_mois", "Mois"]] as const).map(([mode, label]) => (
                   <button
                     key={mode}
                     type="button"

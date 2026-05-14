@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
   const etabId = searchParams.get("etablissement_id");
   const product = searchParams.get("product");
   const category = searchParams.get("category");
+  const service = searchParams.get("service");
   const from = searchParams.get("from");
   const to = searchParams.get("to");
   const groupBy = searchParams.get("group_by");
@@ -62,6 +63,9 @@ export async function GET(req: NextRequest) {
       query = query.eq("description", product);
     } else if (category) {
       query = query.eq("categorie", category);
+    }
+    if (service) {
+      query = query.eq("service", service);
     }
 
     const { data, error } = await query
