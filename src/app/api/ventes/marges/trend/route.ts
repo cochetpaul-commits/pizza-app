@@ -11,6 +11,7 @@ type VenteLigne = {
   ttc: number;
   ht: number;
   categorie?: string;
+  description?: string;
 };
 
 type DailyRow = {
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
   while (hasMore) {
     let query = supabaseAdmin
       .from("ventes_lignes")
-      .select("date_service,quantite,ttc,ht,categorie")
+      .select("date_service,quantite,ttc,ht,categorie,description")
       .eq("etablissement_id", etabId)
       .eq("type_ligne", "Produit")
       .eq("annule", false)
@@ -141,6 +142,23 @@ export async function GET(req: NextRequest) {
       ca_ht: Math.round(v.ca_ht * 100) / 100,
     }));
 
+  /* ── 4. Aggregate by product (description) ── */
+  const prodMap = new Map<string, { qty: number; ca_ttc: number; ca_ht: number }>();
+  for (const r of allRows) {
+    const name = r.description || "Autre";
+    const prev = prodMap.get(name);
+    if (prev) {
+      prev.qty += Number(r.quantite) || 1;
+      prev.ca_ttc += Number(r.ttc);
+      prev.ca_ht += Number(r.ht);
+    } else {
+      prodMap.set(name, { qty: Number(r.quantite) || 1, ca_ttc: Number(r.ttc), ca_ht: Number(r.ht) });
+    }
+  }
+  const products = Array.from(prodMap.entries())
+    .map(([name, v]) => ({ name, qty: Math.round(v.qty), ca_ttc: Math.round(v.ca_ttc * 100) / 100, ca_ht: Math.round(v.ca_ht * 100) / 100 }))
+    .sort((a, b) => b.ca_ht - a.ca_ht);
+
   const label = product ?? category ?? "all";
-  return NextResponse.json({ product: label, daily });
+  return NextResponse.json({ product: label, daily, products });
 }

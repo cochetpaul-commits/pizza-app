@@ -226,6 +226,7 @@ function MargesPage() {
   const [trendMode, setTrendMode] = useState<TrendMode>("par_mois");
   const [trendMetric, setTrendMetric] = useState<"qty" | "ca_ht">("qty");
   const [trendService, setTrendService] = useState<"all" | "midi" | "soir">("all");
+  const [trendProducts, setTrendProducts] = useState<{ name: string; qty: number; ca_ht: number; ca_ttc: number }[]>([]);
   // Trend dates sync avec la page par défaut
   const [trendFrom, setTrendFrom] = useState(range.from);
   const [trendTo, setTrendTo] = useState(range.to);
@@ -570,7 +571,6 @@ function MargesPage() {
       .then((j) => {
         if (cancelled) return;
         if (isSingleDay && trendFilter === "all" && j.categories) {
-          // Convert category data to TrendDaily with cat field (aggregate daily arrays per category)
           const catData: TrendDaily[] = Object.entries(j.categories as Record<string, { qty: number; ca_ttc: number; ca_ht: number }[]>)
             .map(([cat, rows]) => ({
               date: trendFrom, cat,
@@ -583,6 +583,7 @@ function MargesPage() {
         } else {
           setTrendData(j.daily ?? []);
         }
+        setTrendProducts(j.products ?? []);
       })
       .catch(() => { if (!cancelled) setTrendData([]); })
       .finally(() => { if (!cancelled) setTrendLoading(false); });
@@ -999,19 +1000,16 @@ function MargesPage() {
                 </div>
               )}
 
-              {/* Drill-down: products in selected category */}
-              {trendFilter === "category" && trendCategory && data && (() => {
-                const catProducts = data.products
-                  .filter(p => p.categorie === trendCategory)
-                  .sort((a, b) => b.ca_ht - a.ca_ht)
-                  .slice(0, 10);
+              {/* Drill-down: products (from trend data, filtered by service) */}
+              {trendProducts.length > 0 && (trendFilter === "category" || trendFilter === "all") && (() => {
+                const catProducts = trendProducts.slice(0, 15);
                 if (catProducts.length === 0) return null;
                 const maxCA = catProducts[0]?.ca_ht ?? 1;
-                const catColor = getCategoryColor(trendCategory);
+                const catColor = getCategoryColor(trendCategory ?? "Autre");
                 return (
                   <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${COLORS.border}` }}>
                     <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: COLORS.muted, fontWeight: 600, marginBottom: 12 }}>
-                      Produits de cette categorie ({trendCategory})
+                      Produits{trendCategory ? ` (${trendCategory})` : ""}{trendService !== "all" ? ` · ${trendService}` : ""}
                     </div>
                     {catProducts.map((p, i) => (
                       <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
@@ -1032,12 +1030,12 @@ function MargesPage() {
                         <div style={{ width: 40, textAlign: "right", fontSize: 10, color: COLORS.muted }}>
                           {p.qty}x
                         </div>
-                        {p.food_cost_pct !== null && (
+                        {"food_cost_pct" in p && (p as { food_cost_pct: number | null }).food_cost_pct !== null && (
                           <div style={{
                             width: 44, textAlign: "right", fontSize: 10, fontWeight: 600,
-                            color: foodCostColor(p.food_cost_pct),
+                            color: foodCostColor((p as { food_cost_pct: number }).food_cost_pct),
                           }}>
-                            {p.food_cost_pct.toFixed(0)}%
+                            {(p as { food_cost_pct: number }).food_cost_pct.toFixed(0)}%
                           </div>
                         )}
                       </div>
