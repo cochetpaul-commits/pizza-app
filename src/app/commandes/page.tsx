@@ -1132,12 +1132,13 @@ function CommandesPage() {
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, color: stockColor }}>Stock ideal</div>
               <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
-                {packCount > 0 ? `${Math.ceil(obj / packCount)} crt.` : `${obj} ${indiv}s`}
-              </div>
-              <div style={{ fontSize: 10, color: "#999" }}>
                 {obj} {indiv}{obj > 1 ? "s" : ""}
-                {item.prix_commande != null ? ` · ${(obj * (item.prix_commande / (packCount || 1))).toFixed(0)}€ HT` : ""}
               </div>
+              {packCount > 0 && (
+                <div style={{ fontSize: 10, color: "#999" }}>
+                  = {Math.ceil(obj / packCount)} commande{Math.ceil(obj / packCount) > 1 ? "s" : ""}
+                </div>
+              )}
             </div>
           )}
 
@@ -1159,11 +1160,22 @@ function CommandesPage() {
   function conditionLabel(item: CatalogItem): string | null {
     const packCount = item.pack_count ?? 0;
     if (packCount <= 0) return null;
-    const indiv = individualUnitLabel(item);
-    const packEachQty = item.pack_each_qty ?? 1;
-    if (packEachQty > 1) {
-      return `${packCount} × ${packEachQty} ${indiv}s`;
+    // Use the base unit label (bouteille, sachet, etc.)
+    // The order_unit_label tells us the pack type (pack, carton, etc.)
+    const orderU = (item.order_unit_label ?? item.order_unit ?? "").toLowerCase();
+    const isPackUnit = orderU.includes("pack") || orderU.includes("carton") || orderU.includes("colis") || orderU.includes("bloc") || orderU.includes("caisse");
+
+    if (isPackUnit) {
+      // The order unit is the pack itself — describe what's inside
+      const baseUnit = (item.default_unit ?? "").toLowerCase();
+      let unitName = "unité";
+      if (baseUnit.includes("bouteille") || baseUnit === "bt" || baseUnit === "pc") unitName = "bouteille";
+      if (baseUnit.includes("sachet")) unitName = "sachet";
+      if (baseUnit.includes("barquette")) unitName = "barquette";
+      return `${packCount} ${unitName}${packCount > 1 ? "s" : ""}`;
     }
+    // Standard: individual unit with pack option
+    const indiv = individualUnitLabel(item);
     return `${packCount} ${indiv}${packCount > 1 ? "s" : ""}`;
   }
 
@@ -1185,8 +1197,11 @@ function CommandesPage() {
     const packCount = item.pack_count ?? 0;
     if (packCount <= 0) return null;
     const indivLabel = individualUnitLabel(item);
-    // Don't show toggle when individual unit is already "carton" — "carton / carton de X" is redundant
-    if (indivLabel === "carton") return null;
+    // Don't show toggle when the order unit IS the pack itself
+    // e.g. order_unit = "pack" with pack_count = 24 → already ordering packs, no toggle needed
+    const orderU = (item.order_unit_label ?? item.order_unit ?? "").toLowerCase();
+    const isPackUnit = orderU.includes("pack") || orderU.includes("carton") || orderU.includes("colis") || orderU.includes("bloc") || orderU.includes("caisse");
+    if (isPackUnit || indivLabel === "carton") return null;
     const mode = unitModes[item.id] ?? "individual";
     const rawQty = Number(quantities[item.id] ?? 0);
     const packEachQty = item.pack_each_qty ?? 1;
