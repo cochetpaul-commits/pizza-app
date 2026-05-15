@@ -1081,55 +1081,77 @@ function CommandesPage() {
   function renderProductCard(item: CatalogItem, isFav: boolean) {
     const qty = Number(quantities[item.id] ?? 0);
     const hasQty = qty > 0;
-    const cond = conditionLabel(item);
-    const obj = item.stock_objectif;
     const packCount = item.pack_count ?? 0;
+    const packEach = item.pack_each_qty ?? 1;
     const indiv = individualUnitLabel(item);
+    const obj = item.stock_objectif;
+    const min = item.stock_min ?? 0;
+    // Stock color
+    const stockColor = qty >= (obj ?? 0) && (obj ?? 0) > 0 ? "#2e7d32" : qty >= min && min > 0 ? "#e65100" : "#2e7d32";
 
     return (
       <div key={item.id} style={{
         background: "#fff", borderRadius: 14, border: hasQty ? "2px solid #D4775A" : "1.5px solid #e5ddd0",
-        padding: "12px", display: "flex", flexDirection: "column", gap: 6,
-        boxShadow: hasQty ? "0 2px 12px rgba(212,119,90,0.15)" : "0 1px 4px rgba(0,0,0,0.04)",
-        transition: "all 0.15s",
+        padding: 0, display: "flex", flexDirection: "column",
+        boxShadow: hasQty ? "0 4px 16px rgba(212,119,90,0.2)" : "0 1px 6px rgba(0,0,0,0.06)",
+        transition: "all 0.15s", overflow: "hidden",
       }}>
-        {/* Avatar + fav */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <IngredientAvatar ingredientId={item.id} name={item.name} category={(item.category ?? "autre") as Category} size={48} />
-          <button type="button" onClick={() => toggleFavori(item.id, isFav)} style={{ ...starBtnStyle(isFav), fontSize: 14, marginLeft: "auto" }} title={isFav ? "Retirer" : "Ajouter"}>&#x2B50;</button>
+        {/* Image area */}
+        <div style={{ position: "relative", background: "#faf7f2", padding: "16px 12px 12px", display: "flex", justifyContent: "center", alignItems: "center", minHeight: 80 }}>
+          <IngredientAvatar ingredientId={item.id} name={item.name} category={(item.category ?? "autre") as Category} size={64} />
+          <button type="button" onClick={() => toggleFavori(item.id, isFav)}
+            style={{ position: "absolute", top: 8, right: 8, background: "none", border: "none", fontSize: 16, cursor: "pointer", opacity: isFav ? 1 : 0.3 }}>
+            &#x2B50;
+          </button>
         </div>
-        {/* Name */}
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.3, minHeight: 32, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-          {item.name}
-        </div>
-        {/* Price */}
-        <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif", color: "#D4775A" }}>
-          {item.prix_commande != null ? `${item.prix_commande.toFixed(2).replace(".", ",")}€ HT` : "—"}
-        </div>
-        {/* Conditioning */}
-        {cond && (
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", background: "#f5f0e8", borderRadius: 6, fontSize: 9, fontWeight: 600, color: "#888", alignSelf: "flex-start" }}>
-            Cond. | {cond}
+
+        {/* Info */}
+        <div style={{ padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+          {/* Name */}
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.3, minHeight: 30, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            {item.name}
           </div>
-        )}
-        {/* Stock ideal */}
-        {obj != null && obj > 0 && (
-          <div>
-            <div style={{ fontSize: 9, fontWeight: 700, color: "#2e7d32" }}>Stock ideal</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>
-              {obj} {indiv}{obj > 1 ? "s" : ""}
+
+          {/* Price */}
+          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif", color: "#D4775A" }}>
+            {item.prix_commande != null ? `${item.prix_commande.toFixed(2).replace(".", ",")}€ HT` : "—"}
+          </div>
+
+          {/* Conditioning badge */}
+          {packCount > 0 && (
+            <div style={{
+              display: "inline-flex", padding: "5px 10px", border: "1.5px solid #e5ddd0",
+              borderRadius: 8, fontSize: 11, fontWeight: 600, color: "#555", alignSelf: "flex-start",
+            }}>
+              {packEach > 1 ? `${packCount} × ${packEach} ${indiv}s` : `${packCount} ${indiv}${packCount > 1 ? "s" : ""}`}
             </div>
-            {packCount > 0 && (
-              <div style={{ fontSize: 9, color: "#999" }}>{Math.ceil(obj / packCount)} carton{Math.ceil(obj / packCount) > 1 ? "s" : ""}</div>
-            )}
+          )}
+
+          {/* Stock ideal */}
+          {obj != null && obj > 0 && (
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: stockColor }}>Stock ideal</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
+                {packCount > 0 ? `${Math.ceil(obj / packCount)} crt.` : `${obj} ${indiv}s`}
+              </div>
+              <div style={{ fontSize: 10, color: "#999" }}>
+                {obj} {indiv}{obj > 1 ? "s" : ""}
+                {item.prix_commande != null ? ` · ${(obj * (item.prix_commande / (packCount || 1))).toFixed(0)}€ HT` : ""}
+              </div>
+            </div>
+          )}
+
+          {/* Spacer */}
+          <div style={{ flex: 1 }} />
+
+          {/* Stepper */}
+          <div style={{ paddingTop: 4 }}>
+            <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
           </div>
-        )}
-        {/* Stepper */}
-        <div style={{ marginTop: "auto", paddingTop: 4 }}>
-          <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
+
+          {/* Unit toggle */}
+          {packCount > 0 && <div>{unitToggle(item)}</div>}
         </div>
-        {/* Unit toggle */}
-        {packCount > 0 && <div>{unitToggle(item)}</div>}
       </div>
     );
   }
