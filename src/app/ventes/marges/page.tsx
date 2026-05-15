@@ -57,7 +57,7 @@ type ApiData = {
 };
 
 
-type TrendDaily = { date: string; qty: number; ca_ttc: number; ca_ht: number };
+type TrendDaily = { date: string; qty: number; ca_ttc: number; ca_ht: number; cat?: string };
 type TrendMode = "par_jour_semaine" | "par_mois";
 
 type SortKey =
@@ -559,10 +559,31 @@ function MargesPage() {
     if (trendService !== "all") {
       params.set("service", trendService);
     }
+    // Single day → group by category for a useful breakdown
+    const isSingleDay = trendFrom === trendTo;
+    if (isSingleDay && trendFilter === "all") {
+      params.set("group_by", "category");
+    }
 
     fetch(`/api/ventes/marges/trend?${params.toString()}`)
       .then((r) => r.json())
-      .then((j) => { if (!cancelled) setTrendData(j.daily ?? []); })
+      .then((j) => {
+        if (cancelled) return;
+        if (isSingleDay && trendFilter === "all" && j.categories) {
+          // Convert category data to TrendDaily with cat field (aggregate daily arrays per category)
+          const catData: TrendDaily[] = Object.entries(j.categories as Record<string, { qty: number; ca_ttc: number; ca_ht: number }[]>)
+            .map(([cat, rows]) => ({
+              date: trendFrom, cat,
+              qty: rows.reduce((s, r) => s + r.qty, 0),
+              ca_ttc: rows.reduce((s, r) => s + r.ca_ttc, 0),
+              ca_ht: rows.reduce((s, r) => s + r.ca_ht, 0),
+            }))
+            .sort((a, b) => b.ca_ht - a.ca_ht);
+          setTrendData(catData);
+        } else {
+          setTrendData(j.daily ?? []);
+        }
+      })
       .catch(() => { if (!cancelled) setTrendData([]); })
       .finally(() => { if (!cancelled) setTrendLoading(false); });
     return () => { cancelled = true; };
@@ -570,6 +591,13 @@ function MargesPage() {
 
   // Aggregate trend data for chart
   const aggregateTrend = useCallback((daily: TrendDaily[], mode: TrendMode, metric: "qty" | "ca_ht") => {
+    // Category mode (single day with group_by=category)
+    if (daily.length > 0 && daily[0].cat) {
+      return {
+        labels: daily.map(d => d.cat ?? "Autre"),
+        values: daily.map(d => metric === "qty" ? d.qty : d.ca_ht),
+      };
+    }
     if (mode === "par_jour_semaine") {
       const buckets = Array.from({ length: 7 }, () => 0);
       for (const d of daily) {
