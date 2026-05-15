@@ -1804,7 +1804,7 @@ function RecapTable({ services, mode, meteo, dates, days, useWeeks: useWeeksProp
                 <td style={{ ...tdSt, fontWeight: 700, fontSize: 13, color: "#D4775A" }}>{fmt(caVal)}</td>
                 <td style={{ ...tdSt, fontWeight: 600 }}>{s.cov}</td>
                 <td style={{ ...tdSt, fontSize: 11, fontWeight: 600, color: "#46655a" }}>{s.sp_cov || "\u2014"}</td>
-                <td style={tdSt}><span style={{ background: tmBg, color: tmColor, padding: "3px 9px", borderRadius: 5, fontSize: 11, fontWeight: 700 }}>{tmSp.toFixed(0)}{"\u20AC"}</span></td>
+                <td style={tdSt}><span style={{ background: "#46655a18", color: "#46655a", padding: "3px 9px", borderRadius: 5, fontSize: 11, fontWeight: 700 }}>{tmSp.toFixed(0)}{"\u20AC"}</span></td>
                 {(() => {
                   const empCov = s.cov - s.sp_cov;
                   const empCa = mode === "ttc" ? s.emp_ttc : s.emp_ht;
