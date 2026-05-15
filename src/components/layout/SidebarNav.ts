@@ -100,6 +100,7 @@ export const ACHATS_ITEMS: NavItemV2[] = [
   { label: "Base produits", href: "/ingredients", icon: "tag" },
   { label: "Commandes", href: "/commandes", icon: "shoppingBag" },
   { label: "Factures", href: "/achats", icon: "fileText" },
+  { label: "Stats prix", href: "/variations-prix", icon: "trendingUp" },
 ];
 
 // EVENEMENTIEL (Piccola uniquement)
@@ -307,6 +308,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/ingredients": "Achats",
   "/invoices": "Achats",
   "/commandes": "Achats",
+  "/variations-prix": "Achats",
   "/inventaire": "Production",
   "/recettes": "Production",
   "/catalogue": "Production",
@@ -358,6 +360,7 @@ const PAGE_SECTIONS: Record<string, string> = {
   "/ingredients": "Achats",
   "/invoices": "Achats",
   "/commandes": "Achats",
+  "/variations-prix": "Achats",
   "/inventaire": "Production",
   "/recettes": "Production",
   "/epicerie": "Production",
