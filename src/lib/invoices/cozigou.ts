@@ -121,7 +121,10 @@ function parseLines(text: string): ParsedLine[] {
     const pm = rest.match(PRICE_RE);
     if (!pm) continue;
 
-    const unitPrice = parseFrenchNumber(pm[1]);
+    const puNet = parseFrenchNumber(pm[3]);
+    const accise = pm[4] ? parseFrenchNumber(pm[4]) : null;
+    // Real unit price = PU NET HT + ACCISE (excise duty per unit)
+    const unitPrice = (puNet ?? 0) + (accise ?? 0);
     const tvaCode = parseInt(pm[2], 10);
     const montHt = parseFrenchNumber(pm[5]);
     const tax_rate = tvaCode === 1 ? 5.5 : tvaCode === 2 ? 20.0 : null;
