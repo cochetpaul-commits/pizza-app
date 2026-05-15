@@ -6,6 +6,8 @@ import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchPriceAlerts, PriceAlert, ALERT_THRESHOLD } from "@/lib/priceAlerts";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
+import { CAT_COLORS, type Category } from "@/types/ingredients";
 import Link from "next/link";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -141,6 +143,7 @@ export default function VariationsPrixPage() {
   const [period, setPeriod] = useState<Period>("30j");
   const [filterSupplier, setFilterSupplier] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
+  const [filterDropdown, setFilterDropdown] = useState<"supplier" | "category" | null>(null);
   const [threshold, setThreshold] = useState(5);
   const [sortBy, setSortBy] = useState<"date" | "pct" | "price">("date");
   const [showOnlyUp, setShowOnlyUp] = useState(false);
@@ -149,6 +152,7 @@ export default function VariationsPrixPage() {
     setSnoozedState(getSnoozed());
     const run = async () => {
       setLoading(true); setError(null);
+      await loadSupplierColors(supabase);
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Non connecté");
@@ -334,21 +338,63 @@ export default function VariationsPrixPage() {
             <div className="card" style={{ marginBottom: 12, padding: "12px 14px" }}>
               <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.6, letterSpacing: 0.5, marginBottom: 8, textTransform: "uppercase" }}>Filtres</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <div>
-                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4 }}>Fournisseur</div>
-                  <select className="input" style={{ height: 36, padding: "0 10px" }}
-                    value={filterSupplier} onChange={e => setFilterSupplier(e.target.value)}>
-                    <option value="all">Tous</option>
-                    {suppliers.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-                  </select>
+                {/* Fournisseur dropdown */}
+                <div style={{ position: "relative" }}>
+                  <button type="button" onClick={() => setFilterDropdown(filterDropdown === "supplier" ? null : "supplier")}
+                    style={{ display: "flex", alignItems: "center", width: "100%", padding: "9px 14px", background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 10, cursor: "pointer" }}>
+                    {filterSupplier !== "all" && (() => { const s = suppliers.find(x => x[0] === filterSupplier); return s ? <span style={{ width: 8, height: 8, borderRadius: "50%", background: cachedSupplierColor(s[1]), flexShrink: 0, marginRight: 8 }} /> : null; })()}
+                    <span style={{ flex: 1, textAlign: "left", fontSize: 12, fontWeight: 600, color: filterSupplier === "all" ? "#999" : "#1a1a1a" }}>
+                      {filterSupplier === "all" ? "Tous fournisseurs" : suppliers.find(s => s[0] === filterSupplier)?.[1] ?? "Fournisseur"}
+                    </span>
+                    <span style={{ color: "#999", fontSize: 10, transform: filterDropdown === "supplier" ? "rotate(180deg)" : "rotate(0)", transition: "transform .2s" }}>▼</span>
+                  </button>
+                  {filterDropdown === "supplier" && (
+                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50, background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: 280, overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
+                      <button type="button" onClick={() => { setFilterSupplier("all"); setFilterDropdown(null); }}
+                        style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", width: "100%", background: filterSupplier === "all" ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer" }}>
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ccc", flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", flex: 1, textAlign: "left" }}>Tous</span>
+                        {filterSupplier === "all" && <span style={{ color: "#D4775A", fontWeight: 700, fontSize: 13 }}>✓</span>}
+                      </button>
+                      {suppliers.map(([id, name]) => (
+                        <button key={id} type="button" onClick={() => { setFilterSupplier(id); setFilterDropdown(null); }}
+                          style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", width: "100%", background: filterSupplier === id ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer" }}>
+                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: cachedSupplierColor(name), flexShrink: 0 }} />
+                          <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", flex: 1, textAlign: "left" }}>{name}</span>
+                          {filterSupplier === id && <span style={{ color: "#D4775A", fontWeight: 700, fontSize: 13 }}>✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4 }}>Catégorie</div>
-                  <select className="input" style={{ height: 36, padding: "0 10px" }}
-                    value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
-                    <option value="all">Toutes</option>
-                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                {/* Catégorie dropdown */}
+                <div style={{ position: "relative" }}>
+                  <button type="button" onClick={() => setFilterDropdown(filterDropdown === "category" ? null : "category")}
+                    style={{ display: "flex", alignItems: "center", width: "100%", padding: "9px 14px", background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 10, cursor: "pointer" }}>
+                    {filterCategory !== "all" && <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAT_COLORS[filterCategory as Category] ?? "#999", flexShrink: 0, marginRight: 8 }} />}
+                    <span style={{ flex: 1, textAlign: "left", fontSize: 12, fontWeight: 600, color: filterCategory === "all" ? "#999" : "#1a1a1a" }}>
+                      {filterCategory === "all" ? "Toutes catégories" : filterCategory}
+                    </span>
+                    <span style={{ color: "#999", fontSize: 10, transform: filterDropdown === "category" ? "rotate(180deg)" : "rotate(0)", transition: "transform .2s" }}>▼</span>
+                  </button>
+                  {filterDropdown === "category" && (
+                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50, background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: 280, overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
+                      <button type="button" onClick={() => { setFilterCategory("all"); setFilterDropdown(null); }}
+                        style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", width: "100%", background: filterCategory === "all" ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer" }}>
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ccc", flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", flex: 1, textAlign: "left" }}>Toutes</span>
+                        {filterCategory === "all" && <span style={{ color: "#D4775A", fontWeight: 700, fontSize: 13 }}>✓</span>}
+                      </button>
+                      {categories.map(c => (
+                        <button key={c} type="button" onClick={() => { setFilterCategory(c); setFilterDropdown(null); }}
+                          style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", width: "100%", background: filterCategory === c ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer" }}>
+                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAT_COLORS[c as Category] ?? "#999", flexShrink: 0 }} />
+                          <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", flex: 1, textAlign: "left" }}>{c}</span>
+                          {filterCategory === c && <span style={{ color: "#D4775A", fontWeight: 700, fontSize: 13 }}>✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
