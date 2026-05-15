@@ -265,6 +265,11 @@ body.bottom-sheet-open .bottom-bar-fab {
   .mobile-only-block { display: block !important; }
 }
 
+/* Commandes product grid */
+.commandes-grid { grid-template-columns: repeat(2, 1fr) !important; }
+@media (min-width: 768px) { .commandes-grid { grid-template-columns: repeat(4, 1fr) !important; } }
+@media (min-width: 1200px) { .commandes-grid { grid-template-columns: repeat(6, 1fr) !important; } }
+
 /* selects : même look que les inputs */
 select.input{
   -webkit-appearance: none;

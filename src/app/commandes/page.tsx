@@ -1078,6 +1078,62 @@ function CommandesPage() {
     );
   }
 
+  function renderProductCard(item: CatalogItem, isFav: boolean) {
+    const qty = Number(quantities[item.id] ?? 0);
+    const hasQty = qty > 0;
+    const cond = conditionLabel(item);
+    const obj = item.stock_objectif;
+    const packCount = item.pack_count ?? 0;
+    const indiv = individualUnitLabel(item);
+
+    return (
+      <div key={item.id} style={{
+        background: "#fff", borderRadius: 14, border: hasQty ? "2px solid #D4775A" : "1.5px solid #e5ddd0",
+        padding: "12px", display: "flex", flexDirection: "column", gap: 6,
+        boxShadow: hasQty ? "0 2px 12px rgba(212,119,90,0.15)" : "0 1px 4px rgba(0,0,0,0.04)",
+        transition: "all 0.15s",
+      }}>
+        {/* Avatar + fav */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <IngredientAvatar ingredientId={item.id} name={item.name} category={(item.category ?? "autre") as Category} size={48} />
+          <button type="button" onClick={() => toggleFavori(item.id, isFav)} style={{ ...starBtnStyle(isFav), fontSize: 14, marginLeft: "auto" }} title={isFav ? "Retirer" : "Ajouter"}>&#x2B50;</button>
+        </div>
+        {/* Name */}
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.3, minHeight: 32, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          {item.name}
+        </div>
+        {/* Price */}
+        <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif", color: "#D4775A" }}>
+          {item.prix_commande != null ? `${item.prix_commande.toFixed(2).replace(".", ",")}€ HT` : "—"}
+        </div>
+        {/* Conditioning */}
+        {cond && (
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", background: "#f5f0e8", borderRadius: 6, fontSize: 9, fontWeight: 600, color: "#888", alignSelf: "flex-start" }}>
+            Cond. | {cond}
+          </div>
+        )}
+        {/* Stock ideal */}
+        {obj != null && obj > 0 && (
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: "#2e7d32" }}>Stock ideal</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>
+              {obj} {indiv}{obj > 1 ? "s" : ""}
+            </div>
+            {packCount > 0 && (
+              <div style={{ fontSize: 9, color: "#999" }}>{Math.ceil(obj / packCount)} carton{Math.ceil(obj / packCount) > 1 ? "s" : ""}</div>
+            )}
+          </div>
+        )}
+        {/* Stepper */}
+        <div style={{ marginTop: "auto", paddingTop: 4 }}>
+          <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
+        </div>
+        {/* Unit toggle */}
+        {packCount > 0 && <div>{unitToggle(item)}</div>}
+      </div>
+    );
+  }
+
   function conditionLabel(item: CatalogItem): string | null {
     const packCount = item.pack_count ?? 0;
     if (packCount <= 0) return null;
@@ -1441,61 +1497,21 @@ function CommandesPage() {
                 background: "#fff",
               }}>
                 {favoris.length > 0 && (
-                  <div style={{ background: "#FFFBF0", borderLeft: "3px solid #F59E0B", padding: "6px 0 2px 0" }}>
-                    <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "#b8860b", padding: "0 14px 4px" }}>
+                  <>
+                    <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "#b8860b", padding: "8px 14px 4px" }}>
                       Habituels
                     </div>
-                    {favoris.map((item) => (
-                      <div key={item.id} style={tile}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                          <button type="button" onClick={() => toggleFavori(item.id, true)} style={starBtnStyle(true)} title="Retirer des habituels">&#x2B50;</button>
-                          <IngredientAvatar ingredientId={item.id} name={item.name} category={(item.category ?? "autre") as Category} size={28} />
-                          <span style={{
-                            fontSize: 13, fontWeight: Number(quantities[item.id] ?? 0) > 0 ? 700 : 500,
-                            color: Number(quantities[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0,
-                          }}>{item.name}</span>
-                          {stockBadge(item)}
-                        </div>
-                        {conditionLabel(item) && (
-                          <div style={{ paddingLeft: 28, fontSize: 10, color: "#999", marginTop: -2 }}>
-                            Cond. : {conditionLabel(item)}
-                          </div>
-                        )}
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: 28 }}>
-                          {unitPriceBadge(item)}
-                          <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
-                        </div>
-                        {(item.pack_count ?? 0) > 0 && <div style={{ paddingLeft: 28 }}>{unitToggle(item)}</div>}
-                      </div>
-                    ))}
-                  </div>
+                    <div className="commandes-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, padding: "6px 10px 10px" }}>
+                      {favoris.map((item) => renderProductCard(item, true))}
+                    </div>
+                  </>
                 )}
 
-                {others.map((item) => (
-                  <div key={item.id} style={tile}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                      <button type="button" onClick={() => toggleFavori(item.id, false)} style={starBtnStyle(false)} title="Ajouter aux habituels">&#x2B50;</button>
-                      <IngredientAvatar ingredientId={item.id} name={item.name} category={(item.category ?? "autre") as Category} size={28} />
-                      <span style={{
-                        fontSize: 13, fontWeight: Number(quantities[item.id] ?? 0) > 0 ? 700 : 500,
-                        color: Number(quantities[item.id] ?? 0) > 0 ? "#1a1a1a" : "#666",
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0,
-                      }}>{item.name}</span>
-                      {stockBadge(item)}
-                    </div>
-                    {conditionLabel(item) && (
-                      <div style={{ paddingLeft: 28, fontSize: 10, color: "#999", marginTop: -2 }}>
-                        Cond. : {conditionLabel(item)}
-                      </div>
-                    )}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: 28 }}>
-                      {unitPriceBadge(item)}
-                      <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
-                    </div>
-                    {(item.pack_count ?? 0) > 0 && <div style={{ paddingLeft: 28 }}>{unitToggle(item)}</div>}
+                {others.length > 0 && (
+                  <div className="commandes-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, padding: "6px 10px 10px" }}>
+                    {others.map((item) => renderProductCard(item, false))}
                   </div>
-                ))}
+                )}
               </div>
             </div>
           );
