@@ -1306,10 +1306,25 @@ function PerformancesPage() {
                                 <td style={{ ...cellSt, fontWeight: 700, color: "#1a1a1a" }}>{midi?.cov ?? dash}</td>
                                 <td style={{ ...cellSt, fontWeight: 700, color: "#1a1a1a" }}>{soir?.cov ?? dash}</td>
                               </tr>
+                              <tr>
+                                <td style={{ ...labelSt, color: "#46655a" }}>SP</td>
+                                <td style={{ ...cellSt, fontWeight: 600, color: "#46655a" }}>{midi?.sp_cov || dash}</td>
+                                <td style={{ ...cellSt, fontWeight: 600, color: "#46655a" }}>{soir?.sp_cov || dash}</td>
+                              </tr>
+                              <tr>
+                                <td style={{ ...labelSt, color: "#46655a" }}>CVT M SP</td>
+                                <td style={{ ...cellSt, color: "#46655a" }}>{midi ? `${(mode === "ttc" ? midi.tm_sp_ttc : midi.tm_sp_ht).toFixed(0)}€` : dash}</td>
+                                <td style={{ ...cellSt, color: "#46655a" }}>{soir ? `${(mode === "ttc" ? soir.tm_sp_ttc : soir.tm_sp_ht).toFixed(0)}€` : dash}</td>
+                              </tr>
+                              <tr>
+                                <td style={{ ...labelSt, color: "#D4775A" }}>EMP</td>
+                                <td style={{ ...cellSt, fontWeight: 600, color: "#D4775A" }}>{midi ? (midi.cov - midi.sp_cov > 0 ? midi.cov - midi.sp_cov : dash) : dash}</td>
+                                <td style={{ ...cellSt, fontWeight: 600, color: "#D4775A" }}>{soir ? (soir.cov - soir.sp_cov > 0 ? soir.cov - soir.sp_cov : dash) : dash}</td>
+                              </tr>
                               <tr style={{ background: "rgba(0,0,0,0.015)" }}>
-                                <td style={{ ...labelSt, borderBottom: "none" }}>CVT M SP</td>
-                                <td style={{ ...cellSt, borderBottom: "none", color: "#444" }}>{midi ? `${(mode === "ttc" ? midi.tm_sp_ttc : midi.tm_sp_ht).toFixed(0)}€` : dash}</td>
-                                <td style={{ ...cellSt, borderBottom: "none", color: "#444" }}>{soir ? `${(mode === "ttc" ? soir.tm_sp_ttc : soir.tm_sp_ht).toFixed(0)}€` : dash}</td>
+                                <td style={{ ...labelSt, borderBottom: "none", color: "#D4775A" }}>CVT M EMP</td>
+                                <td style={{ ...cellSt, borderBottom: "none", color: "#D4775A" }}>{(() => { if (!midi) return dash; const ec = midi.cov - midi.sp_cov; if (ec <= 0) return dash; const empCa = mode === "ttc" ? midi.emp_ttc : midi.emp_ht; return `${Math.round(empCa / ec)}€`; })()}</td>
+                                <td style={{ ...cellSt, borderBottom: "none", color: "#D4775A" }}>{(() => { if (!soir) return dash; const ec = soir.cov - soir.sp_cov; if (ec <= 0) return dash; const empCa = mode === "ttc" ? soir.emp_ttc : soir.emp_ht; return `${Math.round(empCa / ec)}€`; })()}</td>
                               </tr>
                             </tbody>
                           </table>
