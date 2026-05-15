@@ -160,7 +160,7 @@ function parseLines(text: string): ParsedLine[] {
     // Append continuation line (next row without SKU prefix, starting with a letter)
     if (i + 1 < rows.length) {
       const next = rows[i + 1].trim();
-      if (next && !/^\d{4,6}\s/.test(next) && /^[A-Za-zÀ-ÿ]/.test(next)) {
+      if (next && !/^\d{4,6}\s/.test(next) && /^[A-Za-zÀ-ÿ]/.test(next) && !/^Total\s/i.test(next) && !/^Nous\s/i.test(next) && !/^Pénalités/i.test(next)) {
         const cont = next.replace(/\s+\d+[\.,]?\d*°?\s*$/, "").trim();
         if (cont.length > 1) nameRaw += " " + cont;
       }
