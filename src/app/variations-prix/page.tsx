@@ -385,7 +385,7 @@ export default function VariationsPrixPage() {
 
               {/* Portal-rendered dropdowns */}
               {filterDropdown === "supplier" && dropdownPos && createPortal(
-                <div style={{ position: "fixed", left: dropdownPos.left, top: dropdownPos.top, width: dropdownPos.width, zIndex: 9999, background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: 280, overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
+                <div onMouseDown={e => e.stopPropagation()} style={{ position: "fixed", left: dropdownPos.left, top: dropdownPos.top, width: dropdownPos.width, zIndex: 9999, background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: 280, overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
                   <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => { setFilterSupplier("all"); setFilterDropdown(null); }}
                     style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", width: "100%", background: filterSupplier === "all" ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer" }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ccc", flexShrink: 0 }} />
@@ -404,7 +404,7 @@ export default function VariationsPrixPage() {
                 document.body
               )}
               {filterDropdown === "category" && dropdownPos && createPortal(
-                <div style={{ position: "fixed", left: dropdownPos.left, top: dropdownPos.top, width: dropdownPos.width, zIndex: 9999, background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: 280, overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
+                <div onMouseDown={e => e.stopPropagation()} style={{ position: "fixed", left: dropdownPos.left, top: dropdownPos.top, width: dropdownPos.width, zIndex: 9999, background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: 280, overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
                   <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => { setFilterCategory("all"); setFilterDropdown(null); }}
                     style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", width: "100%", background: filterCategory === "all" ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer" }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ccc", flexShrink: 0 }} />
