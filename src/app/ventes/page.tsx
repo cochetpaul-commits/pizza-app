@@ -1627,7 +1627,7 @@ function UpsellCard({ label, emoji, data, totalTables, totalCov, color, targets,
   );
 }
 
-function UpsellCardMini({ label, emoji, data, totalTables, color, mode, onClick, active }: {
+function _UpsellCardMini({ label, emoji, data, totalTables, color, mode, onClick, active }: {
   label: string; emoji: string; data: UpsellData; totalTables: number; color: string; mode: string;
   onClick?: () => void; active?: boolean;
 }) {
@@ -1806,8 +1806,8 @@ function RecapTable({ services, mode, meteo, dates, days, useWeeks: useWeeksProp
             const z = mode === "ttc" ? s.z_ttc : s.z_ht;
             const tmSp = mode === "ttc" ? s.tm_sp_ttc : s.tm_sp_ht;
             const bg = di % 2 === 0 ? "#fff" : "#faf7f2";
-            const tmColor = tmSp >= 80 ? "#2e7d32" : tmSp >= 65 ? "#e65100" : "#c62828";
-            const tmBg = tmSp >= 80 ? "#e8f5e9" : tmSp >= 65 ? "#fff3e0" : "#ffebee";
+            const _tmColor = tmSp >= 80 ? "#2e7d32" : tmSp >= 65 ? "#e65100" : "#c62828";
+            const _tmBg = tmSp >= 80 ? "#e8f5e9" : tmSp >= 65 ? "#fff3e0" : "#ffebee";
             return (
               <tr key={`${group.groupLabel}-${s.jour}-${s.svc}`} style={{ background: bg, borderTop: si === 0 && di > 0 ? "1px solid #e0d8ce" : si > 0 ? "1px solid rgba(0,0,0,.05)" : "none" }}>
                 {si === 0 && <td rowSpan={svcs.length} style={{ padding: "0 16px", fontWeight: 700, fontSize: useWeeks ? 12 : 15, verticalAlign: "middle", borderRight: "1px solid #e0d8ce" }}>{useWeeks ? group.groupLabel : s.jour}</td>}

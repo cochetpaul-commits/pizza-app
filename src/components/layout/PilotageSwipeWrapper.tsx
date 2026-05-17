@@ -43,13 +43,13 @@ export function PilotageSwipeWrapper({ children, dateFrom, dateTo }: Props) {
     router.push(qs ? `${target.href}?${qs}` : target.href);
   }, [router, dateFrom, dateTo]);
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+  const _handleTouchStart = useCallback((e: React.TouchEvent) => {
     startX.current = e.touches[0].clientX;
     startY.current = e.touches[0].clientY;
     swiping.current = true;
   }, []);
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+  const _handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (!swiping.current) return;
     swiping.current = false;
     const dx = e.changedTouches[0].clientX - startX.current;

@@ -174,7 +174,7 @@ function groupCatalog(items: CatalogItem[]): Record<string, { favoris: CatalogIt
   return result;
 }
 
-function starBtnStyle(isFav: boolean): React.CSSProperties {
+function _starBtnStyle(isFav: boolean): React.CSSProperties {
   return {
     background: "none",
     border: "none",
@@ -1055,7 +1055,7 @@ function CommandesPage() {
 
   // ── Render: unit toggle (individual/carton) ──────────────────────────
 
-  function stockBadge(item: CatalogItem) {
+  function _stockBadge(item: CatalogItem) {
     const obj = item.stock_objectif;
     if (obj == null || obj <= 0) return null;
     const min = item.stock_min ?? 0;
@@ -1157,7 +1157,7 @@ function CommandesPage() {
     );
   }
 
-  function conditionLabel(item: CatalogItem): string | null {
+  function _conditionLabel(item: CatalogItem): string | null {
     const packCount = item.pack_count ?? 0;
     if (packCount <= 0) return null;
     // Use the base unit label (bouteille, sachet, etc.)
@@ -1242,7 +1242,7 @@ function CommandesPage() {
   const [editingUnit, setEditingUnit] = useState<string | null>(null);
   const [editUnitValue, setEditUnitValue] = useState("");
 
-  function unitPriceBadge(item: CatalogItem) {
+  function _unitPriceBadge(item: CatalogItem) {
     const u = item.order_unit;
     const price = item.prix_commande;
     const isEditing = editingUnit === item.id;
