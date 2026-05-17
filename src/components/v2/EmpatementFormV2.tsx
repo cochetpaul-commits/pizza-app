@@ -364,7 +364,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         user_id: auth.user.id,
         pivot_ingredient_id: pivotItemId,
         ingredient_links: ingredientLinks,
-        total_cost: totalCost,
+        total_cost: totalCost ?? 0,
       };
 
       let rid = recipeId;
