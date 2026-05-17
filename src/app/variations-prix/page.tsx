@@ -335,7 +335,7 @@ export default function VariationsPrixPage() {
             </div>
 
             {/* Filtres */}
-            <div className="card" style={{ marginBottom: 12, padding: "12px 14px" }}>
+            <div className="card" style={{ marginBottom: 12, padding: "12px 14px", position: "relative", zIndex: 10 }}>
               <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.6, letterSpacing: 0.5, marginBottom: 8, textTransform: "uppercase" }}>Filtres</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 {/* Fournisseur dropdown */}
