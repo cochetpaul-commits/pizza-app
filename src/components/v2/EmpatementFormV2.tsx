@@ -13,6 +13,7 @@ import { calculerPate, type EmpatementType, type FlourMixItem } from "@/lib/pate
 import { GestionCommandes } from "./GestionCommandes";
 import { GestionPilotage } from "./GestionPilotage";
 import type { Ingredient } from "@/types/ingredients";
+import { offerRowToCpu, enrichCpuWithConversions, type CpuByUnit } from "@/lib/offerPricing";
 import { fetchApi } from "@/lib/fetchApi";
 import { PublishCatalogueButton } from "./PublishCatalogueButton";
 
@@ -30,32 +31,10 @@ function roundG(v: number) { return Math.round(v); }
 function fmtG(v: number) { return roundG(v).toLocaleString("fr-FR") + " g"; }
 function fmtMoney(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
-/** Derive €/g from whatever pricing data the ingredient has */
-function ingredientEurPerG(i: Ingredient): number | null {
-  // 1. cost_per_kg directly
-  if (i.cost_per_kg != null && i.cost_per_kg > 0) return i.cost_per_kg / 1000;
-
-  // 2. cost_per_unit + purchase_unit_label
-  const cpu = i.cost_per_unit;
-  const lbl = (i.purchase_unit_label ?? "").toLowerCase().trim();
-  if (cpu != null && cpu > 0) {
-    if (lbl === "kg") return cpu / 1000;
-    if (lbl === "g") return cpu;
-    if (lbl === "l" && i.density_g_per_ml) return cpu / (i.density_g_per_ml * 1000);
-    if (lbl === "ml" && i.density_g_per_ml) return cpu / i.density_g_per_ml;
-    if ((lbl === "pc" || lbl === "pcs") && i.piece_weight_g && i.piece_weight_g > 0) return cpu / i.piece_weight_g;
-  }
-
-  // 3. purchase_price fallback
-  const pp = i.purchase_price;
-  if (pp != null && pp > 0) {
-    if (lbl === "kg") return pp / 1000;
-    if (lbl === "g") return pp;
-    if (lbl === "l" && i.density_g_per_ml) return pp / (i.density_g_per_ml * 1000);
-    if (lbl === "ml" && i.density_g_per_ml) return pp / i.density_g_per_ml;
-    if ((lbl === "pc" || lbl === "pcs") && i.piece_weight_g && i.piece_weight_g > 0) return pp / i.piece_weight_g;
-  }
-
+/** Derive €/g from offer CPU or ingredient fallback fields */
+function cpuToEurPerG(cpu: CpuByUnit): number | null {
+  if (cpu.g && cpu.g > 0) return cpu.g;
+  if (cpu.ml && cpu.ml > 0) return cpu.ml; // rough approximation (density ~1)
   return null;
 }
 
@@ -121,6 +100,8 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
 
   // All ingredients for SmartSelect
   const [allIngredients, setAllIngredients] = useState<Ingredient[]>([]);
+  // CPU (€/g, €/ml, €/pcs) per ingredient from offers
+  const [cpuMap, setCpuMap] = useState<Record<string, CpuByUnit>>({});
 
   // Non-flour ingredient links
   const [saltId, setSaltId] = useState<string | null>(null);
@@ -134,7 +115,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     .map(i => ({ id: i.id, name: i.name, category: i.category }));
 
   const allOptions: SmartSelectOption[] = allIngredients.map(i => {
-    const epg = ingredientEurPerG(i);
+    const epg = cpuToEurPerG(cpuMap[i.id] ?? {});
     return {
       id: i.id,
       name: i.name,
@@ -169,15 +150,13 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
   // Live cost calculation
   const liveCost = useMemo(() => {
     if (!result) return null;
-    const byId = new Map(allIngredients.map(i => [i.id, i]));
     let cost = 0;
     let hasAnyCost = false;
 
     const flourTotal = result.totals.flour_total_g;
     for (const fm of flourMix) {
       const fId = fm === flourMix[0] ? flour1Id : flour2Id;
-      const ing = fId ? byId.get(fId) : null;
-      const epg = ing ? ingredientEurPerG(ing) : null;
+      const epg = fId ? cpuToEurPerG(cpuMap[fId] ?? {}) : null;
       if (epg) {
         cost += (flourTotal * fm.percent / 100) * epg;
         hasAnyCost = true;
@@ -193,8 +172,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     ];
     for (const [ingId, qty] of nonFlour) {
       if (!ingId || qty <= 0) continue;
-      const ing = byId.get(ingId);
-      const epg = ing ? ingredientEurPerG(ing) : null;
+      const epg = cpuToEurPerG(cpuMap[ingId] ?? {});
       if (epg) {
         cost += qty * epg;
         hasAnyCost = true;
@@ -204,7 +182,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     if (!hasAnyCost) return null;
     const yg = result.summary.total_dough_g;
     return { total: round2(cost), perKg: yg > 0 ? round2((cost / yg) * 1000) : null };
-  }, [result, allIngredients, flourMix, flour1Id, flour2Id, saltId, waterId, oilId, honeyId, yeastId]);
+  }, [result, cpuMap, flourMix, flour1Id, flour2Id, saltId, waterId, oilId, honeyId, yeastId]);
 
   // Virtual ingredient lines for Mode Production
   const empItems: EmpItem[] = useMemo(() => {
@@ -248,9 +226,23 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         .from("ingredients")
         .select("*")
         .eq("is_active", true);
-      const { data: ingsData } = await ingsQ.order("name");
+      const offQ = supabase.from("v_latest_offers").select("*");
+      const [{ data: ingsData }, { data: offersData }] = await Promise.all([
+        ingsQ.order("name"),
+        offQ,
+      ]);
       if (cancelled) return;
       setAllIngredients((ingsData ?? []) as Ingredient[]);
+
+      // Build CPU map from offers
+      const cm: Record<string, CpuByUnit> = {};
+      for (const o of (offersData ?? []) as Record<string, unknown>[]) {
+        const iid = String(o.ingredient_id ?? "");
+        if (!iid) continue;
+        const raw = offerRowToCpu(o);
+        cm[iid] = enrichCpuWithConversions(o, raw);
+      }
+      setCpuMap(cm);
 
       if (recipeId) {
         const { data: rec, error: recErr } = await supabase.from("recipes").select("*").eq("id", recipeId).single();
