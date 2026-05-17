@@ -252,7 +252,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         vat_rate: vatRate,
         margin_rate,
         sell_price: sellPrice !== "" ? Number(sellPrice) : null,
-        procedure: steps.length > 0 ? JSON.stringify(steps) : null,
+        procedure: steps.length > 0 ? JSON.stringify(steps) : "[]",
         user_id: auth.user.id,
       };
 
