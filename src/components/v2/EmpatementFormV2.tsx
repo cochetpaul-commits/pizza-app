@@ -28,7 +28,36 @@ function n2(v: unknown) { const x = Number(v); return Number.isFinite(x) ? x : 0
 function round2(v: number) { return Math.round(v * 100) / 100; }
 function roundG(v: number) { return Math.round(v); }
 function fmtG(v: number) { return roundG(v).toLocaleString("fr-FR") + " g"; }
-function _fmtMoney(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmtMoney(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+/** Derive €/g from whatever pricing data the ingredient has */
+function ingredientEurPerG(i: Ingredient): number | null {
+  // 1. cost_per_kg directly
+  if (i.cost_per_kg != null && i.cost_per_kg > 0) return i.cost_per_kg / 1000;
+
+  // 2. cost_per_unit + purchase_unit_label
+  const cpu = i.cost_per_unit;
+  const lbl = (i.purchase_unit_label ?? "").toLowerCase().trim();
+  if (cpu != null && cpu > 0) {
+    if (lbl === "kg") return cpu / 1000;
+    if (lbl === "g") return cpu;
+    if (lbl === "l" && i.density_g_per_ml) return cpu / (i.density_g_per_ml * 1000);
+    if (lbl === "ml" && i.density_g_per_ml) return cpu / i.density_g_per_ml;
+    if ((lbl === "pc" || lbl === "pcs") && i.piece_weight_g && i.piece_weight_g > 0) return cpu / i.piece_weight_g;
+  }
+
+  // 3. purchase_price fallback
+  const pp = i.purchase_price;
+  if (pp != null && pp > 0) {
+    if (lbl === "kg") return pp / 1000;
+    if (lbl === "g") return pp;
+    if (lbl === "l" && i.density_g_per_ml) return pp / (i.density_g_per_ml * 1000);
+    if (lbl === "ml" && i.density_g_per_ml) return pp / i.density_g_per_ml;
+    if ((lbl === "pc" || lbl === "pcs") && i.piece_weight_g && i.piece_weight_g > 0) return pp / i.piece_weight_g;
+  }
+
+  return null;
+}
 
 // Virtual ingredient IDs for empatement pivot
 type EmpItemId = "flour" | "water" | "salt" | "honey" | "oil" | "yeast";
@@ -104,12 +133,15 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     .filter(i => ["epicerie_salee", "autre"].includes(i.category))
     .map(i => ({ id: i.id, name: i.name, category: i.category }));
 
-  const allOptions: SmartSelectOption[] = allIngredients.map(i => ({
-    id: i.id,
-    name: i.name,
-    category: i.category,
-    rightBottom: i.cost_per_kg != null ? `${i.cost_per_kg.toFixed(2)} €/kg` : undefined,
-  }));
+  const allOptions: SmartSelectOption[] = allIngredients.map(i => {
+    const epg = ingredientEurPerG(i);
+    return {
+      id: i.id,
+      name: i.name,
+      category: i.category,
+      rightBottom: epg != null ? `${fmtMoney(epg * 1000)} €/kg` : undefined,
+    };
+  });
 
   const flourMix: FlourMixItem[] = useMemo(() => {
     if (!useTwoFlours) return [{ name: flour1Name, percent: 100 }];
@@ -145,8 +177,9 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     for (const fm of flourMix) {
       const fId = fm === flourMix[0] ? flour1Id : flour2Id;
       const ing = fId ? byId.get(fId) : null;
-      if (ing?.cost_per_kg) {
-        cost += (flourTotal * fm.percent / 100) * (ing.cost_per_kg / 1000);
+      const epg = ing ? ingredientEurPerG(ing) : null;
+      if (epg) {
+        cost += (flourTotal * fm.percent / 100) * epg;
         hasAnyCost = true;
       }
     }
@@ -161,8 +194,9 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     for (const [ingId, qty] of nonFlour) {
       if (!ingId || qty <= 0) continue;
       const ing = byId.get(ingId);
-      if (ing?.cost_per_kg) {
-        cost += qty * (ing.cost_per_kg / 1000);
+      const epg = ing ? ingredientEurPerG(ing) : null;
+      if (epg) {
+        cost += qty * epg;
         hasAnyCost = true;
       }
     }
@@ -306,43 +340,8 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
       if (honeyId) ingredientLinks.honey = honeyId;
       if (yeastId) ingredientLinks.yeast = yeastId;
 
-      // Calculate total_cost from linked ingredients
-      let totalCost: number | null = null;
-      if (result) {
-        const byId = new Map(allIngredients.map(i => [i.id, i]));
-        let cost = 0;
-        let hasAnyCost = false;
-
-        // Flour costs (split by flour_mix percentages)
-        const flourTotal = result.totals.flour_total_g;
-        for (const fm of flourMix) {
-          const fId = fm === flourMix[0] ? flour1Id : flour2Id;
-          const ing = fId ? byId.get(fId) : null;
-          if (ing?.cost_per_kg) {
-            cost += (flourTotal * fm.percent / 100) * (ing.cost_per_kg / 1000);
-            hasAnyCost = true;
-          }
-        }
-
-        // Non-flour costs
-        const nonFlourMap: [string | null, number][] = [
-          [saltId, result.totals.salt_g],
-          [waterId, result.totals.water_g],
-          [oilId, result.totals.oil_g],
-          [honeyId, result.totals.honey_g],
-          [yeastId, result.totals.yeast_g],
-        ];
-        for (const [ingId, qty] of nonFlourMap) {
-          if (!ingId || qty <= 0) continue;
-          const ing = byId.get(ingId);
-          if (ing?.cost_per_kg) {
-            cost += qty * (ing.cost_per_kg / 1000);
-            hasAnyCost = true;
-          }
-        }
-
-        if (hasAnyCost) totalCost = round2(cost);
-      }
+      // Calculate total_cost from linked ingredients (reuse liveCost logic)
+      const totalCost = liveCost?.total ?? 0;
 
       const payload: Record<string, unknown> = {
         name: name || `Empatement ${type}`,
