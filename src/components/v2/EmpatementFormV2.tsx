@@ -90,13 +90,25 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
-  // Flour ingredients for SmartSelect
-  const [flourIngredients, setFlourIngredients] = useState<Ingredient[]>([]);
+  // All ingredients for SmartSelect
+  const [allIngredients, setAllIngredients] = useState<Ingredient[]>([]);
 
-  const flourOptions: SmartSelectOption[] = flourIngredients.map(i => ({
+  // Non-flour ingredient links
+  const [saltId, setSaltId] = useState<string | null>(null);
+  const [waterId, setWaterId] = useState<string | null>(null);
+  const [oilId, setOilId] = useState<string | null>(null);
+  const [honeyId, setHoneyId] = useState<string | null>(null);
+  const [yeastId, setYeastId] = useState<string | null>(null);
+
+  const flourOptions: SmartSelectOption[] = allIngredients
+    .filter(i => ["epicerie_salee", "autre"].includes(i.category))
+    .map(i => ({ id: i.id, name: i.name, category: i.category }));
+
+  const allOptions: SmartSelectOption[] = allIngredients.map(i => ({
     id: i.id,
     name: i.name,
     category: i.category,
+    rightBottom: i.cost_per_kg != null ? `${i.cost_per_kg.toFixed(2)} €/kg` : undefined,
   }));
 
   const flourMix: FlourMixItem[] = useMemo(() => {
@@ -121,6 +133,44 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
       });
     } catch { return null; }
   }, [type, nbPatons, poidsPaton, hydration, salt, honey, oil, yeast, bigaYeast, flourMix]);
+
+  // Live cost calculation
+  const liveCost = useMemo(() => {
+    if (!result) return null;
+    const byId = new Map(allIngredients.map(i => [i.id, i]));
+    let cost = 0;
+    let hasAnyCost = false;
+
+    const flourTotal = result.totals.flour_total_g;
+    for (const fm of flourMix) {
+      const fId = fm === flourMix[0] ? flour1Id : flour2Id;
+      const ing = fId ? byId.get(fId) : null;
+      if (ing?.cost_per_kg) {
+        cost += (flourTotal * fm.percent / 100) * (ing.cost_per_kg / 1000);
+        hasAnyCost = true;
+      }
+    }
+
+    const nonFlour: [string | null, number][] = [
+      [saltId, result.totals.salt_g],
+      [waterId, result.totals.water_g],
+      [oilId, result.totals.oil_g],
+      [honeyId, result.totals.honey_g],
+      [yeastId, result.totals.yeast_g],
+    ];
+    for (const [ingId, qty] of nonFlour) {
+      if (!ingId || qty <= 0) continue;
+      const ing = byId.get(ingId);
+      if (ing?.cost_per_kg) {
+        cost += qty * (ing.cost_per_kg / 1000);
+        hasAnyCost = true;
+      }
+    }
+
+    if (!hasAnyCost) return null;
+    const yg = result.summary.total_dough_g;
+    return { total: round2(cost), perKg: yg > 0 ? round2((cost / yg) * 1000) : null };
+  }, [result, allIngredients, flourMix, flour1Id, flour2Id, saltId, waterId, oilId, honeyId, yeastId]);
 
   // Virtual ingredient lines for Mode Production
   const empItems: EmpItem[] = useMemo(() => {
@@ -163,11 +213,10 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
       const ingsQ = supabase
         .from("ingredients")
         .select("*")
-        .eq("is_active", true)
-        .in("category", ["epicerie_salee", "autre"]);
+        .eq("is_active", true);
       const { data: ingsData } = await ingsQ.order("name");
       if (cancelled) return;
-      setFlourIngredients((ingsData ?? []) as Ingredient[]);
+      setAllIngredients((ingsData ?? []) as Ingredient[]);
 
       if (recipeId) {
         const { data: rec, error: recErr } = await supabase.from("recipes").select("*").eq("id", recipeId).single();
@@ -211,6 +260,17 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
             try { setSteps(JSON.parse(String(r.procedure)) as string[]); }
             catch { setSteps(String(r.procedure) ? [String(r.procedure)] : []); }
           }
+          // Restore ingredient links
+          if (r.ingredient_links && typeof r.ingredient_links === "object") {
+            const links = r.ingredient_links as Record<string, string>;
+            if (links.flour1) setFlour1Id(links.flour1);
+            if (links.flour2) setFlour2Id(links.flour2);
+            if (links.salt) setSaltId(links.salt);
+            if (links.water) setWaterId(links.water);
+            if (links.oil) setOilId(links.oil);
+            if (links.honey) setHoneyId(links.honey);
+            if (links.yeast) setYeastId(links.yeast);
+          }
           // pivot_ingredient_id is stored as TEXT for empatement virtual IDs
           const pid = String(r.pivot_ingredient_id ?? "");
           if (pid && ["flour","water","salt","honey","oil","yeast"].includes(pid)) {
@@ -236,6 +296,54 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
       const margin_rate = marginRateNum > 0 ? round2(marginRateNum) : 0;
       const yieldGrams = result?.summary.total_dough_g ?? null;
 
+      // Build ingredient links map
+      const ingredientLinks: Record<string, string> = {};
+      if (flour1Id) ingredientLinks.flour1 = flour1Id;
+      if (flour2Id) ingredientLinks.flour2 = flour2Id;
+      if (saltId) ingredientLinks.salt = saltId;
+      if (waterId) ingredientLinks.water = waterId;
+      if (oilId) ingredientLinks.oil = oilId;
+      if (honeyId) ingredientLinks.honey = honeyId;
+      if (yeastId) ingredientLinks.yeast = yeastId;
+
+      // Calculate total_cost from linked ingredients
+      let totalCost: number | null = null;
+      if (result) {
+        const byId = new Map(allIngredients.map(i => [i.id, i]));
+        let cost = 0;
+        let hasAnyCost = false;
+
+        // Flour costs (split by flour_mix percentages)
+        const flourTotal = result.totals.flour_total_g;
+        for (const fm of flourMix) {
+          const fId = fm === flourMix[0] ? flour1Id : flour2Id;
+          const ing = fId ? byId.get(fId) : null;
+          if (ing?.cost_per_kg) {
+            cost += (flourTotal * fm.percent / 100) * (ing.cost_per_kg / 1000);
+            hasAnyCost = true;
+          }
+        }
+
+        // Non-flour costs
+        const nonFlourMap: [string | null, number][] = [
+          [saltId, result.totals.salt_g],
+          [waterId, result.totals.water_g],
+          [oilId, result.totals.oil_g],
+          [honeyId, result.totals.honey_g],
+          [yeastId, result.totals.yeast_g],
+        ];
+        for (const [ingId, qty] of nonFlourMap) {
+          if (!ingId || qty <= 0) continue;
+          const ing = byId.get(ingId);
+          if (ing?.cost_per_kg) {
+            cost += qty * (ing.cost_per_kg / 1000);
+            hasAnyCost = true;
+          }
+        }
+
+        if (hasAnyCost) totalCost = round2(cost);
+      }
+
       const payload: Record<string, unknown> = {
         name: name || `Empatement ${type}`,
         type,
@@ -254,6 +362,8 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         sell_price: sellPrice !== "" ? Number(sellPrice) : null,
         procedure: steps.length > 0 ? JSON.stringify(steps) : "[]",
         user_id: auth.user.id,
+        ingredient_links: ingredientLinks,
+        total_cost: totalCost,
       };
 
       let rid = recipeId;
@@ -569,7 +679,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                         <label className="label">Farine 1 -- nom</label>
                         <input className="input" value={flour1Name} onChange={e => setFlour1Name(e.target.value)} placeholder="ex: Tipo 00" />
                       </div>
-                      {flourIngredients.length > 0 && (
+                      {flourOptions.length > 0 && (
                         <div style={{ flex: "1 1 140px" }}>
                           <label className="label">Lie a un ingredient</label>
                           <SmartSelect
@@ -577,7 +687,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                             value={flour1Id ?? ""}
                             onChange={id => {
                               setFlour1Id(id || null);
-                              const ing = flourIngredients.find(i => i.id === id);
+                              const ing = allIngredients.find(i => i.id === id);
                               if (ing) setFlour1Name(ing.name);
                             }}
                             placeholder="Ingredient..."
@@ -607,7 +717,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                           <label className="label">Farine 2 -- nom</label>
                           <input className="input" value={flour2Name} onChange={e => setFlour2Name(e.target.value)} placeholder="ex: Tipo 1" />
                         </div>
-                        {flourIngredients.length > 0 && (
+                        {flourOptions.length > 0 && (
                           <div style={{ flex: "1 1 140px" }}>
                             <label className="label">Lie a un ingredient</label>
                             <SmartSelect
@@ -615,7 +725,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                               value={flour2Id ?? ""}
                               onChange={id => {
                                 setFlour2Id(id || null);
-                                const ing = flourIngredients.find(i => i.id === id);
+                                const ing = allIngredients.find(i => i.id === id);
                                 if (ing) setFlour2Name(ing.name);
                               }}
                               placeholder="Ingredient..."
@@ -628,6 +738,33 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                         </div>
                       </div>
                     )}
+                  </div>
+                </div>
+
+                {/* Liaison ingredients (pour calcul de cout) */}
+                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
+                    Ingredients lies (cout)
+                  </h3>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    {[
+                      { label: "Sel", value: saltId, set: setSaltId, show: salt > 0 },
+                      { label: "Eau", value: waterId, set: setWaterId, show: true },
+                      { label: "Huile", value: oilId, set: setOilId, show: oil > 0 },
+                      { label: "Miel", value: honeyId, set: setHoneyId, show: honey > 0 },
+                      { label: "Levure", value: yeastId, set: setYeastId, show: yeast > 0 || bigaYeast > 0 },
+                    ].filter(x => x.show).map(x => (
+                      <div key={x.label}>
+                        <label className="label">{x.label}</label>
+                        <SmartSelect
+                          options={allOptions}
+                          value={x.value ?? ""}
+                          onChange={id => x.set(id || null)}
+                          placeholder="Ingredient..."
+                          menuMax={8}
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -664,6 +801,25 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                         </div>
                       ))}
                     </div>
+
+                    {liveCost && (
+                      <div style={{
+                        display: "flex", gap: 12, padding: "10px 12px", borderRadius: 8,
+                        background: "rgba(180,83,9,0.06)", border: "1px solid rgba(180,83,9,0.2)",
+                        marginBottom: 8,
+                      }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#9a8f84", textTransform: "uppercase" }}>Cout total</div>
+                          <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT }}>{liveCost.total.toFixed(2)} €</div>
+                        </div>
+                        {liveCost.perKg != null && (
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: "#9a8f84", textTransform: "uppercase" }}>Cout / kg</div>
+                            <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT }}>{liveCost.perKg.toFixed(2)} €/kg</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {useTwoFlours && result.flour_breakdown.length > 1 && (
                       <div style={{ marginTop: 10 }}>
