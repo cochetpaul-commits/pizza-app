@@ -39,6 +39,7 @@ type CocktailRow = {
 };
 type EmpRow = {
   id: string; name: string; type: string; created_at: string;
+  total_cost: number | null; yield_grams: number | null;
   pivot_ingredient_id: string | null;
 };
 
@@ -408,7 +409,7 @@ function RecettesInner() {
         .select("id,name,image_url,type,total_cost,sell_price,establishments,pivot_ingredient_id")
         .eq("is_draft", false);
       const eq = supabase.from("recipes")
-        .select("id,name,type,created_at,pivot_ingredient_id")
+        .select("id,name,type,created_at,total_cost,yield_grams,pivot_ingredient_id")
         .order("created_at", { ascending: false });
 
       if (etabCtx) {
@@ -928,17 +929,24 @@ function RecettesInner() {
             <SectionHeader title="Empatement" color={EMP_COLOR} count={filteredEmps.length}
               collapsed={!openSections.has("emp")} onToggle={() => toggleSection("emp")} />
             {openSections.has("emp") && <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {filteredEmps.map(r => (
-                <RecipeCard
-                  key={r.id}
-                  name={r.name}
-                  href={`/recettes/empatement/${r.id}`}
-                  onProd={r.pivot_ingredient_id ? () => setProdModal({ type: "empatement", id: r.id, name: r.name ?? "Empatement", pivotId: r.pivot_ingredient_id! }) : undefined}
-                  color={EMP_COLOR}
-                  subtitle="Empâtement"
-                  subtitleColor={EMP_COLOR}
-                />
-              ))}
+              {filteredEmps.map(r => {
+                const costPerKg = r.total_cost != null && r.yield_grams != null && r.yield_grams > 0
+                  ? (r.total_cost / r.yield_grams) * 1000
+                  : null;
+                return (
+                  <RecipeCard
+                    key={r.id}
+                    name={r.name}
+                    href={`/recettes/empatement/${r.id}`}
+                    onProd={r.pivot_ingredient_id ? () => setProdModal({ type: "empatement", id: r.id, name: r.name ?? "Empatement", pivotId: r.pivot_ingredient_id! }) : undefined}
+                    color={EMP_COLOR}
+                    subtitle="Empâtement"
+                    subtitleColor={EMP_COLOR}
+                    cost={costPerKg}
+                    costLabel="/kg"
+                  />
+                );
+              })}
             </div>}
           </div>
         )}
