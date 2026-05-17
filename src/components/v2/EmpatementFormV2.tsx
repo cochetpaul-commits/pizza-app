@@ -362,6 +362,9 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         sell_price: sellPrice !== "" ? Number(sellPrice) : null,
         procedure: steps.length > 0 ? JSON.stringify(steps) : "[]",
         user_id: auth.user.id,
+        pivot_ingredient_id: pivotItemId,
+        ingredient_links: ingredientLinks,
+        total_cost: totalCost,
       };
 
       let rid = recipeId;
@@ -374,12 +377,6 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         rid = data.id;
       }
 
-      // Save extra columns (silent failure if migration not yet applied)
-      await supabase.from("recipes").update({
-        pivot_ingredient_id: pivotItemId,
-        ingredient_links: ingredientLinks,
-        total_cost: totalCost,
-      }).eq("id", rid!).then(() => {});
 
       if (!isEdit) router.push(`/recettes/empatement/${rid}`);
     } catch (err) {
