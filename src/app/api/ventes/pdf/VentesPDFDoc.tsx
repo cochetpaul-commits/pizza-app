@@ -888,23 +888,29 @@ export function VentesPDF({ stats, prev, mode, viewTab, rangeLabel, etabName, br
           <UpsellCard stats={stats} />
           <DurationCard stats={stats} prev={prev} />
           <ComparatifCard stats={stats} prev={prev} mode={mode} />
-          <Top10Card stats={stats} mode={mode} />
-          <Top3CatsCard stats={stats} mode={mode} />
-          <MixCategoriesCard stats={stats} mode={mode} />
-          <ServeursCard stats={stats} mode={mode} />
-          <PaiementsCard stats={stats} />
+          {!isComplet && (
+            <>
+              <Top10Card stats={stats} mode={mode} />
+              <Top3CatsCard stats={stats} mode={mode} />
+              <MixCategoriesCard stats={stats} mode={mode} />
+              <ServeursCard stats={stats} mode={mode} />
+              <PaiementsCard stats={stats} />
+            </>
+          )}
           {briefing && briefing.length > 0 && <BriefingCard briefing={briefing} />}
         </Page>
       )}
 
       {/* ─── PRODUITS: all sections flow in one page with auto-wrap ─── */}
-      {isProduits && (
+      {(isProduits || isComplet) && (
         <Page size="A4" style={s.page} wrap>
           <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
-          <HeroCard stats={stats} prev={prev} mode={mode} />
+          {!isComplet && <HeroCard stats={stats} prev={prev} mode={mode} />}
           <Top10Card stats={stats} mode={mode} />
           <Top3CatsCard stats={stats} mode={mode} />
           <MixCategoriesCard stats={stats} mode={mode} />
+          <ServeursCard stats={stats} mode={mode} />
+          <PaiementsCard stats={stats} />
           <MargeCard stats={stats} />
           <HourlyCard stats={stats} />
           {briefing && briefing.length > 0 && <BriefingCard briefing={briefing} />}

@@ -530,7 +530,7 @@ function PerformancesPage() {
           exportType,
         }),
       });
-      if (!res.ok) { setExporting(false); return; }
+      if (!res.ok) { const errText = await res.text().catch(() => ""); alert(`Erreur export PDF: ${res.status} ${errText.slice(0, 200)}`); setExporting(false); return; }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
