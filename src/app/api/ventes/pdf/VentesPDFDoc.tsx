@@ -190,66 +190,48 @@ function KpiCardsRow({ stats, prev, mode }: { stats: any; prev: any; mode: strin
 function UpsellCard({ stats }: { stats: any }) {
   const W = stats;
   if (!W.ratios) return null;
-  const mainItems = [
+  const allItems = [
     { label: "Antipasti", data: W.ratios.anti, color: c.accent },
+    { label: "Pizzas", data: W.ratios.pizze, color: "#c94c2c" },
+    { label: "Plats / Pasta", data: W.ratios.plats, color: "#8a6b3e" },
     { label: "Desserts", data: W.ratios.dolci, color: "#b5904a" },
     { label: "Vins", data: W.ratios.vin, color: "#7c5c3a" },
-  ];
-  const secondaryItems = [
     { label: "Alcool", data: W.ratios.alcool, color: "#c15f2e" },
     { label: "Boissons", data: W.ratios.boissons, color: c.green },
     { label: "Cafe", data: W.ratios.cafe, color: "#6f5c3a" },
     { label: "Digestifs", data: W.ratios.digestif, color: "#8b6914" },
   ];
 
+  // Render in rows of 3
+  const rows: typeof allItems[] = [];
+  for (let i = 0; i < allItems.length; i += 3) rows.push(allItems.slice(i, i + 3));
+
   return (
-    <View style={s.card}>
+    <View style={s.card} wrap={false}>
       <Text style={s.sec}>Upsell · Performance de la periode</Text>
-      {/* Main 3 cards */}
-      <View style={{ flexDirection: "row", gap: 6, marginBottom: 6 }}>
-        {mainItems.map((u) => {
-          const tables = u.data?.tables ?? 0;
-          const coverts = u.data?.coverts ?? 0;
-          const caTtc = u.data?.ca_ttc ?? 0;
-          const pct = W.tickets > 0 ? Math.round((tables / W.tickets) * 100) : 0;
-          return (
-            <View key={u.label} style={{ flex: 1, backgroundColor: c.white, borderRadius: 5, padding: 6, borderWidth: 0.5, borderColor: c.border }}>
-              <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold", marginBottom: 3 }}>{u.label}</Text>
-              <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: u.color }}>{pct}%</Text>
-              <Text style={{ fontSize: 5, color: c.muted, marginTop: 1 }}>des tables</Text>
-              <View style={{ flexDirection: "row", gap: 4, marginTop: 4 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 5, color: c.muted }}>Tables</Text>
-                  <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold" }}>{tables}/{W.tickets}</Text>
+      {rows.map((row, ri) => (
+        <View key={ri} style={{ flexDirection: "row", gap: 5, marginBottom: 5 }}>
+          {row.map((u) => {
+            const tables = u.data?.tables ?? 0;
+            const coverts = u.data?.coverts ?? 0;
+            const caTtc = u.data?.ca_ttc ?? 0;
+            const pct = W.tickets > 0 ? Math.round((tables / W.tickets) * 100) : 0;
+            const pctCov = W.couverts > 0 ? Math.round((coverts / W.couverts) * 100) : 0;
+            return (
+              <View key={u.label} style={{ flex: 1, backgroundColor: c.white, borderRadius: 5, padding: 5, borderWidth: 0.5, borderColor: c.border }}>
+                <Text style={{ fontSize: 6, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>{u.label}</Text>
+                <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold", color: u.color }}>{pct}%</Text>
+                <Text style={{ fontSize: 5, color: c.muted }}>{tables}/{W.tickets} tbl · {coverts} cvt ({pctCov}%)</Text>
+                <View style={{ ...s.barBg, marginTop: 3, marginBottom: 2 }}>
+                  <View style={{ ...s.barFill, width: `${Math.min(100, pct)}%`, backgroundColor: u.color }} />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 5, color: c.muted }}>Couverts</Text>
-                  <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold" }}>{coverts}</Text>
-                </View>
+                <Text style={{ fontSize: 6, fontFamily: "Helvetica-Bold", color: u.color }}>{fmt(caTtc)}</Text>
               </View>
-              <View style={{ marginTop: 3 }}>
-                <Text style={{ fontSize: 5, color: c.muted }}>CA TTC</Text>
-                <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold", color: u.color }}>{fmt(caTtc)}</Text>
-              </View>
-            </View>
-          );
-        })}
-      </View>
-      {/* Secondary row */}
-      <View style={{ flexDirection: "row", gap: 6 }}>
-        {secondaryItems.map((u) => {
-          const tables = u.data?.tables ?? 0;
-          const caTtc = u.data?.ca_ttc ?? 0;
-          const pct = W.tickets > 0 ? Math.round((tables / W.tickets) * 100) : 0;
-          return (
-            <View key={u.label} style={{ flex: 1, alignItems: "center" as const, backgroundColor: c.white, borderRadius: 5, padding: 5, borderWidth: 0.5, borderColor: c.border }}>
-              <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold", color: u.color }}>{pct}%</Text>
-              <Text style={{ fontSize: 5, color: c.muted, marginTop: 1 }}>{u.label}</Text>
-              <Text style={{ fontSize: 6, fontFamily: "Helvetica-Bold", color: u.color, marginTop: 2 }}>{fmt(caTtc)}</Text>
-            </View>
-          );
-        })}
-      </View>
+            );
+          })}
+          {row.length < 3 && Array.from({ length: 3 - row.length }).map((_, i) => <View key={`pad-${i}`} style={{ flex: 1 }} />)}
+        </View>
+      ))}
     </View>
   );
 }
@@ -546,8 +528,11 @@ function ServicesTable({ stats, mode }: { stats: any; mode: string }) {
         const spCov = arr.reduce((sum: number, x: any) => sum + x.sp_cov, 0);
         const spTtc = arr.reduce((sum: number, x: any) => sum + x.sp_ttc, 0);
         const spHt = arr.reduce((sum: number, x: any) => sum + x.sp_ht, 0);
+        const empTtc = arr.reduce((sum: number, x: any) => sum + (x.emp_ttc ?? 0), 0);
+        const empHt = arr.reduce((sum: number, x: any) => sum + (x.emp_ht ?? 0), 0);
         agg.push({
           jour: label, svc: label === "Midi" ? "midi" : "soir", ttc, ht, cov,
+          sp_cov: spCov, emp_ttc: empTtc, emp_ht: empHt,
           tm_sp_ttc: spCov > 0 ? spTtc / spCov : 0,
           tm_sp_ht: spCov > 0 ? spHt / spCov : 0,
           z_ttc: sumZ(arr, "z_ttc"), z_ht: sumZ(arr, "z_ht"),
@@ -576,8 +561,11 @@ function ServicesTable({ stats, mode }: { stats: any; mode: string }) {
         <Text style={{ ...s.tH, width: 40, textAlign: "right", color: c.terrasse }}>Terrasse</Text>
         <Text style={{ ...s.tH, width: 35, textAlign: "right", color: c.emp }}>Emp.</Text>
         <Text style={{ ...s.tH, width: 42, textAlign: "right", color: c.accent }}>Total</Text>
-        <Text style={{ ...s.tH, width: 25, textAlign: "right" }}>Cvts</Text>
-        <Text style={{ ...s.tH, width: 30, textAlign: "right" }}>CVT M</Text>
+        <Text style={{ ...s.tH, width: 22, textAlign: "right" }}>Cvts</Text>
+        <Text style={{ ...s.tH, width: 18, textAlign: "right", color: c.green }}>SP</Text>
+        <Text style={{ ...s.tH, width: 25, textAlign: "right", color: c.green }}>M SP</Text>
+        <Text style={{ ...s.tH, width: 18, textAlign: "right", color: c.emp }}>EMP</Text>
+        <Text style={{ ...s.tH, width: 25, textAlign: "right", color: c.emp }}>M EMP</Text>
       </View>
       {groups.map((group, di) =>
         group.services.map((sv: any, si: number) => {
@@ -595,8 +583,11 @@ function ServicesTable({ stats, mode }: { stats: any; mode: string }) {
               <Text style={{ ...s.tCellBold, width: 40, textAlign: "right", color: z?.Terrasse ? c.terrasse : c.faint }}>{z?.Terrasse ? fmt(z.Terrasse) : "\u2014"}</Text>
               <Text style={{ ...s.tCellBold, width: 35, textAlign: "right", color: z?.emp ? c.emp : c.faint }}>{z?.emp ? fmt(z.emp) : "\u2014"}</Text>
               <Text style={{ ...s.tCellAccent, width: 42, textAlign: "right" }}>{fmt(caVal)}</Text>
-              <Text style={{ ...s.tCell, width: 25, textAlign: "right" }}>{sv.cov}</Text>
-              <Text style={{ width: 30, textAlign: "right", fontSize: 7, fontFamily: "Helvetica-Bold", color: tmColor }}>{tmSp.toFixed(0)}{"\u20AC"}</Text>
+              <Text style={{ ...s.tCell, width: 22, textAlign: "right" }}>{sv.cov}</Text>
+              <Text style={{ ...s.tCell, width: 18, textAlign: "right", color: c.green }}>{sv.sp_cov || "\u2014"}</Text>
+              <Text style={{ width: 25, textAlign: "right", fontSize: 7, fontFamily: "Helvetica-Bold", color: c.green }}>{tmSp > 0 ? `${tmSp.toFixed(0)}\u20AC` : "\u2014"}</Text>
+              <Text style={{ ...s.tCell, width: 18, textAlign: "right", color: c.emp }}>{sv.cov - (sv.sp_cov ?? 0) > 0 ? sv.cov - sv.sp_cov : "\u2014"}</Text>
+              <Text style={{ width: 25, textAlign: "right", fontSize: 7, fontFamily: "Helvetica-Bold", color: c.emp }}>{(() => { const ec = sv.cov - (sv.sp_cov ?? 0); if (ec <= 0) return "\u2014"; const empCa = mode === "ttc" ? sv.emp_ttc : sv.emp_ht; return empCa ? `${Math.round(empCa / ec)}\u20AC` : "\u2014"; })()}</Text>
             </View>
           );
         })
@@ -878,85 +869,38 @@ export function VentesPDF({ stats, prev, mode, viewTab, rangeLabel, etabName, br
 
   return (
     <Document>
-      {/* ─── PAGE 1: Overview ─── */}
+      {/* ─── VENTES: all sections flow in one page with auto-wrap ─── */}
       {(isVentes || isComplet) && (
         <Page size="A4" style={s.page} wrap>
           <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
           <HeroCard stats={stats} prev={prev} mode={mode} />
           <KpiCardsRow stats={stats} prev={prev} mode={mode} />
+          <SurPlaceEmporterCard stats={stats} mode={mode} />
           <ZonesRow stats={stats} mode={mode} />
-        </Page>
-      )}
-
-      {/* ─── PAGE 2: Upsell + Duration ─── */}
-      {(isVentes || isComplet) && (
-        <Page size="A4" style={s.page} wrap>
-          <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
+          <ServicesTable stats={stats} mode={mode} />
           <UpsellCard stats={stats} />
           <DurationCard stats={stats} prev={prev} />
-        </Page>
-      )}
-
-      {/* ─── PAGE 3: Sur place / Emporter + Zones detail ─── */}
-      {(isVentes || isComplet) && (
-        <Page size="A4" style={s.page} wrap>
-          <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
-          <SurPlaceEmporterCard stats={stats} mode={mode} />
-          <ZonesDetailCard stats={stats} mode={mode} />
-        </Page>
-      )}
-
-      {/* ─── PAGE 4: Comparatif ─── */}
-      {(isVentes || isComplet) && (
-        <Page size="A4" style={s.page} wrap>
-          <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
           <ComparatifCard stats={stats} prev={prev} mode={mode} />
-        </Page>
-      )}
-
-      {/* ─── PAGE 5: Services table ─── */}
-      {(isVentes || isComplet) && (
-        <Page size="A4" style={s.page} wrap>
-          <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
-          <ServicesTable stats={stats} mode={mode} />
-        </Page>
-      )}
-
-      {/* ─── PAGE 6: Top 10 + Top 3 categories ─── */}
-      {(isVentes || isComplet || isProduits) && (
-        <Page size="A4" style={s.page} wrap>
-          <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
-          {isProduits && <HeroCard stats={stats} prev={prev} mode={mode} />}
           <Top10Card stats={stats} mode={mode} />
           <Top3CatsCard stats={stats} mode={mode} />
-        </Page>
-      )}
-
-      {/* ─── PAGE 7: Categories + Serveurs + Paiements ─── */}
-      {(isVentes || isComplet || isProduits) && (
-        <Page size="A4" style={s.page} wrap>
-          <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
           <MixCategoriesCard stats={stats} mode={mode} />
           <ServeursCard stats={stats} mode={mode} />
           <PaiementsCard stats={stats} />
-        </Page>
-      )}
-
-      {/* ─── PAGE 8: Marge + Hourly + Briefing ─── */}
-      {(isProduits || isComplet) && (
-        <Page size="A4" style={s.page} wrap>
-          <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
-          <MargeCard stats={stats} />
-          <HourlyCard stats={stats} />
           {briefing && briefing.length > 0 && <BriefingCard briefing={briefing} />}
         </Page>
       )}
 
-      {/* Briefing on ventes export */}
-      {isVentes && briefing && briefing.length > 0 && (
+      {/* ─── PRODUITS: all sections flow in one page with auto-wrap ─── */}
+      {isProduits && (
         <Page size="A4" style={s.page} wrap>
           <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
-          <BriefingCard briefing={briefing} />
+          <HeroCard stats={stats} prev={prev} mode={mode} />
+          <Top10Card stats={stats} mode={mode} />
+          <Top3CatsCard stats={stats} mode={mode} />
+          <MixCategoriesCard stats={stats} mode={mode} />
+          <MargeCard stats={stats} />
+          <HourlyCard stats={stats} />
+          {briefing && briefing.length > 0 && <BriefingCard briefing={briefing} />}
         </Page>
       )}
     </Document>
