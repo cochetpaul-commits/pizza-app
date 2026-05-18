@@ -12,7 +12,7 @@ const c = {
 };
 
 const s = StyleSheet.create({
-  page: { padding: 24, fontFamily: "Helvetica", fontSize: 8, color: c.text, backgroundColor: c.bg },
+  page: { padding: 24, fontFamily: "Helvetica", fontSize: 9, color: c.text, backgroundColor: c.bg },
   header: { marginBottom: 10, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: c.border },
   eyebrow: { fontSize: 6, textTransform: "uppercase", letterSpacing: 1.5, color: c.accent, marginBottom: 3 },
   title: { fontSize: 16, fontWeight: "bold", fontFamily: "Helvetica-Bold" },
@@ -29,10 +29,10 @@ const s = StyleSheet.create({
   tHead: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: c.border, paddingBottom: 3, marginBottom: 3 },
   tH: { fontSize: 5, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, fontFamily: "Helvetica-Bold" },
   tRow: { flexDirection: "row", paddingVertical: 2, borderBottomWidth: 0.3, borderBottomColor: "#f0ebe3" },
-  tCell: { fontSize: 7 },
-  tCellBold: { fontSize: 7, fontFamily: "Helvetica-Bold" },
-  tCellAccent: { fontSize: 7, fontFamily: "Helvetica-Bold", color: c.accent },
-  tCellMuted: { fontSize: 7, color: c.muted },
+  tCell: { fontSize: 8 },
+  tCellBold: { fontSize: 8, fontFamily: "Helvetica-Bold" },
+  tCellAccent: { fontSize: 8, fontFamily: "Helvetica-Bold", color: c.accent },
+  tCellMuted: { fontSize: 8, color: c.muted },
   kpi: { backgroundColor: c.white, borderRadius: 5, padding: 8, borderWidth: 0.5, borderColor: c.border, alignItems: "center" as const },
   kpiVal: { fontSize: 12, fontWeight: "bold", fontFamily: "Helvetica-Bold" },
   kpiLabel: { fontSize: 5, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, marginTop: 2 },
@@ -43,9 +43,16 @@ const s = StyleSheet.create({
   top3Row: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 1.5, borderBottomWidth: 0.2, borderBottomColor: "#f0ebe3" },
 });
 
-const fmt = (v: number) => Math.round(v).toLocaleString("fr-FR") + "\u20AC";
-const fmtNum = (v: number) => Math.round(v).toLocaleString("fr-FR");
-const fmtSp = (v: number) => v.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+// Manual French number formatting (toLocaleString unreliable on serverless)
+function frNum(n: number): string {
+  const s = Math.abs(Math.round(n)).toString();
+  const parts: string[] = [];
+  for (let i = s.length; i > 0; i -= 3) parts.unshift(s.slice(Math.max(0, i - 3), i));
+  return (n < 0 ? "-" : "") + parts.join("\u202F");
+}
+const fmt = (v: number) => frNum(v) + "\u20AC";
+const fmtNum = (v: number) => frNum(v);
+const fmtSp = (v: number) => v.toFixed(1).replace(".", ",");
 
 type Props = {
   stats: any;
