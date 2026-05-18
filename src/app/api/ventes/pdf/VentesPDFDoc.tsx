@@ -244,7 +244,7 @@ function DurationCard({ stats, prev }: { stats: any; prev: any }) {
   const zoneColors: Record<string, string> = { Pergolas: c.pergolas, Salle: c.salle, Terrasse: c.terrasse };
 
   return (
-    <View style={s.card}>
+    <View style={s.card} wrap={false}>
       <Text style={s.sec}>Duree & rotation des tables</Text>
       {/* Global KPIs */}
       <View style={{ flexDirection: "row", gap: 6, marginBottom: 6 }}>
@@ -331,7 +331,7 @@ function SurPlaceEmporterCard({ stats, mode }: { stats: any; mode: string }) {
   const empTM = W.cov_emp > 0 ? empCA / W.cov_emp : 0;
 
   return (
-    <View style={s.card}>
+    <View style={s.card} wrap={false}>
       <Text style={s.sec}>Sur place vs a emporter</Text>
       <View style={{ flexDirection: "row", gap: 10 }}>
         <View style={{ flex: 1 }}>
@@ -440,7 +440,7 @@ function ComparatifCard({ stats, prev, mode }: { stats: any; prev: any; mode: st
   const maxVal = Math.max(...curData, ...prevData, 1);
 
   return (
-    <View style={s.card}>
+    <View style={s.card} wrap={false}>
       <Text style={s.sec}>Comparatif · CA {mode.toUpperCase()} {useWeeks ? "par semaine" : ""} vs A-1</Text>
       {curData.map((cur, i) => {
         const prv = prevData[i] ?? 0;
@@ -632,7 +632,7 @@ function MargeCard({ stats }: { stats: any }) {
   const labels: string[] = W.days ?? [];
 
   return (
-    <View style={s.card}>
+    <View style={s.card} wrap={false}>
       <Text style={s.sec}>Marge & taux de marque</Text>
       <View style={{ flexDirection: "row", gap: 6, marginBottom: 8 }}>
         <View style={{ ...s.kpi, flex: 1 }}>
@@ -684,7 +684,7 @@ function HourlyCard({ stats }: { stats: any }) {
   const hours = Array.from({ length: endH - startH }, (_, i) => startH + i);
 
   return (
-    <View style={s.card}>
+    <View style={s.card} wrap={false}>
       <Text style={s.sec}>Repartition horaire des ventes (articles)</Text>
       <View style={{ flexDirection: "row", alignItems: "flex-end" as const, gap: 2, height: 80 }}>
         {hours.map((hour) => {
@@ -710,7 +710,7 @@ function MixCategoriesCard({ stats, mode }: { stats: any; mode: string }) {
   const maxV = Math.max(...vals, 1);
   const colors = ["#D4775A", "#8fa8a0", "#46655a", "#7c5c3a", "#c4a882", "#e0b896", "#5e7a8a", "#a8b89c"];
   return (
-    <View style={s.card}>
+    <View style={s.card} wrap={false}>
       <Text style={s.sec}>Ventes par categorie · CA {mode.toUpperCase()}</Text>
       {W.mix_labels.map((label: string, i: number) => {
         const v = vals[i] ?? 0;
@@ -736,7 +736,7 @@ function Top10Card({ stats, mode }: { stats: any; mode: string }) {
   const vals: number[] = (mode === "ttc" ? W.top10_ca_ttc : W.top10_ca_ht) ?? [];
   const maxV = Math.max(...vals, 1);
   return (
-    <View style={s.card}>
+    <View style={s.card} wrap={false}>
       <Text style={s.sec}>Top 10 produits · CA {mode.toUpperCase()}</Text>
       {W.top10_names.map((name: string, i: number) => {
         const v = vals[i] ?? 0;
@@ -761,7 +761,7 @@ function Top3CatsCard({ stats, mode }: { stats: any; mode: string }) {
   const W = stats;
   if (!W.top3_cats || !W.top3_cats.length) return null;
   return (
-    <View style={s.card}>
+    <View style={s.card} wrap={false}>
       <Text style={s.sec}>Top 3 par categorie</Text>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
         {W.top3_cats.slice(0, 8).map((cat: any, ci: number) => (
@@ -793,7 +793,7 @@ function ServeursCard({ stats, mode }: { stats: any; mode: string }) {
   const totalCA = mode === "ttc" ? W.ca_ttc : W.ca_ht;
   const maxV = Math.max(...vals, 1);
   return (
-    <View style={s.card}>
+    <View style={s.card} wrap={false}>
       <Text style={s.sec}>Performance serveurs · CA {mode.toUpperCase()}</Text>
       {W.serveurs.map((name: string, i: number) => {
         const v = vals[i] ?? 0;
@@ -822,7 +822,7 @@ function PaiementsCard({ stats }: { stats: any }) {
   if (!W.pay || !W.pay.length) return null;
   const colors = ["#c8960a", "#e0b020", "#f0c840", "#f5d96a", "#f9e9a0"];
   return (
-    <View style={s.card}>
+    <View style={s.card} wrap={false}>
       <Text style={s.sec}>Modes de paiement</Text>
       {W.pay.map((p: any, i: number) => (
         <View key={i} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 2, borderBottomWidth: 0.3, borderBottomColor: "#f0ebe3" }}>
