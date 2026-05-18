@@ -48,7 +48,7 @@ function frNum(n: number): string {
   const s = Math.abs(Math.round(n)).toString();
   const parts: string[] = [];
   for (let i = s.length; i > 0; i -= 3) parts.unshift(s.slice(Math.max(0, i - 3), i));
-  return (n < 0 ? "-" : "") + parts.join("\u202F");
+  return (n < 0 ? "-" : "") + parts.join(" ");
 }
 const fmt = (v: number) => frNum(v) + "\u20AC";
 const fmtNum = (v: number) => frNum(v);
