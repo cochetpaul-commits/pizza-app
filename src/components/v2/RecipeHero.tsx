@@ -84,8 +84,11 @@ export interface RecipeKpisProps {
   costPerKg?: number | null;
   /** Yield in grams (for context display) */
   yieldGrams?: number | null;
-  /** Mode: "preparation" shows only cost + prix/kg + rendement, hides food cost / vente / marge */
+  /** Mode: "preparation" shows cost/kg + sell price/kg + food cost + marge/kg */
   mode?: "default" | "preparation";
+  /** Sell price per kg HT (for preparation mode) */
+  sellPriceKgHT?: number | null;
+  onSellPriceKgChange?: (price: number) => void;
 }
 
 export function RecipeKpis({
@@ -93,8 +96,19 @@ export function RecipeKpis({
   foodCostTarget = 30, portionLabel = "portion", accent = "#D4775A",
   onSellPriceChange, vatRate, onVatChange, onFoodCostTargetChange,
   multiplier = 1, onMultiplierChange, costPerKg, yieldGrams, mode = "default",
+  sellPriceKgHT, onSellPriceKgChange,
 }: RecipeKpisProps) {
   const isPrep = mode === "preparation";
+
+  // Preparation-mode KPIs (based on cost/kg vs sell price/kg)
+  const prepFcPct = isPrep && costPerKg && sellPriceKgHT && sellPriceKgHT > 0
+    ? (costPerKg / sellPriceKgHT) * 100 : null;
+  const prepMargeKg = isPrep && costPerKg != null && sellPriceKgHT && sellPriceKgHT > 0
+    ? sellPriceKgHT - costPerKg : null;
+  const prepCoeff = isPrep && costPerKg && costPerKg > 0 && sellPriceKgHT && sellPriceKgHT > 0
+    ? sellPriceKgHT / costPerKg : null;
+  const prepTTCKg = isPrep && sellPriceKgHT && vatRate != null
+    ? sellPriceKgHT * (1 + vatRate) : null;
   // Food cost color: green ≤ target, orange ≤ target+5, red >
   const fcColor = foodCostPct == null
     ? "#999"
@@ -156,7 +170,104 @@ export function RecipeKpis({
           />
         )}
 
-        {/* Les cartes ci-dessous sont masquées en mode "preparation" */}
+        {/* ── Preparation mode: prix de vente/kg, food cost, marge/kg, coeff ── */}
+        {isPrep && (
+          <>
+            {/* PRIX DE VENTE AU KILO — éditable */}
+            <BigKpiCard
+              label="Prix de vente HT"
+              color="#1a1a1a"
+              valueNode={
+                onSellPriceKgChange ? (
+                  <EditablePrice value={sellPriceKgHT ?? null} onChange={onSellPriceKgChange} />
+                ) : (
+                  <span>{sellPriceKgHT != null ? `${fmtMoney(sellPriceKgHT)}€` : "-"}</span>
+                )
+              }
+              subNode={
+                onVatChange && vatPct != null ? (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    par kg · TVA
+                    <select
+                      value={vatPct}
+                      onChange={(e) => onVatChange(Number(e.target.value) / 100)}
+                      style={{
+                        padding: "1px 4px", borderRadius: 5, border: "1px solid #d9d2c4",
+                        background: "#fff", fontSize: 12, fontWeight: 700, color: "#1a1a1a",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {[0, 5.5, 10, 20].map((v) => (
+                        <option key={v} value={v}>{v}%</option>
+                      ))}
+                    </select>
+                    {prepTTCKg != null && <span>· {fmtMoney(prepTTCKg)}€ TTC/kg</span>}
+                  </span>
+                ) : <span>par kg{prepTTCKg != null ? ` · ${fmtMoney(prepTTCKg)}€ TTC` : ""}</span>
+              }
+            />
+
+            {/* FOOD COST */}
+            {(() => {
+              const pfc = prepFcPct;
+              const pfcColor = pfc == null ? "#999"
+                : pfc <= foodCostTarget ? "#16a34a"
+                : pfc <= foodCostTarget + 5 ? "#D97706"
+                : "#DC2626";
+              const pfcRatio = pfc == null ? 0 : Math.min(1, pfc / (foodCostTarget * 1.67));
+              return (
+                <BigKpiCard
+                  label="Food cost"
+                  color={pfcColor}
+                  valueNode={<span>{pfc != null ? `${pfc.toFixed(0)}%` : "-"}</span>}
+                  subNode={
+                    onFoodCostTargetChange ? (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        cible
+                        <input
+                          type="number"
+                          min={5} max={80} step={1}
+                          value={foodCostTarget}
+                          onChange={(e) => onFoodCostTargetChange(Number(e.target.value))}
+                          style={{
+                            width: 38, padding: "1px 4px", borderRadius: 5,
+                            border: "1px solid #d9d2c4", background: "#fff",
+                            fontSize: 12, fontWeight: 700, textAlign: "right",
+                            color: "#1a1a1a",
+                          }}
+                        />
+                        %
+                      </span>
+                    ) : <span>{`cible ${foodCostTarget}%`}</span>
+                  }
+                  bottomNode={
+                    <div style={{ height: 6, background: "#ece4d4", borderRadius: 999, overflow: "hidden" }}>
+                      <div style={{ width: `${Math.min(100, pfcRatio * 100)}%`, height: "100%", background: pfcColor, borderRadius: 999, transition: "width 0.3s" }} />
+                    </div>
+                  }
+                />
+              );
+            })()}
+
+            {/* MARGE BRUTE / KG */}
+            <BigKpiCard
+              label="Marge brute"
+              color={prepMargeKg != null && prepMargeKg > 0 ? "#16a34a" : "#999"}
+              valueNode={<span>{prepMargeKg != null ? `${fmtMoney(prepMargeKg)}€` : "-"}</span>}
+              subNode={<span>par kg</span>}
+            />
+
+            {/* COEFFICIENT */}
+            <BigKpiCard
+              label="Coefficient"
+              color="#7C3AED"
+              valueNode={<span>{prepCoeff != null ? `×${prepCoeff.toFixed(2)}` : "-"}</span>}
+              subNode={<span>prix / coût</span>}
+            />
+          </>
+        )}
+
+        {/* ── Default mode: food cost, prix de vente, marge, coeff ── */}
         {!isPrep && (
           <>
             {/* FOOD COST — cible éditable inline */}

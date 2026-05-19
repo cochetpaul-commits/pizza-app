@@ -793,6 +793,8 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
               costPerKg={costPerKg}
               yieldGrams={typeof yieldGrams === "number" ? yieldGrams : null}
               mode={category === "preparation" || category === "sauce" ? "preparation" : "default"}
+              sellPriceKgHT={sp}
+              onSellPriceKgChange={(p) => setSellPrice(p)}
             />
             <GestionFoodCost
               lines={lines}
