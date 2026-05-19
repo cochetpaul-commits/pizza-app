@@ -518,17 +518,19 @@ function PerformancesPage() {
     setPdfDrawerOpen(false);
     setExporting(true);
     try {
+      const bodyPayload = {
+        stats: data, prev: activePrev, mode,
+        viewTab: isSingleDay ? "jour" : "perso",
+        rangeLabel,
+        etabName: etab.nom ?? "Etablissement",
+        briefing,
+        exportType,
+      };
+      console.log("[PDF export] sending exportType:", exportType);
       const res = await fetch("/api/ventes/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          stats: data, prev: activePrev, mode,
-          viewTab: isSingleDay ? "jour" : "perso",
-          rangeLabel,
-          etabName: etab.nom ?? "Etablissement",
-          briefing,
-          exportType,
-        }),
+        body: JSON.stringify(bodyPayload),
       });
       if (!res.ok) { const errText = await res.text().catch(() => ""); alert(`Erreur export PDF: ${res.status} ${errText.slice(0, 200)}`); setExporting(false); return; }
       const blob = await res.blob();
