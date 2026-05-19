@@ -376,7 +376,7 @@ function SurPlaceEmporterCard({ stats, mode }: { stats: any; mode: string }) {
 }
 
 /* Zone cards with weekly breakdown */
-function ZonesDetailCard({ stats, mode }: { stats: any; mode: string }) {
+function _ZonesDetailCard({ stats, mode }: { stats: any; mode: string }) {
   const W = stats;
   if (!W.zones_ttc) return null;
   const zones = mode === "ttc" ? W.zones_ttc : W.zones_ht;
@@ -579,7 +579,7 @@ function ServicesTable({ stats, mode }: { stats: any; mode: string }) {
           const caVal = mode === "ttc" ? sv.ttc : sv.ht;
           const z = mode === "ttc" ? sv.z_ttc : sv.z_ht;
           const tmSp = mode === "ttc" ? sv.tm_sp_ttc : sv.tm_sp_ht;
-          const tmColor = tmSp >= 80 ? c.good : tmSp >= 65 ? "#e65100" : c.bad;
+          const _tmColor = tmSp >= 80 ? c.good : tmSp >= 65 ? "#e65100" : c.bad;
           return (
             <View key={`${di}-${si}`} style={{ ...s.tRow, backgroundColor: di % 2 === 0 ? c.white : "#faf7f2" }} wrap={false}>
               {si === 0 && <Text style={{ ...s.tCellBold, width: 30 }}>{group.groupLabel}</Text>}
