@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
 
     const type: "ventes" | "produits" | "complet" =
       exportType === "produits" || exportType === "complet" ? exportType : "ventes";
+    console.log("[PDF export] type:", type, "exportType received:", exportType);
 
     const el = VentesPDF({ stats, prev, mode, viewTab, rangeLabel, etabName, briefing, exportType: type }) as unknown as React.ReactElement<DocumentProps>;
     const buffer = await renderToBuffer(el);
