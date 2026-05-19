@@ -108,6 +108,8 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
   const [fcTarget, setFcTarget] = useState(30);
   const [marginRate, setMarginRate] = useState("75");
   const [sellPrice, setSellPrice] = useState<number | "">("");
+  // Sell coefficient for preparations (prix vente/kg = coût/kg × sellCoeff)
+  const [sellCoeff, setSellCoeff] = useState<number | null>(null);
 
   // Production mode
   const [prodMode, setProdMode] = useState(initialProdMode ?? false);
@@ -369,8 +371,15 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
           if (r.vat_rate) setVatRate(Number(r.vat_rate));
           if (r.margin_rate) {
             const mr = Number(r.margin_rate);
-            if (mr >= 1) setMarginRate(String(Math.round(mr)));
-            else if (mr > 0) setMarginRate(String(Math.round(mr * 100)));
+            // For preparations, margin_rate stores the sell coefficient (≥1)
+            const cat = String(r.category ?? "");
+            if ((cat === "preparation" || cat === "sauce") && mr >= 1) {
+              setSellCoeff(mr);
+            } else if (mr >= 1) {
+              setMarginRate(String(Math.round(mr)));
+            } else if (mr > 0) {
+              setMarginRate(String(Math.round(mr * 100)));
+            }
           }
           if (r.sell_price != null) setSellPrice(Number(r.sell_price));
           if (r.procedure) {
@@ -452,7 +461,10 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
       if (!auth.user) throw new Error("NOT_LOGGED");
 
       const marginRateNum = Number(marginRate);
-      const margin_rate = marginRateNum > 0 ? round2(marginRateNum) : 0;
+      // For preparations, store the sell coefficient in margin_rate
+      const margin_rate = isPrepCat && sellCoeff && sellCoeff > 0
+        ? round2(sellCoeff)
+        : (marginRateNum > 0 ? round2(marginRateNum) : 0);
       const totalCostRounded = round2(totalCost);
 
       const payload: Record<string, unknown> = {
@@ -468,7 +480,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         total_cost: totalCostRounded > 0 ? totalCostRounded : null,
         cost_per_kg: costPerKg,
         cost_per_portion: costPerPortion,
-        sell_price: sellPrice !== "" ? Number(sellPrice) : null,
+        sell_price: isPrepCat && derivedSellPriceKg ? derivedSellPriceKg : (sellPrice !== "" ? Number(sellPrice) : null),
         photo_url: photoUrl || null,
         procedure: steps.length > 0 ? JSON.stringify(steps) : null,
         is_draft: false,
@@ -696,6 +708,13 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
   }, 0);
 
   // ── KPI computations ──────────────────────────────────────────
+  const isPrepCat = category === "preparation" || category === "sauce";
+  // For preparations: sell price/kg derived from coefficient
+  const derivedSellPriceKg = isPrepCat && costPerKg && sellCoeff && sellCoeff > 0
+    ? round2(costPerKg * sellCoeff) : null;
+  // For preparations: also compute sell price per portion
+  const derivedSellPricePortion = isPrepCat && costPerPortion && sellCoeff && sellCoeff > 0
+    ? round2(costPerPortion * sellCoeff) : null;
   const sp = typeof sellPrice === "number" && sellPrice > 0 ? sellPrice : null;
   const effectiveCostPerPortion = costPerPortion ?? (totalCost > 0 ? totalCost : null);
   const foodCostPct = sp && effectiveCostPerPortion ? (effectiveCostPerPortion / sp) * 100 : null;
@@ -792,10 +811,36 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
               onMultiplierChange={setFcMultiplier}
               costPerKg={costPerKg}
               yieldGrams={typeof yieldGrams === "number" ? yieldGrams : null}
-              mode={category === "preparation" || category === "sauce" ? "preparation" : "default"}
-              sellPriceKgHT={sp}
-              onSellPriceKgChange={(p) => setSellPrice(p)}
+              mode={isPrepCat ? "preparation" : "default"}
+              sellPriceKgHT={derivedSellPriceKg}
+              sellCoeff={sellCoeff}
+              onSellCoeffChange={setSellCoeff}
             />
+            {/* Prix de vente par portion (pour le resto) */}
+            {isPrepCat && derivedSellPricePortion != null && (
+              <div style={{
+                background: "#fff", borderRadius: 12, padding: "14px 18px",
+                border: "1px solid #e0d8ce", marginBottom: 16,
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+              }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                    Prix de vente par portion (resto)
+                  </div>
+                  <div style={{ fontSize: 11, color: "#999" }}>
+                    {portionsCount ? `${portionsCount} portion${Number(portionsCount) > 1 ? "s" : ""}` : "portions non definies"}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
+                    {derivedSellPricePortion.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€ HT
+                  </div>
+                  <div style={{ fontSize: 12, color: "#999" }}>
+                    {(derivedSellPricePortion * (1 + vatRate)).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€ TTC
+                  </div>
+                </div>
+              </div>
+            )}
             <GestionFoodCost
               lines={lines}
               ingredients={ingredients}

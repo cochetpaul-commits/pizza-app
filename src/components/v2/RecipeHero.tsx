@@ -89,6 +89,9 @@ export interface RecipeKpisProps {
   /** Sell price per kg HT (for preparation mode) */
   sellPriceKgHT?: number | null;
   onSellPriceKgChange?: (price: number) => void;
+  /** Selling coefficient for preparations (prix vente = cout/kg × coeff) */
+  sellCoeff?: number | null;
+  onSellCoeffChange?: (coeff: number) => void;
 }
 
 export function RecipeKpis({
@@ -96,19 +99,21 @@ export function RecipeKpis({
   foodCostTarget = 30, portionLabel = "portion", accent = "#D4775A",
   onSellPriceChange, vatRate, onVatChange, onFoodCostTargetChange,
   multiplier = 1, onMultiplierChange, costPerKg, yieldGrams, mode = "default",
-  sellPriceKgHT, onSellPriceKgChange,
+  sellPriceKgHT,
+  sellCoeff, onSellCoeffChange,
 }: RecipeKpisProps) {
   const isPrep = mode === "preparation";
 
-  // Preparation-mode KPIs (based on cost/kg vs sell price/kg)
-  const prepFcPct = isPrep && costPerKg && sellPriceKgHT && sellPriceKgHT > 0
-    ? (costPerKg / sellPriceKgHT) * 100 : null;
-  const prepMargeKg = isPrep && costPerKg != null && sellPriceKgHT && sellPriceKgHT > 0
-    ? sellPriceKgHT - costPerKg : null;
-  const prepCoeff = isPrep && costPerKg && costPerKg > 0 && sellPriceKgHT && sellPriceKgHT > 0
-    ? sellPriceKgHT / costPerKg : null;
-  const prepTTCKg = isPrep && sellPriceKgHT && vatRate != null
-    ? sellPriceKgHT * (1 + vatRate) : null;
+  // Preparation-mode: derive sell price from coefficient × cost/kg
+  const effectiveCoeff = sellCoeff && sellCoeff > 0 ? sellCoeff : null;
+  const derivedSellKg = isPrep && costPerKg && costPerKg > 0 && effectiveCoeff
+    ? costPerKg * effectiveCoeff : sellPriceKgHT ?? null;
+  const prepFcPct = isPrep && costPerKg && derivedSellKg && derivedSellKg > 0
+    ? (costPerKg / derivedSellKg) * 100 : null;
+  const prepMargeKg = isPrep && costPerKg != null && derivedSellKg && derivedSellKg > 0
+    ? derivedSellKg - costPerKg : null;
+  const prepTTCKg = isPrep && derivedSellKg && vatRate != null
+    ? derivedSellKg * (1 + vatRate) : null;
   // Food cost color: green ≤ target, orange ≤ target+5, red >
   const fcColor = foodCostPct == null
     ? "#999"
@@ -170,20 +175,47 @@ export function RecipeKpis({
           />
         )}
 
-        {/* ── Preparation mode: prix de vente/kg, food cost, marge/kg, coeff ── */}
+        {/* ── Preparation mode: coeff × coût/kg → prix vente/kg, food cost, marge ── */}
         {isPrep && (
           <>
-            {/* PRIX DE VENTE AU KILO — éditable */}
+            {/* COEFFICIENT — éditable avec pills */}
+            <BigKpiCard
+              label="Coefficient"
+              color="#7C3AED"
+              valueNode={
+                onSellCoeffChange ? (
+                  <EditableCoeff value={effectiveCoeff} onChange={onSellCoeffChange} />
+                ) : (
+                  <span>{effectiveCoeff != null ? `×${effectiveCoeff.toFixed(2)}` : "-"}</span>
+                )
+              }
+              subNode={<span>coût/kg × coeff = prix vente</span>}
+              bottomNode={onSellCoeffChange ? (
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4 }}>
+                  {[2, 2.5, 3, 3.5, 4, 5].map(c => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => onSellCoeffChange(c)}
+                      style={{
+                        padding: "3px 10px", borderRadius: 12, fontSize: 11, fontWeight: 700,
+                        border: "1px solid",
+                        borderColor: effectiveCoeff === c ? "#7C3AED" : "#d9d2c4",
+                        background: effectiveCoeff === c ? "rgba(124,58,237,0.1)" : "#fff",
+                        color: effectiveCoeff === c ? "#7C3AED" : "#6f6a61",
+                        cursor: "pointer",
+                      }}
+                    >×{c}</button>
+                  ))}
+                </div>
+              ) : undefined}
+            />
+
+            {/* PRIX DE VENTE / KG — dérivé */}
             <BigKpiCard
               label="Prix de vente HT"
               color="#1a1a1a"
-              valueNode={
-                onSellPriceKgChange ? (
-                  <EditablePrice value={sellPriceKgHT ?? null} onChange={onSellPriceKgChange} />
-                ) : (
-                  <span>{sellPriceKgHT != null ? `${fmtMoney(sellPriceKgHT)}€` : "-"}</span>
-                )
-              }
+              valueNode={<span>{derivedSellKg != null ? `${fmtMoney(derivedSellKg)}€` : "-"}</span>}
               subNode={
                 onVatChange && vatPct != null ? (
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -255,14 +287,6 @@ export function RecipeKpis({
               color={prepMargeKg != null && prepMargeKg > 0 ? "#16a34a" : "#999"}
               valueNode={<span>{prepMargeKg != null ? `${fmtMoney(prepMargeKg)}€` : "-"}</span>}
               subNode={<span>par kg</span>}
-            />
-
-            {/* COEFFICIENT */}
-            <BigKpiCard
-              label="Coefficient"
-              color="#7C3AED"
-              valueNode={<span>{prepCoeff != null ? `×${prepCoeff.toFixed(2)}` : "-"}</span>}
-              subNode={<span>prix / coût</span>}
             />
           </>
         )}
@@ -424,6 +448,55 @@ function EditablePrice({ value, onChange }: { value: number | null; onChange: (v
         cursor: "text",
       }}
     />
+  );
+}
+
+// ── Editable coefficient (×2.50) ─────────────────────────────────
+function EditableCoeff({ value, onChange }: { value: number | null; onChange: (v: number) => void }) {
+  const [local, setLocal] = useState<string>(value != null ? value.toFixed(2) : "");
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!editing) setLocal(value != null ? value.toFixed(2) : "");
+  }, [value, editing]);
+
+  return (
+    <span style={{ display: "inline-flex", alignItems: "baseline" }}>
+      <span style={{ fontSize: 36, fontWeight: 800, color: "#7C3AED", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>×</span>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={editing ? local : (value != null ? value.toFixed(2) : "-")}
+        onFocus={(e) => {
+          setEditing(true);
+          setLocal(value != null ? value.toFixed(2) : "");
+          setTimeout(() => e.target.select(), 0);
+        }}
+        onChange={(e) => {
+          const raw = e.target.value.replace(",", ".").replace(/[^\d.]/g, "");
+          setLocal(raw);
+          const n = Number(raw);
+          if (!isNaN(n) && n > 0) onChange(n);
+        }}
+        onBlur={() => {
+          setEditing(false);
+          const n = Number(local);
+          if (!isNaN(n) && n > 0) onChange(n);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur();
+        }}
+        style={{
+          width: 80, border: "none", outline: "none", background: "transparent",
+          fontSize: 36, fontWeight: 800, color: "#7C3AED",
+          fontFamily: "var(--font-oswald), Oswald, sans-serif",
+          lineHeight: 1.05, marginTop: 4, padding: 0,
+          fontVariantNumeric: "tabular-nums",
+          cursor: "text",
+        }}
+      />
+    </span>
   );
 }
 
