@@ -373,7 +373,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
             const mr = Number(r.margin_rate);
             // For preparations, margin_rate stores the sell coefficient (≥1)
             const cat = String(r.category ?? "");
-            if ((cat === "preparation" || cat === "sauce") && mr >= 1) {
+            if ((cat === "preparation" || cat === "sauce" || cat === "plat_cuisine") && mr >= 1) {
               setSellCoeff(mr);
             } else if (mr >= 1) {
               setMarginRate(String(Math.round(mr)));
@@ -708,7 +708,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
   }, 0);
 
   // ── KPI computations ──────────────────────────────────────────
-  const isPrepCat = category === "preparation" || category === "sauce";
+  const isPrepCat = category === "preparation" || category === "sauce" || category === "plat_cuisine";
   // For preparations: sell price/kg derived from coefficient
   const derivedSellPriceKg = isPrepCat && costPerKg && sellCoeff && sellCoeff > 0
     ? round2(costPerKg * sellCoeff) : null;
