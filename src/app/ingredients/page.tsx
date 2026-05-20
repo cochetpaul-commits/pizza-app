@@ -759,11 +759,23 @@ function IngredientsPageInner() {
     // Persist piece type label (barquette, bouteille, etc.) in purchase_unit_label
     const purchaseUnitLabel = edit.baseUnit === "piece" ? (edit.baseUnitLabel || "piece") : edit.baseUnit === "litre" ? "L" : "kg";
 
+    // Compute piece_weight_g for the ingredient table (weight-based piece content)
+    let pieceWeightG: number | null = null;
+    if (edit.baseUnit === "piece") {
+      const cq = parseNum(edit.pieceContentQty);
+      if (cq != null && cq > 0) {
+        const cu = edit.pieceContentUnit;
+        if (cu === "g") pieceWeightG = cq;
+        else if (cu === "kg") pieceWeightG = cq * 1000;
+      }
+    }
+
     const up: Partial<IngredientUpsert> = {
       name, category: edit.category, is_active: edit.is_active, supplier_id,
       popina_name: edit.popinaName.trim() || null,
       popina_dose_cl: edit.popinaDoseCl ? parseFloat(edit.popinaDoseCl) || null : null,
       piece_volume_ml: pieceVolumeMl,
+      piece_weight_g: pieceWeightG,
       purchase_unit_label: purchaseUnitLabel,
       allergens: edit.allergens.length ? edit.allergens : null,
       order_unit_label: orderLabel || null,
