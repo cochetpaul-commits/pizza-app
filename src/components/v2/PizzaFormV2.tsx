@@ -966,11 +966,11 @@ function PizzaPricing({
         <div style={{ textAlign: "center", padding: "0 4px", borderLeft: "1px solid #ece4d4" }}>
           <div style={lbl}>{isMultiParts ? "Vente / part" : "Prix vente"}</div>
           <div style={{ ...bigNum, color: "#1a1a1a" }}>
-            {derivedSellPerPart != null ? `${fmtMoney(derivedSellPerPart)}€` : "-"}
+            {prixTTCPart != null ? `${fmtMoney(prixTTCPart)}€` : "-"}
           </div>
-          {prixTTCPart != null && (
+          {derivedSellPerPart != null && (
             <div style={{ fontSize: 11, color: "#999", marginTop: 1 }}>
-              {fmtMoney(prixTTCPart)}€ TTC
+              {fmtMoney(derivedSellPerPart)}€ HT
             </div>
           )}
         </div>
@@ -981,11 +981,11 @@ function PizzaPricing({
             <>
               <div style={lbl}>Pizza entiere</div>
               <div style={{ ...bigNum, color: "#1a1a1a" }}>
-                {derivedSellPerPizza != null ? `${fmtMoney(derivedSellPerPizza)}€` : "-"}
+                {derivedSellPerPizza != null ? `${fmtMoney(derivedSellPerPizza * (1 + vatRate))}€` : "-"}
               </div>
               {derivedSellPerPizza != null && (
                 <div style={{ fontSize: 11, color: "#999", marginTop: 1 }}>
-                  {fmtMoney(derivedSellPerPizza * (1 + vatRate))}€ TTC
+                  {fmtMoney(derivedSellPerPizza)}€ HT
                 </div>
               )}
             </>
