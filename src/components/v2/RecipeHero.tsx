@@ -339,39 +339,54 @@ export function RecipeKpis({
               }
             />
 
-            {/* PRIX DE VENTE — input éditable + TVA inline */}
+            {/* PRIX DE VENTE — TTC gros, HT petit, plaque + part */}
             <BigKpiCard
               label="Prix de vente"
               color="#1a1a1a"
               valueNode={
-                onSellPriceChange ? (
-                  <EditablePrice value={dispSell} onChange={(v) => onSellPriceChange(v / multiplier)} />
-                ) : (
-                  <span>{dispSell != null ? `${fmtMoney(dispSell)}€` : "-"}</span>
-                )
+                <div>
+                  {/* TTC en gros */}
+                  <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif", color: "#1a1a1a", lineHeight: 1.1 }}>
+                    {dispTTC != null ? `${fmtMoney(dispTTC)}€ TTC` : "-"}
+                  </div>
+                  {/* HT en petit */}
+                  <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>
+                    {dispSell != null ? `${fmtMoney(dispSell)}€ HT` : ""}
+                  </div>
+                  {/* Prix plaque (total) quand on divise */}
+                  {nbParts > 1 && sellPriceTTC != null && (
+                    <div style={{ fontSize: 11, color: "#888", marginTop: 6, paddingTop: 6, borderTop: "1px solid #ece4d4" }}>
+                      Plaque : <strong>{fmtMoney(sellPriceTTC * multiplier)}€ TTC</strong> / {fmtMoney((sellPriceHT ?? 0) * multiplier)}€ HT
+                    </div>
+                  )}
+                </div>
               }
               subNode={
-                onVatChange && vatPct != null ? (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                    TVA
-                    <select
-                      value={vatPct}
-                      onChange={(e) => onVatChange(Number(e.target.value) / 100)}
-                      style={{
-                        padding: "1px 4px", borderRadius: 5, border: "1px solid #d9d2c4",
-                        background: "#fff", fontSize: 12, fontWeight: 700, color: "#1a1a1a",
-                        cursor: "pointer",
-                      }}
-                    >
-                      {[0, 5.5, 10, 20].map((v) => (
-                        <option key={v} value={v}>{v}%</option>
-                      ))}
-                    </select>
-                    {dispTTC != null && <span>· {fmtMoney(dispTTC)}€ TTC</span>}
-                  </span>
-                ) : (
-                  <span>{dispTTC != null ? `HT · ${fmtMoney(dispTTC)}€ TTC` : "HT"}</span>
-                )
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  {onVatChange && vatPct != null ? (
+                    <>
+                      TVA
+                      <select
+                        value={vatPct}
+                        onChange={(e) => onVatChange(Number(e.target.value) / 100)}
+                        style={{
+                          padding: "1px 4px", borderRadius: 5, border: "1px solid #d9d2c4",
+                          background: "#fff", fontSize: 12, fontWeight: 700, color: "#1a1a1a",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {[0, 5.5, 10, 20].map((v) => (
+                          <option key={v} value={v}>{v}%</option>
+                        ))}
+                      </select>
+                    </>
+                  ) : null}
+                  {onSellPriceChange && (
+                    <span style={{ marginLeft: 4 }}>
+                      HT : <EditablePrice value={sellPriceHT != null ? sellPriceHT * multiplier : null} onChange={(v) => onSellPriceChange(v / multiplier)} />
+                    </span>
+                  )}
+                </span>
               }
             />
 
