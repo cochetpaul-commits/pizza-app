@@ -885,7 +885,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   );
 }
 
-// ── Pizza Pricing Panel ──────────────────────────────────────────
+// ── Pizza Pricing Panel — Hero KPI + Tiroir ─────────────────────
 function PizzaPricing({
   costPerPizza, nbParts, onNbPartsChange, costPerPart,
   sellCoeff, onSellCoeffChange,
@@ -912,6 +912,7 @@ function PizzaPricing({
 }) {
   const [coeffLocal, setCoeffLocal] = useState(sellCoeff != null ? String(sellCoeff) : "");
   const [coeffEditing, setCoeffEditing] = useState(false);
+  const [paramsOpen, setParamsOpen] = useState(true);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -923,205 +924,97 @@ function PizzaPricing({
     : foodCostPct <= fcTarget + 5 ? "#D97706"
     : "#DC2626";
   const fcRatio = foodCostPct == null ? 0 : Math.min(1, foodCostPct / (fcTarget * 1.67));
+  const margeColor = margePerPart != null && margePerPart > 0 ? "#16a34a" : "#999";
 
-  const vatPct = Math.round(vatRate * 100);
   const isMultiParts = nbParts > 1;
+  const vatPct = Math.round(vatRate * 100);
+
+  // Label style
+  const lbl: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em" };
+  const bigNum: React.CSSProperties = { fontSize: 26, fontWeight: 800, fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1.1, marginTop: 2 };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
+    <div style={{
+      background: "#fff", borderRadius: 16, border: "1px solid #e0d8ce",
+      marginBottom: 16, overflow: "hidden",
+    }}>
 
-      {/* ── Row 1 : Cout de revient + Parts ── */}
+      {/* ── Hero KPIs — 4 columns ── */}
       <div style={{
-        background: "#fff", borderRadius: 14, padding: "18px 20px",
-        border: "1px solid #e0d8ce",
+        display: "grid",
+        gridTemplateColumns: "repeat(4, 1fr)",
+        gap: 0,
+        padding: "20px 16px 16px",
       }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              Cout de revient
-            </div>
-            <div style={{ fontSize: 32, fontWeight: 800, color: "#8B1A1A", fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1.1, marginTop: 4 }}>
-              {costPerPizza != null ? `${fmtMoney(costPerPizza)}€` : "-"}
-            </div>
-            <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>par pizza</div>
+        {/* KPI 1: Cout/part */}
+        <div style={{ textAlign: "center", padding: "0 4px" }}>
+          <div style={lbl}>{isMultiParts ? "Cout / part" : "Cout pizza"}</div>
+          <div style={{ ...bigNum, color: "#8B1A1A" }}>
+            {costPerPart != null ? `${fmtMoney(costPerPart)}€` : (costPerPizza != null ? `${fmtMoney(costPerPizza)}€` : "-")}
           </div>
+        </div>
 
-          {isMultiParts && costPerPart != null && (
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                Cout / part
-              </div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: "#B45309", fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1.1, marginTop: 4 }}>
-                {fmtMoney(costPerPart)}€
-              </div>
+        {/* KPI 2: Coeff */}
+        <div style={{ textAlign: "center", padding: "0 4px", borderLeft: "1px solid #ece4d4" }}>
+          <div style={lbl}>Coeff</div>
+          <div style={{ ...bigNum, color: "#7C3AED" }}>
+            {sellCoeff != null ? `×${sellCoeff}` : "-"}
+          </div>
+        </div>
+
+        {/* KPI 3: Prix vente */}
+        <div style={{ textAlign: "center", padding: "0 4px", borderLeft: "1px solid #ece4d4" }}>
+          <div style={lbl}>{isMultiParts ? "Vente / part" : "Prix vente"}</div>
+          <div style={{ ...bigNum, color: "#1a1a1a" }}>
+            {derivedSellPerPart != null ? `${fmtMoney(derivedSellPerPart)}€` : "-"}
+          </div>
+          {prixTTCPart != null && (
+            <div style={{ fontSize: 11, color: "#999", marginTop: 1 }}>
+              {fmtMoney(prixTTCPart)}€ TTC
             </div>
           )}
         </div>
 
-        {/* Parts selector */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Parts</span>
-          <div style={{ display: "flex", gap: 4 }}>
-            {[1, 2, 4, 6, 8, 10, 12].map(p => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => onNbPartsChange(p)}
-                style={{
-                  padding: "4px 10px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                  border: "1.5px solid",
-                  borderColor: nbParts === p ? "#8B1A1A" : "#ddd6c8",
-                  background: nbParts === p ? "rgba(139,26,26,0.08)" : "#fff",
-                  color: nbParts === p ? "#8B1A1A" : "#6f6a61",
-                  cursor: "pointer", minWidth: 32,
-                }}
-              >{p}</button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Row 2 : Coefficient ── */}
-      <div style={{
-        background: "#fff", borderRadius: 14, padding: "18px 20px",
-        border: "1px solid #e0d8ce",
-      }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
-          Coefficient multiplicateur
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <span style={{ fontSize: 28, fontWeight: 800, color: "#7C3AED", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>×</span>
-          <input
-            type="text"
-            inputMode="decimal"
-            value={coeffEditing ? coeffLocal : (sellCoeff != null ? sellCoeff.toString() : "")}
-            placeholder="3"
-            onFocus={(e) => {
-              setCoeffEditing(true);
-              setCoeffLocal(sellCoeff != null ? String(sellCoeff) : "");
-              setTimeout(() => e.target.select(), 0);
-            }}
-            onChange={(e) => {
-              const raw = e.target.value.replace(",", ".").replace(/[^\d.]/g, "");
-              setCoeffLocal(raw);
-              const n = Number(raw);
-              if (!isNaN(n) && n > 0) onSellCoeffChange(n);
-            }}
-            onBlur={() => {
-              setCoeffEditing(false);
-              const n = Number(coeffLocal);
-              if (!isNaN(n) && n > 0) onSellCoeffChange(n);
-            }}
-            onKeyDown={(e) => { if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur(); }}
-            style={{
-              width: 70, fontSize: 28, fontWeight: 800, color: "#7C3AED",
-              fontFamily: "var(--font-oswald), Oswald, sans-serif",
-              border: "2px solid #e0d8ce", borderRadius: 10, padding: "4px 10px",
-              background: "#faf6ee", outline: "none",
-              fontVariantNumeric: "tabular-nums",
-            }}
-          />
-        </div>
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-          {[2, 2.5, 3, 3.5, 4, 5].map(c => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => onSellCoeffChange(c)}
-              style={{
-                padding: "4px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                border: "1.5px solid",
-                borderColor: sellCoeff === c ? "#7C3AED" : "#ddd6c8",
-                background: sellCoeff === c ? "rgba(124,58,237,0.08)" : "#fff",
-                color: sellCoeff === c ? "#7C3AED" : "#6f6a61",
-                cursor: "pointer",
-              }}
-            >×{c}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Row 3 : Prix de vente ── */}
-      <div style={{
-        background: "#fff", borderRadius: 14, padding: "18px 20px",
-        border: "1px solid #e0d8ce",
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              {isMultiParts ? "Prix de vente / part" : "Prix de vente"}
-            </div>
-            <div style={{ fontSize: 32, fontWeight: 800, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1.1, marginTop: 4 }}>
-              {derivedSellPerPart != null ? `${fmtMoney(derivedSellPerPart)}€ HT` : "-"}
-            </div>
-            {prixTTCPart != null && (
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#666", marginTop: 2 }}>
-                {fmtMoney(prixTTCPart)}€ TTC
-              </div>
-            )}
-          </div>
-
-          {isMultiParts && derivedSellPerPizza != null && (
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                Prix pizza entiere
-              </div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: "#666", fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1.1, marginTop: 4 }}>
-                {fmtMoney(derivedSellPerPizza)}€ HT
+        {/* KPI 4: Pizza entiere (si multi-parts) ou Marge */}
+        <div style={{ textAlign: "center", padding: "0 4px", borderLeft: "1px solid #ece4d4" }}>
+          {isMultiParts ? (
+            <>
+              <div style={lbl}>Pizza entiere</div>
+              <div style={{ ...bigNum, color: "#1a1a1a" }}>
+                {derivedSellPerPizza != null ? `${fmtMoney(derivedSellPerPizza)}€` : "-"}
               </div>
               {derivedSellPerPizza != null && (
-                <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: "#999", marginTop: 1 }}>
                   {fmtMoney(derivedSellPerPizza * (1 + vatRate))}€ TTC
                 </div>
               )}
-            </div>
+            </>
+          ) : (
+            <>
+              <div style={lbl}>Marge</div>
+              <div style={{ ...bigNum, color: margeColor }}>
+                {margePerPart != null ? `${fmtMoney(margePerPart)}€` : "-"}
+              </div>
+            </>
           )}
-        </div>
-
-        {/* TVA selector */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#999" }}>TVA</span>
-          <select
-            value={vatPct}
-            onChange={(e) => onVatChange(Number(e.target.value) / 100)}
-            style={{
-              padding: "3px 6px", borderRadius: 8, border: "1px solid #ddd6c8",
-              background: "#fff", fontSize: 12, fontWeight: 700, color: "#1a1a1a",
-              cursor: "pointer",
-            }}
-          >
-            {[0, 5.5, 10, 20].map(v => (
-              <option key={v} value={v}>{v}%</option>
-            ))}
-          </select>
         </div>
       </div>
 
-      {/* ── Row 4 : Food cost + Marge ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      {/* ── Food Cost + Marge bar ── */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0,
+        borderTop: "1px solid #ece4d4",
+      }}>
         {/* Food cost */}
-        <div style={{
-          background: "#fff", borderRadius: 14, padding: "16px 18px",
-          border: "1px solid #e0d8ce",
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-            Food cost
-          </div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: fcColor, fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1.1, marginTop: 4 }}>
-            {foodCostPct != null ? `${foodCostPct.toFixed(0)}%` : "-"}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 6, fontSize: 11, color: "#999" }}>
-            cible
-            <input
-              type="number" min={5} max={80} step={1}
-              value={fcTarget}
-              onChange={(e) => onFcTargetChange(Number(e.target.value))}
-              style={{
-                width: 36, padding: "1px 4px", borderRadius: 6,
-                border: "1px solid #ddd6c8", background: "#fff",
-                fontSize: 11, fontWeight: 700, textAlign: "right", color: "#1a1a1a",
-              }}
-            />%
+        <div style={{ padding: "14px 16px", borderRight: "1px solid #ece4d4" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+            <span style={lbl}>Food cost</span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: fcColor, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
+              {foodCostPct != null ? `${foodCostPct.toFixed(0)}%` : "-"}
+            </span>
+            <span style={{ fontSize: 10, color: "#bbb", marginLeft: "auto" }}>
+              cible {fcTarget}%
+            </span>
           </div>
           <div style={{ height: 5, background: "#ece4d4", borderRadius: 999, overflow: "hidden", marginTop: 8 }}>
             <div style={{ width: `${Math.min(100, fcRatio * 100)}%`, height: "100%", background: fcColor, borderRadius: 999, transition: "width 0.3s" }} />
@@ -1129,25 +1022,159 @@ function PizzaPricing({
         </div>
 
         {/* Marge */}
-        <div style={{
-          background: "#fff", borderRadius: 14, padding: "16px 18px",
-          border: "1px solid #e0d8ce",
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-            Marge brute
+        <div style={{ padding: "14px 16px" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+            <span style={lbl}>Marge brute</span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: margeColor, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
+              {margePerPart != null ? `${fmtMoney(margePerPart)}€` : "-"}
+            </span>
+            <span style={{ fontSize: 10, color: "#bbb", marginLeft: "auto" }}>
+              {isMultiParts ? "/ part" : "/ pizza"}
+            </span>
           </div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: margePerPart != null && margePerPart > 0 ? "#16a34a" : "#999", fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1.1, marginTop: 4 }}>
-            {margePerPart != null ? `${fmtMoney(margePerPart)}€` : "-"}
-          </div>
-          <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>
-            {isMultiParts ? "par part" : "par pizza"}
-          </div>
-          {sellCoeff != null && (
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#7C3AED", marginTop: 6 }}>
-              ×{sellCoeff.toFixed(2)}
+          {isMultiParts && costPerPizza != null && (
+            <div style={{ fontSize: 11, color: "#999", marginTop: 6 }}>
+              Cout pizza : {fmtMoney(costPerPizza)}€
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── Tiroir : Parametres de calcul ── */}
+      <div style={{ borderTop: "1px solid #ece4d4" }}>
+        <button
+          type="button"
+          onClick={() => setParamsOpen(!paramsOpen)}
+          style={{
+            width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "10px 16px", background: "none", border: "none",
+            cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#999",
+            textTransform: "uppercase", letterSpacing: "0.06em",
+          }}
+        >
+          <span>Parametres de calcul</span>
+          <span style={{
+            display: "inline-block", transition: "transform 0.2s",
+            transform: paramsOpen ? "rotate(180deg)" : "rotate(0deg)",
+            fontSize: 14,
+          }}>&#9660;</span>
+        </button>
+
+        {paramsOpen && (
+          <div style={{ padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
+
+            {/* Parts */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ ...lbl, minWidth: 44 }}>Parts</span>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {[1, 2, 4, 6, 8, 10, 12].map(p => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => onNbPartsChange(p)}
+                    style={{
+                      padding: "5px 11px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      border: "1.5px solid",
+                      borderColor: nbParts === p ? "#8B1A1A" : "#ddd6c8",
+                      background: nbParts === p ? "rgba(139,26,26,0.08)" : "#fff",
+                      color: nbParts === p ? "#8B1A1A" : "#6f6a61",
+                      cursor: "pointer", minWidth: 34,
+                    }}
+                  >{p}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Coefficient */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ ...lbl, minWidth: 44 }}>Coeff</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 20, fontWeight: 800, color: "#7C3AED", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>×</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={coeffEditing ? coeffLocal : (sellCoeff != null ? sellCoeff.toString() : "")}
+                  placeholder="3"
+                  onFocus={(e) => {
+                    setCoeffEditing(true);
+                    setCoeffLocal(sellCoeff != null ? String(sellCoeff) : "");
+                    setTimeout(() => e.target.select(), 0);
+                  }}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(",", ".").replace(/[^\d.]/g, "");
+                    setCoeffLocal(raw);
+                    const n = Number(raw);
+                    if (!isNaN(n) && n > 0) onSellCoeffChange(n);
+                  }}
+                  onBlur={() => {
+                    setCoeffEditing(false);
+                    const n = Number(coeffLocal);
+                    if (!isNaN(n) && n > 0) onSellCoeffChange(n);
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur(); }}
+                  style={{
+                    width: 56, fontSize: 20, fontWeight: 800, color: "#7C3AED",
+                    fontFamily: "var(--font-oswald), Oswald, sans-serif",
+                    border: "2px solid #e0d8ce", borderRadius: 10, padding: "3px 8px",
+                    background: "#faf6ee", outline: "none",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                />
+              </div>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {[2, 2.5, 3, 3.5, 4, 5].map(c => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => onSellCoeffChange(c)}
+                    style={{
+                      padding: "4px 10px", borderRadius: 10, fontSize: 11, fontWeight: 700,
+                      border: "1.5px solid",
+                      borderColor: sellCoeff === c ? "#7C3AED" : "#ddd6c8",
+                      background: sellCoeff === c ? "rgba(124,58,237,0.08)" : "#fff",
+                      color: sellCoeff === c ? "#7C3AED" : "#6f6a61",
+                      cursor: "pointer",
+                    }}
+                  >×{c}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* TVA + FC cible */}
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ ...lbl, minWidth: 44 }}>TVA</span>
+                <select
+                  value={vatPct}
+                  onChange={(e) => onVatChange(Number(e.target.value) / 100)}
+                  style={{
+                    padding: "4px 8px", borderRadius: 8, border: "1px solid #ddd6c8",
+                    background: "#fff", fontSize: 12, fontWeight: 700, color: "#1a1a1a",
+                    cursor: "pointer",
+                  }}
+                >
+                  {[0, 5.5, 10, 20].map(v => (
+                    <option key={v} value={v}>{v}%</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={lbl}>Cible FC</span>
+                <input
+                  type="number" min={5} max={80} step={1}
+                  value={fcTarget}
+                  onChange={(e) => onFcTargetChange(Number(e.target.value))}
+                  style={{
+                    width: 40, padding: "3px 6px", borderRadius: 8,
+                    border: "1px solid #ddd6c8", background: "#fff",
+                    fontSize: 12, fontWeight: 700, textAlign: "right", color: "#1a1a1a",
+                  }}
+                />
+                <span style={{ fontSize: 12, color: "#999" }}>%</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
