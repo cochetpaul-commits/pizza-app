@@ -440,6 +440,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         photo_url: photoUrl || null,
         establishments: etab.current ? [etab.current.slug] : ["bellomio"],
         total_cost: totalCost > 0 ? totalCost : null,
+        ball_weight_g: ballWeightG !== "" ? Number(ballWeightG) : null,
         vat_rate: vatRate,
         margin_rate,
         sell_price: sellPrice !== "" ? Number(sellPrice) : null,
