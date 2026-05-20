@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
@@ -16,7 +16,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
-import { RecipeHero, RecipeKpis, HeroBtn, HeroDangerBtn } from "./RecipeHero";
+import { RecipeHero, HeroBtn, HeroDangerBtn } from "./RecipeHero";
 import { GestionFoodCost } from "./GestionFoodCost";
 import { PublishCatalogueButton } from "./PublishCatalogueButton";
 import { GestionCommandes } from "./GestionCommandes";
@@ -102,14 +102,11 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
   const [meta, setMeta] = useState<Record<string, string>>({});
   const updateMeta = (k: string, v: string) => setMeta(prev => ({ ...prev, [k]: v }));
 
-  // Pricing — marginRate as string "75" = 75%
+  // Pricing
   const [vatRate, setVatRate] = useState(0.1);
-  const [fcMultiplier, setFcMultiplier] = useState(1);
   const [fcTarget, setFcTarget] = useState(30);
-  const [marginRate, setMarginRate] = useState("75");
-  const [sellPrice, setSellPrice] = useState<number | "">("");
-  // Sell coefficient for preparations (prix vente/kg = coût/kg × sellCoeff)
   const [sellCoeff, setSellCoeff] = useState<number | null>(null);
+  const [pricingMode, setPricingMode] = useState<"portion" | "kg">("portion");
 
   // Production mode
   const [prodMode, setProdMode] = useState(initialProdMode ?? false);
@@ -371,17 +368,13 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
           if (r.vat_rate) setVatRate(Number(r.vat_rate));
           if (r.margin_rate) {
             const mr = Number(r.margin_rate);
-            // For preparations, margin_rate stores the sell coefficient (≥1)
-            const cat = String(r.category ?? "");
-            if ((cat === "preparation" || cat === "sauce" || cat === "plat_cuisine") && mr >= 1) {
-              setSellCoeff(mr);
-            } else if (mr >= 1) {
-              setMarginRate(String(Math.round(mr)));
-            } else if (mr > 0) {
-              setMarginRate(String(Math.round(mr * 100)));
-            }
+            if (mr > 0) setSellCoeff(mr);
           }
-          if (r.sell_price != null) setSellPrice(Number(r.sell_price));
+          if (r.nb_parts != null) {
+            const np = Number(r.nb_parts);
+            if (np === 0) setPricingMode("kg");
+            else setPricingMode("portion");
+          }
           if (r.procedure) {
             try { setSteps(JSON.parse(String(r.procedure)) as string[]); } catch { setSteps([]); }
           }
@@ -460,11 +453,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("NOT_LOGGED");
 
-      const marginRateNum = Number(marginRate);
-      // For preparations, store the sell coefficient in margin_rate
-      const margin_rate = isPrepCat && sellCoeff && sellCoeff > 0
-        ? round2(sellCoeff)
-        : (marginRateNum > 0 ? round2(marginRateNum) : 0);
+      const margin_rate = sellCoeff && sellCoeff > 0 ? round2(sellCoeff) : 0;
       const totalCostRounded = round2(totalCost);
 
       const payload: Record<string, unknown> = {
@@ -480,7 +469,8 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         total_cost: totalCostRounded > 0 ? totalCostRounded : null,
         cost_per_kg: costPerKg,
         cost_per_portion: costPerPortion,
-        sell_price: isPrepCat && derivedSellPriceKg ? derivedSellPriceKg : (sellPrice !== "" ? Number(sellPrice) : null),
+        sell_price: derivedSellPerUnit ?? null,
+        nb_parts: pricingMode === "kg" ? 0 : (portions && portions > 0 ? Math.round(portions) : 1),
         photo_url: photoUrl || null,
         procedure: steps.length > 0 ? JSON.stringify(steps) : null,
         is_draft: false,
@@ -708,18 +698,16 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
   }, 0);
 
   // ── KPI computations ──────────────────────────────────────────
-  const isPrepCat = category === "preparation" || category === "sauce" || category === "plat_cuisine";
-  // For preparations: sell price/kg derived from coefficient
-  const derivedSellPriceKg = isPrepCat && costPerKg && sellCoeff && sellCoeff > 0
-    ? round2(costPerKg * sellCoeff) : null;
-  // For preparations: also compute sell price per portion
-  const derivedSellPricePortion = isPrepCat && costPerPortion && sellCoeff && sellCoeff > 0
-    ? round2(costPerPortion * sellCoeff) : null;
-  const sp = typeof sellPrice === "number" && sellPrice > 0 ? sellPrice : null;
-  const effectiveCostPerPortion = costPerPortion ?? (totalCost > 0 ? totalCost : null);
-  const foodCostPct = sp && effectiveCostPerPortion ? (effectiveCostPerPortion / sp) * 100 : null;
-  const margeBrute = sp && effectiveCostPerPortion ? sp - effectiveCostPerPortion : null;
-  const prixTTC = sp ? sp * (1 + vatRate) : null;
+  // Portion mode: totalCost / portions_count = costPerPart, × coeff = sellPerPart
+  // Kg mode: costPerKg × coeff = sellPerKg
+  const effectiveParts = pricingMode === "portion" ? (portions && portions > 0 ? portions : 1) : 1;
+  const baseCost = pricingMode === "kg" ? costPerKg : (totalCost > 0 ? round2(totalCost / effectiveParts) : null);
+  const derivedSellPerUnit = baseCost && sellCoeff && sellCoeff > 0 ? round2(baseCost * sellCoeff) : null;
+  const derivedSellTotal = pricingMode === "portion" && derivedSellPerUnit && effectiveParts > 1
+    ? round2(derivedSellPerUnit * effectiveParts) : null;
+  const foodCostPct = baseCost && derivedSellPerUnit ? round2((baseCost / derivedSellPerUnit) * 100) : null;
+  const margePerUnit = baseCost && derivedSellPerUnit ? round2(derivedSellPerUnit - baseCost) : null;
+  const prixTTCUnit = derivedSellPerUnit ? round2(derivedSellPerUnit * (1 + vatRate)) : null;
 
   const categoryLabel = CATEGORIES.find(c => c.id === category)?.label ?? category;
 
@@ -794,53 +782,27 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         {/* ── TAB: FOOD COST & MARGES ── */}
         {mainTab === "fc" && (
           <>
-            <RecipeKpis
-              costPerPortion={effectiveCostPerPortion ?? null}
-              foodCostPct={foodCostPct ?? null}
-              sellPriceHT={sp ?? null}
-              sellPriceTTC={prixTTC ?? null}
-              margeBrute={margeBrute ?? null}
-              accent={ACCENT}
-              portionLabel="portion"
-              foodCostTarget={fcTarget}
-              onFoodCostTargetChange={setFcTarget}
-              onSellPriceChange={(p) => setSellPrice(p)}
-              vatRate={vatRate}
-              onVatChange={setVatRate}
-              multiplier={fcMultiplier}
-              onMultiplierChange={setFcMultiplier}
+            <CuisinePricing
+              pricingMode={pricingMode}
+              onPricingModeChange={setPricingMode}
+              totalCost={totalCost > 0 ? round2(totalCost) : null}
               costPerKg={costPerKg}
-              yieldGrams={typeof yieldGrams === "number" ? yieldGrams : null}
-              mode={isPrepCat ? "preparation" : "default"}
-              sellPriceKgHT={derivedSellPriceKg}
+              baseCost={baseCost}
+              portions={portions}
+              onPortionsChange={(n) => setPortionsCount(n)}
               sellCoeff={sellCoeff}
               onSellCoeffChange={setSellCoeff}
+              derivedSellPerUnit={derivedSellPerUnit}
+              derivedSellTotal={derivedSellTotal}
+              foodCostPct={foodCostPct}
+              fcTarget={fcTarget}
+              onFcTargetChange={setFcTarget}
+              margePerUnit={margePerUnit}
+              prixTTCUnit={prixTTCUnit}
+              vatRate={vatRate}
+              onVatChange={setVatRate}
+              yieldGrams={typeof yieldGrams === "number" ? yieldGrams : null}
             />
-            {/* Prix de vente par portion (pour le resto) */}
-            {isPrepCat && derivedSellPricePortion != null && (
-              <div style={{
-                background: "#fff", borderRadius: 12, padding: "14px 18px",
-                border: "1px solid #e0d8ce", marginBottom: 16,
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-              }}>
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                    Prix de vente par portion (resto)
-                  </div>
-                  <div style={{ fontSize: 11, color: "#999" }}>
-                    {portionsCount ? `${portionsCount} portion${Number(portionsCount) > 1 ? "s" : ""}` : "portions non definies"}
-                  </div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
-                    {derivedSellPricePortion.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€ HT
-                  </div>
-                  <div style={{ fontSize: 12, color: "#999" }}>
-                    {(derivedSellPricePortion * (1 + vatRate)).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€ TTC
-                  </div>
-                </div>
-              </div>
-            )}
             <GestionFoodCost
               lines={lines}
               ingredients={ingredients}
@@ -848,7 +810,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
               supplierByIngredient={supplierByIngredient}
               totalCost={totalCost}
               yieldGrams={typeof yieldGrams === "number" ? yieldGrams : null}
-              multiplier={fcMultiplier}
+              multiplier={1}
             />
           </>
         )}
@@ -1267,4 +1229,324 @@ function StepsGhostSlots({ onAdd }: { onAdd: (label: string) => void }) {
   );
 }
 
-// ── KPI Banner Item ──────────────────────────────────────────────
+// ── Cuisine Pricing Panel — Hero KPI + Tiroir ───────────────────
+function CuisinePricing({
+  pricingMode, onPricingModeChange,
+  totalCost, costPerKg: _costPerKg, baseCost,
+  portions, onPortionsChange,
+  sellCoeff, onSellCoeffChange,
+  derivedSellPerUnit, derivedSellTotal,
+  foodCostPct, fcTarget, onFcTargetChange,
+  margePerUnit, prixTTCUnit,
+  vatRate, onVatChange,
+  yieldGrams,
+}: {
+  pricingMode: "portion" | "kg";
+  onPricingModeChange: (m: "portion" | "kg") => void;
+  totalCost: number | null;
+  costPerKg: number | null;
+  baseCost: number | null;
+  portions: number | null;
+  onPortionsChange: (n: number | "") => void;
+  sellCoeff: number | null;
+  onSellCoeffChange: (c: number) => void;
+  derivedSellPerUnit: number | null;
+  derivedSellTotal: number | null;
+  foodCostPct: number | null;
+  fcTarget: number;
+  onFcTargetChange: (t: number) => void;
+  margePerUnit: number | null;
+  prixTTCUnit: number | null;
+  vatRate: number;
+  onVatChange: (r: number) => void;
+  yieldGrams: number | null;
+}) {
+  const [coeffLocal, setCoeffLocal] = useState(sellCoeff != null ? String(sellCoeff) : "");
+  const [coeffEditing, setCoeffEditing] = useState(false);
+  const [paramsOpen, setParamsOpen] = useState(true);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!coeffEditing) setCoeffLocal(sellCoeff != null ? String(sellCoeff) : "");
+  }, [sellCoeff, coeffEditing]);
+
+  const fcColor = foodCostPct == null ? "#999"
+    : foodCostPct <= fcTarget ? "#16a34a"
+    : foodCostPct <= fcTarget + 5 ? "#D97706"
+    : "#DC2626";
+  const fcRatio = foodCostPct == null ? 0 : Math.min(1, foodCostPct / (fcTarget * 1.67));
+  const margeColor = margePerUnit != null && margePerUnit > 0 ? "#16a34a" : "#999";
+
+  const isPortionMode = pricingMode === "portion";
+  const unitLabel = isPortionMode ? "portion" : "kg";
+  const vatPct = Math.round(vatRate * 100);
+  const hasMultiPortions = isPortionMode && portions != null && portions > 1;
+
+  const lbl: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em" };
+  const bigNum: React.CSSProperties = { fontSize: 26, fontWeight: 800, fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1.1, marginTop: 2 };
+
+  return (
+    <div style={{
+      background: "#fff", borderRadius: 16, border: "1px solid #e0d8ce",
+      marginBottom: 16, overflow: "hidden",
+    }}>
+
+      {/* ── Hero KPIs — 4 columns ── */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
+        gap: 0, padding: "20px 16px 16px",
+      }}>
+        {/* KPI 1: Cout */}
+        <div style={{ textAlign: "center", padding: "0 4px" }}>
+          <div style={lbl}>{isPortionMode ? "Cout / portion" : "Cout / kg"}</div>
+          <div style={{ ...bigNum, color: "#8B1A1A" }}>
+            {baseCost != null ? `${fmtMoney(baseCost)}€` : "-"}
+          </div>
+        </div>
+
+        {/* KPI 2: Coeff */}
+        <div style={{ textAlign: "center", padding: "0 4px", borderLeft: "1px solid #ece4d4" }}>
+          <div style={lbl}>Coeff</div>
+          <div style={{ ...bigNum, color: "#7C3AED" }}>
+            {sellCoeff != null ? `×${sellCoeff}` : "-"}
+          </div>
+        </div>
+
+        {/* KPI 3: Prix vente (TTC big, HT small) */}
+        <div style={{ textAlign: "center", padding: "0 4px", borderLeft: "1px solid #ece4d4" }}>
+          <div style={lbl}>{isPortionMode ? "Vente / portion" : "Vente / kg"}</div>
+          <div style={{ ...bigNum, color: "#1a1a1a" }}>
+            {prixTTCUnit != null ? `${fmtMoney(prixTTCUnit)}€` : "-"}
+          </div>
+          {derivedSellPerUnit != null && (
+            <div style={{ fontSize: 11, color: "#999", marginTop: 1 }}>
+              {fmtMoney(derivedSellPerUnit)}€ HT
+            </div>
+          )}
+        </div>
+
+        {/* KPI 4: Plat entier (if multi-portions) or Marge */}
+        <div style={{ textAlign: "center", padding: "0 4px", borderLeft: "1px solid #ece4d4" }}>
+          {hasMultiPortions && derivedSellTotal != null ? (
+            <>
+              <div style={lbl}>Plat entier</div>
+              <div style={{ ...bigNum, color: "#1a1a1a" }}>
+                {fmtMoney(derivedSellTotal * (1 + vatRate))}€
+              </div>
+              <div style={{ fontSize: 11, color: "#999", marginTop: 1 }}>
+                {fmtMoney(derivedSellTotal)}€ HT
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={lbl}>Marge</div>
+              <div style={{ ...bigNum, color: margeColor }}>
+                {margePerUnit != null ? `${fmtMoney(margePerUnit)}€` : "-"}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── Food Cost + Marge bar ── */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0,
+        borderTop: "1px solid #ece4d4",
+      }}>
+        <div style={{ padding: "14px 16px", borderRight: "1px solid #ece4d4" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+            <span style={lbl}>Food cost</span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: fcColor, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
+              {foodCostPct != null ? `${foodCostPct.toFixed(0)}%` : "-"}
+            </span>
+            <span style={{ fontSize: 10, color: "#bbb", marginLeft: "auto" }}>
+              cible {fcTarget}%
+            </span>
+          </div>
+          <div style={{ height: 5, background: "#ece4d4", borderRadius: 999, overflow: "hidden", marginTop: 8 }}>
+            <div style={{ width: `${Math.min(100, fcRatio * 100)}%`, height: "100%", background: fcColor, borderRadius: 999, transition: "width 0.3s" }} />
+          </div>
+        </div>
+
+        <div style={{ padding: "14px 16px" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+            <span style={lbl}>Marge brute</span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: margeColor, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
+              {margePerUnit != null ? `${fmtMoney(margePerUnit)}€` : "-"}
+            </span>
+            <span style={{ fontSize: 10, color: "#bbb", marginLeft: "auto" }}>
+              / {unitLabel}
+            </span>
+          </div>
+          {totalCost != null && totalCost > 0 && (
+            <div style={{ fontSize: 11, color: "#999", marginTop: 6 }}>
+              Cout total : {fmtMoney(totalCost)}€
+              {yieldGrams != null && yieldGrams > 0 && ` · Rendement ${(yieldGrams / 1000).toFixed(2)} kg`}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Tiroir : Parametres de calcul ── */}
+      <div style={{ borderTop: "1px solid #ece4d4" }}>
+        <button
+          type="button"
+          onClick={() => setParamsOpen(!paramsOpen)}
+          style={{
+            width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "10px 16px", background: "none", border: "none",
+            cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#999",
+            textTransform: "uppercase", letterSpacing: "0.06em",
+          }}
+        >
+          <span>Parametres de calcul</span>
+          <span style={{
+            display: "inline-block", transition: "transform 0.2s",
+            transform: paramsOpen ? "rotate(180deg)" : "rotate(0deg)",
+            fontSize: 14,
+          }}>&#9660;</span>
+        </button>
+
+        {paramsOpen && (
+          <div style={{ padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
+
+            {/* Mode toggle */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ ...lbl, minWidth: 44 }}>Mode</span>
+              <div style={{ display: "flex", gap: 4 }}>
+                {(["portion", "kg"] as const).map(m => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => onPricingModeChange(m)}
+                    style={{
+                      padding: "5px 14px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      border: "1.5px solid",
+                      borderColor: pricingMode === m ? "#4a6741" : "#ddd6c8",
+                      background: pricingMode === m ? "rgba(74,103,65,0.08)" : "#fff",
+                      color: pricingMode === m ? "#4a6741" : "#6f6a61",
+                      cursor: "pointer",
+                    }}
+                  >{m === "portion" ? "Portion" : "Au kilo"}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Portions count (only in portion mode) */}
+            {isPortionMode && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ ...lbl, minWidth: 44 }}>Portions</span>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {[1, 2, 4, 6, 8, 10, 12].map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => onPortionsChange(p)}
+                      style={{
+                        padding: "5px 11px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                        border: "1.5px solid",
+                        borderColor: portions === p ? "#4a6741" : "#ddd6c8",
+                        background: portions === p ? "rgba(74,103,65,0.08)" : "#fff",
+                        color: portions === p ? "#4a6741" : "#6f6a61",
+                        cursor: "pointer", minWidth: 34,
+                      }}
+                    >{p}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Coefficient */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ ...lbl, minWidth: 44 }}>Coeff</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 20, fontWeight: 800, color: "#7C3AED", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>×</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={coeffEditing ? coeffLocal : (sellCoeff != null ? sellCoeff.toString() : "")}
+                  placeholder="3"
+                  onFocus={(e) => {
+                    setCoeffEditing(true);
+                    setCoeffLocal(sellCoeff != null ? String(sellCoeff) : "");
+                    setTimeout(() => e.target.select(), 0);
+                  }}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(",", ".").replace(/[^\d.]/g, "");
+                    setCoeffLocal(raw);
+                    const n = Number(raw);
+                    if (!isNaN(n) && n > 0) onSellCoeffChange(n);
+                  }}
+                  onBlur={() => {
+                    setCoeffEditing(false);
+                    const n = Number(coeffLocal);
+                    if (!isNaN(n) && n > 0) onSellCoeffChange(n);
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur(); }}
+                  style={{
+                    width: 56, fontSize: 20, fontWeight: 800, color: "#7C3AED",
+                    fontFamily: "var(--font-oswald), Oswald, sans-serif",
+                    border: "2px solid #e0d8ce", borderRadius: 10, padding: "3px 8px",
+                    background: "#faf6ee", outline: "none",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                />
+              </div>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {[2, 2.5, 3, 3.5, 4, 5].map(c => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => onSellCoeffChange(c)}
+                    style={{
+                      padding: "4px 10px", borderRadius: 10, fontSize: 11, fontWeight: 700,
+                      border: "1.5px solid",
+                      borderColor: sellCoeff === c ? "#7C3AED" : "#ddd6c8",
+                      background: sellCoeff === c ? "rgba(124,58,237,0.08)" : "#fff",
+                      color: sellCoeff === c ? "#7C3AED" : "#6f6a61",
+                      cursor: "pointer",
+                    }}
+                  >×{c}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* TVA + FC cible */}
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ ...lbl, minWidth: 44 }}>TVA</span>
+                <select
+                  value={vatPct}
+                  onChange={(e) => onVatChange(Number(e.target.value) / 100)}
+                  style={{
+                    padding: "4px 8px", borderRadius: 8, border: "1px solid #ddd6c8",
+                    background: "#fff", fontSize: 12, fontWeight: 700, color: "#1a1a1a",
+                    cursor: "pointer",
+                  }}
+                >
+                  {[0, 5.5, 10, 20].map(v => (
+                    <option key={v} value={v}>{v}%</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={lbl}>Cible FC</span>
+                <input
+                  type="number" min={5} max={80} step={1}
+                  value={fcTarget}
+                  onChange={(e) => onFcTargetChange(Number(e.target.value))}
+                  style={{
+                    width: 40, padding: "3px 6px", borderRadius: 8,
+                    border: "1px solid #ddd6c8", background: "#fff",
+                    fontSize: 12, fontWeight: 700, textAlign: "right", color: "#1a1a1a",
+                  }}
+                />
+                <span style={{ fontSize: 12, color: "#999" }}>%</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
@@ -16,7 +16,7 @@ import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./Ingredi
 import { StepsList } from "./StepsList";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
-import { RecipeHero, RecipeKpis, HeroBtn, HeroDangerBtn } from "./RecipeHero";
+import { RecipeHero, HeroBtn, HeroDangerBtn } from "./RecipeHero";
 import { GestionFoodCost } from "./GestionFoodCost";
 import { GestionCommandes } from "./GestionCommandes";
 import { GestionPilotage } from "./GestionPilotage";
@@ -66,7 +66,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
   const [garnish, setGarnish] = useState("");
   const [method, setMethod] = useState("");
   const [baseAlcool, setBaseAlcool] = useState("");
-  const [sellPrice, setSellPrice] = useState<number | "">("");
+  const [sellCoeff, setSellCoeff] = useState<number | null>(null);
   const [imageUrl, setImageUrl] = useState("");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -83,9 +83,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
   // Pricing
   const [vatRate, setVatRate] = useState(0.2);
-  const [fcMultiplier, setFcMultiplier] = useState(1);
   const [fcTarget, setFcTarget] = useState(20);
-  const [marginRate, setMarginRate] = useState("75");
 
   // Main tab
   type MainTab = "fc" | "recette" | "cmd" | "pop";
@@ -162,11 +160,11 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
   }, 0);
 
   // ── KPI computations ──────────────────────────────────────────
-  const sp = typeof sellPrice === "number" && sellPrice > 0 ? sellPrice : null;
-  const effectiveCostPerPortion = totalCostEur > 0 ? round2(totalCostEur) : null;
-  const foodCostPct = sp && effectiveCostPerPortion ? (effectiveCostPerPortion / sp) * 100 : null;
-  const margeBrute = sp && effectiveCostPerPortion ? sp - effectiveCostPerPortion : null;
-  const prixTTC = sp ? sp * (1 + vatRate) : null;
+  const costPerCocktail = totalCostEur > 0 ? round2(totalCostEur) : null;
+  const derivedSellPrice = costPerCocktail && sellCoeff && sellCoeff > 0 ? round2(costPerCocktail * sellCoeff) : null;
+  const foodCostPct = costPerCocktail && derivedSellPrice ? round2((costPerCocktail / derivedSellPrice) * 100) : null;
+  const margePerCocktail = costPerCocktail && derivedSellPrice ? round2(derivedSellPrice - costPerCocktail) : null;
+  const prixTTC = derivedSellPrice ? round2(derivedSellPrice * (1 + vatRate)) : null;
 
   const typeLabel = COCKTAIL_TYPES.find(t => t.id === type)?.label ?? type;
 
@@ -330,14 +328,12 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
           setType(String(c.type ?? "long_drink"));
           setGlass(String(c.glass ?? ""));
           setGarnish(String(c.garnish ?? ""));
-          setSellPrice(c.sell_price ? Number(c.sell_price) : "");
           setImageUrl(String(c.image_url ?? ""));
           if (c.image_url) setPhotoPreview(String(c.image_url));
           if (c.vat_rate) setVatRate(Number(c.vat_rate));
           if (c.margin_rate) {
             const mr = Number(c.margin_rate);
-            if (mr >= 1) setMarginRate(String(Math.round(mr)));
-            else if (mr > 0) setMarginRate(String(Math.round(mr * 100)));
+            if (mr > 0) setSellCoeff(mr);
           }
           if (c.steps) {
             try { setSteps(JSON.parse(String(c.steps)) as string[]); }
@@ -388,8 +384,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("NOT_LOGGED");
 
-      const marginRateNum = Number(marginRate);
-      const margin_rate = marginRateNum > 0 ? round2(marginRateNum) : 0;
+      const margin_rate = sellCoeff && sellCoeff > 0 ? round2(sellCoeff) : 0;
       const totalCost = round2(totalCostEur);
 
       const payload: Record<string, unknown> = {
@@ -397,7 +392,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
         type,
         glass: glass || null,
         garnish: garnish || null,
-        sell_price: sellPrice !== "" ? Number(sellPrice) : null,
+        sell_price: derivedSellPrice ?? null,
         image_url: imageUrl || null,
         vat_rate: vatRate,
         margin_rate,
@@ -543,21 +538,18 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
         {/* ── TAB: FOOD COST & MARGES ── */}
         {mainTab === "fc" && (
           <>
-            <RecipeKpis
-              costPerPortion={effectiveCostPerPortion ?? null}
-              foodCostPct={foodCostPct ?? null}
-              sellPriceHT={sp ?? null}
-              sellPriceTTC={prixTTC ?? null}
-              margeBrute={margeBrute ?? null}
-              accent={ACCENT}
-              portionLabel="cocktail"
-              foodCostTarget={fcTarget}
-              onFoodCostTargetChange={setFcTarget}
-              onSellPriceChange={(p) => setSellPrice(p)}
+            <CocktailPricing
+              costPerCocktail={costPerCocktail}
+              sellCoeff={sellCoeff}
+              onSellCoeffChange={setSellCoeff}
+              derivedSellPrice={derivedSellPrice}
+              foodCostPct={foodCostPct}
+              fcTarget={fcTarget}
+              onFcTargetChange={setFcTarget}
+              margePerCocktail={margePerCocktail}
+              prixTTC={prixTTC}
               vatRate={vatRate}
               onVatChange={setVatRate}
-              multiplier={fcMultiplier}
-              onMultiplierChange={setFcMultiplier}
             />
             <GestionFoodCost
               lines={lines}
@@ -565,7 +557,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
               priceByIngredient={priceByIngredient}
               supplierByIngredient={supplierByIngredient}
               totalCost={round2(totalCostEur)}
-              multiplier={fcMultiplier}
+              multiplier={1}
             />
           </>
         )}
@@ -834,4 +826,237 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
   );
 }
 
-// ── KPI Banner Item ──────────────────────────────────────────────
+// ── Cocktail Pricing Panel — Hero KPI + Tiroir ──────────────────
+function CocktailPricing({
+  costPerCocktail, sellCoeff, onSellCoeffChange,
+  derivedSellPrice, foodCostPct, fcTarget, onFcTargetChange,
+  margePerCocktail, prixTTC,
+  vatRate, onVatChange,
+}: {
+  costPerCocktail: number | null;
+  sellCoeff: number | null;
+  onSellCoeffChange: (c: number) => void;
+  derivedSellPrice: number | null;
+  foodCostPct: number | null;
+  fcTarget: number;
+  onFcTargetChange: (t: number) => void;
+  margePerCocktail: number | null;
+  prixTTC: number | null;
+  vatRate: number;
+  onVatChange: (r: number) => void;
+}) {
+  const [coeffLocal, setCoeffLocal] = useState(sellCoeff != null ? String(sellCoeff) : "");
+  const [coeffEditing, setCoeffEditing] = useState(false);
+  const [paramsOpen, setParamsOpen] = useState(true);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!coeffEditing) setCoeffLocal(sellCoeff != null ? String(sellCoeff) : "");
+  }, [sellCoeff, coeffEditing]);
+
+  const fcColor = foodCostPct == null ? "#999"
+    : foodCostPct <= fcTarget ? "#16a34a"
+    : foodCostPct <= fcTarget + 5 ? "#D97706"
+    : "#DC2626";
+  const fcRatio = foodCostPct == null ? 0 : Math.min(1, foodCostPct / (fcTarget * 1.67));
+  const margeColor = margePerCocktail != null && margePerCocktail > 0 ? "#16a34a" : "#999";
+  const vatPct = Math.round(vatRate * 100);
+
+  const lbl: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em" };
+  const bigNum: React.CSSProperties = { fontSize: 26, fontWeight: 800, fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1.1, marginTop: 2 };
+
+  return (
+    <div style={{
+      background: "#fff", borderRadius: 16, border: "1px solid #e0d8ce",
+      marginBottom: 16, overflow: "hidden",
+    }}>
+
+      {/* -- Hero KPIs -- 4 columns -- */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
+        gap: 0, padding: "20px 16px 16px",
+      }}>
+        <div style={{ textAlign: "center", padding: "0 4px" }}>
+          <div style={lbl}>Cout</div>
+          <div style={{ ...bigNum, color: "#8B1A1A" }}>
+            {costPerCocktail != null ? `${fmtMoney(costPerCocktail)}€` : "-"}
+          </div>
+        </div>
+
+        <div style={{ textAlign: "center", padding: "0 4px", borderLeft: "1px solid #ece4d4" }}>
+          <div style={lbl}>Coeff</div>
+          <div style={{ ...bigNum, color: "#7C3AED" }}>
+            {sellCoeff != null ? `×${sellCoeff}` : "-"}
+          </div>
+        </div>
+
+        <div style={{ textAlign: "center", padding: "0 4px", borderLeft: "1px solid #ece4d4" }}>
+          <div style={lbl}>Prix vente</div>
+          <div style={{ ...bigNum, color: "#1a1a1a" }}>
+            {prixTTC != null ? `${fmtMoney(prixTTC)}€` : "-"}
+          </div>
+          {derivedSellPrice != null && (
+            <div style={{ fontSize: 11, color: "#999", marginTop: 1 }}>
+              {fmtMoney(derivedSellPrice)}€ HT
+            </div>
+          )}
+        </div>
+
+        <div style={{ textAlign: "center", padding: "0 4px", borderLeft: "1px solid #ece4d4" }}>
+          <div style={lbl}>Marge</div>
+          <div style={{ ...bigNum, color: margeColor }}>
+            {margePerCocktail != null ? `${fmtMoney(margePerCocktail)}€` : "-"}
+          </div>
+        </div>
+      </div>
+
+      {/* -- Food Cost + Marge bar -- */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0,
+        borderTop: "1px solid #ece4d4",
+      }}>
+        <div style={{ padding: "14px 16px", borderRight: "1px solid #ece4d4" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+            <span style={lbl}>Food cost</span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: fcColor, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
+              {foodCostPct != null ? `${foodCostPct.toFixed(0)}%` : "-"}
+            </span>
+            <span style={{ fontSize: 10, color: "#bbb", marginLeft: "auto" }}>
+              cible {fcTarget}%
+            </span>
+          </div>
+          <div style={{ height: 5, background: "#ece4d4", borderRadius: 999, overflow: "hidden", marginTop: 8 }}>
+            <div style={{ width: `${Math.min(100, fcRatio * 100)}%`, height: "100%", background: fcColor, borderRadius: 999, transition: "width 0.3s" }} />
+          </div>
+        </div>
+
+        <div style={{ padding: "14px 16px" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+            <span style={lbl}>Marge brute</span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: margeColor, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
+              {margePerCocktail != null ? `${fmtMoney(margePerCocktail)}€` : "-"}
+            </span>
+            <span style={{ fontSize: 10, color: "#bbb", marginLeft: "auto" }}>
+              / cocktail
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* -- Tiroir : Parametres -- */}
+      <div style={{ borderTop: "1px solid #ece4d4" }}>
+        <button
+          type="button"
+          onClick={() => setParamsOpen(!paramsOpen)}
+          style={{
+            width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "10px 16px", background: "none", border: "none",
+            cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#999",
+            textTransform: "uppercase", letterSpacing: "0.06em",
+          }}
+        >
+          <span>Parametres de calcul</span>
+          <span style={{
+            display: "inline-block", transition: "transform 0.2s",
+            transform: paramsOpen ? "rotate(180deg)" : "rotate(0deg)",
+            fontSize: 14,
+          }}>&#9660;</span>
+        </button>
+
+        {paramsOpen && (
+          <div style={{ padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
+
+            {/* Coefficient */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ ...lbl, minWidth: 44 }}>Coeff</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 20, fontWeight: 800, color: "#7C3AED", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>×</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={coeffEditing ? coeffLocal : (sellCoeff != null ? sellCoeff.toString() : "")}
+                  placeholder="3"
+                  onFocus={(e) => {
+                    setCoeffEditing(true);
+                    setCoeffLocal(sellCoeff != null ? String(sellCoeff) : "");
+                    setTimeout(() => e.target.select(), 0);
+                  }}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(",", ".").replace(/[^\d.]/g, "");
+                    setCoeffLocal(raw);
+                    const n = Number(raw);
+                    if (!isNaN(n) && n > 0) onSellCoeffChange(n);
+                  }}
+                  onBlur={() => {
+                    setCoeffEditing(false);
+                    const n = Number(coeffLocal);
+                    if (!isNaN(n) && n > 0) onSellCoeffChange(n);
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur(); }}
+                  style={{
+                    width: 56, fontSize: 20, fontWeight: 800, color: "#7C3AED",
+                    fontFamily: "var(--font-oswald), Oswald, sans-serif",
+                    border: "2px solid #e0d8ce", borderRadius: 10, padding: "3px 8px",
+                    background: "#faf6ee", outline: "none",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                />
+              </div>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {[2, 2.5, 3, 3.5, 4, 5].map(c => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => onSellCoeffChange(c)}
+                    style={{
+                      padding: "4px 10px", borderRadius: 10, fontSize: 11, fontWeight: 700,
+                      border: "1.5px solid",
+                      borderColor: sellCoeff === c ? "#7C3AED" : "#ddd6c8",
+                      background: sellCoeff === c ? "rgba(124,58,237,0.08)" : "#fff",
+                      color: sellCoeff === c ? "#7C3AED" : "#6f6a61",
+                      cursor: "pointer",
+                    }}
+                  >×{c}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* TVA + FC cible */}
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ ...lbl, minWidth: 44 }}>TVA</span>
+                <select
+                  value={vatPct}
+                  onChange={(e) => onVatChange(Number(e.target.value) / 100)}
+                  style={{
+                    padding: "4px 8px", borderRadius: 8, border: "1px solid #ddd6c8",
+                    background: "#fff", fontSize: 12, fontWeight: 700, color: "#1a1a1a",
+                    cursor: "pointer",
+                  }}
+                >
+                  {[0, 5.5, 10, 20].map(v => (
+                    <option key={v} value={v}>{v}%</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={lbl}>Cible FC</span>
+                <input
+                  type="number" min={5} max={80} step={1}
+                  value={fcTarget}
+                  onChange={(e) => onFcTargetChange(Number(e.target.value))}
+                  style={{
+                    width: 40, padding: "3px 6px", borderRadius: 8,
+                    border: "1px solid #ddd6c8", background: "#fff",
+                    fontSize: 12, fontWeight: 700, textAlign: "right", color: "#1a1a1a",
+                  }}
+                />
+                <span style={{ fontSize: 12, color: "#999" }}>%</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
