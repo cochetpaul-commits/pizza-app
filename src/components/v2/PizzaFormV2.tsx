@@ -17,7 +17,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
-import { RecipeHero, RecipeKpis, HeroBtn, HeroDangerBtn } from "./RecipeHero";
+import { RecipeHero, HeroBtn, HeroDangerBtn } from "./RecipeHero";
 import { GestionFoodCost } from "./GestionFoodCost";
 import { PublishCatalogueButton } from "./PublishCatalogueButton";
 import { GestionCommandes } from "./GestionCommandes";
@@ -70,6 +70,8 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   const [photoUploading, setPhotoUploading] = useState(false);
 
   const [sellPrice, setSellPrice] = useState<number | "">("");
+  const [sellCoeff, setSellCoeff] = useState<number | null>(null);
+  const [nbParts, setNbParts] = useState(1);
 
   // Dough recipes
   const [doughRecipes, setDoughRecipes] = useState<DoughRecipeRow[]>([]);
@@ -89,10 +91,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
   // Pricing
   const [vatRate, setVatRate] = useState(0.1);
-  const [fcMultiplier, setFcMultiplier] = useState(1);
-  const [nbParts, setNbParts] = useState(1);
   const [fcTarget, setFcTarget] = useState(30);
-  const [marginRate, setMarginRate] = useState("75");
 
   // Main tab
   type MainTab = "fc" | "recette" | "cmd" | "pop";
@@ -193,11 +192,14 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   }, 0);
 
   // ── KPI computations ──────────────────────────────────────────
-  const sp = typeof sellPrice === "number" && sellPrice > 0 ? sellPrice : null;
-  const effectiveCostPerPortion = totalCost > 0 ? totalCost : null;
-  const foodCostPct = sp && effectiveCostPerPortion ? (effectiveCostPerPortion / sp) * 100 : null;
-  const margeBrute = sp && effectiveCostPerPortion ? sp - effectiveCostPerPortion : null;
-  const prixTTC = sp ? sp * (1 + vatRate) : null;
+  const costPerPizza = totalCost > 0 ? totalCost : null;
+  const effectiveParts = nbParts > 0 ? nbParts : 1;
+  const costPerPart = costPerPizza ? round2(costPerPizza / effectiveParts) : null;
+  const derivedSellPerPart = costPerPart && sellCoeff && sellCoeff > 0 ? round2(costPerPart * sellCoeff) : null;
+  const derivedSellPerPizza = derivedSellPerPart ? round2(derivedSellPerPart * effectiveParts) : null;
+  const foodCostPct = costPerPart && derivedSellPerPart ? round2((costPerPart / derivedSellPerPart) * 100) : null;
+  const margePerPart = costPerPart && derivedSellPerPart ? round2(derivedSellPerPart - costPerPart) : null;
+  const prixTTCPart = derivedSellPerPart ? round2(derivedSellPerPart * (1 + vatRate)) : null;
 
   // Tab definitions
   const MAIN_TABS: { key: MainTab; label: string }[] = isEdit ? [
@@ -370,9 +372,9 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
           if (p.vat_rate) setVatRate(Number(p.vat_rate));
           if (p.margin_rate) {
             const mr = Number(p.margin_rate);
-            if (mr >= 1) setMarginRate(String(Math.round(mr)));
-            else if (mr > 0) setMarginRate(String(Math.round(mr * 100)));
+            if (mr > 0) setSellCoeff(mr);
           }
+          if (p.nb_parts != null && Number(p.nb_parts) > 0) setNbParts(Number(p.nb_parts));
           if (p.sell_price != null) setSellPrice(Number(p.sell_price));
           setPivotIngredientId(String(p.pivot_ingredient_id ?? "") || null);
         }
@@ -428,8 +430,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("NOT_LOGGED");
 
-      const marginRateNum = Number(marginRate);
-      const margin_rate = marginRateNum > 0 ? round2(marginRateNum) : 0;
+      const margin_rate = sellCoeff && sellCoeff > 0 ? round2(sellCoeff) : 0;
       const stepsJson = steps.length > 0 ? JSON.stringify(steps) : null;
       const notesValue = stepsJson ?? (notes || null);
 
@@ -443,7 +444,8 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         ball_weight_g: ballWeightG !== "" ? Number(ballWeightG) : null,
         vat_rate: vatRate,
         margin_rate,
-        sell_price: sellPrice !== "" ? Number(sellPrice) : null,
+        nb_parts: nbParts,
+        sell_price: derivedSellPerPizza ?? (sellPrice !== "" ? Number(sellPrice) : null),
         is_draft: false,
       };
 
@@ -586,23 +588,22 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         {/* ── TAB: FOOD COST & MARGES ── */}
         {mainTab === "fc" && (
           <>
-            <RecipeKpis
-              costPerPortion={effectiveCostPerPortion ?? null}
-              foodCostPct={foodCostPct ?? null}
-              sellPriceHT={sp ?? null}
-              sellPriceTTC={prixTTC ?? null}
-              margeBrute={margeBrute ?? null}
-              accent={ACCENT}
-              portionLabel="pizza"
-              foodCostTarget={fcTarget}
-              onFoodCostTargetChange={setFcTarget}
-              onSellPriceChange={(p) => setSellPrice(p)}
-              vatRate={vatRate}
-              onVatChange={setVatRate}
-              multiplier={fcMultiplier}
-              onMultiplierChange={setFcMultiplier}
+            <PizzaPricing
+              costPerPizza={costPerPizza}
               nbParts={nbParts}
               onNbPartsChange={setNbParts}
+              costPerPart={costPerPart}
+              sellCoeff={sellCoeff}
+              onSellCoeffChange={setSellCoeff}
+              derivedSellPerPart={derivedSellPerPart}
+              derivedSellPerPizza={derivedSellPerPizza}
+              foodCostPct={foodCostPct}
+              fcTarget={fcTarget}
+              onFcTargetChange={setFcTarget}
+              margePerPart={margePerPart}
+              prixTTCPart={prixTTCPart}
+              vatRate={vatRate}
+              onVatChange={setVatRate}
             />
             <GestionFoodCost
               lines={allLines}
@@ -611,7 +612,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
               supplierByIngredient={supplierByIngredient}
               totalCost={totalCost}
               yieldGrams={ballWeightG !== "" ? Number(ballWeightG) : null}
-              multiplier={fcMultiplier}
+              multiplier={1}
             />
           </>
         )}
@@ -881,5 +882,273 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         />
       )}
     </>
+  );
+}
+
+// ── Pizza Pricing Panel ──────────────────────────────────────────
+function PizzaPricing({
+  costPerPizza, nbParts, onNbPartsChange, costPerPart,
+  sellCoeff, onSellCoeffChange,
+  derivedSellPerPart, derivedSellPerPizza,
+  foodCostPct, fcTarget, onFcTargetChange,
+  margePerPart, prixTTCPart,
+  vatRate, onVatChange,
+}: {
+  costPerPizza: number | null;
+  nbParts: number;
+  onNbPartsChange: (n: number) => void;
+  costPerPart: number | null;
+  sellCoeff: number | null;
+  onSellCoeffChange: (c: number) => void;
+  derivedSellPerPart: number | null;
+  derivedSellPerPizza: number | null;
+  foodCostPct: number | null;
+  fcTarget: number;
+  onFcTargetChange: (t: number) => void;
+  margePerPart: number | null;
+  prixTTCPart: number | null;
+  vatRate: number;
+  onVatChange: (r: number) => void;
+}) {
+  const [coeffLocal, setCoeffLocal] = useState(sellCoeff != null ? String(sellCoeff) : "");
+  const [coeffEditing, setCoeffEditing] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!coeffEditing) setCoeffLocal(sellCoeff != null ? String(sellCoeff) : "");
+  }, [sellCoeff, coeffEditing]);
+
+  const fcColor = foodCostPct == null ? "#999"
+    : foodCostPct <= fcTarget ? "#16a34a"
+    : foodCostPct <= fcTarget + 5 ? "#D97706"
+    : "#DC2626";
+  const fcRatio = foodCostPct == null ? 0 : Math.min(1, foodCostPct / (fcTarget * 1.67));
+
+  const vatPct = Math.round(vatRate * 100);
+  const isMultiParts = nbParts > 1;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
+
+      {/* ── Row 1 : Cout de revient + Parts ── */}
+      <div style={{
+        background: "#fff", borderRadius: 14, padding: "18px 20px",
+        border: "1px solid #e0d8ce",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              Cout de revient
+            </div>
+            <div style={{ fontSize: 32, fontWeight: 800, color: "#8B1A1A", fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1.1, marginTop: 4 }}>
+              {costPerPizza != null ? `${fmtMoney(costPerPizza)}€` : "-"}
+            </div>
+            <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>par pizza</div>
+          </div>
+
+          {isMultiParts && costPerPart != null && (
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                Cout / part
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: "#B45309", fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1.1, marginTop: 4 }}>
+                {fmtMoney(costPerPart)}€
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Parts selector */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Parts</span>
+          <div style={{ display: "flex", gap: 4 }}>
+            {[1, 2, 4, 6, 8, 10, 12].map(p => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => onNbPartsChange(p)}
+                style={{
+                  padding: "4px 10px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                  border: "1.5px solid",
+                  borderColor: nbParts === p ? "#8B1A1A" : "#ddd6c8",
+                  background: nbParts === p ? "rgba(139,26,26,0.08)" : "#fff",
+                  color: nbParts === p ? "#8B1A1A" : "#6f6a61",
+                  cursor: "pointer", minWidth: 32,
+                }}
+              >{p}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Row 2 : Coefficient ── */}
+      <div style={{
+        background: "#fff", borderRadius: 14, padding: "18px 20px",
+        border: "1px solid #e0d8ce",
+      }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
+          Coefficient multiplicateur
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <span style={{ fontSize: 28, fontWeight: 800, color: "#7C3AED", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>×</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={coeffEditing ? coeffLocal : (sellCoeff != null ? sellCoeff.toString() : "")}
+            placeholder="3"
+            onFocus={(e) => {
+              setCoeffEditing(true);
+              setCoeffLocal(sellCoeff != null ? String(sellCoeff) : "");
+              setTimeout(() => e.target.select(), 0);
+            }}
+            onChange={(e) => {
+              const raw = e.target.value.replace(",", ".").replace(/[^\d.]/g, "");
+              setCoeffLocal(raw);
+              const n = Number(raw);
+              if (!isNaN(n) && n > 0) onSellCoeffChange(n);
+            }}
+            onBlur={() => {
+              setCoeffEditing(false);
+              const n = Number(coeffLocal);
+              if (!isNaN(n) && n > 0) onSellCoeffChange(n);
+            }}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur(); }}
+            style={{
+              width: 70, fontSize: 28, fontWeight: 800, color: "#7C3AED",
+              fontFamily: "var(--font-oswald), Oswald, sans-serif",
+              border: "2px solid #e0d8ce", borderRadius: 10, padding: "4px 10px",
+              background: "#faf6ee", outline: "none",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          />
+        </div>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {[2, 2.5, 3, 3.5, 4, 5].map(c => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => onSellCoeffChange(c)}
+              style={{
+                padding: "4px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                border: "1.5px solid",
+                borderColor: sellCoeff === c ? "#7C3AED" : "#ddd6c8",
+                background: sellCoeff === c ? "rgba(124,58,237,0.08)" : "#fff",
+                color: sellCoeff === c ? "#7C3AED" : "#6f6a61",
+                cursor: "pointer",
+              }}
+            >×{c}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Row 3 : Prix de vente ── */}
+      <div style={{
+        background: "#fff", borderRadius: 14, padding: "18px 20px",
+        border: "1px solid #e0d8ce",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              {isMultiParts ? "Prix de vente / part" : "Prix de vente"}
+            </div>
+            <div style={{ fontSize: 32, fontWeight: 800, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1.1, marginTop: 4 }}>
+              {derivedSellPerPart != null ? `${fmtMoney(derivedSellPerPart)}€ HT` : "-"}
+            </div>
+            {prixTTCPart != null && (
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#666", marginTop: 2 }}>
+                {fmtMoney(prixTTCPart)}€ TTC
+              </div>
+            )}
+          </div>
+
+          {isMultiParts && derivedSellPerPizza != null && (
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                Prix pizza entiere
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#666", fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1.1, marginTop: 4 }}>
+                {fmtMoney(derivedSellPerPizza)}€ HT
+              </div>
+              {derivedSellPerPizza != null && (
+                <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>
+                  {fmtMoney(derivedSellPerPizza * (1 + vatRate))}€ TTC
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* TVA selector */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#999" }}>TVA</span>
+          <select
+            value={vatPct}
+            onChange={(e) => onVatChange(Number(e.target.value) / 100)}
+            style={{
+              padding: "3px 6px", borderRadius: 8, border: "1px solid #ddd6c8",
+              background: "#fff", fontSize: 12, fontWeight: 700, color: "#1a1a1a",
+              cursor: "pointer",
+            }}
+          >
+            {[0, 5.5, 10, 20].map(v => (
+              <option key={v} value={v}>{v}%</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* ── Row 4 : Food cost + Marge ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        {/* Food cost */}
+        <div style={{
+          background: "#fff", borderRadius: 14, padding: "16px 18px",
+          border: "1px solid #e0d8ce",
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            Food cost
+          </div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: fcColor, fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1.1, marginTop: 4 }}>
+            {foodCostPct != null ? `${foodCostPct.toFixed(0)}%` : "-"}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 6, fontSize: 11, color: "#999" }}>
+            cible
+            <input
+              type="number" min={5} max={80} step={1}
+              value={fcTarget}
+              onChange={(e) => onFcTargetChange(Number(e.target.value))}
+              style={{
+                width: 36, padding: "1px 4px", borderRadius: 6,
+                border: "1px solid #ddd6c8", background: "#fff",
+                fontSize: 11, fontWeight: 700, textAlign: "right", color: "#1a1a1a",
+              }}
+            />%
+          </div>
+          <div style={{ height: 5, background: "#ece4d4", borderRadius: 999, overflow: "hidden", marginTop: 8 }}>
+            <div style={{ width: `${Math.min(100, fcRatio * 100)}%`, height: "100%", background: fcColor, borderRadius: 999, transition: "width 0.3s" }} />
+          </div>
+        </div>
+
+        {/* Marge */}
+        <div style={{
+          background: "#fff", borderRadius: 14, padding: "16px 18px",
+          border: "1px solid #e0d8ce",
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            Marge brute
+          </div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: margePerPart != null && margePerPart > 0 ? "#16a34a" : "#999", fontFamily: "var(--font-oswald), Oswald, sans-serif", lineHeight: 1.1, marginTop: 4 }}>
+            {margePerPart != null ? `${fmtMoney(margePerPart)}€` : "-"}
+          </div>
+          <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>
+            {isMultiParts ? "par part" : "par pizza"}
+          </div>
+          {sellCoeff != null && (
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#7C3AED", marginTop: 6 }}>
+              ×{sellCoeff.toFixed(2)}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
