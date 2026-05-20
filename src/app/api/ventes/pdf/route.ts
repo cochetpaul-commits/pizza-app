@@ -15,9 +15,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "stats manquant" }, { status: 400 });
     }
 
+    // Read from body OR query param (fallback)
+    const qType = req.nextUrl.searchParams.get("type");
+    const rawType = exportType || qType || "ventes";
     const type: "ventes" | "produits" | "complet" =
-      exportType === "produits" || exportType === "complet" ? exportType : "ventes";
-    console.log("[PDF export] type:", type, "exportType received:", exportType);
+      rawType === "produits" || rawType === "complet" ? rawType : "ventes";
+    console.log("[PDF export] type:", type, "body:", exportType, "query:", qType);
 
     const el = VentesPDF({ stats, prev, mode, viewTab, rangeLabel, etabName, briefing, exportType: type }) as unknown as React.ReactElement<DocumentProps>;
     const buffer = await renderToBuffer(el);

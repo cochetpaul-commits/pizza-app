@@ -526,8 +526,7 @@ function PerformancesPage() {
         briefing,
         exportType,
       };
-      console.log("[PDF export] sending exportType:", exportType);
-      const res = await fetch("/api/ventes/pdf", {
+      const res = await fetch(`/api/ventes/pdf?type=${exportType}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(bodyPayload),
