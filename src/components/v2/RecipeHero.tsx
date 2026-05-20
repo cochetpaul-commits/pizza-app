@@ -80,6 +80,9 @@ export interface RecipeKpisProps {
   /** Portions multiplier (×1, ×2, …) — controls the Cost card */
   multiplier?: number;
   onMultiplierChange?: (m: number) => void;
+  /** Number of parts to divide the recipe into */
+  nbParts?: number;
+  onNbPartsChange?: (n: number) => void;
   /** Cost per kg (for preparations/cuisine) — shown as a dedicated card */
   costPerKg?: number | null;
   /** Yield in grams (for context display) */
@@ -98,7 +101,7 @@ export function RecipeKpis({
   costPerPortion, foodCostPct, sellPriceHT, sellPriceTTC, margeBrute,
   foodCostTarget = 30, portionLabel = "portion", accent = "#D4775A",
   onSellPriceChange, vatRate, onVatChange, onFoodCostTargetChange,
-  multiplier = 1, onMultiplierChange, costPerKg, yieldGrams, mode = "default",
+  multiplier = 1, onMultiplierChange, nbParts = 1, onNbPartsChange, costPerKg, yieldGrams, mode = "default",
   sellPriceKgHT,
   sellCoeff, onSellCoeffChange,
 }: RecipeKpisProps) {
@@ -134,11 +137,12 @@ export function RecipeKpis({
     ? sellPriceHT / costPerPortion
     : null;
 
-  // Display values include the multiplier (so the cards reflect the chosen portions count)
-  const dispCost = costPerPortion != null ? costPerPortion * multiplier : null;
-  const dispSell = sellPriceHT != null ? sellPriceHT * multiplier : null;
-  const dispTTC = sellPriceTTC != null ? sellPriceTTC * multiplier : null;
-  const dispMarge = margeBrute != null ? margeBrute * multiplier : null;
+  // Display values include the multiplier and division by nbParts
+  const divider = nbParts > 1 ? nbParts : 1;
+  const dispCost = costPerPortion != null ? (costPerPortion * multiplier) / divider : null;
+  const dispSell = sellPriceHT != null ? (sellPriceHT * multiplier) / divider : null;
+  const dispTTC = sellPriceTTC != null ? (sellPriceTTC * multiplier) / divider : null;
+  const dispMarge = margeBrute != null ? (margeBrute * multiplier) / divider : null;
 
   return (
     <div style={{
@@ -159,9 +163,9 @@ export function RecipeKpis({
           valueNode={
             <span>{dispCost != null ? `${fmtMoney(dispCost)}€` : "-"}</span>
           }
-          subNode={<span>{multiplier === 1 ? `par ${portionLabel}` : `pour ${multiplier} ${portionLabel}s`}</span>}
+          subNode={<span>{nbParts > 1 ? `par part (÷${nbParts})` : multiplier === 1 ? `par ${portionLabel}` : `pour ${multiplier} ${portionLabel}s`}</span>}
           bottomNode={onMultiplierChange ? (
-            <PortionsToggle value={multiplier} onChange={onMultiplierChange} accent={accent} />
+            <PortionsToggle value={multiplier} onChange={onMultiplierChange} accent={accent} nbParts={nbParts} onNbPartsChange={onNbPartsChange} />
           ) : undefined}
         />
 
@@ -376,7 +380,7 @@ export function RecipeKpis({
               label="Marge brute"
               color={margeColor}
               valueNode={<span>{dispMarge != null ? `${fmtMoney(dispMarge)}€` : "-"}</span>}
-              subNode={<span>{multiplier === 1 ? `par ${portionLabel}` : `pour ${multiplier} ${portionLabel}s`}</span>}
+              subNode={<span>{nbParts > 1 ? `par part (÷${nbParts})` : multiplier === 1 ? `par ${portionLabel}` : `pour ${multiplier} ${portionLabel}s`}</span>}
               bottomNode={dispMarge != null && dispMarge > 0 ? (
                 <div style={{
                   height: 6, background: "#ece4d4",
@@ -501,26 +505,43 @@ function EditableCoeff({ value, onChange }: { value: number | null; onChange: (v
 }
 
 // ── Portions multiplier toggle ───────────────────────────────────
-function PortionsToggle({ value, onChange, accent }: { value: number; onChange: (v: number) => void; accent: string }) {
+function PortionsToggle({ value, onChange, accent, nbParts, onNbPartsChange }: {
+  value: number; onChange: (v: number) => void; accent: string;
+  nbParts?: number; onNbPartsChange?: (v: number) => void;
+}) {
   const options = [1, 2, 5, 10, 20];
   return (
-    <div style={{
-      display: "flex", gap: 2, padding: 2, background: "#f5f0e8",
-      borderRadius: 6, alignSelf: "flex-start",
-    }}>
-      {options.map((n) => (
-        <button
-          key={n} type="button" onClick={() => onChange(n)}
-          style={{
-            padding: "3px 9px", borderRadius: 5, fontSize: 10, fontWeight: 700,
-            border: "none", cursor: "pointer",
-            background: value === n ? accent : "transparent",
-            color: value === n ? "#fff" : "#888",
-            transition: "all 0.15s",
-            fontVariantNumeric: "tabular-nums",
-          }}
-        >×{n}</button>
-      ))}
+    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+      <div style={{
+        display: "flex", gap: 2, padding: 2, background: "#f5f0e8",
+        borderRadius: 6,
+      }}>
+        {options.map((n) => (
+          <button
+            key={n} type="button" onClick={() => onChange(n)}
+            style={{
+              padding: "3px 9px", borderRadius: 5, fontSize: 10, fontWeight: 700,
+              border: "none", cursor: "pointer",
+              background: value === n ? accent : "transparent",
+              color: value === n ? "#fff" : "#888",
+              transition: "all 0.15s",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >×{n}</button>
+        ))}
+      </div>
+      {onNbPartsChange && (
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <span style={{ fontSize: 10, color: "#888", fontWeight: 600 }}>÷</span>
+          <input
+            type="number" min={1} max={99}
+            value={nbParts ?? 1}
+            onChange={(e) => onNbPartsChange(Math.max(1, parseInt(e.target.value) || 1))}
+            style={{ width: 36, padding: "3px 4px", borderRadius: 5, border: "1.5px solid #e5ddd0", fontSize: 10, fontWeight: 700, textAlign: "center", background: (nbParts ?? 1) > 1 ? accent + "20" : "#fff", color: "#1a1a1a" }}
+          />
+          <span style={{ fontSize: 10, color: "#888" }}>parts</span>
+        </div>
+      )}
     </div>
   );
 }

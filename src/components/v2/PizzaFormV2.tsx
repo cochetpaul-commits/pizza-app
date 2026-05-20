@@ -90,6 +90,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   // Pricing
   const [vatRate, setVatRate] = useState(0.1);
   const [fcMultiplier, setFcMultiplier] = useState(1);
+  const [nbParts, setNbParts] = useState(1);
   const [fcTarget, setFcTarget] = useState(30);
   const [marginRate, setMarginRate] = useState("75");
 
@@ -599,6 +600,8 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
               onVatChange={setVatRate}
               multiplier={fcMultiplier}
               onMultiplierChange={setFcMultiplier}
+              nbParts={nbParts}
+              onNbPartsChange={setNbParts}
             />
             <GestionFoodCost
               lines={allLines}
