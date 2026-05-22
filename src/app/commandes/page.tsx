@@ -1086,68 +1086,126 @@ function CommandesPage() {
     const indiv = individualUnitLabel(item);
     const obj = item.stock_objectif;
     const min = item.stock_min ?? 0;
-    // Stock color
-    const stockColor = qty >= (obj ?? 0) && (obj ?? 0) > 0 ? "#2e7d32" : qty >= min && min > 0 ? "#e65100" : "#2e7d32";
+    // Stock color: rouge → orange → vert
+    let stockColor = "#d32f2f"; // rouge par défaut (rien commandé)
+    if ((obj ?? 0) > 0) {
+      if (qty >= (obj ?? 0)) stockColor = "#2e7d32"; // vert: objectif atteint
+      else if (qty >= min && qty > 0) stockColor = "#e65100"; // orange: entre min et objectif
+    }
+
+    // Conditioning label — reprend la logique produit
+    const orderU = (item.order_unit_label ?? item.order_unit ?? "").toLowerCase();
+    const isPackUnit = orderU.includes("pack") || orderU.includes("carton") || orderU.includes("colis") || orderU.includes("bloc") || orderU.includes("caisse");
+    let condLabel: string | null = null;
+    if (packCount > 0) {
+      if (isPackUnit) {
+        // Determine pack type name (Carton, Pack, Colis...)
+        let packTypeName = "Carton";
+        if (orderU.includes("pack")) packTypeName = "Pack";
+        else if (orderU.includes("colis")) packTypeName = "Colis";
+        else if (orderU.includes("bloc")) packTypeName = "Bloc";
+        else if (orderU.includes("caisse")) packTypeName = "Caisse";
+        // Determine individual unit inside the pack
+        const baseUnit = (item.default_unit ?? "").toLowerCase();
+        let unitName = "unités";
+        if (baseUnit.includes("bouteille") || baseUnit === "bt" || baseUnit === "btl") unitName = packCount > 1 ? "Bouteilles" : "Bouteille";
+        else if (baseUnit.includes("sachet")) unitName = packCount > 1 ? "Sachets" : "Sachet";
+        else if (baseUnit.includes("barquette")) unitName = packCount > 1 ? "Barquettes" : "Barquette";
+        else if (baseUnit.includes("boite") || baseUnit.includes("boîte")) unitName = packCount > 1 ? "Boîtes" : "Boîte";
+        else if (baseUnit.includes("bidon")) unitName = packCount > 1 ? "Bidons" : "Bidon";
+        else if (baseUnit.includes("pot")) unitName = packCount > 1 ? "Pots" : "Pot";
+        else if (baseUnit === "pc" || baseUnit === "pcs" || baseUnit.includes("piece") || baseUnit.includes("pièce")) unitName = packCount > 1 ? "Pièces" : "Pièce";
+        else if (baseUnit.includes("bac")) unitName = packCount > 1 ? "Bacs" : "Bac";
+        condLabel = `1 ${packTypeName} de ${packCount} ${unitName}`;
+      } else {
+        condLabel = packEach > 1 ? `${packCount} x ${packEach} ${indiv}s` : `${packCount} ${indiv}${packCount > 1 ? "s" : ""}`;
+      }
+    }
+
+    // Unit price (per individual unit)
+    const unitPrice = item.prix_commande != null && packCount > 0 && isPackUnit
+      ? item.prix_commande / packCount
+      : item.prix_commande;
 
     return (
       <div key={item.id} style={{
-        background: "#fff", borderRadius: 14, border: hasQty ? "2px solid #D4775A" : "1.5px solid #e5ddd0",
-        padding: 0, display: "flex", flexDirection: "column",
-        boxShadow: hasQty ? "0 4px 16px rgba(212,119,90,0.2)" : "0 1px 6px rgba(0,0,0,0.06)",
-        transition: "all 0.15s", overflow: "hidden",
+        background: "#fff", borderRadius: 16, border: hasQty ? "2px solid #D4775A" : "1.5px solid #e5ddd0",
+        display: "flex", flexDirection: "row", overflow: "hidden",
+        boxShadow: hasQty ? "0 4px 16px rgba(212,119,90,0.2)" : "0 2px 10px rgba(0,0,0,0.07)",
+        transition: "all 0.15s",
       }}>
-        {/* Image area */}
-        <div style={{ position: "relative", background: "#faf7f2", padding: "16px 12px 12px", display: "flex", justifyContent: "center", alignItems: "center", minHeight: 80 }}>
-          <IngredientAvatar ingredientId={item.id} name={item.name} category={(item.category ?? "autre") as Category} size={64} />
+        {/* Left: Image */}
+        <div style={{
+          position: "relative", background: "#faf7f2", display: "flex", alignItems: "center", justifyContent: "center",
+          width: 120, minHeight: 140, flexShrink: 0, padding: 12,
+        }}>
+          <IngredientAvatar ingredientId={item.id} name={item.name} category={(item.category ?? "autre") as Category} size={80} />
           <button type="button" onClick={() => toggleFavori(item.id, isFav)}
-            style={{ position: "absolute", top: 8, right: 8, background: "none", border: "none", fontSize: 16, cursor: "pointer", opacity: isFav ? 1 : 0.3 }}>
+            style={{ position: "absolute", top: 6, left: 6, background: "none", border: "none", fontSize: 14, cursor: "pointer", opacity: isFav ? 1 : 0.3 }}>
             &#x2B50;
           </button>
         </div>
 
-        {/* Info */}
-        <div style={{ padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+        {/* Right: Info */}
+        <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 4, flex: 1, minWidth: 0 }}>
           {/* Name */}
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.3, minHeight: 30, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
             {item.name}
           </div>
 
           {/* Price */}
-          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif", color: "#D4775A" }}>
+          <div style={{ fontSize: 17, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif", color: "#1a1a1a" }}>
             {item.prix_commande != null ? `${item.prix_commande.toFixed(2).replace(".", ",")}€ HT` : "—"}
           </div>
 
           {/* Conditioning badge */}
-          {packCount > 0 && (
+          {condLabel && (
             <div style={{
-              display: "inline-flex", padding: "5px 10px", border: "1.5px solid #e5ddd0",
+              display: "inline-flex", padding: "4px 12px", border: "1.5px solid #ddd6c8",
               borderRadius: 8, fontSize: 11, fontWeight: 600, color: "#555", alignSelf: "flex-start",
+              background: "#fff",
             }}>
-              {packEach > 1 ? `${packCount} × ${packEach} ${indiv}s` : `${packCount} ${indiv}${packCount > 1 ? "s" : ""}`}
+              {condLabel}
             </div>
           )}
 
           {/* Stock ideal */}
           {obj != null && obj > 0 && (
             <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: stockColor }}>Stock ideal</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
-                {obj} {indiv}{obj > 1 ? "s" : ""}
+              <div style={{ fontSize: 11, fontWeight: 700, color: stockColor }}>Stock idéal</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: stockColor, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
+                {obj} {indiv}{obj > 1 ? "s" : ""}.
               </div>
-              {packCount > 0 && (
-                <div style={{ fontSize: 10, color: "#999" }}>
-                  = {Math.ceil(obj / packCount)} commande{Math.ceil(obj / packCount) > 1 ? "s" : ""}
-                </div>
-              )}
             </div>
           )}
 
-          {/* Spacer */}
-          <div style={{ flex: 1 }} />
+          {/* Unit price */}
+          {unitPrice != null && (
+            <div style={{ fontSize: 11, color: "#999" }}>
+              {unitPrice.toFixed(2).replace(".", ",")}€ HT
+            </div>
+          )}
 
-          {/* Stepper */}
-          <div style={{ paddingTop: 4 }}>
-            <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
+          {/* Label + Stepper row */}
+          <div style={{ fontSize: 11, color: "#999", fontStyle: "italic", marginTop: 2 }}>
+            Prix par unité de vente
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
+            <div style={{ flex: 1 }}>
+              <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
+            </div>
+            <button type="button" onClick={() => { if (!hasQty) handleQtyChange(item.id, 1); }}
+              style={{
+                width: 44, height: 44, borderRadius: 12, border: "none",
+                background: hasQty ? "#D4775A" : "#e5a54b",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", flexShrink: 0, transition: "background 0.15s",
+              }}>
+              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+              </svg>
+            </button>
           </div>
 
           {/* Unit toggle */}
@@ -1538,14 +1596,14 @@ function CommandesPage() {
                     <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "#b8860b", padding: "8px 14px 4px" }}>
                       Habituels
                     </div>
-                    <div className="commandes-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, padding: "6px 10px 10px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "6px 10px 10px" }}>
                       {favoris.map((item) => renderProductCard(item, true))}
                     </div>
                   </>
                 )}
 
                 {others.length > 0 && (
-                  <div className="commandes-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, padding: "6px 10px 10px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "6px 10px 10px" }}>
                     {others.map((item) => renderProductCard(item, false))}
                   </div>
                 )}
