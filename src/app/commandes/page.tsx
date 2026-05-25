@@ -1137,9 +1137,9 @@ function CommandesPage() {
         {/* Left: Image */}
         <div style={{
           position: "relative", background: "#faf7f2", display: "flex", alignItems: "center", justifyContent: "center",
-          width: 120, minHeight: 140, flexShrink: 0, padding: 12,
+          width: 140, minHeight: 160, flexShrink: 0, padding: 14,
         }}>
-          <IngredientAvatar ingredientId={item.id} name={item.name} category={(item.category ?? "autre") as Category} size={80} />
+          <IngredientAvatar ingredientId={item.id} name={item.name} category={(item.category ?? "autre") as Category} size={100} />
           <button type="button" onClick={() => toggleFavori(item.id, isFav)}
             style={{ position: "absolute", top: 6, left: 6, background: "none", border: "none", fontSize: 14, cursor: "pointer", opacity: isFav ? 1 : 0.3 }}>
             &#x2B50;
@@ -1169,15 +1169,30 @@ function CommandesPage() {
             </div>
           )}
 
-          {/* Stock ideal */}
-          {obj != null && obj > 0 && (
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: stockColor }}>Stock idéal</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: stockColor, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
-                {obj} {indiv}{obj > 1 ? "s" : ""}.
+          {/* Stock ideal — affiché en unités individuelles */}
+          {obj != null && obj > 0 && (() => {
+            // Convertir le stock objectif en unités individuelles si c'est un pack
+            const objIndiv = isPackUnit && packCount > 0 ? obj * packCount : obj;
+            // Déterminer le label de l'unité individuelle pour le stock
+            let stockUnitLabel = indiv;
+            if (isPackUnit) {
+              const baseUnit = (item.default_unit ?? "").toLowerCase();
+              if (baseUnit.includes("bouteille") || baseUnit === "bt" || baseUnit === "btl") stockUnitLabel = "Btl";
+              else if (baseUnit.includes("sachet")) stockUnitLabel = "Sac";
+              else if (baseUnit.includes("barquette")) stockUnitLabel = "Barq";
+              else if (baseUnit.includes("boite") || baseUnit.includes("boîte")) stockUnitLabel = "Bte";
+              else if (baseUnit === "pc" || baseUnit === "pcs" || baseUnit.includes("piece") || baseUnit.includes("pièce")) stockUnitLabel = "Pce";
+              else stockUnitLabel = indiv;
+            }
+            return (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: stockColor }}>Stock idéal</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: stockColor, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
+                  {objIndiv} {stockUnitLabel}{objIndiv > 1 ? "." : ""}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Unit price */}
           {unitPrice != null && (
@@ -1190,22 +1205,8 @@ function CommandesPage() {
           <div style={{ fontSize: 11, color: "#999", fontStyle: "italic", marginTop: 2 }}>
             Prix par unité de vente
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
-            <div style={{ flex: 1 }}>
-              <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
-            </div>
-            <button type="button" onClick={() => { if (!hasQty) handleQtyChange(item.id, 1); }}
-              style={{
-                width: 44, height: 44, borderRadius: 12, border: "none",
-                background: hasQty ? "#D4775A" : "#e5a54b",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: "pointer", flexShrink: 0, transition: "background 0.15s",
-              }}>
-              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
-                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-              </svg>
-            </button>
+          <div style={{ marginTop: 2 }}>
+            <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
           </div>
 
           {/* Unit toggle */}
@@ -1596,14 +1597,14 @@ function CommandesPage() {
                     <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "#b8860b", padding: "8px 14px 4px" }}>
                       Habituels
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "6px 10px 10px" }}>
+                    <div className="commandes-grid" style={{ display: "grid", gap: 10, padding: "6px 10px 10px" }}>
                       {favoris.map((item) => renderProductCard(item, true))}
                     </div>
                   </>
                 )}
 
                 {others.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "6px 10px 10px" }}>
+                  <div className="commandes-grid" style={{ display: "grid", gap: 10, padding: "6px 10px 10px" }}>
                     {others.map((item) => renderProductCard(item, false))}
                   </div>
                 )}
