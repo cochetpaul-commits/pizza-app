@@ -19,7 +19,7 @@ import { useBottomBarActions } from "@/lib/BottomBarContext";
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type DeliveryRule = { day: string; cutoff: string; delivery_day: string };
-type Supplier = { id: string; name: string; franco_minimum: number | null; delivery_schedule: DeliveryRule[] | null; color: string | null };
+type Supplier = { id: string; name: string; franco_minimum: number | null; delivery_schedule: DeliveryRule[] | null; color: string | null; website: string | null };
 
 type Ligne = {
   id: string;
@@ -358,7 +358,7 @@ function CommandesPage() {
       // Load ALL suppliers (not filtered by etablissement) so we can build aliases
       const { data } = await supabase
         .from("suppliers")
-        .select("id, name, franco_minimum, delivery_schedule, color")
+        .select("id, name, franco_minimum, delivery_schedule, color, website")
         .eq("is_active", true)
         .order("name");
       // Deduplicate by name (accent+case insensitive) with alias tracking
@@ -1415,6 +1415,14 @@ function CommandesPage() {
                 style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#2563EB", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: sendingEmail ? 0.6 : 1 }}>
                 {sendingEmail ? "Envoi..." : "Envoyer par mail"}
               </button>
+              {currentSupplier?.website && (
+                <a href={currentSupplier.website.startsWith("http") ? currentSupplier.website : `https://${currentSupplier.website}`}
+                  target="_blank" rel="noopener noreferrer"
+                  style={{ padding: "8px 20px", borderRadius: 8, border: "1.5px solid #D4775A", background: "#fff", color: "#D4775A", fontWeight: 700, fontSize: 12, cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  Portail fournisseur
+                </a>
+              )}
               <button onClick={() => recevoirSession(session.id)} disabled={saving}
                 style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
                 Marquer recue
@@ -1685,6 +1693,22 @@ function CommandesPage() {
               <polyline points="6 9 12 15 18 9" />
             </svg>
           </button>
+        )}
+
+        {/* Portail fournisseur button */}
+        {currentSupplier?.website && (
+          <a href={currentSupplier.website.startsWith("http") ? currentSupplier.website : `https://${currentSupplier.website}`}
+            target="_blank" rel="noopener noreferrer"
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              width: "100%", padding: "10px 16px", marginTop: 8,
+              borderRadius: 10, border: "1.5px solid #D4775A", background: "#FFF7F4",
+              color: "#D4775A", fontWeight: 700, fontSize: 13, textDecoration: "none",
+              cursor: "pointer",
+            }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Portail {currentSupplier.name}
+          </a>
         )}
 
         {/* Supplier drawer */}
