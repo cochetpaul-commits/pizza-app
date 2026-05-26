@@ -55,15 +55,25 @@ export async function POST(request: NextRequest) {
   const supplierId = session.supplier_id;
   const supplierName = (session.suppliers as unknown as { name: string } | null)?.name ?? "Fournisseur";
 
-  // 2. Destinataires : contacts send_orders, fallback suppliers.email
+  // 2. Destinataires : contacts send_orders → tout contact avec email → suppliers.email
   const { data: contacts } = await supabaseAdmin
     .from("supplier_contacts")
-    .select("name, email")
-    .eq("supplier_id", supplierId)
-    .eq("send_orders", true);
+    .select("name, email, send_orders")
+    .eq("supplier_id", supplierId);
 
-  const recipients = (contacts ?? []).filter((c) => c.email).map((c) => c.email as string);
+  // Priorité 1 : contacts explicitement marqués "Cdes"
+  let recipients = (contacts ?? [])
+    .filter((c) => c.send_orders && c.email)
+    .map((c) => c.email as string);
 
+  // Priorité 2 : tout contact avec un email
+  if (recipients.length === 0) {
+    recipients = (contacts ?? [])
+      .filter((c) => c.email)
+      .map((c) => c.email as string);
+  }
+
+  // Priorité 3 : email principal du fournisseur
   if (recipients.length === 0) {
     const { data: supplier } = await supabaseAdmin
       .from("suppliers")
@@ -75,7 +85,7 @@ export async function POST(request: NextRequest) {
 
   if (recipients.length === 0) {
     return NextResponse.json({
-      error: "Aucun destinataire configure. Ajoutez un email sur la fiche fournisseur.",
+      error: "Aucun destinataire configuré. Ajoutez un email sur la fiche fournisseur.",
     }, { status: 400 });
   }
 
@@ -112,7 +122,7 @@ export async function POST(request: NextRequest) {
   const totalHT = session.total_ht
     ? Number(session.total_ht).toLocaleString("fr-FR", { style: "currency", currency: "EUR" })
     : "—";
-  const contactNames = (contacts ?? []).filter(c => c.email).map(c => c.name).filter(Boolean).join(", ");
+  const contactNames = (contacts ?? []).filter(c => recipients.includes(c.email as string)).map(c => c.name).filter(Boolean).join(", ");
   const subject = `Commande ${etabName} — ${supplierName} — ${date}`;
 
   const htmlBody = `

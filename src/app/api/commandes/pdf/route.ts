@@ -164,7 +164,7 @@ export async function GET(req: NextRequest) {
       day: "numeric", month: "long", year: "numeric",
     }),
     categories,
-    totalArticles: rows.length,
+    totalArticles: allItems.length,
     notes: session.notes,
     logoBase64: readLogoBase64(),
     exportedAt: new Date().toLocaleDateString("fr-FR", {

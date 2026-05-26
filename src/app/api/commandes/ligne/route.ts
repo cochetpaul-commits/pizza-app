@@ -41,12 +41,23 @@ export async function POST(req: NextRequest) {
 
   // Si ingredient_id fourni, chercher une ligne existante pour cet ingrédient
   if (ingredient_id) {
-    const { data: existing } = await supabaseAdmin
+    const { data: existingRows } = await supabaseAdmin
       .from("commande_lignes")
       .select("id")
       .eq("session_id", session_id)
       .eq("ingredient_id", ingredient_id)
-      .maybeSingle();
+      .order("created_at", { ascending: true });
+
+    const existing = existingRows?.[0] ?? null;
+
+    // Nettoyer les doublons éventuels (garder seulement la première ligne)
+    if (existingRows && existingRows.length > 1) {
+      const duplicateIds = existingRows.slice(1).map((r) => r.id);
+      await supabaseAdmin
+        .from("commande_lignes")
+        .delete()
+        .in("id", duplicateIds);
+    }
 
     if (existing) {
       // Si quantité = 0, supprimer la ligne
