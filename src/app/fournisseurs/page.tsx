@@ -34,6 +34,8 @@ type SupplierRow = {
   etablissement_id: string | null;
   client_code: string | null;
   color: string | null;
+  portal_login: string | null;
+  portal_password: string | null;
 };
 
 type Contact = {
@@ -73,6 +75,8 @@ type ModalForm = {
   etablissement_id: string | null;
   client_code: string;
   color: string;
+  portal_login: string;
+  portal_password: string;
 };
 
 function fmtDate(iso: string) {
@@ -119,6 +123,8 @@ const EMPTY_FORM: ModalForm = {
   etablissement_id: null,
   client_code: "",
   color: "",
+  portal_login: "",
+  portal_password: "",
 };
 
 const labelStyle: React.CSSProperties = {
@@ -134,7 +140,7 @@ const readonlyBadge: React.CSSProperties = {
   padding: "2px 8px", borderRadius: 6, display: "inline-block",
 };
 
-const SELECT_FIELDS = "id,name,is_active,email,phone,contact_name,notes,franco_minimum,franco_obligatoire,mercuriale_only,delivery_schedule,address,city,postal_code,siret,category,payment_terms,delivery_days,website,tva_intra,etablissement_id,client_code,color";
+const SELECT_FIELDS = "id,name,is_active,email,phone,contact_name,notes,franco_minimum,franco_obligatoire,mercuriale_only,delivery_schedule,address,city,postal_code,siret,category,payment_terms,delivery_days,website,tva_intra,etablissement_id,client_code,color,portal_login,portal_password";
 
 // Accordion header pour la fiche fournisseur
 function AccordionHeader({ label, isOpen, onToggle }: { label: string; isOpen: boolean; onToggle: () => void }) {
@@ -169,6 +175,7 @@ export default function FournisseursPage() {
   const [modalMode, setModalMode] = useState<"edit" | "create">("edit");
   // Accordion: which section is open ("coord" by default)
   const [openSection, setOpenSection] = useState<string>("coord");
+  const [showPortalPassword, setShowPortalPassword] = useState(false);
   const toggleSection = (k: string) => setOpenSection(prev => prev === k ? "" : k);
   const [form, setForm] = useState<ModalForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -344,6 +351,8 @@ export default function FournisseursPage() {
       etablissement_id: s.etablissement_id,
       client_code: s.client_code ?? "",
       color: s.color ?? "",
+      portal_login: s.portal_login ?? "",
+      portal_password: s.portal_password ?? "",
     });
     setSchedule(Array.isArray(s.delivery_schedule) ? s.delivery_schedule : []);
     setDeletedContactIds([]);
@@ -476,6 +485,8 @@ export default function FournisseursPage() {
       etablissement_id: form.etablissement_id,
       client_code: form.client_code.trim() || null,
       color: form.color || null,
+      portal_login: form.portal_login.trim() || null,
+      portal_password: form.portal_password.trim() || null,
     };
 
     if (modalMode === "create") {
@@ -822,6 +833,35 @@ export default function FournisseursPage() {
                 placeholder="Informations complementaires..."
                 rows={2}
               />
+            </div>
+          </div>
+        )}
+
+        {/* ── Accordion: Portail fournisseur ── */}
+        <AccordionHeader label="Portail fournisseur" isOpen={openSection === "portal"} onToggle={() => toggleSection("portal")} />
+        {openSection === "portal" && (
+          <div style={{ padding: "0 2px 16px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <div style={labelStyle}>Identifiant</div>
+                <input style={inputStyle} value={form.portal_login} onChange={(e) => setForm((f) => ({ ...f, portal_login: e.target.value }))} placeholder="login / email" />
+              </div>
+              <div>
+                <div style={labelStyle}>Mot de passe</div>
+                <div style={{ position: "relative" }}>
+                  <input
+                    style={{ ...inputStyle, paddingRight: 40 }}
+                    type={showPortalPassword ? "text" : "password"}
+                    value={form.portal_password}
+                    onChange={(e) => setForm((f) => ({ ...f, portal_password: e.target.value }))}
+                    placeholder="••••••••"
+                  />
+                  <button type="button" onClick={() => setShowPortalPassword((v) => !v)}
+                    style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: 4, color: "#999", fontSize: 12 }}>
+                    {showPortalPassword ? "Masquer" : "Voir"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

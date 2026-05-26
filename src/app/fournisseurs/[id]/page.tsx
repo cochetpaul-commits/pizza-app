@@ -41,6 +41,7 @@ type SupplierFull = {
   siret: string | null; category: string | null; payment_terms: string | null;
   delivery_days: string[] | null; website: string | null; tva_intra: string | null;
   color: string | null;
+  portal_login: string | null; portal_password: string | null;
 };
 
 type Invoice = {
@@ -82,9 +83,10 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
     franco_obligatoire: false, mercuriale_only: false,
     address: "", city: "", postal_code: "", siret: "", category: "",
     payment_terms: "", delivery_days: "", website: "", tva_intra: "",
-    color: "",
+    color: "", portal_login: "", portal_password: "",
   });
   const [schedule, setSchedule] = useState<DeliveryRule[]>([]);
+  const [showPortalPassword, setShowPortalPassword] = useState(false);
 
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [deletedContactIds, setDeletedContactIds] = useState<string[]>([]);
@@ -177,7 +179,7 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
           address: s.address ?? "", city: s.city ?? "", postal_code: s.postal_code ?? "",
           siret: s.siret ?? "", category: s.category ?? "", payment_terms: s.payment_terms ?? "",
           delivery_days: (s.delivery_days ?? []).join(", "), website: s.website ?? "", tva_intra: s.tva_intra ?? "",
-          color: s.color ?? "",
+          color: s.color ?? "", portal_login: s.portal_login ?? "", portal_password: s.portal_password ?? "",
         });
         setSchedule(Array.isArray(s.delivery_schedule) ? s.delivery_schedule : []);
 
@@ -248,6 +250,8 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
       website: form.website.trim() || null,
       tva_intra: form.tva_intra.trim() || null,
       color: form.color || null,
+      portal_login: form.portal_login.trim() || null,
+      portal_password: form.portal_password.trim() || null,
     }).eq("id", id);
 
     if (error) { setSaving(false); alert(error.message); return; }
@@ -524,6 +528,31 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
             placeholder="Informations complémentaires..."
             rows={2}
           />
+        </div>
+
+        {/* Portail fournisseur */}
+        <div style={sectionTitle}>Portail fournisseur</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+          <div>
+            <div style={labelStyle}>Identifiant</div>
+            <input style={inputStyle} value={form.portal_login} onChange={(e) => setForm((f) => ({ ...f, portal_login: e.target.value }))} placeholder="login / email" />
+          </div>
+          <div>
+            <div style={labelStyle}>Mot de passe</div>
+            <div style={{ position: "relative" }}>
+              <input
+                style={{ ...inputStyle, paddingRight: 40 }}
+                type={showPortalPassword ? "text" : "password"}
+                value={form.portal_password}
+                onChange={(e) => setForm((f) => ({ ...f, portal_password: e.target.value }))}
+                placeholder="••••••••"
+              />
+              <button type="button" onClick={() => setShowPortalPassword((v) => !v)}
+                style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: 4, color: "#999", fontSize: 12 }}>
+                {showPortalPassword ? "Masquer" : "Voir"}
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Contacts / Destinataires */}
