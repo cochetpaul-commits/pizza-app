@@ -276,12 +276,15 @@ export type IngredientRowProps = {
   onCreateDerived?: (x: Ingredient) => void;
   onOpenSupplier?: (supplierId: string) => void;
   onToggleEstablishment?: (id: string, estab: "bellomio" | "piccola", current: string[]) => void;
+  duplicateMatch?: { id: string; name: string; score: number } | null;
+  onMergeDuplicate?: (keepId: string, deleteId: string) => void;
 };
 
 export const IngredientRow = React.memo(function IngredientRow({
   item: x, offer, supplierName, supplierIdForDisplay, alert, isEditing, compactMode, edit,
   suppliers, storageZones,
   onStartEdit, onSaveEdit, onDelete, onSetStatus, onEditChange, onEditImportName, onCreateDerived, onOpenSupplier, onToggleEstablishment,
+  duplicateMatch, onMergeDuplicate,
 }: IngredientRowProps) {
   const [mobileSection, setMobileSection] = React.useState<string>("prix"); // mobile accordion: only one open at a time
   const toggleMobileSection = React.useCallback((key: string) => {
@@ -455,6 +458,51 @@ export const IngredientRow = React.memo(function IngredientRow({
           </>
         )}
       </div>
+
+      {/* ── DUPLICATE ALERT ── */}
+      {isEditing && duplicateMatch && (
+        <div style={{
+          margin: "0 8px 8px", padding: "10px 14px", borderRadius: 10,
+          background: "#fef3c7", border: "1.5px solid #f59e0b",
+          display: "flex", flexDirection: "column", gap: 8,
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#92400e" }}>
+            Doublon potentiel ({Math.round(duplicateMatch.score * 100)}% similarité)
+          </div>
+          <div style={{ fontSize: 13, color: "#1a1a1a" }}>
+            Un produit similaire existe : <strong>{duplicateMatch.name}</strong>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button"
+              onClick={() => onMergeDuplicate?.(duplicateMatch.id, x.id)}
+              style={{
+                padding: "6px 16px", borderRadius: 8, border: "none",
+                background: "#8B1A1A", color: "#fff", fontWeight: 700, fontSize: 12,
+                cursor: "pointer", fontFamily: "inherit",
+              }}>
+              Fusionner (garder existant)
+            </button>
+            <button type="button"
+              onClick={() => onMergeDuplicate?.(x.id, duplicateMatch.id)}
+              style={{
+                padding: "6px 16px", borderRadius: 8, border: "1.5px solid #8B1A1A",
+                background: "#fff", color: "#8B1A1A", fontWeight: 700, fontSize: 12,
+                cursor: "pointer", fontFamily: "inherit",
+              }}>
+              Fusionner (garder celui-ci)
+            </button>
+            <button type="button"
+              onClick={() => onDelete(x.id, x.name)}
+              style={{
+                padding: "6px 16px", borderRadius: 8, border: "1.5px solid #DC2626",
+                background: "#fff", color: "#DC2626", fontWeight: 700, fontSize: 12,
+                cursor: "pointer", fontFamily: "inherit",
+              }}>
+              Supprimer
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── EDIT FORM ── */}
       {isEditing && edit && (() => {

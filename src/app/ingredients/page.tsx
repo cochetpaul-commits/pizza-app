@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
+import { fetchApi } from "@/lib/fetchApi";
 import { useDebounce } from "@/lib/useDebounce";
 import { useIngredientsData } from "@/lib/useIngredientsData";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -42,7 +43,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
 import { updateDerivedIngredients, computeDerivedPrice, computeRendement } from "@/lib/rendement";
 import DuplicatePanel from "@/components/DuplicatePanel";
-import { detectDuplicates, type DuplicatePair } from "@/lib/duplicateDetection";
+import { detectDuplicates, similarity, type DuplicatePair } from "@/lib/duplicateDetection";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
 
@@ -893,6 +894,42 @@ function IngredientsPageInner() {
     setEdit(prev => prev ? { ...prev, importName: next.trim() } : prev);
   }, []);
 
+  // ─── Duplicate match for editing ingredient ────────────────────────────
+  const editingDuplicateMatch = useMemo(() => {
+    if (!editingId) return null;
+    const current = items.find(i => i.id === editingId);
+    if (!current || current.status === "validated") return null;
+    let best: { id: string; name: string; score: number } | null = null;
+    for (const other of items) {
+      if (other.id === editingId) continue;
+      const score = similarity(current.name, other.name);
+      if (score >= 0.75 && (!best || score > best.score)) {
+        best = { id: other.id, name: other.name, score };
+      }
+    }
+    return best;
+  }, [editingId, items]);
+
+  const handleMergeDuplicate = useCallback(async (keepId: string, deleteId: string) => {
+    const keepName = items.find(i => i.id === keepId)?.name ?? "";
+    const deleteName = items.find(i => i.id === deleteId)?.name ?? "";
+    if (!confirm(`Fusionner "${deleteName}" dans "${keepName}" ?\nLe produit "${deleteName}" sera supprimé.`)) return;
+    try {
+      const { data: { session: sess } } = await supabase.auth.getSession();
+      const res = await fetchApi("/api/ingredients/merge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.access_token ?? ""}` },
+        body: JSON.stringify({ keepId, deleteId }),
+      });
+      const json = await res.json();
+      if (!json.ok) { alert(`Erreur fusion : ${json.error ?? "Inconnue"}`); return; }
+      setEditingId(null); setEdit(null);
+      mutate();
+    } catch (e) {
+      alert(`Erreur : ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [items, mutate]);
+
   // ─── Supplier modal ─────────────────────────────────────────────────────
   const openSupplierModal = useCallback(async (supplierId: string) => {
     setModalSupplierId(supplierId);
@@ -1252,6 +1289,8 @@ function IngredientsPageInner() {
                             onCreateDerived={userCanWrite ? openDeriveModal : undefined}
                             onOpenSupplier={openSupplierModal}
                             onToggleEstablishment={userCanWrite ? toggleEstablishment : undefined}
+                            duplicateMatch={editingId === x.id ? editingDuplicateMatch : null}
+                            onMergeDuplicate={userCanWrite ? handleMergeDuplicate : undefined}
                           />
                         </div>
                       );
