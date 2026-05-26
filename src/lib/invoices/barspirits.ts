@@ -70,16 +70,34 @@ function detectFormat(text: string): "new" | "old" {
 function parseLinesNew(text: string): ParsedLine[] {
   const rows = text.split(/\r?\n/).map((r) => r.trim()).filter(Boolean);
   const HEADER_RE = /^Nom\s+Quantité/;
-  const DATA_RE = /^(\d+(?:[,.]\d+)?)\s+(\S+)\s+([\d.]+)€\s+(\d+(?:[.,]\d+)?)%\s+([\d.]+)€$/;
-  const END_RE = /^Montant\s+[Tt]otal\s+TTC\s+[\d.]+€/i;
+  // Data only: "6 Pièce 15.72€ 20% 113.18€"
+  const DATA_RE = /^(-?\d+(?:[,.]\d+)?)\s+(\S+)\s+(-?[\d.]+)€\s+(\d+(?:[.,]\d+)?)%\s+(-?[\d.]+)€$/;
+  // Name + data on same line: "Berto Aperitivo | 1L 6 Pièce 15.72€ 20% 113.18€"
+  const INLINE_RE = /^(.+?)\s+(-?\d+(?:[,.]\d+)?)\s+(Pièce|Piece|pièce|piece|Kg|kg|KG|L|l)\s+(-?[\d.]+)€\s+(\d+(?:[.,]\d+)?)%\s+(-?[\d.]+)€$/;
+  const END_RE = /^Montant\s+[Tt]otal\s+(?:HT|TTC)\s+[\d.]+€/i;
 
   let inProducts = false;
   const result: ParsedLine[] = [];
   let nameLines: string[] = [];
+  // Description lines follow a product (e.g., "Apéritif, Berto, Italie" or "Giffard, France")
+  // Matches short comma-separated lines without € or digit-heavy content
+  const isDescLine = (s: string) => {
+    if (s.includes("€") || /\d{2,}/.test(s)) return false;
+    const parts = s.split(",").map(p => p.trim());
+    return parts.length >= 2 && parts.length <= 4 && parts.every(p => p.length > 0 && p.length < 40);
+  };
 
   for (const row of rows) {
     if (!inProducts) { if (HEADER_RE.test(row)) inProducts = true; continue; }
     if (END_RE.test(row)) break;
+
+    // Skip description lines (category, brand, country)
+    if (isDescLine(row) && !INLINE_RE.test(row) && !DATA_RE.test(row)) continue;
+    // Skip "(retour)" lines and stray header fragments
+    if (/^\(retour\)$/i.test(row)) continue;
+    if (/^HT\s+TTC$/i.test(row)) continue;
+
+    // Try data-only line first
     const m = DATA_RE.exec(row);
     if (m) {
       const qty = parseFloat(m[1].replace(",", "."));
@@ -89,7 +107,21 @@ function parseLinesNew(text: string): ParsedLine[] {
         result.push({ sku: null, name, quantity: qty, unit: toUnit(m[2]), unit_price: unitPrice, total_price: Math.round(unitPrice * qty * 100) / 100, tax_rate: parseInt(m[4], 10), notes: null, piece_weight_g: null, piece_volume_ml: null });
       }
       nameLines = [];
-    } else { nameLines.push(row); }
+      continue;
+    }
+
+    // Try inline (name + data on same line)
+    const mi = INLINE_RE.exec(row);
+    if (mi) {
+      const inlineName = (nameLines.length > 0 ? nameLines.join(" - ") + " - " : "") + mi[1].trim();
+      const qty = parseFloat(mi[2].replace(",", "."));
+      const unitPrice = parseFloat(mi[4]);
+      result.push({ sku: null, name: inlineName, quantity: qty, unit: toUnit(mi[3]), unit_price: unitPrice, total_price: Math.round(unitPrice * qty * 100) / 100, tax_rate: parseInt(mi[5], 10), notes: null, piece_weight_g: null, piece_volume_ml: null });
+      nameLines = [];
+      continue;
+    }
+
+    nameLines.push(row);
   }
   return result;
 }
