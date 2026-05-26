@@ -226,7 +226,7 @@ export const CategoryHeader = React.memo(function CategoryHeader({
 
 // ─── Edit state type (kept in sync with page.tsx) ───────────────────────────
 export type EditState = {
-  name: string; category: Category; is_active: boolean; supplierId: string;
+  name: string; category: Category; subCategory: string; is_active: boolean; supplierId: string;
   importName: string;
   popinaName: string;
   popinaDoseCl: string;
@@ -278,13 +278,14 @@ export type IngredientRowProps = {
   onToggleEstablishment?: (id: string, estab: "bellomio" | "piccola", current: string[]) => void;
   duplicateMatch?: { id: string; name: string; score: number } | null;
   onMergeDuplicate?: (keepId: string, deleteId: string) => void;
+  subCategorySuggestions?: string[];
 };
 
 export const IngredientRow = React.memo(function IngredientRow({
   item: x, offer, supplierName, supplierIdForDisplay, alert, isEditing, compactMode, edit,
   suppliers, storageZones,
   onStartEdit, onSaveEdit, onDelete, onSetStatus, onEditChange, onEditImportName, onCreateDerived, onOpenSupplier, onToggleEstablishment,
-  duplicateMatch, onMergeDuplicate,
+  duplicateMatch, onMergeDuplicate, subCategorySuggestions,
 }: IngredientRowProps) {
   const [mobileSection, setMobileSection] = React.useState<string>("prix"); // mobile accordion: only one open at a time
   const toggleMobileSection = React.useCallback((key: string) => {
@@ -421,6 +422,7 @@ export const IngredientRow = React.memo(function IngredientRow({
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <span style={{ fontWeight: 600, fontSize: 13, color: CAT_COLORS[x.category] }}>{x.name}</span>
+                  {x.sub_category && <span style={{ fontSize: 9, fontWeight: 600, padding: "1px 5px", borderRadius: 4, background: `${CAT_COLORS[x.category]}15`, color: CAT_COLORS[x.category], marginLeft: 2 }}>{x.sub_category}</span>}
                   {x.is_derived && <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED" }}>DÉRIVÉ</span>}
                 </div>
                 <div style={{ fontSize: 10, color: "#999999", marginTop: 2 }}>
@@ -806,6 +808,17 @@ export const IngredientRow = React.memo(function IngredientRow({
                 />
               </div>
               <div>
+                <div style={fieldLabel}>Sous-catégorie</div>
+                <input style={inputStyle} value={edit.subCategory} list={`subcat-${x.id}`}
+                  onChange={(e) => onEditChange({ ...edit, subCategory: e.target.value })}
+                  placeholder="Ex: Vins rouges, Rhum..." />
+                {subCategorySuggestions && subCategorySuggestions.length > 0 && (
+                  <datalist id={`subcat-${x.id}`}>
+                    {subCategorySuggestions.map(s => <option key={s} value={s} />)}
+                  </datalist>
+                )}
+              </div>
+              <div>
                 <div style={fieldLabel}>Fournisseur</div>
                 <StyledSelect value={edit.supplierId}
                   onChange={(v) => onEditChange({ ...edit, supplierId: v })}
@@ -863,6 +876,17 @@ export const IngredientRow = React.memo(function IngredientRow({
                   options={CATEGORIES.map(c => ({ value: c, label: CAT_LABELS[c] }))}
                   accentColor={CAT_COLORS[edit.category]}
                 />
+              </div>
+              <div>
+                <div style={fieldLabel}>Sous-catégorie</div>
+                <input style={inputStyle} value={edit.subCategory} list={`subcat-${x.id}`}
+                  onChange={(e) => onEditChange({ ...edit, subCategory: e.target.value })}
+                  placeholder="Ex: Vins rouges, Rhum..." />
+                {subCategorySuggestions && subCategorySuggestions.length > 0 && (
+                  <datalist id={`subcat-${x.id}`}>
+                    {subCategorySuggestions.map(s => <option key={s} value={s} />)}
+                  </datalist>
+                )}
               </div>
               <div>
                 <div style={fieldLabel}>Fournisseur</div>

@@ -195,9 +195,26 @@ function IngredientsPageInner() {
     const byCategory = new Map<Category, Ingredient[]>();
     for (const cat of CATEGORIES_ALPHA) byCategory.set(cat, []);
     for (const x of filtered) byCategory.get(x.category)?.push(x);
-    for (const arr of byCategory.values()) arr.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", "fr"));
+    for (const arr of byCategory.values()) {
+      // Sort by sub_category first, then by name
+      arr.sort((a, b) => {
+        const sa = a.sub_category ?? "";
+        const sb = b.sub_category ?? "";
+        if (sa !== sb) return sa.localeCompare(sb, "fr");
+        return (a.name ?? "").localeCompare(b.name ?? "", "fr");
+      });
+    }
     return CATEGORIES_ALPHA.map((cat) => ({ cat, items: byCategory.get(cat) ?? [] })).filter((g) => g.items.length > 0);
   }, [filtered, CATEGORIES_ALPHA]);
+
+  // Sub-category suggestions (unique values from all items, sorted)
+  const subCategorySuggestions = useMemo(() => {
+    const set = new Set<string>();
+    for (const x of items) {
+      if (x.sub_category) set.add(x.sub_category);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, "fr"));
+  }, [items]);
 
   // Collapsed by default; open all when searching
   const [collapsedCats, setCollapsedCats] = useState<Set<Category>>(() => new Set(CATEGORIES));
@@ -612,7 +629,7 @@ function IngredientsPageInner() {
     }
 
     const editState: EditState = {
-      name: x.name, category: x.category, is_active: x.is_active, supplierId,
+      name: x.name, category: x.category, subCategory: x.sub_category ?? "", is_active: x.is_active, supplierId,
       importName: x.import_name ?? x.name,
       popinaName: x.popina_name ?? "",
       popinaDoseCl: x.popina_dose_cl != null ? String(x.popina_dose_cl) : "",
@@ -772,7 +789,7 @@ function IngredientsPageInner() {
     }
 
     const up: Partial<IngredientUpsert> = {
-      name, category: edit.category, is_active: edit.is_active, supplier_id,
+      name, category: edit.category, sub_category: edit.subCategory.trim() || null, is_active: edit.is_active, supplier_id,
       popina_name: edit.popinaName.trim() || null,
       popina_dose_cl: edit.popinaDoseCl ? parseFloat(edit.popinaDoseCl) || null : null,
       piece_volume_ml: pieceVolumeMl,
@@ -1291,6 +1308,7 @@ function IngredientsPageInner() {
                             onToggleEstablishment={userCanWrite ? toggleEstablishment : undefined}
                             duplicateMatch={editingId === x.id ? editingDuplicateMatch : null}
                             onMergeDuplicate={userCanWrite ? handleMergeDuplicate : undefined}
+                            subCategorySuggestions={subCategorySuggestions}
                           />
                         </div>
                       );

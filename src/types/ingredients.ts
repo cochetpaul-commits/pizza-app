@@ -104,6 +104,7 @@ export type Ingredient = {
   /** Dose servie en cl (ex: 5cl pour un verre de liqueur) — null = produit vendu entier */
   popina_dose_cl?: number | null;
   category: Category;
+  sub_category?: string | null;
     allergens: unknown | null;
   is_active: boolean;
   default_unit: string | null;
@@ -183,6 +184,7 @@ export type IngredientUpsert = {
   popina_name?: string | null;
   popina_dose_cl?: number | null;
   category: Category;
+  sub_category?: string | null;
     allergens: unknown | null;
   is_active: boolean;
   default_unit: string | null;
