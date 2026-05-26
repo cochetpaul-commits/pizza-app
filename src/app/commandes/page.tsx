@@ -19,7 +19,7 @@ import { useBottomBarActions } from "@/lib/BottomBarContext";
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type DeliveryRule = { day: string; cutoff: string; delivery_day: string };
-type Supplier = { id: string; name: string; franco_minimum: number | null; delivery_schedule: DeliveryRule[] | null; color: string | null; website: string | null };
+type Supplier = { id: string; name: string; franco_minimum: number | null; delivery_schedule: DeliveryRule[] | null; color: string | null; website: string | null; portal_login: string | null; portal_password: string | null };
 
 type Ligne = {
   id: string;
@@ -319,6 +319,8 @@ function CommandesPage() {
 
   // Email sending state
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [showCredentials, setShowCredentials] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [supplierListOpen, setSupplierListOpen] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -358,7 +360,7 @@ function CommandesPage() {
       // Load ALL suppliers (not filtered by etablissement) so we can build aliases
       const { data } = await supabase
         .from("suppliers")
-        .select("id, name, franco_minimum, delivery_schedule, color, website")
+        .select("id, name, franco_minimum, delivery_schedule, color, website, portal_login, portal_password")
         .eq("is_active", true)
         .order("name");
       // Deduplicate by name (accent+case insensitive) with alias tracking
@@ -874,6 +876,21 @@ function CommandesPage() {
     URL.revokeObjectURL(url);
   }
 
+  function openPortal() {
+    if (!currentSupplier?.website) return;
+    const url = currentSupplier.website.startsWith("http") ? currentSupplier.website : `https://${currentSupplier.website}`;
+    window.open(url, "_blank");
+    if (currentSupplier.portal_login || currentSupplier.portal_password) {
+      setShowCredentials(true);
+    }
+  }
+
+  async function copyToClipboard(text: string, field: string) {
+    await navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  }
+
   async function downloadMercuriale() {
     if (!selectedSupplierId) return;
     const name = currentSupplier?.name ?? "fournisseur";
@@ -1187,21 +1204,20 @@ function CommandesPage() {
             </div>
           )}
 
-          {/* Stock ideal — affiché en unités individuelles */}
+          {/* Stock ideal — toujours affiché en unités individuelles */}
           {obj != null && obj > 0 && (() => {
-            // Convertir le stock objectif en unités individuelles si c'est un pack
-            const objIndiv = isPackUnit && packCount > 0 ? obj * packCount : obj;
-            // Déterminer le label de l'unité individuelle pour le stock
-            let stockUnitLabel = indiv;
-            if (isPackUnit) {
-              const baseUnit = (item.default_unit ?? "").toLowerCase();
-              if (baseUnit.includes("bouteille") || baseUnit === "bt" || baseUnit === "btl") stockUnitLabel = "Btl";
-              else if (baseUnit.includes("sachet")) stockUnitLabel = "Sac";
-              else if (baseUnit.includes("barquette")) stockUnitLabel = "Barq";
-              else if (baseUnit.includes("boite") || baseUnit.includes("boîte")) stockUnitLabel = "Bte";
-              else if (baseUnit === "pc" || baseUnit === "pcs" || baseUnit.includes("piece") || baseUnit.includes("pièce")) stockUnitLabel = "Pce";
-              else stockUnitLabel = indiv;
-            }
+            // Convertir le stock objectif en unités individuelles si pack
+            const objIndiv = packCount > 0 ? obj * packCount : obj;
+            // Déterminer le label de l'unité individuelle
+            let stockUnitLabel: string;
+            const baseUnit = (item.default_unit ?? "").toLowerCase();
+            if (baseUnit.includes("bouteille") || baseUnit === "bt" || baseUnit === "btl") stockUnitLabel = "Btl";
+            else if (baseUnit === "pc" || baseUnit === "pcs" || baseUnit.includes("piece") || baseUnit.includes("pièce")) stockUnitLabel = "Btl";
+            else if (baseUnit.includes("sachet")) stockUnitLabel = "Sac";
+            else if (baseUnit.includes("barquette")) stockUnitLabel = "Barq";
+            else if (baseUnit.includes("boite") || baseUnit.includes("boîte")) stockUnitLabel = "Bte";
+            else if (packCount > 0) stockUnitLabel = "Btl";
+            else stockUnitLabel = indiv;
             return (
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: stockColor }}>Stock idéal</div>
@@ -1434,12 +1450,11 @@ function CommandesPage() {
                 {sendingEmail ? "Envoi..." : "Envoyer par mail"}
               </button>
               {currentSupplier?.website && (
-                <a href={currentSupplier.website.startsWith("http") ? currentSupplier.website : `https://${currentSupplier.website}`}
-                  target="_blank" rel="noopener noreferrer"
-                  style={{ padding: "8px 20px", borderRadius: 8, border: "1.5px solid #D4775A", background: "#fff", color: "#D4775A", fontWeight: 700, fontSize: 12, cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <button type="button" onClick={openPortal}
+                  style={{ padding: "8px 20px", borderRadius: 8, border: "1.5px solid #D4775A", background: "#fff", color: "#D4775A", fontWeight: 700, fontSize: 12, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
                   <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                   Portail fournisseur
-                </a>
+                </button>
               )}
               <button onClick={() => recevoirSession(session.id)} disabled={saving}
                 style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
@@ -1717,18 +1732,17 @@ function CommandesPage() {
         {currentSupplier && (
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
             {currentSupplier.website && (
-              <a href={currentSupplier.website.startsWith("http") ? currentSupplier.website : `https://${currentSupplier.website}`}
-                target="_blank" rel="noopener noreferrer"
+              <button type="button" onClick={openPortal}
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                   flex: 1, padding: "10px 12px",
                   borderRadius: 10, border: "1.5px solid #D4775A", background: "#FFF7F4",
-                  color: "#D4775A", fontWeight: 700, fontSize: 12, textDecoration: "none",
-                  cursor: "pointer",
+                  color: "#D4775A", fontWeight: 700, fontSize: 12,
+                  cursor: "pointer", fontFamily: "inherit",
                 }}>
                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                 Portail
-              </a>
+              </button>
             )}
             <button type="button" onClick={downloadMercuriale}
               style={{
@@ -2418,6 +2432,77 @@ function CommandesPage() {
         )}
 
       </div>
+
+      {/* Panneau trousseau — identifiants portail fournisseur */}
+      {showCredentials && currentSupplier && (currentSupplier.portal_login || currentSupplier.portal_password) && (
+        <>
+          <div onClick={() => setShowCredentials(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 9998 }} />
+          <div style={{
+            position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)",
+            background: "#fff", borderRadius: 16, boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+            padding: "16px 20px", zIndex: 9999, width: "min(360px, 90vw)",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
+                Identifiants {currentSupplier.name}
+              </div>
+              <button type="button" onClick={() => setShowCredentials(false)}
+                style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#999", padding: 4 }}>
+                &times;
+              </button>
+            </div>
+
+            {currentSupplier.portal_login && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 11, color: "#999", marginBottom: 4 }}>Identifiant</div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <div style={{
+                    flex: 1, padding: "8px 12px", background: "#f5f0e8", borderRadius: 8,
+                    fontSize: 13, fontWeight: 600, color: "#1a1a1a", fontFamily: "monospace",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {currentSupplier.portal_login}
+                  </div>
+                  <button type="button" onClick={() => copyToClipboard(currentSupplier.portal_login!, "login")}
+                    style={{
+                      padding: "8px 14px", borderRadius: 8, border: "none", fontFamily: "inherit",
+                      background: copiedField === "login" ? "#16a34a" : "#D4775A",
+                      color: "#fff", fontWeight: 700, fontSize: 11, cursor: "pointer", flexShrink: 0,
+                      transition: "background 0.2s",
+                    }}>
+                    {copiedField === "login" ? "Copie !" : "Copier"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {currentSupplier.portal_password && (
+              <div>
+                <div style={{ fontSize: 11, color: "#999", marginBottom: 4 }}>Mot de passe</div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <div style={{
+                    flex: 1, padding: "8px 12px", background: "#f5f0e8", borderRadius: 8,
+                    fontSize: 13, fontWeight: 600, color: "#1a1a1a", fontFamily: "monospace",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {"••••••••"}
+                  </div>
+                  <button type="button" onClick={() => copyToClipboard(currentSupplier.portal_password!, "password")}
+                    style={{
+                      padding: "8px 14px", borderRadius: 8, border: "none", fontFamily: "inherit",
+                      background: copiedField === "password" ? "#16a34a" : "#D4775A",
+                      color: "#fff", fontWeight: 700, fontSize: 11, cursor: "pointer", flexShrink: 0,
+                      transition: "background 0.2s",
+                    }}>
+                    {copiedField === "password" ? "Copie !" : "Copier"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
     </RequireRole>
   );
 }

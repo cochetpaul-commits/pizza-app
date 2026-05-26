@@ -841,6 +841,10 @@ export default function FournisseursPage() {
         <AccordionHeader label="Portail fournisseur" isOpen={openSection === "portal"} onToggle={() => toggleSection("portal")} />
         {openSection === "portal" && (
           <div style={{ padding: "0 2px 16px" }}>
+            <div style={{ marginBottom: 12 }}>
+              <div style={labelStyle}>URL du portail de commande</div>
+              <input style={inputStyle} value={form.website} onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))} placeholder="https://portail.fournisseur.com" type="url" />
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
                 <div style={labelStyle}>Identifiant</div>

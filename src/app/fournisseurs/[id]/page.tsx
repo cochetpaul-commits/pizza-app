@@ -532,6 +532,10 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
 
         {/* Portail fournisseur */}
         <div style={sectionTitle}>Portail fournisseur</div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={labelStyle}>URL du portail de commande</div>
+          <input style={inputStyle} value={form.website} onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))} placeholder="https://portail.fournisseur.com" type="url" />
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
           <div>
             <div style={labelStyle}>Identifiant</div>
