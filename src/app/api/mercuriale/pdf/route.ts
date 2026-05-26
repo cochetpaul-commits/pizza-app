@@ -66,31 +66,50 @@ export async function POST(req: Request) {
       .order("name", { ascending: true });
     if (ingErr) return NextResponse.json({ message: ingErr.message }, { status: 500 });
 
-    // Fetch offres (v_latest_offers + establishment depuis supplier_offers)
-    const { data: offers, error: offErr } = await supabase
-      .from("v_latest_offers")
-      .select("ingredient_id,supplier_id,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g,updated_at");
-    if (offErr) return NextResponse.json({ message: offErr.message }, { status: 500 });
-
-    // Fetch establishment séparément
-    const { data: estabData } = await supabase
-      .from("supplier_offers")
-      .select("ingredient_id,establishment")
-      .eq("is_active", true)
-      .order("updated_at", { ascending: false });
-    const estabMap = new Map<string, string>();
-    for (const e of (estabData ?? []) as { ingredient_id: string; establishment: string }[]) {
-      if (!estabMap.has(e.ingredient_id)) estabMap.set(e.ingredient_id, e.establishment ?? "both");
-    }
-
-    // Fetch fournisseurs
-    const { data: sups } = await supabase.from("suppliers").select("id,name").eq("etablissement_id", etabId);
+    // Fetch fournisseurs (all, not just this etab, to resolve names)
+    const { data: sups } = await supabase.from("suppliers").select("id,name");
     const supMap = new Map<string, string>();
     for (const s of (sups ?? []) as { id: string; name: string }[]) supMap.set(s.id, s.name);
 
-    // Build offer map
+    // When filtering by supplier, find all alias IDs (same name, different etab)
+    let supplierIds: string[] = [];
+    if (filterSupplier !== "all") {
+      const supplierName = supMap.get(filterSupplier);
+      if (supplierName) {
+        // Find all supplier IDs with the same name (aliases across establishments)
+        for (const [id, name] of supMap) {
+          if (name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() ===
+              supplierName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()) {
+            supplierIds.push(id);
+          }
+        }
+      }
+      if (supplierIds.length === 0) supplierIds = [filterSupplier];
+    }
+
+    // Fetch offres: when filtering by supplier, query supplier_offers directly
+    // (v_latest_offers only keeps ONE offer per ingredient, which may be from another supplier)
+    let offers: Record<string, unknown>[];
+    if (filterSupplier !== "all") {
+      const { data, error: offErr } = await supabase
+        .from("supplier_offers")
+        .select("ingredient_id,supplier_id,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g,updated_at,establishment")
+        .eq("is_active", true)
+        .in("supplier_id", supplierIds)
+        .order("updated_at", { ascending: false });
+      if (offErr) return NextResponse.json({ message: offErr.message }, { status: 500 });
+      offers = (data ?? []) as Record<string, unknown>[];
+    } else {
+      const { data, error: offErr } = await supabase
+        .from("v_latest_offers")
+        .select("ingredient_id,supplier_id,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g,updated_at");
+      if (offErr) return NextResponse.json({ message: offErr.message }, { status: 500 });
+      offers = (data ?? []) as Record<string, unknown>[];
+    }
+
+    // Build offer map (keep latest per ingredient)
     const offerMap = new Map<string, { priceLabel: string; supplier: string | null; supplierRawId: string; updatedAt: string | null; establishment: string | null }>();
-    for (const o of (offers ?? []) as Record<string, unknown>[]) {
+    for (const o of offers) {
       const iid = String(o.ingredient_id ?? "");
       if (!iid || offerMap.has(iid)) continue;
       const cpu = offerRowToCpu(o);
@@ -104,7 +123,7 @@ export async function POST(req: Request) {
         supplier: sid ? (supMap.get(sid) ?? sid.slice(0, 4).toUpperCase()) : null,
         supplierRawId: sid,
         updatedAt: fmtDate(String(o.updated_at ?? "")),
-        establishment: estabMap.get(String(o.ingredient_id ?? "")) ?? "both",
+        establishment: String(o.establishment ?? "both"),
       });
     }
 
@@ -122,9 +141,9 @@ export async function POST(req: Request) {
       };
     });
 
-    // Filtre fournisseur
+    // Filtre fournisseur — ne garder que les ingrédients qui ont une offre
     if (filterSupplier !== "all") {
-      rows = rows.filter(r => r.supplierRawId === filterSupplier);
+      rows = rows.filter(r => r.supplierRawId && supplierIds.includes(r.supplierRawId));
     }
 
     // Filtre établissement
