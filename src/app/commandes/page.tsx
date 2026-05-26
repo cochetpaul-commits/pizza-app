@@ -1669,7 +1669,7 @@ function CommandesPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin", "equipier"]}>
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px", background: "#f2ede4", minHeight: "100vh" }}>
+      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 16px 120px", background: "#f2ede4", minHeight: "100vh" }}>
 
         {confirmation && (
           <div style={{
