@@ -874,6 +874,24 @@ function CommandesPage() {
     URL.revokeObjectURL(url);
   }
 
+  async function downloadMercuriale() {
+    if (!selectedSupplierId) return;
+    const name = currentSupplier?.name ?? "fournisseur";
+    const res = await fetchApi("/api/mercuriale/pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ groupBy: "category", filterSupplier: selectedSupplierId }),
+    });
+    if (!res.ok) { alert("Erreur lors de la génération de la mercuriale"); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `mercuriale-${name.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().slice(0, 10)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // ── Envoi mail via Resend (serveur, zero friction) ──────────────────
 
   async function sendEmailOnly(sessionId: string) {
@@ -1695,20 +1713,35 @@ function CommandesPage() {
           </button>
         )}
 
-        {/* Portail fournisseur button */}
-        {currentSupplier?.website && (
-          <a href={currentSupplier.website.startsWith("http") ? currentSupplier.website : `https://${currentSupplier.website}`}
-            target="_blank" rel="noopener noreferrer"
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-              width: "100%", padding: "10px 16px", marginTop: 8,
-              borderRadius: 10, border: "1.5px solid #D4775A", background: "#FFF7F4",
-              color: "#D4775A", fontWeight: 700, fontSize: 13, textDecoration: "none",
-              cursor: "pointer",
-            }}>
-            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            Portail {currentSupplier.name}
-          </a>
+        {/* Portail fournisseur + Mercuriale buttons */}
+        {currentSupplier && (
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            {currentSupplier.website && (
+              <a href={currentSupplier.website.startsWith("http") ? currentSupplier.website : `https://${currentSupplier.website}`}
+                target="_blank" rel="noopener noreferrer"
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  flex: 1, padding: "10px 12px",
+                  borderRadius: 10, border: "1.5px solid #D4775A", background: "#FFF7F4",
+                  color: "#D4775A", fontWeight: 700, fontSize: 12, textDecoration: "none",
+                  cursor: "pointer",
+                }}>
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                Portail
+              </a>
+            )}
+            <button type="button" onClick={downloadMercuriale}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                flex: 1, padding: "10px 12px",
+                borderRadius: 10, border: "1.5px solid #4a6741", background: "#f4f8f3",
+                color: "#4a6741", fontWeight: 700, fontSize: 12,
+                cursor: "pointer", fontFamily: "inherit",
+              }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              Mercuriale
+            </button>
+          </div>
         )}
 
         {/* Supplier drawer */}
