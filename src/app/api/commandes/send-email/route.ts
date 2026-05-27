@@ -55,25 +55,17 @@ export async function POST(request: NextRequest) {
   const supplierId = session.supplier_id;
   const supplierName = (session.suppliers as unknown as { name: string } | null)?.name ?? "Fournisseur";
 
-  // 2. Destinataires : contacts send_orders → tout contact avec email → suppliers.email
+  // 2. Destinataires : tous les contacts avec email + email principal fournisseur
   const { data: contacts } = await supabaseAdmin
     .from("supplier_contacts")
-    .select("name, email, send_orders")
+    .select("name, email")
     .eq("supplier_id", supplierId);
 
-  // Priorité 1 : contacts explicitement marqués "Cdes"
-  let recipients = (contacts ?? [])
-    .filter((c) => c.send_orders && c.email)
+  const recipients = (contacts ?? [])
+    .filter((c) => c.email)
     .map((c) => c.email as string);
 
-  // Priorité 2 : tout contact avec un email
-  if (recipients.length === 0) {
-    recipients = (contacts ?? [])
-      .filter((c) => c.email)
-      .map((c) => c.email as string);
-  }
-
-  // Priorité 3 : email principal du fournisseur
+  // Fallback : email principal du fournisseur
   if (recipients.length === 0) {
     const { data: supplier } = await supabaseAdmin
       .from("suppliers")
