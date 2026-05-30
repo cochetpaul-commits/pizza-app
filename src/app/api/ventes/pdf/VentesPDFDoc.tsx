@@ -119,22 +119,23 @@ function HeaderBlock({ etabName, rangeLabel, stats, exportType }: { etabName: st
   );
 }
 
-function HeroCard({ stats, prev, mode }: { stats: any; prev: any; mode: string }) {
+function HeroCard({ stats, prev }: { stats: any; prev: any }) {
   const W = stats;
-  const ca = mode === "ttc" ? W.ca_ttc : W.ca_ht;
-  const prevCA = prev ? (mode === "ttc" ? prev.ca_ttc : prev.ca_ht) : null;
+  const prevCA = prev?.ca_ttc ?? null;
+  const cvtTtc = W.couverts > 0 ? (W.ca_ttc / W.couverts).toFixed(1) : "0";
+  const cvtHt = W.couverts > 0 ? (W.ca_ht / W.couverts).toFixed(1) : "0";
   return (
     <View style={s.hero}>
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
         <View>
-          <Text style={{ fontSize: 6, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 3 }}>CA {mode.toUpperCase()}</Text>
-          <Text style={s.heroBig}>{fmt(ca)}</Text>
-          {mode === "ttc" && <Text style={s.heroSub}>HT {fmt(W.ca_ht)}</Text>}
+          <Text style={{ fontSize: 6, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 3 }}>CA TTC</Text>
+          <Text style={s.heroBig}>{fmt(W.ca_ttc)}</Text>
+          <Text style={s.heroSub}>HT {fmt(W.ca_ht)}</Text>
         </View>
         {prevCA != null && prevCA > 0 && (
           <View style={{ alignItems: "flex-end" as const }}>
-            <Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold", color: ca >= prevCA ? "#a5d6a7" : "#ef9a9a" }}>
-              {deltaPct(ca, prevCA)}
+            <Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold", color: W.ca_ttc >= prevCA ? "#a5d6a7" : "#ef9a9a" }}>
+              {deltaPct(W.ca_ttc, prevCA)}
             </Text>
             <Text style={{ fontSize: 6, color: "rgba(255,255,255,0.5)", marginTop: 1 }}>vs A-1</Text>
           </View>
@@ -142,7 +143,7 @@ function HeroCard({ stats, prev, mode }: { stats: any; prev: any; mode: string }
       </View>
       <View style={s.heroRow}>
         <View><Text style={s.heroKpiLabel}>Couverts</Text><Text style={s.heroKpiVal}>{fmtNum(W.couverts || W.tickets)}</Text></View>
-        <View><Text style={s.heroKpiLabel}>CVT moyen</Text><Text style={s.heroKpiVal}>{W.couverts > 0 ? (ca / W.couverts).toFixed(1) : "0"}{"\u20AC"}</Text></View>
+        <View><Text style={s.heroKpiLabel}>CVT moyen TTC</Text><Text style={s.heroKpiVal}>{cvtTtc}{"\u20AC"}</Text><Text style={{ fontSize: 5, color: "rgba(255,255,255,0.5)" }}>HT {cvtHt}{"\u20AC"}</Text></View>
         <View><Text style={s.heroKpiLabel}>Tickets</Text><Text style={s.heroKpiVal}>{fmtNum(W.tickets)}</Text></View>
         <View><Text style={s.heroKpiLabel}>Annulations</Text><Text style={s.heroKpiVal}>{W.ann_pct?.toFixed(1) ?? "0"}%</Text></View>
       </View>
@@ -151,14 +152,14 @@ function HeroCard({ stats, prev, mode }: { stats: any; prev: any; mode: string }
 }
 
 /* KPI cards row: Couverts / CVT Moyen / VS A-1 with deltas */
-function KpiCardsRow({ stats, prev, mode }: { stats: any; prev: any; mode: string }) {
+function KpiCardsRow({ stats, prev }: { stats: any; prev: any }) {
   const W = stats;
-  const ca = mode === "ttc" ? W.ca_ttc : W.ca_ht;
-  const prevCA = prev ? (mode === "ttc" ? prev.ca_ttc : prev.ca_ht) : null;
+  const prevCA = prev?.ca_ttc ?? null;
   const prevCov = prev?.couverts ?? 0;
-  const tm = W.couverts > 0 ? ca / W.couverts : 0;
+  const tmTtc = W.couverts > 0 ? W.ca_ttc / W.couverts : 0;
+  const tmHt = W.couverts > 0 ? W.ca_ht / W.couverts : 0;
   const prevTm = prevCov > 0 && prevCA ? prevCA / prevCov : 0;
-  const tmSP = W.cov_sur > 0 ? (mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur : 0;
+  const tmSP = W.cov_sur > 0 ? W.place_sur_ttc / W.cov_sur : 0;
 
   return (
     <View style={{ ...s.row, marginBottom: 8 }}>
@@ -173,19 +174,19 @@ function KpiCardsRow({ stats, prev, mode }: { stats: any; prev: any; mode: strin
         )}
       </View>
       <View style={{ ...s.kpi, flex: 1 }}>
-        <Text style={{ fontSize: 5, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>CVT Moyen</Text>
-        <Text style={{ ...s.kpiVal, fontSize: 14 }}>{fmtSp(tm)}{"\u20AC"}</Text>
-        <Text style={{ fontSize: 6, color: c.muted }}>CVT M SP {fmtSp(tmSP)}{"\u20AC"}</Text>
+        <Text style={{ fontSize: 5, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>CVT Moyen TTC</Text>
+        <Text style={{ ...s.kpiVal, fontSize: 14 }}>{fmtSp(tmTtc)}{"\u20AC"}</Text>
+        <Text style={{ fontSize: 6, color: c.muted }}>HT {fmtSp(tmHt)}{"\u20AC"} · SP {fmtSp(tmSP)}{"\u20AC"}</Text>
         {prevTm > 0 && (
-          <Text style={{ fontSize: 6, color: tm >= prevTm ? c.good : c.bad, marginTop: 2 }}>
-            {(tm - prevTm) >= 0 ? "+" : ""}{(tm - prevTm).toFixed(1)}{"\u20AC"} ({deltaPct(tm, prevTm)})
+          <Text style={{ fontSize: 6, color: tmTtc >= prevTm ? c.good : c.bad, marginTop: 2 }}>
+            {(tmTtc - prevTm) >= 0 ? "+" : ""}{(tmTtc - prevTm).toFixed(1)}{"\u20AC"} ({deltaPct(tmTtc, prevTm)})
           </Text>
         )}
       </View>
       {prevCA != null && prevCA > 0 && (
         <View style={{ ...s.kpi, flex: 1 }}>
           <Text style={{ fontSize: 5, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>VS A-1</Text>
-          <Text style={{ ...s.kpiVal, fontSize: 14, color: ca >= prevCA ? c.good : c.bad }}>{deltaAbs(Math.round(ca), Math.round(prevCA))}{"\u20AC"}</Text>
+          <Text style={{ ...s.kpiVal, fontSize: 14, color: W.ca_ttc >= prevCA ? c.good : c.bad }}>{deltaAbs(Math.round(W.ca_ttc), Math.round(prevCA))}{"\u20AC"}</Text>
           <Text style={{ fontSize: 6, color: c.muted }}>A-1: {fmt(prevCA)}</Text>
         </View>
       )}
@@ -326,16 +327,14 @@ function DurationCard({ stats, prev }: { stats: any; prev: any }) {
 }
 
 /* Sur place vs A emporter — enhanced */
-function SurPlaceEmporterCard({ stats, mode }: { stats: any; mode: string }) {
+function SurPlaceEmporterCard({ stats }: { stats: any }) {
   const W = stats;
   if (!W.place_emp_ttc && !W.place_sur_ttc) return null;
-  const surCA = mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht;
-  const empCA = mode === "ttc" ? W.place_emp_ttc : W.place_emp_ht;
-  const total = surCA + empCA;
-  const surPct = total > 0 ? Math.round((surCA / total) * 100) : 0;
+  const total = W.place_sur_ttc + W.place_emp_ttc;
+  const surPct = total > 0 ? Math.round((W.place_sur_ttc / total) * 100) : 0;
   const empPct = total > 0 ? 100 - surPct : 0;
-  const surTM = W.cov_sur > 0 ? surCA / W.cov_sur : 0;
-  const empTM = W.cov_emp > 0 ? empCA / W.cov_emp : 0;
+  const surTM = W.cov_sur > 0 ? W.place_sur_ttc / W.cov_sur : 0;
+  const empTM = W.cov_emp > 0 ? W.place_emp_ttc / W.cov_emp : 0;
 
   return (
     <View style={s.card} wrap={false}>
@@ -350,7 +349,7 @@ function SurPlaceEmporterCard({ stats, mode }: { stats: any; mode: string }) {
             <View style={{ ...s.barFill, height: 4, width: `${surPct}%`, backgroundColor: c.green }} />
           </View>
           <View style={{ flexDirection: "row", gap: 8 }}>
-            <View><Text style={{ fontSize: 5, color: c.muted }}>CA</Text><Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold" }}>{fmt(surCA)}</Text></View>
+            <View><Text style={{ fontSize: 5, color: c.muted }}>CA TTC</Text><Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold" }}>{fmt(W.place_sur_ttc)}</Text><Text style={{ fontSize: 6, color: c.muted }}>HT {fmt(W.place_sur_ht)}</Text></View>
             <View><Text style={{ fontSize: 5, color: c.muted }}>CVT</Text><Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold" }}>{fmtNum(W.cov_sur)}</Text></View>
             <View><Text style={{ fontSize: 5, color: c.muted }}>TM</Text><Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold", color: c.green }}>{fmtSp(surTM)}{"\u20AC"}</Text></View>
           </View>
@@ -365,7 +364,7 @@ function SurPlaceEmporterCard({ stats, mode }: { stats: any; mode: string }) {
             <View style={{ ...s.barFill, height: 4, width: `${empPct}%`, backgroundColor: c.accent }} />
           </View>
           <View style={{ flexDirection: "row", gap: 8 }}>
-            <View><Text style={{ fontSize: 5, color: c.muted }}>CA</Text><Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold" }}>{fmt(empCA)}</Text></View>
+            <View><Text style={{ fontSize: 5, color: c.muted }}>CA TTC</Text><Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold" }}>{fmt(W.place_emp_ttc)}</Text><Text style={{ fontSize: 6, color: c.muted }}>HT {fmt(W.place_emp_ht)}</Text></View>
             <View><Text style={{ fontSize: 5, color: c.muted }}>CVT</Text><Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold" }}>{fmtNum(W.cov_emp)}</Text></View>
             <View><Text style={{ fontSize: 5, color: c.muted }}>TM</Text><Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold", color: c.accent }}>{fmtSp(empTM)}{"\u20AC"}</Text></View>
           </View>
@@ -421,11 +420,11 @@ function _ZonesDetailCard({ stats, mode }: { stats: any; mode: string }) {
 }
 
 /* Comparatif weekly */
-function ComparatifCard({ stats, prev, mode }: { stats: any; prev: any; mode: string }) {
+function ComparatifCard({ stats, prev }: { stats: any; prev: any }) {
   const W = stats;
   if (!W.days || W.days.length < 2) return null;
-  const curVals: number[] = (mode === "ttc" ? W.day_ttc : W.day_ht) ?? [];
-  const prevVals: number[] = prev ? ((mode === "ttc" ? prev.day_ttc : prev.day_ht) ?? []) : [];
+  const curVals: number[] = W.day_ttc ?? [];
+  const prevVals: number[] = prev?.day_ttc ?? [];
   if (!curVals.length) return null;
 
   const useWeeks = W.dates && W.dates.length > 14;
@@ -448,7 +447,7 @@ function ComparatifCard({ stats, prev, mode }: { stats: any; prev: any; mode: st
 
   return (
     <View style={s.card} wrap={false}>
-      <Text style={s.sec}>Comparatif · CA {mode.toUpperCase()} {useWeeks ? "par semaine" : ""} vs A-1</Text>
+      <Text style={s.sec}>Comparatif · CA TTC {useWeeks ? "par semaine" : ""} vs A-1</Text>
       {curData.map((cur, i) => {
         const prv = prevData[i] ?? 0;
         const diff = cur - prv;
@@ -480,7 +479,7 @@ function ComparatifCard({ stats, prev, mode }: { stats: any; prev: any; mode: st
 }
 
 /* Services table with zone columns */
-function ServicesTable({ stats, mode }: { stats: any; mode: string }) {
+function ServicesTable({ stats }: { stats: any }) {
   const W = stats;
   const services = W.services ?? [];
   if (!services.length) return null;
@@ -559,7 +558,7 @@ function ServicesTable({ stats, mode }: { stats: any; mode: string }) {
 
   return (
     <View style={s.card} wrap>
-      <Text style={s.sec}>Par service · {mode.toUpperCase()} · couverts</Text>
+      <Text style={s.sec}>Par service · TTC · couverts</Text>
       <View style={s.tHead}>
         <Text style={{ ...s.tH, width: 30 }}>{useWeeks ? "Sem." : "Jour"}</Text>
         <Text style={{ ...s.tH, width: 22 }}>Svc</Text>
@@ -576,9 +575,9 @@ function ServicesTable({ stats, mode }: { stats: any; mode: string }) {
       </View>
       {groups.map((group, di) =>
         group.services.map((sv: any, si: number) => {
-          const caVal = mode === "ttc" ? sv.ttc : sv.ht;
-          const z = mode === "ttc" ? sv.z_ttc : sv.z_ht;
-          const tmSp = mode === "ttc" ? sv.tm_sp_ttc : sv.tm_sp_ht;
+          const caVal = sv.ttc;
+          const z = sv.z_ttc;
+          const tmSp = sv.tm_sp_ttc;
           const _tmColor = tmSp >= 80 ? c.good : tmSp >= 65 ? "#e65100" : c.bad;
           return (
             <View key={`${di}-${si}`} style={{ ...s.tRow, backgroundColor: di % 2 === 0 ? c.white : "#faf7f2" }} wrap={false}>
@@ -594,7 +593,7 @@ function ServicesTable({ stats, mode }: { stats: any; mode: string }) {
               <Text style={{ ...s.tCell, width: 18, textAlign: "right", color: c.green }}>{sv.sp_cov || "\u2014"}</Text>
               <Text style={{ width: 25, textAlign: "right", fontSize: 7, fontFamily: "Helvetica-Bold", color: c.green }}>{tmSp > 0 ? `${tmSp.toFixed(0)}\u20AC` : "\u2014"}</Text>
               <Text style={{ ...s.tCell, width: 18, textAlign: "right", color: c.emp }}>{sv.cov - (sv.sp_cov ?? 0) > 0 ? sv.cov - sv.sp_cov : "\u2014"}</Text>
-              <Text style={{ width: 25, textAlign: "right", fontSize: 7, fontFamily: "Helvetica-Bold", color: c.emp }}>{(() => { const ec = sv.cov - (sv.sp_cov ?? 0); if (ec <= 0) return "\u2014"; const empCa = mode === "ttc" ? sv.emp_ttc : sv.emp_ht; return empCa ? `${Math.round(empCa / ec)}\u20AC` : "\u2014"; })()}</Text>
+              <Text style={{ width: 25, textAlign: "right", fontSize: 7, fontFamily: "Helvetica-Bold", color: c.emp }}>{(() => { const ec = sv.cov - (sv.sp_cov ?? 0); if (ec <= 0) return "\u2014"; return sv.emp_ttc ? `${Math.round(sv.emp_ttc / ec)}\u20AC` : "\u2014"; })()}</Text>
             </View>
           );
         })
@@ -604,20 +603,24 @@ function ServicesTable({ stats, mode }: { stats: any; mode: string }) {
 }
 
 /* Zones row (simple totals) */
-function ZonesRow({ stats, mode }: { stats: any; mode: string }) {
+function ZonesRow({ stats }: { stats: any }) {
   const W = stats;
   if (!W.zones_ttc) return null;
-  const entries = Object.entries(mode === "ttc" ? W.zones_ttc : W.zones_ht).filter(([, vals]: [string, any]) => vals.some((v: number) => v > 0));
-  if (!entries.length) return null;
+  const entriesTtc = Object.entries(W.zones_ttc).filter(([, vals]: [string, any]) => vals.some((v: number) => v > 0));
+  if (!entriesTtc.length) return null;
+  const htZones = W.zones_ht ?? {};
   const zoneColors: Record<string, string> = { Salle: c.salle, Pergolas: c.pergolas, Terrasse: c.terrasse, "\u00C0 emporter": c.emp };
   return (
     <View style={{ ...s.row, marginBottom: 8 }}>
-      {entries.map(([zone, vals]: [string, any]) => {
-        const tot = vals.reduce((a: number, b: number) => a + b, 0);
+      {entriesTtc.map(([zone, vals]: [string, any]) => {
+        const totTtc = vals.reduce((a: number, b: number) => a + b, 0);
+        const htVals: number[] = htZones[zone] ?? [];
+        const totHt = htVals.reduce((a: number, b: number) => a + b, 0);
         return (
           <View key={zone} style={{ ...s.kpi, flex: 1 }}>
             <Text style={{ fontSize: 5, textTransform: "uppercase", letterSpacing: 0.6, color: zoneColors[zone] ?? c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>{zone}</Text>
-            <Text style={{ ...s.kpiVal, color: c.text }}>{fmt(tot)}</Text>
+            <Text style={{ ...s.kpiVal, color: c.text }}>{fmt(totTtc)}</Text>
+            <Text style={{ fontSize: 6, color: c.muted }}>HT {fmt(totHt)}</Text>
           </View>
         );
       })}
@@ -709,16 +712,17 @@ function HourlyCard({ stats }: { stats: any }) {
   );
 }
 
-function MixCategoriesCard({ stats, mode }: { stats: any; mode: string }) {
+function MixCategoriesCard({ stats }: { stats: any }) {
   const W = stats;
   if (!W.mix_labels || !W.mix_labels.length) return null;
-  const vals: number[] = (mode === "ttc" ? W.mix_ttc : W.mix_ht) ?? [];
+  const vals: number[] = W.mix_ttc ?? [];
+  const valsHt: number[] = W.mix_ht ?? [];
   const total = vals.reduce((a: number, b: number) => a + b, 0);
   const maxV = Math.max(...vals, 1);
   const colors = ["#D4775A", "#8fa8a0", "#46655a", "#7c5c3a", "#c4a882", "#e0b896", "#5e7a8a", "#a8b89c"];
   return (
     <View style={s.card} wrap={false}>
-      <Text style={s.sec}>Ventes par categorie · CA {mode.toUpperCase()}</Text>
+      <Text style={s.sec}>Ventes par categorie · CA TTC</Text>
       {W.mix_labels.map((label: string, i: number) => {
         const v = vals[i] ?? 0;
         const pct = total > 0 ? ((v / total) * 100).toFixed(0) : "0";
@@ -729,6 +733,7 @@ function MixCategoriesCard({ stats, mode }: { stats: any; mode: string }) {
               <View style={{ ...s.barFill, width: `${(v / maxV) * 100}%`, backgroundColor: colors[i % colors.length] }} />
             </View>
             <Text style={{ width: 40, textAlign: "right", fontSize: 7, fontFamily: "Helvetica-Bold" }}>{fmt(v)}</Text>
+            <Text style={{ width: 30, textAlign: "right", fontSize: 6, color: c.muted }}>{fmt(valsHt[i] ?? 0)}</Text>
             <Text style={{ width: 22, textAlign: "right", fontSize: 6, color: c.muted }}>{pct}%</Text>
           </View>
         );
@@ -737,14 +742,15 @@ function MixCategoriesCard({ stats, mode }: { stats: any; mode: string }) {
   );
 }
 
-function Top10Card({ stats, mode }: { stats: any; mode: string }) {
+function Top10Card({ stats }: { stats: any }) {
   const W = stats;
   if (!W.top10_names || !W.top10_names.length) return null;
-  const vals: number[] = (mode === "ttc" ? W.top10_ca_ttc : W.top10_ca_ht) ?? [];
+  const vals: number[] = W.top10_ca_ttc ?? [];
+  const valsHt: number[] = W.top10_ca_ht ?? [];
   const maxV = Math.max(...vals, 1);
   return (
     <View style={s.card} wrap={false}>
-      <Text style={s.sec}>Top 10 produits · CA {mode.toUpperCase()}</Text>
+      <Text style={s.sec}>Top 10 produits · CA TTC</Text>
       {W.top10_names.map((name: string, i: number) => {
         const v = vals[i] ?? 0;
         const qty = W.top10_qty?.[i] ?? 0;
@@ -756,6 +762,7 @@ function Top10Card({ stats, mode }: { stats: any; mode: string }) {
               <View style={{ ...s.barFill, width: `${(v / maxV) * 100}%`, backgroundColor: c.accent }} />
             </View>
             <Text style={{ width: 40, textAlign: "right", fontSize: 7, fontFamily: "Helvetica-Bold" }}>{fmt(v)}</Text>
+            <Text style={{ width: 30, textAlign: "right", fontSize: 6, color: c.muted }}>{fmt(valsHt[i] ?? 0)}</Text>
             <Text style={{ width: 22, textAlign: "right", fontSize: 6, color: c.muted }}>{qty}x</Text>
           </View>
         );
@@ -764,7 +771,7 @@ function Top10Card({ stats, mode }: { stats: any; mode: string }) {
   );
 }
 
-function Top3CatsCard({ stats, mode }: { stats: any; mode: string }) {
+function Top3CatsCard({ stats }: { stats: any }) {
   const W = stats;
   if (!W.top3_cats || !W.top3_cats.length) return null;
   return (
@@ -777,13 +784,13 @@ function Top3CatsCard({ stats, mode }: { stats: any; mode: string }) {
             {cat.rows.map((r: any, ri: number) => (
               <View key={ri} style={s.top3Row}>
                 <Text style={{ fontSize: 6 }}>{ri + 1} {r.n}</Text>
-                <Text style={{ fontSize: 6, fontFamily: "Helvetica-Bold", color: c.accent }}>{mode === "ttc" ? r.ca_ttc : r.ca_ht}</Text>
+                <Text style={{ fontSize: 6, fontFamily: "Helvetica-Bold", color: c.accent }}>{r.ca_ttc}</Text>
               </View>
             ))}
             {cat.flop && (
               <View style={{ ...s.top3Row, borderTopWidth: 0.3, borderTopColor: "#f0ebe3", marginTop: 2, paddingTop: 2 }}>
                 <Text style={{ fontSize: 5, color: c.bad }}>&#9660; {cat.flop.n}</Text>
-                <Text style={{ fontSize: 5, color: c.bad }}>{mode === "ttc" ? cat.flop.ca_ttc : cat.flop.ca_ht}</Text>
+                <Text style={{ fontSize: 5, color: c.bad }}>{cat.flop.ca_ttc}</Text>
               </View>
             )}
           </View>
@@ -793,15 +800,16 @@ function Top3CatsCard({ stats, mode }: { stats: any; mode: string }) {
   );
 }
 
-function ServeursCard({ stats, mode }: { stats: any; mode: string }) {
+function ServeursCard({ stats }: { stats: any }) {
   const W = stats;
   if (!W.serveurs || !W.serveurs.length) return null;
-  const vals: number[] = (mode === "ttc" ? W.serv_ca_ttc : W.serv_ca_ht) ?? [];
-  const totalCA = mode === "ttc" ? W.ca_ttc : W.ca_ht;
+  const vals: number[] = W.serv_ca_ttc ?? [];
+  const valsHt: number[] = W.serv_ca_ht ?? [];
+  const totalCA = W.ca_ttc;
   const maxV = Math.max(...vals, 1);
   return (
     <View style={s.card} wrap={false}>
-      <Text style={s.sec}>Performance serveurs · CA {mode.toUpperCase()}</Text>
+      <Text style={s.sec}>Performance serveurs · CA TTC</Text>
       {W.serveurs.map((name: string, i: number) => {
         const v = vals[i] ?? 0;
         const tkt = W.serv_tickets?.[i] ?? 0;
@@ -815,6 +823,7 @@ function ServeursCard({ stats, mode }: { stats: any; mode: string }) {
               <View style={{ ...s.barFill, width: `${(v / maxV) * 100}%`, backgroundColor: c.green }} />
             </View>
             <Text style={{ width: 40, textAlign: "right", fontSize: 7, fontFamily: "Helvetica-Bold" }}>{fmt(v)}</Text>
+            <Text style={{ width: 30, textAlign: "right", fontSize: 6, color: c.muted }}>{fmt(valsHt[i] ?? 0)}</Text>
             <Text style={{ width: 22, textAlign: "right", fontSize: 5, color: c.muted }}>{pctCA}%</Text>
             <Text style={{ width: 50, textAlign: "right", fontSize: 5, color: c.muted }}>{tkt}t · {cov}c · {cvtM}{"\u20AC"}</Text>
           </View>
@@ -870,42 +879,52 @@ function BriefingCard({ briefing }: { briefing: string[] }) {
 
 export function VentesPDF({ stats, prev, mode, viewTab, rangeLabel, etabName, briefing, exportType = "ventes" }: Props) {
   void viewTab;
-  const isVentes = exportType === "ventes";
-  const isProduits = exportType === "produits";
-  const isComplet = exportType === "complet";
+  void mode; // PDF affiche toujours TTC + HT
 
   return (
     <Document>
-      {/* ─── VENTES: KPI + Service + Upsell + Durée + Comparatif ─── */}
-      {(isVentes || isComplet) && (
-        <Page size="A4" style={s.page} wrap>
-          <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
-          <HeroCard stats={stats} prev={prev} mode={mode} />
-          <KpiCardsRow stats={stats} prev={prev} mode={mode} />
-          <SurPlaceEmporterCard stats={stats} mode={mode} />
-          <ZonesRow stats={stats} mode={mode} />
-          <ServicesTable stats={stats} mode={mode} />
-          <UpsellCard stats={stats} />
-          <DurationCard stats={stats} prev={prev} />
-          <ComparatifCard stats={stats} prev={prev} mode={mode} />
-          {briefing && briefing.length > 0 && <BriefingCard briefing={briefing} />}
-        </Page>
-      )}
+      <Page size="A4" style={s.page} wrap>
+        {/* 1. Bandeau jour + synthèse */}
+        <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={exportType} />
+        <HeroCard stats={stats} prev={prev} />
+        <KpiCardsRow stats={stats} prev={prev} />
 
-      {/* ─── PRODUITS: Top 10 + Mix + Serveurs + Paiements ─── */}
-      {(isProduits || isComplet) && (
-        <Page size="A4" style={s.page} wrap>
-          <HeaderBlock etabName={etabName} rangeLabel={rangeLabel} stats={stats} exportType={isProduits ? "produits" : exportType} />
-          {isProduits && <HeroCard stats={stats} prev={prev} mode={mode} />}
-          <Top10Card stats={stats} mode={mode} />
-          <Top3CatsCard stats={stats} mode={mode} />
-          <MixCategoriesCard stats={stats} mode={mode} />
-          <ServeursCard stats={stats} mode={mode} />
-          <PaiementsCard stats={stats} />
-          <MargeCard stats={stats} />
-          <HourlyCard stats={stats} />
-        </Page>
-      )}
+        {/* 2. Upsell · Performance de la période */}
+        <UpsellCard stats={stats} />
+
+        {/* 3. Sur place vs à emporter */}
+        <SurPlaceEmporterCard stats={stats} />
+
+        {/* 4. Tuile par salle */}
+        <ZonesRow stats={stats} />
+
+        {/* 5. Comparatif · CA TTC par semaine vs A-1 */}
+        <ComparatifCard stats={stats} prev={prev} />
+
+        {/* 6. Par service · TTC · Couverts */}
+        <ServicesTable stats={stats} />
+
+        {/* 7. Durée & Rotation des tables */}
+        <DurationCard stats={stats} prev={prev} />
+
+        {/* 8. Top 10 produits · CA TTC */}
+        <Top10Card stats={stats} />
+
+        {/* 9. Top 3 par catégorie · CA TTC */}
+        <Top3CatsCard stats={stats} />
+
+        {/* 10. Ventes par catégorie · CA TTC */}
+        <MixCategoriesCard stats={stats} />
+
+        {/* 11. Performance serveurs · CA TTC */}
+        <ServeursCard stats={stats} />
+
+        {/* 12. Modes de paiement */}
+        <PaiementsCard stats={stats} />
+
+        {/* 13. Points briefing de la période */}
+        {briefing && briefing.length > 0 && <BriefingCard briefing={briefing} />}
+      </Page>
     </Document>
   );
 }
