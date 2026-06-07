@@ -25,4 +25,6 @@ export type Etablissement = {
   valeur_avantage_nature: number;
   taux_accident_travail: number;
   taux_horaire_moyen: number;
+  // Jours de fermeture (0=dim, 1=lun, … 6=sam)
+  jours_fermeture: number[];
 };

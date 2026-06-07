@@ -36,6 +36,7 @@ type Settings = {
   cp_periode_mois: number;
   repos_compensateurs_actif: boolean;
   actif: boolean;
+  jours_fermeture: number[];
 };
 
 type Equipe = {
@@ -680,6 +681,40 @@ export default function EtablissementDetailPage() {
           }}>
             Enregistrer
           </button>
+        </div>
+      </div>
+
+      {/* Jours de fermeture */}
+      <div style={CARD}>
+        <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4, color: "#1a1a1a" }}>Jours de fermeture</h2>
+        <p style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>Les jours cochés ne déclencheront pas l&apos;import Popina et afficheront un état &laquo; fermé &raquo; sur le pilotage.</p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {[
+            { d: 1, l: "Lun" }, { d: 2, l: "Mar" }, { d: 3, l: "Mer" },
+            { d: 4, l: "Jeu" }, { d: 5, l: "Ven" }, { d: 6, l: "Sam" }, { d: 0, l: "Dim" },
+          ].map(({ d, l }) => {
+            const active = (settings.jours_fermeture ?? []).includes(d);
+            return (
+              <button
+                key={d}
+                type="button"
+                onClick={() => {
+                  const current = settings.jours_fermeture ?? [];
+                  const next = active
+                    ? current.filter((x) => x !== d)
+                    : [...current, d].sort((a, b) => a - b);
+                  updateField({ jours_fermeture: next });
+                }}
+                style={{
+                  padding: "10px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  border: active ? "1px solid #D4775A" : "1px solid #ddd6c8",
+                  background: active ? "#D4775A" : "#fff",
+                  color: active ? "#fff" : "#1a1a1a",
+                  cursor: "pointer", minWidth: 56,
+                }}
+              >{l}</button>
+            );
+          })}
         </div>
       </div>
 

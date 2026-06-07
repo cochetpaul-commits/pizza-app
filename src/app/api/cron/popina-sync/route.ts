@@ -44,8 +44,25 @@ export async function GET(req: NextRequest) {
     ? [explicitDay]
     : Array.from({ length: nDays }, (_, i) => getParisDate(-1 - i));
 
+  // Récupère les jours de fermeture de l'établissement
+  const { data: etab } = await supabase
+    .from("etablissements")
+    .select("jours_fermeture")
+    .eq("id", ETAB_BELLO)
+    .maybeSingle();
+  const joursFermeture = new Set<number>((etab?.jours_fermeture as number[] | null) ?? []);
+
   const results = [];
   for (const day of targetDays) {
+    // Sur le cron quotidien, skip les jours de fermeture (pas de log, rien à faire).
+    // Pour un appel manuel, on tente quand même (admin peut vouloir vérifier).
+    if (triggeredBy === "cron") {
+      const dow = new Date(day + "T12:00:00Z").getUTCDay();
+      if (joursFermeture.has(dow)) {
+        results.push({ day, status: "skipped_closed" });
+        continue;
+      }
+    }
     results.push(await syncDay(apiKey, day, triggeredBy));
   }
 

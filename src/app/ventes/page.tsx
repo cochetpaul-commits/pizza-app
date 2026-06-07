@@ -77,6 +77,33 @@ function defaultRange(): DateRange {
   return { from: iso, to: iso };
 }
 
+/** Renvoie l'ensemble des dates ISO (incluses) entre from et to. */
+function enumerateRange(from: string, to: string): string[] {
+  const out: string[] = [];
+  const d = new Date(from + "T12:00:00Z");
+  const end = new Date(to + "T12:00:00Z");
+  while (d <= end) {
+    out.push(d.toISOString().slice(0, 10));
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return out;
+}
+
+/** Vrai si tous les jours de la range sont des jours de fermeture. */
+function isFullyClosed(from: string, to: string, joursFermeture: number[] | null | undefined): boolean {
+  if (!joursFermeture || joursFermeture.length === 0) return false;
+  const closed = new Set(joursFermeture);
+  return enumerateRange(from, to).every((iso) => {
+    const dow = new Date(iso + "T12:00:00Z").getUTCDay();
+    return closed.has(dow);
+  });
+}
+
+const JOURS_LABELS: Record<number, string> = {
+  0: "dimanche", 1: "lundi", 2: "mardi", 3: "mercredi",
+  4: "jeudi", 5: "vendredi", 6: "samedi",
+};
+
 /* ── Helpers ── */
 const fmt = (v: number) => Math.round(v).toLocaleString("fr-FR") + "\u20AC";
 const fmtK = (v: number) => Math.round(v / 1000) + "k\u20AC";
@@ -674,13 +701,34 @@ function PerformancesPage() {
         {/* ── Loading / Empty ── */}
         {loading && <div style={{ textAlign: "center", padding: 60, color: "#999" }}>Chargement...</div>}
 
-        {!loading && !W && (
-          <div style={{ ...S.card, textAlign: "center", padding: 60 }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", marginBottom: 6 }}>Aucune donnee pour cette periode</div>
-            <div style={{ fontSize: 12, color: "#777" }}>Importez un fichier XLSX pour alimenter le dashboard.</div>
-          </div>
-        )}
+        {!loading && !W && (() => {
+          const closed = isFullyClosed(range.from, range.to, etab?.jours_fermeture);
+          if (closed) {
+            const days = (etab?.jours_fermeture ?? [])
+              .slice()
+              .sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
+              .map((d) => JOURS_LABELS[d])
+              .join(" et ");
+            return (
+              <div style={{ ...S.card, textAlign: "center", padding: 60 }}>
+                <div style={{ fontSize: 44, marginBottom: 12 }}>🌙</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", marginBottom: 6 }}>
+                  {etab?.nom ?? "L'établissement"} est fermé
+                </div>
+                <div style={{ fontSize: 12, color: "#777" }}>
+                  Pas d&apos;activité le {days}.
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div style={{ ...S.card, textAlign: "center", padding: 60 }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", marginBottom: 6 }}>Aucune donnee pour cette periode</div>
+              <div style={{ fontSize: 12, color: "#777" }}>Les ventes seront synchronisees automatiquement chaque matin depuis Popina.</div>
+            </div>
+          );
+        })()}
 
         {/* ── Dashboard ── */}
         {!loading && W && (
