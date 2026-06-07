@@ -48,24 +48,20 @@ export async function POST(req: NextRequest) {
       .eq("ingredient_id", ingredient_id)
       .order("created_at", { ascending: true });
 
-    const existing = existingRows?.[0] ?? null;
+    if (existingRows && existingRows.length > 0) {
+      const keepId = existingRows[0].id;
+      // Clean up duplicate rows if any
+      if (existingRows.length > 1) {
+        const dupeIds = existingRows.slice(1).map((r) => r.id);
+        await supabaseAdmin.from("commande_lignes").delete().in("id", dupeIds);
+      }
 
-    // Nettoyer les doublons éventuels (garder seulement la première ligne)
-    if (existingRows && existingRows.length > 1) {
-      const duplicateIds = existingRows.slice(1).map((r) => r.id);
-      await supabaseAdmin
-        .from("commande_lignes")
-        .delete()
-        .in("id", duplicateIds);
-    }
-
-    if (existing) {
       // Si quantité = 0, supprimer la ligne
       if (!quantite || quantite <= 0) {
         await supabaseAdmin
           .from("commande_lignes")
           .delete()
-          .eq("id", existing.id);
+          .eq("id", keepId);
         return NextResponse.json({ ok: true, deleted: true });
       }
 
@@ -73,7 +69,7 @@ export async function POST(req: NextRequest) {
       const { data: ligne, error } = await supabaseAdmin
         .from("commande_lignes")
         .update({ quantite, unite, prix_unitaire_ht, total_ligne_ht: totalLigne })
-        .eq("id", existing.id)
+        .eq("id", keepId)
         .select("*, ingredients(name, category, default_unit)")
         .single();
 
