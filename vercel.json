@@ -18,6 +18,10 @@
     {
       "path": "/api/meteo?action=fetch",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/popina-sync",
+      "schedule": "0 5 * * *"
     }
   ]
 }
