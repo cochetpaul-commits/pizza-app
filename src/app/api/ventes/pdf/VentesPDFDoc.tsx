@@ -628,7 +628,7 @@ function ZonesRow({ stats }: { stats: any }) {
   );
 }
 
-function MargeCard({ stats }: { stats: any }) {
+function _MargeCard({ stats }: { stats: any }) {
   const W = stats;
   const margeTotal = W.marge_total ?? 0;
   const margePct = W.marge_pct ?? 0;
@@ -682,7 +682,7 @@ function MargeCard({ stats }: { stats: any }) {
   );
 }
 
-function HourlyCard({ stats }: { stats: any }) {
+function _HourlyCard({ stats }: { stats: any }) {
   const h: number[] = stats.hourly_totals ?? [];
   if (!h.length || !h.some((v) => v > 0)) return null;
   const maxH = Math.max(...h, 1);

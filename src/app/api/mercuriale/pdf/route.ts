@@ -37,9 +37,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    let etabId: string;
+    let _etabId: string;
     try {
-      ({ etabId } = await getEtablissement(req));
+      ({ etabId: _etabId } = await getEtablissement(req));
     } catch (e) {
       if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
       throw e;
