@@ -925,7 +925,7 @@ function PerformancesPage() {
             {/* Upsell ratios */}
             {W.ratios.anti.tables > 0 && <div style={S.card}>
               <div style={S.sec}>Upsell · performance de la periode</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 14 }}>
+              <div className="ventes-upsell-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 14 }}>
                 <UpsellCard label="Antipasti" emoji="🥗" data={W.ratios.anti} totalTables={W.tickets} totalCov={W.couverts} color="#D4775A" targets={{ ok: 30, good: 50, avgPrice: 12 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Antipasti" ? null : "Antipasti")} active={expandedCat === "Antipasti"} />
                 <UpsellCard label="Pizzas" emoji="🍕" data={W.ratios.pizze} totalTables={W.tickets} totalCov={W.couverts} color="#c94c2c" targets={{ ok: 50, good: 70, avgPrice: 14 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Pizze" ? null : "Pizze")} active={expandedCat === "Pizze"} />
                 <UpsellCard label="Plats / Pasta" emoji="🍝" data={W.ratios.plats} totalTables={W.tickets} totalCov={W.couverts} color="#8a6b3e" targets={{ ok: 40, good: 60, avgPrice: 16 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Plats" ? null : "Plats")} active={expandedCat === "Plats"} />
