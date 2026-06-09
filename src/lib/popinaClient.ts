@@ -137,7 +137,7 @@ export async function fetchAllOrdersForDay(
   const reports = reportsForParisDay(allReports, parisDay);
 
   const orderIds = reports.flatMap((r) => r.orders ?? []);
-  const orders = await runConcurrent(orderIds, 20, (id) => fetchOrderDetail(apiKey, id));
+  const orders = await runConcurrent(orderIds, 50, (id) => fetchOrderDetail(apiKey, id));
 
   return { reports, orders };
 }
