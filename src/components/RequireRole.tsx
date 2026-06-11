@@ -5,19 +5,38 @@ import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import type { Role } from "@/lib/rbac";
 
+/**
+ * Guard component — vérifie les rôles ET/OU les permissions granulaires.
+ *
+ * Usage :
+ *   <RequireRole allowedRoles={["group_admin"]}>           // par rôle
+ *   <RequireRole permission="performances.view">           // par permission
+ *   <RequireRole allowedRoles={["group_admin"]} permission="settings.employes">  // les deux
+ */
 export function RequireRole({
   allowedRoles,
+  permission,
   children,
   fallback,
 }: {
-  allowedRoles: Role[];
+  allowedRoles?: Role[];
+  permission?: string;
   children: React.ReactNode;
   fallback?: React.ReactNode;
 }) {
-  const { role, loading } = useProfile();
+  const { role, loading, can } = useProfile();
   const router = useRouter();
 
-  const allowed = role !== null && allowedRoles.includes(role);
+  let allowed = false;
+  if (role !== null) {
+    if (permission) {
+      allowed = can(permission);
+    } else if (allowedRoles) {
+      allowed = allowedRoles.includes(role);
+    } else {
+      allowed = true;
+    }
+  }
 
   useEffect(() => {
     if (!loading && !allowed && role !== null) {

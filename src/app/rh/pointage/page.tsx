@@ -427,7 +427,7 @@ export default function PointagePage() {
   }, [allEmployes, rows]);
 
   return (
-    <RequireRole allowedRoles={["group_admin"]}>
+    <RequireRole permission="heures.edit_team">
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
 
         {/* Date navigator */}

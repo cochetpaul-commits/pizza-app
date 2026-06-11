@@ -170,7 +170,7 @@ export default function EquipePage() {
   const etabColor = getEtabColor(etab?.slug);
 
   return (
-    <RequireRole allowedRoles={["group_admin"]}>
+    <RequireRole permission="profil.view_team">
       <div style={pageStyle}>
 
         {/* ── Table ── */}

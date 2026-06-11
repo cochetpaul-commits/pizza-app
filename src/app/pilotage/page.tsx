@@ -650,7 +650,7 @@ export default function PilotagePage() {
   const isNow = weekStr === currentWeek;
 
   return (
-    <RequireRole allowedRoles={["group_admin"]}>
+    <RequireRole permission="performances.pilotage">
       <>
         <main style={{ maxWidth: 720, margin: "0 auto", padding: "20px 16px 56px", boxSizing: "border-box" }}>
 

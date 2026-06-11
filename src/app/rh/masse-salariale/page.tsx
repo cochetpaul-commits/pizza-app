@@ -305,7 +305,7 @@ export default function MasseSalarialePage() {
   const navRange = { from: selected?.from ?? "", to: selected?.to ?? "" };
 
   return (
-    <RequireRole allowedRoles={["group_admin"]}>
+    <RequireRole permission="paie.manage">
       <PilotageSwipeWrapper accent={etabColor} dateFrom={navRange.from} dateTo={navRange.to}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "20px 16px 100px" }}>
 

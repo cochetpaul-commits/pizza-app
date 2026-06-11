@@ -1082,6 +1082,21 @@ export default function EmployeDetailPage() {
             const dbRole = newRole === "admin" ? "group_admin" : "equipier";
             await supabase.from("employes").update({ role: dbRole, custom_permissions: {} }).eq("id", emp.id);
             setEmp((prev: Record<string, unknown>) => ({ ...prev, role: dbRole, custom_permissions: {} }));
+            // Synchroniser le rôle auth (profiles) si l'employé a un compte
+            const empEmail = (emp as Record<string, unknown>).email as string | null;
+            if (empEmail) {
+              const { data: profile } = await supabase.from("profiles").select("id").eq("display_name", empEmail).maybeSingle();
+              if (profile) {
+                await supabase.from("profiles").update({ role: dbRole }).eq("id", profile.id);
+              } else {
+                // Chercher par email dans auth via API admin
+                await fetch("/api/admin/sync-role", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ email: empEmail, role: dbRole }),
+                });
+              }
+            }
           };
 
           const togglePerm = async (key: string, currentOn: boolean) => {

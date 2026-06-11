@@ -305,7 +305,7 @@ export default function VariationsPrixPage() {
   });
 
   return (
-    <RequireRole allowedRoles={["group_admin"]}>
+    <RequireRole permission="achats.view">
     <>
       <main className="container safe-bottom">
 

@@ -1614,7 +1614,7 @@ function TresoreriePage() {
 /* ── Export with role guard ── */
 export default function TresoreriePageWrapper() {
   return (
-    <RequireRole allowedRoles={["group_admin"]}>
+    <RequireRole permission="performances.pilotage">
       <TresoreriePage />
     </RequireRole>
   );
