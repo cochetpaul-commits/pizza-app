@@ -65,6 +65,9 @@ type WeekData = {
   day_marge?: number[];
   day_taux_marque?: number[];
   hourly_totals?: number[];
+  // Champs ajoutés (Popina API)
+  remises_ttc?: number;
+  hourly_ttc?: number[];
 };
 
 /* ── Helpers: compute default range (today, weekend-safe) ── */
@@ -181,6 +184,7 @@ function PerformancesPage() {
   });
   const [data, setData] = useState<WeekData | null>(null);
   const [prev, setPrev] = useState<WeekData | null>(null); // A-1
+  const [prevWeek, setPrevWeek] = useState<WeekData | null>(null); // S-1
   const [dataSource, setDataSource] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -251,10 +255,12 @@ function PerformancesPage() {
       if (json.empty || !json.stats) {
         setData(null);
         setPrev(null);
+        setPrevWeek(null);
         setDataSource(null);
       } else {
         setData(json.stats);
         setPrev(json.prev ?? null);
+        setPrevWeek(json.prevWeek ?? null);
         setDataSource(json.source ?? "ventes_lignes");
       }
       // Fetch meteo
@@ -271,6 +277,7 @@ function PerformancesPage() {
     } catch {
       setData(null);
       setPrev(null);
+      setPrevWeek(null);
     }
     setLoading(false);
   }, [etab, getRange]);
@@ -573,6 +580,7 @@ function PerformancesPage() {
 
   const W = data;
   const activePrev = prev;
+  const activePrevWeek = prevWeek;
   const ca = W ? (mode === "ttc" ? W.ca_ttc : W.ca_ht) : 0;
 
   // Register PDF action in the bottom tab bar FAB
@@ -750,19 +758,36 @@ function PerformancesPage() {
                     <div style={{ ...S.bigNum, textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>{fmt(ca)}</div>
                     {mode === "ttc" && <div style={{ fontSize: 13, color: "rgba(255,255,255,.85)", marginTop: 6, fontWeight: 500 }}>HT <span style={{ color: "#fff", fontWeight: 700 }}>{fmt(W.ca_ht)}</span></div>}
                   </div>
-                  {activePrev && (() => {
-                    const prevCA = mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht;
-                    const d = ca - prevCA;
-                    const pct = prevCA > 0 ? (d / prevCA * 100) : 0;
-                    return (
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 12, fontWeight: 500, color: d >= 0 ? "rgba(165,214,167,.9)" : "#fca5a5" }}>
-                          {d >= 0 ? "+" : ""}{pct.toFixed(1)}%
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                    {activePrevWeek && (() => {
+                      const prevCA = mode === "ttc" ? activePrevWeek.ca_ttc : activePrevWeek.ca_ht;
+                      if (prevCA <= 0) return null;
+                      const d = ca - prevCA;
+                      const pct = (d / prevCA * 100);
+                      return (
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: 12, fontWeight: 500, color: d >= 0 ? "rgba(165,214,167,.9)" : "#fca5a5" }}>
+                            {d >= 0 ? "+" : ""}{pct.toFixed(1)}%
+                          </div>
+                          <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>vs S-1</div>
                         </div>
-                        <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>vs A-1</div>
-                      </div>
-                    );
-                  })()}
+                      );
+                    })()}
+                    {activePrev && (() => {
+                      const prevCA = mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht;
+                      if (prevCA <= 0) return null;
+                      const d = ca - prevCA;
+                      const pct = (d / prevCA * 100);
+                      return (
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: 12, fontWeight: 500, color: d >= 0 ? "rgba(165,214,167,.9)" : "#fca5a5" }}>
+                            {d >= 0 ? "+" : ""}{pct.toFixed(1)}%
+                          </div>
+                          <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>vs A-1</div>
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </div>
                 <div className="ventes-hero-kpis" style={{ display: "flex", gap: 20, marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,.12)", flexWrap: "wrap", alignItems: "flex-start" }}>
                   {dataSource === "daily_sales" ? (<>
@@ -892,11 +917,92 @@ function PerformancesPage() {
               );
             })()}
 
-            {/* Hourly distribution (daily_sales source with product data) */}
-            {dataSource === "daily_sales" && W.hourly_totals && W.hourly_totals.some(v => v > 0) && (() => {
-              const h = W.hourly_totals!;
+            {/* Remises + Top serveurs */}
+            {((W.remises_ttc ?? 0) > 0 || W.serveurs.length > 0) && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12, marginBottom: 18 }}>
+
+                {/* Remises */}
+                {(W.remises_ttc ?? 0) > 0 && (() => {
+                  const remises = W.remises_ttc ?? 0;
+                  const caBrut = W.ca_ttc + remises;
+                  const pctCA = caBrut > 0 ? (remises / caBrut * 100) : 0;
+                  const prevR = activePrevWeek?.remises_ttc ?? 0;
+                  return (
+                    <div style={{ ...S.card, marginBottom: 0 }}>
+                      <div style={S.sec}>Remises accordées</div>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 4 }}>
+                        <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 32, fontWeight: 700, color: "#c15f2e" }}>
+                          {Math.round(remises).toLocaleString("fr-FR")}&euro;
+                        </div>
+                        <div style={{ fontSize: 13, color: "#777" }}>
+                          soit {pctCA.toFixed(1)}% du CA brut
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 11, color: "#999" }}>
+                        CA brut (avant remise) : {Math.round(caBrut).toLocaleString("fr-FR")}&euro;
+                      </div>
+                      {prevR > 0 && (
+                        <div style={{ fontSize: 11, color: "#999", marginTop: 6 }}>
+                          S-1 : {Math.round(prevR).toLocaleString("fr-FR")}&euro; ({remises >= prevR ? "+" : ""}{prevR > 0 ? Math.round((remises - prevR) / prevR * 100) : 0}%)
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Top 3 serveurs */}
+                {W.serveurs.length > 0 && (() => {
+                  const ca = mode === "ttc" ? W.serv_ca_ttc : W.serv_ca_ht;
+                  const trios = W.serveurs.map((name, i) => ({
+                    name, ca: ca[i] ?? 0, cov: W.serv_cov[i] ?? 0, tickets: W.serv_tickets[i] ?? 0,
+                  })).sort((a, b) => b.ca - a.ca).slice(0, 3);
+                  const maxCA = trios[0]?.ca ?? 1;
+                  return (
+                    <div style={{ ...S.card, marginBottom: 0 }}>
+                      <div style={S.sec}>Top 3 serveurs · CA {mode.toUpperCase()}</div>
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {trios.map((s, i) => {
+                          const cvtMoy = s.cov > 0 ? s.ca / s.cov : 0;
+                          const barPct = maxCA > 0 ? Math.round(s.ca / maxCA * 100) : 0;
+                          return (
+                            <div key={s.name}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                                <div style={{ display: "flex", gap: 6, alignItems: "center", minWidth: 0 }}>
+                                  <span style={{ fontSize: 10, fontWeight: 800, color: i === 0 ? accent : "#bbb", flexShrink: 0 }}>#{i + 1}</span>
+                                  <span style={{ fontSize: 14, fontWeight: i === 0 ? 700 : 500, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
+                                </div>
+                                <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif", color: i === 0 ? accent : "#1a1a1a", flexShrink: 0 }}>
+                                  {Math.round(s.ca).toLocaleString("fr-FR")}&euro;
+                                </div>
+                              </div>
+                              <div style={{ height: 4, background: "#f0ebe3", borderRadius: 2, marginBottom: 3 }}>
+                                <div style={{ width: `${barPct}%`, height: "100%", background: i === 0 ? accent : "#c9b99a", borderRadius: 2, transition: "width 0.5s" }} />
+                              </div>
+                              <div style={{ fontSize: 10, color: "#999" }}>
+                                {s.cov} cvt · {s.tickets} tickets · CVT moy {cvtMoy.toFixed(1)}&euro;
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+              </div>
+            )}
+
+            {/* Hourly distribution */}
+            {(() => {
+              // Source ventes_lignes : utilise hourly_ttc (CA en €)
+              // Source daily_sales : utilise hourly_totals (nb articles)
+              const isCA = !!W.hourly_ttc && W.hourly_ttc.some(v => v > 0);
+              const isArticles = !isCA && dataSource === "daily_sales" && W.hourly_totals && W.hourly_totals.some(v => v > 0);
+              if (!isCA && !isArticles) return null;
+              const h = (isCA ? W.hourly_ttc : W.hourly_totals) as number[];
+              const unit = isCA ? "€" : " articles";
+              const fmtVal = (v: number) => isCA ? `${Math.round(v)}${unit}` : `${Math.round(v)}${unit}`;
               const maxH = Math.max(...h, 1);
-              // Show hours with activity — find first/last non-zero, with padding
               let startH = h.findIndex(v => v > 0);
               let endH = h.length - 1 - [...h].reverse().findIndex(v => v > 0) + 1;
               if (startH < 0) { startH = 10; endH = 22; }
@@ -904,7 +1010,7 @@ function PerformancesPage() {
               endH = Math.min(24, endH + 1);
               return (
                 <div style={S.card}>
-                  <div style={S.sec}>Repartition horaire des ventes (articles)</div>
+                  <div style={S.sec}>Repartition horaire {isCA ? `du CA ${mode.toUpperCase()}` : "des ventes (articles)"}</div>
                   <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 120, padding: "0 4px" }}>
                     {Array.from({ length: endH - startH }, (_, i) => {
                       const hour = startH + i;
@@ -912,7 +1018,7 @@ function PerformancesPage() {
                       const pct = maxH > 0 ? val / maxH * 100 : 0;
                       return (
                         <div key={hour} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
-                          <div style={{ width: "100%", maxWidth: 32, height: `${Math.max(pct, 2)}%`, background: val > 0 ? accent : "#ddd6c8", borderRadius: "3px 3px 0 0", transition: "height .4s", minHeight: 2, opacity: val > 0 ? 0.4 + 0.6 * (pct / 100) : 0.3 }} title={`${hour}h: ${Math.round(val)} articles`} />
+                          <div style={{ width: "100%", maxWidth: 32, height: `${Math.max(pct, 2)}%`, background: val > 0 ? accent : "#ddd6c8", borderRadius: "3px 3px 0 0", transition: "height .4s", minHeight: 2, opacity: val > 0 ? 0.4 + 0.6 * (pct / 100) : 0.3 }} title={`${hour}h: ${fmtVal(val)}`} />
                           <div style={{ fontSize: 8, color: "#999", marginTop: 3 }}>{hour}h</div>
                         </div>
                       );

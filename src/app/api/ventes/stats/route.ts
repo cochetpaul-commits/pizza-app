@@ -28,7 +28,47 @@ type Row = {
   ferme_a: string;
   type_ligne: string;
   table_num: string;
+  remise_totale: number;
 };
+
+const SELECT_COLS = "date_service,service,salle,operateur,categorie,sous_categorie,description,quantite,annule,ttc,ht,couverts,num_fiscal,statut,ouvert_a,ferme_a,type_ligne,table_num,remise_totale";
+
+/** Décale une date YYYY-MM-DD de N jours (peut être négatif). */
+function shiftDays(date: string, days: number): string {
+  const d = new Date(date + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Heure Paris (0-23) d'un timestamp ISO. */
+function parisHour(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const s = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Paris", hour: "2-digit", hour12: false }).format(new Date(iso));
+  const h = parseInt(s, 10);
+  return isNaN(h) ? null : h;
+}
+
+/** Fetch paginé de ventes_lignes sur une période. */
+async function fetchRange(etabId: string, from: string, to: string): Promise<Row[]> {
+  const out: Row[] = [];
+  const PAGE = 1000;
+  let offset = 0;
+  let hasMore = true;
+  while (hasMore) {
+    const { data } = await supabase
+      .from("ventes_lignes")
+      .select(SELECT_COLS)
+      .eq("etablissement_id", etabId)
+      .gte("date_service", from)
+      .lte("date_service", to)
+      .order("ouvert_a", { ascending: true })
+      .range(offset, offset + PAGE - 1);
+    out.push(...((data ?? []) as Row[]));
+    hasMore = (data?.length ?? 0) === PAGE;
+    offset += PAGE;
+  }
+  return out;
+}
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -40,69 +80,37 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "etablissement_id, from, to requis" }, { status: 400 });
   }
 
-  // Paginate — Supabase defaults to 1000 rows max
-  const allData: Row[] = [];
-  const PAGE = 1000;
-  let offset = 0;
-  let hasMore = true;
-  while (hasMore) {
-    const { data, error } = await supabase
-      .from("ventes_lignes")
-      .select("date_service,service,salle,operateur,categorie,sous_categorie,description,quantite,annule,ttc,ht,couverts,num_fiscal,statut,ouvert_a,ferme_a,type_ligne,table_num")
-      .eq("etablissement_id", etabId)
-      .gte("date_service", from)
-      .lte("date_service", to)
-      .order("ouvert_a", { ascending: true })
-      .range(offset, offset + PAGE - 1);
+  // ── Période courante ───────────────────────────────────────────────────
+  const rows = await fetchRange(etabId, from, to);
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-    allData.push(...((data ?? []) as Row[]));
-    hasMore = (data?.length ?? 0) === PAGE;
-    offset += PAGE;
-  }
-
-  if (allData.length === 0) {
+  if (rows.length === 0) {
     // Fallback: try daily_sales (Kezia / aggregated data)
     const dailyResult = await buildFromDailySales(etabId, from, to);
     if (dailyResult) {
-      // Also fetch comparison data
       let dailyPrev = null;
       const fromA1ds = (parseInt(from.slice(0, 4)) - 1) + from.slice(4);
       const toA1ds = (parseInt(to.slice(0, 4)) - 1) + to.slice(4);
       dailyPrev = await buildFromDailySales(etabId, fromA1ds, toA1ds);
-      return NextResponse.json({ empty: false, stats: dailyResult, prev: dailyPrev, source: "daily_sales" });
+      return NextResponse.json({ empty: false, stats: dailyResult, prev: dailyPrev, prevWeek: null, source: "daily_sales" });
     }
-    return NextResponse.json({ empty: true, stats: null, prev: null });
+    return NextResponse.json({ empty: true, stats: null, prev: null, prevWeek: null });
   }
 
-  const rows = allData;
-
-  // Fetch A-1 (same period, previous year) for comparison
+  // ── Comparatifs : A-1 (année -1) et S-1 (-7 jours), fetch en parallèle ─
   const fromA1 = (parseInt(from.slice(0, 4)) - 1) + from.slice(4);
   const toA1 = (parseInt(to.slice(0, 4)) - 1) + to.slice(4);
-  const prevData: Row[] = [];
-  let prevOffset = 0;
-  let prevMore = true;
-  while (prevMore) {
-    const { data: pd } = await supabase
-      .from("ventes_lignes")
-      .select("date_service,service,salle,operateur,categorie,sous_categorie,description,quantite,annule,ttc,ht,couverts,num_fiscal,statut,ouvert_a,ferme_a,type_ligne,table_num")
-      .eq("etablissement_id", etabId)
-      .gte("date_service", fromA1)
-      .lte("date_service", toA1)
-      .order("ouvert_a", { ascending: true })
-      .range(prevOffset, prevOffset + PAGE - 1);
-    prevData.push(...((pd ?? []) as Row[]));
-    prevMore = (pd?.length ?? 0) === PAGE;
-    prevOffset += PAGE;
-  }
+  const fromS1 = shiftDays(from, -7);
+  const toS1 = shiftDays(to, -7);
 
-  // Aggregate
+  const [prevData, prevWeekData] = await Promise.all([
+    fetchRange(etabId, fromA1, toA1),
+    fetchRange(etabId, fromS1, toS1),
+  ]);
+
   const stats = aggregate(rows);
   const prev = prevData.length > 0 ? aggregate(prevData) : null;
-  return NextResponse.json({ empty: false, stats, prev });
+  const prevWeek = prevWeekData.length > 0 ? aggregate(prevWeekData) : null;
+  return NextResponse.json({ empty: false, stats, prev, prevWeek });
 }
 
 /** Get couverts for a unique order (dedup by num_fiscal+date).
@@ -197,6 +205,24 @@ function aggregate(rows: Row[]) {
   const day_cov = dates.map(d => covByDay[d] || 0);
   const tm_ttc = dates.map((_, i) => day_cov[i] > 0 ? day_ttc[i] / day_cov[i] : 0);
   const tm_ht = dates.map((_, i) => day_cov[i] > 0 ? day_ht[i] / day_cov[i] : 0);
+
+  // Remises totales (dédup par num_fiscal — la remise est portée par la 1ʳᵉ ligne)
+  const remisesSeen = new Map<string, number>();
+  for (const r of productRows) {
+    const key = `${r.date_service}:${r.num_fiscal}`;
+    const rem = Number(r.remise_totale) || 0;
+    if (rem > 0 && !remisesSeen.has(key)) {
+      remisesSeen.set(key, rem);
+    }
+  }
+  const remises_ttc = Array.from(remisesSeen.values()).reduce((s, v) => s + v, 0);
+
+  // Répartition horaire (CA TTC par heure Paris, basée sur ouvert_a)
+  const hourly_ttc: number[] = Array.from({ length: 24 }, () => 0);
+  for (const r of validRows) {
+    const h = parisHour(r.ouvert_a);
+    if (h !== null) hourly_ttc[h] += Number(r.ttc) || 0;
+  }
 
   // Zones par jour (TTC + HT)
   const zoneNames = ["Salle", "Pergolas", "Terrasse", "\u00C0 emporter"];
@@ -604,6 +630,8 @@ function aggregate(rows: Row[]) {
       rotByZone: zoneRotations,
       totalOrders: orderDurs.length,
     },
+    remises_ttc: Math.round(remises_ttc * 100) / 100,
+    hourly_ttc: hourly_ttc.map(v => Math.round(v * 100) / 100),
   };
 }
 
