@@ -200,7 +200,7 @@
 
     destroyCharts();
     drawSerie(serie);
-    drawDow(dowLabels.slice(), dowAvg);
+    drawDow(order.map((d) => dowLabels[d]), dowAvg);
 
     const stale = data._stale ? " · (cache)" : "";
     document.getElementById("footer").textContent =
