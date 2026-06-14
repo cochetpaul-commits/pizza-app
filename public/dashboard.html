@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bello Mio — Tableau de bord CA</title>
+<style>
+  :root {
+    --bg: #161412;
+    --panel: #211e19;
+    --panel2: #2a2620;
+    --creme: #f2ede4;
+    --vert: #7FB069;
+    --rouge: #E06B5A;
+    --terracotta: #D4775A;
+    --gold: #fdbc5d;
+    --muted: #9a948a;
+    --line: #3a352d;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: radial-gradient(1200px 600px at 80% -10%, #23201b, var(--bg));
+    color: var(--creme);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    min-height: 100vh;
+    padding: 28px clamp(16px, 4vw, 48px) 64px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  header .dot { color: var(--terracotta); font-size: 14px; }
+  header h1 { font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
+  header .spacer { flex: 1; }
+  header .date { color: var(--muted); font-size: 14px; }
+  #refresh {
+    background: var(--panel2); color: var(--creme); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px 12px; font-size: 13px; cursor: pointer;
+  }
+  #refresh:hover { border-color: var(--terracotta); }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 22px; }
+
+  .insight {
+    border-left: 3px solid var(--terracotta);
+    background: var(--panel);
+    border-radius: 0 12px 12px 0;
+    padding: 14px 18px; margin-bottom: 22px; font-size: 15px;
+  }
+
+  .grid { display: grid; gap: 14px; }
+  .kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 22px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 16px; padding: 16px 18px;
+  }
+  .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .card .value { font-size: 30px; font-weight: 700; margin-top: 6px; letter-spacing: -0.5px; }
+  .card .delta { font-size: 13px; margin-top: 2px; }
+  .up { color: var(--vert); } .down { color: var(--rouge); }
+
+  .charts { grid-template-columns: 1fr 1fr; }
+  @media (max-width: 760px) { .charts { grid-template-columns: 1fr; } }
+  .panel-title { font-size: 14px; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .chart-box { position: relative; height: 260px; }
+
+  .services-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+  .bar { flex: 1; height: 12px; border-radius: 6px; background: var(--panel2); overflow: hidden; display: flex; }
+  .bar .midi { background: var(--terracotta); height: 100%; }
+  .bar .soir { background: var(--gold); height: 100%; }
+  .legend { display: flex; gap: 18px; margin-top: 10px; font-size: 13px; color: var(--muted); }
+  .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+
+  footer { color: var(--muted); font-size: 12px; margin-top: 26px; text-align: right; }
+  .err { background: #3a1f1a; border: 1px solid var(--rouge); color: #f6cfc7; padding: 16px; border-radius: 12px; }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="dot">●</span>
+    <h1>BELLO MIO</h1>
+    <span class="spacer"></span>
+    <span class="date" id="date">—</span>
+    <button id="refresh">↻ Actualiser</button>
+  </header>
+  <div class="sub">Tableau de bord du chiffre d'affaires · données de la veille</div>
+
+  <div id="content"><div class="muted">Chargement…</div></div>
+
+  <footer id="footer"></footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+  // ===================== CONFIG =====================
+  const ENDPOINT = "https://pizza-app-olive-five.vercel.app/api/widget/ca";
+  const TOKEN = "9e929172a974d541b2d8636877aeadb2";
+  const AUTO_REFRESH_MIN = 15; // 0 = désactivé
+  // ==================================================
+
+  const PAL = {
+    creme: "#f2ede4", vert: "#7FB069", rouge: "#E06B5A",
+    terracotta: "#D4775A", gold: "#fdbc5d", muted: "#9a948a",
+    barDim: "rgba(91,82,73,0.85)", line: "rgba(154,148,138,0.15)",
+  };
+  const fmtE = (n, d = 0) => n == null || isNaN(n)
+    ? "—"
+    : new Intl.NumberFormat("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d }).format(d ? n : Math.round(n)) + " €";
+  const fmtPct = (n) => n == null ? "—" : (n >= 0 ? "▲ " : "▼ ") + Math.abs(n).toFixed(1).replace(".", ",") + " %";
+
+  let charts = [];
+  function destroyCharts() { charts.forEach((c) => c.destroy()); charts = []; }
+
+  async function load() {
+    const el = document.getElementById("content");
+    try {
+      const r = await fetch(`${ENDPOINT}?token=${encodeURIComponent(TOKEN)}`, { cache: "no-store" });
+      const data = await r.json();
+      if (data.error) throw new Error(data.error);
+      render(data);
+    } catch (e) {
+      el.innerHTML = `<div class="err">Impossible de charger les données : ${e.message}.<br>Vérifie ENDPOINT et TOKEN en haut du fichier.</div>`;
+    }
+  }
+
+  function insightText(v) {
+    if (v == null) return null;
+    if (v >= 8) return ["Belle journée — nettement au-dessus du même jour la semaine dernière.", PAL.vert];
+    if (v >= 2) return ["Journée en hausse sur la semaine.", PAL.vert];
+    if (v > -2) return ["Activité stable par rapport à la semaine dernière.", PAL.muted];
+    if (v >= -8) return ["Léger repli par rapport au même jour la semaine dernière.", PAL.rouge];
+    return ["Journée en retrait par rapport à la semaine dernière.", PAL.rouge];
+  }
+
+  function render(data) {
+    document.getElementById("date").textContent = (data.libelle && data.libelle !== "hier" ? "" : "hier · ") + (data.jour || "");
+    const v = data.comparaison_j7 ? data.comparaison_j7.variation_pct : null;
+    const ins = insightText(v);
+
+    const serie = data.serie_30j || data.serie_7j || [];
+    // moyennes par jour de semaine (sur jours ouverts)
+    const byDow = [[], [], [], [], [], [], []];
+    serie.forEach((p) => {
+      const dow = new Date(p.date + "T00:00:00Z").getUTCDay();
+      if (p.ca > 0) byDow[dow].push(p.ca);
+    });
+    const dowLabels = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+    const order = [1, 2, 3, 4, 5, 6, 0];
+    const dowAvg = order.map((d) => {
+      const arr = byDow[d];
+      return arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+    });
+
+    const s = data.services || {};
+    const hasServices = s.midi != null || s.soir != null;
+    const midi = s.midi || 0, soir = s.soir || 0, totS = midi + soir || 1;
+
+    const kpi = (label, value, delta) => `
+      <div class="card"><div class="label">${label}</div>
+      <div class="value">${value}</div>${delta || ""}</div>`;
+
+    document.getElementById("content").innerHTML = `
+      ${ins ? `<div class="insight" style="border-color:${ins[1]}">${ins[0]}</div>` : ""}
+      <div class="grid kpis">
+        ${kpi("CA d'hier", fmtE(data.ca_total),
+          v != null ? `<div class="delta ${v >= 0 ? "up" : "down"}">${fmtPct(v)} vs J-7</div>` : "")}
+        ${kpi("Moyenne 7 jours", fmtE(data.moyenne_7j))}
+        ${kpi("Couverts", data.couverts != null ? data.couverts : "—")}
+        ${kpi("Ticket moyen", fmtE(data.ticket_moyen, 2))}
+        ${kpi("Part pizza", data.part_pizza_pct != null ? data.part_pizza_pct + " %" : "—")}
+        ${data.top_produit ? kpi("Top produit", `<span style="font-size:20px">${data.top_produit}</span>`) : ""}
+      </div>
+
+      <div class="grid charts">
+        <div class="card">
+          <div class="panel-title">30 derniers jours</div>
+          <div class="chart-box"><canvas id="c30"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="panel-title">Moyenne par jour de semaine</div>
+          <div class="chart-box"><canvas id="cdow"></canvas></div>
+        </div>
+      </div>
+
+      ${hasServices ? `
+      <div class="card" style="margin-top:14px">
+        <div class="panel-title">Répartition midi / soir</div>
+        <div class="services-row">
+          <div class="bar">
+            <div class="midi" style="width:${(midi / totS) * 100}%"></div>
+            <div class="soir" style="width:${(soir / totS) * 100}%"></div>
+          </div>
+        </div>
+        <div class="legend">
+          <span><span class="sw" style="background:${PAL.terracotta}"></span>Midi ${fmtE(midi)}</span>
+          <span><span class="sw" style="background:${PAL.gold}"></span>Soir ${fmtE(soir)}</span>
+        </div>
+      </div>` : ""}
+    `;
+
+    destroyCharts();
+    drawSerie(serie);
+    drawDow(dowLabels.slice(), dowAvg);
+
+    const stale = data._stale ? " · (cache)" : "";
+    document.getElementById("footer").textContent =
+      "Mis à jour " + new Date(data.updated_at || Date.now()).toLocaleString("fr-FR") + stale;
+  }
+
+  function baseOpts(maxLabelEvery) {
+    return {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: (c) => fmtE(c.parsed.y) } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: PAL.muted, font: { size: 10 },
+          maxRotation: 0, autoSkip: true, maxTicksLimit: maxLabelEvery } },
+        y: { grid: { color: PAL.line }, ticks: { color: PAL.muted, font: { size: 10 },
+          callback: (val) => (val >= 1000 ? val / 1000 + "k" : val) } },
+      },
+    };
+  }
+
+  function drawSerie(serie) {
+    const labels = serie.map((p) => {
+      const d = new Date(p.date + "T00:00:00Z");
+      return d.getUTCDate() + "/" + (d.getUTCMonth() + 1);
+    });
+    const colors = serie.map((_, i) => (i === serie.length - 1 ? PAL.terracotta : PAL.barDim));
+    charts.push(new Chart(document.getElementById("c30"), {
+      type: "bar",
+      data: { labels, datasets: [{ data: serie.map((p) => p.ca), backgroundColor: colors, borderRadius: 4 }] },
+      options: baseOpts(10),
+    }));
+  }
+  function drawDow(labels, vals) {
+    charts.push(new Chart(document.getElementById("cdow"), {
+      type: "bar",
+      data: { labels, datasets: [{ data: vals, backgroundColor: PAL.gold, borderRadius: 4 }] },
+      options: baseOpts(7),
+    }));
+  }
+
+  document.getElementById("refresh").addEventListener("click", load);
+  load();
+  if (AUTO_REFRESH_MIN > 0) setInterval(load, AUTO_REFRESH_MIN * 60 * 1000);
+</script>
+</body>
+</html>
