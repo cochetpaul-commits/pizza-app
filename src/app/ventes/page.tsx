@@ -968,21 +968,24 @@ function PerformancesPage() {
             {/* Duration & Rotation */}
             {W.duration && W.duration.totalOrders > 0 && (() => {
               const P = activePrev?.duration;
+              const hasRotation = W.duration.avgRotation > 0;
               return (
               <div style={S.card}>
-                <div style={S.sec}>Duree & rotation des tables</div>
+                <div style={S.sec}>{hasRotation ? "Duree & rotation des tables" : "Duree des tables"}</div>
                 {/* KPIs row */}
-                <div className="ventes-duration-kpis" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
+                <div className="ventes-duration-kpis" style={{ display: "grid", gridTemplateColumns: hasRotation ? "1fr 1fr 1fr" : "1fr 1fr", gap: 10, marginBottom: 14 }}>
                   <div style={{ background: "#f9f6f0", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
                     <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 28, fontWeight: 700, color: "#D4775A" }}>{W.duration.avgDurMin}<span style={{ fontSize: 14, fontWeight: 500, color: "#777" }}>min</span></div>
                     <div style={{ fontSize: 10, color: "#777", marginTop: 4 }}>Duree moy. / table</div>
                     {P && P.avgDurMin > 0 && <DeltaBadgeSmall cur={W.duration.avgDurMin} prev={P.avgDurMin} suffix="min" inverse />}
                   </div>
-                  <div style={{ background: "#f9f6f0", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
-                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 28, fontWeight: 700, color: "#46655a" }}>{W.duration.avgRotation}x</div>
-                    <div style={{ fontSize: 10, color: "#777", marginTop: 4 }}>Rotation moy. / table</div>
-                    {P && P.avgRotation > 0 && <DeltaBadgeSmall cur={W.duration.avgRotation} prev={P.avgRotation} suffix="x" />}
-                  </div>
+                  {hasRotation && (
+                    <div style={{ background: "#f9f6f0", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 28, fontWeight: 700, color: "#46655a" }}>{W.duration.avgRotation}x</div>
+                      <div style={{ fontSize: 10, color: "#777", marginTop: 4 }}>Rotation moy. / table</div>
+                      {P && P.avgRotation > 0 && <DeltaBadgeSmall cur={W.duration.avgRotation} prev={P.avgRotation} suffix="x" />}
+                    </div>
+                  )}
                   <div style={{ background: "#f9f6f0", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
                     <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 28, fontWeight: 700, color: "#7c5c3a" }}>{W.duration.totalOrders}</div>
                     <div style={{ fontSize: 10, color: "#777", marginTop: 4 }}>Tables servies</div>
@@ -1003,7 +1006,7 @@ function PerformancesPage() {
                             <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700 }}>{z.avgDur}<span style={{ fontSize: 11, color: "#777" }}>min</span></div>
                             <div style={{ fontSize: 9, color: "#777" }}>duree moy.</div>
                           </div>
-                          {rot && (
+                          {rot && rot.avgRotation > 0 && (
                             <div style={{ textAlign: "right" }}>
                               <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700, color }}>{rot.avgRotation}x</div>
                               <div style={{ fontSize: 9, color: "#777" }}>rotation</div>
@@ -1011,7 +1014,7 @@ function PerformancesPage() {
                           )}
                         </div>
                         <div style={{ fontSize: 10, color: "#777" }}>{z.tables} tables · {z.couverts} cvts</div>
-                        {rot && rot.maxRotation > 1 && (
+                        {rot && rot.maxRotation > 1 && rot.avgRotation > 0 && (
                           <div style={{ fontSize: 10, color, fontWeight: 500, marginTop: 2 }}>max {rot.maxRotation}x rotation</div>
                         )}
                       </div>

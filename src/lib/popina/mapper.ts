@@ -75,20 +75,25 @@ export function orderToVentesLignes(
   const salle = order.orderPlace ?? "";
   const table_num = ""; // Popina ne renvoie pas de num de table
   const couverts = order.guests ?? 0;
-  const num_fiscal = order.orderNumber ?? "";
+  // ⚠️ order.orderNumber n'est PAS unique (collisions entre services et même au sein
+  // d'un même service). On utilise order.id (UUID) garanti unique.
+  const num_fiscal = order.id;
   const operateur = order.operatorName ?? "";
   const orderCanceled = !!order.isCanceled;
   const orderTransferred = !!order.isTransferred;
+  // Remise totale de la commande (en euros), portée par la première ligne produit uniquement.
+  const remiseOrder = cents(order.totalDiscount);
 
   const rows: VentesLigneRow[] = [];
 
   // ── Produits ────────────────────────────────────────────────────────────
-  for (const item of order.items ?? []) {
-    rows.push(itemToRow(item, {
+  const items = order.items ?? [];
+  for (let i = 0; i < items.length; i++) {
+    rows.push(itemToRow(items[i], {
       etablissement_id, ouvert_a, ferme_a, date_service, service,
       salle, table_num, couverts, num_fiscal, operateur, import_file,
       statut: orderCanceled ? "Annulé" : "Payé",
-    }));
+    }, i === 0 ? remiseOrder : 0));
   }
 
   // ── Paiements ───────────────────────────────────────────────────────────
@@ -119,7 +124,7 @@ type CommonCtx = {
   statut: string;
 };
 
-function itemToRow(item: PopinaOrderItem, ctx: CommonCtx): VentesLigneRow {
+function itemToRow(item: PopinaOrderItem, ctx: CommonCtx, remise: number = 0): VentesLigneRow {
   const ttc = cents(item.total);
   const tva = cents(item.tax?.taxAmount);
   const ht = cents(item.tax?.taxableAmount);
@@ -150,7 +155,7 @@ function itemToRow(item: PopinaOrderItem, ctx: CommonCtx): VentesLigneRow {
     transfere: !!item.isTransferred,
     taux_tva: fmtTauxTva(item.tax?.taxRate),
     prix_unitaire: cents(item.unitPrice),
-    remise_totale: 0,
+    remise_totale: remise,
     ttc,
     tva,
     ht,

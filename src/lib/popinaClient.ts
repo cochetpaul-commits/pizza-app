@@ -99,9 +99,9 @@ export type PopinaOrder = {
   orderPlace?: string;
   orderNumber?: string;
   operatorName?: string;
-  total?: number;        // centimes
-  totalTax?: number;
-  totalDiscount?: number;
+  total?: number;          // centimes
+  totalTax?: number;       // centimes
+  totalDiscount?: number;  // centimes
   items?: PopinaOrderItem[];
   payments?: PopinaPayment[];
   isCanceled?: boolean;
