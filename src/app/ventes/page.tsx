@@ -803,7 +803,7 @@ function PerformancesPage() {
                       <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>
                         {W.tickets > 0 ? (ca / W.tickets).toFixed(1) + "\u20AC" : "\u2014"}
                       </div>
-                      {activePrev && activePrev.tickets > 0 && <DeltaBadge cur={ca / W.tickets} prev={(mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht) / activePrev.tickets} decimals={1} suffix="\u20AC" />}
+                      {activePrev && activePrev.tickets > 0 && <DeltaBadge cur={ca / W.tickets} prev={(mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht) / activePrev.tickets} decimals={1} suffix={"\u20AC"} />}
                     </div>
                     <div style={{ width: 1, background: "rgba(255,255,255,.1)", alignSelf: "stretch" }} />
                     <div style={{ minWidth: 0, flex: "1 1 0" }}>
@@ -836,7 +836,7 @@ function PerformancesPage() {
                         {W.couverts > 0 ? (ca / W.couverts).toFixed(1) + "\u20AC" : "\u2014"}
                       </div>
                       {W.cov_sur > 0 && <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>CVT M SP <span style={{ color: "#fff", fontWeight: 700 }}>{((mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur).toFixed(1) + "\u20AC"}</span></div>}
-                      {activePrev && activePrev.couverts > 0 && <DeltaBadge cur={ca / W.couverts} prev={(mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht) / activePrev.couverts} decimals={1} suffix="\u20AC" />}
+                      {activePrev && activePrev.couverts > 0 && <DeltaBadge cur={ca / W.couverts} prev={(mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht) / activePrev.couverts} decimals={1} suffix={"\u20AC"} />}
                     </div>
                     <div style={{ width: 1, background: "rgba(255,255,255,.1)", alignSelf: "stretch" }} />
                     <div style={{ minWidth: 0, flex: "1 1 0" }}>
