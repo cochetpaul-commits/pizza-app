@@ -180,7 +180,7 @@ export async function GET(req: NextRequest) {
     // Top produit du jour
     let topProduit: string | null = null;
     try {
-      const { data: tp } = await supabase.rpc("top_produit_jour", { p_etab: ETAB_ID, p_date: cible });
+      const { data: tp } = await rpc("top_produit_jour", { p_etab: ETAB_ID, p_date: cible });
       if (typeof tp === "string") topProduit = tp;
     } catch (e) {}
 
