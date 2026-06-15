@@ -6,66 +6,62 @@
 <title>Bello Mio — Tableau de bord CA</title>
 <style>
   :root {
-    --bg: #161412;
-    --panel: #211e19;
-    --panel2: #2a2620;
-    --creme: #f2ede4;
-    --vert: #7FB069;
-    --rouge: #E06B5A;
-    --terracotta: #D4775A;
-    --gold: #fdbc5d;
-    --muted: #9a948a;
-    --line: #3a352d;
+    --bg: #161412; --panel: #211e19; --panel2: #2a2620;
+    --creme: #f2ede4; --vert: #7FB069; --rouge: #E06B5A;
+    --terracotta: #D4775A; --gold: #fdbc5d; --muted: #9a948a; --line: #3a352d;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     background: radial-gradient(1200px 600px at 80% -10%, #23201b, var(--bg));
     color: var(--creme);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    min-height: 100vh;
-    padding: 28px clamp(16px, 4vw, 48px) 64px;
+    min-height: 100vh; padding: 24px clamp(14px, 4vw, 44px) 60px;
   }
-  .wrap { max-width: 1080px; margin: 0 auto; }
-
-  header { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  header { display: flex; align-items: center; gap: 12px; }
   header .dot { color: var(--terracotta); font-size: 14px; }
   header h1 { font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
   header .spacer { flex: 1; }
   header .date { color: var(--muted); font-size: 14px; }
-  #refresh {
-    background: var(--panel2); color: var(--creme); border: 1px solid var(--line);
-    border-radius: 10px; padding: 8px 12px; font-size: 13px; cursor: pointer;
-  }
+  #refresh { background: var(--panel2); color: var(--creme); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 13px; cursor: pointer; }
   #refresh:hover { border-color: var(--terracotta); }
-  .sub { color: var(--muted); font-size: 13px; margin-bottom: 22px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 2px 0 18px; }
+  .insight { border-left: 3px solid var(--terracotta); background: var(--panel); border-radius: 0 12px 12px 0; padding: 13px 18px; margin-bottom: 20px; font-size: 15px; }
 
-  .insight {
-    border-left: 3px solid var(--terracotta);
-    background: var(--panel);
-    border-radius: 0 12px 12px 0;
-    padding: 14px 18px; margin-bottom: 22px; font-size: 15px;
-  }
-
-  .grid { display: grid; gap: 14px; }
-  .kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 22px; }
-  .card {
-    background: var(--panel); border: 1px solid var(--line);
-    border-radius: 16px; padding: 16px 18px;
-  }
-  .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .card .value { font-size: 30px; font-weight: 700; margin-top: 6px; letter-spacing: -0.5px; }
-  .card .delta { font-size: 13px; margin-top: 2px; }
-  .up { color: var(--vert); } .down { color: var(--rouge); }
+  .section-title { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.7px; margin: 24px 0 10px; }
+  .grid { display: grid; gap: 12px; }
+  .kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+  .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .card .value { font-size: 26px; font-weight: 700; margin-top: 5px; letter-spacing: -0.5px; }
+  .card .delta, .card .note { font-size: 12.5px; margin-top: 3px; }
+  .card .note { color: var(--muted); }
+  .up { color: var(--vert); } .down { color: var(--rouge); } .flat { color: var(--muted); }
 
   .charts { grid-template-columns: 1fr 1fr; }
-  @media (max-width: 760px) { .charts { grid-template-columns: 1fr; } }
-  .panel-title { font-size: 14px; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .chart-box { position: relative; height: 260px; }
+  @media (max-width: 780px) { .charts { grid-template-columns: 1fr; } .twocol { grid-template-columns: 1fr !important; } }
+  .panel-title { font-size: 13px; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .chart-box { position: relative; height: 250px; }
 
-  .services-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
-  .bar { flex: 1; height: 12px; border-radius: 6px; background: var(--panel2); overflow: hidden; display: flex; }
-  .bar .midi { background: var(--terracotta); height: 100%; }
-  .bar .soir { background: var(--gold); height: 100%; }
+  .twocol { grid-template-columns: 1fr 1fr; }
+  .catrow { margin-bottom: 11px; }
+  .catrow:last-child { margin-bottom: 0; }
+  .catline { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+  .catline .n { color: var(--creme); }
+  .catline .v { color: var(--muted); }
+  .bar { height: 8px; background: var(--panel2); border-radius: 5px; overflow: hidden; }
+  .bar > span { display: block; height: 100%; background: var(--terracotta); border-radius: 5px; }
+
+  .toplist { display: flex; flex-direction: column; gap: 9px; }
+  .topitem { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  .topitem .rk { width: 22px; height: 22px; flex: none; border-radius: 6px; background: var(--panel2); color: var(--gold); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .topitem .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topitem .cat { color: var(--muted); font-size: 11px; }
+  .topitem .ca { font-weight: 600; }
+  .topitem .qt { color: var(--muted); font-size: 11px; margin-left: 6px; }
+
+  .ms-bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--panel2); }
+  .ms-bar .midi { background: var(--terracotta); } .ms-bar .soir { background: var(--gold); }
   .legend { display: flex; gap: 18px; margin-top: 10px; font-size: 13px; color: var(--muted); }
   .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
 
@@ -83,10 +79,8 @@
     <span class="date" id="date">—</span>
     <button id="refresh">↻ Actualiser</button>
   </header>
-  <div class="sub">Tableau de bord du chiffre d'affaires · données de la veille</div>
-
+  <div class="sub">Tableau de bord du chiffre d'affaires</div>
   <div id="content"><div class="muted">Chargement…</div></div>
-
   <footer id="footer"></footer>
 </div>
 
@@ -95,18 +89,13 @@
   // ===================== CONFIG =====================
   const ENDPOINT = "https://pizza-app-olive-five.vercel.app/api/widget/ca";
   const TOKEN = "9e929172a974d541b2d8636877aeadb2";
-  const AUTO_REFRESH_MIN = 15; // 0 = désactivé
+  const AUTO_REFRESH_MIN = 15;
   // ==================================================
 
-  const PAL = {
-    creme: "#f2ede4", vert: "#7FB069", rouge: "#E06B5A",
-    terracotta: "#D4775A", gold: "#fdbc5d", muted: "#9a948a",
-    barDim: "rgba(91,82,73,0.85)", line: "rgba(154,148,138,0.15)",
-  };
-  const fmtE = (n, d = 0) => n == null || isNaN(n)
-    ? "—"
-    : new Intl.NumberFormat("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d }).format(d ? n : Math.round(n)) + " €";
-  const fmtPct = (n) => n == null ? "—" : (n >= 0 ? "▲ " : "▼ ") + Math.abs(n).toFixed(1).replace(".", ",") + " %";
+  const PAL = { creme: "#f2ede4", vert: "#7FB069", rouge: "#E06B5A", terracotta: "#D4775A", gold: "#fdbc5d", muted: "#9a948a", barDim: "rgba(91,82,73,0.85)", line: "rgba(154,148,138,0.15)" };
+  const fmtE = (n, d = 0) => n == null || isNaN(n) ? "—" : new Intl.NumberFormat("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d }).format(d ? n : Math.round(n)) + " €";
+  const fmtPct = (n) => n == null ? "" : (n >= 0 ? "▲ " : "▼ ") + Math.abs(n).toFixed(1).replace(".", ",") + " %";
+  const cls = (n) => n == null ? "flat" : n > 0.05 ? "up" : n < -0.05 ? "down" : "flat";
 
   let charts = [];
   function destroyCharts() { charts.forEach((c) => c.destroy()); charts = []; }
@@ -119,17 +108,25 @@
       if (data.error) throw new Error(data.error);
       render(data);
     } catch (e) {
-      el.innerHTML = `<div class="err">Impossible de charger les données : ${e.message}.<br>Vérifie ENDPOINT et TOKEN en haut du fichier.</div>`;
+      el.innerHTML = `<div class="err">Impossible de charger les données : ${e.message}.</div>`;
     }
   }
 
   function insightText(v) {
     if (v == null) return null;
-    if (v >= 8) return ["Belle journée — nettement au-dessus du même jour la semaine dernière.", PAL.vert];
-    if (v >= 2) return ["Journée en hausse sur la semaine.", PAL.vert];
-    if (v > -2) return ["Activité stable par rapport à la semaine dernière.", PAL.muted];
-    if (v >= -8) return ["Léger repli par rapport au même jour la semaine dernière.", PAL.rouge];
-    return ["Journée en retrait par rapport à la semaine dernière.", PAL.rouge];
+    if (v >= 8) return "Belle journée — nettement au-dessus du même jour la semaine dernière.";
+    if (v >= 2) return "Journée en hausse sur la semaine.";
+    if (v > -2) return "Activité stable par rapport à la semaine dernière.";
+    if (v >= -8) return "Léger repli par rapport au même jour la semaine dernière.";
+    return "Journée en retrait par rapport à la semaine dernière.";
+  }
+
+  function kpi(label, value, sub) {
+    return `<div class="card"><div class="label">${label}</div><div class="value">${value}</div>${sub || ""}</div>`;
+  }
+  function delta(v, suffix) {
+    if (v == null) return "";
+    return `<div class="delta ${cls(v)}">${fmtPct(v)}${suffix ? " " + suffix : ""}</div>`;
   }
 
   function render(data) {
@@ -137,108 +134,102 @@
     const v = data.comparaison_j7 ? data.comparaison_j7.variation_pct : null;
     const ins = insightText(v);
 
-    const serie = data.serie_30j || data.serie_7j || [];
-    // moyennes par jour de semaine (sur jours ouverts)
+    const serie = data.serie_30j || [];
     const byDow = [[], [], [], [], [], [], []];
-    serie.forEach((p) => {
-      const dow = new Date(p.date + "T00:00:00Z").getUTCDay();
-      if (p.ca > 0) byDow[dow].push(p.ca);
-    });
+    serie.forEach((p) => { const d = new Date(p.date + "T00:00:00Z").getUTCDay(); if (p.ca > 0) byDow[d].push(p.ca); });
     const dowLabels = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
     const order = [1, 2, 3, 4, 5, 6, 0];
-    const dowAvg = order.map((d) => {
-      const arr = byDow[d];
-      return arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
-    });
+    const dowAvg = order.map((d) => { const a = byDow[d]; return a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : 0; });
 
-    const s = data.services || {};
-    const hasServices = s.midi != null || s.soir != null;
-    const midi = s.midi || 0, soir = s.soir || 0, totS = midi + soir || 1;
-
-    const kpi = (label, value, delta) => `
-      <div class="card"><div class="label">${label}</div>
-      <div class="value">${value}</div>${delta || ""}</div>`;
+    const sem = data.semaine || {}, mois = data.mois || {}, mj = data.meilleur_jour;
+    const ms = (data.services_30j && data.services_30j.midi != null) ? data.services_30j : data.services || {};
+    const midi = ms.midi || 0, soir = ms.soir || 0, totMS = midi + soir || 1;
+    const cats = data.categories || [];
+    const maxCat = cats.reduce((m, c) => Math.max(m, c.ca), 0) || 1;
+    const tops = data.top_produits || [];
 
     document.getElementById("content").innerHTML = `
-      ${ins ? `<div class="insight" style="border-color:${ins[1]}">${ins[0]}</div>` : ""}
+      ${ins ? `<div class="insight">${ins}</div>` : ""}
+
+      <div class="section-title">Hier · ${data.jour_court || ""}</div>
       <div class="grid kpis">
-        ${kpi("CA d'hier", fmtE(data.ca_total),
-          v != null ? `<div class="delta ${v >= 0 ? "up" : "down"}">${fmtPct(v)} vs J-7</div>` : "")}
-        ${kpi("Moyenne 7 jours", fmtE(data.moyenne_7j))}
-        ${kpi("Couverts", data.couverts != null ? data.couverts : "—")}
-        ${kpi("Ticket moyen", fmtE(data.ticket_moyen, 2))}
-        ${kpi("Part pizza", data.part_pizza_pct != null ? data.part_pizza_pct + " %" : "—")}
-        ${data.top_produit ? kpi("Top produit", `<span style="font-size:20px">${data.top_produit}</span>`) : ""}
+        ${kpi("CA d'hier", fmtE(data.ca_total), delta(v, "vs J-7"))}
+        ${kpi("Couverts", data.couverts != null ? data.couverts : "—", `<div class="note">${data.top_produit ? "top : " + data.top_produit : ""}</div>`)}
+        ${kpi("Ticket moyen", fmtE(data.ticket_moyen, 2), `<div class="note">par couvert</div>`)}
+        ${kpi("Part pizza", data.part_pizza_pct != null ? data.part_pizza_pct + " %" : "—", `<div class="note">du CA du jour</div>`)}
       </div>
 
+      <div class="section-title">Tendances</div>
+      <div class="grid kpis">
+        ${kpi("CA 7 derniers jours", fmtE(sem.ca), delta(sem.variation_pct, "vs 7 j préc."))}
+        ${kpi("CA " + (mois.libelle || "mois") + " (à ce jour)", fmtE(mois.ca), delta(mois.variation_pct, "vs M-1"))}
+        ${kpi("Moyenne / jour (7 j)", fmtE(data.moyenne_7j), `<div class="note">jours ouverts</div>`)}
+        ${kpi("Meilleur jour (30 j)", mj ? fmtE(mj.ca) : "—", `<div class="note">${mj ? mj.jour : ""}</div>`)}
+      </div>
+
+      <div class="section-title">Évolution</div>
       <div class="grid charts">
-        <div class="card">
-          <div class="panel-title">30 derniers jours</div>
-          <div class="chart-box"><canvas id="c30"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="panel-title">Moyenne par jour de semaine</div>
-          <div class="chart-box"><canvas id="cdow"></canvas></div>
-        </div>
+        <div class="card"><div class="panel-title">30 derniers jours</div><div class="chart-box"><canvas id="c30"></canvas></div></div>
+        <div class="card"><div class="panel-title">Moyenne par jour de semaine</div><div class="chart-box"><canvas id="cdow"></canvas></div></div>
       </div>
 
-      ${hasServices ? `
-      <div class="card" style="margin-top:14px">
-        <div class="panel-title">Répartition midi / soir</div>
-        <div class="services-row">
-          <div class="bar">
-            <div class="midi" style="width:${(midi / totS) * 100}%"></div>
-            <div class="soir" style="width:${(soir / totS) * 100}%"></div>
+      <div class="section-title">Mix produits · 30 jours</div>
+      <div class="grid twocol">
+        <div class="card">
+          <div class="panel-title">Par catégorie</div>
+          ${cats.map((c) => `
+            <div class="catrow">
+              <div class="catline"><span class="n">${c.nom}</span><span class="v">${fmtE(c.ca)} · ${c.pct} %</span></div>
+              <div class="bar"><span style="width:${Math.max(2, Math.round((c.ca / maxCat) * 100))}%"></span></div>
+            </div>`).join("") || '<div class="muted">—</div>'}
+        </div>
+        <div class="card">
+          <div class="panel-title">Top produits</div>
+          <div class="toplist">
+            ${tops.map((p, i) => `
+              <div class="topitem">
+                <span class="rk">${i + 1}</span>
+                <span class="nm">${p.produit} <span class="cat">${p.categorie}</span></span>
+                <span class="ca">${fmtE(p.ca)}</span><span class="qt">${p.qte}×</span>
+              </div>`).join("") || '<div class="muted">—</div>'}
           </div>
         </div>
+      </div>
+
+      <div class="section-title">Répartition midi / soir · 30 jours</div>
+      <div class="card">
+        <div class="ms-bar"><div class="midi" style="width:${(midi / totMS) * 100}%"></div><div class="soir" style="width:${(soir / totMS) * 100}%"></div></div>
         <div class="legend">
-          <span><span class="sw" style="background:${PAL.terracotta}"></span>Midi ${fmtE(midi)}</span>
-          <span><span class="sw" style="background:${PAL.gold}"></span>Soir ${fmtE(soir)}</span>
+          <span><span class="sw" style="background:${PAL.terracotta}"></span>Midi ${fmtE(midi)} (${Math.round((midi / totMS) * 100)} %)</span>
+          <span><span class="sw" style="background:${PAL.gold}"></span>Soir ${fmtE(soir)} (${Math.round((soir / totMS) * 100)} %)</span>
         </div>
-      </div>` : ""}
+      </div>
     `;
 
     destroyCharts();
     drawSerie(serie);
     drawDow(order.map((d) => dowLabels[d]), dowAvg);
-
-    const stale = data._stale ? " · (cache)" : "";
     document.getElementById("footer").textContent =
-      "Mis à jour " + new Date(data.updated_at || Date.now()).toLocaleString("fr-FR") + stale;
+      "Mis à jour " + new Date(data.updated_at || Date.now()).toLocaleString("fr-FR") + (data._stale ? " · (cache)" : "");
   }
 
-  function baseOpts(maxLabelEvery) {
+  function baseOpts(maxTicks) {
     return {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false },
-        tooltip: { callbacks: { label: (c) => fmtE(c.parsed.y) } } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => fmtE(c.parsed.y) } } },
       scales: {
-        x: { grid: { display: false }, ticks: { color: PAL.muted, font: { size: 10 },
-          maxRotation: 0, autoSkip: true, maxTicksLimit: maxLabelEvery } },
-        y: { grid: { color: PAL.line }, ticks: { color: PAL.muted, font: { size: 10 },
-          callback: (val) => (val >= 1000 ? val / 1000 + "k" : val) } },
+        x: { grid: { display: false }, ticks: { color: PAL.muted, font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: maxTicks } },
+        y: { grid: { color: PAL.line }, ticks: { color: PAL.muted, font: { size: 10 }, callback: (val) => (val >= 1000 ? val / 1000 + "k" : val) } },
       },
     };
   }
-
   function drawSerie(serie) {
-    const labels = serie.map((p) => {
-      const d = new Date(p.date + "T00:00:00Z");
-      return d.getUTCDate() + "/" + (d.getUTCMonth() + 1);
-    });
+    const labels = serie.map((p) => { const d = new Date(p.date + "T00:00:00Z"); return d.getUTCDate() + "/" + (d.getUTCMonth() + 1); });
     const colors = serie.map((_, i) => (i === serie.length - 1 ? PAL.terracotta : PAL.barDim));
-    charts.push(new Chart(document.getElementById("c30"), {
-      type: "bar",
-      data: { labels, datasets: [{ data: serie.map((p) => p.ca), backgroundColor: colors, borderRadius: 4 }] },
-      options: baseOpts(10),
-    }));
+    charts.push(new Chart(document.getElementById("c30"), { type: "bar", data: { labels, datasets: [{ data: serie.map((p) => p.ca), backgroundColor: colors, borderRadius: 4 }] }, options: baseOpts(10) }));
   }
   function drawDow(labels, vals) {
-    charts.push(new Chart(document.getElementById("cdow"), {
-      type: "bar",
-      data: { labels, datasets: [{ data: vals, backgroundColor: PAL.gold, borderRadius: 4 }] },
-      options: baseOpts(7),
-    }));
+    charts.push(new Chart(document.getElementById("cdow"), { type: "bar", data: { labels, datasets: [{ data: vals, backgroundColor: PAL.gold, borderRadius: 4 }] }, options: baseOpts(7) }));
   }
 
   document.getElementById("refresh").addEventListener("click", load);
