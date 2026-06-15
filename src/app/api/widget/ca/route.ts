@@ -158,11 +158,14 @@ export async function GET(req: NextRequest) {
       if (so != null) { soir30 += so; anyMS = true; }
     }
 
-    // RPC catégories + top produits (30 j)
+    // RPC catégories + top produits (30 j).
+    // Cast : ces fonctions ne sont pas dans les types générés Supabase.
+    const rpc = (fn: string, args: Record<string, unknown>) =>
+      (supabase.rpc as unknown as (f: string, a: Record<string, unknown>) => Promise<{ data: unknown }>)(fn, args);
     const win = addDays(cible, -29);
     const [catRes, topRes] = await Promise.all([
-      supabase.rpc("widget_categories", { p_etab: ETAB_ID, p_debut: win, p_fin: cible }),
-      supabase.rpc("widget_top_produits", { p_etab: ETAB_ID, p_debut: win, p_fin: cible, p_limit: 6 }),
+      rpc("widget_categories", { p_etab: ETAB_ID, p_debut: win, p_fin: cible }),
+      rpc("widget_top_produits", { p_etab: ETAB_ID, p_debut: win, p_fin: cible, p_limit: 6 }),
     ]);
     const catRows = (catRes.data ?? []) as { categorie: string; ca: unknown; qte: unknown }[];
     const totalCat = catRows.reduce((a, c) => a + (num(c.ca) ?? 0), 0) || 1;
