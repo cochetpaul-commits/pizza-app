@@ -21,6 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Piccola Mia", href: "/piccola-mia", group: "pm" },
   { label: "Planning", href: "/piccola-mia/planning", indent: true },
   { label: "Evenements", href: "/piccola-mia/evenements", indent: true },
+  { label: "HACCP", href: "/haccp" },
 ];
 
 const PAGE_LABELS: Record<string, string> = {
@@ -30,6 +31,7 @@ const PAGE_LABELS: Record<string, string> = {
   "/piccola-mia": "Piccola Mia",
   "/piccola-mia/planning": "Planning",
   "/piccola-mia/evenements": "Evenements",
+  "/haccp": "HACCP",
 };
 
 function getPageTitle(pathname: string): string {
