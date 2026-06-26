@@ -10,7 +10,6 @@ import {
   DateTimeRow,
   FormSection,
   HaccpPageShell,
-  NumberStepper,
   SaveBar,
   StatusBanner
 } from "@/components/haccp/FormBlocks";

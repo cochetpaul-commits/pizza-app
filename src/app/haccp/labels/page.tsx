@@ -31,7 +31,7 @@ const DAY_LABELS = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 
 export default function LabellerPage() {
   const { current } = useEtablissement();
-  const router = useRouter();
+  const _router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [kind, setKind] = useState<LabelKind>("fait");
   const [productId, setProductId] = useState("");
@@ -52,6 +52,7 @@ export default function LabellerPage() {
   const product = products.find((p) => p.id === productId);
   const baseDays = KINDS.find((k) => k.value === kind)?.shelfDaysBase;
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShelfDays(baseDays ?? product?.shelf_life_days ?? 3);
   }, [baseDays, product?.shelf_life_days]);
 

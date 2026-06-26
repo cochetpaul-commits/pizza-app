@@ -96,7 +96,7 @@ export default function HaccpModuleStub() {
             </p>
             <p style={{ marginTop: 18, color: T.muted, fontSize: 13 }}>
               La route, les tables Supabase (<code style={{ background: T.creme, padding: "1px 6px", borderRadius: 4 }}>haccp_*</code>) et les
-              policies RLS sont déjà en place. Il ne manque que l'UI de saisie dédiée, à
+              policies RLS sont déjà en place. Il ne manque que l&apos;UI de saisie dédiée, à
               porter depuis le proto Vite (<code style={{ background: T.creme, padding: "1px 6px", borderRadius: 4 }}>/Users/paulcochet/bello-mio 2</code>) en
               style pizza-app.
             </p>
