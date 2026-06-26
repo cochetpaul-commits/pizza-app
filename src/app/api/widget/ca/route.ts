@@ -182,7 +182,7 @@ export async function GET(req: NextRequest) {
     try {
       const { data: tp } = await rpc("top_produit_jour", { p_etab: ETAB_ID, p_date: cible });
       if (typeof tp === "string") topProduit = tp;
-    } catch (e) {}
+    } catch (_e) { /* non bloquant */ }
 
     const ecart = diffJours(hier, cible);
     const libelle = ecart === 0 ? "hier" : ecart === 1 ? "avant-hier" : dateCourte(cible);

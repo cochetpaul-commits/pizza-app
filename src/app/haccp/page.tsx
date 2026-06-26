@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import {
   Barcode,
@@ -403,9 +404,12 @@ function ModuleTile({
           </div>
         )}
         {mod.customIcon ? (
-          <img
+          <Image
             src={mod.customIcon}
             alt=""
+            width={iconPx}
+            height={iconPx}
+            unoptimized
             style={{ width: iconPx, height: iconPx, objectFit: "contain" }}
           />
         ) : (
