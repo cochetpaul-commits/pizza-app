@@ -22,6 +22,8 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/bello-mio":    ALL,
   "/piccola-mia":  ALL,
   "/dashboard":    ALL,
+  "/haccp":        ALL,
+  "/haccp/admin":  ["group_admin"],
   "/fournisseurs": ALL,
   "/rh/conges":    ALL,
   // Pages contrôlées par permissions granulaires (accessibles à tous, RequireRole vérifie la permission)

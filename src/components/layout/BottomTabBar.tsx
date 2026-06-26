@@ -149,6 +149,51 @@ function IconTag({ active: _active }: { active: boolean }) {
   );
 }
 
+function IconClipboard({ active: _active }: { active: boolean }) {
+  return (
+    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="6" y="4" width="12" height="18" rx="2" />
+      <path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" />
+      <path d="M9 11h6M9 15h4" />
+    </svg>
+  );
+}
+
+function IconThermometer({ active: _active }: { active: boolean }) {
+  return (
+    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 14.6V5a2 2 0 1 0-4 0v9.6a4 4 0 1 0 4 0z" />
+    </svg>
+  );
+}
+
+function IconBrush({ active: _active }: { active: boolean }) {
+  return (
+    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.07" />
+      <path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z" />
+    </svg>
+  );
+}
+
+function IconBarcode({ active: _active }: { active: boolean }) {
+  return (
+    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 5v14M7 5v14M11 5v14M15 5v9M19 5v14" />
+    </svg>
+  );
+}
+
+function IconPrinter({ active: _active }: { active: boolean }) {
+  return (
+    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9V3h12v6" />
+      <rect x="3" y="9" width="18" height="9" rx="2" />
+      <rect x="6" y="14" width="12" height="7" />
+    </svg>
+  );
+}
+
 function IconGrid({ active: _active }: { active: boolean }) {
   return (
     <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -275,8 +320,23 @@ const SECTION_EVENTS: TabSection = {
   ],
 };
 
-const SECTIONS_BELLO: TabSection[] = [SECTION_PILOTAGE, SECTION_MY_PLANNING, SECTION_PRODUCTION, SECTION_ACHATS];
-const SECTIONS_PICCOLA: TabSection[] = [SECTION_PILOTAGE, SECTION_MY_PLANNING, SECTION_PRODUCTION_PICCOLA, SECTION_ACHATS, SECTION_EVENTS];
+const SECTION_HACCP: TabSection = {
+  label: "HACCP",
+  href: "/haccp",
+  match: ["/haccp"],
+  icon: (a) => <IconClipboard active={a} />,
+  tabs: [
+    { label: "Tableau",       href: "/haccp",                match: ["/haccp"],                icon: (a) => <IconClipboard active={a} /> },
+    { label: "Températures",  href: "/haccp/temperatures",   match: ["/haccp/temperatures"],   icon: (a) => <IconThermometer active={a} /> },
+    { label: "Nettoyage",     href: "/haccp/cleaning",       match: ["/haccp/cleaning"],       icon: (a) => <IconBrush active={a} /> },
+    { label: "Traçabilité",   href: "/haccp/tracability",    match: ["/haccp/tracability"],    icon: (a) => <IconBarcode active={a} /> },
+    { label: "Réception",     href: "/haccp/reception",      match: ["/haccp/reception"],      icon: (a) => <IconBox active={a} /> },
+    { label: "Étiqueteuse",   href: "/haccp/labels",         match: ["/haccp/labels"],         icon: (a) => <IconPrinter active={a} /> }
+  ]
+};
+
+const SECTIONS_BELLO: TabSection[] = [SECTION_PILOTAGE, SECTION_MY_PLANNING, SECTION_PRODUCTION, SECTION_ACHATS, SECTION_HACCP];
+const SECTIONS_PICCOLA: TabSection[] = [SECTION_PILOTAGE, SECTION_MY_PLANNING, SECTION_PRODUCTION_PICCOLA, SECTION_ACHATS, SECTION_HACCP, SECTION_EVENTS];
 
 
 /* ── Helpers ──────────────────────────────────────── */
@@ -327,6 +387,7 @@ const SECTION_SHORT_LABEL: Record<string, string> = {
   Planning: "Planning",
   "Prod.": "Prod.",
   Achats: "Achats",
+  HACCP: "HACCP",
   Events: "Events",
 };
 

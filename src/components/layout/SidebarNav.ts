@@ -103,6 +103,17 @@ export const ACHATS_ITEMS: NavItemV2[] = [
   { label: "Stats prix", href: "/variations-prix", icon: "trendingUp" },
 ];
 
+// HACCP (autocontrôles & conformité)
+export const HACCP_ITEMS: NavItemV2[] = [
+  { label: "Tableau HACCP", href: "/haccp",                icon: "clipboard" },
+  { label: "Températures",  href: "/haccp/temperatures",   icon: "trendingUp" },
+  { label: "Nettoyage",     href: "/haccp/cleaning",       icon: "clipboard" },
+  { label: "Traçabilité",   href: "/haccp/tracability",    icon: "tag" },
+  { label: "Réception",     href: "/haccp/reception",      icon: "package" },
+  { label: "Étiqueteuse",   href: "/haccp/labels",         icon: "fileText" },
+  { label: "Paramètres",    href: "/haccp/admin",          icon: "settings", roles: ["group_admin"] }
+];
+
 // EVENEMENTIEL (Piccola uniquement)
 export const EVENEMENTIEL_ITEMS: NavItemV2[] = [
   { label: "Evenements", href: "/evenements", icon: "calendarEvent" },
@@ -124,6 +135,7 @@ export const PERSONNEL_SECTION: NavSubSection = { label: "Personnel", icon: "use
 export const PRODUCTION_SECTION: NavSubSection = { label: "Production", icon: "package", roles: ["group_admin"], items: PRODUCTION_ITEMS };
 export const PRODUCTION_SECTION_PICCOLA: NavSubSection = { label: "Production", icon: "package", roles: ["group_admin"], items: PRODUCTION_ITEMS_PICCOLA };
 export const ACHATS_SECTION: NavSubSection = { label: "Achats", icon: "shoppingBag", roles: ["group_admin"], items: ACHATS_ITEMS };
+export const HACCP_SECTION: NavSubSection = { label: "HACCP", icon: "clipboard", href: "/haccp", items: HACCP_ITEMS };
 export const EVENEMENTIEL_SECTION: NavSubSection = { label: "Evenementiel", icon: "calendarEvent", items: EVENEMENTIEL_ITEMS };
 
 // Backward compat
@@ -147,6 +159,7 @@ export function buildDynamicNav(
       PERSONNEL_SECTION,
       isPiccola ? PRODUCTION_SECTION_PICCOLA : PRODUCTION_SECTION,
       ACHATS_SECTION,
+      HACCP_SECTION,
       ...(isPiccola ? [EVENEMENTIEL_SECTION] : []),
     ];
 
@@ -201,6 +214,7 @@ export const SIDEBAR_NAV_SIMPLE: SidebarEntry[] = [
   { kind: "item", label: "Accueil", href: "/dashboard", icon: "dashboard" },
   { kind: "divider" },
   { kind: "item", label: "Mon planning", href: "/mes-shifts", icon: "calendar" },
+  { kind: "item", label: "HACCP", href: "/haccp", icon: "clipboard" },
   { kind: "item", label: "Recettes", href: "/recettes", icon: "book" },
   { kind: "item", label: "Catalogue", href: "/catalogue", icon: "book" },
   { kind: "item", label: "Ingrédients", href: "/ingredients", icon: "tag" },
@@ -336,6 +350,22 @@ export const PAGE_TITLES: Record<string, string> = {
   "/piccola-mia": "Piccola Mia",
   "/piccola-mia/planning": "Planning Piccola Mia",
   "/piccola-mia/evenements": "Événements Piccola Mia",
+  "/haccp": "HACCP",
+  "/haccp/temperatures": "Températures",
+  "/haccp/cleaning": "Plan de nettoyage",
+  "/haccp/tracability": "Traçabilité",
+  "/haccp/reception": "Contrôle à réception",
+  "/haccp/product_temp": "T°C produit",
+  "/haccp/checklist": "Checklist",
+  "/haccp/oils": "Contrôle d'huile",
+  "/haccp/production": "Production",
+  "/haccp/documents": "Documents",
+  "/haccp/labels": "Étiqueteuse",
+  "/haccp/admin": "Paramètres HACCP",
+  "/haccp/admin/equipments": "Équipements",
+  "/haccp/admin/products": "Produits référents",
+  "/haccp/admin/cleaning": "Tâches de nettoyage",
+  "/haccp/admin/probes": "Sondes LoRaWAN",
 };
 
 /** Section name map: pathname → parent section label for TopBar subtitle */

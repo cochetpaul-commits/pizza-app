@@ -12,6 +12,7 @@ import {
   PILOTAGE_SECTION,
   ACHATS_SECTION,
   PRODUCTION_SECTION, PRODUCTION_SECTION_PICCOLA,
+  HACCP_SECTION,
   EVENEMENTIEL_SECTION,
   type NavSubSection,
   type NavItemV2,
@@ -118,6 +119,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           PERSONNEL_SECTION,
           PRODUCTION_SECTION,
           ACHATS_SECTION,
+          HACCP_SECTION,
           ...(isPiccola ? [EVENEMENTIEL_SECTION] : []),
         ]
     : [];
@@ -419,6 +421,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 PERSONNEL_SECTION,
                 isPiccolaEtab ? PRODUCTION_SECTION_PICCOLA : PRODUCTION_SECTION,
                 ACHATS_SECTION,
+                HACCP_SECTION,
                 ...(isPiccolaEtab ? [EVENEMENTIEL_SECTION] : []),
               ];
 
