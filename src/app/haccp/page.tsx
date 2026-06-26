@@ -66,13 +66,17 @@ export default function HaccpHome() {
   const [equipmentsCount, setEquipmentsCount] = useState(0);
 
   useEffect(() => {
-    if (!current?.id) {
-      setCleaning([]);
-      setEquipmentsCount(0);
-      return;
-    }
-    void fetchCleaningTasks(current.id).then(setCleaning);
-    void fetchEquipments(current.id).then((e) => setEquipmentsCount(e.length));
+    if (!current?.id) return;
+    let cancelled = false;
+    void fetchCleaningTasks(current.id).then((d) => {
+      if (!cancelled) setCleaning(d);
+    });
+    void fetchEquipments(current.id).then((e) => {
+      if (!cancelled) setEquipmentsCount(e.length);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [current?.id]);
 
   const dayCount = cleaning.filter((c) => c.frequency === "day").length;
