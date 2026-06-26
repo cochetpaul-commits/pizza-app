@@ -115,7 +115,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
   const [prodQty, setProdQty] = useState<number | "">("");
 
   // Main tab
-  type MainTab = "fc" | "recette" | "cmd" | "pop";
+  type MainTab = "fc" | "recette" | "salle" | "cmd" | "pop";
   const [mainTab, setMainTab] = useState<MainTab>(initialProdMode ? "recette" : isEdit ? "fc" : "recette");
 
   // Save state
@@ -622,6 +622,29 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
     } finally { setPdfLoading(false); }
   }
 
+  async function handleExportPdfSalle() {
+    if (!recipeId) return;
+    setPdfLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { alert("Non authentifié"); return; }
+      const res = await fetchApi("/api/kitchen/pdf-salle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ recipeId }),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({ message: "Erreur inconnue" })); alert(`Erreur PDF salle: ${e.message}`); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `salle-${(name || "plat").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfLoading(false); }
+  }
+
   async function handleIndexSave() {
     if (!recipeId) return;
     setIndexSaving(true);
@@ -715,6 +738,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
   const MAIN_TABS: { key: MainTab; label: string }[] = [
     { key: "fc", label: "Food cost & Marges" },
     { key: "recette", label: "Recette & Procede" },
+    { key: "salle", label: "Salle" },
   ];
 
   if (status === "loading") {
@@ -743,6 +767,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
           actions={<>
             {isEdit && pivotIngredientId && <HeroBtn onClick={() => setShowProdModal(true)}>Production</HeroBtn>}
             <HeroBtn onClick={handleExportPdf} disabled={!isEdit || pdfLoading} title={!isEdit ? "Enregistrer la recette pour exporter le PDF" : undefined}>{pdfLoading ? "Export…" : "PDF"}</HeroBtn>
+            <HeroBtn onClick={handleExportPdfSalle} disabled={!isEdit || pdfLoading} title={!isEdit ? "Enregistrer la recette pour exporter le PDF salle" : "Fiche salle (serveurs)"}>{pdfLoading ? "Export…" : "PDF Salle"}</HeroBtn>
             {isEdit ? <PublishCatalogueButton recipeType="cuisine" recipeId={recipeId!} /> : <HeroBtn disabled title="Enregistrer la recette pour publier au catalogue">Catalogue</HeroBtn>}
             {userCanWrite && <HeroBtn onClick={handleSave} disabled={saving} primary>{saving ? "Sauvegarde…" : "Enregistrer"}</HeroBtn>}
             {isEdit && userCanWrite && (
@@ -1166,6 +1191,21 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
             )}
           </>
         )}
+
+        {/* ── TAB: SALLE ── */}
+        {mainTab === "salle" && (
+          <SalleTab
+            meta={meta}
+            updateMeta={updateMeta}
+            userCanWrite={userCanWrite}
+            saving={saving}
+            saveError={saveError}
+            onSave={handleSave}
+            onExportPdf={handleExportPdfSalle}
+            isEdit={isEdit}
+            pdfLoading={pdfLoading}
+          />
+        )}
       </main>
 
       {showProdModal && pivotIngredientId && recipeId && (
@@ -1177,6 +1217,163 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
           onClose={() => setShowProdModal(false)}
         />
       )}
+    </>
+  );
+}
+
+// ── Salle Tab ────────────────────────────────────────────────────
+const REGIME_OPTIONS: { key: string; label: string }[] = [
+  { key: "vegetarien", label: "Végétarien" },
+  { key: "vegan", label: "Vegan" },
+  { key: "sans_gluten", label: "Sans gluten" },
+  { key: "sans_lactose", label: "Sans lactose" },
+  { key: "halal", label: "Halal" },
+];
+
+function parseRegimes(csv: string | undefined): Set<string> {
+  if (!csv) return new Set();
+  return new Set(csv.split(",").map(s => s.trim()).filter(Boolean));
+}
+
+function serializeRegimes(set: Set<string>): string {
+  return Array.from(set).join(",");
+}
+
+function SalleTab({
+  meta, updateMeta, userCanWrite, saving, saveError, onSave, onExportPdf, isEdit, pdfLoading,
+}: {
+  meta: Record<string, string>;
+  updateMeta: (k: string, v: string) => void;
+  userCanWrite: boolean;
+  saving: boolean;
+  saveError: string | null;
+  onSave: () => void;
+  onExportPdf: () => void;
+  isEdit: boolean;
+  pdfLoading: boolean;
+}) {
+  const regimes = parseRegimes(meta.regimes_csv);
+  const toggleRegime = (key: string) => {
+    const next = new Set(regimes);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    updateMeta("regimes_csv", serializeRegimes(next));
+  };
+
+  const sectionStyle: React.CSSProperties = {
+    background: "#fff", borderRadius: 16, padding: "20px 24px",
+    border: "1px solid #e0d8ce", marginBottom: 14,
+  };
+  const sectionTitleStyle: React.CSSProperties = {
+    margin: "0 0 12px", fontSize: 10, fontWeight: 700,
+    textTransform: "uppercase", letterSpacing: "0.12em", color: "#D4775A",
+  };
+  const hintStyle: React.CSSProperties = {
+    fontSize: 11, color: "#999", marginBottom: 10, lineHeight: 1.4,
+  };
+  const inputStyle: React.CSSProperties = {
+    width: "100%", padding: "10px 12px", borderRadius: 8,
+    border: "1.5px solid #e5ddd0", fontSize: 13, background: "#fff",
+    outline: "none", color: "#1a1a1a", boxSizing: "border-box",
+    fontFamily: "inherit",
+  };
+  const textareaStyle: React.CSSProperties = { ...inputStyle, minHeight: 90, resize: "vertical" };
+
+  return (
+    <>
+      <div style={{
+        background: "#fff7ed", borderRadius: 12, padding: "12px 16px",
+        border: "1px solid #fed7aa", marginBottom: 14, color: "#9a3412", fontSize: 12, lineHeight: 1.5,
+      }}>
+        <strong style={{ fontWeight: 700 }}>Fiche salle</strong> — ces informations alimentent le PDF destiné aux serveurs.
+        Elles permettent de répondre aux clients sur la composition, les allergènes, les accords et les régimes.
+      </div>
+
+      {/* Argumentaire */}
+      <div style={sectionStyle}>
+        <div style={sectionTitleStyle}>Argumentaire client</div>
+        <div style={hintStyle}>
+          Phrase prête à dire au client. Vendeur, court (1-3 phrases), évoque l&apos;origine et le caractère du plat.
+        </div>
+        <textarea
+          value={meta.description_salle ?? ""}
+          onChange={e => updateMeta("description_salle", e.target.value)}
+          placeholder="Ex: Notre risotto crémeux au parmesan Reggiano affiné 24 mois, garni de fruits de mer frais arrivés le matin même…"
+          style={textareaStyle}
+        />
+      </div>
+
+      {/* Accords */}
+      <div style={sectionStyle}>
+        <div style={sectionTitleStyle}>Accords conseillés</div>
+        <div style={hintStyle}>Suggestions à proposer pour augmenter le ticket moyen.</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+          <MetaField label="Vin" value={meta.accords_vin} onChange={v => updateMeta("accords_vin", v)} placeholder="Ex: Vermentino di Sardegna" />
+          <MetaField label="Bière" value={meta.accords_biere} onChange={v => updateMeta("accords_biere", v)} placeholder="Ex: Birra Moretti" />
+          <MetaField label="Sans alcool" value={meta.accords_soft} onChange={v => updateMeta("accords_soft", v)} placeholder="Ex: Limonade artisanale" />
+        </div>
+      </div>
+
+      {/* Régimes */}
+      <div style={sectionStyle}>
+        <div style={sectionTitleStyle}>Régimes compatibles</div>
+        <div style={hintStyle}>Coche uniquement ce que le plat respecte. Les autres régimes seront affichés comme incompatibles.</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {REGIME_OPTIONS.map(opt => {
+            const active = regimes.has(opt.key);
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => toggleRegime(opt.key)}
+                style={{
+                  padding: "8px 14px", borderRadius: 20,
+                  border: active ? "1.5px solid #4A6741" : "1.5px solid #ddd6c8",
+                  background: active ? "#4A6741" : "#fff",
+                  color: active ? "#fff" : "#666",
+                  fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* FAQ */}
+      <div style={sectionStyle}>
+        <div style={sectionTitleStyle}>Questions / objections clients</div>
+        <div style={hintStyle}>
+          Une question par ligne, format : <code style={{ background: "#f5f0e8", padding: "1px 5px", borderRadius: 3 }}>Question | Réponse</code>
+        </div>
+        <textarea
+          value={meta.faq ?? ""}
+          onChange={e => updateMeta("faq", e.target.value)}
+          placeholder={"C'est épicé ? | Non, c'est doux et crémeux.\nLes fruits de mer sont frais ? | Oui, livraison Mael deux fois par semaine.\nC'est servi chaud ? | Oui, à 65°C."}
+          style={{ ...textareaStyle, minHeight: 120, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12 }}
+        />
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: "flex", gap: 12, paddingBottom: 32, flexWrap: "wrap" }}>
+        {userCanWrite && (
+          <button onClick={onSave} disabled={saving} className="btn btnPrimary" style={{ flex: 1, minWidth: 200 }}>
+            {saving ? "Sauvegarde…" : "Sauvegarder"}
+          </button>
+        )}
+        <button
+          onClick={onExportPdf}
+          disabled={!isEdit || pdfLoading}
+          className="btn"
+          style={{ flex: 1, minWidth: 200 }}
+          title={!isEdit ? "Enregistrer d'abord pour exporter le PDF salle" : undefined}
+        >
+          {pdfLoading ? "Export…" : "Exporter PDF Salle"}
+        </button>
+      </div>
+      {saveError && <div className="errorBox" style={{ marginBottom: 8 }}>{saveError}</div>}
     </>
   );
 }
