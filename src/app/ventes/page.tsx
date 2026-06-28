@@ -831,7 +831,7 @@ function PerformancesPage() {
                     </div>
                     <div style={{ width: 1, background: "rgba(255,255,255,.1)", alignSelf: "stretch" }} />
                     <div style={{ minWidth: 0, flex: "1 1 0" }}>
-                      <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>CVT moyen sur place</div>
+                      <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>Ticket moyen sur place</div>
                       <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>
                         {W.cov_sur > 0 ? ((mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur).toFixed(1) + "\u20AC" : "\u2014"}
                       </div>
