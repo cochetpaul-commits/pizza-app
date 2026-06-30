@@ -1,10 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["pdfjs-dist", "web-push"],
-  // Inclure tout pdfjs-dist/legacy/ dans le bundle des API routes (sinon
-  // Vercel tree-shake le worker .mjs car il n'est pas import statiquement
-  // → erreur "Cannot find module .../pdf.worker.mjs" sur les routes PDF).
+  serverExternalPackages: ["web-push"],
+  // pdfjs-dist NE doit PAS etre en serverExternalPackages : le worker .mjs
+  // est resolu dynamiquement et Vercel tree-shake le fichier si pdfjs-dist
+  // n'est pas bundle. En laissant Next bundler le package, le worker est
+  // inclus comme dependence statique.
   outputFileTracingIncludes: {
     "/api/**/*": ["./node_modules/pdfjs-dist/legacy/**/*"],
   },
