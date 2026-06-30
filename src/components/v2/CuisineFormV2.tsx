@@ -520,6 +520,12 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         };
         const ingCat: Category = CAT_MAP[category] ?? "preparation";
         const recipeName = name || "Nouvelle recette";
+        // Si la prépa a un rendement ET un nb de portions, déduire le poids
+        // d'une portion (= piece_weight_g sur l'ingrédient). Permet de
+        // sélectionner cette prépa en `pcs` dans une recette parente.
+        const pieceWeightG = yieldG && yieldG > 0 && portions && portions > 0
+          ? round2(yieldG / portions)
+          : null;
         const ingUpdate = {
           name: recipeName,
           category: ingCat,
@@ -529,6 +535,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
           purchase_unit_name: "kg" as const,
           source: "recette_maison",
           recipe_id: rid!,
+          piece_weight_g: pieceWeightG,
         };
 
         // Strategy 1: already known from load or previous save
@@ -566,7 +573,6 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
             allergens: null,
             default_unit: "g",
             density_g_per_ml: null,
-            piece_weight_g: null,
             piece_volume_ml: null,
             supplier_id: null,
             ...(etab ? { etablissement_id: etab.id } : {}),
@@ -654,6 +660,9 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         preparation: "preparation", sauce: "sauce", autre: "autre",
       };
       const ingCat: Category = CAT_MAP[category] ?? "preparation";
+      const pieceWeightG = yieldG && yieldG > 0 && portions && portions > 0
+        ? round2(yieldG / portions)
+        : null;
 
       if (indexIngredientId) {
         await supabase.from("ingredients").update({
@@ -663,6 +672,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
           purchase_unit: 1,
           purchase_unit_label: "kg",
           purchase_unit_name: "kg",
+          piece_weight_g: pieceWeightG,
         }).eq("id", indexIngredientId);
       } else {
         const { data: newIng, error: insErr } = await supabase.from("ingredients").insert({
@@ -678,7 +688,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
           allergens: null,
           default_unit: "g",
           density_g_per_ml: null,
-          piece_weight_g: null,
+          piece_weight_g: pieceWeightG,
           piece_volume_ml: null,
           supplier_id: null,
           ...(etab ? { etablissement_id: etab.id } : {}),
