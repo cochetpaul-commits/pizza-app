@@ -1,4 +1,10 @@
-import path from "node:path";
+import { createRequire } from "node:module";
+
+// require.resolve statique → webpack/Next trace le worker .mjs comme
+// dépendance et l'inclut dans le bundle serverless. Sans ça, le path
+// est résolu uniquement à runtime et le fichier n'est jamais copié,
+// causant "Cannot find module .../pdf.worker.mjs" sur Vercel.
+const requireFn = createRequire(import.meta.url);
 
 // Polyfill DOMMatrix for Node.js / Vercel serverless (pdfjs-dist requires it)
 // Must run BEFORE pdfjs-dist is imported — hence dynamic import below
@@ -34,9 +40,8 @@ let pdfjsLib: typeof import("pdfjs-dist/legacy/build/pdf.mjs") | null = null;
 async function getPdfjs() {
   if (!pdfjsLib) {
     pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
-    pdfjsLib.GlobalWorkerOptions.workerSrc = path.join(
-      process.cwd(),
-      "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"
+    pdfjsLib.GlobalWorkerOptions.workerSrc = requireFn.resolve(
+      "pdfjs-dist/legacy/build/pdf.worker.mjs"
     );
   }
   return pdfjsLib;
