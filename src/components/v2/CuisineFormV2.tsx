@@ -162,6 +162,8 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
       if (eff.ml == null && eff.pcs != null && pvm && pvm > 0) eff.ml = eff.pcs / pvm;
       if (eff.g == null && eff.ml != null && dens && dens > 0) eff.g = eff.ml / dens;
       if (eff.ml == null && eff.g != null && dens && dens > 0) eff.ml = eff.g * dens;
+      if (eff.pcs == null && eff.g != null && pwg && pwg > 0) eff.pcs = eff.g * pwg;
+      if (eff.pcs == null && eff.ml != null && pvm && pvm > 0) eff.pcs = eff.ml * pvm;
 
       if ((unit === "g" || unit === "kg") && eff.g) return acc + eff.g * (unit === "kg" ? qty * 1000 : qty);
       if ((unit === "cl" || unit === "ml" || unit === "l") && eff.ml) {

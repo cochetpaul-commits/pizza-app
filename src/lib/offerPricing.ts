@@ -84,6 +84,11 @@ export function enrichCpuWithConversions(row: Record<string, unknown>, cpu: CpuB
   if (out.pcs != null && !(out.g != null) && pieceWeightG > 0) {
     out.g = out.pcs / pieceWeightG;
   }
+  // Reciproque : deduire €/pcs depuis €/g quand on connait le poids/piece.
+  // Necessaire pour les preparations indexees en €/kg avec yield/portions.
+  if (out.g != null && !(out.pcs != null) && pieceWeightG > 0) {
+    out.pcs = out.g * pieceWeightG;
+  }
 
   const densityKgPerL = n2(row["density_kg_per_l"]);
   if (densityKgPerL > 0) {
