@@ -34,6 +34,7 @@ type KitchenRow = {
 type CocktailRow = {
   id: string; name: string | null; type: string | null; image_url: string | null;
   total_cost: number | null; sell_price: number | null;
+  vat_rate: number | null;
   establishments: string[] | null;
   pivot_ingredient_id: string | null;
 };
@@ -103,6 +104,14 @@ function matchesSearch(name: string | null, q: string): boolean {
 function normRate(r: number | null): number {
   if (r == null) return 0;
   return r >= 1 ? r / 100 : r;
+}
+
+// sell_price est stocke en HT. Retourne le TTC pour affichage.
+// Default TVA 10% si vat_rate manquant.
+function toTTC(sellHT: number | null, vatRate: number | null): number | null {
+  if (sellHT == null || sellHT <= 0) return null;
+  const v = vatRate == null ? 0.10 : normRate(vatRate);
+  return sellHT * (1 + v);
 }
 
 function pvTTCPizza(r: PizzaRow): number | null {
@@ -406,7 +415,7 @@ function RecettesInner() {
         .select("id,name,photo_url,category,total_cost,cost_per_kg,cost_per_portion,margin_rate,vat_rate,sell_price,establishments,pivot_ingredient_id")
         .eq("is_draft", false);
       const cq = supabase.from("cocktails")
-        .select("id,name,image_url,type,total_cost,sell_price,establishments,pivot_ingredient_id")
+        .select("id,name,image_url,type,total_cost,sell_price,vat_rate,establishments,pivot_ingredient_id")
         .eq("is_draft", false);
       const eq = supabase.from("recipes")
         .select("id,name,type,created_at,total_cost,yield_grams,pivot_ingredient_id")
@@ -802,7 +811,7 @@ function RecettesInner() {
                   subtitle="Pizza"
                   subtitleColor={PIZZA_COLOR}
                   cost={r.total_cost}
-                  pv={r.sell_price}
+                  pv={toTTC(r.sell_price, r.vat_rate)}
                   pvConseille={pvTTCPizza(r)}
                   pvLabel="TTC"
                 />
@@ -885,7 +894,7 @@ function RecettesInner() {
                           subtitleColor={catColor}
                           cost={isPrep ? (hasKg ? r.cost_per_kg! : null) : (hasPortion ? r.cost_per_portion! : hasKg ? r.cost_per_kg! : null)}
                           costLabel={isPrep ? (hasKg ? "/kg" : undefined) : (hasPortion ? "/portion" : hasKg ? "/kg" : undefined)}
-                          pv={isPrep ? null : r.sell_price}
+                          pv={isPrep ? null : toTTC(r.sell_price, r.vat_rate)}
                           pvConseille={isPrep ? null : pvTTCKitchen(r)}
                           pvLabel={isPrep ? undefined : (hasPortion ? "TTC" : hasKg ? "TTC/kg" : undefined)}
                         />
@@ -915,7 +924,7 @@ function RecettesInner() {
                   subtitle="Cocktail"
                   subtitleColor={COCKTAIL_COLOR}
                   cost={r.total_cost}
-                  pv={r.sell_price}
+                  pv={toTTC(r.sell_price, r.vat_rate)}
                   pvLabel="TTC"
                 />
               ))}
