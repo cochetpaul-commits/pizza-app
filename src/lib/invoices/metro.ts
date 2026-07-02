@@ -61,9 +61,11 @@ function parseLines(text: string): ParsedLine[] {
   for (const r of rows) {
     const lineMatch = r.match(/^\d{8,13}\s+(\d{7})\s+(.+?)\s+([\d,]+)\s+(\d+)\s+\d+\s+([\d,]+)\s+([ABD])(?:\s+[A-Z])*\s*$/i);
     if (!lineMatch) {
-      const vapMatch = r.match(/^\d{8,13}\s+(\d{7})\s+(.+?)\s+([\d,]+)\s+([\d,]+)\s+(\d+)\s+\d+\s+([\d,]+)\s+([ABD])(?:\s+[A-Z])*\s*$/i);
+      // VAP = vente au poids : EAN NUM NOM POIDS PRIX_KG QTE MONTANT TVA
+      // (4 nombres apres le nom, pas de colisage). Distingué de PIECE via
+      // 2 décimaux consécutifs au lieu de dec/int/int/dec.
+      const vapMatch = r.match(/^\d{8,13}\s+(\d{7})\s+(.+?)\s+(\d+,\d+)\s+(\d+,\d+)\s+(\d+)\s+([\d,]+)\s+([ABD])(?:\s+[A-Z])*\s*$/i);
       if (vapMatch) {
-        // VAP = vente au poids, prix réel par kg
         tmp.push({ sku: vapMatch[1], name: vapMatch[2].trim(), quantity: parseFrenchNumber(vapMatch[5]), unit: "kg", unit_price: parseFrenchNumber(vapMatch[4]), total_price: parseFrenchNumber(vapMatch[6]), tax_rate: taxMap[vapMatch[7].toUpperCase()] ?? null, notes: "VAP=" + vapMatch[3], piece_weight_g: null, piece_volume_ml: null });
       }
       continue;
