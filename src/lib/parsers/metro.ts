@@ -71,9 +71,11 @@ function shouldSkipLine(line: string): boolean {
 // EAN(8-13) ARTICLE(7) NAME... PRIX_UNIT QTE COLIS MONTANT TVA [Promo] [Extr.]
 const RE_PIECE = /^(\d{8,13})\s+(\d{7})\s+(.+?)\s+([\d,]+)\s+(\d+)\s+(\d+)\s+([\d,]+)\s+([ABD])(?:\s+[A-Z])*\s*$/;
 
-// Regex for VAP line (weight present) — has extra columns
-// EAN ARTICLE NAME... POIDS PRIX_KG QTE COLIS MONTANT TVA [Promo] [Extr.]
-const RE_VAP = /^(\d{8,13})\s+(\d{7})\s+(.+?)\s+([\d,]+)\s+([\d,]+)\s+(\d+)\s+(\d+)\s+([\d,]+)\s+([ABD])(?:\s+[A-Z])*\s*$/;
+// Regex for VAP line (weight present) — no colisage column
+// EAN ARTICLE NAME... POIDS PRIX_KG QTE MONTANT TVA [Promo] [Extr.]
+// Distingué de PIECE via 2 décimaux consécutifs (POIDS, PRIX_KG) au lieu
+// de dec/int/int/dec pour PIECE.
+const RE_VAP = /^(\d{8,13})\s+(\d{7})\s+(.+?)\s+(\d+,\d+)\s+(\d+,\d+)\s+(\d+)\s+([\d,]+)\s+([ABD])(?:\s+[A-Z])*\s*$/;
 
 // Section header
 const RE_SECTION = /^\*{3}\s+(.+?)(?:\s+Total\s*:.*)?$/;
@@ -90,7 +92,11 @@ export function parseMetro(text: string, etablissement: string): ParseResult {
   const ingredients: ParsedIngredient[] = [];
   const logs: ParseLog[] = [];
 
+  // Sur Metro, le header "*** X Total: 12,34" apparait APRES les items de X.
+  // On buffer les indices des items depuis le dernier header pour leur
+  // appliquer retroactivement la vraie categorie.
   let currentCategorie: Categorie = "autre";
+  let pendingIndices: number[] = [];
 
   // Stop parsing at page 2 (TVA recap)
   let reachedPage2 = false;
@@ -109,11 +115,17 @@ export function parseMetro(text: string, etablissement: string): ParseResult {
       continue;
     }
 
-    // Section headers
+    // Section headers — chez Metro le header est un total qui vient APRES
+    // les items, donc on applique la categorie retroactivement au buffer.
     const sectionMatch = trimmed.match(RE_SECTION);
     if (sectionMatch) {
-      currentCategorie = categorieFromMetroSection(sectionMatch[1]);
-      logs.push({ line_number: i + 1, raw: trimmed, rule: "section", result: "ok", detail: currentCategorie });
+      const sectionCat = categorieFromMetroSection(sectionMatch[1]);
+      for (const idx of pendingIndices) {
+        ingredients[idx].categorie = sectionCat;
+      }
+      pendingIndices = [];
+      currentCategorie = sectionCat;
+      logs.push({ line_number: i + 1, raw: trimmed, rule: "section", result: "ok", detail: sectionCat });
       continue;
     }
 
@@ -145,7 +157,7 @@ export function parseMetro(text: string, etablissement: string): ParseResult {
       const poidsReel = parseFrenchNumber(vapMatch[4]);
       const prixKg = parseFrenchNumber(vapMatch[5]);
       const qte = parseInt(vapMatch[6], 10);
-      const montant = parseFrenchNumber(vapMatch[8]);
+      const montant = parseFrenchNumber(vapMatch[7]);
 
       if (prixKg != null && montant != null) {
         const cat = currentCategorie !== "autre" ? currentCategorie : detectCategorieFromName(name);
@@ -165,6 +177,7 @@ export function parseMetro(text: string, etablissement: string): ParseResult {
           raw_line: trimmed,
           confidence: "high",
         });
+        pendingIndices.push(ingredients.length - 1);
 
         logs.push({ line_number: i + 1, raw: trimmed, rule: "vap_line", result: "ok", detail: `${name} @${prixKg}€/kg x${qte}` });
         continue;
@@ -213,6 +226,7 @@ export function parseMetro(text: string, etablissement: string): ParseResult {
           raw_line: trimmed,
           confidence: "high",
         });
+        pendingIndices.push(ingredients.length - 1);
 
         logs.push({ line_number: i + 1, raw: trimmed, rule: "piece_line", result: "ok", detail: `${name} @${prixUnit}€ x${qte} col=${colisage}` });
         continue;
