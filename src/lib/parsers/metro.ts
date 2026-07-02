@@ -25,8 +25,12 @@ import { categorieFromMetroSection, detectCategorieFromName } from "./categories
 
 function detectEtablissement(text: string): string | null {
   const upper = text.toUpperCase();
+  // Nom explicite en priorité
   if (upper.includes("SASHA") || upper.includes("BELLO MIO")) return "bello_mio";
   if (upper.includes("I FRATELLI") || upper.includes("IFRATELLI") || upper.includes("PICCOLA MIA")) return "piccola_mia";
+  // Adresse (client Metro écrit souvent juste "FRATELLI" — desambiguer via l'adresse)
+  if (upper.includes("PLACE DU PONCEL")) return "bello_mio";
+  if (upper.includes("RUE VILLE PEPIN")) return "piccola_mia";
   return null;
 }
 
@@ -86,7 +90,9 @@ const RE_PRIX_KG = /PRIX\s+AU\s+KG\s+OU\s+AU\s+LITRE\s*:\s*([\d,.]+)/i;
 export function parseMetro(text: string, etablissement: string): ParseResult {
   const meta = extractMeta(text);
   const detectedEtab = detectEtablissement(text);
-  const etab = etablissement || detectedEtab || "bello_mio";
+  // Priorité : ce qu'écrit la facture (source de vérité) > contexte UI > default.
+  // Sinon quand l'UI est sur "bello_mio" par défaut, une facture Piccola atterrit sur Bello.
+  const etab = detectedEtab || etablissement || "bello_mio";
 
   const rows = text.split(/\r?\n/);
   const ingredients: ParsedIngredient[] = [];
