@@ -864,7 +864,8 @@ function CocktailPricing({
   function applyTTC(ttcTyped: number) {
     if (!costPerCocktail || costPerCocktail <= 0) return;
     const coeff = ttcTyped / (costPerCocktail * (1 + vatRate));
-    if (coeff > 0) onSellCoeffChange(Math.round(coeff * 100) / 100);
+    // 4 décimales : préserve la précision du TTC saisi.
+    if (coeff > 0) onSellCoeffChange(Math.round(coeff * 10000) / 10000);
   }
 
   const fcColor = foodCostPct == null ? "#999"
@@ -899,7 +900,7 @@ function CocktailPricing({
         <div style={{ textAlign: "center", padding: "0 4px", borderLeft: "1px solid #ece4d4" }}>
           <div style={lbl}>Coeff</div>
           <div style={{ ...bigNum, color: "#7C3AED" }}>
-            {sellCoeff != null ? `×${sellCoeff}` : "-"}
+            {sellCoeff != null ? `×${sellCoeff.toFixed(2)}` : "-"}
           </div>
         </div>
 
@@ -987,7 +988,7 @@ function CocktailPricing({
                 <input
                   type="text"
                   inputMode="decimal"
-                  value={coeffEditing ? coeffLocal : (sellCoeff != null ? sellCoeff.toString() : "")}
+                  value={coeffEditing ? coeffLocal : (sellCoeff != null ? sellCoeff.toFixed(2) : "")}
                   placeholder="3"
                   onFocus={(e) => {
                     setCoeffEditing(true);

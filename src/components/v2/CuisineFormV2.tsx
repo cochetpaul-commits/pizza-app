@@ -1491,7 +1491,9 @@ function CuisinePricing({
   function applyTTC(ttcTyped: number) {
     if (!baseCost || baseCost <= 0) return;
     const coeff = ttcTyped / (baseCost * (1 + vatRate));
-    if (coeff > 0) onSellCoeffChange(Math.round(coeff * 100) / 100);
+    // 4 décimales pour que le TTC recalcule EXACTEMENT ce qui a été tape
+    // (2 décimales font perdre precision : 22€ tape => 3.82 arrondi => 21.98€).
+    if (coeff > 0) onSellCoeffChange(Math.round(coeff * 10000) / 10000);
   }
 
   const fcColor = foodCostPct == null ? "#999"
@@ -1532,7 +1534,7 @@ function CuisinePricing({
         <div style={{ textAlign: "center", padding: "0 4px", borderLeft: "1px solid #ece4d4" }}>
           <div style={lbl}>Coeff</div>
           <div style={{ ...bigNum, color: "#7C3AED" }}>
-            {sellCoeff != null ? `×${sellCoeff}` : "-"}
+            {sellCoeff != null ? `×${sellCoeff.toFixed(2)}` : "-"}
           </div>
         </div>
 
@@ -1688,7 +1690,7 @@ function CuisinePricing({
                 <input
                   type="text"
                   inputMode="decimal"
-                  value={coeffEditing ? coeffLocal : (sellCoeff != null ? sellCoeff.toString() : "")}
+                  value={coeffEditing ? coeffLocal : (sellCoeff != null ? sellCoeff.toFixed(2) : "")}
                   placeholder="3"
                   onFocus={(e) => {
                     setCoeffEditing(true);
