@@ -1664,11 +1664,9 @@ function IngredientsPageInner() {
             autoFocus
             placeholder="Rechercher un ingredient..."
             value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              if (e.target.value.length >= 2) {
-                setTimeout(() => setShowSearchSheet(false), 400);
-              }
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setShowSearchSheet(false);
             }}
             style={{
               width: "100%", borderRadius: 12, border: "1.5px solid #e5ddd0",
