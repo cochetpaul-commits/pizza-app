@@ -120,7 +120,10 @@ export function EtablissementProvider({ children }: { children: ReactNode }) {
 
     init();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      // Ignorer TOKEN_REFRESHED / USER_UPDATED : re-init reset le loading
+      // et fait sauter les formulaires en cours de saisie apres inactivite.
+      if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") return;
       if (session?.user) {
         // User just signed in — re-fetch establishments
         cancelled = false;

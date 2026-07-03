@@ -72,8 +72,12 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (cancelled) return;
+      // Ignorer TOKEN_REFRESHED / USER_UPDATED : ce n'est PAS un changement
+      // d'utilisateur, donc pas besoin de setLoading(true) — sinon RequireRole
+      // demonte tout le contenu (perte du state des formulaires en cours).
+      if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") return;
       if (session?.user) {
         setLoading(true);
         fetchProfile(session.user.id);
