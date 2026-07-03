@@ -847,12 +847,25 @@ function CocktailPricing({
 }) {
   const [coeffLocal, setCoeffLocal] = useState(sellCoeff != null ? String(sellCoeff) : "");
   const [coeffEditing, setCoeffEditing] = useState(false);
+  const [ttcLocal, setTtcLocal] = useState(prixTTC != null ? prixTTC.toFixed(2) : "");
+  const [ttcEditing, setTtcEditing] = useState(false);
   const [paramsOpen, setParamsOpen] = useState(true);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!coeffEditing) setCoeffLocal(sellCoeff != null ? String(sellCoeff) : "");
   }, [sellCoeff, coeffEditing]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!ttcEditing) setTtcLocal(prixTTC != null ? prixTTC.toFixed(2) : "");
+  }, [prixTTC, ttcEditing]);
+
+  function applyTTC(ttcTyped: number) {
+    if (!costPerCocktail || costPerCocktail <= 0) return;
+    const coeff = ttcTyped / (costPerCocktail * (1 + vatRate));
+    if (coeff > 0) onSellCoeffChange(Math.round(coeff * 100) / 100);
+  }
 
   const fcColor = foodCostPct == null ? "#999"
     : foodCostPct <= fcTarget ? "#16a34a"
@@ -1019,6 +1032,48 @@ function CocktailPricing({
                   >×{c}</button>
                 ))}
               </div>
+            </div>
+
+            {/* Prix TTC — saisir directement le prix, deduit le coeff */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ ...lbl, minWidth: 44 }}>Prix TTC</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={ttcEditing ? ttcLocal : (prixTTC != null ? prixTTC.toFixed(2) : "")}
+                  placeholder="10,00"
+                  disabled={!costPerCocktail || costPerCocktail <= 0}
+                  onFocus={(e) => {
+                    setTtcEditing(true);
+                    setTtcLocal(prixTTC != null ? prixTTC.toFixed(2) : "");
+                    setTimeout(() => e.target.select(), 0);
+                  }}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(",", ".").replace(/[^\d.]/g, "");
+                    setTtcLocal(raw);
+                    const n = Number(raw);
+                    if (!isNaN(n) && n > 0) applyTTC(n);
+                  }}
+                  onBlur={() => {
+                    setTtcEditing(false);
+                    const n = Number(ttcLocal);
+                    if (!isNaN(n) && n > 0) applyTTC(n);
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur(); }}
+                  style={{
+                    width: 80, fontSize: 20, fontWeight: 800, color: "#1a1a1a",
+                    fontFamily: "var(--font-oswald), Oswald, sans-serif",
+                    border: "2px solid #e0d8ce", borderRadius: 10, padding: "3px 8px",
+                    background: costPerCocktail && costPerCocktail > 0 ? "#faf6ee" : "#f0ebe2",
+                    outline: "none", fontVariantNumeric: "tabular-nums",
+                  }}
+                />
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#6f6a61" }}>€</span>
+              </div>
+              <span style={{ fontSize: 10, color: "#999", fontStyle: "italic" }}>
+                → ajuste automatiquement le coeff
+              </span>
             </div>
 
             {/* TVA + FC cible */}
