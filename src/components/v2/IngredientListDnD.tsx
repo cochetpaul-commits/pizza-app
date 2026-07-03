@@ -232,20 +232,18 @@ export function IngredientListDnD({
                           }}
                         >✕</button>
 
-                        {/* Density warning for liquids */}
+                        {/* Density warning for liquids — pas de lien pour eviter
+                            la perte du form en cours (target=_blank est ignore
+                            sur mobile/PWA et navigue dans la page courante). */}
                         {densityMissing && (
-                          <a
-                            href={`/ingredients/${line.ingredient_id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <span
                             style={{
                               width: "100%", fontSize: 11, color: "#d97706",
-                              textDecoration: "none", marginTop: 2,
-                              paddingLeft: 24,
+                              marginTop: 2, paddingLeft: 24,
                             }}
                           >
                             ⚠️ Densité manquante — prix estimé avec 1g/ml
-                          </a>
+                          </span>
                         )}
                       </div>
                     )}
