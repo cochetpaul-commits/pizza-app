@@ -58,13 +58,14 @@ const CUISINE_COLOR  = "#4a6741";
 const COCKTAIL_COLOR = "#D4775A";
 const EMP_COLOR      = "#8a7b6b";
 
+// Ordre d'affichage metier : Entrée → Plat → Dessert → Accompagnement → Préparation → Sauce → Autre
 const CUISINE_CATS = [
-  { id: "preparation",    label: "Préparation" },
-  { id: "sauce",          label: "Sauce" },
   { id: "entree",         label: "Entrée" },
   { id: "plat_cuisine",   label: "Plat cuisiné" },
-  { id: "accompagnement", label: "Accompagnement" },
   { id: "dessert",        label: "Dessert" },
+  { id: "accompagnement", label: "Accompagnement" },
+  { id: "preparation",    label: "Préparation" },
+  { id: "sauce",          label: "Sauce" },
   { id: "autre",          label: "Autre" },
 ];
 
@@ -553,11 +554,19 @@ function RecettesInner() {
     for (const r of kitchens) {
       const id = r.category;
       if (!id || byId[id]) continue;
-      // Turn slug (e.g. "verre_de_vin") into a human label ("Verre de vin")
       const label = id.replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
       byId[id] = { id, label };
     }
-    return Object.values(byId).sort((a, b) => a.label.localeCompare(b.label, "fr"));
+    // Ordre déclaré dans CUISINE_CATS d'abord, custom (non listés) ensuite alphabetique.
+    const declaredOrder = new Map(CUISINE_CATS.map((c, i) => [c.id, i]));
+    return Object.values(byId).sort((a, b) => {
+      const ia = declaredOrder.get(a.id);
+      const ib = declaredOrder.get(b.id);
+      if (ia != null && ib != null) return ia - ib;
+      if (ia != null) return -1;
+      if (ib != null) return 1;
+      return a.label.localeCompare(b.label, "fr");
+    });
   }, [kitchens]);
 
   const totalCount = filteredPizzas.length + filteredKitchens.length + filteredCocktails.length + filteredEmps.length;
