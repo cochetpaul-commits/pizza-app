@@ -101,6 +101,7 @@ export const ACHATS_ITEMS: NavItemV2[] = [
   { label: "Commandes", href: "/commandes", icon: "shoppingBag" },
   { label: "Factures", href: "/achats", icon: "fileText" },
   { label: "Stats prix", href: "/variations-prix", icon: "trendingUp" },
+  { label: "Catalogue Popina", href: "/admin/popina-catalogue", icon: "tag", roles: ["group_admin"] },
 ];
 
 // HACCP (autocontrôles & conformité)
@@ -188,7 +189,6 @@ export function buildDynamicNav(
           { label: "Établissement", href: "/settings/etablissements", icon: "building" },
           { label: "Employés", href: "/settings/employes", icon: "users" },
           { label: "Fournisseurs", href: "/fournisseurs", icon: "truck" },
-          { label: "Catalogue Popina", href: "/admin/popina-catalogue", icon: "tag" },
         ],
       },
       {
