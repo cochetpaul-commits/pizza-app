@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NavBar } from "@/components/NavBar";
 import { useProfile } from "@/lib/ProfileContext";
+
+type PairingItem = { id: string; name: string; category: string };
 
 type Fiche = {
   id: string;
@@ -11,6 +13,7 @@ type Fiche = {
   category: string;
   description_courte: string | null;
   wine_pairing: string | null;
+  pairings: PairingItem[];
   photo_url: string | null;
   price_ttc: number | null;
   allergens: string[];
@@ -39,6 +42,136 @@ const ALLERGEN_ICONS: Record<string, string> = {
   Lupin: "Lu", Mollusques: "Ml",
 };
 
+const DRINK_CAT_COLORS: Record<string, { bg: string; fg: string }> = {
+  vins: { bg: "#F5E6F0", fg: "#7B2D5F" },
+  spiritueux: { bg: "#FFF3E0", fg: "#E65100" },
+  biere: { bg: "#FFF9C4", fg: "#F9A825" },
+  soft: { bg: "#E0F7FA", fg: "#00838F" },
+  liqueurs: { bg: "#EDE7F6", fg: "#5E35B1" },
+  cafeteria: { bg: "#EFEBE9", fg: "#5D4037" },
+  sirops: { bg: "#FCE4EC", fg: "#C62828" },
+};
+
+/* ── PairingPicker ──────────────────────────────────────── */
+
+function PairingPicker({ fiche, onAdd, onRemove }: {
+  fiche: Fiche;
+  onAdd: (item: PairingItem) => void;
+  onRemove: (ingredientId: string) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<PairingItem[]>([]);
+  const [searching, setSearching] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function doSearch(q: string) {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!q.trim()) { setResults([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      const res = await fetch(`/api/catalogue/fiches/pairings?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      setResults(Array.isArray(data) ? data : []);
+      setSearching(false);
+    }, 250);
+  }
+
+  const selectedIds = new Set(fiche.pairings.map((p) => p.id));
+
+  return (
+    <div>
+      <label style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1 }}>
+        Accords Mets & Boissons
+      </label>
+
+      {/* Selected pairings */}
+      {fiche.pairings.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+          {fiche.pairings.map((p) => {
+            const col = DRINK_CAT_COLORS[p.category] ?? { bg: "#eee", fg: "#666" };
+            return (
+              <span key={p.id} style={{
+                display: "inline-flex", alignItems: "center", gap: 4,
+                padding: "3px 8px", borderRadius: 6, fontSize: 11,
+                background: col.bg, color: col.fg, border: `1px solid ${col.fg}30`,
+              }}>
+                {p.name}
+                <button
+                  onClick={() => onRemove(p.id)}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    color: col.fg, fontSize: 13, fontWeight: 700, lineHeight: 1, padding: 0,
+                  }}
+                >
+                  x
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Search input */}
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => { setSearch(e.target.value); doSearch(e.target.value); }}
+        placeholder="Rechercher un vin, spiritueux, bière, soft..."
+        style={{
+          width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8,
+          border: "1px solid #ddd6c8", fontSize: 13, outline: "none",
+          boxSizing: "border-box",
+        }}
+      />
+
+      {/* Results dropdown */}
+      {(results.length > 0 || searching) && search.trim() && (
+        <div style={{
+          marginTop: 2, border: "1px solid #e5ddd0", borderRadius: 8,
+          background: "#fff", maxHeight: 180, overflowY: "auto",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+        }}>
+          {searching ? (
+            <div style={{ padding: 10, fontSize: 12, color: "#999" }}>Recherche...</div>
+          ) : (
+            results.map((r) => {
+              const already = selectedIds.has(r.id);
+              const col = DRINK_CAT_COLORS[r.category] ?? { bg: "#eee", fg: "#666" };
+              return (
+                <div
+                  key={r.id}
+                  onClick={() => {
+                    if (already) return;
+                    onAdd(r);
+                    setSearch("");
+                    setResults([]);
+                  }}
+                  style={{
+                    padding: "8px 10px", fontSize: 12, cursor: already ? "default" : "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    opacity: already ? 0.4 : 1,
+                    borderBottom: "1px solid #f5f0e8",
+                  }}
+                  onMouseEnter={(e) => { if (!already) e.currentTarget.style.background = "#f9f6f0"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; }}
+                >
+                  <span>{r.name}</span>
+                  <span style={{
+                    padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 700,
+                    background: col.bg, color: col.fg,
+                  }}>
+                    {r.category}
+                  </span>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── FicheCard ───────────────────────────────────────────── */
 
 function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
@@ -50,7 +183,6 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
 }) {
   const [editing, setEditing] = useState(false);
   const [desc, setDesc] = useState(fiche.description_courte ?? "");
-  const [wine, setWine] = useState(fiche.wine_pairing ?? "");
   const [saving, setSaving] = useState(false);
 
   async function save() {
@@ -62,15 +194,31 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
         id: fiche.id,
         type: fiche.type,
         description_courte: desc.trim(),
-        wine_pairing: wine.trim(),
       }),
     });
     onUpdate(fiche.id, fiche.type, {
       description_courte: desc.trim() || null,
-      wine_pairing: wine.trim() || null,
     });
     setSaving(false);
     setEditing(false);
+  }
+
+  async function addPairing(item: PairingItem) {
+    await fetch("/api/catalogue/fiches/pairings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipe_id: fiche.id, recipe_type: fiche.type, ingredient_id: item.id }),
+    });
+    onUpdate(fiche.id, fiche.type, { pairings: [...fiche.pairings, item] });
+  }
+
+  async function removePairing(ingredientId: string) {
+    await fetch("/api/catalogue/fiches/pairings", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipe_id: fiche.id, recipe_type: fiche.type, ingredient_id: ingredientId }),
+    });
+    onUpdate(fiche.id, fiche.type, { pairings: fiche.pairings.filter((p) => p.id !== ingredientId) });
   }
 
   const col = CAT_COLORS[fiche.category] ?? { bg: "#eee", fg: "#666" };
@@ -144,23 +292,7 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
                   }}
                 />
               </div>
-              {fiche.type !== "cocktail" && (
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1 }}>
-                    Accord Mets & Vins
-                  </label>
-                  <input
-                    type="text"
-                    value={wine}
-                    onChange={(e) => setWine(e.target.value)}
-                    placeholder="Ex: Chianti Classico, Montepulciano d'Abruzzo"
-                    style={{
-                      width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8,
-                      border: "1px solid #ddd6c8", fontSize: 13, outline: "none",
-                    }}
-                  />
-                </div>
-              )}
+              <PairingPicker fiche={fiche} onAdd={addPairing} onRemove={removePairing} />
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   onClick={save}
@@ -174,7 +306,7 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
                   {saving ? "..." : "Enregistrer"}
                 </button>
                 <button
-                  onClick={() => { setEditing(false); setDesc(fiche.description_courte ?? ""); setWine(fiche.wine_pairing ?? ""); }}
+                  onClick={() => { setEditing(false); setDesc(fiche.description_courte ?? ""); }}
                   style={{
                     padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
                     background: "#f5f0e8", color: "#666", border: "none", cursor: "pointer",
@@ -243,20 +375,36 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
                 </div>
               )}
 
-              {/* Wine */}
-              {fiche.wine_pairing && (
+              {/* Pairings */}
+              {(fiche.pairings.length > 0 || fiche.wine_pairing) && (
                 <div style={{ marginTop: 12 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
-                    Accord Mets & Vins
+                    Accords Mets & Boissons
                   </div>
-                  <div style={{ fontSize: 12, color: "#6C3483", fontStyle: "italic" }}>
-                    🍷 {fiche.wine_pairing}
-                  </div>
+                  {fiche.pairings.length > 0 ? (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {fiche.pairings.map((p) => {
+                        const col = DRINK_CAT_COLORS[p.category] ?? { bg: "#eee", fg: "#666" };
+                        return (
+                          <span key={p.id} style={{
+                            padding: "3px 8px", borderRadius: 6, fontSize: 11,
+                            background: col.bg, color: col.fg, border: `1px solid ${col.fg}30`,
+                          }}>
+                            {p.name}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  ) : fiche.wine_pairing ? (
+                    <div style={{ fontSize: 12, color: "#6C3483", fontStyle: "italic" }}>
+                      {fiche.wine_pairing}
+                    </div>
+                  ) : null}
                 </div>
               )}
 
               {/* Empty state for description */}
-              {!fiche.description_courte && !fiche.wine_pairing && canEdit && (
+              {!fiche.description_courte && !fiche.pairings.length && !fiche.wine_pairing && canEdit && (
                 <p style={{ fontSize: 12, color: "#bbb", fontStyle: "italic", marginTop: 12 }}>
                   Aucune description ni accord — cliquez Modifier pour ajouter
                 </p>

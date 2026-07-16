@@ -7,6 +7,8 @@ const sb = () =>
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 
+type PairingItem = { id: string; name: string; category: string };
+
 type FicheCatalogue = {
   id: string;
   type: "pizza" | "cuisine" | "cocktail";
@@ -14,6 +16,7 @@ type FicheCatalogue = {
   category: string;
   description_courte: string | null;
   wine_pairing: string | null;
+  pairings: PairingItem[];
   photo_url: string | null;
   price_ttc: number | null;
   allergens: string[];
@@ -35,6 +38,7 @@ export async function GET() {
     { data: cocktailLines },
     { data: allIngredients },
     { data: popinaProducts },
+    { data: pairingsData },
   ] = await Promise.all([
     supabase.from("pizza_recipes").select("id, name, photo_url, description_courte, wine_pairing").eq("is_active", true),
     supabase.from("pizza_ingredients").select("recipe_id, ingredient_id, qty, unit"),
@@ -44,6 +48,7 @@ export async function GET() {
     supabase.from("cocktail_ingredients").select("cocktail_id, ingredient_id, qty, unit"),
     supabase.from("ingredients").select("id, name, allergens, category"),
     supabase.from("popina_products").select("id, name, price_ttc, pizza_recipe_id, kitchen_recipe_id, cocktail_id").eq("active", true),
+    supabase.from("recipe_pairings").select("recipe_id, recipe_type, ingredient_id"),
   ]);
 
   // Ingredient lookup
@@ -74,6 +79,17 @@ export async function GET() {
     if (pp.pizza_recipe_id) popinaPrice.set("pizza:" + pp.pizza_recipe_id, pp.price_ttc);
     if (pp.kitchen_recipe_id) popinaPrice.set("kitchen:" + pp.kitchen_recipe_id, pp.price_ttc);
     if (pp.cocktail_id) popinaPrice.set("cocktail:" + pp.cocktail_id, pp.price_ttc);
+  }
+
+  // Pairings lookup: key = "type:recipe_id" → PairingItem[]
+  const pairingsMap = new Map<string, PairingItem[]>();
+  for (const p of pairingsData ?? []) {
+    const key = p.recipe_type + ":" + p.recipe_id;
+    const ing = ingMap.get(p.ingredient_id);
+    if (!ing) continue;
+    const arr = pairingsMap.get(key) ?? [];
+    arr.push({ id: p.ingredient_id, name: ing.name, category: ing.category ?? "" });
+    pairingsMap.set(key, arr);
   }
 
   /** Collect allergens recursively from recipe lines */
@@ -117,6 +133,7 @@ export async function GET() {
     fiches.push({
       id: p.id, type: "pizza", name: p.name, category: "pizza",
       description_courte: p.description_courte, wine_pairing: p.wine_pairing,
+      pairings: pairingsMap.get("pizza:" + p.id) ?? [],
       photo_url: p.photo_url, price_ttc: popinaPrice.get("pizza:" + p.id) ?? null,
       allergens: collectAllergens(lines),
       ingredients: lines.map((l) => ({ name: ingMap.get(l.ingredient_id)?.name ?? "?", qty: l.qty, unit: l.unit })),
@@ -132,6 +149,7 @@ export async function GET() {
     fiches.push({
       id: kr.id, type: "cuisine", name: kr.name, category: kr.category,
       description_courte: kr.description_courte, wine_pairing: kr.wine_pairing,
+      pairings: pairingsMap.get("cuisine:" + kr.id) ?? [],
       photo_url: kr.photo_url, price_ttc: popinaPrice.get("kitchen:" + kr.id) ?? null,
       allergens: collectAllergens(lines),
       ingredients: lines.map((l) => ({ name: ingMap.get(l.ingredient_id)?.name ?? "?", qty: l.qty, unit: l.unit })),
@@ -145,6 +163,7 @@ export async function GET() {
     fiches.push({
       id: c.id, type: "cocktail", name: c.name, category: "cocktail",
       description_courte: c.description_courte, wine_pairing: null,
+      pairings: pairingsMap.get("cocktail:" + c.id) ?? [],
       photo_url: c.image_url, price_ttc: popinaPrice.get("cocktail:" + c.id) ?? null,
       allergens: collectAllergens(lines),
       ingredients: lines.map((l) => ({ name: ingMap.get(l.ingredient_id)?.name ?? "?", qty: l.qty, unit: l.unit })),
