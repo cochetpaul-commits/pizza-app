@@ -49,8 +49,15 @@ async function importFile(filePath: string) {
   // Check if text is readable (SASHA PDFs have garbled encoding)
   const hasReadableText = /[a-zA-Z]{3,}/.test(text);
   if (!hasReadableText) {
-    console.log("  SKIP: encoding illisible (facture SASHA) - importer via l'UI avec OCR");
-    return;
+    console.log("  Encoding illisible — fallback OCR via Claude...");
+    const { ocrPdf } = await import("../src/lib/ocrVision");
+    try {
+      text = await ocrPdf(Buffer.from(bytes));
+      console.log("  OCR OK (" + text.length + " chars)");
+    } catch (err) {
+      console.log("  SKIP OCR ERREUR: " + (err instanceof Error ? err.message : String(err)));
+      return;
+    }
   }
 
   const payload = parseBarSpiritsInvoiceText(text);
