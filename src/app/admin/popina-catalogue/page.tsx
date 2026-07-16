@@ -119,6 +119,11 @@ function CataloguePage() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void loadAll(); }, [loadAll]);
 
+  /** Reload en arrière-plan (pas de loading spinner) */
+  const refreshSilent = useCallback(async () => {
+    await Promise.all([loadProducts(), loadRecipes()]);
+  }, [loadProducts, loadRecipes]);
+
   async function syncCatalog() {
     setSyncing(true);
     setSyncResult(null);
@@ -127,7 +132,7 @@ function CataloguePage() {
       const data = await res.json();
       if (data.ok) {
         setSyncResult(`${data.upserted} produits synchronisés, ${data.deactivated} désactivés`);
-        loadAll();
+        refreshSilent();
       } else {
         setSyncResult(`Erreur : ${data.error}`);
       }
@@ -154,17 +159,27 @@ function CataloguePage() {
 
   async function linkProduct(linkedId: string) {
     if (!editing) return;
+    const linkedName = searchResults.find((r) => r.id === linkedId)?.name ?? null;
+    const editingId = editing.id;
     setSaving(true);
     await fetch("/api/popina-catalogue", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ popina_product_id: editing.id, linked_type: linkType, linked_id: linkedId }),
+      body: JSON.stringify({ popina_product_id: editingId, linked_type: linkType, linked_id: linkedId }),
     });
+    // Update local state
+    setProducts((prev) => prev.map((p) =>
+      p.id === editingId ? { ...p, linked_type: linkType, linked_name: linkedName } : p
+    ));
+    setRecipes((prev) => prev.map((r) =>
+      r.id === linkedId && r.type === linkType
+        ? { ...r, popina_product_id: editingId, popina_product_name: editing.name, popina_price: editing.price_ttc }
+        : r
+    ));
     setSaving(false);
     setEditing(null);
     setSearchResults([]);
     setSearchQ("");
-    loadAll();
   }
 
   /* ── Recipe → Popina linking (reverse) ─────────────────── */
@@ -185,32 +200,54 @@ function CataloguePage() {
 
   async function linkFromRecipe(popinaProduct: PopinaProduct) {
     if (!editingRecipe) return;
+    const recipeId = editingRecipe.id;
+    const recipeType = editingRecipe.type;
     setSaving(true);
     await fetch("/api/popina-catalogue", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         popina_product_id: popinaProduct.id,
-        linked_type: editingRecipe.type,
-        linked_id: editingRecipe.id,
+        linked_type: recipeType,
+        linked_id: recipeId,
       }),
     });
+    // Update local state
+    setProducts((prev) => prev.map((p) =>
+      p.id === popinaProduct.id ? { ...p, linked_type: recipeType, linked_name: editingRecipe.name } : p
+    ));
+    setRecipes((prev) => prev.map((r) =>
+      r.id === recipeId && r.type === recipeType
+        ? { ...r, popina_product_id: popinaProduct.id, popina_product_name: popinaProduct.name, popina_price: popinaProduct.price_ttc }
+        : r
+    ));
     setSaving(false);
     setEditingRecipe(null);
     setSearchPopina("");
     setPopinaResults([]);
-    loadAll();
   }
 
   /* ── Unlink ────────────────────────────────────────────── */
 
   async function unlinkProduct(popinaProductId: string) {
+    // Find the recipe/ingredient that was linked before clearing
+    const product = products.find((p) => p.id === popinaProductId);
     await fetch("/api/popina-catalogue", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ popina_product_id: popinaProductId }),
     });
-    loadAll();
+    // Update local state
+    setProducts((prev) => prev.map((p) =>
+      p.id === popinaProductId ? { ...p, linked_type: null, linked_name: null } : p
+    ));
+    if (product?.linked_type) {
+      setRecipes((prev) => prev.map((r) =>
+        r.popina_product_id === popinaProductId
+          ? { ...r, popina_product_id: null, popina_product_name: null, popina_price: null }
+          : r
+      ));
+    }
   }
 
   /* ── Open Popina modal ─────────────────────────────────── */
