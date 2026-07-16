@@ -188,6 +188,7 @@ export function buildDynamicNav(
           { label: "Établissement", href: "/settings/etablissements", icon: "building" },
           { label: "Employés", href: "/settings/employes", icon: "users" },
           { label: "Fournisseurs", href: "/fournisseurs", icon: "truck" },
+          { label: "Catalogue Popina", href: "/admin/popina-catalogue", icon: "tag" },
         ],
       },
       {
@@ -333,6 +334,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/devis": "Evenementiel",
   "/devis/new": "Evenementiel",
   "/admin/utilisateurs": "Utilisateurs",
+  "/admin/popina-catalogue": "Catalogue Popina",
   "/mes-shifts": "Mon planning",
   "/notifications": "Notifications",
   "/session": "Session",
