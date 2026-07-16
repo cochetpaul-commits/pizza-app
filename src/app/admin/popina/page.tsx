@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
 
@@ -89,6 +90,20 @@ function PopinaSyncContent() {
           Cron quotidien à 7h Paris — synchronise les ventes de la veille depuis l&apos;API Popina vers <code>ventes_lignes</code>.
         </p>
       </div>
+
+      {/* Lien catalogue */}
+      <Link href="/admin/popina-catalogue" style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: 16, borderRadius: 12, border: "1px solid #ddd6c8",
+        background: "#fff", marginBottom: 24, textDecoration: "none",
+        cursor: "pointer",
+      }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>Catalogue Popina</div>
+          <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>447 produits — matching recettes et ingrédients</div>
+        </div>
+        <span style={{ fontSize: 20, color: "#D4775A" }}>→</span>
+      </Link>
 
       {/* Resync manuel */}
       <div style={{
