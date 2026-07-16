@@ -78,7 +78,7 @@ function LinkedBadge({ product, doses, onUnlink }: { product: PopinaProduct; dos
   const typeLabel = TYPE_COLORS[product.linked_type ?? ""]?.label ?? product.linked_type;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <div style={{ padding: "4px 10px", borderRadius: 8, fontSize: 11, background: "#E8F5E9", color: "#2D6A4F", fontWeight: 600, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <div style={{ padding: "4px 10px", borderRadius: 8, fontSize: 11, background: "#E8F5E9", color: "#2D6A4F", fontWeight: 600, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {typeLabel} · {product.linked_name}
         {d && <span style={{ color: "#888" }}> · {d.dose}{d.dose_unit}</span>}
       </div>
@@ -481,30 +481,32 @@ function CataloguePage() {
                 const col = CAT_COLORS[p.category] ?? { bg: "#eee", fg: "#666" };
                 return (
                   <div key={p.id} onClick={() => !p.linked_type && openPopinaModal(p)} style={{
-                    display: "flex", alignItems: "center", gap: 10,
+                    display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8,
                     padding: "10px 14px", borderRadius: 10, border: "1px solid #e5ddd0",
                     background: "#fff", cursor: p.linked_type ? "default" : "pointer",
                   }}>
                     <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 9, fontWeight: 700, background: col.bg, color: col.fg, minWidth: 60, textAlign: "center" }}>
                       {p.category}
                     </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ flex: 1, minWidth: 100 }}>
                       <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>{p.name}</div>
                       {p.sub_category && <div style={{ fontSize: 11, color: "#999" }}>{p.sub_category}</div>}
                     </div>
-                    <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Oswald', sans-serif", color: "#1a1a1a" }}>
-                      {p.price_ttc > 0 ? `${p.price_ttc.toFixed(0)} €` : "—"}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Oswald', sans-serif", color: "#1a1a1a" }}>
+                        {p.price_ttc > 0 ? `${p.price_ttc.toFixed(0)} €` : "—"}
+                      </div>
+                      {p.linked_type ? (
+                        <LinkedBadge product={p} doses={doses} onUnlink={unlinkProduct} />
+                      ) : (
+                        <button onClick={(e) => { e.stopPropagation(); openPopinaModal(p); }} style={{
+                          padding: "4px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
+                          background: "#f9f6f0", color: "#D4775A", border: "1px solid #D4775A", cursor: "pointer",
+                        }}>
+                          Relier
+                        </button>
+                      )}
                     </div>
-                    {p.linked_type ? (
-                      <LinkedBadge product={p} doses={doses} onUnlink={unlinkProduct} />
-                    ) : (
-                      <button onClick={(e) => { e.stopPropagation(); openPopinaModal(p); }} style={{
-                        padding: "4px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
-                        background: "#f9f6f0", color: "#D4775A", border: "1px solid #D4775A", cursor: "pointer",
-                      }}>
-                        Relier
-                      </button>
-                    )}
                   </div>
                 );
               })}
