@@ -14,10 +14,11 @@ type Fiche = {
   description_courte: string | null;
   wine_pairing: string | null;
   pairings: PairingItem[];
+  in_catalogue: boolean;
   photo_url: string | null;
   price_ttc: number | null;
   allergens: string[];
-  ingredients: { name: string; qty: number | null; unit: string | null }[];
+  ingredients: string[];
   sub_recipes: { name: string; ingredients: string[] }[];
 };
 
@@ -84,7 +85,6 @@ function PairingPicker({ fiche, onAdd, onRemove }: {
         Accords Mets & Boissons
       </label>
 
-      {/* Selected pairings */}
       {fiche.pairings.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
           {fiche.pairings.map((p) => {
@@ -111,12 +111,11 @@ function PairingPicker({ fiche, onAdd, onRemove }: {
         </div>
       )}
 
-      {/* Search input */}
       <input
         type="text"
         value={search}
         onChange={(e) => { setSearch(e.target.value); doSearch(e.target.value); }}
-        placeholder="Rechercher un vin, spiritueux, bière, soft..."
+        placeholder="Rechercher un vin, spiritueux, biere, soft..."
         style={{
           width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8,
           border: "1px solid #ddd6c8", fontSize: 13, outline: "none",
@@ -124,7 +123,6 @@ function PairingPicker({ fiche, onAdd, onRemove }: {
         }}
       />
 
-      {/* Results dropdown */}
       {(results.length > 0 || searching) && search.trim() && (
         <div style={{
           marginTop: 2, border: "1px solid #e5ddd0", borderRadius: 8,
@@ -221,12 +219,25 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
     onUpdate(fiche.id, fiche.type, { pairings: fiche.pairings.filter((p) => p.id !== ingredientId) });
   }
 
+  async function toggleCatalogue() {
+    const newVal = !fiche.in_catalogue;
+    await fetch("/api/catalogue/fiches/update", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: fiche.id, type: fiche.type, in_catalogue: newVal }),
+    });
+    onUpdate(fiche.id, fiche.type, { in_catalogue: newVal });
+  }
+
   const col = CAT_COLORS[fiche.category] ?? { bg: "#eee", fg: "#666" };
 
   return (
-    <div style={{ borderRadius: 12, border: "1px solid #e5ddd0", background: "#fff", overflow: "hidden" }}>
+    <div style={{
+      borderRadius: 12, border: "1px solid #e5ddd0", background: "#fff", overflow: "hidden",
+      opacity: fiche.in_catalogue ? 1 : 0.5,
+    }}>
 
-      {/* Header — always visible */}
+      {/* Header */}
       <div
         style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", cursor: "pointer" }}
         onClick={onToggle}
@@ -236,13 +247,20 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
         ) : (
           <div style={{ width: 56, height: 56, borderRadius: 10, background: col.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <span style={{ fontSize: 22 }}>
-              {fiche.type === "pizza" ? "🍕" : fiche.type === "cocktail" ? "🍸" : "🍽"}
+              {fiche.type === "pizza" ? "\u{1F355}" : fiche.type === "cocktail" ? "\u{1F378}" : "\u{1F37D}"}
             </span>
           </div>
         )}
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>{fiche.name}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>{fiche.name}</span>
+            {!fiche.in_catalogue && (
+              <span style={{ fontSize: 9, fontWeight: 700, color: "#999", background: "#f0ebe0", padding: "1px 6px", borderRadius: 4 }}>
+                MASQUE
+              </span>
+            )}
+          </div>
           {fiche.description_courte && !editing && (
             <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{fiche.description_courte}</div>
           )}
@@ -262,18 +280,17 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
 
         {fiche.price_ttc != null && fiche.price_ttc > 0 && (
           <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Oswald', sans-serif", color: "#1a1a1a" }}>
-            {fiche.price_ttc.toFixed(0)} €
+            {fiche.price_ttc.toFixed(0)} \u20AC
           </div>
         )}
 
-        <span style={{ fontSize: 14, color: "#999", transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "rotate(0)" }}>▼</span>
+        <span style={{ fontSize: 14, color: "#999", transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "rotate(0)" }}>{"\u25BC"}</span>
       </div>
 
       {/* Expanded */}
       {isOpen && (
         <div style={{ padding: "0 14px 14px", borderTop: "1px solid #f0ebe0" }}>
 
-          {/* Edit mode */}
           {editing ? (
             <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
               <div>
@@ -283,7 +300,7 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
                 <textarea
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
-                  placeholder="Ex: Veau cuit à basse température, sauce thon et câpres..."
+                  placeholder="Ex: Veau cuit a basse temperature, sauce thon et capres..."
                   rows={2}
                   style={{
                     width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8,
@@ -318,33 +335,46 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
             </div>
           ) : (
             <>
-              {/* Edit button */}
+              {/* Actions */}
               {canEdit && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setEditing(true); }}
-                  style={{
-                    float: "right", marginTop: 10, padding: "4px 12px", borderRadius: 8,
-                    fontSize: 11, fontWeight: 600, background: "#f9f6f0", color: "#D4775A",
-                    border: "1px solid #D4775A", cursor: "pointer",
-                  }}
-                >
-                  Modifier
-                </button>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleCatalogue(); }}
+                    style={{
+                      padding: "4px 12px", borderRadius: 8,
+                      fontSize: 11, fontWeight: 600, cursor: "pointer",
+                      background: fiche.in_catalogue ? "#FEF2F2" : "#E8F5E9",
+                      color: fiche.in_catalogue ? "#B91C1C" : "#2D6A4F",
+                      border: `1px solid ${fiche.in_catalogue ? "#FECACA" : "#A5D6A7"}`,
+                    }}
+                  >
+                    {fiche.in_catalogue ? "Retirer du catalogue" : "Ajouter au catalogue"}
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+                    style={{
+                      padding: "4px 12px", borderRadius: 8,
+                      fontSize: 11, fontWeight: 600, background: "#f9f6f0", color: "#D4775A",
+                      border: "1px solid #D4775A", cursor: "pointer",
+                    }}
+                  >
+                    Modifier
+                  </button>
+                </div>
               )}
 
-              {/* Composition */}
+              {/* Composition — names only, no quantities */}
               <div style={{ marginTop: 12 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
                   Composition
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                  {fiche.ingredients.map((ing, i) => (
+                  {fiche.ingredients.map((name, i) => (
                     <span key={i} style={{
                       padding: "3px 8px", borderRadius: 6, fontSize: 11,
                       background: "#f9f6f0", color: "#1a1a1a", border: "1px solid #e5ddd0",
                     }}>
-                      {ing.name}
-                      {ing.qty != null && <span style={{ color: "#999" }}> {ing.qty}{ing.unit}</span>}
+                      {name}
                     </span>
                   ))}
                 </div>
@@ -354,7 +384,7 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
               {fiche.sub_recipes.length > 0 && (
                 <div style={{ marginTop: 12 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
-                    Préparations & Sauces
+                    Preparations & Sauces
                   </div>
                   {fiche.sub_recipes.map((sr, i) => (
                     <div key={i} style={{ marginBottom: 6 }}>
@@ -369,9 +399,9 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
               {fiche.allergens.length > 0 && (
                 <div style={{ marginTop: 12 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
-                    Allergènes
+                    Allergenes
                   </div>
-                  <div style={{ fontSize: 12, color: "#B91C1C" }}>{fiche.allergens.join(" · ")}</div>
+                  <div style={{ fontSize: 12, color: "#B91C1C" }}>{fiche.allergens.join(" \u00B7 ")}</div>
                 </div>
               )}
 
@@ -384,11 +414,11 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
                   {fiche.pairings.length > 0 ? (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                       {fiche.pairings.map((p) => {
-                        const col = DRINK_CAT_COLORS[p.category] ?? { bg: "#eee", fg: "#666" };
+                        const pcol = DRINK_CAT_COLORS[p.category] ?? { bg: "#eee", fg: "#666" };
                         return (
                           <span key={p.id} style={{
                             padding: "3px 8px", borderRadius: 6, fontSize: 11,
-                            background: col.bg, color: col.fg, border: `1px solid ${col.fg}30`,
+                            background: pcol.bg, color: pcol.fg, border: `1px solid ${pcol.fg}30`,
                           }}>
                             {p.name}
                           </span>
@@ -403,7 +433,6 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
                 </div>
               )}
 
-              {/* Empty state for description */}
               {!fiche.description_courte && !fiche.pairings.length && !fiche.wine_pairing && canEdit && (
                 <p style={{ fontSize: 12, color: "#bbb", fontStyle: "italic", marginTop: 12 }}>
                   Aucune description ni accord — cliquez Modifier pour ajouter
@@ -424,7 +453,9 @@ function FichesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("ALL");
+  const [showHidden, setShowHidden] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const { role } = useProfile();
   const canEdit = role === "group_admin";
 
@@ -443,9 +474,26 @@ function FichesPage() {
     setFiches((prev) => prev.map((f) => f.id === id ? { ...f, ...fields } : f));
   }
 
-  const categories = [...new Set(fiches.map((f) => f.category))];
+  async function handleExportPdf() {
+    setExporting(true);
+    try {
+      const res = await fetch("/api/catalogue/fiches/pdf");
+      if (!res.ok) { alert("Erreur export PDF"); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "catalogue-salle.pdf";
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally { setExporting(false); }
+  }
 
-  const filtered = fiches.filter((f) => {
+  const visibleFiches = showHidden ? fiches : fiches.filter((f) => f.in_catalogue);
+  const categories = [...new Set(visibleFiches.map((f) => f.category))];
+  const hiddenCount = fiches.filter((f) => !f.in_catalogue).length;
+
+  const filtered = visibleFiches.filter((f) => {
     if (filterCat !== "ALL" && f.category !== filterCat) return false;
     if (search && !f.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
@@ -465,35 +513,48 @@ function FichesPage() {
 
         <div style={{ marginBottom: 20 }}>
           <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: 2, color: "#D4775A", textTransform: "uppercase", margin: "0 0 6px" }}>
-            CATALOGUE ÉQUIPE
+            CATALOGUE SALLE
           </p>
           <h1 style={{ fontSize: 24, color: "#1a1a1a", margin: 0, fontFamily: "'Oswald', sans-serif" }}>
-            Fiches Techniques
+            Carte & Accords
           </h1>
           <p style={{ fontSize: 13, color: "#666", margin: "8px 0 0" }}>
-            {fiches.length} fiches — plats, pizzas, cocktails avec allergènes et accords
+            {visibleFiches.length} fiches — composition, allergenes et accords
           </p>
         </div>
 
+        {/* Search + Export PDF */}
         <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
           <input
             type="text" placeholder="Rechercher..."
             value={search} onChange={(e) => setSearch(e.target.value)}
             style={{ flex: 1, minWidth: 180, padding: "8px 12px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 13, outline: "none" }}
           />
+          <button
+            onClick={handleExportPdf}
+            disabled={exporting}
+            style={{
+              padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+              background: "#D4775A", color: "#fff", border: "none", cursor: "pointer",
+              opacity: exporting ? 0.6 : 1,
+            }}
+          >
+            {exporting ? "Export..." : "Export PDF"}
+          </button>
         </div>
 
-        <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
+        {/* Category pills + hidden toggle */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
           <button onClick={() => setFilterCat("ALL")} style={{
             padding: "5px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer",
             border: filterCat === "ALL" ? "2px solid #D4775A" : "1px solid #ddd6c8",
             background: filterCat === "ALL" ? "#FFF5F0" : "#fff", color: filterCat === "ALL" ? "#D4775A" : "#666",
           }}>
-            Tout ({fiches.length})
+            Tout ({visibleFiches.length})
           </button>
           {categories.map((cat) => {
             const col = CAT_COLORS[cat] ?? { bg: "#eee", fg: "#666" };
-            const count = fiches.filter((f) => f.category === cat).length;
+            const count = visibleFiches.filter((f) => f.category === cat).length;
             return (
               <button key={cat} onClick={() => setFilterCat(filterCat === cat ? "ALL" : cat)} style={{
                 padding: "5px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer",
@@ -504,6 +565,15 @@ function FichesPage() {
               </button>
             );
           })}
+          {canEdit && hiddenCount > 0 && (
+            <button onClick={() => setShowHidden(!showHidden)} style={{
+              padding: "5px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer",
+              border: showHidden ? "2px solid #999" : "1px solid #ddd6c8",
+              background: showHidden ? "#f0ebe0" : "#fff", color: "#999",
+            }}>
+              {showHidden ? "Masquer retires" : `+ ${hiddenCount} masque${hiddenCount > 1 ? "s" : ""}`}
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -535,7 +605,7 @@ function FichesPage() {
         )}
 
         {filtered.length === 0 && !loading && (
-          <p style={{ textAlign: "center", color: "#999", padding: 40 }}>Aucune fiche trouvée</p>
+          <p style={{ textAlign: "center", color: "#999", padding: 40 }}>Aucune fiche trouvee</p>
         )}
       </main>
     </>

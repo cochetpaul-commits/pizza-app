@@ -86,7 +86,7 @@ export const PLANNING_ITEMS: NavItemV2[] = [
 // PRODUCTION (fiches techniques, catalogue, articles de vente)
 const PRODUCTION_ITEMS: NavItemV2[] = [
   { label: "Fiches techniques", href: "/recettes", icon: "fileText" },
-  { label: "Catalogue équipe", href: "/catalogue/fiches", icon: "book" },
+  { label: "Catalogue Salle", href: "/catalogue/fiches", icon: "book" },
   { label: "Inventaire", href: "/inventaire", icon: "package" },
 ];
 
@@ -218,7 +218,7 @@ export const SIDEBAR_NAV_SIMPLE: SidebarEntry[] = [
   { kind: "item", label: "Mon planning", href: "/mes-shifts", icon: "calendar" },
   { kind: "item", label: "HACCP", href: "/haccp", icon: "clipboard" },
   { kind: "item", label: "Recettes", href: "/recettes", icon: "book" },
-  { kind: "item", label: "Catalogue", href: "/catalogue", icon: "book" },
+  { kind: "item", label: "Catalogue Salle", href: "/catalogue/fiches", icon: "book" },
   { kind: "item", label: "Ingrédients", href: "/ingredients", icon: "tag" },
   { kind: "item", label: "Inventaire", href: "/inventaire", icon: "clipboard" },
   { kind: "item", label: "Commandes", href: "/commandes", icon: "shoppingBag" },
@@ -328,7 +328,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/inventaire": "Production",
   "/recettes": "Production",
   "/catalogue": "Production",
-  "/catalogue/fiches": "Catalogue équipe",
+  "/catalogue/fiches": "Catalogue Salle",
   "/epicerie": "Production",
   "/evenements": "Evenementiel",
   "/clients": "Evenementiel",

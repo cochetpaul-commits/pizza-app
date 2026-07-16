@@ -19,8 +19,9 @@ type FicheCatalogue = {
   pairings: PairingItem[];
   photo_url: string | null;
   price_ttc: number | null;
+  in_catalogue: boolean;
   allergens: string[];
-  ingredients: { name: string; qty: number | null; unit: string | null }[];
+  ingredients: string[];
   sub_recipes: { name: string; ingredients: string[] }[];
 };
 
@@ -40,11 +41,11 @@ export async function GET() {
     { data: popinaProducts },
     { data: pairingsData },
   ] = await Promise.all([
-    supabase.from("pizza_recipes").select("id, name, photo_url, description_courte, wine_pairing").eq("is_active", true),
+    supabase.from("pizza_recipes").select("id, name, photo_url, description_courte, wine_pairing, in_catalogue").eq("is_active", true),
     supabase.from("pizza_ingredients").select("recipe_id, ingredient_id, qty, unit"),
-    supabase.from("kitchen_recipes").select("id, name, photo_url, category, description_courte, wine_pairing, fiche_type, is_active, output_ingredient_id"),
+    supabase.from("kitchen_recipes").select("id, name, photo_url, category, description_courte, wine_pairing, in_catalogue, fiche_type, is_active, output_ingredient_id"),
     supabase.from("kitchen_recipe_lines").select("recipe_id, ingredient_id, qty, unit"),
-    supabase.from("cocktails").select("id, name, image_url, description_courte"),
+    supabase.from("cocktails").select("id, name, image_url, description_courte, in_catalogue"),
     supabase.from("cocktail_ingredients").select("cocktail_id, ingredient_id, qty, unit"),
     supabase.from("ingredients").select("id, name, allergens, category"),
     supabase.from("popina_products").select("id, name, price_ttc, pizza_recipe_id, kitchen_recipe_id, cocktail_id").eq("active", true),
@@ -133,10 +134,11 @@ export async function GET() {
     fiches.push({
       id: p.id, type: "pizza", name: p.name, category: "pizza",
       description_courte: p.description_courte, wine_pairing: p.wine_pairing,
+      in_catalogue: p.in_catalogue !== false,
       pairings: pairingsMap.get("pizza:" + p.id) ?? [],
       photo_url: p.photo_url, price_ttc: popinaPrice.get("pizza:" + p.id) ?? null,
       allergens: collectAllergens(lines),
-      ingredients: lines.map((l) => ({ name: ingMap.get(l.ingredient_id)?.name ?? "?", qty: l.qty, unit: l.unit })),
+      ingredients: lines.map((l) => ingMap.get(l.ingredient_id)?.name ?? "?"),
       sub_recipes: [],
     });
   }
@@ -149,10 +151,11 @@ export async function GET() {
     fiches.push({
       id: kr.id, type: "cuisine", name: kr.name, category: kr.category,
       description_courte: kr.description_courte, wine_pairing: kr.wine_pairing,
+      in_catalogue: kr.in_catalogue !== false,
       pairings: pairingsMap.get("cuisine:" + kr.id) ?? [],
       photo_url: kr.photo_url, price_ttc: popinaPrice.get("kitchen:" + kr.id) ?? null,
       allergens: collectAllergens(lines),
-      ingredients: lines.map((l) => ({ name: ingMap.get(l.ingredient_id)?.name ?? "?", qty: l.qty, unit: l.unit })),
+      ingredients: lines.map((l) => ingMap.get(l.ingredient_id)?.name ?? "?"),
       sub_recipes: getSubRecipes(lines),
     });
   }
@@ -163,10 +166,11 @@ export async function GET() {
     fiches.push({
       id: c.id, type: "cocktail", name: c.name, category: "cocktail",
       description_courte: c.description_courte, wine_pairing: null,
+      in_catalogue: c.in_catalogue !== false,
       pairings: pairingsMap.get("cocktail:" + c.id) ?? [],
       photo_url: c.image_url, price_ttc: popinaPrice.get("cocktail:" + c.id) ?? null,
       allergens: collectAllergens(lines),
-      ingredients: lines.map((l) => ({ name: ingMap.get(l.ingredient_id)?.name ?? "?", qty: l.qty, unit: l.unit })),
+      ingredients: lines.map((l) => ingMap.get(l.ingredient_id)?.name ?? "?"),
       sub_recipes: [],
     });
   }

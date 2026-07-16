@@ -779,7 +779,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
           actions={<>
             {isEdit && pivotIngredientId && <HeroBtn onClick={() => setShowProdModal(true)}>Production</HeroBtn>}
             <HeroBtn onClick={handleExportPdf} disabled={!isEdit || pdfLoading} title={!isEdit ? "Enregistrer la recette pour exporter le PDF" : undefined}>{pdfLoading ? "Export…" : "PDF"}</HeroBtn>
-            <HeroBtn onClick={handleExportPdfSalle} disabled={!isEdit || pdfLoading} title={!isEdit ? "Enregistrer la recette pour exporter le PDF salle" : "Fiche salle (serveurs)"}>{pdfLoading ? "Export…" : "PDF Salle"}</HeroBtn>
+            <HeroBtn onClick={() => router.push("/catalogue/fiches")} title="Voir le catalogue salle">Catalogue Salle</HeroBtn>
             {isEdit ? <PublishCatalogueButton recipeType="cuisine" recipeId={recipeId!} /> : <HeroBtn disabled title="Enregistrer la recette pour publier au catalogue">Catalogue</HeroBtn>}
             {userCanWrite && <HeroBtn onClick={handleSave} disabled={saving} primary>{saving ? "Sauvegarde…" : "Enregistrer"}</HeroBtn>}
             {isEdit && userCanWrite && (
@@ -1264,6 +1264,7 @@ function SalleTab({
   isEdit: boolean;
   pdfLoading: boolean;
 }) {
+  const router = useRouter();
   const regimes = parseRegimes(meta.regimes_csv);
   const toggleRegime = (key: string) => {
     const next = new Set(regimes);
@@ -1376,13 +1377,12 @@ function SalleTab({
           </button>
         )}
         <button
-          onClick={onExportPdf}
-          disabled={!isEdit || pdfLoading}
+          onClick={() => router.push("/catalogue/fiches")}
           className="btn"
           style={{ flex: 1, minWidth: 200 }}
-          title={!isEdit ? "Enregistrer d'abord pour exporter le PDF salle" : undefined}
+          title="Voir le catalogue salle"
         >
-          {pdfLoading ? "Export…" : "Exporter PDF Salle"}
+          Catalogue Salle
         </button>
       </div>
       {saveError && <div className="errorBox" style={{ marginBottom: 8 }}>{saveError}</div>}
