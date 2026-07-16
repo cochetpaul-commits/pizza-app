@@ -30,6 +30,16 @@ type RecipeItem = {
 
 type SearchResult = { id: string; name: string };
 
+type DoseMap = {
+  id: string;
+  dose: number;
+  dose_unit: string;
+  popina_product_id: string;
+  ingredient_id: string;
+  popina_products: { id: string; name: string; category: string; price_ttc: number } | null;
+  ingredients: { id: string; name: string; category: string | null } | null;
+};
+
 /* ── Constants ──────────────────────────────────────────── */
 
 const CAT_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -60,6 +70,22 @@ const TYPE_OPTIONS = [
 ];
 
 const POPINA_CATEGORIES = ["PIZZE", "CUCINA", "ANTIPASTI", "DOLCI", "VINI", "DIGESTIVI", "ALCOOL", "BEVANDE", "BEVANDE CALDE", "MESSAGES"];
+
+/* ── Components ──────────────────────────────────────────── */
+
+function LinkedBadge({ product, doses, onUnlink }: { product: PopinaProduct; doses: DoseMap[]; onUnlink: (id: string) => void }) {
+  const d = doses.find((dm) => dm.popina_product_id === product.id);
+  const typeLabel = TYPE_COLORS[product.linked_type ?? ""]?.label ?? product.linked_type;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <div style={{ padding: "4px 10px", borderRadius: 8, fontSize: 11, background: "#E8F5E9", color: "#2D6A4F", fontWeight: 600, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {typeLabel} · {product.linked_name}
+        {d && <span style={{ color: "#888" }}> · {d.dose}{d.dose_unit}</span>}
+      </div>
+      <button onClick={(e) => { e.stopPropagation(); onUnlink(product.id); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#999", padding: 2 }} title="Délier">×</button>
+    </div>
+  );
+}
 
 /* ── Page ────────────────────────────────────────────────── */
 
@@ -96,6 +122,11 @@ function CataloguePage() {
   const [searchPopina, setSearchPopina] = useState("");
   const [popinaResults, setPopinaResults] = useState<PopinaProduct[]>([]);
 
+  // Doses
+  const [doses, setDoses] = useState<DoseMap[]>([]);
+  const [doseValue, setDoseValue] = useState<number | "">("");
+  const [doseUnit, setDoseUnit] = useState<string>("cl");
+
   /* ── Data loading ──────────────────────────────────────── */
 
   const loadProducts = useCallback(async () => {
@@ -110,19 +141,25 @@ function CataloguePage() {
     setRecipes(Array.isArray(data) ? data : []);
   }, []);
 
+  const loadDoses = useCallback(async () => {
+    const res = await fetch("/api/popina-catalogue/doses");
+    const data = await res.json();
+    setDoses(Array.isArray(data) ? data : []);
+  }, []);
+
   const loadAll = useCallback(async () => {
     setLoading(true);
-    await Promise.all([loadProducts(), loadRecipes()]);
+    await Promise.all([loadProducts(), loadRecipes(), loadDoses()]);
     setLoading(false);
-  }, [loadProducts, loadRecipes]);
+  }, [loadProducts, loadRecipes, loadDoses]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void loadAll(); }, [loadAll]);
 
   /** Reload en arrière-plan (pas de loading spinner) */
   const refreshSilent = useCallback(async () => {
-    await Promise.all([loadProducts(), loadRecipes()]);
-  }, [loadProducts, loadRecipes]);
+    await Promise.all([loadProducts(), loadRecipes(), loadDoses()]);
+  }, [loadProducts, loadRecipes, loadDoses]);
 
   async function syncCatalog() {
     setSyncing(true);
@@ -162,11 +199,33 @@ function CataloguePage() {
     const linkedName = searchResults.find((r) => r.id === linkedId)?.name ?? null;
     const editingId = editing.id;
     setSaving(true);
-    await fetch("/api/popina-catalogue", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ popina_product_id: editingId, linked_type: linkType, linked_id: linkedId }),
-    });
+
+    // For ingredients with a dose → use dose_map
+    if (linkType === "ingredient" && doseValue) {
+      await fetch("/api/popina-catalogue/doses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          popina_product_id: editingId,
+          ingredient_id: linkedId,
+          dose: doseValue,
+          dose_unit: doseUnit,
+        }),
+      });
+      // Also set the simple link for display
+      await fetch("/api/popina-catalogue", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ popina_product_id: editingId, linked_type: "ingredient", linked_id: linkedId }),
+      });
+    } else {
+      await fetch("/api/popina-catalogue", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ popina_product_id: editingId, linked_type: linkType, linked_id: linkedId }),
+      });
+    }
+
     // Update local state
     setProducts((prev) => prev.map((p) =>
       p.id === editingId ? { ...p, linked_type: linkType, linked_name: linkedName } : p
@@ -176,10 +235,20 @@ function CataloguePage() {
         ? { ...r, popina_product_id: editingId, popina_product_name: editing.name, popina_price: editing.price_ttc }
         : r
     ));
+    if (linkType === "ingredient" && doseValue) {
+      setDoses((prev) => [...prev, {
+        id: "temp-" + Date.now(),
+        dose: Number(doseValue), dose_unit: doseUnit,
+        popina_product_id: editingId, ingredient_id: linkedId,
+        popina_products: { id: editingId, name: editing.name, category: editing.category, price_ttc: editing.price_ttc },
+        ingredients: { id: linkedId, name: linkedName ?? "", category: null },
+      }]);
+    }
     setSaving(false);
     setEditing(null);
     setSearchResults([]);
     setSearchQ("");
+    setDoseValue("");
   }
 
   /* ── Recipe → Popina linking (reverse) ─────────────────── */
@@ -427,12 +496,7 @@ function CataloguePage() {
                       {p.price_ttc > 0 ? `${p.price_ttc.toFixed(0)} €` : "—"}
                     </div>
                     {p.linked_type ? (
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <div style={{ padding: "4px 10px", borderRadius: 8, fontSize: 11, background: "#E8F5E9", color: "#2D6A4F", fontWeight: 600, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {TYPE_COLORS[p.linked_type]?.label ?? p.linked_type} · {p.linked_name}
-                        </div>
-                        <button onClick={(e) => { e.stopPropagation(); unlinkProduct(p.id); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#999", padding: 2 }} title="Délier">×</button>
-                      </div>
+                      <LinkedBadge product={p} doses={doses} onUnlink={unlinkProduct} />
                     ) : (
                       <button onClick={(e) => { e.stopPropagation(); openPopinaModal(p); }} style={{
                         padding: "4px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
@@ -564,17 +628,59 @@ function CataloguePage() {
               </button>
             </div>
 
+            {/* Dose field for ingredients */}
+            {linkType === "ingredient" && searchResults.length > 0 && (
+              <div style={{
+                display: "flex", gap: 8, alignItems: "center", marginBottom: 12,
+                padding: 12, borderRadius: 8, background: "#FFF8F0", border: "1px solid #f0e0c8",
+              }}>
+                <span style={{ fontSize: 12, color: "#666", whiteSpace: "nowrap" }}>Dose par vente :</span>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  value={doseValue}
+                  onChange={(e) => setDoseValue(e.target.value ? Number(e.target.value) : "")}
+                  placeholder="12.5"
+                  style={{ width: 70, padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd6c8", fontSize: 14, textAlign: "center" }}
+                />
+                <select value={doseUnit} onChange={(e) => setDoseUnit(e.target.value)}
+                  style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd6c8", fontSize: 13 }}>
+                  <option value="cl">cl</option>
+                  <option value="g">g</option>
+                  <option value="pcs">pcs</option>
+                </select>
+              </div>
+            )}
+
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {searchResults.map((r) => (
-                <button key={r.id} onClick={() => linkProduct(r.id)} disabled={saving} style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "10px 14px", borderRadius: 8, border: "1px solid #e5ddd0", background: "#f9f6f0",
-                  cursor: "pointer", textAlign: "left", fontSize: 13, opacity: saving ? 0.6 : 1,
-                }}>
-                  <span style={{ fontWeight: 600, color: "#1a1a1a" }}>{r.name}</span>
-                  <span style={{ fontSize: 11, color: "#D4775A", fontWeight: 700 }}>Relier</span>
-                </button>
-              ))}
+              {searchResults.map((r) => {
+                const existingDoses = doses.filter((d) => d.ingredient_id === r.id);
+                return (
+                  <div key={r.id}>
+                    <button onClick={() => linkProduct(r.id)} disabled={saving || (linkType === "ingredient" && !doseValue)} style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%",
+                      padding: "10px 14px", borderRadius: 8, border: "1px solid #e5ddd0", background: "#f9f6f0",
+                      cursor: (linkType === "ingredient" && !doseValue) ? "not-allowed" : "pointer",
+                      textAlign: "left", fontSize: 13, opacity: saving ? 0.6 : (linkType === "ingredient" && !doseValue) ? 0.5 : 1,
+                    }}>
+                      <span style={{ fontWeight: 600, color: "#1a1a1a" }}>{r.name}</span>
+                      <span style={{ fontSize: 11, color: "#D4775A", fontWeight: 700 }}>
+                        {linkType === "ingredient" && doseValue ? `${doseValue} ${doseUnit}` : "Relier"}
+                      </span>
+                    </button>
+                    {existingDoses.length > 0 && (
+                      <div style={{ paddingLeft: 14, marginTop: 2, marginBottom: 4 }}>
+                        {existingDoses.map((d) => (
+                          <span key={d.id} style={{ fontSize: 10, color: "#999", marginRight: 8 }}>
+                            Déjà relié : {d.popina_products?.name} → {d.dose} {d.dose_unit}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <button onClick={() => setEditing(null)} style={{ marginTop: 20, width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 13, fontWeight: 600, background: "#f5f0e8", color: "#666", border: "none", cursor: "pointer" }}>Fermer</button>
