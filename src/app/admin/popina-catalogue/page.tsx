@@ -79,6 +79,10 @@ function CataloguePage() {
   const [filterRecipeLinked, setFilterRecipeLinked] = useState("ALL");
   const [searchRecipe, setSearchRecipe] = useState("");
 
+  // Sync
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+
   // Modal — linking from Popina view
   const [editing, setEditing] = useState<PopinaProduct | null>(null);
   const [linkType, setLinkType] = useState("kitchen");
@@ -114,6 +118,25 @@ function CataloguePage() {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void loadAll(); }, [loadAll]);
+
+  async function syncCatalog() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/popina-catalogue/sync", { method: "POST" });
+      const data = await res.json();
+      if (data.ok) {
+        setSyncResult(`${data.upserted} produits synchronisés, ${data.deactivated} désactivés`);
+        loadAll();
+      } else {
+        setSyncResult(`Erreur : ${data.error}`);
+      }
+    } catch (e) {
+      setSyncResult(`Erreur réseau : ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   /* ── Popina → Recipe linking ───────────────────────────── */
 
@@ -235,14 +258,37 @@ function CataloguePage() {
       <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px", boxSizing: "border-box" }}>
 
         {/* Header */}
-        <div style={{ marginBottom: 20 }}>
-          <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: 2, color: "#D4775A", textTransform: "uppercase", margin: "0 0 6px" }}>
-            ACHATS
-          </p>
-          <h1 style={{ fontSize: 24, color: "#1a1a1a", margin: 0, fontFamily: "'Oswald', sans-serif" }}>
-            Catalogue Popina
-          </h1>
+        <div style={{ marginBottom: 20, display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+          <div>
+            <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: 2, color: "#D4775A", textTransform: "uppercase", margin: "0 0 6px" }}>
+              ACHATS
+            </p>
+            <h1 style={{ fontSize: 24, color: "#1a1a1a", margin: 0, fontFamily: "'Oswald', sans-serif" }}>
+              Catalogue Popina
+            </h1>
+          </div>
+          <button
+            onClick={syncCatalog}
+            disabled={syncing}
+            style={{
+              padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+              background: syncing ? "#ccc" : "#D4775A", color: "#fff",
+              border: "none", cursor: syncing ? "default" : "pointer",
+              whiteSpace: "nowrap", marginTop: 16,
+            }}
+          >
+            {syncing ? "Sync en cours..." : "Sync Popina"}
+          </button>
         </div>
+        {syncResult && (
+          <div style={{
+            padding: "10px 14px", borderRadius: 8, marginBottom: 16, fontSize: 13,
+            background: syncResult.startsWith("Erreur") ? "#FEF2F2" : "#E8F5E9",
+            color: syncResult.startsWith("Erreur") ? "#B91C1C" : "#2D6A4F",
+          }}>
+            {syncResult}
+          </div>
+        )}
 
         {/* View toggle */}
         <div style={{ display: "flex", gap: 0, marginBottom: 20, borderRadius: 10, overflow: "hidden", border: "1px solid #ddd6c8" }}>
