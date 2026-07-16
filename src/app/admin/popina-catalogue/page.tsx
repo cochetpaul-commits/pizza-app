@@ -67,7 +67,8 @@ function CataloguePage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void load(); }, [load]);
 
   // Filter products
   const filtered = products.filter((p) => {
