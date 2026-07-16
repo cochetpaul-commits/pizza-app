@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { NavBar } from "@/components/NavBar";
+import { useProfile } from "@/lib/ProfileContext";
 
 type Fiche = {
   id: string;
@@ -38,12 +39,246 @@ const ALLERGEN_ICONS: Record<string, string> = {
   Lupin: "Lu", Mollusques: "Ml",
 };
 
+/* ── FicheCard ───────────────────────────────────────────── */
+
+function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
+  fiche: Fiche;
+  isOpen: boolean;
+  onToggle: () => void;
+  canEdit: boolean;
+  onUpdate: (id: string, type: string, fields: Partial<Fiche>) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [desc, setDesc] = useState(fiche.description_courte ?? "");
+  const [wine, setWine] = useState(fiche.wine_pairing ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    await fetch("/api/catalogue/fiches/update", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: fiche.id,
+        type: fiche.type,
+        description_courte: desc.trim(),
+        wine_pairing: wine.trim(),
+      }),
+    });
+    onUpdate(fiche.id, fiche.type, {
+      description_courte: desc.trim() || null,
+      wine_pairing: wine.trim() || null,
+    });
+    setSaving(false);
+    setEditing(false);
+  }
+
+  const col = CAT_COLORS[fiche.category] ?? { bg: "#eee", fg: "#666" };
+
+  return (
+    <div style={{ borderRadius: 12, border: "1px solid #e5ddd0", background: "#fff", overflow: "hidden" }}>
+
+      {/* Header — always visible */}
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", cursor: "pointer" }}
+        onClick={onToggle}
+      >
+        {fiche.photo_url ? (
+          <img src={fiche.photo_url} alt={fiche.name} style={{ width: 56, height: 56, borderRadius: 10, objectFit: "cover" }} />
+        ) : (
+          <div style={{ width: 56, height: 56, borderRadius: 10, background: col.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontSize: 22 }}>
+              {fiche.type === "pizza" ? "🍕" : fiche.type === "cocktail" ? "🍸" : "🍽"}
+            </span>
+          </div>
+        )}
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>{fiche.name}</div>
+          {fiche.description_courte && !editing && (
+            <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{fiche.description_courte}</div>
+          )}
+          {fiche.allergens.length > 0 && (
+            <div style={{ display: "flex", gap: 3, marginTop: 4, flexWrap: "wrap" }}>
+              {fiche.allergens.map((a) => (
+                <span key={a} title={a} style={{
+                  padding: "1px 5px", borderRadius: 4, fontSize: 9, fontWeight: 700,
+                  background: "#FEF2F2", color: "#B91C1C", border: "1px solid #FECACA",
+                }}>
+                  {ALLERGEN_ICONS[a] ?? a}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {fiche.price_ttc != null && fiche.price_ttc > 0 && (
+          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Oswald', sans-serif", color: "#1a1a1a" }}>
+            {fiche.price_ttc.toFixed(0)} €
+          </div>
+        )}
+
+        <span style={{ fontSize: 14, color: "#999", transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "rotate(0)" }}>▼</span>
+      </div>
+
+      {/* Expanded */}
+      {isOpen && (
+        <div style={{ padding: "0 14px 14px", borderTop: "1px solid #f0ebe0" }}>
+
+          {/* Edit mode */}
+          {editing ? (
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1 }}>
+                  Description courte
+                </label>
+                <textarea
+                  value={desc}
+                  onChange={(e) => setDesc(e.target.value)}
+                  placeholder="Ex: Veau cuit à basse température, sauce thon et câpres..."
+                  rows={2}
+                  style={{
+                    width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8,
+                    border: "1px solid #ddd6c8", fontSize: 13, resize: "vertical", outline: "none",
+                    fontFamily: "inherit",
+                  }}
+                />
+              </div>
+              {fiche.type !== "cocktail" && (
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1 }}>
+                    Accord Mets & Vins
+                  </label>
+                  <input
+                    type="text"
+                    value={wine}
+                    onChange={(e) => setWine(e.target.value)}
+                    placeholder="Ex: Chianti Classico, Montepulciano d'Abruzzo"
+                    style={{
+                      width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8,
+                      border: "1px solid #ddd6c8", fontSize: 13, outline: "none",
+                    }}
+                  />
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={save}
+                  disabled={saving}
+                  style={{
+                    padding: "8px 20px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                    background: "#D4775A", color: "#fff", border: "none", cursor: "pointer",
+                    opacity: saving ? 0.6 : 1,
+                  }}
+                >
+                  {saving ? "..." : "Enregistrer"}
+                </button>
+                <button
+                  onClick={() => { setEditing(false); setDesc(fiche.description_courte ?? ""); setWine(fiche.wine_pairing ?? ""); }}
+                  style={{
+                    padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                    background: "#f5f0e8", color: "#666", border: "none", cursor: "pointer",
+                  }}
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Edit button */}
+              {canEdit && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+                  style={{
+                    float: "right", marginTop: 10, padding: "4px 12px", borderRadius: 8,
+                    fontSize: 11, fontWeight: 600, background: "#f9f6f0", color: "#D4775A",
+                    border: "1px solid #D4775A", cursor: "pointer",
+                  }}
+                >
+                  Modifier
+                </button>
+              )}
+
+              {/* Composition */}
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
+                  Composition
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  {fiche.ingredients.map((ing, i) => (
+                    <span key={i} style={{
+                      padding: "3px 8px", borderRadius: 6, fontSize: 11,
+                      background: "#f9f6f0", color: "#1a1a1a", border: "1px solid #e5ddd0",
+                    }}>
+                      {ing.name}
+                      {ing.qty != null && <span style={{ color: "#999" }}> {ing.qty}{ing.unit}</span>}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sub-recipes */}
+              {fiche.sub_recipes.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
+                    Préparations & Sauces
+                  </div>
+                  {fiche.sub_recipes.map((sr, i) => (
+                    <div key={i} style={{ marginBottom: 6 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#D4775A" }}>{sr.name}</div>
+                      <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>{sr.ingredients.join(", ")}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Allergens */}
+              {fiche.allergens.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
+                    Allergènes
+                  </div>
+                  <div style={{ fontSize: 12, color: "#B91C1C" }}>{fiche.allergens.join(" · ")}</div>
+                </div>
+              )}
+
+              {/* Wine */}
+              {fiche.wine_pairing && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
+                    Accord Mets & Vins
+                  </div>
+                  <div style={{ fontSize: 12, color: "#6C3483", fontStyle: "italic" }}>
+                    🍷 {fiche.wine_pairing}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty state for description */}
+              {!fiche.description_courte && !fiche.wine_pairing && canEdit && (
+                <p style={{ fontSize: 12, color: "#bbb", fontStyle: "italic", marginTop: 12 }}>
+                  Aucune description ni accord — cliquez Modifier pour ajouter
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Page ────────────────────────────────────────────────── */
+
 function FichesPage() {
   const [fiches, setFiches] = useState<Fiche[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("ALL");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const { role } = useProfile();
+  const canEdit = role === "group_admin";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,6 +291,10 @@ function FichesPage() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load(); }, [load]);
 
+  function handleUpdate(id: string, _type: string, fields: Partial<Fiche>) {
+    setFiches((prev) => prev.map((f) => f.id === id ? { ...f, ...fields } : f));
+  }
+
   const categories = [...new Set(fiches.map((f) => f.category))];
 
   const filtered = fiches.filter((f) => {
@@ -64,7 +303,6 @@ function FichesPage() {
     return true;
   });
 
-  // Group by category
   const grouped = new Map<string, Fiche[]>();
   for (const f of filtered) {
     const arr = grouped.get(f.category) ?? [];
@@ -89,7 +327,6 @@ function FichesPage() {
           </p>
         </div>
 
-        {/* Search + filters */}
         <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
           <input
             type="text" placeholder="Rechercher..."
@@ -98,7 +335,6 @@ function FichesPage() {
           />
         </div>
 
-        {/* Category pills */}
         <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
           <button onClick={() => setFilterCat("ALL")} style={{
             padding: "5px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer",
@@ -135,128 +371,16 @@ function FichesPage() {
               </h2>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {items.map((f) => {
-                  const isOpen = expanded === f.id;
-                  return (
-                    <div key={f.id} style={{
-                      borderRadius: 12, border: "1px solid #e5ddd0", background: "#fff",
-                      overflow: "hidden", cursor: "pointer",
-                    }} onClick={() => setExpanded(isOpen ? null : f.id)}>
-
-                      {/* Card header */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px" }}>
-                        {/* Photo */}
-                        {f.photo_url ? (
-                          <img src={f.photo_url} alt={f.name} style={{ width: 56, height: 56, borderRadius: 10, objectFit: "cover" }} />
-                        ) : (
-                          <div style={{ width: 56, height: 56, borderRadius: 10, background: CAT_COLORS[f.category]?.bg ?? "#f0ebe0", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <span style={{ fontSize: 22 }}>
-                              {f.type === "pizza" ? "🍕" : f.type === "cocktail" ? "🍸" : "🍽"}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Name + description */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>{f.name}</div>
-                          {f.description_courte && (
-                            <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{f.description_courte}</div>
-                          )}
-                          {/* Allergen badges inline */}
-                          {f.allergens.length > 0 && (
-                            <div style={{ display: "flex", gap: 3, marginTop: 4, flexWrap: "wrap" }}>
-                              {f.allergens.map((a) => (
-                                <span key={a} title={a} style={{
-                                  padding: "1px 5px", borderRadius: 4, fontSize: 9, fontWeight: 700,
-                                  background: "#FEF2F2", color: "#B91C1C", border: "1px solid #FECACA",
-                                }}>
-                                  {ALLERGEN_ICONS[a] ?? a}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Price */}
-                        {f.price_ttc != null && f.price_ttc > 0 && (
-                          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Oswald', sans-serif", color: "#1a1a1a" }}>
-                            {f.price_ttc.toFixed(0)} €
-                          </div>
-                        )}
-
-                        {/* Expand arrow */}
-                        <span style={{ fontSize: 14, color: "#999", transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "rotate(0)" }}>
-                          ▼
-                        </span>
-                      </div>
-
-                      {/* Expanded details */}
-                      {isOpen && (
-                        <div style={{ padding: "0 14px 14px", borderTop: "1px solid #f0ebe0" }}>
-
-                          {/* Ingredients */}
-                          <div style={{ marginTop: 12 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
-                              Composition
-                            </div>
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                              {f.ingredients.map((ing, i) => (
-                                <span key={i} style={{
-                                  padding: "3px 8px", borderRadius: 6, fontSize: 11,
-                                  background: "#f9f6f0", color: "#1a1a1a", border: "1px solid #e5ddd0",
-                                }}>
-                                  {ing.name}
-                                  {ing.qty != null && <span style={{ color: "#999" }}> {ing.qty}{ing.unit}</span>}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Sub-recipes */}
-                          {f.sub_recipes.length > 0 && (
-                            <div style={{ marginTop: 12 }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
-                                Préparations & Sauces
-                              </div>
-                              {f.sub_recipes.map((sr, i) => (
-                                <div key={i} style={{ marginBottom: 6 }}>
-                                  <div style={{ fontSize: 12, fontWeight: 600, color: "#D4775A" }}>{sr.name}</div>
-                                  <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>
-                                    {sr.ingredients.join(", ")}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Allergens detail */}
-                          {f.allergens.length > 0 && (
-                            <div style={{ marginTop: 12 }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
-                                Allergènes
-                              </div>
-                              <div style={{ fontSize: 12, color: "#B91C1C" }}>
-                                {f.allergens.join(" · ")}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Wine pairing */}
-                          {f.wine_pairing && (
-                            <div style={{ marginTop: 12 }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
-                                Accord Mets & Vins
-                              </div>
-                              <div style={{ fontSize: 12, color: "#6C3483", fontStyle: "italic" }}>
-                                🍷 {f.wine_pairing}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                {items.map((f) => (
+                  <FicheCard
+                    key={f.id}
+                    fiche={f}
+                    isOpen={expanded === f.id}
+                    onToggle={() => setExpanded(expanded === f.id ? null : f.id)}
+                    canEdit={canEdit}
+                    onUpdate={handleUpdate}
+                  />
+                ))}
               </div>
             </div>
           ))
