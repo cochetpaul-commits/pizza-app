@@ -86,6 +86,7 @@ export const PLANNING_ITEMS: NavItemV2[] = [
 // PRODUCTION (fiches techniques, catalogue, articles de vente)
 const PRODUCTION_ITEMS: NavItemV2[] = [
   { label: "Fiches techniques", href: "/recettes", icon: "fileText" },
+  { label: "Catalogue équipe", href: "/catalogue/fiches", icon: "book" },
   { label: "Inventaire", href: "/inventaire", icon: "package" },
 ];
 
@@ -327,6 +328,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/inventaire": "Production",
   "/recettes": "Production",
   "/catalogue": "Production",
+  "/catalogue/fiches": "Catalogue équipe",
   "/epicerie": "Production",
   "/evenements": "Evenementiel",
   "/clients": "Evenementiel",
