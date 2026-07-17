@@ -77,8 +77,8 @@ export default function InventairePage() {
   const [reloadTick, setReloadTick] = useState(0);
   const reload = useCallback(() => setReloadTick((t) => t + 1), []);
 
-  // Category collapse state
-  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
+  // Category collapse state — all collapsed by default
+  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set(CATEGORIES));
   const toggleCat = (cat: string) => setCollapsedCats(prev => {
     const next = new Set(prev);
     if (next.has(cat)) next.delete(cat); else next.add(cat);
