@@ -14,6 +14,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("popina_products")
     .select("*")
+    .eq("active", true)
     .order("category")
     .order("name");
 
