@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { RequireRole } from "@/components/RequireRole";
@@ -294,6 +294,251 @@ export default function CommandesPageWrapper() {
   );
 }
 
+/* ── Reception Modal ──────────────────────────────────────────── */
+
+type ReceptionLine = {
+  id: string;
+  ingredient_id: string;
+  ingredient_name: string;
+  quantite: number;
+  unite: string | null;
+  prix_unitaire_ht: number | null;
+  qty_received: number | null;
+  checked: boolean;
+  reception_note: string | null;
+};
+
+function ReceptionModal({ sessionId, onClose, onDone }: {
+  sessionId: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [lines, setLines] = useState<ReceptionLine[]>([]);
+  const [supplierName, setSupplierName] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/commandes/reception?session_id=${sessionId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        setLines(data.lines ?? []);
+        setSupplierName(data.session?.supplier_name ?? "");
+        setLoading(false);
+      });
+  }, [sessionId]);
+
+  function toggleCheck(id: string) {
+    setLines((prev) => prev.map((l) =>
+      l.id === id ? {
+        ...l,
+        checked: !l.checked,
+        qty_received: !l.checked ? (l.qty_received ?? l.quantite) : l.qty_received,
+      } : l
+    ));
+  }
+
+  function setQtyReceived(id: string, val: number | null) {
+    setLines((prev) => prev.map((l) => l.id === id ? { ...l, qty_received: val, checked: true } : l));
+  }
+
+  function setNote(id: string, note: string) {
+    setLines((prev) => prev.map((l) => l.id === id ? { ...l, reception_note: note || null } : l));
+  }
+
+  function markAllReceived() {
+    setLines((prev) => prev.map((l) => ({ ...l, checked: true, qty_received: l.quantite })));
+  }
+
+  async function save(finalize: boolean) {
+    setSaving(true);
+    await fetch("/api/commandes/reception", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: sessionId,
+        lines: lines.map((l) => ({
+          id: l.id,
+          qty_received: l.qty_received,
+          checked: l.checked,
+          reception_note: l.reception_note,
+        })),
+        finalize,
+      }),
+    });
+    setSaving(false);
+    if (finalize) onDone();
+    else onClose();
+  }
+
+  const allChecked = lines.length > 0 && lines.every((l) => l.checked);
+  const checkedCount = lines.filter((l) => l.checked).length;
+  const hasEcarts = lines.some((l) => l.checked && l.qty_received != null && l.qty_received !== l.quantite);
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+        display: "flex", alignItems: "flex-end", justifyContent: "center",
+        zIndex: 1000,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#f9f6f0", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: 600,
+          maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column",
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          padding: "18px 20px 12px", borderBottom: "1px solid #e5ddd0",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#16a34a", letterSpacing: 2, textTransform: "uppercase" }}>
+              Pointage réception
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Oswald', sans-serif", color: "#1a1a1a" }}>
+              {supplierName}
+            </div>
+            <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>
+              {checkedCount}/{lines.length} produits pointés
+              {hasEcarts && <span style={{ color: "#D4775A", fontWeight: 600 }}> — écarts détectés</span>}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#999" }}>✕</button>
+        </div>
+
+        {/* Actions bar */}
+        <div style={{ padding: "10px 20px", display: "flex", gap: 8, borderBottom: "1px solid #e5ddd0" }}>
+          <button
+            onClick={markAllReceived}
+            style={{
+              padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+              background: "#E8F5E9", color: "#2D6A4F", border: "1px solid #A5D6A7", cursor: "pointer",
+            }}
+          >
+            Tout reçu conforme
+          </button>
+        </div>
+
+        {/* Lines */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px" }}>
+          {loading ? (
+            <p style={{ textAlign: "center", color: "#999", padding: 40 }}>Chargement...</p>
+          ) : lines.map((l) => {
+            const ecart = l.checked && l.qty_received != null && l.qty_received !== l.quantite;
+            return (
+              <div key={l.id} style={{
+                display: "flex", flexDirection: "column", gap: 6,
+                padding: "12px 14px", marginBottom: 6, borderRadius: 12,
+                background: l.checked ? "#fff" : "#fefefe",
+                border: ecart ? "1.5px solid #D4775A" : l.checked ? "1.5px solid #A5D6A7" : "1px solid #e5ddd0",
+                opacity: l.checked ? 1 : 0.75,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {/* Checkbox */}
+                  <button
+                    type="button"
+                    onClick={() => toggleCheck(l.id)}
+                    style={{
+                      width: 28, height: 28, borderRadius: 8, flexShrink: 0, cursor: "pointer",
+                      border: l.checked ? "2px solid #16a34a" : "2px solid #ddd6c8",
+                      background: l.checked ? "#16a34a" : "#fff",
+                      color: "#fff", fontSize: 16, fontWeight: 700,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >
+                    {l.checked ? "✓" : ""}
+                  </button>
+
+                  {/* Name + ordered qty */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>{l.ingredient_name}</div>
+                    <div style={{ fontSize: 11, color: "#999" }}>
+                      Commandé : <strong>{l.quantite}</strong> {l.unite ?? ""}
+                    </div>
+                  </div>
+
+                  {/* Received qty input */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                    <input
+                      type="number"
+                      value={l.qty_received ?? ""}
+                      onChange={(e) => setQtyReceived(l.id, e.target.value ? Number(e.target.value) : null)}
+                      placeholder={String(l.quantite)}
+                      style={{
+                        width: 60, padding: "6px 8px", borderRadius: 8, textAlign: "center",
+                        border: ecart ? "1.5px solid #D4775A" : "1px solid #ddd6c8",
+                        fontSize: 14, fontWeight: 700, fontFamily: "'Oswald', sans-serif",
+                        outline: "none", background: "#fff",
+                      }}
+                    />
+                    <span style={{ fontSize: 11, color: "#999" }}>{l.unite ?? ""}</span>
+                  </div>
+                </div>
+
+                {/* Ecart warning + note */}
+                {ecart && (
+                  <div style={{ fontSize: 11, color: "#D4775A", fontWeight: 600, marginLeft: 38 }}>
+                    Écart : {((l.qty_received ?? 0) - l.quantite > 0 ? "+" : "")}{((l.qty_received ?? 0) - l.quantite).toFixed(1)} {l.unite ?? ""}
+                  </div>
+                )}
+                {l.checked && (
+                  <input
+                    type="text"
+                    value={l.reception_note ?? ""}
+                    onChange={(e) => setNote(l.id, e.target.value)}
+                    placeholder="Note (optionnel)"
+                    style={{
+                      marginLeft: 38, padding: "4px 8px", borderRadius: 6,
+                      border: "1px solid #e5ddd0", fontSize: 11, outline: "none",
+                      color: "#666", background: "#faf7f2",
+                    }}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: "14px 20px", borderTop: "1px solid #e5ddd0",
+          display: "flex", gap: 10,
+          paddingBottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
+        }}>
+          <button
+            onClick={() => save(false)}
+            disabled={saving}
+            style={{
+              flex: 1, padding: "12px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+              background: "#fff", color: "#1a1a1a", border: "1.5px solid #ddd6c8", cursor: "pointer",
+            }}
+          >
+            {saving ? "..." : "Sauvegarder le pointage"}
+          </button>
+          <button
+            onClick={() => save(true)}
+            disabled={saving || !allChecked}
+            title={allChecked ? "Valider la réception" : "Pointe tous les produits d'abord"}
+            style={{
+              flex: 1, padding: "12px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+              background: allChecked ? "#16a34a" : "#ccc", color: "#fff",
+              border: "none", cursor: allChecked ? "pointer" : "not-allowed",
+              opacity: saving ? 0.6 : 1,
+            }}
+          >
+            {saving ? "..." : "Valider réception"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CommandesPage() {
   const { current: etab } = useEtablissement();
   const searchParams = useSearchParams();
@@ -303,6 +548,9 @@ function CommandesPage() {
   const [supplierAliases, setSupplierAliases] = useState<Map<string, Set<string>>>(new Map());
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [draftSupplierIds, setDraftSupplierIds] = useState<Set<string>>(new Set());
+
+  // Reception modal
+  const [receptionSessionId, setReceptionSessionId] = useState<string | null>(null);
 
   // Current supplier state
   const [session, setSession] = useState<Session | null>(null);
@@ -1456,9 +1704,9 @@ function CommandesPage() {
                   Portail fournisseur
                 </button>
               )}
-              <button onClick={() => recevoirSession(session.id)} disabled={saving}
+              <button onClick={() => setReceptionSessionId(session.id)} disabled={saving}
                 style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                Marquer recue
+                Pointer la réception
               </button>
             </div>
           )}
@@ -2037,13 +2285,13 @@ function CommandesPage() {
                     }}>
                     PDF
                   </button>
-                  <button type="button" onClick={() => recevoirPending(r.id)} disabled={saving}
+                  <button type="button" onClick={() => setReceptionSessionId(r.id)} disabled={saving}
                     style={{
                       fontSize: 11, fontWeight: 700, color: "#fff", background: "#16a34a",
                       border: "none", borderRadius: 6, cursor: "pointer", padding: "5px 14px",
                       fontFamily: "inherit",
                     }}>
-                    Receptionner
+                    Pointer
                   </button>
                 </div>
               </div>
@@ -2501,6 +2749,22 @@ function CommandesPage() {
             )}
           </div>
         </>
+      )}
+
+      {/* Reception modal */}
+      {receptionSessionId && (
+        <ReceptionModal
+          sessionId={receptionSessionId}
+          onClose={() => setReceptionSessionId(null)}
+          onDone={async () => {
+            setReceptionSessionId(null);
+            // Refresh pending receptions
+            setPendingReceptions((prev) => prev.filter((r) => r.id !== receptionSessionId));
+            if (session?.id === receptionSessionId) await reloadSession();
+            setConfirmation("Commande réceptionnée");
+            setTimeout(() => setConfirmation(null), 4000);
+          }}
+        />
       )}
 
     </RequireRole>
