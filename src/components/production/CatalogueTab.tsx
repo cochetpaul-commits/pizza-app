@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import type { CSSProperties } from "react";
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
@@ -742,6 +743,39 @@ export function CatalogueContent() {
     setOpenId(prev => prev === id ? null : id);
   }, []);
 
+  // Custom category order (persisted in localStorage)
+  const SORT_KEY = `catalogue-cat-order-${etabSlug ?? "all"}`;
+  const [catOrder, setCatOrder] = useState<string[]>([]);
+
+  // Load saved order on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SORT_KEY);
+      if (saved) setCatOrder(JSON.parse(saved));
+    } catch { /* ignore */ }
+  }, [SORT_KEY]);
+
+  // Apply custom order to groups
+  const orderedGroups = useMemo(() => {
+    if (catOrder.length === 0) return groups;
+    const orderMap = new Map(catOrder.map((k, i) => [k, i]));
+    return [...groups].sort((a, b) => {
+      const ia = orderMap.get(a[0]) ?? 999;
+      const ib = orderMap.get(b[0]) ?? 999;
+      if (ia !== ib) return ia - ib;
+      return 0; // keep original order for unranked
+    });
+  }, [groups, catOrder]);
+
+  const handleDragEnd = useCallback((result: DropResult) => {
+    if (!result.destination || result.source.index === result.destination.index) return;
+    const keys = orderedGroups.map(([k]) => k);
+    const [moved] = keys.splice(result.source.index, 1);
+    keys.splice(result.destination.index, 0, moved);
+    setCatOrder(keys);
+    try { localStorage.setItem(SORT_KEY, JSON.stringify(keys)); } catch { /* ignore */ }
+  }, [orderedGroups, SORT_KEY]);
+
   const handleDelete = useCallback(async (recipe: Recipe) => {
     if (!window.confirm(`Supprimer "${recipe.name}" ?\nCette action est irréversible.`)) return;
     try {
@@ -982,24 +1016,45 @@ export function CatalogueContent() {
           <p style={{ textAlign: "center", color: "#999", padding: 40, fontSize: 14 }}>Aucune recette trouvée.</p>
         )}
 
-        {/* Groups */}
-        {groups.map(([key, items]) => {
+        {/* Groups — drag & drop reorderable */}
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="catalogue-categories">
+            {(droppableProvided) => (
+              <div ref={droppableProvided.innerRef} {...droppableProvided.droppableProps}>
+        {orderedGroups.map(([key, items], groupIdx) => {
           const color = groupColor(key);
           const isCollapsed = !openCats.has(key);
           return (
-            <div key={key} style={{ marginBottom: 18 }}>
+            <Draggable key={key} draggableId={key} index={groupIdx}>
+              {(provided, snapshot) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.draggableProps}
+              style={{ ...provided.draggableProps.style, marginBottom: 18 }}
+            >
               {/* Category header */}
               <button
                 onClick={() => toggleCat(key)}
                 style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 12,
-                  padding: "14px 18px", background: "#fff",
+                  padding: "14px 18px", background: snapshot.isDragging ? "#f9f6f0" : "#fff",
                   border: "1px solid #ede6d9",
-                  boxShadow: `inset 4px 0 0 ${color}, 0 1px 3px rgba(0,0,0,0.04)`,
+                  boxShadow: snapshot.isDragging
+                    ? `inset 4px 0 0 ${color}, 0 4px 16px rgba(0,0,0,0.12)`
+                    : `inset 4px 0 0 ${color}, 0 1px 3px rgba(0,0,0,0.04)`,
                   borderRadius: 14, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
                   marginBottom: 8,
                 }}
               >
+                {/* Drag handle */}
+                <span
+                  {...provided.dragHandleProps}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ cursor: "grab", color: "#ccc", fontSize: 14, flexShrink: 0, lineHeight: 1, touchAction: "none" }}
+                  title="Glisser pour réordonner"
+                >
+                  ≡
+                </span>
                 <span style={{
                   fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 14, fontWeight: 800,
                   letterSpacing: "0.12em", textTransform: "uppercase", color,
@@ -1276,8 +1331,15 @@ export function CatalogueContent() {
                 );
               })}
             </div>
+            )}
+            </Draggable>
           );
         })}
+        {droppableProvided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
 
       {/* MODALE PIVOT */}
       {modalRecipe && (() => {
