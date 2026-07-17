@@ -100,6 +100,7 @@ const PRODUCTION_ITEMS_PICCOLA: NavItemV2[] = [
 export const ACHATS_ITEMS: NavItemV2[] = [
   { label: "Base produits", href: "/ingredients", icon: "tag" },
   { label: "Commandes", href: "/commandes", icon: "shoppingBag" },
+  { label: "Stock", href: "/stock", icon: "package" },
   { label: "Factures", href: "/achats", icon: "fileText" },
   { label: "Stats prix", href: "/variations-prix", icon: "trendingUp" },
   { label: "Catalogue Popina", href: "/admin/popina-catalogue", icon: "tag", roles: ["group_admin"] },
@@ -324,6 +325,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/ingredients": "Achats",
   "/invoices": "Achats",
   "/commandes": "Achats",
+  "/stock": "Stock",
   "/variations-prix": "Achats",
   "/inventaire": "Production",
   "/recettes": "Production",
@@ -394,6 +396,7 @@ const PAGE_SECTIONS: Record<string, string> = {
   "/ingredients": "Achats",
   "/invoices": "Achats",
   "/commandes": "Achats",
+  "/stock": "Achats",
   "/variations-prix": "Achats",
   "/inventaire": "Production",
   "/recettes": "Production",

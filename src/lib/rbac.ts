@@ -15,6 +15,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/catalogue":    ALL,
   "/ingredients":  ALL,
   "/commandes":    ALL,
+  "/stock":        ALL,
   "/inventaire":   ALL,
   "/session":      ALL,
   "/settings/account": ALL,

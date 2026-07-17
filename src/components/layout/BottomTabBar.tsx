@@ -271,12 +271,13 @@ const SECTION_PILOTAGE: TabSection = {
 const SECTION_ACHATS: TabSection = {
   label: "Achats",
   href: "/commandes",
-  match: ["/achats", "/commandes", "/ingredients", "/invoices", "/fournisseurs", "/stats-achats", "/variations-prix", "/admin/popina-catalogue"],
+  match: ["/achats", "/commandes", "/ingredients", "/invoices", "/fournisseurs", "/stats-achats", "/variations-prix", "/admin/popina-catalogue", "/stock"],
   icon: (a) => <IconShoppingBag active={a} />,
   roles: ["group_admin"],
   tabs: [
     { label: "Produits", href: "/ingredients", match: ["/ingredients"], icon: () => <ShoppingBasket size={24} strokeWidth={1.8} /> },
     { label: "Commandes", href: "/commandes", match: ["/commandes"], icon: (a) => <IconTruck active={a} /> },
+    { label: "Stock", href: "/stock", match: ["/stock"], icon: (a) => <IconBox active={a} /> },
     { label: "Factures", href: "/achats", match: ["/achats", "/invoices"], icon: (a) => <IconFileText active={a} /> },
     { label: "Stats prix", href: "/variations-prix", match: ["/variations-prix"], icon: (a) => <IconTrendingUp active={a} /> },
     { label: "Catalogue Popina", href: "/admin/popina-catalogue", match: ["/admin/popina-catalogue"], icon: (a) => <IconTag active={a} /> },
