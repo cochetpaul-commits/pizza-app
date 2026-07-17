@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useProfile } from "@/lib/ProfileContext";
+import { useEtablissement } from "@/lib/EtablissementContext";
 
 type PairingItem = { id: string; name: string; category: string };
 
@@ -273,15 +274,17 @@ export function CatalogueSalleContent() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const { role } = useProfile();
+  const { current: etab } = useEtablissement();
   const canEdit = role === "group_admin";
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/catalogue/fiches");
+    const etabParam = etab?.slug ? `?etab=${etab.slug}` : "";
+    const res = await fetch(`/api/catalogue/fiches${etabParam}`);
     const data = await res.json();
     setFiches(Array.isArray(data) ? data : []);
     setLoading(false);
-  }, []);
+  }, [etab]);
 
   useEffect(() => { void load(); }, [load]);
 

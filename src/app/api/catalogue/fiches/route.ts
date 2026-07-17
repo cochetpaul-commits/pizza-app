@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const sb = () =>
@@ -25,9 +25,16 @@ type FicheCatalogue = {
   sub_recipes: { name: string; ingredients: string[] }[];
 };
 
-/** GET — fiches catalogue pour l'équipe */
-export async function GET() {
+/** GET — fiches catalogue pour l'équipe. ?etab=slug pour filtrer par établissement */
+export async function GET(req: NextRequest) {
   const supabase = sb();
+  const etabSlug = req.nextUrl.searchParams.get("etab");
+
+  const matchEstab = (establishments: string[] | null): boolean => {
+    if (!etabSlug) return true;
+    if (!establishments || establishments.length === 0) return true;
+    return establishments.includes(etabSlug);
+  };
 
   // Load all data in parallel
   const [
@@ -41,11 +48,11 @@ export async function GET() {
     { data: popinaProducts },
     { data: pairingsData },
   ] = await Promise.all([
-    supabase.from("pizza_recipes").select("id, name, photo_url, description_courte, wine_pairing, in_catalogue").eq("is_active", true),
+    supabase.from("pizza_recipes").select("id, name, photo_url, description_courte, wine_pairing, in_catalogue, establishments").eq("is_active", true),
     supabase.from("pizza_ingredients").select("recipe_id, ingredient_id, qty, unit"),
-    supabase.from("kitchen_recipes").select("id, name, photo_url, category, description_courte, wine_pairing, in_catalogue, fiche_type, is_active, output_ingredient_id"),
+    supabase.from("kitchen_recipes").select("id, name, photo_url, category, description_courte, wine_pairing, in_catalogue, establishments, fiche_type, is_active, output_ingredient_id"),
     supabase.from("kitchen_recipe_lines").select("recipe_id, ingredient_id, qty, unit"),
-    supabase.from("cocktails").select("id, name, image_url, description_courte, in_catalogue"),
+    supabase.from("cocktails").select("id, name, image_url, description_courte, in_catalogue, establishments"),
     supabase.from("cocktail_ingredients").select("cocktail_id, ingredient_id, qty, unit"),
     supabase.from("ingredients").select("id, name, allergens, category"),
     supabase.from("popina_products").select("id, name, price_ttc, pizza_recipe_id, kitchen_recipe_id, cocktail_id").eq("active", true),
@@ -138,6 +145,7 @@ export async function GET() {
 
   // Pizzas
   for (const p of pizzas ?? []) {
+    if (!matchEstab(p.establishments)) continue;
     const lines = (pizzaLines ?? []).filter((l) => l.recipe_id === p.id);
     fiches.push({
       id: p.id, type: "pizza", name: p.name, category: "pizza",
@@ -155,6 +163,7 @@ export async function GET() {
   const sellCategories = ["entree", "plat_cuisine", "dessert", "accompagnement"];
   for (const kr of kitchens ?? []) {
     if (!kr.is_active || !sellCategories.includes(kr.category)) continue;
+    if (!matchEstab(kr.establishments)) continue;
     const lines = (kitchenLines ?? []).filter((l) => l.recipe_id === kr.id);
     fiches.push({
       id: kr.id, type: "cuisine", name: kr.name, category: kr.category,
@@ -170,6 +179,7 @@ export async function GET() {
 
   // Cocktails
   for (const c of cocktailsData ?? []) {
+    if (!matchEstab(c.establishments)) continue;
     const lines = (cocktailLines ?? []).filter((l) => l.cocktail_id === c.id);
     fiches.push({
       id: c.id, type: "cocktail", name: c.name, category: "cocktail",

@@ -595,7 +595,7 @@ export function CatalogueContent() {
   const createProduit = async () => {
     if (!etab || !produitName.trim()) return;
     setProduitSaving(true);
-    const slug = etab.slug?.includes("piccola") ? "piccola" : "bellomio";
+    const slug = etab.slug?.includes("piccola") ? "piccola" : "bello_mio";
     const { error } = await supabase.from("kitchen_recipes").insert({
       name: produitName.trim(),
       category: produitCat,
