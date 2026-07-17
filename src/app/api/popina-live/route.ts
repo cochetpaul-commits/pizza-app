@@ -15,6 +15,17 @@ export const dynamic = "force-dynamic";
  * }
  */
 export async function GET(req: NextRequest) {
+  // Optional widget token auth (env WIDGET_TOKEN)
+  const widgetToken = process.env.WIDGET_TOKEN;
+  if (widgetToken) {
+    const token = req.nextUrl.searchParams.get("token") ?? req.headers.get("x-widget-token");
+    const referer = req.headers.get("referer") ?? "";
+    const isInternal = referer.includes(req.nextUrl.host);
+    if (!isInternal && token !== widgetToken) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+  }
+
   const apiKey = process.env.POPINA_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "POPINA_API_KEY manquant" }, { status: 500 });
 
