@@ -72,6 +72,7 @@ export type SidebarEntry = NavEtabGroup | NavSettingsGroup | NavStandaloneItem |
 // PILOTAGE (analyse & performance)
 const PILOTAGE_ITEMS: NavItemV2[] = [
   { label: "Ventes", href: "/ventes", icon: "barChart" },
+  { label: "Ventes live", href: "/ventes/live", icon: "trendingUp" },
   { label: "Produits", href: "/ventes/marges", icon: "wallet" },
   { label: "Masse salariale", href: "/rh/masse-salariale", icon: "calculator" },
   { label: "Tresorerie", href: "/tresorerie", icon: "wallet" },
