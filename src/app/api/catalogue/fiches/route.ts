@@ -119,11 +119,19 @@ export async function GET() {
     for (const line of lines) {
       const subRecipe = kitchenMap.get("out:" + line.ingredient_id);
       if (subRecipe && (subRecipe.category === "preparation" || subRecipe.category === "sauce")) {
-        const subIngNames = subRecipe.lines.map((l) => ingMap.get(l.ingredient_id)?.name ?? "?");
+        const subIngNames = subRecipe.lines.map((l) => cleanName(ingMap.get(l.ingredient_id)?.name ?? "?"));
         subs.push({ name: subRecipe.name, ingredients: subIngNames });
       }
     }
     return subs;
+  }
+
+  /** Strip trailing quantities/weights from ingredient names for salle display */
+  function cleanName(raw: string): string {
+    return raw
+      .replace(/\s+\d+[.,/]?\d*\s*(KG|G|CL|ML|L|PCS|PIECES?|UNITE?S?)\b/gi, "")
+      .replace(/\s+\d+[.,/]\d+\s*$/g, "")
+      .trim();
   }
 
   const fiches: FicheCatalogue[] = [];
@@ -138,7 +146,7 @@ export async function GET() {
       pairings: pairingsMap.get("pizza:" + p.id) ?? [],
       photo_url: p.photo_url, price_ttc: popinaPrice.get("pizza:" + p.id) ?? null,
       allergens: collectAllergens(lines),
-      ingredients: lines.map((l) => ingMap.get(l.ingredient_id)?.name ?? "?"),
+      ingredients: lines.map((l) => cleanName(ingMap.get(l.ingredient_id)?.name ?? "?")),
       sub_recipes: [],
     });
   }
@@ -155,7 +163,7 @@ export async function GET() {
       pairings: pairingsMap.get("cuisine:" + kr.id) ?? [],
       photo_url: kr.photo_url, price_ttc: popinaPrice.get("kitchen:" + kr.id) ?? null,
       allergens: collectAllergens(lines),
-      ingredients: lines.map((l) => ingMap.get(l.ingredient_id)?.name ?? "?"),
+      ingredients: lines.map((l) => cleanName(ingMap.get(l.ingredient_id)?.name ?? "?")),
       sub_recipes: getSubRecipes(lines),
     });
   }
@@ -170,7 +178,7 @@ export async function GET() {
       pairings: pairingsMap.get("cocktail:" + c.id) ?? [],
       photo_url: c.image_url, price_ttc: popinaPrice.get("cocktail:" + c.id) ?? null,
       allergens: collectAllergens(lines),
-      ingredients: lines.map((l) => ingMap.get(l.ingredient_id)?.name ?? "?"),
+      ingredients: lines.map((l) => cleanName(ingMap.get(l.ingredient_id)?.name ?? "?")),
       sub_recipes: [],
     });
   }

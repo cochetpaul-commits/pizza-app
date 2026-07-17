@@ -203,6 +203,13 @@ export async function GET() {
       return [...allergens].sort();
     }
 
+    function cleanName(raw: string): string {
+      return raw
+        .replace(/\s+\d+[.,/]?\d*\s*(KG|G|CL|ML|L|PCS|PIECES?|UNITE?S?)\b/gi, "")
+        .replace(/\s+\d+[.,/]\d+\s*$/g, "")
+        .trim();
+    }
+
     const fiches: FichePdf[] = [];
     const sellCategories = ["entree", "plat_cuisine", "dessert", "accompagnement"];
 
@@ -213,7 +220,7 @@ export async function GET() {
         name: p.name, category: "pizza", description_courte: p.description_courte,
         price_ttc: popinaPrice.get("pizza:" + p.id) ?? null,
         allergens: collectAllergens(lines),
-        ingredients: lines.map((l) => ingMap.get(l.ingredient_id)?.name ?? "?"),
+        ingredients: lines.map((l) => cleanName(ingMap.get(l.ingredient_id)?.name ?? "?")),
         pairings: pairingsMap.get("pizza:" + p.id) ?? [],
       });
     }
@@ -225,7 +232,7 @@ export async function GET() {
         name: kr.name, category: kr.category, description_courte: kr.description_courte,
         price_ttc: popinaPrice.get("kitchen:" + kr.id) ?? null,
         allergens: collectAllergens(lines),
-        ingredients: lines.map((l) => ingMap.get(l.ingredient_id)?.name ?? "?"),
+        ingredients: lines.map((l) => cleanName(ingMap.get(l.ingredient_id)?.name ?? "?")),
         pairings: pairingsMap.get("cuisine:" + kr.id) ?? [],
       });
     }
@@ -237,7 +244,7 @@ export async function GET() {
         name: c.name, category: "cocktail", description_courte: c.description_courte,
         price_ttc: popinaPrice.get("cocktail:" + c.id) ?? null,
         allergens: collectAllergens(lines),
-        ingredients: lines.map((l) => ingMap.get(l.ingredient_id)?.name ?? "?"),
+        ingredients: lines.map((l) => cleanName(ingMap.get(l.ingredient_id)?.name ?? "?")),
         pairings: pairingsMap.get("cocktail:" + c.id) ?? [],
       });
     }
