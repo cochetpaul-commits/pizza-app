@@ -755,26 +755,61 @@ export function CatalogueContent() {
     } catch { /* ignore */ }
   }, [SORT_KEY]);
 
-  // Apply custom order to groups
-  const orderedGroups = useMemo(() => {
-    if (catOrder.length === 0) return groups;
-    const orderMap = new Map(catOrder.map((k, i) => [k, i]));
-    return [...groups].sort((a, b) => {
-      const ia = orderMap.get(a[0]) ?? 999;
-      const ib = orderMap.get(b[0]) ?? 999;
-      if (ia !== ib) return ia - ib;
-      return 0; // keep original order for unranked
+  // Build nested groups: type → subGroups[]
+  type SubGroup = { key: string; label: string; color: string; items: Recipe[] };
+  type TypeGroup = { type: string; label: string; color: string; count: number; subGroups: SubGroup[] };
+
+  const nestedGroups = useMemo((): TypeGroup[] => {
+    const typeMap = new Map<string, SubGroup[]>();
+    for (const [key, items] of groups) {
+      const [type, cat] = key.split(":");
+      const subs = typeMap.get(type) ?? [];
+      const subColor = type === "cuisine" && cat ? (CUISINE_CAT_COLORS[cat] ?? "#4a6741") : groupColor(key);
+      subs.push({ key, label: cat ? groupLabel(key) : "", color: subColor, items });
+      typeMap.set(type, subs);
+    }
+
+    const typeOrder: string[] = ["pizza", "cuisine", "cocktail", "vin", "produit", "production"];
+    const result: TypeGroup[] = [];
+    for (const [type, subs] of typeMap) {
+      const color = TYPE_COLORS[type as RecipeType] ?? "#1a1a1a";
+      const count = subs.reduce((s, g) => s + g.items.length, 0);
+      const label = TYPE_LABELS[type as RecipeType] ?? type;
+      result.push({ type, label, color, count, subGroups: subs });
+    }
+    result.sort((a, b) => {
+      const ia = typeOrder.indexOf(a.type);
+      const ib = typeOrder.indexOf(b.type);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
     });
-  }, [groups, catOrder]);
+
+    // Apply custom order
+    if (catOrder.length > 0) {
+      const orderMap = new Map(catOrder.map((k, i) => [k, i]));
+      result.sort((a, b) => {
+        const ia = orderMap.get(a.type) ?? 999;
+        const ib = orderMap.get(b.type) ?? 999;
+        return ia - ib;
+      });
+    }
+
+    return result;
+  }, [groups, catOrder, groupLabel, groupColor]);
+
+  // Track open types separately
+  const [openTypes, setOpenTypes] = useState<Set<string>>(new Set());
+  const toggleType = useCallback((type: string) => {
+    setOpenTypes(prev => { const n = new Set(prev); if (n.has(type)) n.delete(type); else n.add(type); return n; });
+  }, []);
 
   const handleDragEnd = useCallback((result: DropResult) => {
     if (!result.destination || result.source.index === result.destination.index) return;
-    const keys = orderedGroups.map(([k]) => k);
+    const keys = nestedGroups.map((g) => g.type);
     const [moved] = keys.splice(result.source.index, 1);
     keys.splice(result.destination.index, 0, moved);
     setCatOrder(keys);
     try { localStorage.setItem(SORT_KEY, JSON.stringify(keys)); } catch { /* ignore */ }
-  }, [orderedGroups, SORT_KEY]);
+  }, [nestedGroups, SORT_KEY]);
 
   const handleDelete = useCallback(async (recipe: Recipe) => {
     if (!window.confirm(`Supprimer "${recipe.name}" ?\nCette action est irréversible.`)) return;
@@ -1016,40 +1051,39 @@ export function CatalogueContent() {
           <p style={{ textAlign: "center", color: "#999", padding: 40, fontSize: 14 }}>Aucune recette trouvée.</p>
         )}
 
-        {/* Groups — drag & drop reorderable */}
+        {/* Groups — nested accordion with drag & drop */}
         <DragDropContext onDragEnd={handleDragEnd}>
           <Droppable droppableId="catalogue-categories">
             {(droppableProvided) => (
               <div ref={droppableProvided.innerRef} {...droppableProvided.droppableProps}>
-        {orderedGroups.map(([key, items], groupIdx) => {
-          const color = groupColor(key);
-          const isCollapsed = !openCats.has(key);
+        {nestedGroups.map((tg, groupIdx) => {
+          const typeOpen = openTypes.has(tg.type);
+          const hasSubs = tg.subGroups.length > 1 || (tg.subGroups.length === 1 && tg.subGroups[0].label);
           return (
-            <Draggable key={key} draggableId={key} index={groupIdx}>
+            <Draggable key={tg.type} draggableId={tg.type} index={groupIdx}>
               {(provided, snapshot) => (
             <div
               ref={provided.innerRef}
               {...provided.draggableProps}
-              style={{ ...provided.draggableProps.style, marginBottom: 18 }}
+              style={{ ...provided.draggableProps.style, marginBottom: 14 }}
             >
-              {/* Category header */}
+              {/* Type header */}
               <div
                 style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 12,
                   padding: "14px 18px", background: snapshot.isDragging ? "#f9f6f0" : "#fff",
                   border: "1px solid #ede6d9",
                   boxShadow: snapshot.isDragging
-                    ? `inset 4px 0 0 ${color}, 0 4px 16px rgba(0,0,0,0.12)`
-                    : `inset 4px 0 0 ${color}, 0 1px 3px rgba(0,0,0,0.04)`,
+                    ? `inset 4px 0 0 ${tg.color}, 0 4px 16px rgba(0,0,0,0.12)`
+                    : `inset 4px 0 0 ${tg.color}, 0 1px 3px rgba(0,0,0,0.04)`,
                   borderRadius: 14, textAlign: "left", fontFamily: "inherit",
-                  marginBottom: 8, boxSizing: "border-box",
+                  boxSizing: "border-box",
                 }}
               >
-                {/* Drag handle */}
                 <div
                   {...provided.dragHandleProps}
                   style={{
-                    cursor: "grab", color: "#b0a894", fontSize: 18, flexShrink: 0,
+                    cursor: "grab", color: "#b0a894", flexShrink: 0,
                     lineHeight: 1, touchAction: "none", padding: "4px 2px",
                     display: "flex", alignItems: "center",
                   }}
@@ -1058,33 +1092,76 @@ export function CatalogueContent() {
                   <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
                 </div>
                 <div
-                  onClick={() => toggleCat(key)}
+                  onClick={() => toggleType(tg.type)}
                   style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}
                 >
                   <span style={{
                     fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 14, fontWeight: 800,
-                    letterSpacing: "0.12em", textTransform: "uppercase", color,
+                    letterSpacing: "0.12em", textTransform: "uppercase", color: tg.color,
                   }}>
-                    {groupLabel(key)}
+                    {tg.label}
                   </span>
                   <span style={{
                     fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20,
-                    background: `${color}15`, color,
+                    background: `${tg.color}15`, color: tg.color,
                   }}>
-                    {items.length}
+                    {tg.count}
                   </span>
                   <span style={{
                     marginLeft: "auto", fontSize: 10, color: "#b0a894",
                     transition: "transform 0.2s",
-                    transform: isCollapsed ? "rotate(-90deg)" : "rotate(0)",
+                    transform: typeOpen ? "rotate(0)" : "rotate(-90deg)",
                   }}>
                     ▼
                   </span>
                 </div>
               </div>
 
-              {/* Recipe rows */}
-              {!isCollapsed && items.map(recipe => {
+              {/* Sub-groups or direct recipes */}
+              {typeOpen && (
+                <div style={{ paddingLeft: hasSubs ? 0 : 0, marginTop: 6 }}>
+                  {tg.subGroups.map((sg) => {
+                    const subOpen = !hasSubs || openCats.has(sg.key);
+                    return (
+                      <div key={sg.key} style={{ marginBottom: hasSubs ? 8 : 0 }}>
+                        {/* Sub-category header (only if multiple sub-groups) */}
+                        {hasSubs && (
+                          <div
+                            onClick={() => toggleCat(sg.key)}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 10,
+                              padding: "10px 18px", cursor: "pointer",
+                              background: `${sg.color}08`, borderRadius: 10,
+                              border: `1px solid ${sg.color}18`,
+                              marginBottom: subOpen ? 6 : 0,
+                            }}
+                          >
+                            <span style={{
+                              width: 8, height: 8, borderRadius: "50%",
+                              background: sg.color, flexShrink: 0,
+                            }} />
+                            <span style={{
+                              fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 12, fontWeight: 700,
+                              letterSpacing: "0.08em", textTransform: "uppercase", color: sg.color,
+                            }}>
+                              {sg.label}
+                            </span>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: sg.color, opacity: 0.6 }}>
+                              {sg.items.length}
+                            </span>
+                            <span style={{
+                              marginLeft: "auto", fontSize: 9, color: "#b0a894",
+                              transition: "transform 0.2s",
+                              transform: subOpen ? "rotate(0)" : "rotate(-90deg)",
+                            }}>
+                              ▼
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Recipe rows */}
+                        {subOpen && sg.items.map(recipe => {
+                          const color = tg.color;
                 const isOpen = openId === recipe.id;
                 const canProduce = !!recipe.emp_data
                   || (recipe.type === "pizza" || (recipe.type === "cuisine" && recipe.category !== "preparation"))
@@ -1337,6 +1414,11 @@ export function CatalogueContent() {
                   </div>
                 );
               })}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             )}
             </Draggable>
