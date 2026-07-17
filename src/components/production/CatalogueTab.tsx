@@ -7,7 +7,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
 import { calculerPate, type EmpatementType, type FlourMixItem, type PateResult } from "@/lib/pateEngine";
-import { AiInsightCard } from "@/components/AiInsightCard";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
 
@@ -903,12 +902,6 @@ export function CatalogueContent() {
           }}>
             Catalogue <span style={{ fontSize: 14, fontWeight: 500, color: "#999", letterSpacing: 0, textTransform: "none" }}>({recipes.length}) — consultation équipe</span>
           </h1>
-          <AiInsightCard
-            type="menu"
-            label="Suggestions menu IA"
-            icon={"🍴"}
-            color="#46655a"
-          />
         </div>
 
         {/* ── Line 2 — search + category dropdown + production toggle ── */}
