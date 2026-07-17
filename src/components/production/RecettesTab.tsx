@@ -84,12 +84,6 @@ const BAR_SUB_COLORS: Record<string, string> = {
   sirop: "#7C3AED",
 };
 
-const FOOD_COST_FILTERS: { id: FoodCostFilter; label: string }[] = [
-  { id: "all",       label: "Tous" },
-  { id: "bon",       label: "≤28%" },
-  { id: "attention", label: "≤32%" },
-  { id: "alerte",    label: ">32%" },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -356,15 +350,6 @@ function SectionHeader({
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
-
-const filterPill = (active: boolean, activeColor?: string): React.CSSProperties => ({
-  padding: "4px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700,
-  border: "1.5px solid",
-  borderColor: active ? (activeColor ?? "#D4775A") : "#ddd6c8",
-  background: active ? (activeColor ?? "#D4775A") + "14" : "transparent",
-  color: active ? (activeColor ?? "#D4775A") : "#999",
-  cursor: "pointer",
-});
 
 
 // ─── Main inner component ─────────────────────────────────────────────────────
@@ -778,18 +763,6 @@ function RecettesInner() {
             background: "#fff", border: "1.5px solid #ddd6c8",
             display: "flex", flexDirection: "column", gap: 10,
           }}>
-            {/* Food cost */}
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#999", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Food cost</div>
-              <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                {FOOD_COST_FILTERS.map(f => (
-                  <button key={f.id} type="button" onClick={() => setFoodCostFilter(f.id)}
-                    style={filterPill(foodCostFilter === f.id, f.id === "bon" ? "#4a6741" : f.id === "attention" ? "#d97706" : f.id === "alerte" ? "#8B1A1A" : undefined)}>
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-            </div>
             {hasActiveFilter && (
               <button type="button" onClick={() => { setFoodCostFilter("all"); setCuisineCatFilter("all"); setProdFilter(false); }}
                 style={{ fontSize: 12, fontWeight: 600, color: "#D4775A", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
@@ -837,19 +810,23 @@ function RecettesInner() {
             {openSections.has("cuisine") && dynamicCuisineCats.filter(cat => (kitchenByCat[cat.id]?.length ?? 0) > 0).map(cat => {
               const catColor = CUISINE_CAT_COLORS[cat.id] ?? CUISINE_COLOR;
               const isCustom = !KNOWN_CAT_IDS.has(cat.id);
+              const subOpen = openSections.has("sub:" + cat.id);
               return (
-                <div key={cat.id} style={{ marginTop: 14 }}>
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: "8px 12px", marginBottom: 10,
-                    background: `${catColor}10`,
-                    border: `1px solid ${catColor}25`,
-                    borderRadius: 10,
-                  }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: catColor, flexShrink: 0 }} />
+                <div key={cat.id} style={{ marginTop: 8 }}>
+                  <div
+                    onClick={() => toggleSection("sub:" + cat.id)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "10px 14px", marginBottom: subOpen ? 8 : 0,
+                      background: `${catColor}08`,
+                      border: `1px solid ${catColor}18`,
+                      borderRadius: 10, cursor: "pointer",
+                    }}
+                  >
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: catColor, flexShrink: 0 }} />
                     <span style={{
                       fontSize: 12, fontWeight: 800, color: catColor,
-                      textTransform: "uppercase", letterSpacing: "0.1em",
+                      textTransform: "uppercase", letterSpacing: "0.08em",
                       fontFamily: "var(--font-oswald), Oswald, sans-serif",
                     }}>
                       {cat.label}
@@ -860,11 +837,11 @@ function RecettesInner() {
                     {isCustom && canWrite && (
                       <button
                         type="button"
-                        onClick={() => handleDeleteCategory(cat.id, cat.label)}
+                        onClick={(e) => { e.stopPropagation(); handleDeleteCategory(cat.id, cat.label); }}
                         title={`Supprimer la catégorie "${cat.label}"`}
                         aria-label={`Supprimer la catégorie ${cat.label}`}
                         style={{
-                          marginLeft: "auto", width: 22, height: 22, padding: 0,
+                          width: 22, height: 22, padding: 0,
                           borderRadius: 6, border: "1px solid rgba(220,38,38,0.2)",
                           background: "rgba(220,38,38,0.06)", color: "#DC2626",
                           cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
@@ -885,8 +862,15 @@ function RecettesInner() {
                         </svg>
                       </button>
                     )}
+                    <span style={{
+                      marginLeft: "auto", fontSize: 9, color: "#b0a894",
+                      transition: "transform 0.2s",
+                      transform: subOpen ? "rotate(0)" : "rotate(-90deg)",
+                    }}>
+                      ▼
+                    </span>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+                  {subOpen && <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
                     {kitchenByCat[cat.id].map(r => {
                       const isPrep = cat.id === "preparation" || cat.id === "sauce";
                       const hasPortion = r.cost_per_portion != null && r.cost_per_portion > 0;
@@ -909,7 +893,7 @@ function RecettesInner() {
                         />
                       );
                     })}
-                  </div>
+                  </div>}
                 </div>
               );
             })}
