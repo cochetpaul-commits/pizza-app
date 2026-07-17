@@ -80,6 +80,8 @@ function StockContent() {
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [loadingMov, setLoadingMov] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!etab) return;
@@ -94,6 +96,28 @@ function StockContent() {
   }, [etab]);
 
   useEffect(() => { void load(); }, [load]);
+
+  async function syncVentes() {
+    setSyncing(true);
+    setSyncMsg(null);
+    // Sync last 30 days
+    const to = new Date().toISOString().slice(0, 10);
+    const from = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const res = await fetchApi("/api/stock/sync-ventes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date_from: from, date_to: to }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setSyncMsg(`${data.ingredients_impacted} ingredients impactes (${data.matched_products} produits matches, ${data.unmatched_products} non matches)`);
+      void load();
+    } else {
+      setSyncMsg("Erreur de synchronisation");
+    }
+    setSyncing(false);
+    setTimeout(() => setSyncMsg(null), 8000);
+  }
 
   async function loadMovements(item: StockItem) {
     setSelectedItem(item);
@@ -160,6 +184,24 @@ function StockContent() {
             {inventoryDate && <> — dernier inventaire : {fmtDate(inventoryDate)}</>}
             {!inventoryDate && <> — aucun inventaire cloture</>}
           </p>
+        </div>
+
+        {/* Sync ventes button */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+          <button
+            onClick={syncVentes}
+            disabled={syncing}
+            style={{
+              padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+              background: "#2563EB", color: "#fff", border: "none", cursor: "pointer",
+              opacity: syncing ? 0.6 : 1,
+            }}
+          >
+            {syncing ? "Sync..." : "Sync ventes Popina (30j)"}
+          </button>
+          {syncMsg && (
+            <span style={{ fontSize: 12, color: "#4a6741", fontWeight: 600 }}>{syncMsg}</span>
+          )}
         </div>
 
         {/* Alertes banner */}
