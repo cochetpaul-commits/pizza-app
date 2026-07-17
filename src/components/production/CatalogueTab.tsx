@@ -1033,8 +1033,7 @@ export function CatalogueContent() {
               style={{ ...provided.draggableProps.style, marginBottom: 18 }}
             >
               {/* Category header */}
-              <button
-                onClick={() => toggleCat(key)}
+              <div
                 style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 12,
                   padding: "14px 18px", background: snapshot.isDragging ? "#f9f6f0" : "#fff",
@@ -1042,39 +1041,47 @@ export function CatalogueContent() {
                   boxShadow: snapshot.isDragging
                     ? `inset 4px 0 0 ${color}, 0 4px 16px rgba(0,0,0,0.12)`
                     : `inset 4px 0 0 ${color}, 0 1px 3px rgba(0,0,0,0.04)`,
-                  borderRadius: 14, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                  marginBottom: 8,
+                  borderRadius: 14, textAlign: "left", fontFamily: "inherit",
+                  marginBottom: 8, boxSizing: "border-box",
                 }}
               >
                 {/* Drag handle */}
-                <span
+                <div
                   {...provided.dragHandleProps}
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ cursor: "grab", color: "#ccc", fontSize: 14, flexShrink: 0, lineHeight: 1, touchAction: "none" }}
+                  style={{
+                    cursor: "grab", color: "#b0a894", fontSize: 18, flexShrink: 0,
+                    lineHeight: 1, touchAction: "none", padding: "4px 2px",
+                    display: "flex", alignItems: "center",
+                  }}
                   title="Glisser pour réordonner"
                 >
-                  ≡
-                </span>
-                <span style={{
-                  fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 14, fontWeight: 800,
-                  letterSpacing: "0.12em", textTransform: "uppercase", color,
-                }}>
-                  {groupLabel(key)}
-                </span>
-                <span style={{
-                  fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20,
-                  background: `${color}15`, color,
-                }}>
-                  {items.length}
-                </span>
-                <span style={{
-                  marginLeft: "auto", fontSize: 10, color: "#b0a894",
-                  transition: "transform 0.2s",
-                  transform: isCollapsed ? "rotate(-90deg)" : "rotate(0)",
-                }}>
-                  ▼
-                </span>
-              </button>
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
+                </div>
+                <div
+                  onClick={() => toggleCat(key)}
+                  style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}
+                >
+                  <span style={{
+                    fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 14, fontWeight: 800,
+                    letterSpacing: "0.12em", textTransform: "uppercase", color,
+                  }}>
+                    {groupLabel(key)}
+                  </span>
+                  <span style={{
+                    fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20,
+                    background: `${color}15`, color,
+                  }}>
+                    {items.length}
+                  </span>
+                  <span style={{
+                    marginLeft: "auto", fontSize: 10, color: "#b0a894",
+                    transition: "transform 0.2s",
+                    transform: isCollapsed ? "rotate(-90deg)" : "rotate(0)",
+                  }}>
+                    ▼
+                  </span>
+                </div>
+              </div>
 
               {/* Recipe rows */}
               {!isCollapsed && items.map(recipe => {
