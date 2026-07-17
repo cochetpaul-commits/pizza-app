@@ -3,7 +3,6 @@ import { createClient } from "@supabase/supabase-js";
 import React from "react";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { Document, Page, View, Text, StyleSheet, Font } from "@react-pdf/renderer";
-import fs from "fs";
 import path from "path";
 
 export const runtime = "nodejs";

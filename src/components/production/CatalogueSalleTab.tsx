@@ -173,6 +173,7 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
     <div style={{ borderRadius: 12, border: "1px solid #e5ddd0", background: "#fff", overflow: "hidden", opacity: fiche.in_catalogue ? 1 : 0.5 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", cursor: "pointer" }} onClick={onToggle}>
         {fiche.photo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img src={fiche.photo_url} alt={fiche.name} style={{ width: 56, height: 56, borderRadius: 10, objectFit: "cover" }} />
         ) : (
           <div style={{ width: 56, height: 56, borderRadius: 10, background: col.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -282,7 +283,6 @@ export function CatalogueSalleContent() {
     setLoading(false);
   }, []);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load(); }, [load]);
 
   function handleUpdate(id: string, _type: string, fields: Partial<Fiche>) {

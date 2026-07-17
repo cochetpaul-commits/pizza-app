@@ -153,7 +153,6 @@ function CataloguePage() {
     setLoading(false);
   }, [loadProducts, loadRecipes, loadDoses]);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void loadAll(); }, [loadAll]);
 
   /** Reload en arrière-plan (pas de loading spinner) */

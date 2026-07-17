@@ -755,6 +755,21 @@ export function CatalogueContent() {
     } catch { /* ignore */ }
   }, [SORT_KEY]);
 
+  const groupLabel = useCallback((key: string): string => {
+    const [type, cat] = key.split(":");
+    if (!cat) return TYPE_LABELS[type as RecipeType] ?? type;
+    if (type === "cuisine") return cuisineCatLabel(cat);
+    if (type === "produit") return PRODUIT_CAT_LABELS[cat] ?? cat;
+    if (cat === "empatement") return "Empâtement";
+    if (cat === "prep" || cat === "preparation") return "Préparations";
+    return cat;
+  }, [cuisineCatLabel]);
+
+  const groupColor = useCallback((key: string): string => {
+    const type = key.split(":")[0] as RecipeType;
+    return TYPE_COLORS[type] ?? "#1a1a1a";
+  }, []);
+
   // Build nested groups: type → subGroups[]
   type SubGroup = { key: string; label: string; color: string; items: Recipe[] };
   type TypeGroup = { type: string; label: string; color: string; count: number; subGroups: SubGroup[] };
@@ -856,21 +871,6 @@ export function CatalogueContent() {
       alert(`Erreur lors de la suppression : ${msg}`);
     }
   }, []);
-
-  function groupLabel(key: string): string {
-    const [type, cat] = key.split(":");
-    if (!cat) return TYPE_LABELS[type as RecipeType] ?? type;
-    if (type === "cuisine") return cuisineCatLabel(cat);
-    if (type === "produit") return PRODUIT_CAT_LABELS[cat] ?? cat;
-    if (cat === "empatement") return "Empâtement";
-    if (cat === "prep" || cat === "preparation") return "Préparations";
-    return cat;
-  }
-
-  function groupColor(key: string): string {
-    const type = key.split(":")[0] as RecipeType;
-    return TYPE_COLORS[type] ?? "#1a1a1a";
-  }
 
   // Dropdown menu item style
   const menuItem = (active: boolean, color: string): CSSProperties => ({

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { RequireRole } from "@/components/RequireRole";
@@ -1033,34 +1033,6 @@ function CommandesPage() {
     setSaving(false);
     if (selectedSupplierId) setDraftSupplierIds((prev) => new Set([...prev, selectedSupplierId]));
     setConfirmation("Commande renvoyee en brouillon");
-    setTimeout(() => setConfirmation(null), 4000);
-  }
-
-  async function recevoirSession(sessionId: string) {
-    setSaving(true);
-    await fetchApi("/api/commandes/session", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: sessionId, status: "recue" }),
-    });
-    await reloadSession();
-    setSaving(false);
-    setConfirmation("Commande marquée comme reçue");
-    setTimeout(() => setConfirmation(null), 4000);
-  }
-
-  async function recevoirPending(sessionId: string) {
-    setSaving(true);
-    await fetchApi("/api/commandes/session", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: sessionId, status: "recue" }),
-    });
-    setPendingReceptions((prev) => prev.filter((r) => r.id !== sessionId));
-    // If this was the currently viewed session, reload it
-    if (session?.id === sessionId) await reloadSession();
-    setSaving(false);
-    setConfirmation("Commande marquee comme recue");
     setTimeout(() => setConfirmation(null), 4000);
   }
 

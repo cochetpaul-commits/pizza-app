@@ -630,28 +630,6 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
     } finally { setPdfLoading(false); }
   }
 
-  async function handleExportPdfSalle() {
-    if (!recipeId) return;
-    setPdfLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) { alert("Non authentifié"); return; }
-      const res = await fetchApi("/api/kitchen/pdf-salle", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ recipeId }),
-      });
-      if (!res.ok) { const e = await res.json().catch(() => ({ message: "Erreur inconnue" })); alert(`Erreur PDF salle: ${e.message}`); return; }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `salle-${(name || "plat").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } finally { setPdfLoading(false); }
-  }
 
   async function handleIndexSave() {
     if (!recipeId) return;
@@ -1213,9 +1191,6 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
             saving={saving}
             saveError={saveError}
             onSave={handleSave}
-            onExportPdf={handleExportPdfSalle}
-            isEdit={isEdit}
-            pdfLoading={pdfLoading}
             recipeId={recipeId ?? null}
           />
         )}
@@ -1265,7 +1240,7 @@ const DRINK_CAT_COLORS: Record<string, { bg: string; fg: string }> = {
 };
 
 function SalleTab({
-  meta, updateMeta, userCanWrite, saving, saveError, onSave, onExportPdf, isEdit, pdfLoading, recipeId,
+  meta, updateMeta, userCanWrite, saving, saveError, onSave, recipeId,
 }: {
   meta: Record<string, string>;
   updateMeta: (k: string, v: string) => void;
@@ -1273,9 +1248,6 @@ function SalleTab({
   saving: boolean;
   saveError: string | null;
   onSave: () => void;
-  onExportPdf: () => void;
-  isEdit: boolean;
-  pdfLoading: boolean;
   recipeId: string | null;
 }) {
   const router = useRouter();
@@ -1291,11 +1263,8 @@ function SalleTab({
   // Load existing pairings
   useEffect(() => {
     if (!recipeId) return;
-    fetch(`/api/catalogue/fiches/pairings?recipe_id=${recipeId}&recipe_type=cuisine`)
-      .then(async (res) => {
-        // The GET endpoint returns drink ingredients, not pairings for a recipe
-        // We need to load pairings from the fiches API instead
-        const fichesRes = await fetch("/api/catalogue/fiches");
+    fetch("/api/catalogue/fiches")
+      .then(async (fichesRes) => {
         const fiches = await fichesRes.json();
         const fiche = Array.isArray(fiches) ? fiches.find((f: { id: string }) => f.id === recipeId) : null;
         if (fiche?.pairings) setPairings(fiche.pairings);
