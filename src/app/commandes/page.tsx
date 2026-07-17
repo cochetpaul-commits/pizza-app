@@ -68,13 +68,6 @@ type HistItem = {
 
 // ── Catégories ordonnées ─────────────────────────────────────────────────────
 
-const CAT_ORDER = [
-  "cremerie_fromage", "charcuterie_viande", "maree",
-  "legumes_herbes", "fruit", "epicerie_salee", "epicerie_sucree",
-  "vins", "spiritueux", "biere", "soft", "cafeteria", "liqueurs", "sirops",
-  "preparation", "sauce", "antipasti", "emballage", "autre",
-];
-
 function catLabel(cat: string | null): string {
   const map: Record<string, string> = {
     cremerie_fromage: "CRÉMERIE / FROMAGE",
@@ -122,9 +115,8 @@ const CAT_COLORS: Record<string, string> = {
   autre: "#6B7280",
 };
 
-function catIndex(cat: string | null): number {
-  const idx = CAT_ORDER.indexOf(cat ?? "autre");
-  return idx === -1 ? 999 : idx;
+function catCompare(a: string | null, b: string | null): number {
+  return catLabel(a).localeCompare(catLabel(b), "fr");
 }
 
 // ── Styles ───────────────────────────────────────────────────────────────────
@@ -1643,7 +1635,7 @@ function CommandesPage() {
       byCat[item.category].push(item);
     }
 
-    const sortedCats = Object.keys(byCat).sort((a, b) => catIndex(a) - catIndex(b));
+    const sortedCats = Object.keys(byCat).sort((a, b) => catCompare(a, b));
 
     return (
       <div>
@@ -1763,7 +1755,7 @@ function CommandesPage() {
 
   function renderCatalog() {
     const grouped = groupCatalog(catalog);
-    const sortedCats = Object.keys(grouped).sort((a, b) => catIndex(a) - catIndex(b));
+    const sortedCats = Object.keys(grouped).sort((a, b) => catCompare(a, b));
 
     return (
       <>
