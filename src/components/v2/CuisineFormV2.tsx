@@ -1216,6 +1216,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
             onExportPdf={handleExportPdfSalle}
             isEdit={isEdit}
             pdfLoading={pdfLoading}
+            recipeId={recipeId ?? null}
           />
         )}
       </main>
@@ -1251,8 +1252,20 @@ function serializeRegimes(set: Set<string>): string {
   return Array.from(set).join(",");
 }
 
+type PairingItem = { id: string; name: string; category: string };
+
+const DRINK_CAT_COLORS: Record<string, { bg: string; fg: string }> = {
+  vins: { bg: "#F5E6F0", fg: "#7B2D5F" },
+  spiritueux: { bg: "#FFF3E0", fg: "#E65100" },
+  biere: { bg: "#FFF9C4", fg: "#F9A825" },
+  soft: { bg: "#E0F7FA", fg: "#00838F" },
+  liqueurs: { bg: "#EDE7F6", fg: "#5E35B1" },
+  cafeteria: { bg: "#EFEBE9", fg: "#5D4037" },
+  sirops: { bg: "#FCE4EC", fg: "#C62828" },
+};
+
 function SalleTab({
-  meta, updateMeta, userCanWrite, saving, saveError, onSave, onExportPdf, isEdit, pdfLoading,
+  meta, updateMeta, userCanWrite, saving, saveError, onSave, onExportPdf, isEdit, pdfLoading, recipeId,
 }: {
   meta: Record<string, string>;
   updateMeta: (k: string, v: string) => void;
@@ -1263,9 +1276,68 @@ function SalleTab({
   onExportPdf: () => void;
   isEdit: boolean;
   pdfLoading: boolean;
+  recipeId: string | null;
 }) {
   const router = useRouter();
   const regimes = parseRegimes(meta.regimes_csv);
+
+  // Pairings state
+  const [pairings, setPairings] = useState<PairingItem[]>([]);
+  const [pairingSearch, setPairingSearch] = useState("");
+  const [pairingResults, setPairingResults] = useState<PairingItem[]>([]);
+  const [pairingSearching, setPairingSearching] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Load existing pairings
+  useEffect(() => {
+    if (!recipeId) return;
+    fetch(`/api/catalogue/fiches/pairings?recipe_id=${recipeId}&recipe_type=cuisine`)
+      .then(async (res) => {
+        // The GET endpoint returns drink ingredients, not pairings for a recipe
+        // We need to load pairings from the fiches API instead
+        const fichesRes = await fetch("/api/catalogue/fiches");
+        const fiches = await fichesRes.json();
+        const fiche = Array.isArray(fiches) ? fiches.find((f: { id: string }) => f.id === recipeId) : null;
+        if (fiche?.pairings) setPairings(fiche.pairings);
+      })
+      .catch(() => {});
+  }, [recipeId]);
+
+  function doPairingSearch(q: string) {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!q.trim()) { setPairingResults([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      setPairingSearching(true);
+      const res = await fetch(`/api/catalogue/fiches/pairings?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      setPairingResults(Array.isArray(data) ? data : []);
+      setPairingSearching(false);
+    }, 250);
+  }
+
+  async function addPairing(item: PairingItem) {
+    if (!recipeId) return;
+    await fetch("/api/catalogue/fiches/pairings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipe_id: recipeId, recipe_type: "cuisine", ingredient_id: item.id }),
+    });
+    setPairings((prev) => [...prev, item]);
+    setPairingSearch("");
+    setPairingResults([]);
+  }
+
+  async function removePairing(ingredientId: string) {
+    if (!recipeId) return;
+    await fetch("/api/catalogue/fiches/pairings", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipe_id: recipeId, recipe_type: "cuisine", ingredient_id: ingredientId }),
+    });
+    setPairings((prev) => prev.filter((p) => p.id !== ingredientId));
+  }
+
+  const selectedPairingIds = new Set(pairings.map((p) => p.id));
   const toggleRegime = (key: string) => {
     const next = new Set(regimes);
     if (next.has(key)) next.delete(key);
@@ -1316,15 +1388,110 @@ function SalleTab({
         />
       </div>
 
-      {/* Accords */}
+      {/* Accords — multi-select depuis ingrédients boissons */}
       <div style={sectionStyle}>
         <div style={sectionTitleStyle}>Accords conseillés</div>
-        <div style={hintStyle}>Suggestions à proposer pour augmenter le ticket moyen.</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-          <MetaField label="Vin" value={meta.accords_vin} onChange={v => updateMeta("accords_vin", v)} placeholder="Ex: Vermentino di Sardegna" />
-          <MetaField label="Bière" value={meta.accords_biere} onChange={v => updateMeta("accords_biere", v)} placeholder="Ex: Birra Moretti" />
-          <MetaField label="Sans alcool" value={meta.accords_soft} onChange={v => updateMeta("accords_soft", v)} placeholder="Ex: Limonade artisanale" />
-        </div>
+        <div style={hintStyle}>Sélectionne les boissons à suggérer pour augmenter le ticket moyen.</div>
+
+        {/* Selected pairings */}
+        {pairings.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+            {pairings.map((p) => {
+              const col = DRINK_CAT_COLORS[p.category] ?? { bg: "#eee", fg: "#666" };
+              return (
+                <span key={p.id} style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  padding: "5px 10px", borderRadius: 8, fontSize: 12,
+                  background: col.bg, color: col.fg, border: `1px solid ${col.fg}30`,
+                }}>
+                  {p.name}
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
+                    background: `${col.fg}15`, color: col.fg,
+                  }}>
+                    {p.category}
+                  </span>
+                  {userCanWrite && (
+                    <button
+                      type="button"
+                      onClick={() => removePairing(p.id)}
+                      style={{
+                        background: "none", border: "none", cursor: "pointer",
+                        color: col.fg, fontSize: 15, fontWeight: 700, lineHeight: 1, padding: 0,
+                      }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Search input */}
+        {userCanWrite && recipeId && (
+          <div style={{ position: "relative" }}>
+            <input
+              type="text"
+              value={pairingSearch}
+              onChange={(e) => { setPairingSearch(e.target.value); doPairingSearch(e.target.value); }}
+              placeholder="Rechercher un vin, spiritueux, biere, soft..."
+              style={inputStyle}
+            />
+            {(pairingResults.length > 0 || pairingSearching) && pairingSearch.trim() && (
+              <div style={{
+                position: "absolute", top: "100%", left: 0, right: 0, zIndex: 20,
+                marginTop: 2, border: "1px solid #e5ddd0", borderRadius: 8,
+                background: "#fff", maxHeight: 200, overflowY: "auto",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+              }}>
+                {pairingSearching ? (
+                  <div style={{ padding: 10, fontSize: 12, color: "#999" }}>Recherche...</div>
+                ) : (
+                  pairingResults.map((r) => {
+                    const already = selectedPairingIds.has(r.id);
+                    const col = DRINK_CAT_COLORS[r.category] ?? { bg: "#eee", fg: "#666" };
+                    return (
+                      <div
+                        key={r.id}
+                        onClick={() => { if (!already) addPairing(r); }}
+                        style={{
+                          padding: "8px 12px", fontSize: 12, cursor: already ? "default" : "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          opacity: already ? 0.4 : 1,
+                          borderBottom: "1px solid #f5f0e8",
+                        }}
+                        onMouseEnter={(e) => { if (!already) e.currentTarget.style.background = "#f9f6f0"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; }}
+                      >
+                        <span>{r.name}</span>
+                        <span style={{
+                          padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 700,
+                          background: col.bg, color: col.fg,
+                        }}>
+                          {r.category}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!recipeId && (
+          <div style={{ fontSize: 12, color: "#bbb", fontStyle: "italic" }}>
+            Enregistre la recette pour ajouter des accords.
+          </div>
+        )}
+
+        {pairings.length === 0 && recipeId && !pairingSearch && (
+          <div style={{ fontSize: 12, color: "#bbb", fontStyle: "italic", marginTop: 6 }}>
+            Aucun accord — recherche une boisson ci-dessus.
+          </div>
+        )}
       </div>
 
       {/* Régimes */}
