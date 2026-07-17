@@ -72,12 +72,44 @@ export async function PATCH(req: NextRequest) {
       .eq("id", line.id);
   }
 
-  // Mark session as received if finalize
+  // Mark session as received + create stock movements if finalize
   if (finalize) {
     await supabaseAdmin
       .from("commande_sessions")
       .update({ status: "recue", received_at: new Date().toISOString() })
       .eq("id", session_id);
+
+    // Get session info for etablissement_id
+    const { data: sess } = await supabaseAdmin
+      .from("commande_sessions")
+      .select("etablissement_id, created_by")
+      .eq("id", session_id)
+      .single();
+
+    if (sess) {
+      // Get full line data with ingredient_id
+      const { data: fullLines } = await supabaseAdmin
+        .from("commande_lignes")
+        .select("id, ingredient_id, qty_received, quantite, unite")
+        .eq("session_id", session_id);
+
+      const movements = (fullLines ?? [])
+        .filter((l) => l.ingredient_id && (l.qty_received ?? l.quantite) > 0)
+        .map((l) => ({
+          etablissement_id: sess.etablissement_id,
+          ingredient_id: l.ingredient_id,
+          type: "reception" as const,
+          quantity: l.qty_received ?? Number(l.quantite),
+          unit: l.unite,
+          reference_type: "commande_session",
+          reference_id: session_id,
+          created_by: sess.created_by,
+        }));
+
+      if (movements.length > 0) {
+        await supabaseAdmin.from("stock_movements").insert(movements);
+      }
+    }
   }
 
   return NextResponse.json({ ok: true });
