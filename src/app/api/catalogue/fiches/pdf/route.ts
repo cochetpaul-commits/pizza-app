@@ -144,7 +144,7 @@ export async function GET() {
       { data: popinaProducts },
       { data: pairingsData },
     ] = await Promise.all([
-      supabase.from("pizza_recipes").select("id, name, description_courte, in_catalogue").eq("is_active", true),
+      supabase.from("pizza_recipes").select("id, name, description_courte, in_catalogue"),
       supabase.from("pizza_ingredients").select("recipe_id, ingredient_id"),
       supabase.from("kitchen_recipes").select("id, name, category, description_courte, in_catalogue, is_active, output_ingredient_id"),
       supabase.from("kitchen_recipe_lines").select("recipe_id, ingredient_id"),
