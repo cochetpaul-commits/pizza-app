@@ -23,7 +23,7 @@ type Fiche = {
 };
 
 const CAT_LABELS: Record<string, string> = {
-  pizza: "Pizze", entree: "Antipasti", plat_cuisine: "Piatti",
+  pizza: "Pizze", entree: "Antipasti", plat_cuisine: "Cucina",
   dessert: "Dolci", accompagnement: "Contorni", cocktail: "Cocktails",
 };
 

@@ -35,7 +35,7 @@ type FichePdf = {
 };
 
 const CAT_LABELS: Record<string, string> = {
-  pizza: "PIZZE", entree: "ANTIPASTI", plat_cuisine: "PIATTI",
+  pizza: "PIZZE", entree: "ANTIPASTI", plat_cuisine: "CUCINA",
   dessert: "DOLCI", accompagnement: "CONTORNI", cocktail: "COCKTAILS",
 };
 
