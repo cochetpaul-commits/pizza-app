@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { RecettesContent } from "@/components/production/RecettesTab";
-import { CatalogueContent } from "@/components/production/CatalogueTab";
+import { CatalogueSalleContent } from "@/components/production/CatalogueSalleTab";
 
 type TabKey = "recettes" | "catalogue";
 
@@ -50,9 +50,8 @@ export default function FichesTechniquesPage() {
         </div>
       </div>
 
-      {/* Tab content — lazy render (only mount active tab) */}
       {tab === "recettes" && <RecettesContent />}
-      {tab === "catalogue" && <CatalogueContent />}
+      {tab === "catalogue" && <CatalogueSalleContent />}
     </div>
   );
 }
