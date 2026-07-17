@@ -272,6 +272,7 @@ export function CatalogueSalleContent() {
   const [filterCat, setFilterCat] = useState("ALL");
   const [showHidden, setShowHidden] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [openCats, setOpenCats] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
   const { role } = useProfile();
   const { current: etab } = useEtablissement();
@@ -358,16 +359,52 @@ export function CatalogueSalleContent() {
       </div>
 
       {loading ? <p style={{ textAlign: "center", color: "#999", padding: 40 }}>Chargement...</p> : (
-        [...grouped.entries()].map(([cat, items]) => (
-          <div key={cat} style={{ marginBottom: 28 }}>
-            <h2 style={{ fontSize: 16, fontFamily: "'Oswald', sans-serif", color: CAT_COLORS[cat]?.fg ?? "#1a1a1a", margin: "0 0 12px", paddingBottom: 6, borderBottom: `2px solid ${CAT_COLORS[cat]?.bg ?? "#eee"}` }}>
-              {CAT_LABELS[cat] ?? cat}
-            </h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {items.map((f) => <FicheCard key={f.id} fiche={f} isOpen={expanded === f.id} onToggle={() => setExpanded(expanded === f.id ? null : f.id)} canEdit={canEdit} onUpdate={handleUpdate} />)}
+        [...grouped.entries()].map(([cat, items]) => {
+          const col = CAT_COLORS[cat] ?? { bg: "#eee", fg: "#666" };
+          const isOpen = openCats.has(cat);
+          return (
+            <div key={cat} style={{ marginBottom: 10 }}>
+              {/* Category accordion header */}
+              <div
+                onClick={() => setOpenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })}
+                style={{
+                  display: "flex", alignItems: "center", gap: 12,
+                  padding: "12px 16px", cursor: "pointer",
+                  background: "#fff", borderRadius: 12,
+                  border: "1px solid #ede6d9",
+                  boxShadow: `inset 4px 0 0 ${col.fg}, 0 1px 3px rgba(0,0,0,0.04)`,
+                }}
+              >
+                <span style={{
+                  fontFamily: "'Oswald', sans-serif", fontSize: 14, fontWeight: 800,
+                  letterSpacing: "0.1em", textTransform: "uppercase", color: col.fg,
+                }}>
+                  {CAT_LABELS[cat] ?? cat}
+                </span>
+                <span style={{
+                  fontSize: 11, fontWeight: 800, padding: "2px 8px", borderRadius: 12,
+                  background: col.bg, color: col.fg,
+                }}>
+                  {items.length}
+                </span>
+                <span style={{
+                  marginLeft: "auto", fontSize: 10, color: "#b0a894",
+                  transition: "transform 0.2s",
+                  transform: isOpen ? "rotate(0)" : "rotate(-90deg)",
+                }}>
+                  ▼
+                </span>
+              </div>
+
+              {/* Fiches */}
+              {isOpen && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                  {items.map((f) => <FicheCard key={f.id} fiche={f} isOpen={expanded === f.id} onToggle={() => setExpanded(expanded === f.id ? null : f.id)} canEdit={canEdit} onUpdate={handleUpdate} />)}
+                </div>
+              )}
             </div>
-          </div>
-        ))
+          );
+        })
       )}
 
       {filtered.length === 0 && !loading && <p style={{ textAlign: "center", color: "#999", padding: 40 }}>Aucune fiche trouvee</p>}
