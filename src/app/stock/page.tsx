@@ -83,6 +83,12 @@ function StockContent() {
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
+  // Auto-doses
+  type DoseSuggestion = { popina_product_id: string; popina_name: string; popina_category: string; ingredient_id: string; ingredient_name: string; suggested_dose: number; suggested_unit: string; rule: string };
+  const [doseSuggestions, setDoseSuggestions] = useState<DoseSuggestion[] | null>(null);
+  const [doseLoading, setDoseLoading] = useState(false);
+  const [doseApplying, setDoseApplying] = useState(false);
+
   const load = useCallback(async () => {
     if (!etab) return;
     setLoading(true);
@@ -96,6 +102,33 @@ function StockContent() {
   }, [etab]);
 
   useEffect(() => { void load(); }, [load]);
+
+  async function loadDoseSuggestions() {
+    setDoseLoading(true);
+    const res = await fetch("/api/stock/auto-doses");
+    if (res.ok) setDoseSuggestions(await res.json());
+    setDoseLoading(false);
+  }
+
+  async function applyDoses() {
+    if (!doseSuggestions || doseSuggestions.length === 0) return;
+    setDoseApplying(true);
+    const entries = doseSuggestions.map((s) => ({
+      popina_product_id: s.popina_product_id,
+      ingredient_id: s.ingredient_id,
+      dose: s.suggested_dose,
+      dose_unit: s.suggested_unit,
+    }));
+    await fetch("/api/stock/auto-doses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entries }),
+    });
+    setDoseApplying(false);
+    setDoseSuggestions(null);
+    setSyncMsg(`${entries.length} doses appliquees`);
+    setTimeout(() => setSyncMsg(null), 5000);
+  }
 
   async function syncVentes() {
     setSyncing(true);
@@ -186,22 +219,17 @@ function StockContent() {
           </p>
         </div>
 
-        {/* Sync ventes button */}
+        {/* Actions bar */}
         <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
-          <button
-            onClick={syncVentes}
-            disabled={syncing}
-            style={{
-              padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-              background: "#2563EB", color: "#fff", border: "none", cursor: "pointer",
-              opacity: syncing ? 0.6 : 1,
-            }}
-          >
-            {syncing ? "Sync..." : "Sync ventes Popina (30j)"}
+          <button onClick={syncVentes} disabled={syncing}
+            style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: "#2563EB", color: "#fff", border: "none", cursor: "pointer", opacity: syncing ? 0.6 : 1 }}>
+            {syncing ? "Sync..." : "Sync ventes (30j)"}
           </button>
-          {syncMsg && (
-            <span style={{ fontSize: 12, color: "#4a6741", fontWeight: 600 }}>{syncMsg}</span>
-          )}
+          <button onClick={loadDoseSuggestions} disabled={doseLoading}
+            style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: "#7C3AED", color: "#fff", border: "none", cursor: "pointer", opacity: doseLoading ? 0.6 : 1 }}>
+            {doseLoading ? "..." : "Auto-doses Popina"}
+          </button>
+          {syncMsg && <span style={{ fontSize: 12, color: "#4a6741", fontWeight: 600 }}>{syncMsg}</span>}
         </div>
 
         {/* Alertes banner */}
@@ -369,6 +397,54 @@ function StockContent() {
           })
         )}
       </main>
+
+      {/* Auto-doses suggestions modal */}
+      {doseSuggestions !== null && (
+        <div onClick={() => setDoseSuggestions(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 1000 }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ background: "#f9f6f0", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: 600, maxHeight: "85vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            <div style={{ padding: "18px 20px 12px", borderBottom: "1px solid #e5ddd0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 800, color: "#7C3AED", letterSpacing: 2, textTransform: "uppercase" }}>Auto-doses</div>
+                <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Oswald', sans-serif", color: "#1a1a1a" }}>
+                  {doseSuggestions.length} suggestion{doseSuggestions.length > 1 ? "s" : ""}
+                </div>
+              </div>
+              <button onClick={() => setDoseSuggestions(null)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#999" }}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px" }}>
+              {doseSuggestions.length === 0 ? (
+                <p style={{ textAlign: "center", color: "#999", padding: 30, fontSize: 13 }}>Toutes les doses sont deja configurees.</p>
+              ) : doseSuggestions.map((s) => (
+                <div key={s.popina_product_id} style={{
+                  display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 4,
+                  borderRadius: 10, background: "#fff", border: "1px solid #f0ebe0",
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>{s.popina_name}</div>
+                    <div style={{ fontSize: 10, color: "#999" }}>{s.ingredient_name}</div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "'Oswald', sans-serif", color: "#7C3AED" }}>
+                      {s.suggested_dose} {s.suggested_unit}
+                    </div>
+                    <div style={{ fontSize: 9, color: "#999" }}>{s.rule}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {doseSuggestions.length > 0 && (
+              <div style={{ padding: "14px 20px", borderTop: "1px solid #e5ddd0", paddingBottom: "calc(14px + env(safe-area-inset-bottom, 0px))" }}>
+                <button onClick={applyDoses} disabled={doseApplying}
+                  style={{ width: "100%", padding: "12px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: "#7C3AED", color: "#fff", border: "none", cursor: "pointer", opacity: doseApplying ? 0.6 : 1 }}>
+                  {doseApplying ? "Application..." : `Appliquer ${doseSuggestions.length} doses`}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Movement detail modal */}
       {selectedItem && (
