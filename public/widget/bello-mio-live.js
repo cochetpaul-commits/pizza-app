@@ -8,9 +8,9 @@
 // ═══════════════════════════════════════════════════════════════
 
 // ── CONFIG ───────────────────────────────────────────────────
-const API_URL = "https://pizza-app-ifratelli.vercel.app/api/popina-live";
+const API_URL = "https://pizza-app-olive-five.vercel.app/api/popina-live";
 const LIVE_WIDGET_KEY = "REMPLACER_PAR_VOTRE_TOKEN"; // env LIVE_WIDGET_KEY sur Vercel
-const APP_URL = "https://pizza-app-ifratelli.vercel.app/ventes/live";
+const APP_URL = "https://pizza-app-olive-five.vercel.app/ventes/live";
 // ─────────────────────────────────────────────────────────────
 
 async function fetchLive() {
