@@ -145,7 +145,7 @@ export async function GET() {
       { data: pairingsData },
     ] = await Promise.all([
       supabase.from("pizza_recipes").select("id, name, description_courte, in_catalogue"),
-      supabase.from("pizza_ingredients").select("recipe_id, ingredient_id"),
+      supabase.from("pizza_ingredients").select("pizza_id, ingredient_id"),
       supabase.from("kitchen_recipes").select("id, name, category, description_courte, in_catalogue, is_active, output_ingredient_id"),
       supabase.from("kitchen_recipe_lines").select("recipe_id, ingredient_id"),
       supabase.from("cocktails").select("id, name, description_courte, in_catalogue"),
@@ -214,7 +214,7 @@ export async function GET() {
 
     for (const p of pizzas ?? []) {
       if (p.in_catalogue === false) continue;
-      const lines = (pizzaLines ?? []).filter((l) => l.recipe_id === p.id);
+      const lines = (pizzaLines ?? []).filter((l) => l.pizza_id === p.id);
       fiches.push({
         name: p.name, category: "pizza", description_courte: p.description_courte,
         price_ttc: popinaPrice.get("pizza:" + p.id) ?? null,

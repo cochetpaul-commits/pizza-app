@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
     { data: pairingsData },
   ] = await Promise.all([
     supabase.from("pizza_recipes").select("id, name, photo_url, description_courte, wine_pairing, in_catalogue, establishments"),
-    supabase.from("pizza_ingredients").select("recipe_id, ingredient_id, qty, unit"),
+    supabase.from("pizza_ingredients").select("pizza_id, ingredient_id, qty, unit"),
     supabase.from("kitchen_recipes").select("id, name, photo_url, category, description_courte, wine_pairing, in_catalogue, establishments, fiche_type, is_active, output_ingredient_id"),
     supabase.from("kitchen_recipe_lines").select("recipe_id, ingredient_id, qty, unit"),
     supabase.from("cocktails").select("id, name, image_url, description_courte, in_catalogue, establishments"),
@@ -146,7 +146,7 @@ export async function GET(req: NextRequest) {
   // Pizzas
   for (const p of pizzas ?? []) {
     if (!matchEstab(p.establishments)) continue;
-    const lines = (pizzaLines ?? []).filter((l) => l.recipe_id === p.id);
+    const lines = (pizzaLines ?? []).filter((l) => l.pizza_id === p.id);
     fiches.push({
       id: p.id, type: "pizza", name: p.name, category: "pizza",
       description_courte: p.description_courte, wine_pairing: p.wine_pairing,
