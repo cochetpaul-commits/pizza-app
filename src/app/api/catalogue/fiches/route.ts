@@ -136,8 +136,10 @@ export async function GET(req: NextRequest) {
   /** Strip trailing quantities/weights from ingredient names for salle display */
   function cleanName(raw: string): string {
     return raw
-      .replace(/\s+\d+[.,/]?\d*\s*(KG|G|CL|ML|L|PCS|PIECES?|UNITE?S?)\b/gi, "")
+      .replace(/\s+\d+[.,/]?\d*\s*(KG|G|GR|CL|ML|L|PCS|PIECES?|UNITE?S?|X)\b/gi, "")
       .replace(/\s+\d+[.,/]\d+\s*$/g, "")
+      .replace(/\s*~+\s*$/g, "")
+      .replace(/\s+\d+\s*%\s*/g, " ")
       .trim();
   }
 
