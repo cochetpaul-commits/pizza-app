@@ -9,13 +9,13 @@
 
 // ── CONFIG ───────────────────────────────────────────────────
 const API_URL = "https://pizza-app-ifratelli.vercel.app/api/popina-live";
-const WIDGET_TOKEN = "REMPLACER_PAR_VOTRE_TOKEN"; // env WIDGET_TOKEN sur Vercel
+const LIVE_WIDGET_KEY = "REMPLACER_PAR_VOTRE_TOKEN"; // env LIVE_WIDGET_KEY sur Vercel
 const APP_URL = "https://pizza-app-ifratelli.vercel.app/ventes/live";
 // ─────────────────────────────────────────────────────────────
 
 async function fetchLive() {
   const today = new Date().toISOString().slice(0, 10);
-  const url = `${API_URL}?day=${today}&token=${WIDGET_TOKEN}`;
+  const url = `${API_URL}?day=${today}&token=${LIVE_WIDGET_KEY}`;
   const req = new Request(url);
   req.timeoutInterval = 10;
   try {
