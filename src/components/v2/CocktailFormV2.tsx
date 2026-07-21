@@ -18,8 +18,6 @@ import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { RecipeHero, HeroBtn, HeroDangerBtn } from "./RecipeHero";
 import { GestionFoodCost } from "./GestionFoodCost";
-import { GestionCommandes } from "./GestionCommandes";
-import { GestionPilotage } from "./GestionPilotage";
 import { StepperInput } from "@/components/StepperInput";
 import type { Ingredient } from "@/types/ingredients";
 import type { CpuByUnit } from "@/lib/offerPricing";
@@ -86,8 +84,8 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
   const [fcTarget, setFcTarget] = useState(20);
 
   // Main tab
-  type MainTab = "fc" | "recette" | "cmd" | "pop";
-  const [mainTab, setMainTab] = useState<MainTab>(initialProdMode ? "recette" : isEdit ? "fc" : "recette");
+  type MainTab = "recette";
+  const [mainTab, setMainTab] = useState<MainTab>("recette");
 
   // Production mode
   const [prodMode, setProdMode] = useState(initialProdMode ?? false);
@@ -169,14 +167,8 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
   const typeLabel = COCKTAIL_TYPES.find(t => t.id === type)?.label ?? type;
 
   // Tab definitions
-  const MAIN_TABS: { key: MainTab; label: string }[] = isEdit ? [
-    { key: "fc", label: "Food cost & Marges" },
-    { key: "recette", label: "Recette & Procede" },
-    { key: "cmd", label: "Commandes fournisseurs" },
-    { key: "pop", label: "Pilotage CA" },
-  ] : [
-    { key: "fc", label: "Food cost & Marges" },
-    { key: "recette", label: "Recette & Procede" },
+  const MAIN_TABS: { key: MainTab; label: string }[] = [
+    { key: "recette", label: "Recette" },
   ];
 
   // Load
@@ -535,9 +527,10 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
         {saveError && <div className="errorBox" style={{ marginBottom: 12 }}>{saveError}</div>}
 
-        {/* ── TAB: FOOD COST & MARGES ── */}
-        {mainTab === "fc" && (
+        {/* ── TAB: RECETTE ── */}
+        {mainTab === "recette" && (
           <>
+            {/* Food cost & Marges */}
             <CocktailPricing
               costPerCocktail={costPerCocktail}
               sellCoeff={sellCoeff}
@@ -559,28 +552,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
               totalCost={round2(totalCostEur)}
               multiplier={1}
             />
-          </>
-        )}
 
-        {/* ── TAB: COMMANDES ── */}
-        {mainTab === "cmd" && isEdit && cocktailId && (
-          <GestionCommandes
-            recipeId={cocktailId}
-            recipeType="cocktail"
-            lines={lines}
-            ingredients={ingredients}
-            etablissementId={etab?.id}
-          />
-        )}
-
-        {/* ── TAB: PILOTAGE ── */}
-        {mainTab === "pop" && isEdit && (
-          <GestionPilotage recipeName={name} recipeType="cocktail" />
-        )}
-
-        {/* ── TAB: RECETTE & PROCEDE ── */}
-        {mainTab === "recette" && (
-          <>
             {/* Production mode toggle */}
             {isEdit && (
               <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>

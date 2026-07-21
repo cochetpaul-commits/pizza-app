@@ -10,8 +10,6 @@ import { StepperInput } from "@/components/StepperInput";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { calculerPate, type EmpatementType, type FlourMixItem } from "@/lib/pateEngine";
-import { GestionCommandes } from "./GestionCommandes";
-import { GestionPilotage } from "./GestionPilotage";
 import type { Ingredient } from "@/types/ingredients";
 import { offerRowToCpu, enrichCpuWithConversions, type CpuByUnit } from "@/lib/offerPricing";
 import { fetchApi } from "@/lib/fetchApi";
@@ -85,7 +83,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
   const [sellPrice, setSellPrice] = useState<number | "">("");
 
   // Main tab
-  type MainTab = "fc" | "recette" | "cmd" | "pop";
+  type MainTab = "recette";
   const [mainTab, setMainTab] = useState<MainTab>("recette");
 
   // Production mode
@@ -208,12 +206,8 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
   }, 0);
 
   // Tab definitions
-  const MAIN_TABS: { key: MainTab; label: string }[] = isEdit ? [
-    { key: "recette", label: "Recette & Procede" },
-    { key: "cmd", label: "Commandes fournisseurs" },
-    { key: "pop", label: "Pilotage CA" },
-  ] : [
-    { key: "recette", label: "Recette & Procede" },
+  const MAIN_TABS: { key: MainTab; label: string }[] = [
+    { key: "recette", label: "Recette" },
   ];
 
   useEffect(() => {
@@ -461,23 +455,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
 
         {saveError && <div className="errorBox" style={{ marginBottom: 12 }}>{saveError}</div>}
 
-        {/* ── TAB: COMMANDES ── */}
-        {mainTab === "cmd" && isEdit && recipeId && (
-          <GestionCommandes
-            recipeId={recipeId}
-            recipeType="empatement"
-            lines={[]}
-            ingredients={[]}
-            etablissementId={etab?.id}
-          />
-        )}
-
-        {/* ── TAB: PILOTAGE ── */}
-        {mainTab === "pop" && isEdit && (
-          <GestionPilotage recipeName={name} recipeType="empatement" />
-        )}
-
-        {/* ── TAB: RECETTE & PROCEDE ── */}
+        {/* ── TAB: RECETTE ── */}
         {mainTab === "recette" && (
           <>
             {/* Production mode toggle */}
