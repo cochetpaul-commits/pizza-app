@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import type { CSSProperties } from "react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -104,7 +103,6 @@ const CUISINE_CAT_LABELS: Record<string, string> = {
   cocktail: "Cocktail",
 };
 
-const EMP_COLOR = "#8a7b6b";
 
 const CUISINE_CAT_COLORS: Record<string, string> = {
   all: "#4a6741", plat_cuisine: "#B45309", preparation: "#7C3AED",
@@ -508,12 +506,14 @@ export function CatalogueContent() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
-  const [mainFilter, setMainFilter] = useState<MainFilter>("tous");
-  const [cuisineCatFilter, setCuisineCatFilter] = useState<CuisineCatFilter>("all");
-  const [prodFilter, setProdFilter] = useState(false);
+  const [mainFilter] = useState<MainFilter>("tous");
+  const [cuisineCatFilter] = useState<CuisineCatFilter>("all");
+  const [prodFilter] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
-  const [showTypePop, setShowTypePop] = useState(false);
+  const [showNewSheet, setShowNewSheet] = useState(false);
+  const [showNewCatModal, setShowNewCatModal] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
 
   // Pivot overrides: { recipeId: qty }
   const [pivotOverrides, setPivotOverrides] = useState<Record<string, number>>({});
@@ -610,37 +610,6 @@ export function CatalogueContent() {
     fetchAllRecipes(etabSlug).then(r => setRecipes(r));
   };
 
-  // CSV Import
-  const [importingCsv, setImportingCsv] = useState(false);
-  const [importMsg, setImportMsg] = useState("");
-
-  const handleCsvImport = async (file: File) => {
-    if (!etab) return;
-    setImportingCsv(true);
-    setImportMsg("");
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("etablissement_id", etab.id);
-    fd.append("mode", "commit");
-    try {
-      const res = await fetch("/api/ventes/articles/import", { method: "POST", body: fd });
-      const json = await res.json();
-      if (json.ok) {
-        setImportMsg(`${json.inserted} nouveaux + ${json.updated} mis a jour (${json.nb_products} produits)`);
-        // Refresh available articles for linking
-        supabase.from("articles_vente").select("recette_id,nom_vente").eq("etablissement_id", etab.id).not("recette_id", "is", null)
-          .then(({ data }) => { const m = new Map<string, string>(); for (const r of data ?? []) if (r.recette_id) m.set(r.recette_id, r.nom_vente); setArticleLinks(m); });
-        supabase.from("articles_vente").select("nom_vente").eq("etablissement_id", etab.id)
-          .then(({ data }) => { setAvailableArticles((data ?? []).map(r => r.nom_vente).sort((a, b) => a.localeCompare(b, "fr"))); });
-      } else {
-        setImportMsg("Erreur : " + (json.error ?? "inconnue"));
-      }
-    } catch (e) {
-      setImportMsg("Erreur : " + String(e));
-    }
-    setImportingCsv(false);
-  };
-
   useEffect(() => {
     fetchAllRecipes(etabSlug).then(r => { setRecipes(r); setLoading(false); });
   }, [etabSlug]);
@@ -669,35 +638,7 @@ export function CatalogueContent() {
 
   // Dynamic cuisine categories: base labels + any custom category actually
   // present in the data, sorted alphabetically by label.
-  const dynamicCuisineCats = useMemo(() => {
-    const byId: Record<string, { id: string; label: string; color: string }> = {};
-    for (const [id, label] of Object.entries(CUISINE_CAT_LABELS)) {
-      byId[id] = { id, label, color: CUISINE_CAT_COLORS[id] ?? "#4a6741" };
-    }
-    for (const r of recipes) {
-      if (r.type !== "cuisine" || !r.category) continue;
-      if (byId[r.category]) continue;
-      const label = r.category.replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
-      byId[r.category] = { id: r.category, label, color: "#6B7280" };
-    }
-    return Object.values(byId).sort((a, b) => a.label.localeCompare(b.label, "fr"));
-  }, [recipes]);
-
   // Counts per main filter (independent of current filter)
-  const filterCounts = useMemo(() => {
-    const prodPreps = recipes.filter(r => r.type === "production" && r.category !== "empatement").length;
-    return {
-      tous: recipes.length,
-      pizza: recipes.filter(r => r.type === "pizza").length,
-      cuisine: recipes.filter(r => r.type === "cuisine").length,
-      cocktail: recipes.filter(r => r.type === "cocktail").length,
-      vin: recipes.filter(r => r.type === "vin").length,
-      produit: recipes.filter(r => r.type === "produit").length,
-      empatement: recipes.filter(r => r.type === "production" && r.category === "empatement").length,
-      production: prodPreps,
-    };
-  }, [recipes]);
-
   // Build a label for a cuisine category id (built-in or custom slug)
   const cuisineCatLabel = useCallback((id: string): string => {
     return CUISINE_CAT_LABELS[id]
@@ -871,18 +812,6 @@ export function CatalogueContent() {
     }
   }, []);
 
-  // Dropdown menu item style
-  const menuItem = (active: boolean, color: string): CSSProperties => ({
-    width: "100%", padding: "8px 12px", borderRadius: 8,
-    border: "none", background: active ? color + "14" : "transparent",
-    color: active ? color : "#1a1a1a", fontSize: 13, fontWeight: active ? 700 : 500,
-    cursor: "pointer", textAlign: "left" as const,
-    display: "flex", alignItems: "center", gap: 8,
-  });
-
-  const activeColor = mainFilter === "pizza" ? TYPE_COLORS.pizza : mainFilter === "cuisine" ? TYPE_COLORS.cuisine : mainFilter === "cocktail" ? TYPE_COLORS.cocktail : mainFilter === "vin" ? TYPE_COLORS.vin : mainFilter === "produit" ? TYPE_COLORS.produit : mainFilter === "empatement" ? EMP_COLOR : null;
-  const activeLabel = mainFilter === "tous" ? "Toutes" : mainFilter === "pizza" ? "Pizza" : mainFilter === "cuisine" ? (cuisineCatFilter !== "all" ? dynamicCuisineCats.find(f => f.id === cuisineCatFilter)?.label ?? "Cuisine" : "Cuisine") : mainFilter === "cocktail" ? "Cocktail" : mainFilter === "vin" ? "Vins" : mainFilter === "produit" ? "Produit" : "Empât.";
-
   // Register FAB in bottom bar for "produit" mode
   const produitAccent = TYPE_COLORS.produit;
   useBottomBarActions(() => canWrite && mainFilter === "produit" ? [{
@@ -894,22 +823,12 @@ export function CatalogueContent() {
   return (
     <main className="container" style={{ paddingBottom: 80 }}>
 
-        {/* ── Line 1 — title + AI suggestions ── */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
-          <h1 style={{
-            fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 24,
-            color: "#1a1a1a", margin: 0, textTransform: "uppercase", letterSpacing: "0.04em",
-          }}>
-            Catalogue <span style={{ fontSize: 14, fontWeight: 500, color: "#999", letterSpacing: 0, textTransform: "none" }}>({recipes.length}) — consultation équipe</span>
-          </h1>
-        </div>
-
-        {/* ── Line 2 — search + category dropdown + production toggle ── */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 14, alignItems: "center" }}>
-          <div style={{ position: "relative", flex: 1 }}>
+        {/* ── Search + CTAs ── */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ position: "relative", flex: 1, minWidth: 180 }}>
             <input
               type="search"
-              placeholder="Rechercher..."
+              placeholder="Rechercher une fiche..."
               value={q}
               onChange={e => setQ(e.target.value)}
               style={{
@@ -919,122 +838,27 @@ export function CatalogueContent() {
               }}
             />
           </div>
-          {/* Category dropdown */}
-          <div style={{ position: "relative", flexShrink: 0 }}>
-            <button type="button" onClick={() => setShowTypePop(p => !p)}
-              style={{
-                padding: "8px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                border: activeColor ? `1.5px solid ${activeColor}` : "1.5px solid #ddd6c8",
-                background: activeColor ? activeColor + "14" : "#fff",
-                color: activeColor ?? "#1a1a1a",
-                cursor: "pointer", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
-              }}>
-              {activeLabel}
-              <span style={{ fontSize: 10, opacity: 0.6 }}>({filterCounts[mainFilter]})</span>
-              <span style={{ fontSize: 8, opacity: 0.5 }}>{"▼"}</span>
-            </button>
-            {showTypePop && (
-              <>
-                <div onClick={() => setShowTypePop(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
-                <div style={{
-                  position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 200,
-                  background: "#fff", borderRadius: 14, padding: 6,
-                  boxShadow: "0 8px 30px rgba(0,0,0,0.15)", border: "1px solid #e0d8ce",
-                  minWidth: 220,
-                }}>
-                  {/* Toutes */}
-                  <button type="button" onClick={() => { setMainFilter("tous"); setCuisineCatFilter("all"); setShowTypePop(false); }}
-                    style={menuItem(mainFilter === "tous", "#1a1a1a")}>
-                    Toutes les fiches
-                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{filterCounts.tous}</span>
-                  </button>
-                  <div style={{ height: 1, background: "#f0ebe2", margin: "4px 0" }} />
-                  {/* Pizza */}
-                  <button type="button" onClick={() => { setMainFilter("pizza"); setCuisineCatFilter("all"); setShowTypePop(false); }}
-                    style={menuItem(mainFilter === "pizza", TYPE_COLORS.pizza)}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: TYPE_COLORS.pizza, flexShrink: 0 }} />
-                    Pizza
-                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{filterCounts.pizza}</span>
-                  </button>
-                  {/* Cuisine (tous) */}
-                  <button type="button" onClick={() => { setMainFilter("cuisine"); setCuisineCatFilter("all"); setShowTypePop(false); }}
-                    style={menuItem(mainFilter === "cuisine" && cuisineCatFilter === "all", TYPE_COLORS.cuisine)}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: TYPE_COLORS.cuisine, flexShrink: 0 }} />
-                    Cuisine (tous)
-                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{filterCounts.cuisine}</span>
-                  </button>
-                  {/* Cuisine sub-categories */}
-                  {dynamicCuisineCats.map(f => (
-                    <button key={f.id} type="button" onClick={() => { setMainFilter("cuisine"); setCuisineCatFilter(f.id); setShowTypePop(false); }}
-                      style={{ ...menuItem(mainFilter === "cuisine" && cuisineCatFilter === f.id, f.color), paddingLeft: 32 }}>
-                      {f.label}
-                    </button>
-                  ))}
-                  <div style={{ height: 1, background: "#f0ebe2", margin: "4px 0" }} />
-                  {/* Cocktail */}
-                  <button type="button" onClick={() => { setMainFilter("cocktail"); setCuisineCatFilter("all"); setShowTypePop(false); }}
-                    style={menuItem(mainFilter === "cocktail", TYPE_COLORS.cocktail)}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: TYPE_COLORS.cocktail, flexShrink: 0 }} />
-                    Cocktail
-                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{filterCounts.cocktail}</span>
-                  </button>
-                  {/* Vins */}
-                  <button type="button" onClick={() => { setMainFilter("vin"); setCuisineCatFilter("all"); setShowTypePop(false); }}
-                    style={menuItem(mainFilter === "vin", TYPE_COLORS.vin)}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: TYPE_COLORS.vin, flexShrink: 0 }} />
-                    Vins
-                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{filterCounts.vin}</span>
-                  </button>
-                  {/* Produit */}
-                  <button type="button" onClick={() => { setMainFilter("produit"); setCuisineCatFilter("all"); setShowTypePop(false); }}
-                    style={menuItem(mainFilter === "produit", TYPE_COLORS.produit)}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: TYPE_COLORS.produit, flexShrink: 0 }} />
-                    Produit
-                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{filterCounts.produit}</span>
-                  </button>
-                  {/* Empâtement */}
-                  <button type="button" onClick={() => { setMainFilter("empatement"); setCuisineCatFilter("all"); setShowTypePop(false); }}
-                    style={menuItem(mainFilter === "empatement", EMP_COLOR)}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: EMP_COLOR, flexShrink: 0 }} />
-                    Empâtement
-                    <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{filterCounts.empatement}</span>
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-          {/* Production toggle (preps, not empâtement) */}
-          {filterCounts.production > 0 && (
-            <button type="button" onClick={() => setProdFilter(p => !p)}
-              style={{
-                padding: "7px 10px", borderRadius: 10, fontSize: 11, fontWeight: 700,
-                border: prodFilter ? "1.5px solid #6b5b3e" : "1.5px solid #ddd6c8",
-                background: prodFilter ? "#6b5b3e14" : "#fff",
-                color: prodFilter ? "#6b5b3e" : "#999",
-                cursor: "pointer", whiteSpace: "nowrap",
-              }}>
-              Production ({filterCounts.production})
-            </button>
-          )}
-
-          {/* Import CSV articles */}
           {canWrite && (
-            <label style={{
-              padding: "7px 10px", borderRadius: 10, fontSize: 11, fontWeight: 700,
-              border: "1.5px solid #ddd6c8", background: "#fff", color: "#999",
-              cursor: "pointer", whiteSpace: "nowrap",
-              display: "inline-flex", alignItems: "center", gap: 4,
-            }}>
-              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-              {importingCsv ? "Import..." : "Import CSV"}
-              <input type="file" accept=".csv" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) handleCsvImport(f); e.target.value = ""; }} />
-            </label>
+            <>
+              <button type="button" onClick={() => setShowNewSheet(true)}
+                style={{
+                  padding: "8px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                  border: "none", background: "#D4775A", color: "#fff",
+                  cursor: "pointer", whiteSpace: "nowrap",
+                }}>
+                + Nouvelle recette
+              </button>
+              <button type="button" onClick={() => setShowNewCatModal(true)}
+                style={{
+                  padding: "8px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                  border: "1.5px solid #4a6741", background: "#fff", color: "#4a6741",
+                  cursor: "pointer", whiteSpace: "nowrap",
+                }}>
+                + Categorie
+              </button>
+            </>
           )}
         </div>
-
-        {importMsg && <div style={{ padding: "8px 20px", fontSize: 12, color: "#4a6741", fontWeight: 600 }}>{importMsg}</div>}
 
         {/* Loading */}
         {loading && <p style={{ textAlign: "center", color: "#999", padding: 40 }}>Chargement...</p>}
@@ -1945,6 +1769,70 @@ export function CatalogueContent() {
             }}
           >
             {produitSaving ? "..." : "Creer la fiche produit"}
+          </button>
+        </div>
+      </BottomSheet>
+
+      {/* ── Nouvelle recette BottomSheet ── */}
+      <BottomSheet open={showNewSheet} onClose={() => setShowNewSheet(false)} title="Nouvelle recette">
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {[
+            { label: "Pizza", href: "/recettes/new/pizza", color: TYPE_COLORS.pizza },
+            { label: "Cuisine", href: "/recettes/new/cuisine", color: TYPE_COLORS.cuisine },
+            { label: "Cocktail", href: "/recettes/new/cocktail", color: TYPE_COLORS.cocktail },
+            { label: "Empatement", href: "/recettes/new/empatement", color: "#8a7b6b" },
+          ].map((item) => (
+            <a key={item.href} href={item.href} style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "14px 16px", borderRadius: 12, background: "#fff",
+              border: "1px solid #ede6d9", textDecoration: "none", cursor: "pointer",
+              borderLeft: `4px solid ${item.color}`,
+            }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: item.color }}>{item.label}</span>
+            </a>
+          ))}
+        </div>
+      </BottomSheet>
+
+      {/* ── Nouvelle catégorie BottomSheet ── */}
+      <BottomSheet open={showNewCatModal} onClose={() => setShowNewCatModal(false)} title="Nouvelle categorie">
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <input
+            type="text"
+            value={newCatName}
+            onChange={(e) => setNewCatName(e.target.value)}
+            placeholder="Nom de la categorie (ex: Brunch, Street Food...)"
+            style={{
+              width: "100%", padding: "10px 12px", borderRadius: 8,
+              border: "1.5px solid #ddd6c8", fontSize: 13, outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+          <button
+            type="button"
+            disabled={!newCatName.trim()}
+            onClick={async () => {
+              if (!etab || !newCatName.trim()) return;
+              const slug = newCatName.trim().toLowerCase().replace(/[^a-z0-9àâäéèêëïîôùûüç]+/g, "_").replace(/^_|_$/g, "");
+              const estabSlug = etab.slug?.includes("piccola") ? "piccola" : "bello_mio";
+              await supabase.from("kitchen_recipes").insert({
+                name: `Nouvelle recette ${newCatName.trim()}`,
+                category: slug,
+                establishments: [estabSlug],
+                is_active: true,
+                is_draft: true,
+              });
+              setNewCatName("");
+              setShowNewCatModal(false);
+              fetchAllRecipes(etabSlug).then(r => setRecipes(r));
+            }}
+            style={{
+              padding: "12px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+              background: newCatName.trim() ? "#4a6741" : "#ccc",
+              color: "#fff", border: "none", cursor: newCatName.trim() ? "pointer" : "not-allowed",
+            }}
+          >
+            Creer la categorie
           </button>
         </div>
       </BottomSheet>
