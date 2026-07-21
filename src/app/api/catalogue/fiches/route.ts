@@ -16,6 +16,8 @@ type FicheCatalogue = {
   category: string;
   description_courte: string | null;
   wine_pairing: string | null;
+  accord: string | null;
+  resume_salle: string | null;
   pairings: PairingItem[];
   photo_url: string | null;
   price_ttc: number | null;
@@ -50,7 +52,7 @@ export async function GET(req: NextRequest) {
   ] = await Promise.all([
     supabase.from("pizza_recipes").select("id, name, photo_url, description_courte, wine_pairing, in_catalogue, establishments"),
     supabase.from("pizza_ingredients").select("pizza_id, ingredient_id, qty, unit"),
-    supabase.from("kitchen_recipes").select("id, name, photo_url, category, description_courte, wine_pairing, in_catalogue, establishments, fiche_type, is_active, output_ingredient_id"),
+    supabase.from("kitchen_recipes").select("id, name, photo_url, category, description_courte, wine_pairing, accord, resume_salle, in_catalogue, statut, sell_price, vat_rate, establishments, fiche_type, is_active, output_ingredient_id"),
     supabase.from("kitchen_recipe_lines").select("recipe_id, ingredient_id, qty, unit"),
     supabase.from("cocktails").select("id, name, image_url, description_courte, in_catalogue, establishments"),
     supabase.from("cocktail_ingredients").select("cocktail_id, ingredient_id, qty, unit"),
@@ -152,6 +154,7 @@ export async function GET(req: NextRequest) {
     fiches.push({
       id: p.id, type: "pizza", name: p.name, category: "pizza",
       description_courte: p.description_courte, wine_pairing: p.wine_pairing,
+      accord: null, resume_salle: null,
       in_catalogue: p.in_catalogue !== false,
       pairings: pairingsMap.get("pizza:" + p.id) ?? [],
       photo_url: p.photo_url, price_ttc: popinaPrice.get("pizza:" + p.id) ?? null,
@@ -167,12 +170,18 @@ export async function GET(req: NextRequest) {
     if (!kr.is_active || hiddenCategories.includes(kr.category)) continue;
     if (!matchEstab(kr.establishments)) continue;
     const lines = (kitchenLines ?? []).filter((l) => l.recipe_id === kr.id);
+    // Prix TTC : Popina d'abord, sinon sell_price * (1 + vat_rate)
+    const popPrice = popinaPrice.get("kitchen:" + kr.id);
+    const computedPrice = kr.sell_price && kr.vat_rate != null
+      ? Number(kr.sell_price) * (1 + Number(kr.vat_rate))
+      : null;
     fiches.push({
       id: kr.id, type: "cuisine", name: kr.name, category: kr.category,
       description_courte: kr.description_courte, wine_pairing: kr.wine_pairing,
+      accord: kr.accord ?? null, resume_salle: kr.resume_salle ?? null,
       in_catalogue: kr.in_catalogue !== false,
       pairings: pairingsMap.get("cuisine:" + kr.id) ?? [],
-      photo_url: kr.photo_url, price_ttc: popinaPrice.get("kitchen:" + kr.id) ?? null,
+      photo_url: kr.photo_url, price_ttc: popPrice ?? computedPrice,
       allergens: collectAllergens(lines),
       ingredients: lines.map((l) => cleanName(ingMap.get(l.ingredient_id)?.name ?? "?")),
       sub_recipes: getSubRecipes(lines),
@@ -186,6 +195,7 @@ export async function GET(req: NextRequest) {
     fiches.push({
       id: c.id, type: "cocktail", name: c.name, category: "cocktail",
       description_courte: c.description_courte, wine_pairing: null,
+      accord: null, resume_salle: null,
       in_catalogue: c.in_catalogue !== false,
       pairings: pairingsMap.get("cocktail:" + c.id) ?? [],
       photo_url: c.image_url, price_ttc: popinaPrice.get("cocktail:" + c.id) ?? null,

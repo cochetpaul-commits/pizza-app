@@ -30,7 +30,13 @@ export async function PATCH(req: NextRequest) {
   const update: Record<string, unknown> = {};
   if (description_courte !== undefined) update.description_courte = description_courte || null;
   if (wine_pairing !== undefined && table !== "cocktails") update.wine_pairing = wine_pairing || null;
-  if (in_catalogue !== undefined) update.in_catalogue = in_catalogue;
+  if (in_catalogue !== undefined) {
+    update.in_catalogue = in_catalogue;
+    // Sync statut for kitchen_recipes
+    if (table === "kitchen_recipes") {
+      update.statut = in_catalogue ? "publiee" : "validee";
+    }
+  }
 
   const { error } = await supabase.from(table).update(update).eq("id", id);
 

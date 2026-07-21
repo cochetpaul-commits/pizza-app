@@ -26,10 +26,10 @@ type Props = {
   recipeType?: "pizza" | "cuisine" | "cocktail";
 };
 
-export default function FicheWizard({ recipeId: _recipeId, recipeType: _recipeType }: Props) {
-  const _router = useRouter();
+export default function FicheWizard({ recipeId, recipeType }: Props) {
+  const router = useRouter();
   const { current: etab, etablissements } = useEtablissement();
-  const { canWrite: _canWrite } = useProfile();
+  const { canWrite } = useProfile();
   const resolvedEtab = etab ?? etablissements?.[0];
   const etabSlug = resolvedEtab?.slug?.includes("piccola") ? "piccola" : "bello_mio";
 
@@ -39,16 +39,23 @@ export default function FicheWizard({ recipeId: _recipeId, recipeType: _recipeTy
   const [familles, setFamilles] = useState<Famille[]>([]);
   const [mercuriale, setMercuriale] = useState<IngredientRef[]>([]);
   const [loading, setLoading] = useState(true);
-  const [_saving, _setSaving] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
+  const [showNewCat, setShowNewCat] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [showNewSubCat, setShowNewSubCat] = useState(false);
+  const [newSubCatName, setNewSubCatName] = useState("");
+  const [salleView, setSalleView] = useState<"salle" | "cuisine">("salle");
 
   // ── Load data ──
   useEffect(() => {
-    Promise.all([
+    (async () => {
+    const [fRes, cRes, iRes] = await Promise.all([
       supabase.from("familles").select("*"),
       supabase.from("categories").select("*").order("sort_order").order("nom"),
       supabase.from("ingredients").select("id, name, category, allergens, cost_per_unit, purchase_unit"),
-    ]).then(([fRes, cRes, iRes]) => {
+    ]);
+    {
       setFamilles((fRes.data ?? []) as Famille[]);
       setCategories((cRes.data ?? []) as Categorie[]);
       // Build mercuriale from ingredients
@@ -68,9 +75,59 @@ export default function FicheWizard({ recipeId: _recipeId, recipeType: _recipeTy
         };
       });
       setMercuriale(mercs);
+
+      // Load existing recipe if recipeId is provided
+      if (recipeId) {
+        const type = recipeType ?? "cuisine";
+        const table = type === "pizza" ? "pizza_recipes" : type === "cocktail" ? "cocktails" : "kitchen_recipes";
+        const linesTable = type === "pizza" ? "pizza_ingredients" : type === "cocktail" ? "cocktail_ingredients" : "kitchen_recipe_lines";
+        const lineFK = type === "pizza" ? "pizza_id" : type === "cocktail" ? "cocktail_id" : "recipe_id";
+
+        const { data: rec } = await supabase.from(table).select("*").eq("id", recipeId).single();
+        if (rec) {
+          const { data: lines } = await supabase.from(linesTable).select("*").eq(lineFK, recipeId);
+          const ficheLines: LigneIngredient[] = (lines ?? []).map((l: Record<string, unknown>) => {
+            const ing = mercs.find(m => m.id === l.ingredient_id);
+            return {
+              key: tmpKey(),
+              ingredient_id: l.ingredient_id as string,
+              ingredient: ing ?? null,
+              quantite: Number(l.qty ?? l.quantite ?? 0),
+              unite: (l.unit ?? l.unite ?? ing?.unite_base ?? "g") as string,
+              zone: (l.zone ?? "apres_four") as "avant_four" | "apres_four",
+            };
+          });
+
+          const catSlug = type === "pizza" ? "pizza" : type === "cocktail" ? "cocktail" : (rec.category ?? "plat_cuisine");
+          setFiche({
+            id: recipeId,
+            nom: rec.name ?? "",
+            categorie_slug: catSlug,
+            sous_categorie: rec.sous_categorie ?? "",
+            statut: rec.statut ?? (rec.in_catalogue ? "publiee" : "validee"),
+            paton_poids: rec.ball_weight_g ?? 264,
+            empatement: "FOCACCIA",
+            lignes: ficheLines,
+            etapes: (() => { try { return typeof rec.procedure === "string" ? JSON.parse(rec.procedure) : (rec.procedure ?? []); } catch { return []; } })(),
+            notes: rec.notes ?? "",
+            portions: rec.portions_count ?? 1,
+            coeff: rec.sell_price && rec.cost_per_portion ? (rec.sell_price / rec.cost_per_portion) : 3,
+            tva: rec.vat_rate ? Number(rec.vat_rate) * 100 : 10,
+            prix_ttc_manuel: rec.sell_price ? Number(rec.sell_price) * (1 + (rec.vat_rate ? Number(rec.vat_rate) : 0.1)) : null,
+            description: rec.description_courte ?? "",
+            accord: rec.accord ?? rec.wine_pairing ?? "",
+            resume_salle: rec.resume_salle ?? "",
+            resume_manuel: rec.resume_manuel ?? false,
+            photo_url: rec.photo_url ?? rec.image_url ?? null,
+            establishments: rec.establishments ?? [etabSlug],
+          });
+        }
+      }
+
       setLoading(false);
-    });
-  }, []);
+    }
+    })();
+  }, [recipeId, recipeType, etabSlug]);
 
   // ── Derived ──
   const cat = useMemo(() => categories.find(c => c.slug === fiche.categorie_slug), [categories, fiche.categorie_slug]);
@@ -94,6 +151,81 @@ export default function FicheWizard({ recipeId: _recipeId, recipeType: _recipeTy
   }, []);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2600); };
+
+  // ── Save to DB ──
+  async function handleSave() {
+    if (!fiche.nom.trim()) { showToast("Le nom est requis"); return; }
+    setSaving(true);
+
+    const catSlug = fiche.categorie_slug;
+    const isEdit = !!fiche.id;
+    const savePainterCost = patonCost;
+    const saveTotalCost = coutRecetteTotal(fiche.lignes, savePainterCost);
+    const saveCostPerPortion = coutPortion(saveTotalCost, fiche.portions);
+    const saveTtc = prixTTC(saveCostPerPortion, fiche.coeff, fiche.prix_ttc_manuel);
+    const saveHt = prixHT(saveTtc, fiche.tva);
+
+    const recData: Record<string, unknown> = {
+      name: fiche.nom.trim(),
+      category: catSlug,
+      sous_categorie: fiche.sous_categorie || null,
+      statut: fiche.statut,
+      in_catalogue: fiche.statut === "publiee",
+      is_active: true,
+      establishments: fiche.establishments,
+      procedure: JSON.stringify(fiche.etapes.filter(Boolean)),
+      notes: fiche.notes || null,
+      portions_count: fiche.portions,
+      cost_per_portion: saveCostPerPortion > 0 ? saveCostPerPortion : null,
+      total_cost: saveTotalCost > 0 ? saveTotalCost : null,
+      sell_price: saveHt > 0 ? saveHt : null,
+      vat_rate: fiche.tva / 100,
+      margin_rate: saveHt > 0 ? (1 - saveCostPerPortion / saveHt) : 0.65,
+      description_courte: fiche.description || null,
+      wine_pairing: fiche.accord || null,
+      accord: fiche.accord || null,
+      resume_salle: fiche.resume_salle || null,
+      resume_manuel: fiche.resume_manuel,
+      photo_url: fiche.photo_url,
+    };
+
+    if (isPizza) {
+      recData.ball_weight_g = fiche.paton_poids;
+      recData.empatement = fiche.empatement || null;
+    }
+
+    let savedId = fiche.id;
+
+    if (isEdit && savedId) {
+      const { error } = await supabase.from("kitchen_recipes").update(recData).eq("id", savedId);
+      if (error) { showToast("Erreur : " + error.message); setSaving(false); return; }
+    } else {
+      const { data, error } = await supabase.from("kitchen_recipes").insert(recData).select("id").single();
+      if (error) { showToast("Erreur : " + error.message); setSaving(false); return; }
+      savedId = data?.id;
+      update({ id: savedId });
+    }
+
+    if (savedId) {
+      await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", savedId);
+      const linesToInsert = fiche.lignes
+        .filter(l => l.ingredient_id)
+        .map((l, i) => ({
+          recipe_id: savedId,
+          ingredient_id: l.ingredient_id,
+          qty: l.quantite,
+          unit: l.unite,
+          zone: l.zone,
+          sort_order: i,
+        }));
+      if (linesToInsert.length > 0) {
+        await supabase.from("kitchen_recipe_lines").insert(linesToInsert);
+      }
+    }
+
+    setSaving(false);
+    showToast("Fiche sauvegardee");
+  }
 
   // ── Steps ──
   const STEPS = ["Infos", "Ingredients", "Preparation", "Prix et marge", "Fiche salle"];
@@ -194,27 +326,73 @@ export default function FicheWizard({ recipeId: _recipeId, recipeType: _recipeTy
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 14 }}>
             <div style={{ flex: 1, minWidth: 150 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>Categorie</label>
-              <select value={fiche.categorie_slug} onChange={e => {
-                const slug = e.target.value;
-                const c = categories.find(cc => cc.slug === slug);
-                const f = familles.find(ff => ff.id === (c?.famille_id ?? "autre"));
-                update({ categorie_slug: slug, sous_categorie: "", tva: f?.tva_defaut ?? 10 });
-              }} style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", fontFamily: "inherit" }}>
-                {categories.map(c => {
-                  const f = familles.find(ff => ff.id === c.famille_id);
-                  return <option key={c.slug} value={c.slug}>{c.nom} ({f?.label ?? "Autre"}, FC {f?.objectif_fc ?? 30} %)</option>;
-                })}
-              </select>
+              {showNewCat ? (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input type="text" autoFocus value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Nom de la categorie"
+                    style={{ flex: 1, border: `1.5px solid ${COLORS.terra}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", outline: "none", fontFamily: "inherit" }}
+                    onKeyDown={async e => {
+                      if (e.key === "Enter" && newCatName.trim()) {
+                        const slug = newCatName.trim().toLowerCase().replace(/[^a-z0-9àâäéèêëïîôùûüç]+/g, "_").replace(/^_|_$/g, "");
+                        const { data } = await supabase.from("categories").insert({ nom: newCatName.trim(), slug, couleur: "#999999", famille_id: "autre", sous_categories: [], sort_order: 99 }).select().single();
+                        if (data) {
+                          setCategories(prev => [...prev, data as Categorie]);
+                          update({ categorie_slug: slug, sous_categorie: "" });
+                        }
+                        setNewCatName(""); setShowNewCat(false);
+                      }
+                      if (e.key === "Escape") { setNewCatName(""); setShowNewCat(false); }
+                    }} />
+                  <button onClick={() => { setNewCatName(""); setShowNewCat(false); }}
+                    style={{ border: "none", background: "#f2ede2", borderRadius: 10, padding: "0 12px", cursor: "pointer", color: COLORS.muted, fontWeight: 700, fontFamily: "inherit" }}>x</button>
+                </div>
+              ) : (
+                <select value={fiche.categorie_slug} onChange={e => {
+                  const slug = e.target.value;
+                  if (slug === "__new__") { setShowNewCat(true); return; }
+                  const c = categories.find(cc => cc.slug === slug);
+                  const f = familles.find(ff => ff.id === (c?.famille_id ?? "autre"));
+                  update({ categorie_slug: slug, sous_categorie: "", tva: f?.tva_defaut ?? 10 });
+                }} style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", fontFamily: "inherit" }}>
+                  {categories.map(c => {
+                    const f = familles.find(ff => ff.id === c.famille_id);
+                    return <option key={c.slug} value={c.slug}>{c.nom} ({f?.label ?? "Autre"}, FC {f?.objectif_fc ?? 30} %)</option>;
+                  })}
+                  <option value="__new__">+ Creer une categorie</option>
+                </select>
+              )}
             </div>
             <div style={{ flex: 1, minWidth: 150 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>
                 Sous-categorie <span style={{ textTransform: "none", letterSpacing: 0 }}>(facultatif)</span>
               </label>
-              <select value={fiche.sous_categorie} onChange={e => update({ sous_categorie: e.target.value })}
-                style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", fontFamily: "inherit" }}>
-                <option value="">Aucune</option>
-                {(cat?.sous_categories ?? []).map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+              {showNewSubCat ? (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input type="text" autoFocus value={newSubCatName} onChange={e => setNewSubCatName(e.target.value)} placeholder="Nom de la sous-categorie"
+                    style={{ flex: 1, border: `1.5px solid ${COLORS.terra}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", outline: "none", fontFamily: "inherit" }}
+                    onKeyDown={async e => {
+                      if (e.key === "Enter" && newSubCatName.trim() && cat) {
+                        const newSubs = [...(cat.sous_categories ?? []), newSubCatName.trim()];
+                        await supabase.from("categories").update({ sous_categories: newSubs }).eq("id", cat.id);
+                        setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, sous_categories: newSubs } : c));
+                        update({ sous_categorie: newSubCatName.trim() });
+                        setNewSubCatName(""); setShowNewSubCat(false);
+                      }
+                      if (e.key === "Escape") { setNewSubCatName(""); setShowNewSubCat(false); }
+                    }} />
+                  <button onClick={() => { setNewSubCatName(""); setShowNewSubCat(false); }}
+                    style={{ border: "none", background: "#f2ede2", borderRadius: 10, padding: "0 12px", cursor: "pointer", color: COLORS.muted, fontWeight: 700, fontFamily: "inherit" }}>x</button>
+                </div>
+              ) : (
+                <select value={fiche.sous_categorie} onChange={e => {
+                  const v = e.target.value;
+                  if (v === "__new__") { setShowNewSubCat(true); return; }
+                  update({ sous_categorie: v });
+                }} style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", fontFamily: "inherit" }}>
+                  <option value="">Aucune</option>
+                  {(cat?.sous_categories ?? []).map(s => <option key={s} value={s}>{s}</option>)}
+                  <option value="__new__">+ Creer une sous-categorie</option>
+                </select>
+              )}
             </div>
           </div>
 
@@ -471,34 +649,87 @@ export default function FicheWizard({ recipeId: _recipeId, recipeType: _recipeTy
           <textarea value={fiche.resume_salle} onChange={e => update({ resume_salle: e.target.value, resume_manuel: true })} placeholder="Genere automatiquement depuis les etapes de preparation"
             style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", outline: "none", resize: "vertical", minHeight: 56, fontFamily: "inherit", boxSizing: "border-box" }} />
 
-          {/* Aperçu salle */}
-          <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "20px 0 6px" }}>Apercu</label>
-          <div style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 16, padding: "18px 20px", background: "#fffdf9" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 46, height: 46, borderRadius: 12, background: "#f6e7d8", color: COLORS.bordeaux, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, fontWeight: 800 }}>
-                  {(fiche.nom || "?").charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: ".05em", textTransform: "uppercase" }}>{fiche.nom || "Nouvelle recette"}</div>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
-                    {[...actifs].map(a => <span key={a} style={{ border: "1px solid #f2c9c4", color: COLORS.warn, background: "#fdf0ee", borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 600 }}>{a}</span>)}
+          {/* Aperçu toggle */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "20px 0 6px", flexWrap: "wrap", gap: 8 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: 0 }}>Apercu</label>
+            <div style={{ display: "flex", gap: 4, background: COLORS.pill, borderRadius: 999, padding: 3 }}>
+              <button onClick={() => setSalleView("salle")} style={{ border: "none", borderRadius: 999, padding: "6px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: salleView === "salle" ? COLORS.card : "transparent", color: salleView === "salle" ? COLORS.bordeaux : COLORS.muted, boxShadow: salleView === "salle" ? "0 2px 6px #00000012" : "none" }}>Vue salle</button>
+              <button onClick={() => setSalleView("cuisine")} style={{ border: "none", borderRadius: 999, padding: "6px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: salleView === "cuisine" ? COLORS.card : "transparent", color: salleView === "cuisine" ? COLORS.bordeaux : COLORS.muted, boxShadow: salleView === "cuisine" ? "0 2px 6px #00000012" : "none" }}>Vue cuisine</button>
+            </div>
+          </div>
+
+          {salleView === "salle" ? (
+            <div style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 16, padding: "18px 20px", background: "#fffdf9" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 46, height: 46, borderRadius: 12, background: "#f6e7d8", color: COLORS.bordeaux, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, fontWeight: 800 }}>
+                    {(fiche.nom || "?").charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: ".05em", textTransform: "uppercase" }}>{fiche.nom || "Nouvelle recette"}</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                      {[...actifs].map(a => <span key={a} style={{ border: "1px solid #f2c9c4", color: COLORS.warn, background: "#fdf0ee", borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 600 }}>{a}</span>)}
+                    </div>
                   </div>
                 </div>
+                <div style={{ fontSize: 19, fontWeight: 800, color: COLORS.bordeaux, whiteSpace: "nowrap" }}>{Math.round(ttc)} {"\u20AC"}</div>
               </div>
-              <div style={{ fontSize: 19, fontWeight: 800, color: COLORS.bordeaux, whiteSpace: "nowrap" }}>{Math.round(ttc)} {"\u20AC"}</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+                {fiche.lignes.filter(l => l.ingredient).map(l => (
+                  <span key={l.key} style={{ border: `1px solid ${COLORS.line}`, borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 600, background: "#fff" }}>
+                    {l.ingredient?.nom_court}
+                  </span>
+                ))}
+              </div>
+              {fiche.description && <div style={{ fontSize: 13.5, color: "#5b5346", marginTop: 10, lineHeight: 1.55 }}>{fiche.description}</div>}
+              {fiche.resume_salle && <div style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 10, lineHeight: 1.5, fontStyle: "italic", borderLeft: `3px solid ${COLORS.pill}`, paddingLeft: 10 }}>En cuisine : {fiche.resume_salle}</div>}
+              {fiche.accord && <div style={{ fontSize: 12.5, marginTop: 8, color: COLORS.green, fontWeight: 700 }}>Accord : {fiche.accord}</div>}
             </div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
-              {fiche.lignes.filter(l => l.ingredient).map(l => (
-                <span key={l.key} style={{ border: `1px solid ${COLORS.line}`, borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 600, background: "#fff" }}>
-                  {l.ingredient?.nom_court}
-                </span>
+          ) : (
+            <div style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 16, padding: "18px 20px", background: "#fffdf9" }}>
+              <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 12 }}>{fiche.nom || "Nouvelle recette"}</div>
+              {isPizza && (
+                <div style={{ fontSize: 12.5, color: COLORS.muted, marginBottom: 10 }}>
+                  Paton : {fiche.paton_poids} g ({fiche.empatement}) : {eur(patonCost)}
+                </div>
+              )}
+              {isPizza && fiche.lignes.some(l => l.zone === "avant_four" && l.ingredient) && (
+                <>
+                  <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, margin: "8px 0 4px" }}>Avant four</div>
+                  {fiche.lignes.filter(l => l.zone === "avant_four" && l.ingredient).map(l => (
+                    <div key={l.key} style={{ fontSize: 13, padding: "3px 0", display: "flex", justifyContent: "space-between" }}>
+                      <span>{l.ingredient?.nom_court}</span>
+                      <span style={{ color: COLORS.muted }}>{l.quantite} {l.unite} : {eur(coutLigne(l))}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+              <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, margin: "8px 0 4px" }}>
+                {isPizza ? "Apres four" : isBar ? "Composition" : "Ingredients"}
+              </div>
+              {fiche.lignes.filter(l => l.zone === "apres_four" && l.ingredient).map(l => (
+                <div key={l.key} style={{ fontSize: 13, padding: "3px 0", display: "flex", justifyContent: "space-between" }}>
+                  <span>{l.ingredient?.nom_court}</span>
+                  <span style={{ color: COLORS.muted }}>{l.quantite} {l.unite} : {eur(coutLigne(l))}</span>
+                </div>
               ))}
+              <div style={{ borderTop: `1.5px solid ${COLORS.line}`, marginTop: 10, paddingTop: 8, display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 14 }}>
+                <span>Cout total</span>
+                <span style={{ color: COLORS.bordeaux }}>{eur(totalCost)}</span>
+              </div>
+              {fiche.etapes.filter(Boolean).length > 0 && (
+                <>
+                  <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, margin: "14px 0 6px" }}>Preparation</div>
+                  {fiche.etapes.filter(Boolean).map((e, i) => (
+                    <div key={i} style={{ fontSize: 13, padding: "2px 0", display: "flex", gap: 8 }}>
+                      <span style={{ color: COLORS.bordeaux, fontWeight: 800, flexShrink: 0 }}>{i + 1}.</span>
+                      <span>{e}</span>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
-            {fiche.description && <div style={{ fontSize: 13.5, color: "#5b5346", marginTop: 10, lineHeight: 1.55 }}>{fiche.description}</div>}
-            {fiche.resume_salle && <div style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 10, lineHeight: 1.5, fontStyle: "italic", borderLeft: `3px solid ${COLORS.pill}`, paddingLeft: 10 }}>En cuisine : {fiche.resume_salle}</div>}
-            {fiche.accord && <div style={{ fontSize: 12.5, marginTop: 8, color: COLORS.green, fontWeight: 700 }}>Accord : {fiche.accord}</div>}
-          </div>
+          )}
 
           {/* Publier */}
           <div style={{ marginTop: 20, textAlign: "right" }}>
@@ -519,7 +750,13 @@ export default function FicheWizard({ recipeId: _recipeId, recipeType: _recipeTy
           style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "13px 28px", fontSize: 14.5, fontWeight: 800, cursor: step === 0 ? "default" : "pointer", background: "transparent", color: COLORS.muted, opacity: step === 0 ? 0.45 : 1, fontFamily: "inherit" }}>
           Retour
         </button>
-        <button onClick={() => { if (step < 4) setStep(s => s + 1); else showToast("Fiche terminee"); }}
+        {canWrite && (
+          <button disabled={saving} onClick={handleSave}
+            style={{ border: `1.5px solid ${COLORS.green}`, borderRadius: 999, padding: "13px 28px", fontSize: 14.5, fontWeight: 800, cursor: "pointer", background: "#fff", color: COLORS.green, fontFamily: "inherit", opacity: saving ? 0.5 : 1 }}>
+            {saving ? "..." : "Sauvegarder"}
+          </button>
+        )}
+        <button onClick={() => { if (step < 4) setStep(s => s + 1); else { handleSave(); router.push("/recettes"); } }}
           style={{ border: "none", borderRadius: 999, padding: "13px 28px", fontSize: 14.5, fontWeight: 800, cursor: "pointer", background: COLORS.terra, color: "#fff", boxShadow: "0 6px 16px #c97b5b44", fontFamily: "inherit" }}>
           {step === 4 ? "Terminer" : "Continuer"}
         </button>

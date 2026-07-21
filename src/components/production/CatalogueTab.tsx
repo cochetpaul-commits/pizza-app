@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from "react";
+import Link from "next/link";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -912,14 +913,14 @@ export function CatalogueContent() {
           </div>
           {canWrite && (
             <>
-              <button type="button" onClick={() => setShowNewSheet(true)}
+              <Link href="/fiche/new"
                 style={{
                   padding: "8px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
                   border: "none", background: "#D4775A", color: "#fff",
-                  cursor: "pointer", whiteSpace: "nowrap",
+                  cursor: "pointer", whiteSpace: "nowrap", textDecoration: "none", display: "inline-block",
                 }}>
                 + Nouvelle recette
-              </button>
+              </Link>
               <button type="button" onClick={() => setShowNewCatModal(true)}
                 style={{
                   padding: "8px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
@@ -1172,10 +1173,9 @@ export function CatalogueContent() {
 
                       {/* Voir la fiche */}
                       <a
-                        href={recipe.type === "pizza" ? `/recettes/pizza/${recipe.id}`
-                          : recipe.type === "cocktail" ? `/recettes/cocktail/${recipe.id}`
-                          : recipe.type === "production" && recipe.category === "empatement" ? `/recettes/empatement/${recipe.id.replace(/^emp-/, "")}`
-                          : `/recettes/cuisine/${recipe.id}`}
+                        href={recipe.type === "production" && recipe.category === "empatement" ? `/recettes/empatement/${recipe.id.replace(/^emp-/, "")}`
+                          : recipe.type === "pizza" ? `/recettes/pizza/${recipe.id}`
+                          : `/fiche/${recipe.id}`}
                         onClick={(e) => e.stopPropagation()}
                         style={{
                           padding: "3px 10px", borderRadius: 20, border: `1px solid ${color}40`,

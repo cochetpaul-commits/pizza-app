@@ -16,6 +16,8 @@ type Fiche = {
   category: string;
   description_courte: string | null;
   wine_pairing: string | null;
+  accord: string | null;
+  resume_salle: string | null;
   pairings: PairingItem[];
   in_catalogue: boolean;
   photo_url: string | null;
@@ -180,7 +182,7 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
           <img src={fiche.photo_url} alt={fiche.name} style={{ width: 56, height: 56, borderRadius: 10, objectFit: "cover" }} />
         ) : (
           <div style={{ width: 56, height: 56, borderRadius: 10, background: col.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontSize: 22 }}>{fiche.type === "pizza" ? "\u{1F355}" : fiche.type === "cocktail" ? "\u{1F378}" : "\u{1F37D}"}</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: col.fg }}>{(fiche.name || "?").charAt(0).toUpperCase()}</span>
           </div>
         )}
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -254,7 +256,19 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
                   ) : fiche.wine_pairing ? <div style={{ fontSize: 12, color: "#6C3483", fontStyle: "italic" }}>{fiche.wine_pairing}</div> : null}
                 </div>
               )}
-              {!fiche.description_courte && !fiche.pairings.length && !fiche.wine_pairing && canEdit && (
+              {fiche.resume_salle && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>En cuisine</div>
+                  <div style={{ fontSize: 12, color: "#666", fontStyle: "italic" }}>{fiche.resume_salle}</div>
+                </div>
+              )}
+              {fiche.accord && !fiche.pairings.length && !fiche.wine_pairing && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Accord conseille</div>
+                  <div style={{ fontSize: 12, color: "#6C3483", fontStyle: "italic" }}>{fiche.accord}</div>
+                </div>
+              )}
+              {!fiche.description_courte && !fiche.pairings.length && !fiche.wine_pairing && !fiche.accord && !fiche.resume_salle && canEdit && (
                 <p style={{ fontSize: 12, color: "#bbb", fontStyle: "italic", marginTop: 12 }}>Aucune description ni accord — cliquez Modifier pour ajouter</p>
               )}
             </>
