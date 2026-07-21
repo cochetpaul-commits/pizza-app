@@ -1849,14 +1849,14 @@ export function CatalogueContent() {
             onClick={async () => {
               if (!resolvedEtab || !newCatName.trim()) return;
               const slug = newCatName.trim().toLowerCase().replace(/[^a-z0-9àâäéèêëïîôùûüç]+/g, "_").replace(/^_|_$/g, "");
-              const estabSlug = resolvedEtab.slug?.includes("piccola") ? "piccola" : "bello_mio";
-              await supabase.from("kitchen_recipes").insert({
+              const eSlug = resolvedEtab.slug?.includes("piccola") ? "piccola" : "bello_mio";
+              const { error } = await supabase.from("kitchen_recipes").insert({
                 name: `Nouvelle recette ${newCatName.trim()}`,
                 category: slug,
-                establishments: [estabSlug],
+                establishments: [eSlug],
                 is_active: true,
-                is_draft: true,
               });
+              if (error) { alert("Erreur: " + error.message); return; }
               setNewCatName("");
               setShowNewCatModal(false);
               fetchAllRecipes(etabSlug).then(r => setRecipes(r));
@@ -1892,21 +1892,14 @@ export function CatalogueContent() {
             onClick={async () => {
               if (!resolvedEtab || !newSubCatName.trim()) return;
               const slug = newSubCatName.trim().toLowerCase().replace(/[^a-z0-9àâäéèêëïîôùûüç]+/g, "_").replace(/^_|_$/g, "");
-              const estabSlug = resolvedEtab.slug?.includes("piccola") ? "piccola" : "bello_mio";
-              // Create a draft recipe in this sub-category to make it appear
-              const table = newSubCatType === "pizza" ? "pizza_recipes"
-                : newSubCatType === "cocktail" ? "cocktails"
-                : "kitchen_recipes";
-              const insert: Record<string, unknown> = {
+              const eSlug2 = resolvedEtab.slug?.includes("piccola") ? "piccola" : "bello_mio";
+              const { error } = await supabase.from("kitchen_recipes").insert({
                 name: `Nouvelle recette ${newSubCatName.trim()}`,
-                establishments: [estabSlug],
-              };
-              if (table === "kitchen_recipes") {
-                insert.category = slug;
-                insert.is_active = true;
-                insert.is_draft = true;
-              }
-              await supabase.from(table).insert(insert);
+                category: slug,
+                establishments: [eSlug2],
+                is_active: true,
+              });
+              if (error) { alert("Erreur: " + error.message); return; }
               setNewSubCatName("");
               setShowNewSubCatModal(false);
               fetchAllRecipes(etabSlug).then(r => setRecipes(r));
