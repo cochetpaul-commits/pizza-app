@@ -1063,11 +1063,11 @@ export function CatalogueContent() {
               {/* Type header */}
               <div
                 style={{
-                  width: "100%", display: "flex", alignItems: "center", gap: 12,
-                  padding: "14px 18px", background: snapshot.isDragging ? "#f9f6f0" : "#fff",
-                  border: "1px solid #ede6d9",
+                  width: "100%", display: "flex", alignItems: "center", gap: 8,
+                  padding: "12px 14px", background: snapshot.isDragging ? "#f9f6f0" : "#fff",
+                  border: snapshot.isDragging ? `2px solid ${tg.color}` : "1px solid #ede6d9",
                   boxShadow: snapshot.isDragging
-                    ? `inset 4px 0 0 ${tg.color}, 0 4px 16px rgba(0,0,0,0.12)`
+                    ? `inset 4px 0 0 ${tg.color}, 0 8px 24px rgba(0,0,0,0.15)`
                     : `inset 4px 0 0 ${tg.color}, 0 1px 3px rgba(0,0,0,0.04)`,
                   borderRadius: 14, textAlign: "left", fontFamily: "inherit",
                   boxSizing: "border-box",
@@ -1077,12 +1077,13 @@ export function CatalogueContent() {
                   {...provided.dragHandleProps}
                   style={{
                     cursor: "grab", color: "#b0a894", flexShrink: 0,
-                    lineHeight: 1, touchAction: "none", padding: "4px 2px",
+                    touchAction: "none", padding: "10px 6px",
                     display: "flex", alignItems: "center",
+                    WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none",
                   }}
                   title="Glisser pour réordonner"
                 >
-                  <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
+                  <svg width={18} height={18} viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="4" r="2"/><circle cx="16" cy="4" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="8" cy="20" r="2"/><circle cx="16" cy="20" r="2"/></svg>
                 </div>
                 <div
                   onClick={() => toggleType(tg.type)}
