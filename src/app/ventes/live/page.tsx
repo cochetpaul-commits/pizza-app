@@ -33,7 +33,7 @@ function fmtDay(iso: string) {
 
 export default function VentesLivePage() {
   return (
-    <RequireRole allowedRoles={["group_admin"]}>
+    <RequireRole allowedRoles={["group_admin", "manager"]}>
       <LiveContent />
     </RequireRole>
   );

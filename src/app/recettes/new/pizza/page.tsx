@@ -1,7 +1,12 @@
 "use client";
 
 import PizzaFormV2 from "@/components/v2/PizzaFormV2";
+import { RequireRole } from "@/components/RequireRole";
 
 export default function NewPizzaV2Page() {
-  return <PizzaFormV2 />;
+  return (
+    <RequireRole allowedRoles={["group_admin", "manager"]}>
+      <PizzaFormV2 />
+    </RequireRole>
+  );
 }
