@@ -393,14 +393,14 @@ function BelloMioContent() {
       {meteoDays.length > 0 && (
         <>
           <SectionTitle>Meteo ({meteoDays.length} jours)</SectionTitle>
-          <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, marginBottom: 20, scrollbarWidth: "none" }}>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(meteoDays.length, 7)}, 1fr)`, gap: 6, marginBottom: 20 }}>
             {meteoDays.map((m, i) => {
               const isToday = m.date === today;
               const dt = new Date(m.date + "T12:00:00");
               return (
                 <div key={i} style={{
-                  background: isToday ? `${COLOR}15` : T.white, borderRadius: 12, padding: "10px 12px",
-                  border: `1.5px solid ${isToday ? COLOR : T.border}`, textAlign: "center", minWidth: 64, flexShrink: 0,
+                  background: isToday ? `${COLOR}15` : T.white, borderRadius: 12, padding: "10px 8px",
+                  border: `1.5px solid ${isToday ? COLOR : T.border}`, textAlign: "center",
                 }}>
                   <div style={{ fontSize: 9, fontWeight: 700, color: isToday ? COLOR : T.muted, textTransform: "uppercase" }}>
                     {dt.toLocaleDateString("fr-FR", { weekday: "short" })}
