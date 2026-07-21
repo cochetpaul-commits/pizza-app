@@ -498,8 +498,9 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function CatalogueContent() {
-  const { current: etab } = useEtablissement();
-  const etabSlug = etab?.slug ?? null;
+  const { current: etab, etablissements } = useEtablissement();
+  const resolvedEtab = etab ?? etablissements?.[0] ?? null;
+  const etabSlug = resolvedEtab?.slug ?? null;
   const { can } = useProfile();
   const canWrite = can("operations.edit_recettes");
 
@@ -596,13 +597,13 @@ export function CatalogueContent() {
   const [produitSaving, setProduitSaving] = useState(false);
 
   const createProduit = async () => {
-    if (!etab || !produitName.trim()) return;
+    if (!resolvedEtab || !produitName.trim()) return;
     setProduitSaving(true);
-    const slug = etab.slug?.includes("piccola") ? "piccola" : "bello_mio";
+    const slug = resolvedEtab.slug?.includes("piccola") ? "piccola" : "bello_mio";
     const { error } = await supabase.from("kitchen_recipes").insert({
       name: produitName.trim(),
       category: produitCat,
-      etablissement_id: etab.id,
+      etablissement_id: resolvedEtab.id,
       establishments: [slug],
       is_active: true,
       is_draft: false,
@@ -1846,9 +1847,9 @@ export function CatalogueContent() {
             type="button"
             disabled={!newCatName.trim()}
             onClick={async () => {
-              if (!etab || !newCatName.trim()) return;
+              if (!resolvedEtab || !newCatName.trim()) return;
               const slug = newCatName.trim().toLowerCase().replace(/[^a-z0-9àâäéèêëïîôùûüç]+/g, "_").replace(/^_|_$/g, "");
-              const estabSlug = etab.slug?.includes("piccola") ? "piccola" : "bello_mio";
+              const estabSlug = resolvedEtab.slug?.includes("piccola") ? "piccola" : "bello_mio";
               await supabase.from("kitchen_recipes").insert({
                 name: `Nouvelle recette ${newCatName.trim()}`,
                 category: slug,
@@ -1889,9 +1890,9 @@ export function CatalogueContent() {
             type="button"
             disabled={!newSubCatName.trim()}
             onClick={async () => {
-              if (!etab || !newSubCatName.trim()) return;
+              if (!resolvedEtab || !newSubCatName.trim()) return;
               const slug = newSubCatName.trim().toLowerCase().replace(/[^a-z0-9àâäéèêëïîôùûüç]+/g, "_").replace(/^_|_$/g, "");
-              const estabSlug = etab.slug?.includes("piccola") ? "piccola" : "bello_mio";
+              const estabSlug = resolvedEtab.slug?.includes("piccola") ? "piccola" : "bello_mio";
               // Create a draft recipe in this sub-category to make it appear
               const table = newSubCatType === "pizza" ? "pizza_recipes"
                 : newSubCatType === "cocktail" ? "cocktails"
