@@ -17,10 +17,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
 import { RecipeHero, HeroBtn, HeroDangerBtn } from "./RecipeHero";
-import { GestionFoodCost } from "./GestionFoodCost";
 import { PublishCatalogueButton } from "./PublishCatalogueButton";
-import { GestionCommandes } from "./GestionCommandes";
-import { GestionPilotage } from "./GestionPilotage";
 import { StepperInput } from "@/components/StepperInput";
 import type { Ingredient, Category } from "@/types/ingredients";
 import type { CpuByUnit } from "@/lib/offerPricing";
@@ -92,7 +89,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, CpuByUnit>>({});
   const [priceLabelByIngredient, setPriceLabelByIngredient] = useState<Record<string, string>>({});
-  const [supplierByIngredient, setSupplierByIngredient] = useState<Record<string, string | null>>({});
+  const [, setSupplierByIngredient] = useState<Record<string, string | null>>({});
   const [lines, setLines] = useState<IngredientLine[]>([]);
 
   // Steps
@@ -115,8 +112,8 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
   const [prodQty, setProdQty] = useState<number | "">("");
 
   // Main tab
-  type MainTab = "fc" | "recette" | "salle" | "cmd" | "pop";
-  const [mainTab, setMainTab] = useState<MainTab>(initialProdMode ? "recette" : isEdit ? "fc" : "recette");
+  type MainTab = "recette" | "salle";
+  const [mainTab, setMainTab] = useState<MainTab>("recette");
 
   // Save state
   const [saving, setSaving] = useState(false);
@@ -726,8 +723,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
 
   // Tab definitions — same in create and edit (cmd & pop tabs require existing recipe)
   const MAIN_TABS: { key: MainTab; label: string }[] = [
-    { key: "fc", label: "Food cost & Marges" },
-    { key: "recette", label: "Recette & Procede" },
+    { key: "recette", label: "Recette" },
     { key: "salle", label: "Salle" },
   ];
 
@@ -794,9 +790,10 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
 
         {saveError && <div className="errorBox" style={{ marginBottom: 12 }}>{saveError}</div>}
 
-        {/* ── TAB: FOOD COST & MARGES ── */}
-        {mainTab === "fc" && (
+        {/* ── TAB: RECETTE (Food Cost + Recette fusionnés) ── */}
+        {mainTab === "recette" && (
           <>
+            {/* Food Cost & Marges */}
             <CuisinePricing
               pricingMode={pricingMode}
               onPricingModeChange={setPricingMode}
@@ -818,35 +815,8 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
               onVatChange={setVatRate}
               yieldGrams={typeof yieldGrams === "number" ? yieldGrams : null}
             />
-            <GestionFoodCost
-              lines={lines}
-              ingredients={ingredients}
-              priceByIngredient={priceByIngredient}
-              supplierByIngredient={supplierByIngredient}
-              totalCost={totalCost}
-              yieldGrams={typeof yieldGrams === "number" ? yieldGrams : null}
-              multiplier={1}
-            />
           </>
         )}
-
-        {/* ── TAB: COMMANDES ── */}
-        {mainTab === "cmd" && isEdit && recipeId && (
-          <GestionCommandes
-            recipeId={recipeId}
-            recipeType="cuisine"
-            lines={lines}
-            ingredients={ingredients}
-            etablissementId={etab?.id}
-          />
-        )}
-
-        {/* ── TAB: PILOTAGE ── */}
-        {mainTab === "pop" && isEdit && (
-          <GestionPilotage recipeName={name} recipeType="cuisine" />
-        )}
-
-        {/* ── TAB: RECETTE & PROCEDE ── */}
         {mainTab === "recette" && (
           <>
             {/* Production mode toggle */}
