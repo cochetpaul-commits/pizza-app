@@ -514,6 +514,9 @@ export function CatalogueContent() {
   const [showNewSheet, setShowNewSheet] = useState(false);
   const [showNewCatModal, setShowNewCatModal] = useState(false);
   const [newCatName, setNewCatName] = useState("");
+  const [showNewSubCatModal, setShowNewSubCatModal] = useState(false);
+  const [newSubCatName, setNewSubCatName] = useState("");
+  const [newSubCatType, setNewSubCatType] = useState("");
 
   // Pivot overrides: { recipeId: qty }
   const [pivotOverrides, setPivotOverrides] = useState<Record<string, number>>({});
@@ -938,11 +941,11 @@ export function CatalogueContent() {
               {/* Sub-groups or direct recipes */}
               {typeOpen && (
                 <div style={{ marginTop: 6 }}>
-                  {/* CTA + Sous-catégorie (for types with sub-groups, e.g. Cuisine) */}
-                  {hasSubs && canWrite && tg.type === "cuisine" && (
+                  {/* CTA + Sous-catégorie */}
+                  {canWrite && (
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); setShowNewCatModal(true); }}
+                      onClick={(e) => { e.stopPropagation(); setNewSubCatType(tg.type); setShowNewSubCatModal(true); }}
                       style={{
                         padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
                         border: `1.5px solid ${tg.color}40`, background: `${tg.color}08`, color: tg.color,
@@ -1864,6 +1867,56 @@ export function CatalogueContent() {
             }}
           >
             Creer la categorie
+          </button>
+        </div>
+      </BottomSheet>
+
+      {/* ── Nouvelle sous-catégorie BottomSheet ── */}
+      <BottomSheet open={showNewSubCatModal} onClose={() => { setShowNewSubCatModal(false); setNewSubCatName(""); }} title={`Nouvelle sous-categorie (${newSubCatType})`}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <input
+            type="text"
+            value={newSubCatName}
+            onChange={(e) => setNewSubCatName(e.target.value)}
+            placeholder="Nom de la sous-categorie (ex: Entrée, Dessert, Cocktail signature...)"
+            style={{
+              width: "100%", padding: "10px 12px", borderRadius: 8,
+              border: "1.5px solid #ddd6c8", fontSize: 13, outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+          <button
+            type="button"
+            disabled={!newSubCatName.trim()}
+            onClick={async () => {
+              if (!etab || !newSubCatName.trim()) return;
+              const slug = newSubCatName.trim().toLowerCase().replace(/[^a-z0-9àâäéèêëïîôùûüç]+/g, "_").replace(/^_|_$/g, "");
+              const estabSlug = etab.slug?.includes("piccola") ? "piccola" : "bello_mio";
+              // Create a draft recipe in this sub-category to make it appear
+              const table = newSubCatType === "pizza" ? "pizza_recipes"
+                : newSubCatType === "cocktail" ? "cocktails"
+                : "kitchen_recipes";
+              const insert: Record<string, unknown> = {
+                name: `Nouvelle recette ${newSubCatName.trim()}`,
+                establishments: [estabSlug],
+              };
+              if (table === "kitchen_recipes") {
+                insert.category = slug;
+                insert.is_active = true;
+                insert.is_draft = true;
+              }
+              await supabase.from(table).insert(insert);
+              setNewSubCatName("");
+              setShowNewSubCatModal(false);
+              fetchAllRecipes(etabSlug).then(r => setRecipes(r));
+            }}
+            style={{
+              padding: "12px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+              background: newSubCatName.trim() ? "#4a6741" : "#ccc",
+              color: "#fff", border: "none", cursor: newSubCatName.trim() ? "pointer" : "not-allowed",
+            }}
+          >
+            Creer la sous-categorie
           </button>
         </div>
       </BottomSheet>
