@@ -7,17 +7,22 @@
  * Each permission: true (granted), false (denied), "toggle" (configurable per user)
  */
 
-export type AppRole = "group_admin" | "equipier";
+export type AppRole = "group_admin" | "manager" | "equipier";
 
-export type PermRole = "equipier" | "admin";
+export type PermRole = "equipier" | "manager" | "admin";
 
-export const PERM_ROLES: PermRole[] = ["equipier", "admin"];
+export const PERM_ROLES: PermRole[] = ["equipier", "manager", "admin"];
 
 export const ROLE_INFO: Record<PermRole, { label: string; description: string; color: string; bg: string }> = {
   equipier: {
     label: "Equipier",
     description: "Acces production (fiches techniques, catalogue, recettes), inventaire, base produits, commandes et fournisseurs.",
     color: "#2D6A4F", bg: "rgba(45,106,79,0.08)",
+  },
+  manager: {
+    label: "Manager",
+    description: "Acces equipier + pilotage, ventes, validation commandes, gestion equipe, evenements.",
+    color: "#2563EB", bg: "rgba(37,99,235,0.06)",
   },
   admin: {
     label: "Administrateur",
@@ -126,8 +131,21 @@ export const DEFAULT_PERMS: Record<PermRole, Record<string, PermValue>> = {
     "profil.view_team": false, "profil.view_managers": false, "profil.view_all": false, "profil.delete": false,
     "absences.edit_cp": false, "paie.manage": false,
     "achats.view": true, "achats.edit": true, "achats.inventaire": true,
-    "operations.recettes": true, "operations.edit_recettes": true, "operations.commandes": true, "commandes.valider": false,
+    "operations.recettes": true, "operations.edit_recettes": false, "operations.commandes": true, "commandes.valider": false,
     "performances.view": false, "performances.pilotage": false,
+    "settings.etablissements": false, "settings.employes": false, "settings.roles": false,
+  },
+  manager: {
+    "planning.view_own": true, "planning.view_draft": true, "planning.view_other": true,
+    "planning.view_alerts": true, "planning.edit": true, "planning.validate_shifts": true, "planning.view_ratios": true,
+    "heures.register_own": true, "heures.edit_team": true, "heures.validate_own": true,
+    "heures.edit_all": false, "heures.unvalidate": false, "heures.revalorize_absences": false,
+    "profil.view_own": true, "profil.edit_own": true, "profil.view_feuilles": true,
+    "profil.view_team": true, "profil.view_managers": true, "profil.view_all": false, "profil.delete": false,
+    "absences.edit_cp": false, "paie.manage": false,
+    "achats.view": true, "achats.edit": true, "achats.inventaire": true,
+    "operations.recettes": true, "operations.edit_recettes": true, "operations.commandes": true, "commandes.valider": true,
+    "performances.view": true, "performances.pilotage": true,
     "settings.etablissements": false, "settings.employes": false, "settings.roles": false,
   },
   admin: {
@@ -148,12 +166,14 @@ export const DEFAULT_PERMS: Record<PermRole, Record<string, PermValue>> = {
 /** Legacy compat */
 export const PERMISSIONS: Record<AppRole, string[]> = {
   group_admin: Object.keys(DEFAULT_PERMS.admin).filter(k => DEFAULT_PERMS.admin[k] === true),
+  manager: Object.keys(DEFAULT_PERMS.manager).filter(k => DEFAULT_PERMS.manager[k] === true),
   equipier: Object.keys(DEFAULT_PERMS.equipier).filter(k => DEFAULT_PERMS.equipier[k] === true),
 };
 
 /** Map app roles to perm roles */
 export function mapToPermRole(role: string): PermRole {
   if (role === "group_admin" || role === "admin" || role === "proprietaire" || role === "direction" || role === "directeur") return "admin";
+  if (role === "manager" || role === "responsable" || role === "chef") return "manager";
   return "equipier";
 }
 

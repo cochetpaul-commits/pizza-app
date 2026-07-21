@@ -1,16 +1,18 @@
-export type Role = "group_admin" | "equipier";
+export type Role = "group_admin" | "manager" | "equipier";
 
 // Legacy role aliases — map old roles to new ones
 export function normalizeRole(role: string): Role {
-  if (role === "group_admin" || role === "admin" || role === "direction") return "group_admin";
-  return "equipier"; // manager, cuisine, salle, plonge, equipier → equipier
+  if (role === "group_admin" || role === "admin" || role === "direction" || role === "proprietaire" || role === "directeur") return "group_admin";
+  if (role === "manager" || role === "responsable" || role === "chef") return "manager";
+  return "equipier"; // cuisine, salle, plonge, equipier → equipier
 }
 
-const ALL: Role[] = ["group_admin", "equipier"];
+const ALL: Role[] = ["group_admin", "manager", "equipier"];
+const MANAGERS: Role[] = ["group_admin", "manager"];
 
 /** Routes and which roles can access them (prefix match) */
 export const ROUTE_ACCESS: Record<string, Role[]> = {
-  // Équipier: prod (recettes, catalogue, inventaire) + achats (ingredients, commandes)
+  // Tous: production, achats, stock
   "/recettes":     ALL,
   "/catalogue":    ALL,
   "/ingredients":  ALL,
@@ -19,34 +21,33 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/inventaire":   ALL,
   "/session":      ALL,
   "/settings/account": ALL,
-  // Hub routes
   "/bello-mio":    ALL,
   "/piccola-mia":  ALL,
   "/dashboard":    ALL,
   "/haccp":        ALL,
-  "/haccp/admin":  ["group_admin"],
   "/fournisseurs": ALL,
   "/rh/conges":    ALL,
-  // Pages contrôlées par permissions granulaires (accessibles à tous, RequireRole vérifie la permission)
-  "/plannings":       ALL,
-  "/pilotage":        ALL,
-  "/ventes":          ALL,
-  "/finances":        ALL,
-  "/variations-prix": ALL,
-  "/rh":              ALL,
-  "/personnel":       ALL,
-  "/achats":          ALL,
-  "/stats-achats":    ALL,
-  "/tresorerie":      ALL,
-  "/mercuriale":      ALL,
-  // Group admin only (admin, settings, imports)
+  "/plannings":    ALL,
+  // Manager + Admin: pilotage, ventes, RH, événements
+  "/pilotage":        MANAGERS,
+  "/ventes":          MANAGERS,
+  "/finances":        MANAGERS,
+  "/variations-prix": MANAGERS,
+  "/rh":              MANAGERS,
+  "/personnel":       MANAGERS,
+  "/achats":          MANAGERS,
+  "/stats-achats":    MANAGERS,
+  "/tresorerie":      MANAGERS,
+  "/mercuriale":      MANAGERS,
+  "/evenements":      MANAGERS,
+  "/clients":         MANAGERS,
+  "/devis":           MANAGERS,
+  "/epicerie":        MANAGERS,
+  // Admin only: settings, imports, groupe, admin
+  "/haccp/admin":  ["group_admin"],
   "/groupe":       ["group_admin"],
   "/admin":        ["group_admin"],
   "/invoices":     ["group_admin"],
-  "/evenements":   ["group_admin"],
-  "/epicerie":     ["group_admin"],
-  "/clients":      ["group_admin"],
-  "/devis":        ["group_admin"],
   "/settings":     ["group_admin"],
 };
 
@@ -71,5 +72,5 @@ export function canAccess(role: Role, path: string): boolean {
 
 /** Can this role write (create/edit/delete)? */
 export function canWrite(role: Role): boolean {
-  return role === "group_admin";
+  return role === "group_admin" || role === "manager";
 }
