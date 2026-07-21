@@ -35,7 +35,7 @@ type PizzaRowDB = {
 
 type PizzaIngredientDBRow = {
   id: string;
-  pizza_id: string;
+  recipe_id: string;
   ingredient_id: string;
   stage: "pre" | "post";
   qty: number | null;
@@ -467,7 +467,7 @@ setPriceLabelByIngredient(priceLabelMap);
       }
 
       const { data: pizza, error: pizzaErr } = await supabase
-        .from("pizza_recipes")
+        .from("kitchen_recipes")
         .select("id,name,dough_recipe_id,notes,photo_url,is_draft")
         .eq("id", pizzaId)
         .maybeSingle();
@@ -484,9 +484,9 @@ setPriceLabelByIngredient(priceLabelMap);
       }
 
       const { data: pi, error: piErr } = await supabase
-        .from("pizza_ingredients")
-        .select("id,pizza_id,ingredient_id,stage,qty,unit,sort_order")
-        .eq("pizza_id", pizzaId)
+        .from("kitchen_recipe_lines")
+        .select("id,recipe_id,ingredient_id,stage,qty,unit,sort_order")
+        .eq("recipe_id", pizzaId)
         .order("stage", { ascending: true })
         .order("sort_order", { ascending: true });
 

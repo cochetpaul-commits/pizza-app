@@ -83,7 +83,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   const [preLines, setPreLines] = useState<IngredientLine[]>([]);
   const [postLines, setPostLines] = useState<IngredientLine[]>([]);
 
-  // Steps (stored in notes for pizza_recipes)
+  // Steps (stored in notes for kitchen_recipes)
   const [steps, setSteps] = useState<string[]>([]);
 
   // Pricing
@@ -349,8 +349,8 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
       if (pizzaId) {
         const [{ data: piz }, { data: pLines }] = await Promise.all([
-          supabase.from("pizza_recipes").select("*").eq("id", pizzaId).single(),
-          supabase.from("pizza_ingredients").select("*").eq("pizza_id", pizzaId).order("sort_order"),
+          supabase.from("kitchen_recipes").select("*").eq("id", pizzaId).single(),
+          supabase.from("kitchen_recipe_lines").select("*").eq("recipe_id", pizzaId).order("sort_order"),
         ]);
         if (cancelled) return;
         if (piz) {
@@ -444,29 +444,29 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
       let pid = pizzaId;
       if (pid) {
-        const { error } = await supabase.from("pizza_recipes").update(payload).eq("id", pid);
+        const { error } = await supabase.from("kitchen_recipes").update(payload).eq("id", pid);
         if (error) throw error;
       } else {
-        const { data, error } = await supabase.from("pizza_recipes")
-          .insert({ ...payload, user_id: auth.user.id, ...(etab.current ? { etablissement_id: etab.current.id } : {}) })
+        const { data, error } = await supabase.from("kitchen_recipes")
+          .insert({ ...payload, user_id: auth.user.id, category: "pizza", ...(etab.current ? { etablissement_id: etab.current.id } : {}) })
           .select("id").single<{ id: string }>();
         if (error) throw error;
         pid = data.id;
       }
 
-      // Save pivot (column added by migration — silent failure if not yet applied)
-      await supabase.from("pizza_recipes").update({ pivot_ingredient_id: pivotIngredientId }).eq("id", pid!);
+      // Save pivot
+      await supabase.from("kitchen_recipes").update({ pivot_ingredient_id: pivotIngredientId }).eq("id", pid!);
 
       // Upsert ingredient lines
-      await supabase.from("pizza_ingredients").delete().eq("pizza_id", pid!);
+      await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", pid!);
       const allValidLines = [
         ...preLines.filter(l => l.ingredient_id && l.qty !== "" && Number(l.qty) > 0).map((l, i) => ({ ...l, stage: "pre", sort_order: i })),
         ...postLines.filter(l => l.ingredient_id && l.qty !== "" && Number(l.qty) > 0).map((l, i) => ({ ...l, stage: "post", sort_order: i })),
       ];
       if (allValidLines.length > 0) {
-        const { error: lErr } = await supabase.from("pizza_ingredients").insert(
+        const { error: lErr } = await supabase.from("kitchen_recipe_lines").insert(
           allValidLines.map(l => ({
-            pizza_id: pid!,
+            recipe_id: pid!,
             ingredient_id: l.ingredient_id,
             qty: Number(l.qty),
             unit: l.unit,
@@ -488,8 +488,8 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   async function handleDelete() {
     if (!pizzaId) return;
     if (!window.confirm("Supprimer cette fiche pizza ?")) return;
-    await supabase.from("pizza_ingredients").delete().eq("pizza_id", pizzaId);
-    await supabase.from("pizza_recipes").delete().eq("id", pizzaId);
+    await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", pizzaId);
+    await supabase.from("kitchen_recipes").delete().eq("id", pizzaId);
     router.push("/recettes?tab=pizza");
   }
 
@@ -547,7 +547,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
             {isEdit && userCanWrite && (
               <HeroDangerBtn onClick={async () => {
                 if (!confirm("Supprimer cette recette ? Cette action est irreversible.")) return;
-                const { error } = await supabase.from("pizza_recipes").delete().eq("id", pizzaId);
+                const { error } = await supabase.from("kitchen_recipes").delete().eq("id", pizzaId);
                 if (error) { alert(error.message); return; }
                 router.push("/recettes");
               }}>Supprimer</HeroDangerBtn>

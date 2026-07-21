@@ -83,15 +83,10 @@ export async function GET(req: NextRequest) {
   unmatched.sort((a, b) => b.ca_ttc - a.ca_ttc);
 
   /* 3. Fetch recipes for dropdown */
-  const [pizzaRes, kitchenRes, cocktailRes] = await Promise.all([
-    supabaseAdmin
-      .from("pizza_recipes")
-      .select("id,name,total_cost")
-      .eq("is_draft", false)
-      .eq("etablissement_id", etabId),
+  const [kitchenRes, cocktailRes] = await Promise.all([
     supabaseAdmin
       .from("kitchen_recipes")
-      .select("id,name,total_cost,cost_per_portion,cost_per_kg")
+      .select("id,name,category,total_cost,cost_per_portion,cost_per_kg")
       .eq("is_draft", false)
       .eq("etablissement_id", etabId),
     supabaseAdmin
@@ -102,15 +97,13 @@ export async function GET(req: NextRequest) {
   ]);
 
   const recipes: RecipeOption[] = [];
-  for (const r of pizzaRes.data ?? []) {
-    if (r.total_cost && r.total_cost > 0) {
-      recipes.push({ id: r.id, name: r.name, type: "pizza", cost: r.total_cost });
-    }
-  }
   for (const r of kitchenRes.data ?? []) {
-    const cost = r.cost_per_portion ?? r.total_cost ?? r.cost_per_kg ?? 0;
+    const isPizza = r.category === "pizza";
+    const cost = isPizza
+      ? (r.total_cost ?? 0)
+      : (r.cost_per_portion ?? r.total_cost ?? r.cost_per_kg ?? 0);
     if (cost > 0) {
-      recipes.push({ id: r.id, name: r.name, type: "kitchen", cost });
+      recipes.push({ id: r.id, name: r.name, type: isPizza ? "pizza" : "kitchen", cost });
     }
   }
   for (const r of cocktailRes.data ?? []) {
@@ -170,23 +163,17 @@ export async function POST(req: NextRequest) {
       // Look up recipe cost
       source = "recette";
 
-      if (recette_type === "kitchen") {
+      if (recette_type === "kitchen" || recette_type === "pizza") {
         const { data: recipe } = await supabaseAdmin
           .from("kitchen_recipes")
-          .select("cost_per_portion,total_cost,cost_per_kg")
+          .select("cost_per_portion,total_cost,cost_per_kg,category")
           .eq("id", recette_id)
           .maybeSingle();
         if (recipe) {
-          cout_unitaire = recipe.cost_per_portion ?? recipe.total_cost ?? recipe.cost_per_kg ?? null;
-        }
-      } else if (recette_type === "pizza") {
-        const { data: recipe } = await supabaseAdmin
-          .from("pizza_recipes")
-          .select("total_cost")
-          .eq("id", recette_id)
-          .maybeSingle();
-        if (recipe) {
-          cout_unitaire = recipe.total_cost ?? null;
+          const isPizza = recipe.category === "pizza";
+          cout_unitaire = isPizza
+            ? (recipe.total_cost ?? null)
+            : (recipe.cost_per_portion ?? recipe.total_cost ?? recipe.cost_per_kg ?? null);
         }
       } else {
         const { data: recipe } = await supabaseAdmin

@@ -12,6 +12,7 @@ import {
   foodCostPct, margeBrute, prixConseille, fcColor, allergenesActifs, resumeAuto,
   eur, tmpKey, defaultFiche,
 } from "./ficheTypes";
+import { offerRowToCpu, enrichCpuWithConversions, type CpuByUnit } from "@/lib/offerPricing";
 
 // ── Styles ──
 const COLORS = {
@@ -51,30 +52,83 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
   // ── Load data ──
   useEffect(() => {
     (async () => {
-    const [fRes, cRes, iRes, empRes] = await Promise.all([
+    const [fRes, cRes, iRes, empRes, offRes] = await Promise.all([
       supabase.from("familles").select("*"),
       supabase.from("categories").select("*").order("sort_order").order("nom"),
-      supabase.from("ingredients").select("id, name, category, allergens, cost_per_unit, purchase_unit"),
+      supabase.from("ingredients").select("id, name, category, allergens, cost_per_unit, purchase_price, purchase_unit, purchase_unit_label, density_g_per_ml, piece_weight_g, piece_volume_ml"),
       supabase.from("recipes").select("id, name").order("name"),
+      supabase.from("v_latest_offers").select("*"),
     ]);
     {
       setFamilles((fRes.data ?? []) as Famille[]);
       setCategories((cRes.data ?? []) as Categorie[]);
       setEmpatements((empRes.data ?? []).map((r: Record<string, unknown>) => ({ id: r.id as string, name: (r.name as string).trim() })));
 
-      // Build mercuriale from ingredients
-      const mercs: IngredientRef[] = (iRes.data ?? []).map((i: Record<string, unknown>) => {
+      // Build CPU map from supplier offers
+      const cpuMap: Record<string, CpuByUnit> = {};
+      for (const o of (offRes.data ?? []) as Record<string, unknown>[]) {
+        const iid = String(o.ingredient_id ?? "");
+        if (!iid) continue;
+        cpuMap[iid] = offerRowToCpu(o);
+      }
+
+      // Build mercuriale from ingredients + offers
+      const ingList = (iRes.data ?? []) as Record<string, unknown>[];
+      // Enrich CPU with ingredient meta (density, piece weight)
+      for (const i of ingList) {
+        const id = i.id as string;
+        let cpu = cpuMap[id];
+        if (cpu) {
+          cpu = enrichCpuWithConversions({
+            piece_weight_g: (i.piece_weight_g as number) ?? null,
+            density_kg_per_l: (i.density_g_per_ml as number) ?? null,
+          }, cpu);
+          cpuMap[id] = cpu;
+        }
+        // Fallback: purchase_price
+        if (!cpu || (!cpu.g && !cpu.ml && !cpu.pcs)) {
+          const pp = Number(i.purchase_price) || 0;
+          const pu = Number(i.purchase_unit) || 1;
+          const pul = String(i.purchase_unit_label ?? "").toLowerCase().trim();
+          if (pp > 0 && pu > 0) {
+            const perUnit = pp / pu;
+            if (pul === "kg") cpuMap[id] = { g: perUnit / 1000 };
+            else if (pul === "g") cpuMap[id] = { g: perUnit };
+            else if (pul === "l" || pul === "litre") cpuMap[id] = { ml: perUnit / 1000 };
+            else if (pul === "cl") cpuMap[id] = { ml: perUnit / 10 };
+            else if (pul === "ml") cpuMap[id] = { ml: perUnit };
+            else if (pul === "bouteille" || pul === "piece" || pul === "pièce" || pul === "unite" || pul === "unité") cpuMap[id] = { pcs: perUnit };
+            else cpuMap[id] = { g: perUnit / 1000 }; // default: treat as kg
+          }
+        }
+        // Fallback: cost_per_unit (generated column, €/g)
+        if (!cpuMap[id] || (!cpuMap[id].g && !cpuMap[id].ml && !cpuMap[id].pcs)) {
+          const costPU = Number(i.cost_per_unit) || 0;
+          if (costPU > 0) cpuMap[id] = { g: costPU };
+        }
+      }
+
+      const mercs: IngredientRef[] = ingList.map((i) => {
+        const id = i.id as string;
         let allergens: string[] = [];
-        try { allergens = typeof i.allergens === "string" ? JSON.parse(i.allergens as string) : (i.allergens as string[] ?? []); } catch { /* */ }
-        const cpu = Number(i.cost_per_unit) || 0;
-        const pu = String(i.purchase_unit ?? "g");
-        const base = pu === "L" || pu === "cl" || pu === "ml" ? "cl" : (pu === "pc" || pu === "piece" ? "pc" : "g");
+        try { allergens = typeof i.allergens === "string" ? JSON.parse(i.allergens as string) : ((i.allergens as string[]) ?? []); } catch { /* */ }
+        const cpu = cpuMap[id] ?? {};
+        // Determine base unit from best available price
+        let base: "g" | "cl" | "pc" = "g";
+        let prixBase = cpu.g ?? 0;
+        if (cpu.ml != null && cpu.ml > 0 && (!cpu.g || cpu.g <= 0)) { base = "cl"; prixBase = cpu.ml * 10; } // €/ml → €/cl
+        else if (cpu.pcs != null && cpu.pcs > 0 && (!cpu.g || cpu.g <= 0) && (!cpu.ml || cpu.ml <= 0)) { base = "pc"; prixBase = cpu.pcs; }
+        // Override with density detection from category
+        const cat = String(i.category ?? "");
+        if (["vins", "spiritueux", "biere", "soft", "liqueurs", "sirops"].includes(cat) && cpu.ml != null && cpu.ml > 0) {
+          base = "cl"; prixBase = cpu.ml * 10;
+        }
         return {
-          id: i.id as string,
+          id,
           nom_court: (i.name as string).replace(/\s+\d+[.,/]?\d*\s*(KG|G|GR|CL|ML|L|PCS|PIECES?|UNITE?S?|X)\b/gi, "").replace(/\s*~+\s*$/g, "").trim(),
           nom_produit: i.name as string,
-          prix_base: cpu,
-          unite_base: base as "g" | "cl" | "pc",
+          prix_base: prixBase,
+          unite_base: base,
           allergenes: allergens,
         };
       });
@@ -92,7 +146,7 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
           if (data) { rec = data; detectedType = "cuisine"; }
         }
         if (!rec && (!recipeType || recipeType === "pizza")) {
-          const { data } = await supabase.from("pizza_recipes").select("*").eq("id", recipeId).single();
+          const { data } = await supabase.from("kitchen_recipes").select("*").eq("id", recipeId).eq("category", "pizza").single();
           if (data) { rec = data; detectedType = "pizza"; }
         }
         if (!rec && (!recipeType || recipeType === "cocktail")) {
@@ -101,8 +155,8 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
         }
 
         if (rec) {
-          const linesTable = detectedType === "pizza" ? "pizza_ingredients" : detectedType === "cocktail" ? "cocktail_ingredients" : "kitchen_recipe_lines";
-          const lineFK = detectedType === "pizza" ? "pizza_id" : detectedType === "cocktail" ? "cocktail_id" : "recipe_id";
+          const linesTable = detectedType === "pizza" ? "kitchen_recipe_lines" : detectedType === "cocktail" ? "cocktail_ingredients" : "kitchen_recipe_lines";
+          const lineFK = detectedType === "pizza" ? "recipe_id" : detectedType === "cocktail" ? "cocktail_id" : "recipe_id";
           const { data: lData } = await supabase.from(linesTable).select("*").eq(lineFK, recipeId);
           lines = (lData ?? []) as Record<string, unknown>[];
 

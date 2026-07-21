@@ -861,8 +861,7 @@ function IngredientsPageInner() {
     if (!confirm(`Supprimer "${name}" ?`)) return;
     // Check all recipe tables in parallel
     const recipeTables = [
-      { table: "pizza_ingredients", label: "pizza" },
-      { table: "kitchen_recipe_lines", label: "recette cuisine" },
+      { table: "kitchen_recipe_lines", label: "recette (pizza/cuisine)" },
       { table: "prep_recipe_lines", label: "préparation" },
       { table: "cocktail_ingredients", label: "cocktail" },
       { table: "recipe_ingredients", label: "empâtement" },

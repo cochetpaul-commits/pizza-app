@@ -134,8 +134,6 @@ export async function GET() {
     const supabase = sb();
 
     const [
-      { data: pizzas },
-      { data: pizzaLines },
       { data: kitchens },
       { data: kitchenLines },
       { data: cocktailsData },
@@ -144,14 +142,12 @@ export async function GET() {
       { data: popinaProducts },
       { data: pairingsData },
     ] = await Promise.all([
-      supabase.from("pizza_recipes").select("id, name, description_courte, in_catalogue"),
-      supabase.from("pizza_ingredients").select("pizza_id, ingredient_id"),
       supabase.from("kitchen_recipes").select("id, name, category, description_courte, in_catalogue, is_active, output_ingredient_id"),
       supabase.from("kitchen_recipe_lines").select("recipe_id, ingredient_id"),
       supabase.from("cocktails").select("id, name, description_courte, in_catalogue"),
       supabase.from("cocktail_ingredients").select("cocktail_id, ingredient_id"),
       supabase.from("ingredients").select("id, name, allergens, category"),
-      supabase.from("popina_products").select("id, price_ttc, pizza_recipe_id, kitchen_recipe_id, cocktail_id").eq("active", true),
+      supabase.from("popina_products").select("id, price_ttc, kitchen_recipe_id, cocktail_id").eq("active", true),
       supabase.from("recipe_pairings").select("recipe_id, recipe_type, ingredient_id"),
     ]);
 
@@ -173,7 +169,6 @@ export async function GET() {
     // Popina prices
     const popinaPrice = new Map<string, number>();
     for (const pp of popinaProducts ?? []) {
-      if (pp.pizza_recipe_id) popinaPrice.set("pizza:" + pp.pizza_recipe_id, pp.price_ttc);
       if (pp.kitchen_recipe_id) popinaPrice.set("kitchen:" + pp.kitchen_recipe_id, pp.price_ttc);
       if (pp.cocktail_id) popinaPrice.set("cocktail:" + pp.cocktail_id, pp.price_ttc);
     }
@@ -210,29 +205,19 @@ export async function GET() {
     }
 
     const fiches: FichePdf[] = [];
-    const sellCategories = ["entree", "plat_cuisine", "dessert", "accompagnement"];
-
-    for (const p of pizzas ?? []) {
-      if (p.in_catalogue === false) continue;
-      const lines = (pizzaLines ?? []).filter((l) => l.pizza_id === p.id);
-      fiches.push({
-        name: p.name, category: "pizza", description_courte: p.description_courte,
-        price_ttc: popinaPrice.get("pizza:" + p.id) ?? null,
-        allergens: collectAllergens(lines),
-        ingredients: lines.map((l) => cleanName(ingMap.get(l.ingredient_id)?.name ?? "?")),
-        pairings: pairingsMap.get("pizza:" + p.id) ?? [],
-      });
-    }
+    const sellCategories = ["pizza", "entree", "plat_cuisine", "dessert", "accompagnement"];
 
     for (const kr of kitchens ?? []) {
       if (!kr.is_active || !sellCategories.includes(kr.category) || kr.in_catalogue === false) continue;
       const lines = (kitchenLines ?? []).filter((l) => l.recipe_id === kr.id);
+      const isPizza = kr.category === "pizza";
+      const pairingKey = isPizza ? "pizza:" + kr.id : "cuisine:" + kr.id;
       fiches.push({
         name: kr.name, category: kr.category, description_courte: kr.description_courte,
         price_ttc: popinaPrice.get("kitchen:" + kr.id) ?? null,
         allergens: collectAllergens(lines),
         ingredients: lines.map((l) => cleanName(ingMap.get(l.ingredient_id)?.name ?? "?")),
-        pairings: pairingsMap.get("cuisine:" + kr.id) ?? [],
+        pairings: pairingsMap.get(pairingKey) ?? [],
       });
     }
 

@@ -79,14 +79,14 @@ export async function POST(req: NextRequest) {
   let allergens: string[] = [];
 
   if (recipeType === "pizza") {
-    const { data } = await supabaseAdmin.from("pizza_recipes").select("name, photo_url, notes").eq("id", recipeId).single();
+    const { data } = await supabaseAdmin.from("kitchen_recipes").select("name, photo_url, procedure").eq("id", recipeId).single();
     if (data) {
       name = data.name; photoUrl = data.photo_url;
-      try { stepCount = Array.isArray(JSON.parse(data.notes || "[]")) ? JSON.parse(data.notes || "[]").length : 0; } catch { stepCount = 0; }
+      try { stepCount = Array.isArray(JSON.parse(data.procedure || "[]")) ? JSON.parse(data.procedure || "[]").length : 0; } catch { stepCount = 0; }
     }
-    const { count } = await supabaseAdmin.from("pizza_ingredients").select("id", { count: "exact", head: true }).eq("pizza_id", recipeId);
+    const { count } = await supabaseAdmin.from("kitchen_recipe_lines").select("id", { count: "exact", head: true }).eq("recipe_id", recipeId);
     ingredientCount = count ?? 0;
-    const { data: ings } = await supabaseAdmin.from("pizza_ingredients").select("ingredient:ingredients(allergens)").eq("pizza_id", recipeId);
+    const { data: ings } = await supabaseAdmin.from("kitchen_recipe_lines").select("ingredient:ingredients(allergens)").eq("recipe_id", recipeId);
     allergens = extractAllergens(ings);
   } else if (recipeType === "cuisine") {
     const { data } = await supabaseAdmin.from("kitchen_recipes").select("name, category, photo_url, procedure").eq("id", recipeId).single();

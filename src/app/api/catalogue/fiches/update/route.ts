@@ -16,7 +16,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const table =
-    type === "pizza" ? "pizza_recipes"
+    type === "pizza" ? "kitchen_recipes"
     : type === "cuisine" ? "kitchen_recipes"
     : type === "cocktail" ? "cocktails"
     : null;
@@ -32,7 +32,7 @@ export async function PATCH(req: NextRequest) {
   if (wine_pairing !== undefined && table !== "cocktails") update.wine_pairing = wine_pairing || null;
   if (in_catalogue !== undefined) {
     update.in_catalogue = in_catalogue;
-    // Sync statut for kitchen_recipes
+    // Sync statut for kitchen_recipes (includes pizzas)
     if (table === "kitchen_recipes") {
       update.statut = in_catalogue ? "publiee" : "validee";
     }

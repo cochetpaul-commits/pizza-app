@@ -66,13 +66,9 @@ export async function GET(request: NextRequest) {
   const fetchTo = weekDates[6] > todayParis ? todayParis : weekDates[6];
 
   // ── Fetch sales from ventes_lignes + Supabase recipes in parallel ──
-  const [pizzaRes, kitchenRes, cocktailRes] = await Promise.all([
-    supabaseAdmin.from("pizza_recipes")
-      .select("name,total_cost,sell_price")
-      .eq("is_draft", false)
-      .eq("etablissement_id", etabId),
+  const [kitchenRes, cocktailRes] = await Promise.all([
     supabaseAdmin.from("kitchen_recipes")
-      .select("name,total_cost,cost_per_portion,cost_per_kg,sell_price")
+      .select("name,category,total_cost,cost_per_portion,cost_per_kg,sell_price")
       .eq("is_draft", false)
       .eq("etablissement_id", etabId),
     supabaseAdmin.from("cocktails")
@@ -84,25 +80,17 @@ export async function GET(request: NextRequest) {
   // ── Build recipe cost map (normalized name → cost) ──
   const recipeCosts = new Map<string, RecipeCost>();
 
-  for (const r of pizzaRes.data ?? []) {
-    if (r.total_cost && r.total_cost > 0) {
-      recipeCosts.set(normalize(r.name), {
-        name: r.name,
-        cost: r.total_cost,
-        sellPrice: r.sell_price ?? null,
-        type: "pizza",
-      });
-    }
-  }
-
   for (const r of kitchenRes.data ?? []) {
-    const cost = r.cost_per_portion ?? r.total_cost ?? r.cost_per_kg ?? 0;
+    const isPizza = r.category === "pizza";
+    const cost = isPizza
+      ? (r.total_cost ?? 0)
+      : (r.cost_per_portion ?? r.total_cost ?? r.cost_per_kg ?? 0);
     if (cost > 0) {
       recipeCosts.set(normalize(r.name), {
         name: r.name,
         cost,
         sellPrice: r.sell_price ?? null,
-        type: "kitchen",
+        type: isPizza ? "pizza" : "kitchen",
       });
     }
   }

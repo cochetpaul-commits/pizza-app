@@ -382,9 +382,10 @@ function RecettesInner() {
       if (cancelled) return;
       if (!sessionData.session) { setAuthOk(false); setLoading(false); return; }
       setAuthOk(true);
-      const pq = supabase.from("pizza_recipes")
+      const pq = supabase.from("kitchen_recipes")
         .select("id,name,photo_url,total_cost,margin_rate,vat_rate,sell_price,establishments,pivot_ingredient_id")
-        .eq("is_draft", false);
+        .eq("is_draft", false)
+        .eq("category", "pizza");
       const kq = supabase.from("kitchen_recipes")
         .select("id,name,photo_url,category,total_cost,cost_per_kg,cost_per_portion,margin_rate,vat_rate,sell_price,establishments,pivot_ingredient_id")
         .eq("is_draft", false);

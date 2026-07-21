@@ -272,19 +272,20 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
 
   // ── Pizza ──
   const { data: pizzas } = await supabase
-    .from("pizza_recipes")
+    .from("kitchen_recipes")
     .select("id, name, photo_url, notes, pivot_ingredient_id, ball_weight_g, establishments")
+    .eq("category", "pizza")
     .order("name");
   const pizzaIds = (pizzas ?? []).map(p => p.id);
   const { data: pizzaIngs } = pizzaIds.length ? await supabase
-    .from("pizza_ingredients")
-    .select("pizza_id, ingredient_id, qty, unit, sort_order, ingredients(name, allergens)")
-    .in("pizza_id", pizzaIds)
+    .from("kitchen_recipe_lines")
+    .select("recipe_id, ingredient_id, qty, unit, sort_order, ingredients(name, allergens)")
+    .in("recipe_id", pizzaIds)
     .order("sort_order") : { data: [] };
 
   for (const p of (pizzas ?? [])) {
     if (!matchEstab(p.establishments)) continue;
-    const pIngs = (pizzaIngs ?? []).filter((i: Record<string, unknown>) => i.pizza_id === p.id);
+    const pIngs = (pizzaIngs ?? []).filter((i: Record<string, unknown>) => i.recipe_id === p.id);
     const allergenSet = new Set<string>();
     const lines: RecipeLine[] = pIngs.map((i: Record<string, unknown>) => {
       const ing = i.ingredients as Record<string, unknown> | null;
@@ -797,8 +798,8 @@ export function CatalogueContent() {
     if (!window.confirm(`Supprimer "${recipe.name}" ?\nCette action est irréversible.`)) return;
     try {
       if (recipe.type === "pizza") {
-        await supabase.from("pizza_ingredients").delete().eq("recipe_id", recipe.id);
-        const { error } = await supabase.from("pizza_recipes").delete().eq("id", recipe.id);
+        await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", recipe.id);
+        const { error } = await supabase.from("kitchen_recipes").delete().eq("id", recipe.id);
         if (error) throw error;
       } else if (recipe.type === "cuisine" || recipe.type === "produit") {
         await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", recipe.id);
@@ -842,15 +843,15 @@ export function CatalogueContent() {
   const handleDuplicate = useCallback(async (recipe: Recipe) => {
     try {
       if (recipe.type === "pizza") {
-        const { data: orig } = await supabase.from("pizza_recipes").select("*").eq("id", recipe.id).single();
+        const { data: orig } = await supabase.from("kitchen_recipes").select("*").eq("id", recipe.id).single();
         if (!orig) return;
-        const { id: _id, created_at: _ca, ...rest } = orig;
+        const { id: _id, created_at: _ca, updated_at: _ua, ...rest } = orig;
         rest.name = `${rest.name} (copie)`;
-        const { data: newRec } = await supabase.from("pizza_recipes").insert(rest).select("id").single();
+        const { data: newRec } = await supabase.from("kitchen_recipes").insert(rest).select("id").single();
         if (newRec) {
-          const { data: lines } = await supabase.from("pizza_ingredients").select("*").eq("pizza_id", recipe.id);
+          const { data: lines } = await supabase.from("kitchen_recipe_lines").select("*").eq("recipe_id", recipe.id);
           if (lines?.length) {
-            await supabase.from("pizza_ingredients").insert(lines.map(({ id: _i, pizza_id: _p, created_at: _c, ...l }) => ({ ...l, pizza_id: newRec.id })));
+            await supabase.from("kitchen_recipe_lines").insert(lines.map(({ id: _i, recipe_id: _r, created_at: _c, ...l }) => ({ ...l, recipe_id: newRec.id })));
           }
         }
       } else if (recipe.type === "cuisine" || recipe.type === "produit") {

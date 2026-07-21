@@ -40,8 +40,6 @@ export async function GET(req: NextRequest) {
 
   // Load all data in parallel
   const [
-    { data: pizzas },
-    { data: pizzaLines },
     { data: kitchens },
     { data: kitchenLines },
     { data: cocktailsData },
@@ -50,14 +48,12 @@ export async function GET(req: NextRequest) {
     { data: popinaProducts },
     { data: pairingsData },
   ] = await Promise.all([
-    supabase.from("pizza_recipes").select("id, name, photo_url, description_courte, wine_pairing, in_catalogue, establishments"),
-    supabase.from("pizza_ingredients").select("pizza_id, ingredient_id, qty, unit"),
     supabase.from("kitchen_recipes").select("id, name, photo_url, category, description_courte, wine_pairing, accord, resume_salle, in_catalogue, statut, sell_price, vat_rate, establishments, fiche_type, is_active, output_ingredient_id"),
     supabase.from("kitchen_recipe_lines").select("recipe_id, ingredient_id, qty, unit"),
     supabase.from("cocktails").select("id, name, image_url, description_courte, in_catalogue, establishments"),
     supabase.from("cocktail_ingredients").select("cocktail_id, ingredient_id, qty, unit"),
     supabase.from("ingredients").select("id, name, allergens, category"),
-    supabase.from("popina_products").select("id, name, price_ttc, pizza_recipe_id, kitchen_recipe_id, cocktail_id").eq("active", true),
+    supabase.from("popina_products").select("id, name, price_ttc, kitchen_recipe_id, cocktail_id").eq("active", true),
     supabase.from("recipe_pairings").select("recipe_id, recipe_type, ingredient_id"),
   ]);
 
@@ -86,7 +82,6 @@ export async function GET(req: NextRequest) {
   // Popina price lookup
   const popinaPrice = new Map<string, number>();
   for (const pp of popinaProducts ?? []) {
-    if (pp.pizza_recipe_id) popinaPrice.set("pizza:" + pp.pizza_recipe_id, pp.price_ttc);
     if (pp.kitchen_recipe_id) popinaPrice.set("kitchen:" + pp.kitchen_recipe_id, pp.price_ttc);
     if (pp.cocktail_id) popinaPrice.set("cocktail:" + pp.cocktail_id, pp.price_ttc);
   }
@@ -147,24 +142,7 @@ export async function GET(req: NextRequest) {
 
   const fiches: FicheCatalogue[] = [];
 
-  // Pizzas
-  for (const p of pizzas ?? []) {
-    if (!matchEstab(p.establishments)) continue;
-    const lines = (pizzaLines ?? []).filter((l) => l.pizza_id === p.id);
-    fiches.push({
-      id: p.id, type: "pizza", name: p.name, category: "pizza",
-      description_courte: p.description_courte, wine_pairing: p.wine_pairing,
-      accord: null, resume_salle: null,
-      in_catalogue: p.in_catalogue !== false,
-      pairings: pairingsMap.get("pizza:" + p.id) ?? [],
-      photo_url: p.photo_url, price_ttc: popinaPrice.get("pizza:" + p.id) ?? null,
-      allergens: collectAllergens(lines),
-      ingredients: lines.map((l) => cleanName(ingMap.get(l.ingredient_id)?.name ?? "?")),
-      sub_recipes: [],
-    });
-  }
-
-  // Kitchen recipes (only plats vendus, pas les préparations internes)
+  // Kitchen recipes (includes pizzas with category='pizza', excludes internal preparations)
   const hiddenCategories = ["preparation", "sauce"];
   for (const kr of kitchens ?? []) {
     if (!kr.is_active || hiddenCategories.includes(kr.category)) continue;
@@ -177,16 +155,19 @@ export async function GET(req: NextRequest) {
     const computedPrice = kr.sell_price && kr.vat_rate != null
       ? Number(kr.sell_price) * (1 + Number(kr.vat_rate))
       : null;
+    const isPizza = kr.category === "pizza";
+    const type = isPizza ? "pizza" : "cuisine";
+    const pairingKey = isPizza ? "pizza:" + kr.id : "cuisine:" + kr.id;
     fiches.push({
-      id: kr.id, type: "cuisine", name: kr.name, category: kr.category,
+      id: kr.id, type, name: kr.name, category: kr.category,
       description_courte: kr.description_courte, wine_pairing: kr.wine_pairing,
       accord: kr.accord ?? null, resume_salle: kr.resume_salle ?? null,
       in_catalogue: kr.in_catalogue !== false,
-      pairings: pairingsMap.get("cuisine:" + kr.id) ?? [],
+      pairings: pairingsMap.get(pairingKey) ?? [],
       photo_url: kr.photo_url, price_ttc: popPrice ?? computedPrice,
       allergens: collectAllergens(lines),
       ingredients: lines.map((l) => cleanName(ingMap.get(l.ingredient_id)?.name ?? "?")),
-      sub_recipes: getSubRecipes(lines),
+      sub_recipes: isPizza ? [] : getSubRecipes(lines),
     });
   }
 

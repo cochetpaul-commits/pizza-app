@@ -41,7 +41,7 @@ function readLogoBase64(): string | null {
 type PizzaRow = {
   id: string;
   name: string | null;
-  notes: string | null;
+  procedure: string | null;
   dough_recipe_id: string | null;
   photo_url: string | null;
 };
@@ -50,7 +50,7 @@ type RecipeRow = { id: string; name: string | null; type: string | null };
 
 type PiRow = {
   ingredient_id: string;
-  stage: "pre" | "post";
+  zone: "avant_four" | "apres_four";
   qty: number | null;
   unit: string | null;
   sort_order: number | null;
@@ -87,9 +87,10 @@ export async function POST(req: Request) {
     });
 
     const { data: pizza, error: pErr } = await supabase
-      .from("pizza_recipes")
-      .select("id,name,notes,dough_recipe_id,photo_url")
+      .from("kitchen_recipes")
+      .select("id,name,procedure,dough_recipe_id,photo_url")
       .eq("id", pizzaId)
+      .eq("category", "pizza")
       .eq("etablissement_id", etabId)
       .maybeSingle();
 
@@ -116,10 +117,10 @@ export async function POST(req: Request) {
     }
 
     const { data: pi, error: piErr } = await supabase
-      .from("pizza_ingredients")
-      .select("ingredient_id,stage,qty,unit,sort_order")
-      .eq("pizza_id", pizzaId)
-      .order("stage", { ascending: true })
+      .from("kitchen_recipe_lines")
+      .select("ingredient_id,zone,qty,unit,sort_order")
+      .eq("recipe_id", pizzaId)
+      .order("zone", { ascending: true })
       .order("sort_order", { ascending: true });
 
     if (piErr) return NextResponse.json({ message: "Pizza ingredients error", details: piErr.message }, { status: 500 });
@@ -141,7 +142,7 @@ export async function POST(req: Request) {
     }
 
     const pre = piRows
-      .filter((r) => r.stage === "pre")
+      .filter((r) => r.zone === "avant_four")
       .map((r) => ({
         name: ingMap.get(r.ingredient_id) ?? null,
         qty: r.qty ?? null,
@@ -149,7 +150,7 @@ export async function POST(req: Request) {
       }));
 
     const post = piRows
-      .filter((r) => r.stage === "post")
+      .filter((r) => r.zone === "apres_four")
       .map((r) => ({
         name: ingMap.get(r.ingredient_id) ?? null,
         qty: r.qty ?? null,
@@ -164,7 +165,7 @@ export async function POST(req: Request) {
 
     const data: PizzaPdfData = {
       pizzaName: (pizzaRow.name ?? "Pizza").toString(),
-      notes: pizzaRow.notes ?? null,
+      notes: pizzaRow.procedure ?? null,
       doughRecipeName: doughName,
       doughRecipeType: doughType,
       pre,

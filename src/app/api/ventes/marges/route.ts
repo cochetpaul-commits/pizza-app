@@ -87,13 +87,8 @@ export async function GET(req: NextRequest) {
     offset += PAGE;
   }
 
-  /* ── 2. Fetch recipe costs (pizza, kitchen, cocktails) ── */
-  const [pizzaRes, kitchenRes, cocktailRes] = await Promise.all([
-    supabaseAdmin
-      .from("pizza_recipes")
-      .select("name,total_cost")
-      .eq("is_draft", false)
-      .eq("etablissement_id", etabId),
+  /* ── 2. Fetch recipe costs (kitchen incl. pizza, cocktails) ── */
+  const [kitchenRes, cocktailRes] = await Promise.all([
     supabaseAdmin
       .from("kitchen_recipes")
       .select("name,category,total_cost,cost_per_portion,cost_per_kg")
@@ -108,24 +103,17 @@ export async function GET(req: NextRequest) {
 
   const recipeCosts = new Map<string, RecipeCost>();
 
-  for (const r of pizzaRes.data ?? []) {
-    if (r.total_cost && r.total_cost > 0) {
-      recipeCosts.set(normalize(r.name), {
-        name: r.name,
-        cost: r.total_cost,
-        type: "pizza",
-        recipeCategory: "Pizze",
-      });
-    }
-  }
   for (const r of kitchenRes.data ?? []) {
-    const cost = r.cost_per_portion ?? r.total_cost ?? r.cost_per_kg ?? 0;
+    const isPizza = r.category === "pizza";
+    const cost = isPizza
+      ? (r.total_cost ?? 0)
+      : (r.cost_per_portion ?? r.total_cost ?? r.cost_per_kg ?? 0);
     if (cost > 0) {
       recipeCosts.set(normalize(r.name), {
         name: r.name,
         cost,
-        type: "kitchen",
-        recipeCategory: r.category || "Cuisine",
+        type: isPizza ? "pizza" : "kitchen",
+        recipeCategory: isPizza ? "Pizze" : (r.category || "Cuisine"),
       });
     }
   }
