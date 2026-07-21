@@ -15,7 +15,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   // Tous: production, achats, stock
   "/recettes":     ALL,
   "/catalogue":    ALL,
-  "/ingredients":  ALL,
+  "/ingredients":  MANAGERS,
   "/commandes":    ALL,
   "/stock":        ALL,
   "/inventaire":   ALL,

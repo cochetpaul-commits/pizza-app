@@ -215,11 +215,8 @@ export const SIDEBAR_NAV_V2: SidebarEntry[] = buildDynamicNav([
 /* ── Simplified nav for employee roles ─────────────────── */
 
 export const SIDEBAR_NAV_SIMPLE: SidebarEntry[] = [
-  { kind: "item", label: "Accueil", href: "/dashboard", icon: "dashboard" },
-  { kind: "divider" },
   { kind: "item", label: "Recettes", href: "/recettes", icon: "fileText" },
   { kind: "item", label: "Catalogue", href: "/catalogue", icon: "book" },
-  { kind: "item", label: "Ingrédients", href: "/ingredients", icon: "tag" },
   { kind: "item", label: "Inventaire", href: "/inventaire", icon: "clipboard" },
   { kind: "item", label: "Commandes", href: "/commandes", icon: "shoppingBag" },
   { kind: "item", label: "Fournisseurs", href: "/fournisseurs", icon: "truck" },
