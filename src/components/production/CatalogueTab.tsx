@@ -839,6 +839,51 @@ export function CatalogueContent() {
     }
   }, []);
 
+  const handleDuplicate = useCallback(async (recipe: Recipe) => {
+    try {
+      if (recipe.type === "pizza") {
+        const { data: orig } = await supabase.from("pizza_recipes").select("*").eq("id", recipe.id).single();
+        if (!orig) return;
+        const { id: _id, created_at: _ca, ...rest } = orig;
+        rest.name = `${rest.name} (copie)`;
+        const { data: newRec } = await supabase.from("pizza_recipes").insert(rest).select("id").single();
+        if (newRec) {
+          const { data: lines } = await supabase.from("pizza_ingredients").select("*").eq("pizza_id", recipe.id);
+          if (lines?.length) {
+            await supabase.from("pizza_ingredients").insert(lines.map(({ id: _i, pizza_id: _p, created_at: _c, ...l }) => ({ ...l, pizza_id: newRec.id })));
+          }
+        }
+      } else if (recipe.type === "cuisine" || recipe.type === "produit") {
+        const { data: orig } = await supabase.from("kitchen_recipes").select("*").eq("id", recipe.id).single();
+        if (!orig) return;
+        const { id: _id, created_at: _ca, updated_at: _ua, ...rest } = orig;
+        rest.name = `${rest.name} (copie)`;
+        const { data: newRec } = await supabase.from("kitchen_recipes").insert(rest).select("id").single();
+        if (newRec) {
+          const { data: lines } = await supabase.from("kitchen_recipe_lines").select("*").eq("recipe_id", recipe.id);
+          if (lines?.length) {
+            await supabase.from("kitchen_recipe_lines").insert(lines.map(({ id: _i, recipe_id: _r, ...l }) => ({ ...l, recipe_id: newRec.id })));
+          }
+        }
+      } else if (recipe.type === "cocktail") {
+        const { data: orig } = await supabase.from("cocktails").select("*").eq("id", recipe.id).single();
+        if (!orig) return;
+        const { id: _id, created_at: _ca, ...rest } = orig;
+        rest.name = `${rest.name} (copie)`;
+        const { data: newRec } = await supabase.from("cocktails").insert(rest).select("id").single();
+        if (newRec) {
+          const { data: lines } = await supabase.from("cocktail_ingredients").select("*").eq("cocktail_id", recipe.id);
+          if (lines?.length) {
+            await supabase.from("cocktail_ingredients").insert(lines.map(({ id: _i, cocktail_id: _c, created_at: _ca2, ...l }) => ({ ...l, cocktail_id: newRec.id })));
+          }
+        }
+      }
+      fetchAllRecipes(etabSlug).then(r => setRecipes(r));
+    } catch (err) {
+      alert(`Erreur duplication : ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, [etabSlug]);
+
   // Register FAB in bottom bar for "produit" mode
   const produitAccent = TYPE_COLORS.produit;
   useBottomBarActions(() => canWrite && mainFilter === "produit" ? [{
@@ -1158,6 +1203,26 @@ export function CatalogueContent() {
                             <span style={{ fontSize: 8, color: "#999" }}>+{recipe.allergens.length - 3}</span>
                           )}
                         </div>
+                      )}
+
+                      {/* Duplicate button */}
+                      {canWrite && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleDuplicate(recipe); }}
+                          title="Dupliquer la recette"
+                          aria-label="Dupliquer"
+                          style={{
+                            width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(37,99,235,0.2)",
+                            background: "rgba(37,99,235,0.06)", color: "#2563EB", cursor: "pointer",
+                            flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                          }}
+                        >
+                          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                          </svg>
+                        </button>
                       )}
 
                       {/* Delete button */}
