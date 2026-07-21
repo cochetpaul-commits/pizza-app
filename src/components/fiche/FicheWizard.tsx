@@ -83,6 +83,11 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
             piece_weight_g: (i.piece_weight_g as number) ?? null,
             density_kg_per_l: (i.density_g_per_ml as number) ?? null,
           }, cpu);
+          // Derive ml from pcs + piece_volume_ml (e.g. bottle 750ml at 3.73€ → 0.00497 €/ml)
+          const pvml = Number(i.piece_volume_ml) || 0;
+          if (pvml > 0 && cpu.pcs != null && cpu.pcs > 0 && (cpu.ml == null || cpu.ml <= 0)) {
+            cpu = { ...cpu, ml: cpu.pcs / pvml };
+          }
           cpuMap[id] = cpu;
         }
         // Fallback: purchase_price
