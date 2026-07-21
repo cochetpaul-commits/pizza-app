@@ -937,7 +937,21 @@ export function CatalogueContent() {
 
               {/* Sub-groups or direct recipes */}
               {typeOpen && (
-                <div style={{ paddingLeft: hasSubs ? 0 : 0, marginTop: 6 }}>
+                <div style={{ marginTop: 6 }}>
+                  {/* CTA + Sous-catégorie (for types with sub-groups, e.g. Cuisine) */}
+                  {hasSubs && canWrite && tg.type === "cuisine" && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setShowNewCatModal(true); }}
+                      style={{
+                        padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        border: `1.5px solid ${tg.color}40`, background: `${tg.color}08`, color: tg.color,
+                        cursor: "pointer", marginBottom: 8,
+                      }}
+                    >
+                      + Sous-categorie
+                    </button>
+                  )}
                   {tg.subGroups.map((sg) => {
                     const subOpen = !hasSubs || openCats.has(sg.key);
                     return (
@@ -1067,6 +1081,23 @@ export function CatalogueContent() {
                           Production
                         </button>
                       )}
+
+                      {/* Voir la fiche */}
+                      <a
+                        href={recipe.type === "pizza" ? `/recettes/pizza/${recipe.id}`
+                          : recipe.type === "cocktail" ? `/recettes/cocktail/${recipe.id}`
+                          : recipe.type === "production" && recipe.category === "empatement" ? `/recettes/empatement/${recipe.id.replace(/^emp-/, "")}`
+                          : `/recettes/cuisine/${recipe.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          padding: "3px 10px", borderRadius: 20, border: `1px solid ${color}40`,
+                          background: `${color}08`, color,
+                          fontSize: 10, fontWeight: 700, cursor: "pointer",
+                          flexShrink: 0, letterSpacing: "0.02em", textDecoration: "none",
+                        }}
+                      >
+                        Voir la fiche
+                      </a>
 
                       {/* Allergen dots */}
                       {recipe.allergens.length > 0 && (

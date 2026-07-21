@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 
@@ -24,7 +25,7 @@ type Fiche = {
 
 const CAT_LABELS: Record<string, string> = {
   pizza: "Pizze", entree: "Antipasti", plat_cuisine: "Cucina",
-  dessert: "Dolci", accompagnement: "Contorni", cocktail: "Cocktails",
+  dessert: "Dolci", cocktail: "Cocktails",
 };
 
 const CAT_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -32,7 +33,6 @@ const CAT_COLORS: Record<string, { bg: string; fg: string }> = {
   entree: { bg: "#FAD7A0", fg: "#8B6914" },
   plat_cuisine: { bg: "#D4EFDF", fg: "#1B7A3D" },
   dessert: { bg: "#F5CBA7", fg: "#A0522D" },
-  accompagnement: { bg: "#D1F2EB", fg: "#117A65" },
   cocktail: { bg: "#FADBD8", fg: "#922B21" },
 };
 
@@ -274,8 +274,14 @@ export function CatalogueSalleContent() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
+  const [catOrder, setCatOrder] = useState<string[]>([]);
   const { role } = useProfile();
   const { current: etab } = useEtablissement();
+
+  // Load saved category order
+  useEffect(() => {
+    try { const s = localStorage.getItem("catalogue-salle-cat-order"); if (s) setCatOrder(JSON.parse(s)); } catch { /* */ }
+  }, []);
   const canEdit = role === "group_admin";
 
   const load = useCallback(async () => {
@@ -316,8 +322,25 @@ export function CatalogueSalleContent() {
     return true;
   });
 
-  const grouped = new Map<string, Fiche[]>();
-  for (const f of filtered) { const arr = grouped.get(f.category) ?? []; arr.push(f); grouped.set(f.category, arr); }
+  const orderedGroups = useMemo(() => {
+    const map = new Map<string, Fiche[]>();
+    for (const f of filtered) { const arr = map.get(f.category) ?? []; arr.push(f); map.set(f.category, arr); }
+    const entries = [...map.entries()];
+    if (catOrder.length > 0) {
+      const orderMap = new Map(catOrder.map((k, i) => [k, i]));
+      entries.sort((a, b) => (orderMap.get(a[0]) ?? 999) - (orderMap.get(b[0]) ?? 999));
+    }
+    return entries;
+  }, [filtered, catOrder]);
+
+  const handleDragEnd = useCallback((result: DropResult) => {
+    if (!result.destination || result.source.index === result.destination.index) return;
+    const keys = orderedGroups.map(([k]) => k);
+    const [moved] = keys.splice(result.source.index, 1);
+    keys.splice(result.destination.index, 0, moved);
+    setCatOrder(keys);
+    try { localStorage.setItem("catalogue-salle-cat-order", JSON.stringify(keys)); } catch { /* */ }
+  }, [orderedGroups]);
 
   return (
     <main className="container" style={{ paddingBottom: 80 }}>
@@ -359,52 +382,63 @@ export function CatalogueSalleContent() {
       </div>
 
       {loading ? <p style={{ textAlign: "center", color: "#999", padding: 40 }}>Chargement...</p> : (
-        [...grouped.entries()].map(([cat, items]) => {
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="catalogue-salle-cats">
+            {(droppableProvided) => (
+              <div ref={droppableProvided.innerRef} {...droppableProvided.droppableProps}>
+        {orderedGroups.map(([cat, items], idx) => {
           const col = CAT_COLORS[cat] ?? { bg: "#eee", fg: "#666" };
           const isOpen = openCats.has(cat);
           return (
-            <div key={cat} style={{ marginBottom: 10 }}>
-              {/* Category accordion header */}
+            <Draggable key={cat} draggableId={cat} index={idx}>
+              {(provided, snapshot) => (
+            <div ref={provided.innerRef} {...provided.draggableProps} style={{ ...provided.draggableProps.style, marginBottom: 10 }}>
               <div
-                onClick={() => setOpenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })}
                 style={{
-                  display: "flex", alignItems: "center", gap: 12,
-                  padding: "12px 16px", cursor: "pointer",
-                  background: "#fff", borderRadius: 12,
-                  border: "1px solid #ede6d9",
-                  boxShadow: `inset 4px 0 0 ${col.fg}, 0 1px 3px rgba(0,0,0,0.04)`,
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "12px 14px", background: snapshot.isDragging ? "#f9f6f0" : "#fff", borderRadius: 12,
+                  border: snapshot.isDragging ? `2px solid ${col.fg}` : "1px solid #ede6d9",
+                  boxShadow: snapshot.isDragging
+                    ? `inset 4px 0 0 ${col.fg}, 0 8px 24px rgba(0,0,0,0.15)`
+                    : `inset 4px 0 0 ${col.fg}, 0 1px 3px rgba(0,0,0,0.04)`,
+                  boxSizing: "border-box",
                 }}
               >
-                <span style={{
-                  fontFamily: "'Oswald', sans-serif", fontSize: 14, fontWeight: 800,
-                  letterSpacing: "0.1em", textTransform: "uppercase", color: col.fg,
-                }}>
-                  {CAT_LABELS[cat] ?? cat}
-                </span>
-                <span style={{
-                  fontSize: 11, fontWeight: 800, padding: "2px 8px", borderRadius: 12,
-                  background: col.bg, color: col.fg,
-                }}>
-                  {items.length}
-                </span>
-                <span style={{
-                  marginLeft: "auto", fontSize: 10, color: "#b0a894",
-                  transition: "transform 0.2s",
-                  transform: isOpen ? "rotate(0)" : "rotate(-90deg)",
-                }}>
-                  ▼
-                </span>
+                <div {...provided.dragHandleProps} style={{
+                  cursor: "grab", color: "#b0a894", flexShrink: 0, touchAction: "none",
+                  padding: "10px 6px", display: "flex", alignItems: "center",
+                  WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none",
+                }} title="Glisser pour reordonner">
+                  <svg width={18} height={18} viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="4" r="2"/><circle cx="16" cy="4" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="8" cy="20" r="2"/><circle cx="16" cy="20" r="2"/></svg>
+                </div>
+                <div onClick={() => setOpenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })}
+                  style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+                  <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 14, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: col.fg }}>
+                    {CAT_LABELS[cat] ?? cat}
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 8px", borderRadius: 12, background: col.bg, color: col.fg }}>
+                    {items.length}
+                  </span>
+                  <span style={{ marginLeft: "auto", fontSize: 10, color: "#b0a894", transition: "transform 0.2s", transform: isOpen ? "rotate(0)" : "rotate(-90deg)" }}>
+                    ▼
+                  </span>
+                </div>
               </div>
-
-              {/* Fiches */}
               {isOpen && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
                   {items.map((f) => <FicheCard key={f.id} fiche={f} isOpen={expanded === f.id} onToggle={() => setExpanded(expanded === f.id ? null : f.id)} canEdit={canEdit} onUpdate={handleUpdate} />)}
                 </div>
               )}
             </div>
+              )}
+            </Draggable>
           );
-        })
+        })}
+        {droppableProvided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
       )}
 
       {filtered.length === 0 && !loading && <p style={{ textAlign: "center", color: "#999", padding: 40 }}>Aucune fiche trouvee</p>}

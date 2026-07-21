@@ -1,7 +1,7 @@
 "use client";
 
-import { CatalogueContent } from "@/components/production/CatalogueTab";
+import { CatalogueSalleContent } from "@/components/production/CatalogueSalleTab";
 
 export default function CataloguePage() {
-  return <CatalogueContent />;
+  return <CatalogueSalleContent />;
 }

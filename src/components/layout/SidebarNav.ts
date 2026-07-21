@@ -86,7 +86,8 @@ export const PLANNING_ITEMS: NavItemV2[] = [
 
 // PRODUCTION (fiches techniques, catalogue, articles de vente)
 const PRODUCTION_ITEMS: NavItemV2[] = [
-  { label: "Fiches & Catalogue", href: "/recettes", icon: "fileText" },
+  { label: "Recettes", href: "/recettes", icon: "fileText" },
+  { label: "Catalogue", href: "/catalogue", icon: "book" },
   { label: "Inventaire", href: "/inventaire", icon: "package" },
 ];
 
@@ -218,7 +219,8 @@ export const SIDEBAR_NAV_SIMPLE: SidebarEntry[] = [
   { kind: "divider" },
   { kind: "item", label: "Mon planning", href: "/mes-shifts", icon: "calendar" },
   { kind: "item", label: "HACCP", href: "/haccp", icon: "clipboard" },
-  { kind: "item", label: "Recettes & Catalogue", href: "/recettes", icon: "book" },
+  { kind: "item", label: "Recettes", href: "/recettes", icon: "fileText" },
+  { kind: "item", label: "Catalogue", href: "/catalogue", icon: "book" },
   { kind: "item", label: "Ingrédients", href: "/ingredients", icon: "tag" },
   { kind: "item", label: "Inventaire", href: "/inventaire", icon: "clipboard" },
   { kind: "item", label: "Commandes", href: "/commandes", icon: "shoppingBag" },
