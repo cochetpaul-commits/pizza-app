@@ -74,6 +74,9 @@ const TYPE_LABELS: Record<RecipeType, string> = {
 };
 
 const PRODUIT_CATEGORIES = ["produit_vin", "produit_spiritueux", "produit_biere", "produit_soft", "produit_autre"] as const;
+
+// Known cuisine sub-categories (stay under CUISINE group; anything else = top-level)
+const CUISINE_SUBCATS = new Set(["entree", "plat_cuisine", "dessert", "accompagnement", "preparation", "sauce"]);
 const PRODUIT_CAT_LABELS: Record<string, string> = {
   blanc: "Blanc",
   "rosé": "Rosé",
@@ -716,12 +719,22 @@ export function CatalogueContent() {
 
   // Build nested groups: type → subGroups[]
   type SubGroup = { key: string; label: string; color: string; items: Recipe[] };
-  type TypeGroup = { type: string; label: string; color: string; count: number; subGroups: SubGroup[] };
+  type TypeGroup = { type: string; label: string; color: string; count: number; subGroups: SubGroup[]; isCustom?: boolean };
 
   const nestedGroups = useMemo((): TypeGroup[] => {
     const typeMap = new Map<string, SubGroup[]>();
+    // Custom top-level categories (kitchen_recipes with non-standard category)
+    const customTopLevel = new Map<string, Recipe[]>();
+
     for (const [key, items] of groups) {
       const [type, cat] = key.split(":");
+      // If it's a cuisine recipe with a non-standard category → promote to top-level
+      if (type === "cuisine" && cat && !CUISINE_SUBCATS.has(cat)) {
+        const existing = customTopLevel.get(cat) ?? [];
+        existing.push(...items);
+        customTopLevel.set(cat, existing);
+        continue;
+      }
       const subs = typeMap.get(type) ?? [];
       const subColor = type === "cuisine" && cat ? (CUISINE_CAT_COLORS[cat] ?? "#4a6741") : groupColor(key);
       subs.push({ key, label: cat ? groupLabel(key) : "", color: subColor, items });
@@ -735,6 +748,16 @@ export function CatalogueContent() {
       const count = subs.reduce((s, g) => s + g.items.length, 0);
       const label = TYPE_LABELS[type as RecipeType] ?? type;
       result.push({ type, label, color, count, subGroups: subs });
+    }
+
+    // Add custom top-level categories
+    const customColors = ["#8B6914", "#7C3AED", "#0284C7", "#C026D3", "#EA580C", "#16A34A", "#D97706"];
+    let ci = 0;
+    for (const [cat, items] of customTopLevel) {
+      const color = customColors[ci % customColors.length];
+      ci++;
+      const label = cat.replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
+      result.push({ type: `custom:${cat}`, label, color, count: items.length, subGroups: [{ key: `cuisine:${cat}`, label: "", color, items }], isCustom: true });
     }
     result.sort((a, b) => {
       const ia = typeOrder.indexOf(a.type);
@@ -937,6 +960,22 @@ export function CatalogueContent() {
                     ▼
                   </span>
                 </div>
+                {/* Delete custom category */}
+                {tg.isCustom && canWrite && (
+                  <button type="button" onClick={async (e) => {
+                    e.stopPropagation();
+                    const cat = tg.type.replace("custom:", "");
+                    if (!confirm(`Supprimer la catégorie "${tg.label}" et ses ${tg.count} recettes ?`)) return;
+                    await supabase.from("kitchen_recipes").delete().eq("category", cat);
+                    fetchAllRecipes(etabSlug).then(r => setRecipes(r));
+                  }} style={{
+                    width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(220,38,38,0.2)",
+                    background: "rgba(220,38,38,0.06)", color: "#DC2626", cursor: "pointer",
+                    flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                  }} title="Supprimer cette catégorie">
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></svg>
+                  </button>
+                )}
               </div>
 
               {/* Sub-groups or direct recipes */}
