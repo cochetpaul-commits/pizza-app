@@ -26,7 +26,7 @@ import ProductionModal from "@/components/ProductionModal";
 const CUISINE_UNITS = ["g", "cL", "pcs"];
 const ACCENT = "#4a6741";
 
-const CATEGORIES = [
+const BASE_CATEGORIES = [
   { id: "preparation",    label: "Préparation" },
   { id: "plat_cuisine",   label: "Plat cuisiné" },
   { id: "entree",         label: "Entrée" },
@@ -95,6 +95,26 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
   // Steps
   const [steps, setSteps] = useState<string[]>([]);
 
+  // Dynamic categories (base + custom from DB)
+  const [customCats, setCustomCats] = useState<{ id: string; label: string }[]>([]);
+  const CATEGORIES = useMemo(() => {
+    const baseIds = new Set(BASE_CATEGORIES.map(c => c.id));
+    const extras = customCats.filter(c => !baseIds.has(c.id));
+    return [...BASE_CATEGORIES, ...extras];
+  }, [customCats]);
+
+  useEffect(() => {
+    supabase.from("kitchen_recipes").select("category").eq("is_active", true)
+      .then(({ data }) => {
+        const cats = new Set<string>();
+        for (const r of data ?? []) if (r.category) cats.add(r.category);
+        const baseIds = new Set(BASE_CATEGORIES.map(c => c.id));
+        setCustomCats([...cats].filter(c => !baseIds.has(c)).map(c => ({
+          id: c, label: c.replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase()),
+        })));
+      });
+  }, []);
+
   // Metadata (vin/boisson specific fields)
   const [meta, setMeta] = useState<Record<string, string>>({});
   const updateMeta = (k: string, v: string) => setMeta(prev => ({ ...prev, [k]: v }));
@@ -112,8 +132,8 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
   const [prodQty, setProdQty] = useState<number | "">("");
 
   // Main tab
-  type MainTab = "recette" | "salle";
-  const [mainTab, setMainTab] = useState<MainTab>("recette");
+  type MainTab = "recette";
+  const [mainTab] = useState<MainTab>("recette");
 
   // Save state
   const [saving, setSaving] = useState(false);
@@ -722,10 +742,6 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
   const categoryLabel = CATEGORIES.find(c => c.id === category)?.label ?? category;
 
   // Tab definitions — same in create and edit (cmd & pop tabs require existing recipe)
-  const MAIN_TABS: { key: MainTab; label: string }[] = [
-    { key: "recette", label: "Recette" },
-    { key: "salle", label: "Salle" },
-  ];
 
   if (status === "loading") {
     return (
@@ -766,27 +782,6 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
             )}
           </>}
         />
-
-        {/* ── Tab bar ── */}
-        <div style={{ textAlign: "center", marginBottom: 16 }}><div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, overflowX: "auto" }}>
-          {MAIN_TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setMainTab(t.key)}
-              style={{
-                padding: "8px 20px", fontSize: 13, fontWeight: 600,
-                cursor: "pointer", border: "none", borderRadius: 10,
-                background: mainTab === t.key ? (etab?.couleur ? etab.couleur + "25" : "#fff") : "transparent",
-                color: mainTab === t.key ? "#1a1a1a" : "#999",
-                boxShadow: mainTab === t.key ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
-                transition: "all 0.15s", whiteSpace: "nowrap",
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div></div>
 
         {saveError && <div className="errorBox" style={{ marginBottom: 12 }}>{saveError}</div>}
 
@@ -1152,8 +1147,8 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
           </>
         )}
 
-        {/* ── TAB: SALLE ── */}
-        {mainTab === "salle" && (
+        {/* ── SALLE (intégré dans recette) ── */}
+        {mainTab === "recette" && (
           <SalleTab
             meta={meta}
             updateMeta={updateMeta}
