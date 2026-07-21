@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { supabase } from "@/lib/supabaseClient";
+import { BottomSheet } from "@/components/layout/BottomSheet";
 
 type PairingItem = { id: string; name: string; category: string };
 
@@ -275,6 +277,8 @@ export function CatalogueSalleContent() {
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
   const [catOrder, setCatOrder] = useState<string[]>([]);
+  const [showNewCat, setShowNewCat] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
   const { role } = useProfile();
   const { current: etab } = useEtablissement();
 
@@ -353,6 +357,12 @@ export function CatalogueSalleContent() {
       <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
         <input type="text" placeholder="Rechercher..." value={search} onChange={(e) => setSearch(e.target.value)}
           style={{ flex: 1, minWidth: 180, padding: "8px 12px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 13, outline: "none" }} />
+        {canEdit && (
+          <button onClick={() => setShowNewCat(true)}
+            style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, border: "1.5px solid #4a6741", background: "#fff", color: "#4a6741", cursor: "pointer" }}>
+            + Categorie
+          </button>
+        )}
         <button onClick={handleExportPdf} disabled={exporting}
           style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: "#D4775A", color: "#fff", border: "none", cursor: "pointer", opacity: exporting ? 0.6 : 1 }}>
           {exporting ? "Export..." : "Export PDF"}
@@ -442,6 +452,37 @@ export function CatalogueSalleContent() {
       )}
 
       {filtered.length === 0 && !loading && <p style={{ textAlign: "center", color: "#999", padding: 40 }}>Aucune fiche trouvee</p>}
+
+      {/* Nouvelle catégorie */}
+      <BottomSheet open={showNewCat} onClose={() => { setShowNewCat(false); setNewCatName(""); }} title="Nouvelle categorie">
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <input type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
+            placeholder="Nom de la categorie (ex: Brunch, Aperitivo...)"
+            style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1.5px solid #ddd6c8", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+          <button type="button" disabled={!newCatName.trim()}
+            onClick={async () => {
+              if (!etab || !newCatName.trim()) return;
+              const slug = newCatName.trim().toLowerCase().replace(/[^a-z0-9àâäéèêëïîôùûüç]+/g, "_").replace(/^_|_$/g, "");
+              const estabSlug = etab.slug?.includes("piccola") ? "piccola" : "bello_mio";
+              await supabase.from("kitchen_recipes").insert({
+                name: `Nouvelle recette ${newCatName.trim()}`,
+                category: slug,
+                establishments: [estabSlug],
+                is_active: true,
+                in_catalogue: true,
+              });
+              setNewCatName(""); setShowNewCat(false);
+              void load();
+            }}
+            style={{
+              padding: "12px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+              background: newCatName.trim() ? "#4a6741" : "#ccc",
+              color: "#fff", border: "none", cursor: newCatName.trim() ? "pointer" : "not-allowed",
+            }}>
+            Creer la categorie
+          </button>
+        </div>
+      </BottomSheet>
     </main>
   );
 }

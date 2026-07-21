@@ -162,9 +162,9 @@ export async function GET(req: NextRequest) {
   }
 
   // Kitchen recipes (only plats vendus, pas les préparations internes)
-  const sellCategories = ["entree", "plat_cuisine", "dessert"];
+  const hiddenCategories = ["preparation", "sauce"];
   for (const kr of kitchens ?? []) {
-    if (!kr.is_active || !sellCategories.includes(kr.category)) continue;
+    if (!kr.is_active || hiddenCategories.includes(kr.category)) continue;
     if (!matchEstab(kr.establishments)) continue;
     const lines = (kitchenLines ?? []).filter((l) => l.recipe_id === kr.id);
     fiches.push({
