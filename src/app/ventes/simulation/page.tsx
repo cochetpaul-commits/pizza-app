@@ -376,7 +376,7 @@ function SimulationPageInner() {
                   style={{ flex: 1, minWidth: 120, accentColor: accent }}
                 />
                 <span style={{ fontSize: 22, fontWeight: 700, color: accent, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                  {fmt(caSimule)} &euro;
+                  {fmt(caSimule)} {"\u20AC"}
                 </span>
               </div>
             </div>
@@ -384,12 +384,12 @@ function SimulationPageInner() {
             {/* KPI cards */}
             <div className="ventes-sim-kpis" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
               <div style={kpiCard}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmt(totalMS)} &euro;</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmt(totalMS)} {"\u20AC"}</div>
                 <div style={kpiLabel}>Masse salariale totale</div>
                 <div style={kpiSub}>cout employeur mensuel</div>
               </div>
               <div style={kpiCard}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: accent, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmt(totalCharges)} &euro;</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: accent, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmt(totalCharges)} {"\u20AC"}</div>
                 <div style={kpiLabel}>Charges totales</div>
                 <div style={kpiSub}>taux moyen {tauxMoyen.toFixed(1)}%</div>
               </div>
@@ -404,7 +404,7 @@ function SimulationPageInner() {
                 <div style={kpiSub}>objectif {OBJECTIF_MS_CA}%</div>
               </div>
               <div style={kpiCard}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmt(caNeeded)} &euro;</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmt(caNeeded)} {"\u20AC"}</div>
                 <div style={kpiLabel}>CA necessaire ({OBJECTIF_MS_CA}%)</div>
                 <div style={kpiSub}>pour tenir l&apos;objectif</div>
               </div>
@@ -443,7 +443,7 @@ function SimulationPageInner() {
                       <th style={thR}>Reduction Fillon</th>
                       <th style={thR}>Cout employeur</th>
                       <th style={thR}>Taux reel</th>
-                      <th style={thR}>&euro;/h</th>
+                      <th style={thR}>{"\u20AC"}/h</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -476,24 +476,24 @@ function SimulationPageInner() {
                           </span>
                         </td>
                         <td style={tdR}>
-                          <div style={{ fontWeight: 600 }}>{fmt(c.brut)} &euro;</div>
+                          <div style={{ fontWeight: 600 }}>{fmt(c.brut)} {"\u20AC"}</div>
                           {c.isTNS && <div style={{ fontSize: 10, color: "#999" }}>net</div>}
                         </td>
                         <td style={{ ...tdR, color: accent, fontWeight: 600 }}>
-                          {c.isTNS ? fmt(c.chargesPatronales) : fmt(c.chargesPatronales)} &euro;
+                          {c.isTNS ? fmt(c.chargesPatronales) : fmt(c.chargesPatronales)} {"\u20AC"}
                         </td>
                         <td style={{ ...tdR, color: c.fillon > 0 ? "#4a6741" : "#ccc", fontWeight: 600 }}>
                           {c.isTNS ? "N/A" : c.fillon > 0 ? `-${fmt(c.fillon)} \u20AC` : "\u2014"}
                         </td>
                         <td style={{ ...tdR, fontWeight: 700, color: accent }}>
-                          {fmt(c.coutEmployeur)} &euro;
+                          {fmt(c.coutEmployeur)} {"\u20AC"}
                         </td>
                         <td style={{ ...tdR, fontWeight: 600, color: c.tauxReel > 30 ? "#DC2626" : "#1a1a1a" }}>
                           {c.tauxReel.toFixed(1)} %
                         </td>
                         <td style={tdR}>
                           <div style={{ fontWeight: 600 }}>{fmtDec(c.coutHoraire)}</div>
-                          <div style={{ fontSize: 10, color: "#999" }}>&euro;</div>
+                          <div style={{ fontSize: 10, color: "#999" }}>{"\u20AC"}</div>
                         </td>
                       </tr>
                     ))}
@@ -547,7 +547,7 @@ function SimulationPageInner() {
                         <Link href={`/rh/employe/${c.emp.id}`} onClick={(e) => e.stopPropagation()} style={{ textDecoration: "none", color: "#1a1a1a", fontSize: 16, fontWeight: 700 }}>{c.emp.prenom}</Link>
                         <div style={{ fontSize: 12, color: "#999" }}>Gerant TNS</div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: isOvr ? accent : "#1a1a1a", marginTop: 4 }}>
-                          {fmt(c.brut)} &euro; net
+                          {fmt(c.brut)} {"\u20AC"} net
                           {isOvr && <span style={{ fontSize: 10, fontWeight: 500, color: "#999" }}> (modifie)</span>}
                         </div>
                       </button>
@@ -593,14 +593,14 @@ function SimulationPageInner() {
                           <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 6, flexWrap: "wrap" }}>
                             <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Remuneration nette :</span>
                             <span style={{ fontSize: 26, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", color: isOverridden ? accent : "#1a1a1a" }}>
-                              {fmt(tnsNet)} &euro;
+                              {fmt(tnsNet)} {"\u20AC"}
                             </span>
                             {isOverridden && (
                               <button type="button" onClick={() => resetOverride(sel.emp.id)} style={{
                                 fontSize: 11, color: "#999", background: "none", border: "1px solid #ddd6c8",
                                 borderRadius: 12, padding: "2px 10px", cursor: "pointer",
                               }}>
-                                Reinitialiser ({fmt(baseNet)} &euro;)
+                                Reinitialiser ({fmt(baseNet)} {"\u20AC"})
                               </button>
                             )}
                           </div>
@@ -611,8 +611,8 @@ function SimulationPageInner() {
                             style={{ width: "100%", accentColor: "#9BA3B5" }}
                           />
                           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#999", marginTop: 2 }}>
-                            <span>1 000 &euro;</span>
-                            <span>15 000 &euro;</span>
+                            <span>1 000 {"\u20AC"}</span>
+                            <span>15 000 {"\u20AC"}</span>
                           </div>
                         </div>
 
@@ -620,21 +620,21 @@ function SimulationPageInner() {
                         <div className="ventes-sim-tns-kpis" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 20 }}>
                           <div style={{ ...kpiCard, borderColor: "#8B7EC820" }}>
                             <div style={{ fontSize: 22, fontWeight: 700, color: "#8B7EC8", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                              {fmt(tnsNet * TAUX_CHARGES_TNS)} &euro;
+                              {fmt(tnsNet * TAUX_CHARGES_TNS)} {"\u20AC"}
                             </div>
                             <div style={kpiLabel}>Charges TNS</div>
                             <div style={kpiSub}>{(TAUX_CHARGES_TNS * 100).toFixed(1)} % du net</div>
                           </div>
                           <div style={kpiCard}>
                             <div style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                              {fmt(tnsNet * (1 + TAUX_CHARGES_TNS))} &euro;
+                              {fmt(tnsNet * (1 + TAUX_CHARGES_TNS))} {"\u20AC"}
                             </div>
                             <div style={kpiLabel}>Cout reel mensuel</div>
                             <div style={kpiSub}>net + charges</div>
                           </div>
                           <div style={kpiCard}>
                             <div style={{ fontSize: 22, fontWeight: 700, color: accent, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                              {heuresMois > 0 ? fmtDec(tnsNet * (1 + TAUX_CHARGES_TNS) / heuresMois) : "\u2014"} &euro;
+                              {heuresMois > 0 ? fmtDec(tnsNet * (1 + TAUX_CHARGES_TNS) / heuresMois) : "\u2014"} {"\u20AC"}
                             </div>
                             <div style={kpiLabel}>Cout / heure</div>
                             <div style={kpiSub}>{sel.heuresSemaine}h/sem</div>
@@ -654,7 +654,7 @@ function SimulationPageInner() {
                                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                                   <span style={{ fontSize: 13, color: "#4a3f35" }}>{d.label}</span>
                                   <span style={{ fontSize: 13 }}>
-                                    <strong>{fmtDec(montant)} &euro;</strong>{" "}
+                                    <strong>{fmtDec(montant)} {"\u20AC"}</strong>{" "}
                                     <span style={{ color: "#999" }}>({d.taux.toFixed(1)} %)</span>
                                   </span>
                                 </div>
@@ -747,11 +747,11 @@ function SimulationPageInner() {
                           />
                           <div style={{ textAlign: "right", minWidth: 80, flexShrink: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 700, color: isOvr ? accent : "#1a1a1a" }}>
-                              {fmt(c.brut)} &euro;
+                              {fmt(c.brut)} {"\u20AC"}
                             </div>
                             {isOvr && diff !== 0 && (
                               <div style={{ fontSize: 10, color: diff > 0 ? "#DC2626" : "#4a6741", fontWeight: 600 }}>
-                                {diff > 0 ? "+" : ""}{fmt(diff)} &euro;
+                                {diff > 0 ? "+" : ""}{fmt(diff)} {"\u20AC"}
                               </div>
                             )}
                           </div>
@@ -769,7 +769,7 @@ function SimulationPageInner() {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, paddingTop: 10, borderTop: "1px solid #f0ebe3" }}>
                       <span style={{ fontSize: 12, color: "#6f6a61" }}>
                         Impact augmentations : <strong style={{ color: totalMS > baseTotalMS ? "#DC2626" : "#4a6741" }}>
-                          {totalMS > baseTotalMS ? "+" : ""}{fmt(totalMS - baseTotalMS)} &euro;/mois
+                          {totalMS > baseTotalMS ? "+" : ""}{fmt(totalMS - baseTotalMS)} {"\u20AC"}/mois
                         </strong>
                       </span>
                       <button type="button" onClick={() => setSalaryOverrides({})} style={{
@@ -795,7 +795,7 @@ function SimulationPageInner() {
                       </h3>
                       {simRows.length > 0 && (
                         <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>
-                          {simRows.length} nouveau{simRows.length > 1 ? "x" : ""} collaborateur{simRows.length > 1 ? "s" : ""} · cout total {fmt(simTotalCost)} &euro;/mois
+                          {simRows.length} nouveau{simRows.length > 1 ? "x" : ""} collaborateur{simRows.length > 1 ? "s" : ""} · cout total {fmt(simTotalCost)} {"\u20AC"}/mois
                         </div>
                       )}
                     </div>
@@ -837,9 +837,9 @@ function SimulationPageInner() {
                               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                 <div style={{ textAlign: "right" }}>
                                   <div style={{ fontSize: 16, fontWeight: 700, color: accent, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                                    {fmt(s.selected)} &euro;
+                                    {fmt(s.selected)} {"\u20AC"}
                                   </div>
-                                  <div style={{ fontSize: 10, color: "#999" }}>{fmtDec(s.eurH)} &euro;/h</div>
+                                  <div style={{ fontSize: 10, color: "#999" }}>{fmtDec(s.eurH)} {"\u20AC"}/h</div>
                                 </div>
                                 <button type="button" onClick={() => removeSim(r.id)} style={{
                                   width: 24, height: 24, borderRadius: "50%",
@@ -883,7 +883,7 @@ function SimulationPageInner() {
                               <div>
                                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
                                   <span style={miniLabel}>Salaire brut</span>
-                                  <span style={{ fontSize: 12, fontWeight: 700 }}>{fmt(r.brut)} &euro;</span>
+                                  <span style={{ fontSize: 12, fontWeight: 700 }}>{fmt(r.brut)} {"\u20AC"}</span>
                                 </div>
                                 <input type="range" min={1400} max={4500} step={50} value={r.brut}
                                   onChange={(e) => updateSim(r.id, { brut: Number(e.target.value) })}
@@ -942,12 +942,12 @@ function SimulationPageInner() {
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
                     <div style={{ padding: "10px 12px", borderRadius: 8, background: "#faf7f2", border: "1px solid #f0ebe3" }}>
                       <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>MS base</div>
-                      <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmt(baseTotalMS)} &euro;</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmt(baseTotalMS)} {"\u20AC"}</div>
                       <div style={{ fontSize: 11, color: "#999" }}>{caSimule > 0 ? (baseTotalMS / caSimule * 100).toFixed(1) : "—"}% du CA</div>
                     </div>
                     <div style={{ padding: "10px 12px", borderRadius: 8, background: `${accent}08`, border: `1px solid ${accent}30` }}>
                       <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>MS projetee</div>
-                      <div style={{ fontSize: 20, fontWeight: 700, color: accent, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmt(msProjetee)} &euro;</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: accent, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>{fmt(msProjetee)} {"\u20AC"}</div>
                       <div style={{ fontSize: 11, color: "#999" }}>{ratioProjecte.toFixed(1)}% du CA</div>
                     </div>
                   </div>
@@ -990,7 +990,7 @@ function SimulationPageInner() {
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
                         <span style={{ fontSize: 12, color: "#4a3f35" }}>Augmentations</span>
                         <span style={{ fontSize: 12, fontWeight: 600, color: totalMS > baseTotalMS ? "#DC2626" : "#4a6741" }}>
-                          {totalMS > baseTotalMS ? "+" : ""}{fmt(totalMS - baseTotalMS)} &euro;/mois
+                          {totalMS > baseTotalMS ? "+" : ""}{fmt(totalMS - baseTotalMS)} {"\u20AC"}/mois
                         </span>
                       </div>
                     )}
@@ -1000,7 +1000,7 @@ function SimulationPageInner() {
                           <div style={{ width: 8, height: 8, borderRadius: "50%", background: avatarColor(idx) }} />
                           <span style={{ fontSize: 12, color: "#4a3f35" }}>{s.row.nom}</span>
                         </div>
-                        <span style={{ fontSize: 12, fontWeight: 600 }}>{fmt(s.selected)} &euro;/mois</span>
+                        <span style={{ fontSize: 12, fontWeight: 600 }}>{fmt(s.selected)} {"\u20AC"}/mois</span>
                       </div>
                     ))}
                     {(hasOverrides || simRows.length > 0) && (
@@ -1008,12 +1008,12 @@ function SimulationPageInner() {
                         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0ebe3" }}>
                           <span style={{ fontSize: 12, fontWeight: 700 }}>Impact total</span>
                           <span style={{ fontSize: 12, fontWeight: 700, color: (msProjetee - baseTotalMS) > 0 ? "#DC2626" : "#4a6741" }}>
-                            {(msProjetee - baseTotalMS) > 0 ? "+" : ""}{fmt(msProjetee - baseTotalMS)} &euro;/mois
+                            {(msProjetee - baseTotalMS) > 0 ? "+" : ""}{fmt(msProjetee - baseTotalMS)} {"\u20AC"}/mois
                           </span>
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between" }}>
                           <span style={{ fontSize: 11, color: "#999" }}>Impact annuel</span>
-                          <span style={{ fontSize: 11, fontWeight: 600 }}>{fmt((msProjetee - baseTotalMS) * 12)} &euro;/an</span>
+                          <span style={{ fontSize: 11, fontWeight: 600 }}>{fmt((msProjetee - baseTotalMS) * 12)} {"\u20AC"}/an</span>
                         </div>
                       </>
                     )}
@@ -1040,7 +1040,7 @@ function SimulationPageInner() {
 
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
                     <span style={{ color: "#6f6a61" }}>CA actuel mensuel</span>
-                    <span style={{ fontWeight: 700 }}>{fmt(caSimule)} &euro;</span>
+                    <span style={{ fontWeight: 700 }}>{fmt(caSimule)} {"\u20AC"}</span>
                   </div>
                   <div style={{ ...barBg, marginBottom: 16 }}>
                     <div style={{
@@ -1056,17 +1056,17 @@ function SimulationPageInner() {
                   }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>CA necessaire / mois</div>
                     <div style={{ fontSize: 26, fontWeight: 700, color: accent, fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
-                      {fmt(caNeededProjecte)} &euro;
+                      {fmt(caNeededProjecte)} {"\u20AC"}
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 6 }}>
                       <span style={{ color: "#6f6a61" }}>Progression</span>
                       <span style={{ fontWeight: 700, color: caNeededProjecte > caSimule ? "#DC2626" : "#4a6741" }}>
-                        {caNeededProjecte > caSimule ? "+" : ""}{fmt(caNeededProjecte - caSimule)} &euro;
+                        {caNeededProjecte > caSimule ? "+" : ""}{fmt(caNeededProjecte - caSimule)} {"\u20AC"}
                       </span>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
                       <span style={{ color: "#6f6a61" }}>Annuel</span>
-                      <span style={{ fontWeight: 700 }}>{fmt(caNeededProjecte * 12)} &euro;</span>
+                      <span style={{ fontWeight: 700 }}>{fmt(caNeededProjecte * 12)} {"\u20AC"}</span>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
                       <span style={{ color: "#6f6a61" }}>Productivite cible</span>
@@ -1075,7 +1075,7 @@ function SimulationPageInner() {
                           const totalHeures = costs.reduce((a, c) => a + (c.heuresSemaine * 52 / 12), 0)
                             + simRows.reduce((a, r) => a + (r.heures * 52 / 12), 0);
                           return totalHeures > 0 ? fmtDec(caNeededProjecte / totalHeures) : "\u2014";
-                        })()} &euro;/h
+                        })()} {"\u20AC"}/h
                       </span>
                     </div>
                   </div>

@@ -936,18 +936,18 @@ function PerformancesPage() {
                       <div style={S.sec}>Remises accordées</div>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 4 }}>
                         <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 32, fontWeight: 700, color: "#c15f2e" }}>
-                          {Math.round(remises).toLocaleString("fr-FR")}&euro;
+                          {Math.round(remises).toLocaleString("fr-FR")}{"\u20AC"}
                         </div>
                         <div style={{ fontSize: 13, color: "#777" }}>
                           soit {pctCA.toFixed(1)}% du CA brut
                         </div>
                       </div>
                       <div style={{ fontSize: 11, color: "#999" }}>
-                        CA brut (avant remise) : {Math.round(caBrut).toLocaleString("fr-FR")}&euro;
+                        CA brut (avant remise) : {Math.round(caBrut).toLocaleString("fr-FR")}{"\u20AC"}
                       </div>
                       {prevR > 0 && (
                         <div style={{ fontSize: 11, color: "#999", marginTop: 6 }}>
-                          S-1 : {Math.round(prevR).toLocaleString("fr-FR")}&euro; ({remises >= prevR ? "+" : ""}{prevR > 0 ? Math.round((remises - prevR) / prevR * 100) : 0}%)
+                          S-1 : {Math.round(prevR).toLocaleString("fr-FR")}{"\u20AC"} ({remises >= prevR ? "+" : ""}{prevR > 0 ? Math.round((remises - prevR) / prevR * 100) : 0}%)
                         </div>
                       )}
                     </div>
@@ -976,14 +976,14 @@ function PerformancesPage() {
                                   <span style={{ fontSize: 14, fontWeight: i === 0 ? 700 : 500, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
                                 </div>
                                 <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif", color: i === 0 ? accent : "#1a1a1a", flexShrink: 0 }}>
-                                  {Math.round(s.ca).toLocaleString("fr-FR")}&euro;
+                                  {Math.round(s.ca).toLocaleString("fr-FR")}{"\u20AC"}
                                 </div>
                               </div>
                               <div style={{ height: 4, background: "#f0ebe3", borderRadius: 2, marginBottom: 3 }}>
                                 <div style={{ width: `${barPct}%`, height: "100%", background: i === 0 ? accent : "#c9b99a", borderRadius: 2, transition: "width 0.5s" }} />
                               </div>
                               <div style={{ fontSize: 10, color: "#999" }}>
-                                {s.cov} cvt · {s.tickets} tickets · CVT moy {cvtMoy.toFixed(1)}&euro;
+                                {s.cov} cvt · {s.tickets} tickets · CVT moy {cvtMoy.toFixed(1)}{"\u20AC"}
                               </div>
                             </div>
                           );
