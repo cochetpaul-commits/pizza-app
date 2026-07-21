@@ -168,6 +168,8 @@ export async function GET(req: NextRequest) {
   const hiddenCategories = ["preparation", "sauce"];
   for (const kr of kitchens ?? []) {
     if (!kr.is_active || hiddenCategories.includes(kr.category)) continue;
+    // Skip brouillon fiches — only validee/publiee appear in catalogue
+    if (kr.statut === "brouillon") continue;
     if (!matchEstab(kr.establishments)) continue;
     const lines = (kitchenLines ?? []).filter((l) => l.recipe_id === kr.id);
     // Prix TTC : Popina d'abord, sinon sell_price * (1 + vat_rate)

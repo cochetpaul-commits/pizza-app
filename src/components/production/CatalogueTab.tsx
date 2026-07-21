@@ -516,7 +516,6 @@ export function CatalogueContent() {
   const [prodFilter] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
-  const [showNewSheet, setShowNewSheet] = useState(false);
   const [showNewCatModal, setShowNewCatModal] = useState(false);
   const [newCatName, setNewCatName] = useState("");
   const [showNewSubCatModal, setShowNewSubCatModal] = useState(false);
@@ -1909,27 +1908,6 @@ export function CatalogueContent() {
           >
             {produitSaving ? "..." : "Creer la fiche produit"}
           </button>
-        </div>
-      </BottomSheet>
-
-      {/* ── Nouvelle recette BottomSheet ── */}
-      <BottomSheet open={showNewSheet} onClose={() => setShowNewSheet(false)} title="Nouvelle recette">
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {[
-            { label: "Pizza", href: "/recettes/new/pizza", color: TYPE_COLORS.pizza },
-            { label: "Cuisine", href: "/recettes/new/cuisine", color: TYPE_COLORS.cuisine },
-            { label: "Cocktail", href: "/recettes/new/cocktail", color: TYPE_COLORS.cocktail },
-            { label: "Empatement", href: "/recettes/new/empatement", color: "#8a7b6b" },
-          ].map((item) => (
-            <a key={item.href} href={item.href} style={{
-              display: "flex", alignItems: "center", gap: 12,
-              padding: "14px 16px", borderRadius: 12, background: "#fff",
-              border: "1px solid #ede6d9", textDecoration: "none", cursor: "pointer",
-              borderLeft: `4px solid ${item.color}`,
-            }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: item.color }}>{item.label}</span>
-            </a>
-          ))}
         </div>
       </BottomSheet>
 

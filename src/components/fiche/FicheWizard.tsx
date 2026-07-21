@@ -38,6 +38,7 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
   const [categories, setCategories] = useState<Categorie[]>([]);
   const [familles, setFamilles] = useState<Famille[]>([]);
   const [mercuriale, setMercuriale] = useState<IngredientRef[]>([]);
+  const [empatements, setEmpatements] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
@@ -50,14 +51,17 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
   // ── Load data ──
   useEffect(() => {
     (async () => {
-    const [fRes, cRes, iRes] = await Promise.all([
+    const [fRes, cRes, iRes, empRes] = await Promise.all([
       supabase.from("familles").select("*"),
       supabase.from("categories").select("*").order("sort_order").order("nom"),
       supabase.from("ingredients").select("id, name, category, allergens, cost_per_unit, purchase_unit"),
+      supabase.from("recipes").select("id, name").order("name"),
     ]);
     {
       setFamilles((fRes.data ?? []) as Famille[]);
       setCategories((cRes.data ?? []) as Categorie[]);
+      setEmpatements((empRes.data ?? []).map((r: Record<string, unknown>) => ({ id: r.id as string, name: (r.name as string).trim() })));
+
       // Build mercuriale from ingredients
       const mercs: IngredientRef[] = (iRes.data ?? []).map((i: Record<string, unknown>) => {
         let allergens: string[] = [];
@@ -78,15 +82,31 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
 
       // Load existing recipe if recipeId is provided
       if (recipeId) {
-        const type = recipeType ?? "cuisine";
-        const table = type === "pizza" ? "pizza_recipes" : type === "cocktail" ? "cocktails" : "kitchen_recipes";
-        const linesTable = type === "pizza" ? "pizza_ingredients" : type === "cocktail" ? "cocktail_ingredients" : "kitchen_recipe_lines";
-        const lineFK = type === "pizza" ? "pizza_id" : type === "cocktail" ? "cocktail_id" : "recipe_id";
+        // Auto-detect type: try kitchen_recipes first, then pizza, then cocktail
+        let rec: Record<string, unknown> | null = null;
+        let lines: Record<string, unknown>[] = [];
+        let detectedType: "cuisine" | "pizza" | "cocktail" = recipeType ?? "cuisine";
 
-        const { data: rec } = await supabase.from(table).select("*").eq("id", recipeId).single();
+        if (!recipeType || recipeType === "cuisine") {
+          const { data } = await supabase.from("kitchen_recipes").select("*").eq("id", recipeId).single();
+          if (data) { rec = data; detectedType = "cuisine"; }
+        }
+        if (!rec && (!recipeType || recipeType === "pizza")) {
+          const { data } = await supabase.from("pizza_recipes").select("*").eq("id", recipeId).single();
+          if (data) { rec = data; detectedType = "pizza"; }
+        }
+        if (!rec && (!recipeType || recipeType === "cocktail")) {
+          const { data } = await supabase.from("cocktails").select("*").eq("id", recipeId).single();
+          if (data) { rec = data; detectedType = "cocktail"; }
+        }
+
         if (rec) {
-          const { data: lines } = await supabase.from(linesTable).select("*").eq(lineFK, recipeId);
-          const ficheLines: LigneIngredient[] = (lines ?? []).map((l: Record<string, unknown>) => {
+          const linesTable = detectedType === "pizza" ? "pizza_ingredients" : detectedType === "cocktail" ? "cocktail_ingredients" : "kitchen_recipe_lines";
+          const lineFK = detectedType === "pizza" ? "pizza_id" : detectedType === "cocktail" ? "cocktail_id" : "recipe_id";
+          const { data: lData } = await supabase.from(linesTable).select("*").eq(lineFK, recipeId);
+          lines = (lData ?? []) as Record<string, unknown>[];
+
+          const ficheLines: LigneIngredient[] = lines.map((l) => {
             const ing = mercs.find(m => m.id === l.ingredient_id);
             return {
               key: tmpKey(),
@@ -98,28 +118,28 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
             };
           });
 
-          const catSlug = type === "pizza" ? "pizza" : type === "cocktail" ? "cocktail" : (rec.category ?? "plat_cuisine");
+          const catSlug = detectedType === "pizza" ? "pizza" : detectedType === "cocktail" ? "cocktail" : (rec.category as string ?? "plat_cuisine");
           setFiche({
             id: recipeId,
-            nom: rec.name ?? "",
+            nom: (rec.name as string) ?? "",
             categorie_slug: catSlug,
-            sous_categorie: rec.sous_categorie ?? "",
-            statut: rec.statut ?? (rec.in_catalogue ? "publiee" : "validee"),
-            paton_poids: rec.ball_weight_g ?? 264,
-            empatement: "FOCACCIA",
+            sous_categorie: (rec.sous_categorie as string) ?? "",
+            statut: ((rec.statut as string) ?? (rec.in_catalogue ? "publiee" : "validee")) as "brouillon" | "validee" | "publiee",
+            paton_poids: (rec.ball_weight_g as number) ?? 264,
+            empatement: (rec.empatement as string) ?? "FOCACCIA",
             lignes: ficheLines,
-            etapes: (() => { try { return typeof rec.procedure === "string" ? JSON.parse(rec.procedure) : (rec.procedure ?? []); } catch { return []; } })(),
-            notes: rec.notes ?? "",
-            portions: rec.portions_count ?? 1,
-            coeff: rec.sell_price && rec.cost_per_portion ? (rec.sell_price / rec.cost_per_portion) : 3,
+            etapes: (() => { try { return typeof rec.procedure === "string" ? JSON.parse(rec.procedure as string) : ((rec.procedure as string[]) ?? []); } catch { return []; } })(),
+            notes: (rec.notes as string) ?? "",
+            portions: (rec.portions_count as number) ?? 1,
+            coeff: rec.sell_price && rec.cost_per_portion ? Number(rec.sell_price) / Number(rec.cost_per_portion) : 3,
             tva: rec.vat_rate ? Number(rec.vat_rate) * 100 : 10,
             prix_ttc_manuel: rec.sell_price ? Number(rec.sell_price) * (1 + (rec.vat_rate ? Number(rec.vat_rate) : 0.1)) : null,
-            description: rec.description_courte ?? "",
-            accord: rec.accord ?? rec.wine_pairing ?? "",
-            resume_salle: rec.resume_salle ?? "",
-            resume_manuel: rec.resume_manuel ?? false,
-            photo_url: rec.photo_url ?? rec.image_url ?? null,
-            establishments: rec.establishments ?? [etabSlug],
+            description: (rec.description_courte as string) ?? "",
+            accord: (rec.accord as string) ?? (rec.wine_pairing as string) ?? "",
+            resume_salle: (rec.resume_salle as string) ?? "",
+            resume_manuel: (rec.resume_manuel as boolean) ?? false,
+            photo_url: (rec.photo_url as string) ?? (rec.image_url as string) ?? null,
+            establishments: (rec.establishments as string[]) ?? [etabSlug],
           });
         }
       }
@@ -403,7 +423,10 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
                 <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>Empatement lie</label>
                 <select value={fiche.empatement} onChange={e => update({ empatement: e.target.value })}
                   style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", fontFamily: "inherit" }}>
-                  <option>FOCACCIA</option><option>NAPOLITAINE</option><option>TEGLIA ROMANA</option>
+                  {empatements.length > 0
+                    ? empatements.map(emp => <option key={emp.id} value={emp.name}>{emp.name}</option>)
+                    : <option>FOCACCIA</option>
+                  }
                 </select>
               </div>
               <div style={{ flex: 1, minWidth: 150 }}>
@@ -570,7 +593,7 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
             <div style={{ flex: 1, minWidth: 150 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>Coefficient</label>
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <input type="number" value={fiche.coeff.toFixed(2)} step="0.01" onChange={e => update({ coeff: Number(e.target.value) || 1, prix_ttc_manuel: null })}
+                <input type="number" value={(costPerPortion > 0 ? ttc / costPerPortion : fiche.coeff).toFixed(2)} step="0.01" onChange={e => update({ coeff: Number(e.target.value) || 1, prix_ttc_manuel: null })}
                   style={{ width: 86, textAlign: "center", fontWeight: 800, color: "#6b4fd8", fontSize: 17, border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "9px", background: "#fffdf9", fontFamily: "inherit" }} />
                 {[2.5, 3, 3.5, 4].map(c => (
                   <button key={c} onClick={() => update({ coeff: c, prix_ttc_manuel: null })}

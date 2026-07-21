@@ -870,7 +870,7 @@ function RecettesInner() {
                 <RecipeCard
                   key={r.id}
                   name={r.name ?? "Cocktail"}
-                  href={`/recettes/cocktail/${r.id}`}
+                  href={`/fiche/${r.id}`}
                   onProd={r.pivot_ingredient_id ? () => setProdModal({ type: "cocktail", id: r.id, name: r.name ?? "Cocktail", pivotId: r.pivot_ingredient_id! }) : undefined}
                   color={COCKTAIL_COLOR}
                   photoUrl={r.image_url}
