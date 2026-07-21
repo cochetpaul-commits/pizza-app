@@ -136,28 +136,23 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
 
       // Load existing recipe if recipeId is provided
       if (recipeId) {
-        // Auto-detect type: try kitchen_recipes first, then pizza, then cocktail
+        // Auto-detect type: all recipes are now in kitchen_recipes
         let rec: Record<string, unknown> | null = null;
         let lines: Record<string, unknown>[] = [];
         let detectedType: "cuisine" | "pizza" | "cocktail" = recipeType ?? "cuisine";
 
-        if (!recipeType || recipeType === "cuisine") {
-          const { data } = await supabase.from("kitchen_recipes").select("*").eq("id", recipeId).single();
-          if (data) { rec = data; detectedType = "cuisine"; }
-        }
-        if (!rec && (!recipeType || recipeType === "pizza")) {
-          const { data } = await supabase.from("kitchen_recipes").select("*").eq("id", recipeId).eq("category", "pizza").single();
-          if (data) { rec = data; detectedType = "pizza"; }
-        }
-        if (!rec && (!recipeType || recipeType === "cocktail")) {
-          const { data } = await supabase.from("cocktails").select("*").eq("id", recipeId).single();
-          if (data) { rec = data; detectedType = "cocktail"; }
+        // All types (pizza, cuisine, cocktail) are in kitchen_recipes
+        const { data } = await supabase.from("kitchen_recipes").select("*").eq("id", recipeId).single();
+        if (data) {
+          rec = data;
+          const cat = data.category as string;
+          if (cat === "pizza") detectedType = "pizza";
+          else if (cat === "cocktail") detectedType = "cocktail";
+          else detectedType = "cuisine";
         }
 
         if (rec) {
-          const linesTable = detectedType === "pizza" ? "kitchen_recipe_lines" : detectedType === "cocktail" ? "cocktail_ingredients" : "kitchen_recipe_lines";
-          const lineFK = detectedType === "pizza" ? "recipe_id" : detectedType === "cocktail" ? "cocktail_id" : "recipe_id";
-          const { data: lData } = await supabase.from(linesTable).select("*").eq(lineFK, recipeId);
+          const { data: lData } = await supabase.from("kitchen_recipe_lines").select("*").eq("recipe_id", recipeId);
           lines = (lData ?? []) as Record<string, unknown>[];
 
           const ficheLines: LigneIngredient[] = lines.map((l) => {

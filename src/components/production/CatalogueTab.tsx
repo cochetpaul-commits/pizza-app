@@ -320,6 +320,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
     // Skip if category is "preparation" — those go to Production section below
     if (k.category === "preparation") continue;
     const isProduit = k.category?.startsWith("produit_");
+    const isCocktail = k.category === "cocktail";
     const kIngs = (kitchenIngs ?? []).filter((i: Record<string, unknown>) => i.recipe_id === k.id);
     const allergenSet = new Set<string>();
     const lines: RecipeLine[] = kIngs.map((i: Record<string, unknown>) => {
@@ -335,43 +336,12 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
     if (k.portions_count) yieldInfo = `${k.portions_count} portion${k.portions_count > 1 ? "s" : ""}`;
     else if (k.yield_grams) yieldInfo = `${k.yield_grams} g`;
     recipes.push({
-      id: k.id, type: isProduit ? "produit" : "cuisine", name: k.name, category: k.category,
-      fiche_type: k.fiche_type ?? "recette",
+      id: k.id, type: isProduit ? "produit" : isCocktail ? "cocktail" : "cuisine", name: k.name, category: k.category,
+      fiche_type: k.fiche_type ?? (isCocktail ? "cocktail" : "recette"),
       metadata: (k.metadata as Record<string, unknown>) ?? {},
       photo_url: k.photo_url, lines, steps: parseJsonSteps(k.procedure),
       pivot_ingredient_id: k.pivot_ingredient_id, yield_info: yieldInfo,
       portions_count: k.portions_count ?? null,
-      allergens: [...allergenSet],
-    });
-  }
-
-  // ── Cocktail ──
-  const { data: cocktails } = await supabase
-    .from("cocktails")
-    .select("id, name, image_url, steps, pivot_ingredient_id, glass, establishments")
-    .order("name");
-  const cocktailIds = (cocktails ?? []).map(c => c.id);
-  const { data: cocktailIngs } = cocktailIds.length ? await supabase
-    .from("cocktail_ingredients")
-    .select("cocktail_id, ingredient_id, qty, unit, sort_order, ingredients(name, allergens)")
-    .in("cocktail_id", cocktailIds)
-    .order("sort_order") : { data: [] };
-
-  for (const c of (cocktails ?? [])) {
-    if (!matchEstab(c.establishments)) continue;
-    const cIngs = (cocktailIngs ?? []).filter((i: Record<string, unknown>) => i.cocktail_id === c.id);
-    const allergenSet = new Set<string>();
-    const lines: RecipeLine[] = cIngs.map((i: Record<string, unknown>) => {
-      const ing = i.ingredients as Record<string, unknown> | null;
-      for (const a of parseAllergenArray(ing?.allergens)) allergenSet.add(a);
-      return { ingredient_id: (i.ingredient_id as string) ?? null, ingredient_name: (ing?.name as string) ?? "?", qty: Number(i.qty) || 0, unit: String(i.unit ?? "cL") };
-    });
-    recipes.push({
-      id: c.id, type: "cocktail", name: c.name, category: null, fiche_type: "cocktail",
-      photo_url: c.image_url, lines, steps: parseJsonSteps(c.steps),
-      pivot_ingredient_id: c.pivot_ingredient_id,
-      yield_info: c.glass ? `Verre : ${c.glass}` : null,
-      portions_count: null,
       allergens: [...allergenSet],
     });
   }
@@ -566,7 +536,7 @@ export function CatalogueContent() {
       });
   }, [etab]);
 
-  const recipeTypeMap: Record<RecipeType, string> = { pizza: "pizza", cuisine: "kitchen", cocktail: "cocktail", vin: "wine", production: "kitchen", produit: "kitchen" };
+  const recipeTypeMap: Record<RecipeType, string> = { pizza: "pizza", cuisine: "kitchen", cocktail: "kitchen", vin: "wine", production: "kitchen", produit: "kitchen" };
 
   const linkArticle = async (recipe: Recipe, nomVente: string) => {
     if (!etab) return;
@@ -806,8 +776,8 @@ export function CatalogueContent() {
         const { error } = await supabase.from("kitchen_recipes").delete().eq("id", recipe.id);
         if (error) throw error;
       } else if (recipe.type === "cocktail") {
-        await supabase.from("cocktail_ingredients").delete().eq("recipe_id", recipe.id);
-        const { error } = await supabase.from("cocktails").delete().eq("id", recipe.id);
+        await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", recipe.id);
+        const { error } = await supabase.from("kitchen_recipes").delete().eq("id", recipe.id);
         if (error) throw error;
       } else if (recipe.type === "vin") {
         const realId = recipe.id.replace(/^wine-/, "");
@@ -867,15 +837,15 @@ export function CatalogueContent() {
           }
         }
       } else if (recipe.type === "cocktail") {
-        const { data: orig } = await supabase.from("cocktails").select("*").eq("id", recipe.id).single();
+        const { data: orig } = await supabase.from("kitchen_recipes").select("*").eq("id", recipe.id).single();
         if (!orig) return;
-        const { id: _id, created_at: _ca, ...rest } = orig;
+        const { id: _id, created_at: _ca, updated_at: _ua, ...rest } = orig;
         rest.name = `${rest.name} (copie)`;
-        const { data: newRec } = await supabase.from("cocktails").insert(rest).select("id").single();
+        const { data: newRec } = await supabase.from("kitchen_recipes").insert(rest).select("id").single();
         if (newRec) {
-          const { data: lines } = await supabase.from("cocktail_ingredients").select("*").eq("cocktail_id", recipe.id);
+          const { data: lines } = await supabase.from("kitchen_recipe_lines").select("*").eq("recipe_id", recipe.id);
           if (lines?.length) {
-            await supabase.from("cocktail_ingredients").insert(lines.map(({ id: _i, cocktail_id: _c, created_at: _ca2, ...l }) => ({ ...l, cocktail_id: newRec.id })));
+            await supabase.from("kitchen_recipe_lines").insert(lines.map(({ id: _i, recipe_id: _r, ...l }) => ({ ...l, recipe_id: newRec.id })));
           }
         }
       }

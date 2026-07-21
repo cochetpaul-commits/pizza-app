@@ -14,7 +14,6 @@ function getEnv(name: string): string {
 const FK_TABLES = [
   "kitchen_recipe_lines",
   "prep_recipe_lines",
-  "cocktail_ingredients",
   "recipe_ingredients",
   "ingredient_usage",
   "formula_lines",

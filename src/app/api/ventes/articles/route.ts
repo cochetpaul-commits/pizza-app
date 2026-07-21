@@ -83,32 +83,21 @@ export async function GET(req: NextRequest) {
   unmatched.sort((a, b) => b.ca_ttc - a.ca_ttc);
 
   /* 3. Fetch recipes for dropdown */
-  const [kitchenRes, cocktailRes] = await Promise.all([
-    supabaseAdmin
-      .from("kitchen_recipes")
-      .select("id,name,category,total_cost,cost_per_portion,cost_per_kg")
-      .eq("is_draft", false)
-      .eq("etablissement_id", etabId),
-    supabaseAdmin
-      .from("cocktails")
-      .select("id,name,total_cost")
-      .eq("is_draft", false)
-      .eq("etablissement_id", etabId),
-  ]);
+  const { data: kitchenData } = await supabaseAdmin
+    .from("kitchen_recipes")
+    .select("id,name,category,total_cost,cost_per_portion,cost_per_kg")
+    .eq("is_draft", false)
+    .eq("etablissement_id", etabId);
 
   const recipes: RecipeOption[] = [];
-  for (const r of kitchenRes.data ?? []) {
+  for (const r of kitchenData ?? []) {
     const isPizza = r.category === "pizza";
+    const isCocktail = r.category === "cocktail";
     const cost = isPizza
       ? (r.total_cost ?? 0)
       : (r.cost_per_portion ?? r.total_cost ?? r.cost_per_kg ?? 0);
     if (cost > 0) {
-      recipes.push({ id: r.id, name: r.name, type: isPizza ? "pizza" : "kitchen", cost });
-    }
-  }
-  for (const r of cocktailRes.data ?? []) {
-    if (r.total_cost && r.total_cost > 0) {
-      recipes.push({ id: r.id, name: r.name, type: "cocktail", cost: r.total_cost });
+      recipes.push({ id: r.id, name: r.name, type: isPizza ? "pizza" : isCocktail ? "cocktail" : "kitchen", cost });
     }
   }
   recipes.sort((a, b) => a.name.localeCompare(b.name, "fr"));
@@ -175,9 +164,9 @@ export async function POST(req: NextRequest) {
             ? (recipe.total_cost ?? null)
             : (recipe.cost_per_portion ?? recipe.total_cost ?? recipe.cost_per_kg ?? null);
         }
-      } else {
+      } else if (recette_type === "cocktail") {
         const { data: recipe } = await supabaseAdmin
-          .from("cocktails")
+          .from("kitchen_recipes")
           .select("total_cost")
           .eq("id", recette_id)
           .maybeSingle();

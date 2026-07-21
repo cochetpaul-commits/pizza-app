@@ -27,14 +27,14 @@ interface Props {
 const LINE_TABLES: Record<RecipeType, string> = {
   pizza: "kitchen_recipe_lines",
   cuisine: "kitchen_recipe_lines",
-  cocktail: "cocktail_ingredients",
+  cocktail: "kitchen_recipe_lines",
   empatement: "recipe_ingredients",
 };
 
 const LINE_FK: Record<RecipeType, string> = {
   pizza: "recipe_id",
   cuisine: "recipe_id",
-  cocktail: "cocktail_id",
+  cocktail: "recipe_id",
   empatement: "recipe_id",
 };
 

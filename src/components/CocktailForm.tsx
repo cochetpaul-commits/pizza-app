@@ -25,17 +25,15 @@ type CocktailDB = {
   id: string;
   user_id: string;
   name: string | null;
-  type: string | null;
-  glass: string | null;
-  garnish: string | null;
-  steps: string | null;
+  metadata: Record<string, unknown> | null;
+  procedure: string | null;
   sell_price: number | null;
-  image_url: string | null;
+  photo_url: string | null;
 };
 
 type LineDB = {
   id: string;
-  cocktail_id: string;
+  recipe_id: string;
   ingredient_id: string;
   qty: number | null;
   unit: string | null;
@@ -368,8 +366,8 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
     if (!isEdit) { setStatus("OK"); return; }
 
     const { data: cocktail, error: cErr } = await supabase
-      .from("cocktails")
-      .select("id,user_id,name,type,glass,garnish,steps,sell_price,image_url")
+      .from("kitchen_recipes")
+      .select("id,user_id,name,metadata,procedure,sell_price,photo_url")
       .eq("id", cocktailId)
       .maybeSingle();
 
@@ -377,21 +375,22 @@ export default function CocktailForm({ cocktailId }: { cocktailId?: string }) {
     if (!cocktail) { setStatus("ERROR"); setError({ message: "Cocktail introuvable" }); return; }
 
     const c = cocktail as CocktailDB;
+    const meta = (c.metadata ?? {}) as Record<string, unknown>;
     setForm({
       name: c.name ?? "",
-      type: c.type ?? "",
-      glass: c.glass ?? "",
-      garnish: c.garnish ?? "",
-      steps: c.steps ?? "",
+      type: (meta.type as string) ?? "",
+      glass: (meta.glass as string) ?? "",
+      garnish: (meta.garnish as string) ?? "",
+      steps: c.procedure ?? "",
       sell_price: c.sell_price != null ? String(c.sell_price) : "",
-      image_url: c.image_url ?? "",
+      image_url: c.photo_url ?? "",
     });
-    setPhotoPreview(c.image_url ?? null);
+    setPhotoPreview(c.photo_url ?? null);
 
     const { data: ln, error: lErr } = await supabase
-      .from("cocktail_ingredients")
-      .select("id,cocktail_id,ingredient_id,qty,unit,sort_order")
-      .eq("cocktail_id", cocktailId)
+      .from("kitchen_recipe_lines")
+      .select("id,recipe_id,ingredient_id,qty,unit,sort_order")
+      .eq("recipe_id", cocktailId)
       .order("sort_order", { ascending: true });
 
     if (lErr) { setStatus("ERROR"); setError(lErr); return; }

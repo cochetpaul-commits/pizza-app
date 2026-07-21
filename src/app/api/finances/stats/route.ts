@@ -55,36 +55,24 @@ function getWeekLabel(dateStr: string): string {
 }
 
 async function loadRecipeCosts(etabId: string): Promise<Map<string, RecipeCost>> {
-  const [kitchenRes, cocktailRes] = await Promise.all([
-    supabaseAdmin.from("kitchen_recipes")
-      .select("name,category,total_cost,cost_per_portion,cost_per_kg,sell_price")
-      .eq("is_draft", false)
-      .eq("etablissement_id", etabId),
-    supabaseAdmin.from("cocktails")
-      .select("name,total_cost,sell_price")
-      .eq("is_draft", false)
-      .eq("etablissement_id", etabId),
-  ]);
+  const { data: kitchenData } = await supabaseAdmin.from("kitchen_recipes")
+    .select("name,category,total_cost,cost_per_portion,cost_per_kg,sell_price")
+    .eq("is_draft", false)
+    .eq("etablissement_id", etabId);
 
   const recipeCosts = new Map<string, RecipeCost>();
 
-  for (const r of kitchenRes.data ?? []) {
+  for (const r of kitchenData ?? []) {
     const isPizza = r.category === "pizza";
+    const isCocktail = r.category === "cocktail";
     const cost = isPizza
       ? (r.total_cost ?? 0)
       : (r.cost_per_portion ?? r.total_cost ?? r.cost_per_kg ?? 0);
     if (cost > 0) {
       recipeCosts.set(normalize(r.name), {
         name: r.name, cost, sellPrice: r.sell_price ?? null,
-        type: isPizza ? "pizza" : "kitchen", category: isPizza ? "Pizze" : (r.category || "Cucina"),
-      });
-    }
-  }
-  for (const r of cocktailRes.data ?? []) {
-    if (r.total_cost && r.total_cost > 0) {
-      recipeCosts.set(normalize(r.name), {
-        name: r.name, cost: r.total_cost, sellPrice: r.sell_price ?? null,
-        type: "cocktail", category: "Cocktails",
+        type: isPizza ? "pizza" : isCocktail ? "cocktail" : "kitchen",
+        category: isPizza ? "Pizze" : isCocktail ? "Cocktails" : (r.category || "Cucina"),
       });
     }
   }

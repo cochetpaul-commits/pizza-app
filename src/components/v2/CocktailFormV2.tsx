@@ -310,26 +310,27 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
       if (cocktailId) {
         const [{ data: coc }, { data: cLines }] = await Promise.all([
-          supabase.from("cocktails").select("*").eq("id", cocktailId).single(),
-          supabase.from("cocktail_ingredients").select("*").eq("cocktail_id", cocktailId).order("sort_order"),
+          supabase.from("kitchen_recipes").select("*").eq("id", cocktailId).single(),
+          supabase.from("kitchen_recipe_lines").select("*").eq("recipe_id", cocktailId).order("sort_order"),
         ]);
         if (cancelled) return;
         if (coc) {
           const c = coc as Record<string, unknown>;
+          const meta = (c.metadata ?? {}) as Record<string, unknown>;
           setName(String(c.name ?? ""));
-          setType(String(c.type ?? "long_drink"));
-          setGlass(String(c.glass ?? ""));
-          setGarnish(String(c.garnish ?? ""));
-          setImageUrl(String(c.image_url ?? ""));
-          if (c.image_url) setPhotoPreview(String(c.image_url));
+          setType(String(meta.type ?? "long_drink"));
+          setGlass(String(meta.glass ?? ""));
+          setGarnish(String(meta.garnish ?? ""));
+          setImageUrl(String(c.photo_url ?? ""));
+          if (c.photo_url) setPhotoPreview(String(c.photo_url));
           if (c.vat_rate) setVatRate(Number(c.vat_rate));
           if (c.margin_rate) {
             const mr = Number(c.margin_rate);
             if (mr > 0) setSellCoeff(mr);
           }
-          if (c.steps) {
-            try { setSteps(JSON.parse(String(c.steps)) as string[]); }
-            catch { setSteps(String(c.steps) ? String(c.steps).split("\n").filter(Boolean) : []); }
+          if (c.procedure) {
+            try { setSteps(JSON.parse(String(c.procedure)) as string[]); }
+            catch { setSteps(String(c.procedure) ? String(c.procedure).split("\n").filter(Boolean) : []); }
           }
           setPivotIngredientId(String(c.pivot_ingredient_id ?? "") || null);
         }
@@ -381,40 +382,40 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
       const payload: Record<string, unknown> = {
         name: name || "Nouveau cocktail",
-        type,
-        glass: glass || null,
-        garnish: garnish || null,
+        category: "cocktail",
+        metadata: { type, glass: glass || null, garnish: garnish || null },
         sell_price: derivedSellPrice ?? null,
-        image_url: imageUrl || null,
+        photo_url: imageUrl || null,
         vat_rate: vatRate,
         margin_rate,
         total_cost: totalCost > 0 ? totalCost : null,
-        steps: steps.length > 0 ? JSON.stringify(steps) : null,
+        procedure: steps.length > 0 ? JSON.stringify(steps) : null,
         establishments: etab ? [etab.slug] : ["bellomio"],
         is_draft: false,
+        is_active: true,
       };
 
       let cid = cocktailId;
       if (cid) {
-        const { error } = await supabase.from("cocktails").update(payload).eq("id", cid);
+        const { error } = await supabase.from("kitchen_recipes").update(payload).eq("id", cid);
         if (error) throw error;
       } else {
-        const { data, error } = await supabase.from("cocktails")
+        const { data, error } = await supabase.from("kitchen_recipes")
           .insert({ ...payload, user_id: auth.user.id, ...(etab ? { etablissement_id: etab.id } : {}) })
           .select("id").single<{ id: string }>();
         if (error) throw error;
         cid = data.id;
       }
 
-      // Save pivot (column added by migration -- silent failure if not yet applied)
-      await supabase.from("cocktails").update({ pivot_ingredient_id: pivotIngredientId }).eq("id", cid!);
+      // Save pivot
+      await supabase.from("kitchen_recipes").update({ pivot_ingredient_id: pivotIngredientId }).eq("id", cid!);
 
-      await supabase.from("cocktail_ingredients").delete().eq("cocktail_id", cid!);
+      await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", cid!);
       const validLines = lines.filter(l => l.ingredient_id && l.qty !== "" && Number(l.qty) > 0);
       if (validLines.length > 0) {
-        const { error: lErr } = await supabase.from("cocktail_ingredients").insert(
+        const { error: lErr } = await supabase.from("kitchen_recipe_lines").insert(
           validLines.map((l, i) => ({
-            cocktail_id: cid!,
+            recipe_id: cid!,
             ingredient_id: l.ingredient_id,
             qty: Number(l.qty),
             unit: l.unit,
@@ -435,8 +436,8 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
   async function handleDelete() {
     if (!cocktailId) return;
     if (!window.confirm("Supprimer ce cocktail ?")) return;
-    await supabase.from("cocktail_ingredients").delete().eq("cocktail_id", cocktailId);
-    await supabase.from("cocktails").delete().eq("id", cocktailId);
+    await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", cocktailId);
+    await supabase.from("kitchen_recipes").delete().eq("id", cocktailId);
     router.push("/recettes?tab=cocktail");
   }
 
@@ -496,7 +497,8 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
             {isEdit && userCanWrite && (
               <HeroDangerBtn onClick={async () => {
                 if (!confirm("Supprimer cette recette ? Cette action est irreversible.")) return;
-                const { error } = await supabase.from("cocktails").delete().eq("id", cocktailId);
+                await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", cocktailId);
+                const { error } = await supabase.from("kitchen_recipes").delete().eq("id", cocktailId);
                 if (error) { alert(error.message); return; }
                 router.push("/recettes");
               }}>Supprimer</HeroDangerBtn>

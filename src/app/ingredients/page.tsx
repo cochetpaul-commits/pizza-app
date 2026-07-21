@@ -861,9 +861,8 @@ function IngredientsPageInner() {
     if (!confirm(`Supprimer "${name}" ?`)) return;
     // Check all recipe tables in parallel
     const recipeTables = [
-      { table: "kitchen_recipe_lines", label: "recette (pizza/cuisine)" },
+      { table: "kitchen_recipe_lines", label: "recette (pizza/cuisine/cocktail)" },
       { table: "prep_recipe_lines", label: "préparation" },
-      { table: "cocktail_ingredients", label: "cocktail" },
       { table: "recipe_ingredients", label: "empâtement" },
     ] as const;
     const checks = await Promise.all(

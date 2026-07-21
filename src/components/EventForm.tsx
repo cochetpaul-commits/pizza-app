@@ -154,13 +154,13 @@ export default function EventForm({ eventId }: { eventId?: string }) {
 
       let pQ = supabase.from("kitchen_recipes").select("id,name,cost_per_portion").eq("category", "pizza");
       let kQ = supabase.from("kitchen_recipes").select("id,name,cost_per_portion").neq("category", "pizza");
-      let cQ = supabase.from("cocktails").select("id,name,total_cost").eq("is_draft", false);
+      let cQ = supabase.from("kitchen_recipes").select("id,name,total_cost").eq("is_draft", false).eq("category", "cocktail");
       let eQ = supabase.from("recipes").select("id,name");
       if (etab) { pQ = pQ.eq("etablissement_id", etab.id); kQ = kQ.eq("etablissement_id", etab.id); cQ = cQ.eq("etablissement_id", etab.id); eQ = eQ.eq("etablissement_id", etab.id); }
       const [pizzas, kitchens, cocktails, empats] = await Promise.all([pQ, kQ, cQ, eQ]);
       if (pizzas.error) { console.error("kitchen_recipes (pizza) query:", pizzas.error); }
       if (kitchens.error) { console.error("kitchen_recipes query:", kitchens.error); }
-      if (cocktails.error) { console.error("cocktails query:", cocktails.error); }
+      if (cocktails.error) { console.error("kitchen_recipes (cocktail) query:", cocktails.error); }
       if (empats.error) { console.error("recipes query:", empats.error); }
 
       const opts: RecipeOption[] = [];

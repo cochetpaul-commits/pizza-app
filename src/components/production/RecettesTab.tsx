@@ -32,7 +32,7 @@ type KitchenRow = {
   pivot_ingredient_id: string | null;
 };
 type CocktailRow = {
-  id: string; name: string | null; type: string | null; image_url: string | null;
+  id: string; name: string | null; category: string | null; photo_url: string | null;
   total_cost: number | null; sell_price: number | null;
   vat_rate: number | null;
   establishments: string[] | null;
@@ -389,9 +389,10 @@ function RecettesInner() {
       const kq = supabase.from("kitchen_recipes")
         .select("id,name,photo_url,category,total_cost,cost_per_kg,cost_per_portion,margin_rate,vat_rate,sell_price,establishments,pivot_ingredient_id")
         .eq("is_draft", false);
-      const cq = supabase.from("cocktails")
-        .select("id,name,image_url,type,total_cost,sell_price,vat_rate,establishments,pivot_ingredient_id")
-        .eq("is_draft", false);
+      const cq = supabase.from("kitchen_recipes")
+        .select("id,name,photo_url,category,total_cost,sell_price,vat_rate,establishments,pivot_ingredient_id")
+        .eq("is_draft", false)
+        .eq("category", "cocktail");
       const eq = supabase.from("recipes")
         .select("id,name,type,created_at,total_cost,yield_grams,pivot_ingredient_id")
         .order("created_at", { ascending: false });
@@ -874,7 +875,7 @@ function RecettesInner() {
                   href={`/fiche/${r.id}`}
                   onProd={r.pivot_ingredient_id ? () => setProdModal({ type: "cocktail", id: r.id, name: r.name ?? "Cocktail", pivotId: r.pivot_ingredient_id! }) : undefined}
                   color={COCKTAIL_COLOR}
-                  photoUrl={r.image_url}
+                  photoUrl={r.photo_url}
                   subtitle="Cocktail"
                   subtitleColor={COCKTAIL_COLOR}
                   cost={r.total_cost}

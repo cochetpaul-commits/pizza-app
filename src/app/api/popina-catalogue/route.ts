@@ -22,17 +22,15 @@ export async function GET() {
 
   // Fetch recipe/ingredient names for linked products
   const kitchenIds = data.filter((p) => p.kitchen_recipe_id).map((p) => p.kitchen_recipe_id);
-  const cocktailIds = data.filter((p) => p.cocktail_id).map((p) => p.cocktail_id);
   const ingredientIds = data.filter((p) => p.ingredient_id).map((p) => p.ingredient_id);
 
-  const [kitchens, cocktails, ingredients] = await Promise.all([
+  const [kitchens, ingredients] = await Promise.all([
     kitchenIds.length ? supabase.from("kitchen_recipes").select("id, name").in("id", kitchenIds).then((r) => r.data ?? []) : [],
-    cocktailIds.length ? supabase.from("cocktails").select("id, name").in("id", cocktailIds).then((r) => r.data ?? []) : [],
     ingredientIds.length ? supabase.from("ingredients").select("id, name").in("id", ingredientIds).then((r) => r.data ?? []) : [],
   ]);
 
   const nameMap: Record<string, string> = {};
-  for (const r of [...kitchens, ...cocktails, ...ingredients]) {
+  for (const r of [...kitchens, ...ingredients]) {
     nameMap[r.id] = r.name;
   }
 
@@ -40,7 +38,6 @@ export async function GET() {
     ...p,
     linked_name:
       nameMap[p.kitchen_recipe_id] ??
-      nameMap[p.cocktail_id] ??
       nameMap[p.ingredient_id] ??
       null,
   }));
@@ -62,17 +59,16 @@ export async function PATCH(req: NextRequest) {
   // Reset all links
   const update: Record<string, unknown> = {
     kitchen_recipe_id: null,
-    cocktail_id: null,
     ingredient_id: null,
     linked_type: linked_type || null,
     updated_at: new Date().toISOString(),
   };
 
-  // Set the correct link (pizza and kitchen both go to kitchen_recipe_id)
+  // Set the correct link (pizza, kitchen, and cocktail all go to kitchen_recipe_id)
   if (linked_type && linked_id) {
     if (linked_type === "pizza") update.kitchen_recipe_id = linked_id;
     else if (linked_type === "kitchen") update.kitchen_recipe_id = linked_id;
-    else if (linked_type === "cocktail") update.cocktail_id = linked_id;
+    else if (linked_type === "cocktail") update.kitchen_recipe_id = linked_id;
     else if (linked_type === "ingredient") update.ingredient_id = linked_id;
   } else {
     update.linked_type = null;
@@ -96,7 +92,7 @@ export async function POST(req: NextRequest) {
   const table =
     type === "pizza" ? "kitchen_recipes"
     : type === "kitchen" ? "kitchen_recipes"
-    : type === "cocktail" ? "cocktails"
+    : type === "cocktail" ? "kitchen_recipes"
     : "ingredients";
 
   const { data, error } = await supabase

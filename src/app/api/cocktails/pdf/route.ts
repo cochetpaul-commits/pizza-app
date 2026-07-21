@@ -50,12 +50,10 @@ function readLogoBase64(): string | null {
 type CocktailRow = {
   id: string;
   name: string | null;
-  type: string | null;
-  glass: string | null;
-  garnish: string | null;
-  steps: string | null;
+  metadata: Record<string, unknown> | null;
+  procedure: string | null;
   sell_price: number | null;
-  image_url: string | null;
+  photo_url: string | null;
 };
 
 type LineRow = {
@@ -104,8 +102,8 @@ export async function POST(req: Request) {
     });
 
     const { data: cocktail, error: cErr } = await supabase
-      .from("cocktails")
-      .select("id,name,type,glass,garnish,steps,sell_price,image_url")
+      .from("kitchen_recipes")
+      .select("id,name,metadata,procedure,sell_price,photo_url")
       .eq("id", cocktailId)
       .eq("etablissement_id", etabId)
       .maybeSingle();
@@ -116,9 +114,9 @@ export async function POST(req: Request) {
     const cr = cocktail as CocktailRow;
 
     const { data: ln, error: lErr } = await supabase
-      .from("cocktail_ingredients")
+      .from("kitchen_recipe_lines")
       .select("ingredient_id,qty,unit,sort_order")
-      .eq("cocktail_id", cocktailId)
+      .eq("recipe_id", cocktailId)
       .order("sort_order", { ascending: true });
 
     if (lErr) return NextResponse.json({ message: lErr.message }, { status: 500 });
@@ -199,17 +197,18 @@ export async function POST(req: Request) {
     const totalCost = round2(lines.reduce((acc, l) => acc + n2(l.cost), 0));
 
     // Photo en base64 — via SDK Storage (évite les problèmes MIME/CORS du fetch HTTP)
-    const photoUrl = cr.image_url ? await photoToBase64(supabase, cr.image_url) : null;
+    const photoUrl = cr.photo_url ? await photoToBase64(supabase, cr.photo_url) : null;
 
     const exportedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
     const logoBase64 = readLogoBase64();
 
+    const meta = (cr.metadata ?? {}) as Record<string, unknown>;
     const data: CocktailPdfData = {
       cocktailName: (cr.name ?? "Cocktail").toString(),
-      type: cr.type ?? null,
-      glass: cr.glass ?? null,
-      garnish: cr.garnish ?? null,
-      steps: cr.steps ?? null,
+      type: (meta.type as string) ?? null,
+      glass: (meta.glass as string) ?? null,
+      garnish: (meta.garnish as string) ?? null,
+      steps: cr.procedure ?? null,
       sellPrice: cr.sell_price ?? null,
       totalCost: totalCost > 0 ? totalCost : null,
       lines: lines.map((l) => ({

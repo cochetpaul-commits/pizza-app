@@ -88,23 +88,17 @@ export async function GET(req: NextRequest) {
   }
 
   /* ── 2. Fetch recipe costs (kitchen incl. pizza, cocktails) ── */
-  const [kitchenRes, cocktailRes] = await Promise.all([
-    supabaseAdmin
-      .from("kitchen_recipes")
-      .select("name,category,total_cost,cost_per_portion,cost_per_kg")
-      .eq("is_draft", false)
-      .eq("etablissement_id", etabId),
-    supabaseAdmin
-      .from("cocktails")
-      .select("name,total_cost")
-      .eq("is_draft", false)
-      .eq("etablissement_id", etabId),
-  ]);
+  const { data: kitchenData } = await supabaseAdmin
+    .from("kitchen_recipes")
+    .select("name,category,total_cost,cost_per_portion,cost_per_kg")
+    .eq("is_draft", false)
+    .eq("etablissement_id", etabId);
 
   const recipeCosts = new Map<string, RecipeCost>();
 
-  for (const r of kitchenRes.data ?? []) {
+  for (const r of kitchenData ?? []) {
     const isPizza = r.category === "pizza";
+    const isCocktail = r.category === "cocktail";
     const cost = isPizza
       ? (r.total_cost ?? 0)
       : (r.cost_per_portion ?? r.total_cost ?? r.cost_per_kg ?? 0);
@@ -112,18 +106,8 @@ export async function GET(req: NextRequest) {
       recipeCosts.set(normalize(r.name), {
         name: r.name,
         cost,
-        type: isPizza ? "pizza" : "kitchen",
-        recipeCategory: isPizza ? "Pizze" : (r.category || "Cuisine"),
-      });
-    }
-  }
-  for (const r of cocktailRes.data ?? []) {
-    if (r.total_cost && r.total_cost > 0) {
-      recipeCosts.set(normalize(r.name), {
-        name: r.name,
-        cost: r.total_cost,
-        type: "cocktail",
-        recipeCategory: "Cocktails",
+        type: isPizza ? "pizza" : isCocktail ? "cocktail" : "kitchen",
+        recipeCategory: isPizza ? "Pizze" : isCocktail ? "Cocktails" : (r.category || "Cuisine"),
       });
     }
   }

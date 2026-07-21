@@ -42,18 +42,14 @@ export async function GET(req: NextRequest) {
   const [
     { data: kitchens },
     { data: kitchenLines },
-    { data: cocktailsData },
-    { data: cocktailLines },
     { data: allIngredients },
     { data: popinaProducts },
     { data: pairingsData },
   ] = await Promise.all([
     supabase.from("kitchen_recipes").select("id, name, photo_url, category, description_courte, wine_pairing, accord, resume_salle, in_catalogue, statut, sell_price, vat_rate, establishments, fiche_type, is_active, output_ingredient_id"),
     supabase.from("kitchen_recipe_lines").select("recipe_id, ingredient_id, qty, unit"),
-    supabase.from("cocktails").select("id, name, image_url, description_courte, in_catalogue, establishments"),
-    supabase.from("cocktail_ingredients").select("cocktail_id, ingredient_id, qty, unit"),
     supabase.from("ingredients").select("id, name, allergens, category"),
-    supabase.from("popina_products").select("id, name, price_ttc, kitchen_recipe_id, cocktail_id").eq("active", true),
+    supabase.from("popina_products").select("id, name, price_ttc, kitchen_recipe_id").eq("active", true),
     supabase.from("recipe_pairings").select("recipe_id, recipe_type, ingredient_id"),
   ]);
 
@@ -83,7 +79,6 @@ export async function GET(req: NextRequest) {
   const popinaPrice = new Map<string, number>();
   for (const pp of popinaProducts ?? []) {
     if (pp.kitchen_recipe_id) popinaPrice.set("kitchen:" + pp.kitchen_recipe_id, pp.price_ttc);
-    if (pp.cocktail_id) popinaPrice.set("cocktail:" + pp.cocktail_id, pp.price_ttc);
   }
 
   // Pairings lookup: key = "type:recipe_id" → PairingItem[]
@@ -156,8 +151,9 @@ export async function GET(req: NextRequest) {
       ? Number(kr.sell_price) * (1 + Number(kr.vat_rate))
       : null;
     const isPizza = kr.category === "pizza";
-    const type = isPizza ? "pizza" : "cuisine";
-    const pairingKey = isPizza ? "pizza:" + kr.id : "cuisine:" + kr.id;
+    const isCocktail = kr.category === "cocktail";
+    const type = isPizza ? "pizza" : isCocktail ? "cocktail" : "cuisine";
+    const pairingKey = type + ":" + kr.id;
     fiches.push({
       id: kr.id, type, name: kr.name, category: kr.category,
       description_courte: kr.description_courte, wine_pairing: kr.wine_pairing,
@@ -167,24 +163,7 @@ export async function GET(req: NextRequest) {
       photo_url: kr.photo_url, price_ttc: popPrice ?? computedPrice,
       allergens: collectAllergens(lines),
       ingredients: lines.map((l) => cleanName(ingMap.get(l.ingredient_id)?.name ?? "?")),
-      sub_recipes: isPizza ? [] : getSubRecipes(lines),
-    });
-  }
-
-  // Cocktails
-  for (const c of cocktailsData ?? []) {
-    if (!matchEstab(c.establishments)) continue;
-    const lines = (cocktailLines ?? []).filter((l) => l.cocktail_id === c.id);
-    fiches.push({
-      id: c.id, type: "cocktail", name: c.name, category: "cocktail",
-      description_courte: c.description_courte, wine_pairing: null,
-      accord: null, resume_salle: null,
-      in_catalogue: c.in_catalogue !== false,
-      pairings: pairingsMap.get("cocktail:" + c.id) ?? [],
-      photo_url: c.image_url, price_ttc: popinaPrice.get("cocktail:" + c.id) ?? null,
-      allergens: collectAllergens(lines),
-      ingredients: lines.map((l) => cleanName(ingMap.get(l.ingredient_id)?.name ?? "?")),
-      sub_recipes: [],
+      sub_recipes: (isPizza || isCocktail) ? [] : getSubRecipes(lines),
     });
   }
 

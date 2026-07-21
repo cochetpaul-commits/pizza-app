@@ -9,7 +9,7 @@ const supabaseAdmin = createClient(
 const TABLE_MAP: Record<string, string> = {
   cuisine: "kitchen_recipes",
   pizza: "kitchen_recipes",
-  cocktail: "cocktails",
+  cocktail: "kitchen_recipes",
   empatement: "recipes",
 };
 
