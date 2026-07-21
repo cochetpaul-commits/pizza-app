@@ -24,10 +24,10 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/bello-mio":    ALL,
   "/piccola-mia":  ALL,
   "/dashboard":    ALL,
-  "/haccp":        ALL,
+  "/haccp":        MANAGERS,
   "/fournisseurs": ALL,
   "/rh/conges":    ALL,
-  "/plannings":    ALL,
+  "/plannings":    MANAGERS,
   // Manager + Admin: pilotage, ventes, RH, événements
   "/pilotage":        MANAGERS,
   "/ventes":          MANAGERS,
