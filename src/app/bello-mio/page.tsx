@@ -7,6 +7,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { T } from "@/lib/tokens";
 import { RequireRole } from "@/components/RequireRole";
+import { useProfile } from "@/lib/ProfileContext";
 
 const COLOR = "#e27f57";
 const OSWALD = "var(--font-oswald), Oswald, sans-serif";
@@ -67,7 +68,7 @@ async function fetchAllRows(etabId: string, from: string, to: string, cols = "tt
 
 export default function BelloMioDashboard() {
   return (
-    <RequireRole allowedRoles={["group_admin", "equipier"]}>
+    <RequireRole allowedRoles={["group_admin", "manager", "equipier"]}>
       <BelloMioContent />
     </RequireRole>
   );
@@ -80,6 +81,8 @@ type PendingDelivery = { supplier: string; status: string; created: string };
 
 function BelloMioContent() {
   const { etablissements, setCurrent, setGroupView } = useEtablissement();
+  const { role } = useProfile();
+  const canSeePilotage = role === "group_admin" || role === "manager";
 
   const today = useMemo(
     () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(new Date()),
@@ -311,7 +314,8 @@ function BelloMioContent() {
         <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>{dateDisplay}</div>
       </div>
 
-      {/* KPI cards */}
+      {/* KPI cards — manager+ only */}
+      {canSeePilotage && (<>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
         <KpiCard label={dayLabel} value={`${fmtEur(caDay)} \u20AC`} accent={COLOR}
           sub={deltaCa != null ? `${deltaCa > 0 ? "+" : ""}${deltaCa}% ${deltaLabel}` : undefined}
@@ -388,6 +392,8 @@ function BelloMioContent() {
           </div>
         </>
       )}
+
+      </>)}
 
       {/* Météo prévisions */}
       {meteoDays.length > 0 && (

@@ -217,7 +217,6 @@ export const SIDEBAR_NAV_V2: SidebarEntry[] = buildDynamicNav([
 export const SIDEBAR_NAV_SIMPLE: SidebarEntry[] = [
   { kind: "item", label: "Accueil", href: "/dashboard", icon: "dashboard" },
   { kind: "divider" },
-  { kind: "item", label: "Mon planning", href: "/mes-shifts", icon: "calendar" },
   { kind: "item", label: "Recettes", href: "/recettes", icon: "fileText" },
   { kind: "item", label: "Catalogue", href: "/catalogue", icon: "book" },
   { kind: "item", label: "Ingrédients", href: "/ingredients", icon: "tag" },

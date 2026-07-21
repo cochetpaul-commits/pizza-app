@@ -238,7 +238,7 @@ const SECTION_MY_PLANNING: TabSection = {
   href: "/mes-shifts",
   match: ["/mes-shifts"],
   icon: (a) => <IconCalendar active={a} />,
-  roles: ["equipier"],
+  roles: ["group_admin", "manager"],
   tabs: [],
 };
 
@@ -259,7 +259,7 @@ const SECTION_PILOTAGE: TabSection = {
   href: "/ventes",
   match: ["/ventes", "/tresorerie", "/rh/masse-salariale"],
   icon: (a) => <IconWallet active={a} />,
-  roles: ["group_admin"],
+  roles: ["group_admin", "manager"],
   tabs: [
     { label: "Ventes", href: "/ventes", match: ["/ventes"], icon: (a) => <IconWallet active={a} /> },
     { label: "Produits", href: "/ventes/marges", match: ["/ventes/marges"], icon: (a) => <IconTag active={a} /> },
@@ -273,7 +273,7 @@ const SECTION_ACHATS: TabSection = {
   href: "/commandes",
   match: ["/achats", "/commandes", "/ingredients", "/invoices", "/fournisseurs", "/stats-achats", "/variations-prix", "/admin/popina-catalogue", "/stock"],
   icon: (a) => <IconShoppingBag active={a} />,
-  roles: ["group_admin"],
+  roles: ["group_admin", "manager", "equipier"],
   tabs: [
     { label: "Produits", href: "/ingredients", match: ["/ingredients"], icon: () => <ShoppingBasket size={24} strokeWidth={1.8} /> },
     { label: "Commandes", href: "/commandes", match: ["/commandes"], icon: (a) => <IconTruck active={a} /> },
@@ -329,6 +329,7 @@ const SECTION_HACCP: TabSection = {
   href: "/haccp",
   match: ["/haccp"],
   icon: (a) => <IconClipboard active={a} />,
+  roles: ["group_admin", "manager"],
   tabs: [
     { label: "Tableau",       href: "/haccp",                match: ["/haccp"],                icon: (a) => <IconClipboard active={a} /> },
     { label: "Températures",  href: "/haccp/temperatures",   match: ["/haccp/temperatures"],   icon: (a) => <IconThermometer active={a} /> },
