@@ -383,14 +383,6 @@ export function CatalogueSalleContent() {
         </button>
       </div>
 
-      {canEdit && hiddenCount > 0 && (
-        <div style={{ marginBottom: 14 }}>
-          <button onClick={() => setShowHidden(!showHidden)} style={{
-            padding: "5px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer",
-            border: showHidden ? "2px solid #999" : "1px solid #ddd6c8", background: showHidden ? "#f0ebe0" : "#fff", color: "#999",
-          }}>{showHidden ? "Masquer retires" : `+ ${hiddenCount} masque${hiddenCount > 1 ? "s" : ""}`}</button>
-        </div>
-      )}
 
       {loading ? <p style={{ textAlign: "center", color: "#999", padding: 40 }}>Chargement...</p> : (
         <DragDropContext onDragEnd={handleDragEnd}>
