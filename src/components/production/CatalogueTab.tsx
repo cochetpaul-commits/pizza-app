@@ -42,6 +42,7 @@ type Recipe = {
   type: RecipeType;
   name: string;
   category: string | null;
+  sous_categorie: string | null;
   fiche_type: string;
   photo_url: string | null;
   lines: RecipeLine[];
@@ -273,7 +274,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
   // ── Pizza ──
   const { data: pizzas } = await supabase
     .from("kitchen_recipes")
-    .select("id, name, photo_url, notes, pivot_ingredient_id, ball_weight_g, establishments")
+    .select("id, name, photo_url, notes, pivot_ingredient_id, ball_weight_g, establishments, sous_categorie")
     .eq("category", "pizza")
     .order("name");
   const pizzaIds = (pizzas ?? []).map(p => p.id);
@@ -293,7 +294,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
       return { ingredient_id: (i.ingredient_id as string) ?? null, ingredient_name: (ing?.name as string) ?? "?", qty: Number(i.qty) || 0, unit: String(i.unit ?? "g") };
     });
     recipes.push({
-      id: p.id, type: "pizza", name: p.name, category: null, fiche_type: "recette",
+      id: p.id, type: "pizza", name: p.name, category: null, sous_categorie: p.sous_categorie ?? null, fiche_type: "recette",
       photo_url: p.photo_url, lines, steps: parseJsonSteps(p.notes),
       pivot_ingredient_id: p.pivot_ingredient_id,
       yield_info: p.ball_weight_g ? `Pâton ${p.ball_weight_g} g` : null,
@@ -305,7 +306,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
   // ── Cuisine ──
   const { data: kitchens } = await supabase
     .from("kitchen_recipes")
-    .select("id, name, category, fiche_type, metadata, photo_url, procedure, pivot_ingredient_id, yield_grams, portions_count, establishments")
+    .select("id, name, category, sous_categorie, fiche_type, metadata, photo_url, procedure, pivot_ingredient_id, yield_grams, portions_count, establishments")
     .eq("is_active", true)
     .order("name");
   const kitchenIds = (kitchens ?? []).map(k => k.id);
@@ -336,7 +337,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
     if (k.portions_count) yieldInfo = `${k.portions_count} portion${k.portions_count > 1 ? "s" : ""}`;
     else if (k.yield_grams) yieldInfo = `${k.yield_grams} g`;
     recipes.push({
-      id: k.id, type: isProduit ? "produit" : isCocktail ? "cocktail" : "cuisine", name: k.name, category: k.category,
+      id: k.id, type: isProduit ? "produit" : isCocktail ? "cocktail" : "cuisine", name: k.name, category: k.category, sous_categorie: k.sous_categorie ?? null,
       fiche_type: k.fiche_type ?? (isCocktail ? "cocktail" : "recette"),
       metadata: (k.metadata as Record<string, unknown>) ?? {},
       photo_url: k.photo_url, lines, steps: parseJsonSteps(k.procedure),
@@ -355,7 +356,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
   for (const w of (wines ?? [])) {
     if (!matchEstab(w.establishments)) continue;
     recipes.push({
-      id: `wine-${w.id}`, type: "vin", name: w.name, category: null, fiche_type: "vin",
+      id: `wine-${w.id}`, type: "vin", name: w.name, category: null, sous_categorie: null, fiche_type: "vin",
       photo_url: null, lines: [], steps: [],
       pivot_ingredient_id: null,
       yield_info: w.domaine ? `${w.domaine}` : null,
@@ -391,7 +392,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
       return { ingredient_id: (i.ingredient_id as string) ?? null, ingredient_name: (ing?.name as string) ?? "?", qty, unit };
     });
     recipes.push({
-      id: `prep-${p.id}`, type: "production", name: p.name, category: "prep", fiche_type: "recette",
+      id: `prep-${p.id}`, type: "production", name: p.name, category: "prep", sous_categorie: null, fiche_type: "recette",
       photo_url: p.photo_url, lines, steps: parseJsonSteps(p.procedure),
       pivot_ingredient_id: p.pivot_ingredient_id,
       yield_info: p.yield_grams ? `${p.yield_grams} g` : null,
@@ -416,7 +417,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
       return { ingredient_id: (i.ingredient_id as string) ?? null, ingredient_name: (ing?.name as string) ?? "?", qty, unit };
     });
     recipes.push({
-      id: k.id, type: "production", name: k.name, category: "preparation", fiche_type: "recette",
+      id: k.id, type: "production", name: k.name, category: "preparation", sous_categorie: null, fiche_type: "recette",
       photo_url: k.photo_url, lines, steps: parseJsonSteps(k.procedure),
       pivot_ingredient_id: k.pivot_ingredient_id,
       yield_info: k.yield_grams ? `${k.yield_grams} g` : null,
@@ -457,7 +458,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
     const lines = resultToLines(result);
 
     recipes.push({
-      id: `emp-${e.id}`, type: "production", name: e.name, category: "empatement", fiche_type: "empatement",
+      id: `emp-${e.id}`, type: "production", name: e.name, category: "empatement", sous_categorie: null, fiche_type: "empatement",
       photo_url: null, lines, steps: parseJsonSteps(e.procedure),
       pivot_ingredient_id: e.pivot_ingredient_id,
       yield_info: `${bc} pâton${bc > 1 ? "s" : ""} × ${bw} g`,
@@ -568,6 +569,9 @@ export function CatalogueContent() {
   const [dupTarget, setDupTarget] = useState<Recipe | null>(null);
   const [dupCat, setDupCat] = useState("");
   const [dupSubCat, setDupSubCat] = useState("");
+  const [editCatTarget, setEditCatTarget] = useState<Recipe | null>(null);
+  const [editCatValue, setEditCatValue] = useState("");
+  const [editSubCatValue, setEditSubCatValue] = useState("");
   const [produitName, setProduitName] = useState("");
   const [produitCat, setProduitCat] = useState("produit_vin");
   const [produitNotes, setProduitNotes] = useState("");
@@ -711,7 +715,30 @@ export function CatalogueContent() {
       }
       const subs = typeMap.get(type) ?? [];
       const subColor = type === "cuisine" && cat ? (CUISINE_CAT_COLORS[cat] ?? "#4a6741") : groupColor(key);
-      subs.push({ key, label: cat ? groupLabel(key) : "", color: subColor, items });
+
+      // Split items by sous_categorie within each category
+      const subCatMap = new Map<string, Recipe[]>();
+      const noSubCat: Recipe[] = [];
+      for (const r of items) {
+        if (r.sous_categorie) {
+          const arr = subCatMap.get(r.sous_categorie) ?? [];
+          arr.push(r);
+          subCatMap.set(r.sous_categorie, arr);
+        } else {
+          noSubCat.push(r);
+        }
+      }
+      if (subCatMap.size > 0) {
+        // Add sub-groups for each sous_categorie
+        if (noSubCat.length > 0) {
+          subs.push({ key: `${key}:_none`, label: cat ? groupLabel(key) : "", color: subColor, items: noSubCat });
+        }
+        for (const [sc, scItems] of subCatMap) {
+          subs.push({ key: `${key}:${sc}`, label: sc, color: subColor, items: scItems });
+        }
+      } else {
+        subs.push({ key, label: cat ? groupLabel(key) : "", color: subColor, items });
+      }
       typeMap.set(type, subs);
     }
 
@@ -1180,6 +1207,26 @@ export function CatalogueContent() {
                           <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <rect x="9" y="9" width="13" height="13" rx="2" />
                             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                          </svg>
+                        </button>
+                      )}
+
+                      {/* Edit category button */}
+                      {canWrite && recipe.type !== "production" && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setEditCatTarget(recipe); setEditCatValue(recipe.category ?? ""); setEditSubCatValue(recipe.sous_categorie ?? ""); }}
+                          title="Modifier la categorie"
+                          aria-label="Categorie"
+                          style={{
+                            width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(212,119,90,0.2)",
+                            background: "rgba(212,119,90,0.06)", color: "#D4775A", cursor: "pointer",
+                            flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                          }}
+                        >
+                          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                           </svg>
                         </button>
                       )}
@@ -1872,6 +1919,49 @@ export function CatalogueContent() {
       </BottomSheet>
 
       {/* ── Nouvelle catégorie BottomSheet ── */}
+      {/* ── Edit category modal ── */}
+      {editCatTarget && (
+        <div onClick={() => setEditCatTarget(null)} style={{
+          position: "fixed", inset: 0, zIndex: 300,
+          background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: "#fff", borderRadius: 16, padding: 24, maxWidth: 420, width: "100%",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.25)", border: "1px solid #e0d8ce",
+          }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 4px", color: "#1a1a1a" }}>
+              {editCatTarget.name}
+            </h3>
+            <p style={{ fontSize: 12, color: "#999", margin: "0 0 16px" }}>Modifier la categorie et la sous-categorie</p>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 4px" }}>Categorie</label>
+            <select value={editCatValue} onChange={e => setEditCatValue(e.target.value)}
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1.5px solid #ddd6c8", fontSize: 13, marginBottom: 12, fontFamily: "inherit", boxSizing: "border-box" }}>
+              <option value="pizza">Pizza</option>
+              {Object.entries(CUISINE_CAT_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+              {[...new Set(recipes.map(r => r.category ?? "").filter(c => c && c !== "pizza" && !(c in CUISINE_CAT_LABELS)))].map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 4px" }}>Sous-categorie</label>
+            <input type="text" value={editSubCatValue} onChange={e => setEditSubCatValue(e.target.value)} placeholder="Facultatif"
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1.5px solid #ddd6c8", fontSize: 13, marginBottom: 16, fontFamily: "inherit", boxSizing: "border-box" }} />
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setEditCatTarget(null)} style={{ padding: "10px 20px", borderRadius: 10, fontSize: 13, fontWeight: 600, background: "#f5f0e8", color: "#666", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
+              <button onClick={async () => {
+                const table = editCatTarget.type === "production" ? "kitchen_recipes" : "kitchen_recipes";
+                const realId = editCatTarget.id.replace(/^(prep-|emp-)/, "");
+                await supabase.from(table).update({ category: editCatValue, sous_categorie: editSubCatValue.trim() || null }).eq("id", realId);
+                setEditCatTarget(null);
+                fetchAllRecipes(etabSlug).then(r => setRecipes(r));
+              }} style={{ padding: "10px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: "#D4775A", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Enregistrer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <BottomSheet open={showNewCatModal} onClose={() => setShowNewCatModal(false)} title="Nouvelle categorie">
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <input
