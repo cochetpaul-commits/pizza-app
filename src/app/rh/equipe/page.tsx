@@ -222,6 +222,7 @@ export default function EquipePage() {
                   <th style={{ ...thStyle, textAlign: "left" }} className="hide-mobile">Email</th>
                   <th style={{ ...thStyle, textAlign: "left" }} className="hide-mobile">Telephone</th>
                   <th style={{ ...thStyle, textAlign: "center" }} className="hide-mobile">Dossier RH</th>
+                  <th style={{ ...thStyle, textAlign: "center" }} className="hide-mobile">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -312,6 +313,40 @@ export default function EquipePage() {
                             {pct}% — {pct >= 100 ? "Complet" : "Incomplet"}
                           </span>
                         </div>
+                      </td>
+
+                      {/* Actions */}
+                      <td style={{ ...tdStyle, textAlign: "center" }} className="hide-mobile">
+                        {emp.email ? (
+                          <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
+                            <button type="button" onClick={async (e) => {
+                              e.stopPropagation();
+                              const { data: { session } } = await supabase.auth.getSession();
+                              const res = await fetch("/api/admin/invite", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+                                body: JSON.stringify({ email: emp.email, displayName: `${emp.prenom} ${emp.nom}`, role: emp.role ?? "equipier" }),
+                              });
+                              if (res.ok) alert(`Invitation envoyee a ${emp.email}`);
+                              else { const d = await res.json(); alert(d.error || "Erreur"); }
+                            }} style={{
+                              padding: "4px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700,
+                              border: "1px solid #2D6A4F40", background: "#2D6A4F08", color: "#2D6A4F", cursor: "pointer",
+                            }}>Inviter</button>
+                            <button type="button" onClick={async (e) => {
+                              e.stopPropagation();
+                              const origin = window.location.origin;
+                              const { error } = await supabase.auth.resetPasswordForEmail(emp.email!, { redirectTo: `${origin}/auth/callback` });
+                              if (error) alert(error.message);
+                              else alert(`Email de reset envoye a ${emp.email}`);
+                            }} style={{
+                              padding: "4px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700,
+                              border: "1px solid #D4775A40", background: "#D4775A08", color: "#D4775A", cursor: "pointer",
+                            }}>Reset mdp</button>
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: 10, color: "#ccc" }}>Pas d&apos;email</span>
+                        )}
                       </td>
                     </tr>
                   );

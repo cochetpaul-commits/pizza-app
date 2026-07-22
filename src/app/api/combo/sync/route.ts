@@ -46,7 +46,12 @@ export async function POST() {
         const match = findMatch(existingList, contract);
         const team = loc.teams.find(t => contract.function?.toLowerCase().includes(t.name.toLowerCase()));
 
-        const employeData = {
+        // Map Combo function to team name
+        const teamName = team?.name
+          ?? (contract.function?.toLowerCase().includes("salle") || contract.function?.toLowerCase().includes("rang") || contract.function?.toLowerCase().includes("barman") ? "Salle" : null)
+          ?? (contract.function?.toLowerCase().includes("cuisi") || contract.function?.toLowerCase().includes("pizza") || contract.function?.toLowerCase().includes("plong") ? "Cuisine" : null);
+
+        const employeData: Record<string, unknown> = {
           prenom: capitalize(contract.firstname),
           nom: contract.lastname.toUpperCase(),
           email: contract.email || null,
@@ -55,8 +60,14 @@ export async function POST() {
           combo_id: contract.id,
           combo_contract_id: contract.original_contract_id,
           etablissement_id: etabId,
-          equipes_access: team ? [team.name] : [],
+          equipes_access: teamName ? [teamName] : [],
           actif: true,
+          // Infos from Combo
+          adresse: contract.street_address || null,
+          code_postal: contract.zip || null,
+          ville: contract.city || null,
+          numero_secu: contract.social_security_number || null,
+          emploi: contract.function || null,
         };
 
         if (match) {
