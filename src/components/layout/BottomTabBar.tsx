@@ -221,6 +221,7 @@ type TabSection = {
   icon: (active: boolean) => React.ReactNode;
   tabs: Tab[];
   roles?: Role[];
+  permission?: string;
 };
 
 /* ── Sections with sub-tabs ──────────────────────── */
@@ -239,6 +240,7 @@ const SECTION_MY_PLANNING: TabSection = {
   match: ["/mes-shifts"],
   icon: (a) => <IconCalendar active={a} />,
   roles: ["group_admin", "manager"],
+  permission: "planning.view_own",
   tabs: [],
 };
 
@@ -444,7 +446,7 @@ function ActionRow({ action, onDone, etabColor }: { action: BottomBarAction; onD
 export function BottomTabBar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { role } = useProfile();
+  const { role, can } = useProfile();
   const { current, setCurrent, etablissements, isGroupView, setGroupView, isGroupAdmin } = useEtablissement();
   const [drawerSection, setDrawerSection] = useState<TabSection | null>(null);
   const [etabDrawerOpen, setEtabDrawerOpen] = useState(false);
@@ -471,7 +473,11 @@ export function BottomTabBar() {
 
   const isPiccola = current?.slug?.includes("piccola");
   const allSections = isPiccola ? SECTIONS_PICCOLA : SECTIONS_BELLO;
-  const sections = allSections.filter(s => !s.roles || s.roles.includes(role));
+  const sections = allSections.filter(s => {
+    if (s.roles && !s.roles.includes(role!)) return false;
+    if (s.permission && !can(s.permission)) return false;
+    return true;
+  });
   const activeSection = getActiveSection(pathname, sections);
   const etabColor = current?.couleur ?? "#b45f57";
   const canSwitchEtab = isGroupAdmin || etablissements.length > 1;

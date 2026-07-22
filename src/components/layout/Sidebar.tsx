@@ -69,7 +69,7 @@ function isRoleAllowed(roles: Role[] | undefined, role: Role | null): boolean {
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { role } = useProfile();
+  const { role, can } = useProfile();
   const { current, setCurrent, etablissements, isGroupView, setGroupView } = useEtablissement();
 
   const [openHub, setOpenHub] = useState<string | null>(null);
@@ -164,6 +164,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   const _renderHub = (sub: NavSubSection) => {
     if (!isRoleAllowed(sub.roles, role)) return null;
+    if (sub.permission && !can(sub.permission)) return null;
     const items = sub.items.filter(i => isRoleAllowed(i.roles, role));
     if (items.length === 0 && !sub.href) return null;
 

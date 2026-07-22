@@ -112,11 +112,6 @@ function BelloMioContent() {
   const [meteoForecast, setMeteoForecast] = useState<MeteoDay[]>([]);
   const [stockAlerts, setStockAlerts] = useState<{ name: string; stock: number; min: number }[]>([]);
 
-  // Live Popina data
-  const [liveCA, setLiveCA] = useState<number | null>(null);
-  const [liveCouverts, setLiveCouverts] = useState(0);
-  const [liveTop, setLiveTop] = useState<{ name: string; qty: number; ca: number }[]>([]);
-
   const chartRef = useRef<HTMLCanvasElement | null>(null);
   const chartInstance = useRef<Chart | null>(null);
 
@@ -235,16 +230,6 @@ function BelloMioContent() {
       }
     } catch { /* ignore */ }
 
-    // Live Popina
-    try {
-      const liveRes = await fetch(`/api/popina-live?day=${today}`);
-      if (liveRes.ok) {
-        const live = await liveRes.json();
-        setLiveCA(live.totalCA);
-        setLiveCouverts(live.couverts);
-        setLiveTop((live.topProducts ?? []).slice(0, 5));
-      }
-    } catch { /* ignore */ }
   }, [etab, today]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]); // eslint-disable-line react-hooks/set-state-in-effect
@@ -330,39 +315,6 @@ function BelloMioContent() {
           sub={deltaTicketsA1 != null ? `${deltaTicketsA1 > 0 ? "+" : ""}${deltaTicketsA1}% vs A-1` : undefined}
           subColor={deltaTicketsA1 != null ? (deltaTicketsA1 >= 0 ? T.sauge : "#DC2626") : undefined} />
       </div>
-
-      {/* Live Popina widget */}
-      {liveCA != null && liveCA > 0 && (
-        <>
-          <SectionTitle>Popina live</SectionTitle>
-          <div style={{
-              background: `linear-gradient(135deg, #2563EB10 0%, #2563EB05 100%)`,
-              borderRadius: 14, padding: "14px 16px", border: "1.5px solid #2563EB25",
-              marginBottom: 20,
-            }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <div>
-                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: OSWALD, color: "#2563EB" }}>
-                    {fmtEur(liveCA)} {"\u20AC"}
-                  </div>
-                  <div style={{ fontSize: 11, color: "#666" }}>{liveCouverts} couverts : en direct</div>
-                </div>
-                <span style={{ fontSize: 10, color: "#2563EB", fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: "#2563EB15" }}>
-                  LIVE
-                </span>
-              </div>
-              {liveTop.length > 0 && (
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {liveTop.map((p, i) => (
-                    <span key={i} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 6, background: "#fff", border: "1px solid #e5ddd0", color: "#666" }}>
-                      {p.name} <strong style={{ color: "#1a1a1a" }}>{p.qty}x</strong>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-        </>
-      )}
 
       {/* CA chart 7 jours */}
       {dailyCa.length > 0 && (

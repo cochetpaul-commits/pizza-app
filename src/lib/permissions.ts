@@ -40,82 +40,48 @@ export type PermSection = {
 
 export const PERM_SECTIONS: PermSection[] = [
   {
-    label: "Planning",
+    label: "Pilotage",
     permissions: [
-      { key: "planning.view_own", label: "Acces au planning publie de ses equipes/etablissements" },
-      { key: "planning.view_draft", label: "Acces au planning non-publie (brouillon)" },
-      { key: "planning.view_other", label: "Acces au planning publie des autres equipes/etablissements" },
-      { key: "planning.view_alerts", label: "Visualisation des alertes et compteurs" },
-      { key: "planning.edit", label: "Creation, modification et publication de planning" },
-      { key: "planning.validate_shifts", label: "Peut modifier les plannings publies et valider les shifts de son etablissement" },
-      { key: "planning.view_ratios", label: "Visualisation des ratios" },
+      { key: "performances.view", label: "Ventes et indicateurs" },
+      { key: "performances.pilotage", label: "Marges et pilotage" },
     ],
   },
   {
-    label: "Gestion des heures",
+    label: "Personnel",
     permissions: [
-      { key: "heures.register_own", label: "Enregistrer ses propres heures de travail" },
-      { key: "heures.edit_team", label: "Saisir les heures reelles de son equipe/etablissement" },
-      { key: "heures.validate_own", label: "Peut valider ses propres heures reelles" },
-      { key: "heures.edit_all", label: "Saisir les heures reelles de toutes les equipes/etablissements" },
-      { key: "heures.unvalidate", label: "Peut devalider les heures reelles" },
-      { key: "heures.revalorize_absences", label: "Peut revaloriser des absences" },
+      { key: "planning.view_own", label: "Voir le planning" },
+      { key: "planning.edit", label: "Creer et modifier les plannings" },
+      { key: "planning.validate_shifts", label: "Valider les shifts" },
+      { key: "heures.register_own", label: "Saisir ses heures" },
+      { key: "heures.edit_team", label: "Saisir les heures de l'equipe" },
+      { key: "profil.view_team", label: "Voir les fiches employes" },
+      { key: "profil.view_all", label: "Voir tous les employes (tous etabs)" },
+      { key: "absences.edit_cp", label: "Modifier les compteurs de conges" },
+      { key: "paie.manage", label: "Gestion de la paie" },
     ],
   },
   {
-    label: "Profil utilisateur",
+    label: "Production",
     permissions: [
-      { key: "profil.view_own", label: "Peut acceder a son profil utilisateur" },
-      { key: "profil.edit_own", label: "Peut modifier son etat civil et ses informations de contact" },
-      { key: "profil.view_feuilles", label: "Peut consulter ses propres feuilles de presence" },
-      { key: "profil.view_team", label: "Acces au profil des employes de mon equipe ou etablissement" },
-      { key: "profil.view_managers", label: "Acces au profil des managers de mon equipe ou etablissement" },
-      { key: "profil.view_all", label: "Acces au profil de tous les salaries de tous les etablissements" },
-      { key: "profil.delete", label: "Peut supprimer un profil employe ou manager" },
+      { key: "operations.recettes", label: "Catalogue recettes et fiches techniques" },
+      { key: "operations.edit_recettes", label: "Creer et modifier les recettes" },
     ],
   },
   {
-    label: "Gestion des absences",
+    label: "Achats",
     permissions: [
-      { key: "absences.edit_cp", label: "Peut modifier manuellement les compteurs de conges payes" },
-    ],
-  },
-  {
-    label: "Gestion de la paie",
-    permissions: [
-      { key: "paie.manage", label: "Peut distribuer, consulter et supprimer les bulletins de paie de tous les employes" },
-    ],
-  },
-  {
-    label: "Achats & Stock",
-    permissions: [
-      { key: "achats.view", label: "Acces aux stats d'achats et factures fournisseurs" },
-      { key: "achats.edit", label: "Peut creer et modifier des commandes fournisseurs" },
-      { key: "achats.inventaire", label: "Acces a l'inventaire et gestion du stock" },
-    ],
-  },
-  {
-    label: "Operations",
-    permissions: [
-      { key: "operations.recettes", label: "Acces au catalogue recettes et fiches techniques" },
-      { key: "operations.edit_recettes", label: "Peut creer et modifier les recettes" },
-      { key: "operations.commandes", label: "Acces aux commandes" },
-      { key: "commandes.valider", label: "Peut valider ou refuser les commandes fournisseurs" },
-    ],
-  },
-  {
-    label: "Performances",
-    permissions: [
-      { key: "performances.view", label: "Acces aux indicateurs cles et ratios" },
-      { key: "performances.pilotage", label: "Acces au pilotage et marges" },
+      { key: "achats.view", label: "Stats achats et factures" },
+      { key: "achats.edit", label: "Creer et modifier des commandes" },
+      { key: "commandes.valider", label: "Valider les commandes" },
+      { key: "achats.inventaire", label: "Inventaire et stock" },
     ],
   },
   {
     label: "Parametres",
     permissions: [
-      { key: "settings.etablissements", label: "Peut configurer les etablissements" },
-      { key: "settings.employes", label: "Peut gerer les employes et invitations" },
-      { key: "settings.roles", label: "Peut modifier les roles et permissions" },
+      { key: "settings.etablissements", label: "Configurer les etablissements" },
+      { key: "settings.employes", label: "Gerer les employes et invitations" },
+      { key: "settings.roles", label: "Modifier les roles et permissions" },
     ],
   },
 ];

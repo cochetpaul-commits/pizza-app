@@ -198,7 +198,7 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
           )}
         </div>
         {fiche.price_ttc != null && fiche.price_ttc > 0 && (
-          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Oswald', sans-serif", color: "#1a1a1a" }}>{fiche.price_ttc.toFixed(0)} \u20AC</div>
+          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Oswald', sans-serif", color: "#1a1a1a" }}>{fiche.price_ttc.toFixed(0)} {"\u20AC"}</div>
         )}
         <span style={{ fontSize: 14, color: "#999", transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "rotate(0)" }}>{"\u25BC"}</span>
       </div>

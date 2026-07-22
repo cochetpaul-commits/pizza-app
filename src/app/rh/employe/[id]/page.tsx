@@ -1103,7 +1103,7 @@ export default function EmployeDetailPage() {
                 iconColor="#D4775A" iconBg="rgba(212,119,90,0.1)"
               >
                 {/* Role cards */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginBottom: 16 }}>
                   {(["equipier", "manager", "admin"] as PermRole[]).map(r => {
                     const info = ROLE_INFO[r];
                     const active = empRole === r;
