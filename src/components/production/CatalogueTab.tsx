@@ -2136,6 +2136,9 @@ export function CatalogueContent() {
             onClick={async () => {
               if (!resolvedEtab || !newCatName.trim()) return;
               const slug = newCatName.trim().toLowerCase().replace(/[^a-z0-9àâäéèêëïîôùûüç]+/g, "_").replace(/^_|_$/g, "");
+              // Check if category already exists
+              const existing = recipes.find(r => r.category === slug);
+              if (existing) { alert(`La categorie "${newCatName.trim()}" existe deja.`); return; }
               const eSlug = resolvedEtab.slug?.includes("piccola") ? "piccola" : "bello_mio";
               const { error } = await supabase.from("kitchen_recipes").insert({
                 name: `Nouvelle recette ${newCatName.trim()}`,
