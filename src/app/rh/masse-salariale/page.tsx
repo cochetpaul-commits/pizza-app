@@ -136,7 +136,6 @@ export default function MasseSalarialePage() {
   // Load presences for selected month
   const loadPresences = useCallback(async () => {
     if (!etab || !selected) return;
-    setLoading(true);
     const { data } = await supabase
       .from("combo_presences")
       .select("id, combo_nom, equipe, employe_id, matched, heures_planifiees, heures_travaillees, heures_contrat, nb_repas, nb_jours_travailles, ecart_total, periode_debut, periode_fin")
@@ -145,7 +144,6 @@ export default function MasseSalarialePage() {
       .lte("periode_fin", selected.to)
       .order("combo_nom");
     setPresences((data ?? []) as ComboPresence[]);
-    setLoading(false);
   }, [etab, selected]);
 
   // Load CA + stats for selected period
@@ -164,7 +162,19 @@ export default function MasseSalarialePage() {
     }
   }, [etab, selected]);
 
-  useEffect(() => { loadPresences(); loadCA(); }, [loadPresences, loadCA]); // eslint-disable-line react-hooks/set-state-in-effect
+  // Trigger load on period/etab change
+  const loadKey = `${etab?.id ?? ""}:${selected?.from ?? ""}:${selected?.to ?? ""}`;
+  const prevLoadKey = useRef("");
+  useEffect(() => {
+    if (!etab || !selected || loadKey === prevLoadKey.current) return;
+    prevLoadKey.current = loadKey;
+    let cancelled = false;
+    setLoading(true); // eslint-disable-line react-hooks/set-state-in-effect -- intentional: loading state for data fetch
+    Promise.all([loadPresences(), loadCA()]).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [loadKey, etab, selected, loadPresences, loadCA]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Aggregate by employee (merge multiple weeks)
   const aggregated = useMemo(() => {
@@ -292,9 +302,31 @@ export default function MasseSalarialePage() {
 
   const etabColor = etab?.couleur ?? ACCENT;
 
+  // Sync Combo API (fetch shifts for current period)
+  const [syncing, setSyncing] = useState(false);
+  const handleComboSync = async () => {
+    if (!selected) return;
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/rh/combo-presences-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from: selected.from, to: selected.to }),
+      });
+      const d = await res.json();
+      if (d.ok) {
+        setImportMsg(`Combo sync: ${d.inserted} employes (${selected.from} → ${selected.to})`);
+        loadPresences();
+      } else {
+        setImportMsg("Erreur sync: " + (d.error ?? "inconnue"));
+      }
+    } catch (e) { setImportMsg("Erreur: " + String(e)); }
+    setSyncing(false);
+  };
+
   // Bottom bar FAB: Import Combo
   useBottomBarActions(() => [{
-    key: "import", label: "Import Combo", accent: ACCENT,
+    key: "import", label: "Import PDF", accent: ACCENT,
     onClick: () => {},
     fileAccept: ".pdf",
     onFileChange: (f: File) => handleImport(f),
@@ -398,7 +430,19 @@ export default function MasseSalarialePage() {
           </div>
         </div>
 
-        {importMsg && <div style={{ fontSize: 12, color: ACCENT, marginBottom: 10 }}>{importMsg}</div>}
+        {/* Sync Combo button */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
+          <button type="button" onClick={handleComboSync} disabled={syncing} style={{
+            padding: "8px 20px", borderRadius: 10, border: `1.5px solid ${ACCENT}`,
+            background: syncing ? "#f0ebe3" : "#fff", color: ACCENT,
+            fontSize: 12, fontWeight: 700, cursor: syncing ? "wait" : "pointer",
+            opacity: syncing ? 0.6 : 1,
+          }}>
+            {syncing ? "Synchronisation..." : "Sync Combo (API)"}
+          </button>
+        </div>
+
+        {importMsg && <div style={{ fontSize: 12, color: ACCENT, marginBottom: 10, textAlign: "center" }}>{importMsg}</div>}
 
         {/* ── KPIs RH + Popina ── */}
 
