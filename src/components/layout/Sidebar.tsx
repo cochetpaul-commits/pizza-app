@@ -227,6 +227,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       {
         label: "",
         items: [
+          { label: "Utilisateurs", href: "/admin/utilisateurs", icon: "users" },
           { label: "Etablissement", href: "/settings/etablissements", icon: "building" },
           { label: "Employes", href: "/settings/employes", icon: "users" },
           { label: "Fournisseurs", href: "/fournisseurs", icon: "truck" },

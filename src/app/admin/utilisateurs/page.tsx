@@ -208,6 +208,7 @@ function UsersContent() {
                     }}
                   >
                     <option value="equipier">Equipier</option>
+                    <option value="manager">Manager</option>
                     <option value="group_admin">Administrateur</option>
                   </select>
                 </div>
@@ -260,7 +261,7 @@ function UsersContent() {
                     <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>{u.email}</div>
                     <div style={{ fontSize: 11, color: "#bbb", marginTop: 2 }}>Depuis {fmtDate(u.createdAt)}</div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <select
                       value={u.role}
                       onChange={(e) => handleRoleChange(u.id, e.target.value as Role)}
