@@ -301,7 +301,7 @@ export default function MasseSalarialePage() {
       const json = await res.json();
       if (json.ok) {
         setImportMsg(`${json.nb_employes} employes importes (${json.periode.debut} → ${json.periode.fin})`);
-        loadPresences();
+        await loadPresences();
       } else {
         setImportMsg("Erreur : " + (json.error ?? "inconnue"));
       }
@@ -327,7 +327,15 @@ export default function MasseSalarialePage() {
       const d = await res.json();
       if (d.ok) {
         setImportMsg(`Combo sync: ${d.inserted} employes (${selected.from} → ${selected.to})`);
-        loadPresences();
+        // Reload presences inline
+        const { data: freshData } = await supabase
+          .from("combo_presences")
+          .select("id, combo_nom, equipe, employe_id, matched, heures_planifiees, heures_travaillees, heures_contrat, nb_repas, nb_jours_travailles, ecart_total, periode_debut, periode_fin")
+          .eq("etablissement_id", etabId!)
+          .gte("periode_debut", selected.from)
+          .lte("periode_fin", selected.to)
+          .order("combo_nom");
+        setPresences((freshData ?? []) as ComboPresence[]);
       } else {
         setImportMsg("Erreur sync: " + (d.error ?? "inconnue"));
       }
