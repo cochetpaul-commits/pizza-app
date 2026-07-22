@@ -48,21 +48,28 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
   const [showNewSubCat, setShowNewSubCat] = useState(false);
   const [newSubCatName, setNewSubCatName] = useState("");
   const [salleView, setSalleView] = useState<"salle" | "cuisine">("salle");
+  const [popinaProducts, setPopinaProducts] = useState<{ id: string; name: string; category: string; price_ttc: number; kitchen_recipe_id: string | null }[]>([]);
+  const [linkedPopina, setLinkedPopina] = useState<string | null>(null);
+  const [popinaSearch, setPopinaSearch] = useState("");
+  const [showPopinaList, setShowPopinaList] = useState(false);
 
   // ── Load data ──
   useEffect(() => {
     (async () => {
-    const [fRes, cRes, iRes, empRes, offRes] = await Promise.all([
+    const [fRes, cRes, iRes, empRes, offRes, popRes] = await Promise.all([
       supabase.from("familles").select("*"),
       supabase.from("categories").select("*").order("sort_order").order("nom"),
       supabase.from("ingredients").select("id, name, category, allergens, cost_per_unit, purchase_price, purchase_unit, purchase_unit_label, density_g_per_ml, piece_weight_g, piece_volume_ml"),
       supabase.from("recipes").select("id, name").order("name"),
       supabase.from("v_latest_offers").select("*"),
+      supabase.from("popina_products").select("id, name, category, price_ttc, kitchen_recipe_id").eq("active", true).order("name"),
     ]);
     {
       setFamilles((fRes.data ?? []) as Famille[]);
       setCategories((cRes.data ?? []) as Categorie[]);
       setEmpatements((empRes.data ?? []).map((r: Record<string, unknown>) => ({ id: r.id as string, name: (r.name as string).trim() })));
+      const popProducts = (popRes.data ?? []) as { id: string; name: string; category: string; price_ttc: number; kitchen_recipe_id: string | null }[];
+      setPopinaProducts(popProducts);
 
       // Build CPU map from supplier offers
       const cpuMap: Record<string, CpuByUnit> = {};
@@ -198,6 +205,12 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
         }
       }
 
+      // Detect linked Popina product
+      if (recipeId) {
+        const linked = popProducts.find(p => p.kitchen_recipe_id === recipeId);
+        if (linked) setLinkedPopina(linked.id);
+      }
+
       setLoading(false);
     }
     })();
@@ -294,6 +307,14 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
         }));
       if (linesToInsert.length > 0) {
         await supabase.from("kitchen_recipe_lines").insert(linesToInsert);
+      }
+    }
+
+    // Sync Popina link if we just got an ID
+    if (savedId && linkedPopina) {
+      const pp = popinaProducts.find(p => p.id === linkedPopina);
+      if (pp && pp.kitchen_recipe_id !== savedId) {
+        await supabase.from("popina_products").update({ kitchen_recipe_id: savedId }).eq("id", linkedPopina);
       }
     }
 
@@ -684,6 +705,73 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
                 background: fcCol === "ok" ? COLORS.ok : fcCol === "warn" ? COLORS.amber : COLORS.warn,
               }} />
             </div>
+          </div>
+
+          {/* Liaison Popina */}
+          <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1.5px solid ${COLORS.line}` }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 6 }}>
+              Touche vente Popina
+            </label>
+            {linkedPopina ? (() => {
+              const pp = popinaProducts.find(p => p.id === linkedPopina);
+              return (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#f2f7f0", border: `1.5px solid #dfe8dc`, borderRadius: 12, padding: "10px 14px" }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.green, flex: 1 }}>{pp?.name ?? "Produit lie"}</span>
+                  <span style={{ fontSize: 12, color: COLORS.muted }}>{pp?.category} : {pp?.price_ttc?.toFixed(2)} {"\u20AC"}</span>
+                  <button onClick={async () => {
+                    if (linkedPopina) {
+                      await supabase.from("popina_products").update({ kitchen_recipe_id: null }).eq("id", linkedPopina);
+                    }
+                    setLinkedPopina(null);
+                    showToast("Lien Popina retire");
+                  }} style={{ border: "none", background: "#f7e3df", color: COLORS.warn, width: 26, height: 26, borderRadius: "50%", cursor: "pointer", fontWeight: 800, flexShrink: 0, fontFamily: "inherit" }}>x</button>
+                </div>
+              );
+            })() : (
+              <div style={{ position: "relative" }}>
+                <input type="text" value={popinaSearch} placeholder="Chercher un produit Popina..."
+                  onChange={e => { setPopinaSearch(e.target.value); setShowPopinaList(true); }}
+                  onFocus={() => setShowPopinaList(true)}
+                  onBlur={() => setTimeout(() => setShowPopinaList(false), 150)}
+                  style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 14, background: "#fffdf9", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+                {showPopinaList && popinaSearch.trim().length > 0 && (() => {
+                  const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                  const q = norm(popinaSearch);
+                  const results = popinaProducts
+                    .filter(p => !p.kitchen_recipe_id && norm(p.name).includes(q))
+                    .slice(0, 15);
+                  return results.length > 0 ? (
+                    <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "#fff", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, maxHeight: 220, overflowY: "auto", zIndex: 30, boxShadow: "0 12px 28px #00000020" }}>
+                      {results.map(p => (
+                        <div key={p.id} onMouseDown={async e => {
+                          e.preventDefault();
+                          if (fiche.id) {
+                            await supabase.from("popina_products").update({ kitchen_recipe_id: fiche.id }).eq("id", p.id);
+                          }
+                          setLinkedPopina(p.id);
+                          setPopinaSearch("");
+                          setShowPopinaList(false);
+                          showToast(`Lie a ${p.name}`);
+                        }} style={{ padding: "9px 13px", cursor: "pointer" }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#faf5ea"; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#fff"; }}
+                        >
+                          <div style={{ fontSize: 13.5, fontWeight: 700 }}>{p.name}</div>
+                          <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 1 }}>
+                            {p.category} : {p.price_ttc?.toFixed(2)} {"\u20AC"} TTC
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "#fff", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: 12, zIndex: 30, boxShadow: "0 12px 28px #00000020" }}>
+                      <span style={{ fontSize: 12.5, color: COLORS.muted, fontStyle: "italic" }}>Aucun produit Popina non lie trouve.</span>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+            {!linkedPopina && <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 4 }}>Associer cette fiche a un produit de la caisse Popina pour le suivi des ventes.</div>}
           </div>
 
           {/* Bouton valider */}
