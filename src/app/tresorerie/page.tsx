@@ -819,6 +819,61 @@ function TresoreriePage() {
               </div>
             </div>
 
+            {/* ══════ Projection 30/60/90 jours ══════ */}
+            {ops.length > 10 && (() => {
+              // Compute daily average from current period
+              const fromD = new Date(period.from + "T12:00:00");
+              const toD = new Date(period.to + "T12:00:00");
+              const days = Math.max(1, Math.round((toD.getTime() - fromD.getTime()) / 86400000) + 1);
+              const dailyIn = totals.credits / days;
+              const dailyOut = Math.abs(totals.debits) / days;
+              const dailyNet = totals.balance / days;
+
+              // Identify fixed costs (recurring monthly)
+              const fixedCats = new Set(["salaire", "remuneration_gerant", "charges_sociales", "loyer", "leasing", "assurance", "pret", "abonnement", "comptabilite", "telecom_energie", "epargne_salariale"]);
+              let fixedTotal = 0;
+              for (const op of ops) {
+                if (fixedCats.has(op.category) && Number(op.amount) < 0) {
+                  fixedTotal += Math.abs(Number(op.amount));
+                }
+              }
+              const fixedMonthly = days >= 25 ? fixedTotal : fixedTotal * (30 / days);
+
+              const projections = [30, 60, 90].map(d => ({
+                days: d,
+                label: `${d}j`,
+                balance: Math.round(totals.balance + dailyNet * d),
+                entrees: Math.round(dailyIn * d),
+                sorties: Math.round(dailyOut * d),
+              }));
+
+              return (
+                <div style={{ ...S.card, marginBottom: 14 }}>
+                  <div style={S.sec}>Projection a 30 / 60 / 90 jours</div>
+                  <div style={{ fontSize: 11, color: "#999", marginBottom: 12 }}>
+                    Base : rythme du mois en cours ({fmtEur(dailyIn)}/j entrees · {fmtEur(dailyOut)}/j sorties)
+                    {fixedMonthly > 0 && <span> · Charges fixes estimees : {fmtEur(fixedMonthly)}/mois</span>}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                    {projections.map(p => (
+                      <div key={p.days} style={{ textAlign: "center", padding: "14px 10px", borderRadius: 10, background: p.balance >= 0 ? "#4a674110" : "#DC262610", border: `1px solid ${p.balance >= 0 ? "#4a674130" : "#DC262630"}` }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 6 }}>{p.label}</div>
+                        <div style={{ fontFamily: OSWALD, fontSize: 22, fontWeight: 700, color: p.balance >= 0 ? "#2563EB" : "#DC2626" }}>
+                          {p.balance >= 0 ? "+" : ""}{fmtEur(p.balance)}
+                        </div>
+                        <div style={{ fontSize: 10, color: "#999", marginTop: 4 }}>
+                          +{fmtEur(p.entrees)} / -{fmtEur(p.sorties)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 10, color: "#bbb", marginTop: 8, fontStyle: "italic" }}>
+                    Projection lineaire sur la base des flux actuels. Ne tient pas compte de la saisonnalite.
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* ══════ Cash Flow Chart (Weekly Bars) ══════ */}
             {weeklyFlow.length > 0 && (
               <>

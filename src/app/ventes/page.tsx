@@ -68,6 +68,11 @@ type WeekData = {
   // Champs ajoutés (Popina API)
   remises_ttc?: number;
   hourly_ttc?: number[];
+  // Split Food / Boissons
+  food_ttc?: number; food_ht?: number;
+  drink_ttc?: number; drink_ht?: number;
+  // Plats qui dorment
+  bottom5?: { n: string; qty: number; ca_ttc: number; ca_ht: number }[];
 };
 
 /* ── Helpers: compute default range (today, weekend-safe) ── */
@@ -198,6 +203,16 @@ function PerformancesPage() {
   const [zoneDetail, setZoneDetail] = useState<string | null>(null);
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
   const [meteo, setMeteo] = useState<Record<string, { emoji: string; desc: string; temp: number }>>({});
+  const [objectifs, setObjectifs] = useState<Record<string, { valeur: number; unite: string }>>({});
+
+  // Fetch objectifs on mount
+  useEffect(() => {
+    if (!etab) return;
+    fetch(`/api/pilotage/objectifs?etablissement_id=${etab.id}`)
+      .then(r => r.json())
+      .then(d => { if (d.objectifs) setObjectifs(d.objectifs); })
+      .catch(() => {});
+  }, [etab?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch last import date on first load (when no URL range provided)
   useEffect(() => {
@@ -1035,17 +1050,23 @@ function PerformancesPage() {
             {/* Upsell ratios */}
             {W.ratios.anti.tables > 0 && <div style={S.card}>
               <div style={S.sec}>Upsell · performance de la periode</div>
+              {/* Objectifs dynamiques (DB) avec fallback hardcode */}
+              {(() => {
+                const obj = (key: string, fallback: number) => objectifs[key]?.valeur ?? fallback;
+                return (
               <div className="ventes-upsell-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 14 }}>
-                <UpsellCard label="Antipasti" emoji="🥗" data={W.ratios.anti} totalTables={W.tickets} totalCov={W.couverts} color="#D4775A" targets={{ ok: 30, good: 50, avgPrice: 12 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Antipasti" ? null : "Antipasti")} active={expandedCat === "Antipasti"} />
-                <UpsellCard label="Pizzas" emoji="🍕" data={W.ratios.pizze} totalTables={W.tickets} totalCov={W.couverts} color="#c94c2c" targets={{ ok: 50, good: 70, avgPrice: 14 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Pizze" ? null : "Pizze")} active={expandedCat === "Pizze"} />
-                <UpsellCard label="Plats / Pasta" emoji="🍝" data={W.ratios.plats} totalTables={W.tickets} totalCov={W.couverts} color="#8a6b3e" targets={{ ok: 40, good: 60, avgPrice: 16 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Plats" ? null : "Plats")} active={expandedCat === "Plats"} />
-                <UpsellCard label="Desserts" emoji="🍮" data={W.ratios.dolci} totalTables={W.tickets} totalCov={W.couverts} color="#b5904a" targets={{ ok: 80, good: 100, avgPrice: 9 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Dolci" ? null : "Dolci")} active={expandedCat === "Dolci"} />
-                <UpsellCard label="Vins" emoji="🍷" data={W.ratios.vin} totalTables={W.tickets} totalCov={W.couverts} color="#7c5c3a" targets={{ ok: 60, good: 80, avgPrice: 6 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Vins" ? null : "Vins")} active={expandedCat === "Vins"} />
-                <UpsellCard label="Alcool" emoji="🍹" data={W.ratios.alcool} totalTables={W.tickets} totalCov={W.couverts} color="#c15f2e" targets={{ ok: 30, good: 50, avgPrice: 8 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Alcool" ? null : "Alcool")} active={expandedCat === "Alcool"} />
+                <UpsellCard label="Antipasti" emoji="🥗" data={W.ratios.anti} totalTables={W.tickets} totalCov={W.couverts} color="#D4775A" targets={{ ok: obj("attache_antipasti", 30), good: obj("attache_antipasti", 30) + 20, avgPrice: 12 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Antipasti" ? null : "Antipasti")} active={expandedCat === "Antipasti"} />
+                <UpsellCard label="Pizzas" emoji="🍕" data={W.ratios.pizze} totalTables={W.tickets} totalCov={W.couverts} color="#c94c2c" targets={{ ok: obj("attache_pizzas", 50), good: obj("attache_pizzas", 50) + 20, avgPrice: 14 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Pizze" ? null : "Pizze")} active={expandedCat === "Pizze"} />
+                <UpsellCard label="Plats / Pasta" emoji="🍝" data={W.ratios.plats} totalTables={W.tickets} totalCov={W.couverts} color="#8a6b3e" targets={{ ok: obj("attache_plats", 40), good: obj("attache_plats", 40) + 20, avgPrice: 16 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Plats" ? null : "Plats")} active={expandedCat === "Plats"} />
+                <UpsellCard label="Desserts" emoji="🍮" data={W.ratios.dolci} totalTables={W.tickets} totalCov={W.couverts} color="#b5904a" targets={{ ok: obj("attache_desserts", 80), good: obj("attache_desserts", 80) + 20, avgPrice: 9 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Dolci" ? null : "Dolci")} active={expandedCat === "Dolci"} />
+                <UpsellCard label="Vins" emoji="🍷" data={W.ratios.vin} totalTables={W.tickets} totalCov={W.couverts} color="#7c5c3a" targets={{ ok: obj("attache_vins", 60), good: obj("attache_vins", 60) + 20, avgPrice: 6 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Vins" ? null : "Vins")} active={expandedCat === "Vins"} />
+                <UpsellCard label="Alcool" emoji="🍹" data={W.ratios.alcool} totalTables={W.tickets} totalCov={W.couverts} color="#c15f2e" targets={{ ok: obj("attache_alcool", 30), good: obj("attache_alcool", 30) + 20, avgPrice: 8 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Alcool" ? null : "Alcool")} active={expandedCat === "Alcool"} />
                 <UpsellCard label="Boissons" emoji="🥤" data={W.ratios.boissons} totalTables={W.tickets} totalCov={W.couverts} color="#5e7a8a" targets={{ ok: 70, good: 90, avgPrice: 5 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Boissons" ? null : "Boissons")} active={expandedCat === "Boissons"} />
                 <UpsellCard label="Cafe / Chaud" emoji="☕" data={W.ratios.cafe} totalTables={W.tickets} totalCov={W.couverts} color="#6f5c3a" targets={{ ok: 25, good: 40, avgPrice: 3 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Boissons chaudes" ? null : "Boissons chaudes")} active={expandedCat === "Boissons chaudes"} />
                 <UpsellCard label="Digestifs" emoji="🥃" data={W.ratios.digestif} totalTables={W.tickets} totalCov={W.couverts} color="#46655a" targets={{ ok: 10, good: 20, avgPrice: 6 }} mode={mode} action="" onClick={() => setExpandedCat(expandedCat === "Digestifs" ? null : "Digestifs")} active={expandedCat === "Digestifs"} />
               </div>
+                );
+              })()}
               {/* Expanded category detail */}
               {expandedCat && W.cat_products[expandedCat] && (() => {
                 const products = W.cat_products[expandedCat];
@@ -1206,6 +1227,39 @@ function PerformancesPage() {
               })()}
             </div>}
 
+            {/* Food vs Boissons */}
+            {(W.food_ttc || W.drink_ttc) && (() => {
+              const fCA = mode === "ttc" ? (W.food_ttc ?? 0) : (W.food_ht ?? 0);
+              const dCA = mode === "ttc" ? (W.drink_ttc ?? 0) : (W.drink_ht ?? 0);
+              const tot = fCA + dCA;
+              if (tot <= 0) return null;
+              const fPct = Math.round(fCA / tot * 100);
+              const dPct = 100 - fPct;
+              return (
+                <div style={S.card}>
+                  <div style={S.sec}>Food vs Boissons · CA {mode.toUpperCase()}</div>
+                  {/* Progress bar */}
+                  <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 14 }}>
+                    <div style={{ width: `${fPct}%`, background: "#8a6b3e", transition: "width .4s" }} />
+                    <div style={{ width: `${dPct}%`, background: "#5e8278", transition: "width .4s" }} />
+                  </div>
+                  <div className="ventes-food-drink" style={{ display: "flex", gap: 0 }}>
+                    <div style={{ flex: 1, textAlign: "center" }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#8a6b3e", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 4 }}>Food</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color: "#1a1a1a" }}>{fmt(fCA)}{"\u20AC"}</div>
+                      <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>{fPct} %</div>
+                    </div>
+                    <div style={{ width: 1, background: "rgba(0,0,0,.08)", margin: "0 20px", flexShrink: 0 }} />
+                    <div style={{ flex: 1, textAlign: "center" }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#5e8278", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 4 }}>Boissons</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color: "#1a1a1a" }}>{fmt(dCA)}{"\u20AC"}</div>
+                      <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>{dPct} %</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Zones */}
             {W.days.length > 0 && (() => {
               const zones = mode === "ttc" ? W.zones_ttc : W.zones_ht;
@@ -1362,6 +1416,113 @@ function PerformancesPage() {
                   );
                 })}
               </div>
+              );
+            })()}
+
+            {/* Projection fin de mois */}
+            {(() => {
+              const fromD = new Date(from + "T12:00:00");
+              const toD = new Date(to + "T12:00:00");
+              // Only show if range is within a single month and doesn't cover the full month
+              if (fromD.getMonth() !== toD.getMonth()) return null;
+              const y = fromD.getFullYear(), m2 = fromD.getMonth();
+              const daysInMonth = new Date(y, m2 + 1, 0).getDate();
+              const today = new Date();
+              const daysCovered = Math.min(toD.getDate(), today.getDate());
+              if (daysCovered >= daysInMonth) return null; // full month already
+              if (daysCovered < 3) return null; // not enough data
+              const ca = mode === "ttc" ? W.ca_ttc : W.ca_ht;
+              if (ca <= 0) return null;
+              const projected = Math.round(ca / daysCovered * daysInMonth);
+              const prevMonthCA = activePrev ? (mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht) : null;
+              const monthLabel = fromD.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+              return (
+                <div style={S.card}>
+                  <div style={S.sec}>Projection fin {monthLabel}</div>
+                  <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 10, color: "#999", fontWeight: 600, marginBottom: 4 }}>Cumul au {toD.getDate()}/{m2 + 1}</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#1a1a1a" }}>{fmt(ca)}{"\u20AC"}</div>
+                      <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>{daysCovered}j / {daysInMonth}j</div>
+                    </div>
+                    <div style={{ width: 1, height: 50, background: "rgba(0,0,0,.08)" }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 10, color: "#999", fontWeight: 600, marginBottom: 4 }}>Projection lineaire</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: accent }}>{fmt(projected)}{"\u20AC"}</div>
+                      {prevMonthCA != null && prevMonthCA > 0 && (() => {
+                        const d = projected - prevMonthCA;
+                        const pct = (d / prevMonthCA * 100).toFixed(1);
+                        return <div style={{ fontSize: 11, color: d >= 0 ? "#2e7d32" : "#c62828", marginTop: 2, fontWeight: 600 }}>{d >= 0 ? "+" : ""}{pct}% vs A-1</div>;
+                      })()}
+                    </div>
+                  </div>
+                  {/* Progress bar */}
+                  <div style={{ marginTop: 12, height: 6, background: "#f0ebe3", borderRadius: 3, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${Math.round(daysCovered / daysInMonth * 100)}%`, background: accent, borderRadius: 3, transition: "width .4s" }} />
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Avant / Apres carte */}
+            {(() => {
+              const pivotRaw = objectifs["date_nouvelle_carte"]?.valeur;
+              if (!pivotRaw) return null;
+              const pivotStr = String(Math.round(pivotRaw));
+              const pivotDate = `${pivotStr.slice(0, 4)}-${pivotStr.slice(4, 6)}-${pivotStr.slice(6, 8)}`;
+              // Only show if the range spans at least 3 days and the pivot is within or near the range
+              if (W.dates.length < 3) return null;
+              const firstDate = W.dates[0];
+              const lastDate = W.dates[W.dates.length - 1];
+              if (pivotDate <= firstDate || pivotDate > lastDate) return null;
+
+              // Split dates into before/after
+              const beforeDates = W.dates.filter(d => d < pivotDate);
+              const afterDates = W.dates.filter(d => d >= pivotDate);
+              if (beforeDates.length === 0 || afterDates.length === 0) return null;
+
+              // Compute per-period metrics from mix
+              const beforeIdxs = beforeDates.map(d => W.dates.indexOf(d));
+              const afterIdxs = afterDates.map(d => W.dates.indexOf(d));
+              const sumIdxs = (arr: number[], idxs: number[]) => idxs.reduce((s, i) => s + (arr[i] ?? 0), 0);
+
+              const bCA = sumIdxs(mode === "ttc" ? W.day_ttc : W.day_ht, beforeIdxs);
+              const aCA = sumIdxs(mode === "ttc" ? W.day_ttc : W.day_ht, afterIdxs);
+              const bCov = sumIdxs(W.day_cov, beforeIdxs);
+              const aCov = sumIdxs(W.day_cov, afterIdxs);
+              const bTM = bCov > 0 ? bCA / bCov : 0;
+              const aTM = aCov > 0 ? aCA / aCov : 0;
+              const bCADay = beforeDates.length > 0 ? bCA / beforeDates.length : 0;
+              const aCADay = afterDates.length > 0 ? aCA / afterDates.length : 0;
+
+              const pivotLabel = new Date(pivotDate + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+
+              type CompRow = { label: string; before: string; after: string; delta: string; positive: boolean };
+              const rows: CompRow[] = [
+                { label: "CA / jour", before: `${fmt(bCADay)}\u20AC`, after: `${fmt(aCADay)}\u20AC`, delta: `${aCADay >= bCADay ? "+" : ""}${fmt(Math.round(aCADay - bCADay))}\u20AC`, positive: aCADay >= bCADay },
+                { label: "Couverts / jour", before: `${(bCov / beforeDates.length).toFixed(0)}`, after: `${(aCov / afterDates.length).toFixed(0)}`, delta: `${aCov / afterDates.length >= bCov / beforeDates.length ? "+" : ""}${((aCov / afterDates.length) - (bCov / beforeDates.length)).toFixed(0)}`, positive: aCov / afterDates.length >= bCov / beforeDates.length },
+                { label: "Ticket moyen", before: `${bTM.toFixed(1)}\u20AC`, after: `${aTM.toFixed(1)}\u20AC`, delta: `${aTM >= bTM ? "+" : ""}${(aTM - bTM).toFixed(1)}\u20AC`, positive: aTM >= bTM },
+              ];
+
+              return (
+                <div style={{ ...S.card, borderLeft: `4px solid ${accent}` }}>
+                  <div style={S.sec}>Nouvelle carte · avant / apres le {pivotLabel}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 80px 80px 70px", gap: 0, fontSize: 11 }}>
+                    <div style={{ fontWeight: 700, color: "#999", padding: "6px 0", fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em" }}></div>
+                    <div style={{ fontWeight: 700, color: "#999", padding: "6px 0", fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", textAlign: "right" }}>Avant</div>
+                    <div style={{ fontWeight: 700, color: "#999", padding: "6px 0", fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", textAlign: "right" }}>Apres</div>
+                    <div style={{ fontWeight: 700, color: "#999", padding: "6px 0", fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", textAlign: "right" }}>Delta</div>
+                    {rows.map((r, i) => (<>
+                      <div key={`l${i}`} style={{ padding: "6px 0", fontWeight: 500, borderTop: "1px solid #f0ebe3" }}>{r.label}</div>
+                      <div key={`b${i}`} style={{ padding: "6px 0", textAlign: "right", color: "#777", borderTop: "1px solid #f0ebe3" }}>{r.before}</div>
+                      <div key={`a${i}`} style={{ padding: "6px 0", textAlign: "right", fontWeight: 600, borderTop: "1px solid #f0ebe3" }}>{r.after}</div>
+                      <div key={`d${i}`} style={{ padding: "6px 0", textAlign: "right", fontWeight: 700, color: r.positive ? "#2e7d32" : "#c62828", borderTop: "1px solid #f0ebe3" }}>{r.delta}</div>
+                    </>))}
+                  </div>
+                  <div style={{ fontSize: 10, color: "#999", marginTop: 8 }}>
+                    Avant : {beforeDates.length}j ({beforeDates[0]} au {beforeDates[beforeDates.length - 1]}) · Apres : {afterDates.length}j ({afterDates[0]} au {afterDates[afterDates.length - 1]})
+                  </div>
+                </div>
               );
             })()}
 
@@ -1529,6 +1690,23 @@ function PerformancesPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Plats qui dorment */}
+            {W.bottom5 && W.bottom5.length > 0 && (
+              <div style={S.card}>
+                <div style={S.sec}>Plats qui dorment · a valoriser</div>
+                {W.bottom5.map((p, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: i < W.bottom5!.length - 1 ? "1px solid #f0ebe3" : "none" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, overflow: "hidden" }}>
+                      <span style={{ fontSize: 9, color: "#c62828", fontWeight: 600 }}>▼</span>
+                      <span style={{ fontSize: 12, color: "#555", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.n}</span>
+                    </span>
+                    <span style={{ fontSize: 11, color: "#999", marginLeft: 8, flexShrink: 0 }}>x{p.qty}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#999", marginLeft: 12, flexShrink: 0, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{fmt(mode === "ttc" ? p.ca_ttc : p.ca_ht)}{"\u20AC"}</span>
+                  </div>
+                ))}
               </div>
             )}
 

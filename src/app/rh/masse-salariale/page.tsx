@@ -185,7 +185,7 @@ export default function MasseSalarialePage() {
     };
     doLoad();
     return () => { cancelled = true; };
-  }, [etabId, selectedFrom, selectedTo]); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [etabId, selectedFrom, selectedTo]);
 
   // Aggregate by employee (merge multiple weeks)
   const aggregated = useMemo(() => {
@@ -500,6 +500,7 @@ export default function MasseSalarialePage() {
             <div style={KPI}>{fmtDec(totals.hTrav)}h</div>
             <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>
               <span style={{ color: heuresSup > 0 ? GREEN : "#999" }}>+{fmtDec(heuresSup)}h sup.</span>
+              {heuresSup > 0 && <span style={{ color: "#DC2626", fontWeight: 600 }}> (~{fmt(Math.round(heuresSup * tauxHoraire * 1.1 * 1.42))}{"\u20AC"} cout)</span>}
               {" · "}
               <span style={{ color: heuresManquantes > 0 ? "#DC2626" : "#999" }}>-{fmtDec(heuresManquantes)}h</span>
             </div>
@@ -613,6 +614,7 @@ export default function MasseSalarialePage() {
                     <th style={{ textAlign: "right", padding: "8px 4px", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>H. plan.</th>
                     <th style={{ textAlign: "right", padding: "8px 4px", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>H. trav.</th>
                     <th style={{ textAlign: "right", padding: "8px 4px", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Ecart</th>
+                    <th style={{ textAlign: "right", padding: "8px 4px", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Cout HS</th>
                     <th style={{ textAlign: "right", padding: "8px 4px", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Repas</th>
                     <th style={{ textAlign: "right", padding: "8px 0 8px 4px", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Jours</th>
                   </tr>
@@ -630,6 +632,9 @@ export default function MasseSalarialePage() {
                       <td style={{ padding: "10px 4px", textAlign: "right", color: e.ecart >= 0 ? GREEN : "#DC2626", fontWeight: 600 }}>
                         {e.ecart >= 0 ? "+" : ""}{fmtDec(e.ecart)}
                       </td>
+                      <td style={{ padding: "10px 4px", textAlign: "right", color: e.ecart > 0 ? "#DC2626" : "#999", fontSize: 11 }}>
+                        {e.ecart > 0 ? `${fmt(Math.round(e.ecart * tauxHoraire * 1.1 * 1.42))}\u20AC` : "\u2014"}
+                      </td>
                       <td style={{ padding: "10px 4px", textAlign: "right" }}>{e.repas}</td>
                       <td style={{ padding: "10px 0 10px 4px", textAlign: "right" }}>{e.jours}</td>
                     </tr>
@@ -641,6 +646,9 @@ export default function MasseSalarialePage() {
                     <td style={{ padding: "10px 4px", textAlign: "right" }}>{fmtDec(totals.hPlan)}</td>
                     <td style={{ padding: "10px 4px", textAlign: "right" }}>{fmtDec(totals.hTrav)}</td>
                     <td style={{ padding: "10px 4px", textAlign: "right" }}>{fmtDec(totals.hTrav - totals.hPlan)}</td>
+                    <td style={{ padding: "10px 4px", textAlign: "right", color: heuresSup > 0 ? "#DC2626" : "#999", fontWeight: 700 }}>
+                      {heuresSup > 0 ? `${fmt(Math.round(heuresSup * tauxHoraire * 1.1 * 1.42))}\u20AC` : "\u2014"}
+                    </td>
                     <td style={{ padding: "10px 4px", textAlign: "right" }}>{totals.repas}</td>
                     <td style={{ padding: "10px 0 10px 4px", textAlign: "right" }}>{totals.jours}</td>
                   </tr>

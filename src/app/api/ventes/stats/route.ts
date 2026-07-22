@@ -162,6 +162,9 @@ const CAT_MAP: Record<string, string> = {
   "BEVANDE CALDE": "Boissons chaudes", DIGESTIVI: "Digestifs",
   MESSAGES: "Messages",
 };
+
+const FOOD_CATS = new Set(["Pizze", "Antipasti", "Cuisine", "Dolci", "Plats"]);
+const DRINK_CATS = new Set(["Vins", "Alcool", "Boissons", "Boissons chaudes", "Digestifs"]);
 function normCat(cat: string | null): string {
   if (!cat) return "Autre";
   return CAT_MAP[cat.toUpperCase()] ?? CAT_MAP[cat] ?? cat;
@@ -595,6 +598,25 @@ function aggregate(rows: Row[]) {
       pct: payTotal > 0 ? Math.round(val / payTotal * 100) : 0,
     }));
 
+  // Split Food vs Boissons
+  let food_ttc = 0, food_ht = 0, drink_ttc = 0, drink_ht = 0;
+  for (const r of validRows) {
+    const cat = normCat(r.categorie);
+    if (FOOD_CATS.has(cat)) { food_ttc += Number(r.ttc); food_ht += Number(r.ht); }
+    else if (DRINK_CATS.has(cat)) { drink_ttc += Number(r.ttc); drink_ht += Number(r.ht); }
+  }
+
+  // Bottom 5 — plats qui dorment (lowest qty, food only)
+  const bottom5 = Object.entries(prodMap)
+    .filter(([, v]) => v.qty >= 1)
+    .filter(([name]) => {
+      const row = validRows.find(r => r.description === name);
+      return row ? FOOD_CATS.has(normCat(row.categorie)) : false;
+    })
+    .sort((a, b) => a[1].qty - b[1].qty)
+    .slice(0, 5)
+    .map(([name, v]) => ({ n: name, qty: v.qty, ca_ttc: Math.round(v.ca_ttc), ca_ht: Math.round(v.ca_ht) }));
+
   return {
     dates,
     days: dayNames.map(d => d.charAt(0).toUpperCase() + d.slice(1)),
@@ -632,6 +654,9 @@ function aggregate(rows: Row[]) {
     },
     remises_ttc: Math.round(remises_ttc * 100) / 100,
     hourly_ttc: hourly_ttc.map(v => Math.round(v * 100) / 100),
+    food_ttc: Math.round(food_ttc), food_ht: Math.round(food_ht),
+    drink_ttc: Math.round(drink_ttc), drink_ht: Math.round(drink_ht),
+    bottom5,
   };
 }
 
