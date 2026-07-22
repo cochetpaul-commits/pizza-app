@@ -565,6 +565,9 @@ export function CatalogueContent() {
 
   // Produit creation
   const [showProduitForm, setShowProduitForm] = useState(false);
+  const [dupTarget, setDupTarget] = useState<Recipe | null>(null);
+  const [dupCat, setDupCat] = useState("");
+  const [dupSubCat, setDupSubCat] = useState("");
   const [produitName, setProduitName] = useState("");
   const [produitCat, setProduitCat] = useState("produit_vin");
   const [produitNotes, setProduitNotes] = useState("");
@@ -810,50 +813,36 @@ export function CatalogueContent() {
     }
   }, []);
 
-  const handleDuplicate = useCallback(async (recipe: Recipe) => {
+  const handleDuplicate = useCallback((recipe: Recipe) => {
+    setDupTarget(recipe);
+    setDupCat(recipe.category ?? "plat_cuisine");
+    setDupSubCat("");
+  }, []);
+
+  const confirmDuplicate = useCallback(async () => {
+    if (!dupTarget) return;
     try {
-      if (recipe.type === "pizza") {
-        const { data: orig } = await supabase.from("kitchen_recipes").select("*").eq("id", recipe.id).single();
-        if (!orig) return;
-        const { id: _id, created_at: _ca, updated_at: _ua, ...rest } = orig;
-        rest.name = `${rest.name} (copie)`;
-        const { data: newRec } = await supabase.from("kitchen_recipes").insert(rest).select("id").single();
-        if (newRec) {
-          const { data: lines } = await supabase.from("kitchen_recipe_lines").select("*").eq("recipe_id", recipe.id);
-          if (lines?.length) {
-            await supabase.from("kitchen_recipe_lines").insert(lines.map(({ id: _i, recipe_id: _r, created_at: _c, ...l }) => ({ ...l, recipe_id: newRec.id })));
-          }
-        }
-      } else if (recipe.type === "cuisine" || recipe.type === "produit") {
-        const { data: orig } = await supabase.from("kitchen_recipes").select("*").eq("id", recipe.id).single();
-        if (!orig) return;
-        const { id: _id, created_at: _ca, updated_at: _ua, ...rest } = orig;
-        rest.name = `${rest.name} (copie)`;
-        const { data: newRec } = await supabase.from("kitchen_recipes").insert(rest).select("id").single();
-        if (newRec) {
-          const { data: lines } = await supabase.from("kitchen_recipe_lines").select("*").eq("recipe_id", recipe.id);
-          if (lines?.length) {
-            await supabase.from("kitchen_recipe_lines").insert(lines.map(({ id: _i, recipe_id: _r, ...l }) => ({ ...l, recipe_id: newRec.id })));
-          }
-        }
-      } else if (recipe.type === "cocktail") {
-        const { data: orig } = await supabase.from("kitchen_recipes").select("*").eq("id", recipe.id).single();
-        if (!orig) return;
-        const { id: _id, created_at: _ca, updated_at: _ua, ...rest } = orig;
-        rest.name = `${rest.name} (copie)`;
-        const { data: newRec } = await supabase.from("kitchen_recipes").insert(rest).select("id").single();
-        if (newRec) {
-          const { data: lines } = await supabase.from("kitchen_recipe_lines").select("*").eq("recipe_id", recipe.id);
-          if (lines?.length) {
-            await supabase.from("kitchen_recipe_lines").insert(lines.map(({ id: _i, recipe_id: _r, ...l }) => ({ ...l, recipe_id: newRec.id })));
-          }
+      const { data: orig } = await supabase.from("kitchen_recipes").select("*").eq("id", dupTarget.id).single();
+      if (!orig) return;
+      const { id: _id, created_at: _ca, updated_at: _ua, ...rest } = orig;
+      rest.name = `${rest.name} (copie)`;
+      rest.category = dupCat || orig.category;
+      rest.sous_categorie = dupSubCat || null;
+      rest.statut = "brouillon";
+      rest.in_catalogue = false;
+      const { data: newRec } = await supabase.from("kitchen_recipes").insert(rest).select("id").single();
+      if (newRec) {
+        const { data: lines } = await supabase.from("kitchen_recipe_lines").select("*").eq("recipe_id", dupTarget.id);
+        if (lines?.length) {
+          await supabase.from("kitchen_recipe_lines").insert(lines.map(({ id: _i, recipe_id: _r, created_at: _c, updated_at: _u, ...l }: Record<string, unknown>) => ({ ...l, recipe_id: newRec.id })));
         }
       }
+      setDupTarget(null);
       fetchAllRecipes(etabSlug).then(r => setRecipes(r));
     } catch (err) {
       alert(`Erreur duplication : ${err instanceof Error ? err.message : String(err)}`);
     }
-  }, [etabSlug]);
+  }, [dupTarget, dupCat, dupSubCat, etabSlug]);
 
   // Register FAB in bottom bar for "produit" mode
   const produitAccent = TYPE_COLORS.produit;
@@ -1967,6 +1956,45 @@ export function CatalogueContent() {
           </button>
         </div>
       </BottomSheet>
+
+      {/* ── Modal duplication ── */}
+      {dupTarget && (
+        <div onClick={() => setDupTarget(null)} style={{
+          position: "fixed", inset: 0, zIndex: 300,
+          background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: "#fff", borderRadius: 16, padding: 24, maxWidth: 420, width: "100%",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.25)", border: "1px solid #e0d8ce",
+          }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 4px", color: "#1a1a1a" }}>
+              Dupliquer : {dupTarget.name}
+            </h3>
+            <p style={{ fontSize: 12, color: "#999", margin: "0 0 16px" }}>
+              La copie sera creee en brouillon. Choisissez la categorie cible.
+            </p>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 4px" }}>Categorie</label>
+            <select value={dupCat} onChange={e => { setDupCat(e.target.value); setDupSubCat(""); }}
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1.5px solid #ddd6c8", fontSize: 13, marginBottom: 12, fontFamily: "inherit", boxSizing: "border-box" }}>
+              <option value="pizza">Pizza</option>
+              {Object.entries(CUISINE_CAT_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+              {[...new Set(recipes.map(r => r.category ?? "").filter(c => c && c !== "pizza" && !(c in CUISINE_CAT_LABELS)))].map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 4px" }}>Sous-categorie (facultatif)</label>
+            <input type="text" value={dupSubCat} onChange={e => setDupSubCat(e.target.value)} placeholder="Ex : Signature, Classique..."
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1.5px solid #ddd6c8", fontSize: 13, marginBottom: 16, fontFamily: "inherit", boxSizing: "border-box" }} />
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setDupTarget(null)} style={{ padding: "10px 20px", borderRadius: 10, fontSize: 13, fontWeight: 600, background: "#f5f0e8", color: "#666", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
+              <button onClick={confirmDuplicate} style={{ padding: "10px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: "#2563EB", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Dupliquer</button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </main>
   );
