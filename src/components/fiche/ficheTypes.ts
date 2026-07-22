@@ -154,7 +154,7 @@ export function allergenesActifs(lignes: LigneIngredient[]): Set<string> {
 export function resumeAuto(etapes: string[]): string {
   const steps = etapes.map(e => e.trim().replace(/\.$/, "")).filter(Boolean);
   if (!steps.length) return "";
-  return steps.map((s, i) => i === 0 ? s : s.charAt(0).toLowerCase() + s.slice(1)).join(", puis ") + ".";
+  return steps.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(". ") + ".";
 }
 
 export function tmpKey(): string {

@@ -613,8 +613,13 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
         </div>
       )}
 
-      {/* ÉTAPE 4 : PRIX & MARGE */}
-      {step === 3 && (
+      {/* ÉTAPE 4 : PRIX & MARGE (managers et admins uniquement) */}
+      {step === 3 && !canWrite && (
+        <div style={{ background: COLORS.card, borderRadius: 18, padding: "22px 24px", marginBottom: 14, boxShadow: "0 4px 14px #0000000a", textAlign: "center" }}>
+          <div style={{ fontSize: 13, color: COLORS.muted, padding: 20 }}>Les tarifs et marges sont reserves aux managers et administrateurs.</div>
+        </div>
+      )}
+      {step === 3 && canWrite && (
         <div style={{ background: COLORS.card, borderRadius: 18, padding: "22px 24px", marginBottom: 14, boxShadow: "0 4px 14px #0000000a" }}>
           <h2 style={{ fontSize: 13, letterSpacing: ".15em", textTransform: "uppercase", color: COLORS.bordeaux, marginBottom: 16, fontWeight: 800 }}>
             4. Prix et marge
@@ -825,27 +830,17 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
 
           {salleView === "salle" ? (
             <div style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 16, padding: "18px 20px", background: "#fffdf9" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ width: 46, height: 46, borderRadius: 12, background: "#f6e7d8", color: COLORS.bordeaux, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, fontWeight: 800 }}>
-                    {(fiche.nom || "?").charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: ".05em", textTransform: "uppercase" }}>{fiche.nom || "Nouvelle recette"}</div>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
-                      {[...actifs].map(a => <span key={a} style={{ border: "1px solid #f2c9c4", color: COLORS.warn, background: "#fdf0ee", borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 600 }}>{a}</span>)}
-                    </div>
-                  </div>
+              <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 4 }}>{fiche.nom || "Nouvelle recette"}</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                {[...actifs].map(a => <span key={a} style={{ border: "1px solid #f2c9c4", color: COLORS.warn, background: "#fdf0ee", borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 600 }}>{a}</span>)}
+              </div>
+              <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, marginBottom: 4 }}>Composition</div>
+              {fiche.lignes.filter(l => l.ingredient).map(l => (
+                <div key={l.key} style={{ fontSize: 13, padding: "3px 0", display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontWeight: 600 }}>{l.ingredient?.nom_court}</span>
+                  <span style={{ color: COLORS.muted }}>{l.quantite} {l.unite}</span>
                 </div>
-                <div style={{ fontSize: 19, fontWeight: 800, color: COLORS.bordeaux, whiteSpace: "nowrap" }}>{Math.round(ttc)} {"\u20AC"}</div>
-              </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
-                {fiche.lignes.filter(l => l.ingredient).map(l => (
-                  <span key={l.key} style={{ border: `1px solid ${COLORS.line}`, borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 600, background: "#fff" }}>
-                    {l.ingredient?.nom_court}
-                  </span>
-                ))}
-              </div>
+              ))}
               {fiche.description && <div style={{ fontSize: 13.5, color: "#5b5346", marginTop: 10, lineHeight: 1.55 }}>{fiche.description}</div>}
               {fiche.resume_salle && <div style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 10, lineHeight: 1.5, fontStyle: "italic", borderLeft: `3px solid ${COLORS.pill}`, paddingLeft: 10 }}>En cuisine : {fiche.resume_salle}</div>}
               {fiche.accord && <div style={{ fontSize: 12.5, marginTop: 8, color: COLORS.green, fontWeight: 700 }}>Accord : {fiche.accord}</div>}
