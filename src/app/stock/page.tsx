@@ -83,6 +83,28 @@ function StockContent() {
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
+  // Tab: stock / commandes
+  const [activeTab, setActiveTab] = useState<"stock" | "commandes">("stock");
+
+  // Commandes théoriques
+  type OrderLine = { ingredient_id: string; name: string; category: string | null; unit: string; current_stock: number; avg_daily: number; stock_objectif: number; days_until_delivery: number; stock_at_delivery: number; qty_to_order: number; pack_label: string | null; pack_price: number | null; estimated_cost: number | null; urgent: boolean };
+  type SupplierOrder = { supplier_id: string; supplier_name: string; supplier_color: string | null; delivery_days: string[] | null; next_delivery_in: number; franco_minimum: number | null; lines: OrderLine[]; total_estimated: number };
+  const [orders, setOrders] = useState<SupplierOrder[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersDate, setOrdersDate] = useState<string | null>(null);
+
+  const loadOrders = useCallback(async () => {
+    if (!etab) return;
+    setOrdersLoading(true);
+    const res = await fetchApi("/api/stock/commandes-theoriques");
+    if (res.ok) {
+      const d = await res.json();
+      setOrders(d.suppliers ?? []);
+      setOrdersDate(d.generated_at ? new Date(d.generated_at).toLocaleString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : null);
+    }
+    setOrdersLoading(false);
+  }, [etab]);
+
   // Auto-doses
   type DoseSuggestion = { popina_product_id: string; popina_name: string; popina_category: string; ingredient_id: string; ingredient_name: string; suggested_dose: number; suggested_unit: string; rule: string };
   const [doseSuggestions, setDoseSuggestions] = useState<DoseSuggestion[] | null>(null);
@@ -219,6 +241,102 @@ function StockContent() {
             {!inventoryDate && <> — aucun inventaire cloture</>}
           </p>
         </div>
+
+        {/* Tabs: Stock / Commandes */}
+        <div style={{ display: "flex", gap: 4, padding: 4, background: "#f0ebe2", borderRadius: 12, marginBottom: 14, border: "1px solid #e8e0d0" }}>
+          {([["stock", "Stock theorique"], ["commandes", "Commandes a passer"]] as const).map(([key, label]) => (
+            <button key={key} type="button" onClick={() => { setActiveTab(key); if (key === "commandes" && orders.length === 0) loadOrders(); }} style={{
+              flex: 1, padding: "8px 10px", borderRadius: 10, border: "none",
+              background: activeTab === key ? "#fff" : "transparent",
+              color: activeTab === key ? "#1a1a1a" : "#777",
+              fontSize: 12, fontWeight: 700, cursor: "pointer",
+              boxShadow: activeTab === key ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+            }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === "commandes" ? (
+          /* ── Commandes théoriques ── */
+          ordersLoading ? (
+            <div style={{ textAlign: "center", padding: 40, color: "#999" }}>Calcul en cours...</div>
+          ) : (
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                <p style={{ fontSize: 12, color: "#999", margin: 0 }}>
+                  {orders.length} fournisseur{orders.length > 1 ? "s" : ""} avec des produits a commander
+                  {ordersDate && <> — calcule a {ordersDate}</>}
+                </p>
+                <button onClick={loadOrders} style={{ padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, border: "1px solid #ddd6c8", background: "#fff", color: "#1a1a1a", cursor: "pointer" }}>
+                  Recalculer
+                </button>
+              </div>
+
+              {orders.length === 0 && (
+                <div style={{ textAlign: "center", padding: 40, color: "#999", fontSize: 13 }}>
+                  Aucune commande necessaire — le stock couvre les prochaines livraisons.
+                </div>
+              )}
+
+              {orders.map(order => {
+                const urgentCount = order.lines.filter(l => l.urgent).length;
+                return (
+                  <div key={order.supplier_id} style={{ background: "#fff", borderRadius: 14, border: "1px solid #ddd6c8", marginBottom: 14, overflow: "hidden" }}>
+                    {/* Supplier header */}
+                    <div style={{
+                      padding: "14px 18px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+                      borderBottom: "1px solid #f0ebe3",
+                      boxShadow: `inset 4px 0 0 ${order.supplier_color ?? "#D4775A"}`,
+                    }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: "#1a1a1a", fontFamily: "'Oswald', sans-serif", textTransform: "uppercase", letterSpacing: ".06em" }}>
+                          {order.supplier_name}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>
+                          {order.delivery_days?.join(", ") ?? "—"}
+                          {" · "}Prochaine livraison dans {order.next_delivery_in}j
+                          {urgentCount > 0 && <span style={{ color: "#DC2626", fontWeight: 700, marginLeft: 6 }}>{urgentCount} urgent{urgentCount > 1 ? "s" : ""}</span>}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: "#1a1a1a", fontFamily: "'Oswald', sans-serif" }}>
+                          {order.total_estimated > 0 ? `${order.total_estimated.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}\u20AC` : "—"}
+                        </div>
+                        {order.franco_minimum != null && order.franco_minimum > 0 && (
+                          <div style={{ fontSize: 10, color: order.total_estimated >= order.franco_minimum ? "#16A34A" : "#DC2626", fontWeight: 600 }}>
+                            Franco {order.franco_minimum}\u20AC {order.total_estimated >= order.franco_minimum ? "\u2714" : `(-${(order.franco_minimum - order.total_estimated).toFixed(0)}\u20AC)`}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Lines */}
+                    <div style={{ padding: "8px 18px 14px" }}>
+                      {order.lines.map(l => (
+                        <div key={l.ingredient_id} style={{
+                          display: "flex", alignItems: "center", gap: 8, padding: "6px 0",
+                          borderBottom: "1px solid #f8f4ee", fontSize: 12,
+                        }}>
+                          {l.urgent && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#DC2626", flexShrink: 0 }} />}
+                          <span style={{ flex: 1, fontWeight: 600, color: "#1a1a1a" }}>{l.name}</span>
+                          <span style={{ width: 50, textAlign: "right", color: "#999", fontSize: 10 }}>stock: {l.current_stock}</span>
+                          <span style={{ width: 50, textAlign: "right", color: "#999", fontSize: 10 }}>{l.avg_daily > 0 ? `${l.avg_daily}/j` : "—"}</span>
+                          <span style={{ width: 60, textAlign: "right", fontWeight: 700, color: l.urgent ? "#DC2626" : "#1a1a1a", fontSize: 13, fontFamily: "'Oswald', sans-serif" }}>
+                            {l.qty_to_order} {l.unit}
+                          </span>
+                          <span style={{ width: 60, textAlign: "right", fontSize: 10, color: "#777" }}>
+                            {l.estimated_cost != null ? `${l.estimated_cost.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}\u20AC` : "—"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        ) : (<>
 
         {/* Actions bar */}
         <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
@@ -397,6 +515,7 @@ function StockContent() {
             );
           })
         )}
+        </>)}
       </main>
 
       {/* Auto-doses suggestions modal */}
