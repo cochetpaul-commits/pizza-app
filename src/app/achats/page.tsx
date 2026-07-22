@@ -805,15 +805,19 @@ function AchatsContent() {
           ))}
         </div>
 
+        {/* Date picker — shared between tabs */}
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginBottom: 24 }}>
+          <DateRangePicker value={range} onChange={(r) => setRange(r)} />
+        </div>
+
         {activeTab === "stats" ? (
           <StatsAchatsContent />
         ) : (<>
 
         {/* ══════════════════════════════════════════════════ */}
-        {/*  HEADER — date picker + import button            */}
+        {/*  HEADER — import button                          */}
         {/* ══════════════════════════════════════════════════ */}
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginBottom: 24 }}>
-          <DateRangePicker value={range} onChange={(r) => setRange(r)} />
           <button
             type="button"
             className="desktop-only"
