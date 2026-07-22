@@ -1,10 +1,8 @@
-import KitchenRecipeForm from "@/components/KitchenRecipeForm";
-
-export default async function KitchenRecipeDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  return <KitchenRecipeForm recipeId={id} />;
+"use client";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+export default function Redirect() {
+  const router = useRouter();
+  useEffect(() => { router.replace("/recettes"); }, [router]);
+  return null;
 }

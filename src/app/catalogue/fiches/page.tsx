@@ -1,13 +1,8 @@
 "use client";
-
-import { NavBar } from "@/components/NavBar";
-import { CatalogueSalleContent } from "@/components/production/CatalogueSalleTab";
-
-export default function CatalogueFichesPage() {
-  return (
-    <>
-      <NavBar backHref="/recettes" backLabel="Recettes" />
-      <CatalogueSalleContent />
-    </>
-  );
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+export default function Redirect() {
+  const router = useRouter();
+  useEffect(() => { router.replace("/catalogue"); }, [router]);
+  return null;
 }

@@ -1,7 +1,8 @@
 "use client";
-
-import PizzaForm from "@/components/PizzaForm";
-
-export default function NewPizzaPage() {
-  return <PizzaForm />;
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+export default function Redirect() {
+  const router = useRouter();
+  useEffect(() => { router.replace("/recettes"); }, [router]);
+  return null;
 }

@@ -1,9 +1,8 @@
 "use client";
-
-import { usePathname } from "next/navigation";
-import KitchenRecipeForm from "@/components/KitchenRecipeForm";
-
-export default function NewKitchenRecipePage() {
-  const pathname = usePathname();
-  return <KitchenRecipeForm key={pathname} />;
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+export default function Redirect() {
+  const router = useRouter();
+  useEffect(() => { router.replace("/recettes"); }, [router]);
+  return null;
 }
