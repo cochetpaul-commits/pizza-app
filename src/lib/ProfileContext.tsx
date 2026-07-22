@@ -33,7 +33,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    async function fetchProfile(userId: string, userEmail?: string) {
+    async function fetchProfile(userId: string) {
       const { data, error } = await supabase
         .from("profiles")
         .select("role, display_name")
@@ -62,18 +62,15 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         setDisplayName(null);
       }
 
-      // Load custom permissions from employes table (matched by email)
-      const email = userEmail ?? data?.display_name;
-      if (email) {
-        const { data: empData } = await supabase
-          .from("employes")
-          .select("custom_permissions")
-          .eq("email", email)
-          .eq("actif", true)
-          .maybeSingle();
-        if (!cancelled && empData?.custom_permissions) {
-          setCustomPerms(empData.custom_permissions as Record<string, boolean>);
-        }
+      // Load custom permissions from employes table (linked by auth_user_id, fallback email)
+      const { data: empData } = await supabase
+        .from("employes")
+        .select("custom_permissions, role")
+        .eq("auth_user_id", userId)
+        .eq("actif", true)
+        .maybeSingle();
+      if (!cancelled && empData?.custom_permissions) {
+        setCustomPerms(empData.custom_permissions as Record<string, boolean>);
       }
 
       setLoading(false);
@@ -82,7 +79,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     supabase.auth.getUser().then(({ data }) => {
       if (cancelled) return;
       if (data.user) {
-        fetchProfile(data.user.id, data.user.email);
+        fetchProfile(data.user.id);
       } else {
         setLoading(false);
       }
@@ -97,7 +94,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         setLoading(true);
         setCustomPerms({});
-        fetchProfile(session.user.id, session.user.email);
+        fetchProfile(session.user.id);
       } else {
         setRole(null);
         setDisplayName(null);
