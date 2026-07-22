@@ -1197,6 +1197,9 @@ export default function EmployeDetailPage() {
                   await supabase.from("contrats").delete().eq("employe_id", empId);
                   await supabase.from("absences").delete().eq("employe_id", empId);
                   await supabase.from("shifts").delete().eq("employe_id", empId);
+                  await supabase.from("compteurs_employe").delete().eq("employe_id", empId);
+                  await supabase.from("combo_presences").delete().eq("employe_id", empId);
+                  await supabase.from("signatures").delete().eq("employe_id", empId);
                   const { error } = await supabase.from("employes").delete().eq("id", empId);
                   if (error) { alert("Erreur : " + error.message); return; }
                   window.location.href = "/settings/employes";
