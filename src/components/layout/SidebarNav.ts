@@ -104,8 +104,7 @@ export const ACHATS_ITEMS: NavItemV2[] = [
   { label: "Base produits", href: "/ingredients", icon: "tag" },
   { label: "Commandes", href: "/commandes", icon: "shoppingBag" },
   { label: "Stock", href: "/stock", icon: "package" },
-  { label: "Factures", href: "/achats", icon: "fileText" },
-  { label: "Stats prix", href: "/variations-prix", icon: "trendingUp" },
+  { label: "Factures & Stats", href: "/achats", icon: "fileText" },
   { label: "Catalogue Popina", href: "/admin/popina-catalogue", icon: "tag", roles: ["group_admin"] },
 ];
 

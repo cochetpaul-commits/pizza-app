@@ -10,6 +10,8 @@ import Chart from "chart.js/auto";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
 import { setPendingInvoiceFile } from "@/lib/pendingInvoiceFile";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
+import { useSearchParams } from "next/navigation";
+import { StatsAchatsContent } from "@/components/achats/StatsAchatsContent";
 
 /* ── Types ── */
 
@@ -129,8 +131,12 @@ const S = {
 
 export default function AchatsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const etab = useEtablissement();
   const etabId = etab.current?.id ?? null;
+  const [activeTab, setActiveTab] = useState<"factures" | "stats">(() => {
+    return searchParams.get("tab") === "stats" ? "stats" : "factures";
+  });
 
   // ── Date range (default: current month) ──
   const [range, setRange] = useState<DateRange>(() => {
@@ -778,6 +784,28 @@ export default function AchatsPage() {
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px" }}>
 
         {/* ══════════════════════════════════════════════════ */}
+        {/*  TABS — Factures / Stats prix                    */}
+        {/* ══════════════════════════════════════════════════ */}
+        <div style={{ display: "flex", gap: 4, padding: 4, background: "#f0ebe2", borderRadius: 12, marginBottom: 18, border: "1px solid #e8e0d0" }}>
+          {([["factures", "Factures"], ["stats", "Stats prix"]] as const).map(([key, label]) => (
+            <button key={key} type="button" onClick={() => setActiveTab(key)} style={{
+              flex: 1, padding: "8px 10px", borderRadius: 10, border: "none",
+              background: activeTab === key ? "#fff" : "transparent",
+              color: activeTab === key ? "#1a1a1a" : "#777",
+              fontSize: 12, fontWeight: 700, cursor: "pointer",
+              boxShadow: activeTab === key ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+              whiteSpace: "nowrap",
+            }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === "stats" ? (
+          <StatsAchatsContent />
+        ) : (<>
+
+        {/* ══════════════════════════════════════════════════ */}
         {/*  HEADER — date picker + import button            */}
         {/* ══════════════════════════════════════════════════ */}
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginBottom: 24 }}>
@@ -1208,6 +1236,7 @@ export default function AchatsPage() {
           </>
         )}
 
+        </>)}
       </div>
     </RequireRole>
   );
