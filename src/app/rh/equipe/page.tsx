@@ -113,6 +113,8 @@ export default function EquipePage() {
 
   // ── Modal state ──
   const [showModal, setShowModal] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState("");
 
   /* ── Load data ── */
   useEffect(() => {
@@ -172,6 +174,35 @@ export default function EquipePage() {
   return (
     <RequireRole permission="profil.view_team">
       <div style={pageStyle}>
+
+        {/* ── Actions ── */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+          <button type="button" onClick={() => setShowModal(true)} style={{
+            padding: "8px 16px", borderRadius: 10, border: "none",
+            background: "#2D6A4F", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
+          }}>+ Ajouter un employe</button>
+          <button type="button" disabled={syncing} onClick={async () => {
+            setSyncing(true); setSyncResult("");
+            try {
+              const res = await fetch("/api/combo/sync", { method: "POST" });
+              const data = await res.json();
+              if (data.ok) {
+                const summary = (data.results as { location: string; created: number; updated: number }[])
+                  .map((r: { location: string; created: number; updated: number }) => `${r.location} : ${r.created} crees, ${r.updated} mis a jour`).join(" ; ");
+                setSyncResult(summary);
+                loadData();
+              } else {
+                setSyncResult("Erreur : " + (data.error ?? "inconnue"));
+              }
+            } catch (e) { setSyncResult("Erreur reseau"); console.error(e); }
+            setSyncing(false);
+          }} style={{
+            padding: "8px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: "pointer",
+            border: "1.5px solid #2563EB", background: "#fff", color: "#2563EB",
+            opacity: syncing ? 0.5 : 1,
+          }}>{syncing ? "Synchronisation..." : "Sync Combo"}</button>
+          {syncResult && <span style={{ fontSize: 11, color: syncResult.startsWith("Erreur") ? "#DC2626" : "#2D6A4F", fontWeight: 600 }}>{syncResult}</span>}
+        </div>
 
         {/* ── Table ── */}
         {loading ? (
