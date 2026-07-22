@@ -128,6 +128,9 @@ export default function MasseSalarialePage() {
   const selected = options.find(o => o.value === selectedValue);
   const setSelectedValue = (v: string) => {
     if (periodMode === "month") setSelectedMonth(v); else setSelectedWeek(v);
+    // Reload with new period
+    const opt = options.find(o => o.value === v);
+    if (opt && etabId) setTimeout(() => loadAllData(etabId, opt.from, opt.to), 0);
   };
   const currentIdx = options.findIndex(o => o.value === selectedValue);
   const goPrev = () => { if (currentIdx < options.length - 1) setSelectedValue(options[currentIdx + 1].value); };
@@ -138,35 +141,21 @@ export default function MasseSalarialePage() {
   const selectedFrom = selected?.from;
   const selectedTo = selected?.to;
 
-  const loadPresences = useCallback(async () => {
-    if (!etabId || !selectedFrom || !selectedTo) return;
-    const { data } = await supabase
-      .from("combo_presences")
-      .select("id, combo_nom, equipe, employe_id, matched, heures_planifiees, heures_travaillees, heures_contrat, nb_repas, nb_jours_travailles, ecart_total, periode_debut, periode_fin")
-      .eq("etablissement_id", etabId)
-      .gte("periode_debut", selectedFrom)
-      .lte("periode_fin", selectedTo)
-      .order("combo_nom");
-    setPresences((data ?? []) as ComboPresence[]);
-  }, [etabId, selectedFrom, selectedTo]);
 
-  useEffect(() => {
-    if (!etabId || !selectedFrom || !selectedTo) return;
-    let cancelled = false;
-    setLoading(true); // eslint-disable-line react-hooks/set-state-in-effect
-    const doLoad = async () => {
+  const loadAllData = useCallback(async (eId: string, from: string, to: string) => {
+    setLoading(true);
+    try {
       const [presData] = await Promise.all([
         supabase
           .from("combo_presences")
           .select("id, combo_nom, equipe, employe_id, matched, heures_planifiees, heures_travaillees, heures_contrat, nb_repas, nb_jours_travailles, ecart_total, periode_debut, periode_fin")
-          .eq("etablissement_id", etabId)
-          .gte("periode_debut", selectedFrom)
-          .lte("periode_fin", selectedTo)
+          .eq("etablissement_id", eId)
+          .gte("periode_debut", from)
+          .lte("periode_fin", to)
           .order("combo_nom"),
-        fetch(`/api/ventes/stats?etablissement_id=${etabId}&from=${selectedFrom}&to=${selectedTo}`)
+        fetch(`/api/ventes/stats?etablissement_id=${eId}&from=${from}&to=${to}`)
           .then(r => r.json())
           .then(json => {
-            if (cancelled) return;
             const s = json.stats;
             setCaMonth(s?.ca_ttc ?? s?.total_ttc ?? null);
             setCaHtMonth(s?.ca_ht ?? s?.total_ht ?? null);
@@ -174,18 +163,24 @@ export default function MasseSalarialePage() {
             setTicketsMonth(s?.tickets ?? null);
           })
           .catch(() => {
-            if (cancelled) return;
             setCaMonth(null); setCaHtMonth(null); setCouvertsMonth(null); setTicketsMonth(null);
           }),
       ]);
-      if (!cancelled) {
-        setPresences((presData.data ?? []) as ComboPresence[]);
-        setLoading(false);
-      }
-    };
-    doLoad();
-    return () => { cancelled = true; };
-  }, [etabId, selectedFrom, selectedTo]);
+      setPresences((presData.data ?? []) as ComboPresence[]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Initial load on mount
+  const didMount = useRef(false);
+  useEffect(() => {
+    if (didMount.current) return;
+    if (etabId && selectedFrom && selectedTo) {
+      didMount.current = true;
+      loadAllData(etabId, selectedFrom, selectedTo);
+    }
+  }); // no deps — runs until mount fires
 
   // Aggregate by employee (merge multiple weeks)
   const aggregated = useMemo(() => {
@@ -301,7 +296,7 @@ export default function MasseSalarialePage() {
       const json = await res.json();
       if (json.ok) {
         setImportMsg(`${json.nb_employes} employes importes (${json.periode.debut} → ${json.periode.fin})`);
-        await loadPresences();
+        if (etabId && selectedFrom && selectedTo) await loadAllData(etabId, selectedFrom, selectedTo);
       } else {
         setImportMsg("Erreur : " + (json.error ?? "inconnue"));
       }
@@ -327,15 +322,7 @@ export default function MasseSalarialePage() {
       const d = await res.json();
       if (d.ok) {
         setImportMsg(`Combo sync: ${d.inserted} employes (${selected.from} → ${selected.to})`);
-        // Reload presences inline
-        const { data: freshData } = await supabase
-          .from("combo_presences")
-          .select("id, combo_nom, equipe, employe_id, matched, heures_planifiees, heures_travaillees, heures_contrat, nb_repas, nb_jours_travailles, ecart_total, periode_debut, periode_fin")
-          .eq("etablissement_id", etabId!)
-          .gte("periode_debut", selected.from)
-          .lte("periode_fin", selected.to)
-          .order("combo_nom");
-        setPresences((freshData ?? []) as ComboPresence[]);
+        await loadAllData(etabId!, selected.from, selected.to);
       } else {
         setImportMsg("Erreur sync: " + (d.error ?? "inconnue"));
       }
