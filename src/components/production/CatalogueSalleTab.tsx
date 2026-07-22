@@ -285,8 +285,7 @@ export function CatalogueSalleContent() {
   const [fiches, setFiches] = useState<Fiche[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [filterCat] = useState("ALL");
+  const filterCat = "ALL";
   const [showHidden, setShowHidden] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
@@ -332,7 +331,7 @@ export function CatalogueSalleContent() {
   }
 
   const visibleFiches = showHidden ? fiches : fiches.filter((f) => f.in_catalogue);
-  const categories = [...new Set(visibleFiches.map((f) => f.category))];
+  const _categories = [...new Set(visibleFiches.map((f) => f.category))];
   const hiddenCount = fiches.filter((f) => !f.in_catalogue).length;
 
   const filtered = visibleFiches.filter((f) => {

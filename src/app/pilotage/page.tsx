@@ -662,10 +662,9 @@ export default function PilotagePage() {
   const [prodCatFilter, setProdCatFilter] = useState("");
 
   // Load produits data when tab switches or week changes
-  useEffect(() => {
-    if (pilotageTab !== "produits" || !currentEtabId) return;
+  const loadProdData = useCallback(async () => {
+    if (!currentEtabId) return;
     setProdLoading(true);
-    // Compute date range from weekStr
     const [yearStr, weekNum] = weekStr.split("-W");
     const jan4 = new Date(Number(yearStr), 0, 4);
     const dayOfWeek = jan4.getDay() || 7;
@@ -675,13 +674,13 @@ export default function PilotagePage() {
     sunday.setDate(monday.getDate() + 6);
     const from = monday.toISOString().slice(0, 10);
     const to = sunday.toISOString().slice(0, 10);
-
-    fetch(`/api/ventes/marges?etablissement_id=${currentEtabId}&from=${from}&to=${to}`)
-      .then(r => r.json())
-      .then(d => setProdData(d))
-      .catch(() => setProdData(null))
-      .finally(() => setProdLoading(false));
-  }, [pilotageTab, weekStr, currentEtabId]);
+    try {
+      const r = await fetch(`/api/ventes/marges?etablissement_id=${currentEtabId}&from=${from}&to=${to}`);
+      const d = await r.json();
+      setProdData(d);
+    } catch { setProdData(null); }
+    setProdLoading(false);
+  }, [weekStr, currentEtabId]);
 
   return (
     <RequireRole permission="performances.pilotage">
@@ -743,7 +742,7 @@ export default function PilotagePage() {
           {/* ── TABS : Ventes | Produits ── */}
           <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
             {(["ventes", "produits"] as const).map(t => (
-              <button key={t} type="button" onClick={() => setPilotageTab(t)} style={{
+              <button key={t} type="button" onClick={() => { setPilotageTab(t); if (t === "produits") loadProdData(); }} style={{
                 flex: 1, padding: "10px 0", borderRadius: 10,
                 background: pilotageTab === t ? "#1a1a1a" : "#fff",
                 color: pilotageTab === t ? "#fff" : "#999",
