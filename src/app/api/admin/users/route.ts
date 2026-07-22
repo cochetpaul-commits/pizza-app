@@ -58,7 +58,7 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json();
   const { userId, role } = body as { userId?: string; role?: string };
-  if (!userId || !role || !["group_admin", "equipier"].includes(role)) {
+  if (!userId || !role || !["group_admin", "manager", "equipier"].includes(role)) {
     return NextResponse.json({ error: "Invalid params" }, { status: 400 });
   }
 
@@ -89,7 +89,7 @@ export async function PUT(req: NextRequest) {
   const reqOrigin = new URL(req.url).origin;
   const origin = process.env.NEXT_PUBLIC_SITE_URL
     || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
-    || (reqOrigin.includes("localhost") ? "https://pizza-app.vercel.app" : reqOrigin);
+    || (reqOrigin.includes("localhost") ? "https://pizza-app-olive-five.vercel.app" : reqOrigin);
 
   const { error } = await supabaseAdmin.auth.resetPasswordForEmail(userData.user.email, {
     redirectTo: `${origin}/auth/callback`,

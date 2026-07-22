@@ -19,8 +19,15 @@ export default function SetupPasswordPage() {
   useEffect(() => {
     const init = async () => {
       const hash = window.location.hash;
-      const recovery = hash.includes("type=recovery") || hash.includes("type%3Drecovery");
-      // Supabase client auto-detects session from hash URL (detectSessionInUrl: true)
+      const params = new URLSearchParams(window.location.search);
+      const recovery = hash.includes("type=recovery") || hash.includes("type%3Drecovery") || params.get("type") === "recovery";
+
+      // PKCE: if there's a code, exchange it first
+      const code = params.get("code");
+      if (code) {
+        await supabase.auth.exchangeCodeForSession(code);
+      }
+
       const { data } = await supabase.auth.getSession();
       if (data.session) {
         if (recovery) setIsRecovery(true);

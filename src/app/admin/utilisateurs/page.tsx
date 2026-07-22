@@ -18,15 +18,16 @@ type UserRow = {
 
 const ROLE_LABELS: Record<string, string> = {
   group_admin: "Administrateur",
+  manager: "Manager",
   equipier: "Equipier",
-  // Legacy compat
-  manager: "Equipier", cuisine: "Equipier", salle: "Equipier", plonge: "Equipier",
+  cuisine: "Equipier", salle: "Equipier", plonge: "Equipier",
 };
 
 const ROLE_COLORS: Record<string, string> = {
   group_admin: "#D4775A",
+  manager: "#2563EB",
   equipier: "#2D6A4F",
-  manager: "#2D6A4F", cuisine: "#2D6A4F", salle: "#2D6A4F", plonge: "#2D6A4F",
+  cuisine: "#2D6A4F", salle: "#2D6A4F", plonge: "#2D6A4F",
 };
 
 function fmtDate(iso: string) {
@@ -271,7 +272,7 @@ function UsersContent() {
                         fontSize: 12, fontWeight: 700, cursor: "pointer",
                       }}
                     >
-                      {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
+                      {(["equipier", "manager", "group_admin"] as Role[]).map((r) => (
                         <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                       ))}
                     </select>
