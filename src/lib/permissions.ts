@@ -123,9 +123,9 @@ export const PERM_SECTIONS: PermSection[] = [
 /** Default permission matrix per role */
 export const DEFAULT_PERMS: Record<PermRole, Record<string, PermValue>> = {
   equipier: {
-    "planning.view_own": true, "planning.view_draft": false, "planning.view_other": false,
+    "planning.view_own": false, "planning.view_draft": false, "planning.view_other": false,
     "planning.view_alerts": false, "planning.edit": false, "planning.validate_shifts": false, "planning.view_ratios": false,
-    "heures.register_own": true, "heures.edit_team": false, "heures.validate_own": false,
+    "heures.register_own": false, "heures.edit_team": false, "heures.validate_own": false,
     "heures.edit_all": false, "heures.unvalidate": false, "heures.revalorize_absences": false,
     "profil.view_own": true, "profil.edit_own": true, "profil.view_feuilles": true,
     "profil.view_team": false, "profil.view_managers": false, "profil.view_all": false, "profil.delete": false,
@@ -136,9 +136,9 @@ export const DEFAULT_PERMS: Record<PermRole, Record<string, PermValue>> = {
     "settings.etablissements": false, "settings.employes": false, "settings.roles": false,
   },
   manager: {
-    "planning.view_own": true, "planning.view_draft": true, "planning.view_other": true,
-    "planning.view_alerts": true, "planning.edit": true, "planning.validate_shifts": true, "planning.view_ratios": true,
-    "heures.register_own": true, "heures.edit_team": true, "heures.validate_own": true,
+    "planning.view_own": false, "planning.view_draft": false, "planning.view_other": false,
+    "planning.view_alerts": false, "planning.edit": false, "planning.validate_shifts": false, "planning.view_ratios": false,
+    "heures.register_own": false, "heures.edit_team": false, "heures.validate_own": false,
     "heures.edit_all": false, "heures.unvalidate": false, "heures.revalorize_absences": false,
     "profil.view_own": true, "profil.edit_own": true, "profil.view_feuilles": true,
     "profil.view_team": true, "profil.view_managers": true, "profil.view_all": false, "profil.delete": false,
