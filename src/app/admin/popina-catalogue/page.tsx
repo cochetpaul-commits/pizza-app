@@ -261,8 +261,7 @@ function CataloguePage() {
   function searchPopinaProducts() {
     const q = searchPopina.toLowerCase().trim();
     if (!q) { setPopinaResults([]); return; }
-    const unlinked = products.filter((p) => !p.linked_type);
-    const results = unlinked.filter((p) => p.name.toLowerCase().includes(q));
+    const results = products.filter((p) => p.name.toLowerCase().includes(q));
     setPopinaResults(results.slice(0, 20));
   }
 
@@ -479,10 +478,10 @@ function CataloguePage() {
               {filteredProducts.map((p) => {
                 const col = CAT_COLORS[p.category] ?? { bg: "#eee", fg: "#666" };
                 return (
-                  <div key={p.id} onClick={() => !p.linked_type && openPopinaModal(p)} style={{
+                  <div key={p.id} onClick={() => openPopinaModal(p)} style={{
                     display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8,
                     padding: "10px 14px", borderRadius: 10, border: "1px solid #e5ddd0",
-                    background: "#fff", cursor: p.linked_type ? "default" : "pointer",
+                    background: "#fff", cursor: "pointer",
                   }}>
                     <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 9, fontWeight: 700, background: col.bg, color: col.fg, minWidth: 60, textAlign: "center" }}>
                       {p.category}
@@ -725,9 +724,12 @@ function CataloguePage() {
                     cursor: "pointer", textAlign: "left", fontSize: 13, opacity: saving ? 0.6 : 1,
                   }}>
                     <span style={{ padding: "2px 6px", borderRadius: 4, fontSize: 9, fontWeight: 700, background: col.bg, color: col.fg }}>{p.category}</span>
-                    <span style={{ flex: 1, fontWeight: 600, color: "#1a1a1a" }}>{p.name}</span>
+                    <span style={{ flex: 1, fontWeight: 600, color: "#1a1a1a" }}>
+                      {p.name}
+                      {p.linked_type && <span style={{ fontSize: 9, color: "#999", marginLeft: 6 }}>(lie a {p.linked_name ?? p.linked_type})</span>}
+                    </span>
                     <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "'Oswald', sans-serif" }}>{p.price_ttc > 0 ? `${p.price_ttc.toFixed(0)} €` : ""}</span>
-                    <span style={{ fontSize: 11, color: "#D4775A", fontWeight: 700 }}>Relier</span>
+                    <span style={{ fontSize: 11, color: "#D4775A", fontWeight: 700 }}>{p.linked_type ? "Re-lier" : "Relier"}</span>
                   </button>
                 );
               })}
