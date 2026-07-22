@@ -671,6 +671,15 @@ function MargesPage() {
       ])].filter(Boolean).sort()
     : [];
 
+  // Auto-select first category so TENDANCES shows data by default
+  useEffect(() => {
+    if (allCategories.length > 0 && !trendCategory) {
+      setTrendFilter("category");
+      setTrendCategory(allCategories[0]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allCategories.length]);
+
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>

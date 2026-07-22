@@ -649,6 +649,40 @@ export default function PilotagePage() {
   const s = stats;
   const isNow = weekStr === currentWeek;
 
+  // Tabs: Ventes | Produits
+  const [pilotageTab, setPilotageTab] = useState<"ventes" | "produits">("ventes");
+
+  // Produits tab data (loaded from /api/ventes/marges)
+  const [prodData, setProdData] = useState<{
+    kpis: { ca_ttc: number; ca_ht: number; cogs: number; marge_brute: number; food_cost_pct: number; nb_produits: number; nb_matched: number; total_qty: number };
+    products: { name: string; categorie: string; qty: number; ca_ttc: number; ca_ht: number; prix_revient: number | null; cout_total: number | null; marge_brute: number | null; marge_pct: number | null; food_cost_pct: number | null; matched: boolean }[];
+    categories: { cat: string; ca_ht: number; ca_ttc: number; cogs: number; marge: number; food_cost_pct: number }[];
+  } | null>(null);
+  const [prodLoading, setProdLoading] = useState(false);
+  const [prodCatFilter, setProdCatFilter] = useState("");
+
+  // Load produits data when tab switches or week changes
+  useEffect(() => {
+    if (pilotageTab !== "produits" || !currentEtabId) return;
+    setProdLoading(true);
+    // Compute date range from weekStr
+    const [yearStr, weekNum] = weekStr.split("-W");
+    const jan4 = new Date(Number(yearStr), 0, 4);
+    const dayOfWeek = jan4.getDay() || 7;
+    const monday = new Date(jan4);
+    monday.setDate(jan4.getDate() - dayOfWeek + 1 + (Number(weekNum) - 1) * 7);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const from = monday.toISOString().slice(0, 10);
+    const to = sunday.toISOString().slice(0, 10);
+
+    fetch(`/api/ventes/marges?etablissement_id=${currentEtabId}&from=${from}&to=${to}`)
+      .then(r => r.json())
+      .then(d => setProdData(d))
+      .catch(() => setProdData(null))
+      .finally(() => setProdLoading(false));
+  }, [pilotageTab, weekStr, currentEtabId]);
+
   return (
     <RequireRole permission="performances.pilotage">
       <>
@@ -706,7 +740,93 @@ export default function PilotagePage() {
             </div>
           </div>
 
-          {loading ? (
+          {/* ── TABS : Ventes | Produits ── */}
+          <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
+            {(["ventes", "produits"] as const).map(t => (
+              <button key={t} type="button" onClick={() => setPilotageTab(t)} style={{
+                flex: 1, padding: "10px 0", borderRadius: 10,
+                background: pilotageTab === t ? "#1a1a1a" : "#fff",
+                color: pilotageTab === t ? "#fff" : "#999",
+                fontSize: 13, fontWeight: 700, cursor: "pointer",
+                fontFamily: "var(--font-oswald), Oswald, sans-serif",
+                textTransform: "uppercase", letterSpacing: ".06em",
+                boxShadow: pilotageTab === t ? "0 2px 8px rgba(0,0,0,0.12)" : "none",
+                border: pilotageTab === t ? "1.5px solid #1a1a1a" : "1px solid #ede6d9",
+              }}>
+                {t === "ventes" ? "Ventes" : "Produits"}
+              </button>
+            ))}
+          </div>
+
+          {pilotageTab === "produits" ? (
+            /* ── TAB PRODUITS ── */
+            prodLoading ? (
+              <div style={{ textAlign: "center", padding: "48px 0", fontSize: 13, color: "#bbb" }}>Chargement produits…</div>
+            ) : prodData ? (() => {
+              const k = prodData.kpis;
+              const cats = prodData.categories.sort((a, b) => b.ca_ht - a.ca_ht);
+              const prods = prodData.products
+                .filter(p => !prodCatFilter || p.categorie === prodCatFilter)
+                .sort((a, b) => b.ca_ht - a.ca_ht);
+              const maxCA = prods[0]?.ca_ht ?? 1;
+              const fcColor = (fc: number | null) => fc == null ? "#999" : fc <= 25 ? "#16A34A" : fc <= 35 ? "#D97706" : "#DC2626";
+              return (
+                <>
+                  {/* KPIs */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 16 }}>
+                    <div style={card}><p style={kpiLabel}>CA HT</p><p style={kpiValue}>{fmtEuro(k.ca_ht)}</p></div>
+                    <div style={card}><p style={kpiLabel}>Marge brute</p><p style={kpiValue}>{fmtEuro(k.marge_brute)}</p></div>
+                    <div style={card}><p style={kpiLabel}>Food cost</p><p style={{ ...kpiValue, color: fcColor(k.food_cost_pct) }}>{k.food_cost_pct.toFixed(1)}%</p></div>
+                    <div style={card}><p style={kpiLabel}>Articles vendus</p><p style={kpiValue}>{k.total_qty}</p></div>
+                    <div style={card}><p style={kpiLabel}>Produits lies</p><p style={kpiValue}>{k.nb_matched}/{k.nb_produits}</p></div>
+                  </div>
+
+                  {/* Categories breakdown */}
+                  <p style={sectionLabel}>CATEGORIES</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+                    {cats.map(c => (
+                      <div key={c.cat} onClick={() => setProdCatFilter(prodCatFilter === c.cat ? "" : c.cat)} style={{
+                        display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
+                        background: prodCatFilter === c.cat ? "#f9f6f0" : "#fff",
+                        borderRadius: 10, border: prodCatFilter === c.cat ? "1.5px solid #D4775A" : "1px solid #ede6d9",
+                        cursor: "pointer",
+                      }}>
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#D4775A", flexShrink: 0 }} />
+                        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>{c.cat}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{fmtEuro(c.ca_ht)}</span>
+                        <span style={{ fontSize: 10, fontWeight: 600, color: fcColor(c.food_cost_pct) }}>{c.food_cost_pct.toFixed(1)}%</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Products list */}
+                  <p style={sectionLabel}>PRODUITS{prodCatFilter ? ` · ${prodCatFilter}` : ""} ({prods.length})</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {prods.slice(0, 30).map((p, i) => (
+                      <div key={i} style={{
+                        display: "flex", alignItems: "center", gap: 8, padding: "8px 14px",
+                        background: "#fff", borderRadius: 8, border: "1px solid #ede6d9",
+                      }}>
+                        <span style={{ width: 20, fontSize: 10, color: "#ccc", fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
+                        <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                        <div style={{ width: 80, height: 14, background: "#f5f0e8", borderRadius: 3, overflow: "hidden", flexShrink: 0 }}>
+                          <div style={{ width: `${Math.max(2, (p.ca_ht / maxCA) * 100)}%`, height: "100%", background: "#D4775A", borderRadius: 3 }} />
+                        </div>
+                        <span style={{ width: 60, textAlign: "right", fontSize: 11, fontWeight: 700, color: "#1a1a1a", fontVariantNumeric: "tabular-nums" }}>{fmtEuro(p.ca_ht)}</span>
+                        <span style={{ width: 30, textAlign: "right", fontSize: 10, color: "#999" }}>{p.qty}x</span>
+                        {p.food_cost_pct != null && (
+                          <span style={{ width: 36, textAlign: "right", fontSize: 10, fontWeight: 600, color: fcColor(p.food_cost_pct) }}>{p.food_cost_pct.toFixed(0)}%</span>
+                        )}
+                      </div>
+                    ))}
+                    {prods.length > 30 && <div style={{ fontSize: 11, color: "#999", textAlign: "center", padding: 8 }}>+{prods.length - 30} autres produits</div>}
+                  </div>
+                </>
+              );
+            })() : (
+              <div style={{ textAlign: "center", padding: "48px 0", fontSize: 13, color: "#bbb" }}>Aucune donnee produit</div>
+            )
+          ) : loading ? (
             <div style={{ textAlign: "center", padding: "48px 0", fontSize: 13, color: "#bbb" }}>Chargement…</div>
           ) : s ? (
             <>
@@ -1159,6 +1279,27 @@ export default function PilotagePage() {
                 <line x1="16" y1="17" x2="8" y2="17" />
               </svg>
               {pdfLoading ? "Generation..." : "Rapport PDF de la semaine"}
+            </button>
+            <button type="button" onClick={async () => {
+              try {
+                const res = await fetch("/api/popina-catalogue/sync", { method: "POST" });
+                const d = await res.json();
+                if (d.error) alert("Erreur sync Popina: " + d.error);
+                else alert(`Popina synced: ${d.inserted ?? 0} ajouts, ${d.updated ?? 0} mis a jour`);
+              } catch (e) { alert("Erreur: " + (e instanceof Error ? e.message : e)); }
+              setActionDrawerOpen(false);
+            }} style={{
+              display: "flex", alignItems: "center", gap: 14,
+              width: "100%", padding: "16px 8px", cursor: "pointer",
+              border: "none", background: "transparent", textAlign: "left",
+              borderTop: "1px solid rgba(0,0,0,0.06)",
+              fontFamily: "inherit", fontSize: 15, fontWeight: 500, color: "#1a1a1a",
+            }}>
+              <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </svg>
+              Sync Popina
             </button>
           </div>
         </BottomSheet>
