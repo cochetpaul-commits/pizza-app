@@ -786,7 +786,51 @@ export function CatalogueContent() {
   }, []);
 
   const handleDragEnd = useCallback((result: DropResult) => {
-    if (!result.destination || result.source.index === result.destination.index) return;
+    if (!result.destination) return;
+
+    // Recipe drag between sub-groups
+    if (result.type === "recipes") {
+      const srcDropId = result.source.droppableId;
+      const dstDropId = result.destination.droppableId;
+      if (srcDropId === dstDropId && result.source.index === result.destination.index) return;
+
+      const recipeId = result.draggableId;
+
+      // Parse droppableId to extract category + sous_categorie
+      // Format: "type:category" or "type:category:sous_cat" or "type:category:_none"
+      const parseDrop = (dropId: string) => {
+        const parts = dropId.split(":");
+        const type = parts[0]; // "cuisine", "pizza", etc.
+        const cat = parts[1] ?? "";
+        const sc = parts[2];
+        return {
+          type,
+          category: cat || type, // if no sub-cat split, category = type
+          sous_categorie: sc && sc !== "_none" ? sc : null,
+        };
+      };
+
+      const dst = parseDrop(dstDropId);
+
+      // Update local state immediately
+      setRecipes(prev => prev.map(r => {
+        if (r.id !== recipeId) return r;
+        return { ...r, category: dst.category, sous_categorie: dst.sous_categorie };
+      }));
+
+      // Update DB
+      supabase
+        .from("kitchen_recipes")
+        .update({ category: dst.category, sous_categorie: dst.sous_categorie })
+        .eq("id", recipeId)
+        .then(({ error }) => {
+          if (error) console.error("Failed to move recipe:", error);
+        });
+      return;
+    }
+
+    // Category reorder (existing logic)
+    if (result.source.index === result.destination.index) return;
     const keys = nestedGroups.map((g) => g.type);
     const [moved] = keys.splice(result.source.index, 1);
     keys.splice(result.destination.index, 0, moved);
@@ -929,7 +973,7 @@ export function CatalogueContent() {
 
         {/* Groups — nested accordion with drag & drop */}
         <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="catalogue-categories">
+          <Droppable droppableId="catalogue-categories" type="categories">
             {(droppableProvided) => (
               <div ref={droppableProvided.innerRef} {...droppableProvided.droppableProps}>
         {nestedGroups.map((tg, groupIdx) => {
@@ -1066,8 +1110,23 @@ export function CatalogueContent() {
                           </div>
                         )}
 
-                        {/* Recipe rows */}
-                        {subOpen && sg.items.map(recipe => {
+                        {/* Recipe rows — droppable zone */}
+                        {subOpen && (
+                          <Droppable droppableId={sg.key} type="recipes">
+                            {(subDropProvided, subDropSnap) => (
+                              <div
+                                ref={subDropProvided.innerRef}
+                                {...subDropProvided.droppableProps}
+                                style={{
+                                  minHeight: 4,
+                                  borderRadius: 8,
+                                  transition: "background 0.15s",
+                                  background: subDropSnap.isDraggingOver ? `${tg.color}08` : "transparent",
+                                  border: subDropSnap.isDraggingOver ? `1.5px dashed ${tg.color}40` : "1.5px dashed transparent",
+                                  padding: subDropSnap.isDraggingOver ? 4 : 0,
+                                }}
+                              >
+                          {sg.items.map((recipe, recipeIdx) => {
                           const color = tg.color;
                 const isOpen = openId === recipe.id;
                 const canProduce = !!recipe.emp_data
@@ -1075,23 +1134,46 @@ export function CatalogueContent() {
                   || !!recipe.pivot_ingredient_id;
 
                 return (
-                  <div key={recipe.id} style={{ marginBottom: 6 }}>
+                  <Draggable key={recipe.id} draggableId={recipe.id} index={recipeIdx}>
+                    {(recDragProvided, recDragSnap) => (
+                  <div
+                    ref={recDragProvided.innerRef}
+                    {...recDragProvided.draggableProps}
+                    style={{ ...recDragProvided.draggableProps.style, marginBottom: 6, opacity: recDragSnap.isDragging ? 0.85 : 1 }}
+                  >
                     {/* Row */}
                     <div
                       onClick={() => toggleOpen(recipe.id)}
                       style={{
                         display: "flex", alignItems: "center", gap: 14,
-                        padding: "14px 18px", background: "#fff",
-                        border: "1px solid #ede6d9",
+                        padding: "14px 18px", background: recDragSnap.isDragging ? "#faf7f2" : "#fff",
+                        border: recDragSnap.isDragging ? `2px solid ${color}` : "1px solid #ede6d9",
                         borderRadius: isOpen ? "12px 12px 0 0" : 12,
-                        borderBottom: isOpen ? "1px solid #f2ede4" : "1px solid #ede6d9",
+                        borderBottom: isOpen ? "1px solid #f2ede4" : recDragSnap.isDragging ? `2px solid ${color}` : "1px solid #ede6d9",
                         cursor: "pointer",
                         transition: "all 0.18s",
-                        boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
+                        boxShadow: recDragSnap.isDragging ? `0 8px 24px rgba(0,0,0,0.15)` : "0 1px 2px rgba(0,0,0,0.02)",
                       }}
                       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = `${color}40`; (e.currentTarget as HTMLElement).style.boxShadow = `0 2px 8px ${color}12`; }}
                       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = isOpen ? "#f2ede4" : "#ede6d9"; (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 2px rgba(0,0,0,0.02)"; }}
                     >
+                      {/* Drag handle */}
+                      {canWrite && (
+                        <div
+                          {...recDragProvided.dragHandleProps}
+                          style={{
+                            cursor: "grab", color: "#ccc", flexShrink: 0,
+                            touchAction: "none", padding: "4px 2px",
+                            display: "flex", alignItems: "center",
+                            WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none",
+                          }}
+                          title="Glisser pour deplacer"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="4" r="1.5"/><circle cx="16" cy="4" r="1.5"/><circle cx="8" cy="12" r="1.5"/><circle cx="16" cy="12" r="1.5"/><circle cx="8" cy="20" r="1.5"/><circle cx="16" cy="20" r="1.5"/></svg>
+                        </div>
+                      )}
+
                       {/* Thumbnail */}
                       <div style={{
                         width: 46, height: 46, borderRadius: 10, flexShrink: 0, overflow: "hidden",
@@ -1375,8 +1457,15 @@ export function CatalogueContent() {
                       </div>
                     )}
                   </div>
+                    )}
+                  </Draggable>
                 );
               })}
+                          {subDropProvided.placeholder}
+                              </div>
+                            )}
+                          </Droppable>
+                        )}
                       </div>
                     );
                   })}
