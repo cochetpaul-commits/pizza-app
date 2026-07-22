@@ -56,8 +56,8 @@ async function getCallerRole(req: NextRequest): Promise<string | null> {
 /** POST — invite a new user by email */
 export async function POST(req: NextRequest) {
   const callerRole = await getCallerRole(req);
-  if (callerRole !== "admin" && callerRole !== "group_admin") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (callerRole !== "admin" && callerRole !== "group_admin" && callerRole !== "manager") {
+    return NextResponse.json({ error: `Acces refuse (role: ${callerRole ?? "inconnu"})` }, { status: 403 });
   }
 
   const body = await req.json();
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
   const reqOrigin = new URL(req.url).origin;
   const origin = process.env.NEXT_PUBLIC_SITE_URL
     || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
-    || (reqOrigin.includes("localhost") ? "https://pizza-app.vercel.app" : reqOrigin);
+    || (reqOrigin.includes("localhost") ? "https://pizza-app-olive-five.vercel.app" : reqOrigin);
   let inviteData: { user: { id: string } | null } = { user: null };
 
   const { data: firstTry, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {

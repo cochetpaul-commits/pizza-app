@@ -223,7 +223,7 @@ export default function EquipePage() {
                   <th style={{ ...thStyle, textAlign: "center" }} className="hide-mobile">Code PIN</th>
                   <th style={{ ...thStyle, textAlign: "left" }} className="hide-mobile">Email</th>
                   <th style={{ ...thStyle, textAlign: "left" }} className="hide-mobile">Telephone</th>
-                  <th style={{ ...thStyle, textAlign: "center" }} className="hide-mobile">Dossier RH</th>
+                  <th style={{ ...thStyle, textAlign: "center" }} className="hide-mobile">Completude</th>
                   <th style={{ ...thStyle, textAlign: "center" }} className="hide-mobile">Actions</th>
                 </tr>
               </thead>
@@ -327,8 +327,8 @@ export default function EquipePage() {
                               <span style={{ fontSize: 10, color: "#999", fontWeight: 600 }}>Envoi...</span>
                             ) : inviteStatus[emp.id] === "sent" ? (
                               <span style={{ fontSize: 10, fontWeight: 700, color: "#2D6A4F" }}>Invite envoye</span>
-                            ) : inviteStatus[emp.id] === "error" ? (
-                              <span style={{ fontSize: 10, fontWeight: 700, color: "#DC2626" }}>Erreur</span>
+                            ) : inviteStatus[emp.id]?.startsWith("err:") ? (
+                              <span style={{ fontSize: 10, fontWeight: 700, color: "#DC2626" }} title={inviteStatus[emp.id]}>{inviteStatus[emp.id].replace("err:", "")}</span>
                             ) : (
                               <button type="button" onClick={async (e) => {
                                 e.stopPropagation();
@@ -339,7 +339,12 @@ export default function EquipePage() {
                                   headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
                                   body: JSON.stringify({ email: emp.email, displayName: `${emp.prenom} ${emp.nom}`, role: emp.role ?? "equipier" }),
                                 });
-                                setInviteStatus(prev => ({ ...prev, [emp.id]: res.ok ? "sent" : "error" }));
+                                if (res.ok) {
+                                  setInviteStatus(prev => ({ ...prev, [emp.id]: "sent" }));
+                                } else {
+                                  const errData = await res.json().catch(() => ({}));
+                                  setInviteStatus(prev => ({ ...prev, [emp.id]: `err:${errData.error || res.status}` }));
+                                }
                               }} style={{
                                 padding: "4px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700,
                                 border: "1px solid #2D6A4F40", background: "#2D6A4F08", color: "#2D6A4F", cursor: "pointer",
