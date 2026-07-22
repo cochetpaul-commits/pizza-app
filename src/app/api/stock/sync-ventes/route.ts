@@ -4,17 +4,15 @@ import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 
 /**
  * POST /api/stock/sync-ventes
- * Calculates stock consumption from ventes_lignes for a date range,
- * using popina_products links (ingredient_id or dose_map).
+ * Calculates stock consumption from ventes_lignes for a date range.
  *
- * Body: { date_from: string, date_to: string }
+ * Two paths:
+ * A) popina_product → ingredient_id (direct link or dose_map)
+ *    → converts dose (cl/g) to stock units (bouteilles/pcs) via piece_volume_ml
+ * B) popina_product → kitchen_recipe_id (recipe link)
+ *    → decomposes recipe into ingredient lines, converts to stock units
  *
- * Flow:
- * 1. ventes_lignes (description) → match popina_products (name)
- * 2. popina_products → ingredient_id (direct) or dose_map (with dose)
- * 3. Create negative stock_movements (type: "vente")
- *
- * Idempotent: deletes existing "vente" movements for the same date range before inserting.
+ * Idempotent: deletes existing "vente" movements for the same period before inserting.
  */
 export async function POST(req: NextRequest) {
   let etabId: string;
@@ -53,14 +51,13 @@ export async function POST(req: NextRequest) {
   // 3. Load popina_products with their links
   const { data: products } = await supabaseAdmin
     .from("popina_products")
-    .select("id, name, ingredient_id, linked_type")
+    .select("id, name, ingredient_id, kitchen_recipe_id, linked_type")
     .eq("active", true);
 
-  // Build name → product map (case-insensitive)
-  const productByName = new Map<string, { id: string; ingredient_id: string | null }>();
+  const productByName = new Map<string, { id: string; ingredient_id: string | null; kitchen_recipe_id: string | null }>();
   for (const p of products ?? []) {
     const key = (p.name ?? "").trim().toLowerCase();
-    if (key) productByName.set(key, { id: p.id, ingredient_id: p.ingredient_id });
+    if (key) productByName.set(key, { id: p.id, ingredient_id: p.ingredient_id, kitchen_recipe_id: p.kitchen_recipe_id });
   }
 
   // 4. Load dose_map
@@ -68,7 +65,6 @@ export async function POST(req: NextRequest) {
     .from("popina_dose_map")
     .select("popina_product_id, ingredient_id, dose, dose_unit");
 
-  // Build product_id → dose entries
   const dosesByProduct = new Map<string, { ingredient_id: string; dose: number; dose_unit: string }[]>();
   for (const d of doseMaps ?? []) {
     const arr = dosesByProduct.get(d.popina_product_id) ?? [];
@@ -76,33 +72,152 @@ export async function POST(req: NextRequest) {
     dosesByProduct.set(d.popina_product_id, arr);
   }
 
-  // 5. Calculate consumption per ingredient
-  const consumption = new Map<string, { qty: number; unit: string | null }>();
+  // 5. Load all recipe lines for linked recipes
+  const recipeIds = [...new Set(
+    (products ?? []).filter(p => p.kitchen_recipe_id).map(p => p.kitchen_recipe_id!)
+  )];
+  const { data: recipeLines } = recipeIds.length > 0
+    ? await supabaseAdmin
+        .from("kitchen_recipe_lines")
+        .select("recipe_id, ingredient_id, qty, unit")
+        .in("recipe_id", recipeIds)
+    : { data: [] };
+
+  // recipe_id → [{ ingredient_id, qty, unit }]
+  const linesByRecipe = new Map<string, { ingredient_id: string; qty: number; unit: string }[]>();
+  for (const l of recipeLines ?? []) {
+    if (!l.ingredient_id) continue;
+    const arr = linesByRecipe.get(l.recipe_id) ?? [];
+    arr.push({ ingredient_id: l.ingredient_id, qty: Number(l.qty), unit: l.unit ?? "g" });
+    linesByRecipe.set(l.recipe_id, arr);
+  }
+
+  // 6. Load ingredient data for unit conversion
+  const allIngIds = new Set<string>();
+  for (const d of doseMaps ?? []) allIngIds.add(d.ingredient_id);
+  for (const p of products ?? []) if (p.ingredient_id) allIngIds.add(p.ingredient_id);
+  for (const lines of linesByRecipe.values()) for (const l of lines) allIngIds.add(l.ingredient_id);
+
+  const { data: ingredients } = allIngIds.size > 0
+    ? await supabaseAdmin
+        .from("ingredients")
+        .select("id, name, default_unit, piece_volume_ml, purchase_unit_label")
+        .in("id", [...allIngIds])
+    : { data: [] };
+
+  const ingMap = new Map((ingredients ?? []).map(i => [i.id, i]));
+
+  // Also load supplier_offers for pack info (for g → pcs conversion)
+  const { data: offers } = allIngIds.size > 0
+    ? await supabaseAdmin
+        .from("supplier_offers")
+        .select("ingredient_id, pack_count, pack_each_qty, pack_each_unit")
+        .eq("is_active", true)
+        .in("ingredient_id", [...allIngIds])
+        .not("pack_count", "is", null)
+    : { data: [] };
+
+  // ingredient_id → { pack_count, pack_each_qty (g or ml per piece), pack_each_unit }
+  const packMap = new Map<string, { pack_count: number; pack_each_qty: number; pack_each_unit: string }>();
+  for (const o of offers ?? []) {
+    if (!packMap.has(o.ingredient_id) && o.pack_count) {
+      packMap.set(o.ingredient_id, {
+        pack_count: o.pack_count,
+        pack_each_qty: o.pack_each_qty ?? 1,
+        pack_each_unit: o.pack_each_unit ?? "pcs",
+      });
+    }
+  }
+
+  /**
+   * Convert a raw consumption amount (in dose_unit like cl/g) to stock units (bouteilles/pcs).
+   * Returns { qty: number, unit: string }
+   */
+  function toStockUnits(ingredientId: string, rawQty: number, rawUnit: string): { qty: number; unit: string } {
+    const ing = ingMap.get(ingredientId);
+    if (!ing) return { qty: rawQty, unit: rawUnit };
+
+    const volumeMl = Number(ing.piece_volume_ml) || 0;
+    const stockLabel = ing.purchase_unit_label || ing.default_unit || "pcs";
+
+    // cl → bouteilles/pcs via piece_volume_ml
+    if (rawUnit === "cl" && volumeMl > 0) {
+      const rawMl = rawQty * 10; // cl to ml
+      const pieces = rawMl / volumeMl;
+      return { qty: Math.round(pieces * 100) / 100, unit: stockLabel };
+    }
+
+    // g → pcs via pack info (e.g., 1000g per paquet)
+    if (rawUnit === "g") {
+      const pack = packMap.get(ingredientId);
+      if (pack && pack.pack_each_unit === "g" && pack.pack_each_qty > 0) {
+        // pack_each_qty is grams per piece (e.g., 1000g per paquet)
+        const pieces = rawQty / pack.pack_each_qty;
+        return { qty: Math.round(pieces * 100) / 100, unit: stockLabel };
+      }
+      if (pack && pack.pack_each_unit === "kg" && pack.pack_each_qty > 0) {
+        const pieces = rawQty / (pack.pack_each_qty * 1000);
+        return { qty: Math.round(pieces * 100) / 100, unit: stockLabel };
+      }
+    }
+
+    // ml → pcs via piece_volume_ml
+    if (rawUnit === "ml" && volumeMl > 0) {
+      const pieces = rawQty / volumeMl;
+      return { qty: Math.round(pieces * 100) / 100, unit: stockLabel };
+    }
+
+    // pcs → pcs (no conversion needed)
+    if (rawUnit === "pcs") {
+      return { qty: rawQty, unit: stockLabel };
+    }
+
+    // Fallback: keep raw
+    return { qty: rawQty, unit: rawUnit };
+  }
+
+  // 7. Calculate consumption per ingredient (in stock units)
+  const consumption = new Map<string, { qty: number; unit: string }>();
+
+  function addConsumption(ingredientId: string, qty: number, unit: string) {
+    const converted = toStockUnits(ingredientId, qty, unit);
+    const existing = consumption.get(ingredientId) ?? { qty: 0, unit: converted.unit };
+    existing.qty += converted.qty;
+    consumption.set(ingredientId, existing);
+  }
+
+  let matchedCount = 0;
+  let recipeCount = 0;
 
   for (const [name, salesQty] of salesByName) {
     const product = productByName.get(name);
     if (!product) continue;
+    matchedCount++;
 
-    // Check dose_map first
+    // A) Dose map → ingredient with dose conversion
     const doses = dosesByProduct.get(product.id);
     if (doses && doses.length > 0) {
-      // Use dose_map: each sale × dose → consumption
       for (const d of doses) {
-        const key = d.ingredient_id;
-        const existing = consumption.get(key) ?? { qty: 0, unit: d.dose_unit };
-        existing.qty += salesQty * d.dose;
-        consumption.set(key, existing);
+        addConsumption(d.ingredient_id, salesQty * d.dose, d.dose_unit);
       }
-    } else if (product.ingredient_id) {
-      // Direct link: 1 sale = 1 unit of ingredient
-      const key = product.ingredient_id;
-      const existing = consumption.get(key) ?? { qty: 0, unit: null };
-      existing.qty += salesQty;
-      consumption.set(key, existing);
+    }
+    // B) Direct ingredient link (no dose) → 1 sale = 1 pcs
+    else if (product.ingredient_id) {
+      addConsumption(product.ingredient_id, salesQty, "pcs");
+    }
+    // C) Recipe link → decompose into ingredients
+    else if (product.kitchen_recipe_id) {
+      const lines = linesByRecipe.get(product.kitchen_recipe_id);
+      if (lines) {
+        recipeCount++;
+        for (const line of lines) {
+          addConsumption(line.ingredient_id, salesQty * line.qty, line.unit);
+        }
+      }
     }
   }
 
-  // 6. Delete existing vente movements for this period (idempotent)
+  // 8. Delete existing vente movements for this period (idempotent)
   await supabaseAdmin
     .from("stock_movements")
     .delete()
@@ -112,7 +227,7 @@ export async function POST(req: NextRequest) {
     .gte("created_at", `${date_from}T00:00:00`)
     .lte("created_at", `${date_to}T23:59:59`);
 
-  // 7. Insert new movements (negative quantities)
+  // 9. Insert new movements (negative quantities, in stock units)
   const movements = [...consumption.entries()].map(([ingredientId, { qty, unit }]) => ({
     etablissement_id: etabId,
     ingredient_id: ingredientId,
@@ -135,8 +250,9 @@ export async function POST(req: NextRequest) {
     ok: true,
     period: { from: date_from, to: date_to },
     sales_lines: ventes?.length ?? 0,
-    matched_products: [...salesByName.keys()].filter((n) => productByName.has(n)).length,
-    unmatched_products: [...salesByName.keys()].filter((n) => !productByName.has(n)).length,
+    matched_products: matchedCount,
+    unmatched_products: salesByName.size - matchedCount,
+    recipes_decomposed: recipeCount,
     ingredients_impacted: inserted,
   });
 }

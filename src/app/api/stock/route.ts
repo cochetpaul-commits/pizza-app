@@ -84,7 +84,41 @@ export async function GET(req: NextRequest) {
     stockMap.set(m.ingredient_id, entry);
   }
 
-  // 5. Get ingredient names
+  // 5. Also include all ingredients linked via popina_products (even without movements)
+  const { data: popinaLinked } = await supabaseAdmin
+    .from("popina_products")
+    .select("ingredient_id")
+    .eq("active", true)
+    .not("ingredient_id", "is", null);
+
+  for (const p of popinaLinked ?? []) {
+    if (p.ingredient_id && !stockMap.has(p.ingredient_id)) {
+      stockMap.set(p.ingredient_id, { stock: 0, unit: null, receptions: 0, ventes: 0 });
+    }
+  }
+
+  // Also include ingredients from recipes linked via popina_products
+  const { data: popinaRecipeLinked } = await supabaseAdmin
+    .from("popina_products")
+    .select("kitchen_recipe_id")
+    .eq("active", true)
+    .not("kitchen_recipe_id", "is", null);
+
+  const recipeIds = [...new Set((popinaRecipeLinked ?? []).map(p => p.kitchen_recipe_id!))];
+  if (recipeIds.length > 0) {
+    const { data: recipeLines } = await supabaseAdmin
+      .from("kitchen_recipe_lines")
+      .select("ingredient_id")
+      .in("recipe_id", recipeIds)
+      .not("ingredient_id", "is", null);
+    for (const l of recipeLines ?? []) {
+      if (l.ingredient_id && !stockMap.has(l.ingredient_id)) {
+        stockMap.set(l.ingredient_id, { stock: 0, unit: null, receptions: 0, ventes: 0 });
+      }
+    }
+  }
+
+  // 6. Get ingredient details
   const ids = [...stockMap.keys()];
   if (ids.length === 0) {
     return NextResponse.json({ inventory_date: lastInv?.date ?? null, items: [] });
@@ -92,7 +126,7 @@ export async function GET(req: NextRequest) {
 
   const { data: ingredients } = await supabaseAdmin
     .from("ingredients")
-    .select("id, name, category, stock_min, stock_objectif")
+    .select("id, name, category, stock_min, stock_objectif, purchase_unit_label, default_unit")
     .in("id", ids);
 
   const ingMap = new Map((ingredients ?? []).map((i) => [i.id, i]));
@@ -100,11 +134,13 @@ export async function GET(req: NextRequest) {
   const items = ids.map((id) => {
     const s = stockMap.get(id)!;
     const ing = ingMap.get(id);
+    // Use purchase_unit_label (bouteille, paquet) as display unit, fallback to movement unit or default_unit
+    const displayUnit = ing?.purchase_unit_label || s.unit || ing?.default_unit || "pcs";
     return {
       ingredient_id: id,
       name: ing?.name ?? "?",
       category: ing?.category ?? null,
-      unit: s.unit,
+      unit: displayUnit,
       stock: s.stock,
       receptions: s.receptions,
       ventes: s.ventes,
