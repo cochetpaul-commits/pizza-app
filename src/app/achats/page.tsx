@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef, type CSSProperties } from "react";
+import React, { Suspense, useEffect, useState, useMemo, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -130,6 +130,10 @@ const S = {
 /* ── Component ── */
 
 export default function AchatsPage() {
+  return <Suspense><AchatsContent /></Suspense>;
+}
+
+function AchatsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const etab = useEtablissement();

@@ -214,6 +214,7 @@ function MargesPage() {
   const [sortKey, setSortKey] = useState<SortKey>("ca_ttc");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [filterCat, setFilterCat] = useState<string>("all");
+  const [filterSubCat, setFilterSubCat] = useState<string>("all");
   const [filterMatch, setFilterMatch] = useState<"all" | "matched" | "unmatched">("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -471,6 +472,10 @@ function MargesPage() {
     // Filter by category
     if (filterCat !== "all") {
       prods = prods.filter((p) => p.categorie === filterCat);
+    }
+    // Filter by sub-category
+    if (filterSubCat !== "all") {
+      prods = prods.filter((p) => popinaSubCats[p.name.trim().toLowerCase()] === filterSubCat);
     }
 
     // Filter by match status
@@ -1097,12 +1102,15 @@ function MargesPage() {
                     <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: COLORS.muted, fontWeight: 600, marginBottom: 12 }}>
                       Produits{trendCategory ? ` (${trendCategory})` : ""}{trendService !== "all" ? ` · ${trendService}` : ""}
                     </div>
-                    {catProducts.map((p, i) => (
-                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                        <div style={{ width: 160, fontSize: 12, color: COLORS.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 0 }}>
+                    {catProducts.map((p, i) => {
+                      // Enrich with margin data from main data
+                      const margeInfo = (data?.products ?? []).find(dp => dp.name === p.name);
+                      return (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                        <div style={{ width: 140, fontSize: 12, color: COLORS.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 0 }}>
                           {p.name}
                         </div>
-                        <div style={{ flex: 1, height: 18, background: "#f5f0e8", borderRadius: 4, overflow: "hidden" }}>
+                        <div style={{ flex: 1, minWidth: 60, height: 18, background: "#f5f0e8", borderRadius: 4, overflow: "hidden" }}>
                           <div style={{
                             width: `${Math.max(2, (p.ca_ht / maxCA) * 100)}%`,
                             height: "100%",
@@ -1110,22 +1118,30 @@ function MargesPage() {
                             borderRadius: 4,
                           }} />
                         </div>
-                        <div style={{ width: 70, textAlign: "right", fontSize: 11, fontVariantNumeric: "tabular-nums", color: COLORS.dark }}>
+                        <div style={{ width: 60, textAlign: "right", fontSize: 11, fontVariantNumeric: "tabular-nums", color: COLORS.dark }}>
                           {fmtDec(p.ca_ht)}
                         </div>
-                        <div style={{ width: 40, textAlign: "right", fontSize: 10, color: COLORS.muted }}>
+                        <div style={{ width: 30, textAlign: "right", fontSize: 10, color: COLORS.muted }}>
                           {p.qty}x
                         </div>
-                        {"food_cost_pct" in p && (p as { food_cost_pct: number | null }).food_cost_pct !== null && (
-                          <div style={{
-                            width: 44, textAlign: "right", fontSize: 10, fontWeight: 600,
-                            color: foodCostColor((p as { food_cost_pct: number }).food_cost_pct),
-                          }}>
-                            {(p as { food_cost_pct: number }).food_cost_pct.toFixed(0)}%
+                        {margeInfo?.marge_brute != null && (
+                          <div style={{ width: 55, textAlign: "right", fontSize: 10, fontWeight: 600, color: "#2D6A4F" }}>
+                            {fmtDec(margeInfo.marge_brute)}
                           </div>
                         )}
+                        {margeInfo?.food_cost_pct != null && (
+                          <div style={{
+                            width: 38, textAlign: "right", fontSize: 10, fontWeight: 600,
+                            color: foodCostColor(margeInfo.food_cost_pct),
+                          }}>
+                            {margeInfo.food_cost_pct.toFixed(0)}%
+                          </div>
+                        )}
+                        {!margeInfo?.matched && (
+                          <span style={{ fontSize: 8, color: "#D4775A", fontWeight: 600 }}>?</span>
+                        )}
                       </div>
-                    ))}
+                    );})}
                   </div>
                 );
               })()}
@@ -1158,7 +1174,7 @@ function MargesPage() {
                 />
                 <select
                   value={filterCat}
-                  onChange={(e) => { setFilterCat(e.target.value); setPage(1); }}
+                  onChange={(e) => { setFilterCat(e.target.value); setFilterSubCat("all"); setPage(1); }}
                   style={{
                     padding: "7px 12px",
                     borderRadius: 8,
@@ -1174,6 +1190,21 @@ function MargesPage() {
                     </option>
                   ))}
                 </select>
+                {filterCat !== "all" && (allSubCats[filterCat]?.length ?? 0) > 0 && (
+                  <select
+                    value={filterSubCat}
+                    onChange={(e) => { setFilterSubCat(e.target.value); setPage(1); }}
+                    style={{
+                      padding: "7px 12px", borderRadius: 8,
+                      border: `1px solid ${COLORS.border}`, fontSize: 13, background: "#fff",
+                    }}
+                  >
+                    <option value="all">Toutes sous-cat.</option>
+                    {(allSubCats[filterCat] ?? []).map((sc) => (
+                      <option key={sc} value={sc}>{sc}</option>
+                    ))}
+                  </select>
+                )}
                 <select
                   value={filterMatch}
                   onChange={(e) => {
