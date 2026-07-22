@@ -734,11 +734,12 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
                   onFocus={() => setShowPopinaList(true)}
                   onBlur={() => setTimeout(() => setShowPopinaList(false), 150)}
                   style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 14, background: "#fffdf9", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
-                {showPopinaList && popinaSearch.trim().length > 0 && (() => {
+                {showPopinaList && popinaSearch.trim().length >= 2 && (() => {
                   const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
                   const q = norm(popinaSearch);
                   const results = popinaProducts
-                    .filter(p => !p.kitchen_recipe_id && norm(p.name).includes(q))
+                    .filter(p => norm(p.name).includes(q))
+                    .sort((a, b) => (a.kitchen_recipe_id ? 1 : 0) - (b.kitchen_recipe_id ? 1 : 0))
                     .slice(0, 15);
                   return results.length > 0 ? (
                     <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "#fff", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, maxHeight: 220, overflowY: "auto", zIndex: 30, boxShadow: "0 12px 28px #00000020" }}>
@@ -746,6 +747,10 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
                         <div key={p.id} onMouseDown={async e => {
                           e.preventDefault();
                           if (fiche.id) {
+                            // Detach from previous recipe if already linked
+                            if (p.kitchen_recipe_id) {
+                              await supabase.from("popina_products").update({ kitchen_recipe_id: null }).eq("id", p.id);
+                            }
                             await supabase.from("popina_products").update({ kitchen_recipe_id: fiche.id }).eq("id", p.id);
                           }
                           setLinkedPopina(p.id);
@@ -756,7 +761,10 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
                           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#faf5ea"; }}
                           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#fff"; }}
                         >
-                          <div style={{ fontSize: 13.5, fontWeight: 700 }}>{p.name}</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontSize: 13.5, fontWeight: 700 }}>{p.name}</span>
+                            {p.kitchen_recipe_id && <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: "#f0ebe2", color: "#999" }}>deja lie</span>}
+                          </div>
                           <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 1 }}>
                             {p.category} : {p.price_ttc?.toFixed(2)} {"\u20AC"} TTC
                           </div>
