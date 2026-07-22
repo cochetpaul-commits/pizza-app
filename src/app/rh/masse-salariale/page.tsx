@@ -306,7 +306,7 @@ export default function MasseSalarialePage() {
 
   if (!etab) {
     return (
-      <RequireRole permission="paie.manage">
+      <RequireRole permission="performances.pilotage">
         <div style={{ maxWidth: 900, margin: "0 auto", padding: "40px 16px", textAlign: "center", color: "#999", fontSize: 14 }}>
           Selectionnez un etablissement pour afficher la masse salariale.
         </div>
@@ -315,7 +315,7 @@ export default function MasseSalarialePage() {
   }
 
   return (
-    <RequireRole permission="paie.manage">
+    <RequireRole permission="performances.pilotage">
       <PilotageSwipeWrapper accent={etabColor} dateFrom={navRange.from} dateTo={navRange.to}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "20px 16px 100px" }}>
 
