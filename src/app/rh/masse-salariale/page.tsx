@@ -133,48 +133,59 @@ export default function MasseSalarialePage() {
   const goPrev = () => { if (currentIdx < options.length - 1) setSelectedValue(options[currentIdx + 1].value); };
   const goNext = () => { if (currentIdx > 0) setSelectedValue(options[currentIdx - 1].value); };
 
-  // Load presences for selected month
+  // Load all data for selected period
+  const etabId = etab?.id;
+  const selectedFrom = selected?.from;
+  const selectedTo = selected?.to;
+
   const loadPresences = useCallback(async () => {
-    if (!etab || !selected) return;
+    if (!etabId || !selectedFrom || !selectedTo) return;
     const { data } = await supabase
       .from("combo_presences")
       .select("id, combo_nom, equipe, employe_id, matched, heures_planifiees, heures_travaillees, heures_contrat, nb_repas, nb_jours_travailles, ecart_total, periode_debut, periode_fin")
-      .eq("etablissement_id", etab.id)
-      .gte("periode_debut", selected.from)
-      .lte("periode_fin", selected.to)
+      .eq("etablissement_id", etabId)
+      .gte("periode_debut", selectedFrom)
+      .lte("periode_fin", selectedTo)
       .order("combo_nom");
     setPresences((data ?? []) as ComboPresence[]);
-  }, [etab, selected]);
+  }, [etabId, selectedFrom, selectedTo]);
 
-  // Load CA + stats for selected period
-  const loadCA = useCallback(async () => {
-    if (!etab || !selected) return;
-    try {
-      const res = await fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${selected.from}&to=${selected.to}`);
-      const json = await res.json();
-      const s = json.stats;
-      setCaMonth(s?.ca_ttc ?? s?.total_ttc ?? null);
-      setCaHtMonth(s?.ca_ht ?? s?.total_ht ?? null);
-      setCouvertsMonth(s?.couverts ?? null);
-      setTicketsMonth(s?.tickets ?? null);
-    } catch {
-      setCaMonth(null); setCaHtMonth(null); setCouvertsMonth(null); setTicketsMonth(null);
-    }
-  }, [etab, selected]);
-
-  // Trigger load on period/etab change
-  const loadKey = `${etab?.id ?? ""}:${selected?.from ?? ""}:${selected?.to ?? ""}`;
-  const prevLoadKey = useRef("");
   useEffect(() => {
-    if (!etab || !selected || loadKey === prevLoadKey.current) return;
-    prevLoadKey.current = loadKey;
+    if (!etabId || !selectedFrom || !selectedTo) return;
     let cancelled = false;
-    setLoading(true); // eslint-disable-line react-hooks/set-state-in-effect -- intentional: loading state for data fetch
-    Promise.all([loadPresences(), loadCA()]).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
+    setLoading(true); // eslint-disable-line react-hooks/set-state-in-effect
+    const doLoad = async () => {
+      const [presData] = await Promise.all([
+        supabase
+          .from("combo_presences")
+          .select("id, combo_nom, equipe, employe_id, matched, heures_planifiees, heures_travaillees, heures_contrat, nb_repas, nb_jours_travailles, ecart_total, periode_debut, periode_fin")
+          .eq("etablissement_id", etabId)
+          .gte("periode_debut", selectedFrom)
+          .lte("periode_fin", selectedTo)
+          .order("combo_nom"),
+        fetch(`/api/ventes/stats?etablissement_id=${etabId}&from=${selectedFrom}&to=${selectedTo}`)
+          .then(r => r.json())
+          .then(json => {
+            if (cancelled) return;
+            const s = json.stats;
+            setCaMonth(s?.ca_ttc ?? s?.total_ttc ?? null);
+            setCaHtMonth(s?.ca_ht ?? s?.total_ht ?? null);
+            setCouvertsMonth(s?.couverts ?? null);
+            setTicketsMonth(s?.tickets ?? null);
+          })
+          .catch(() => {
+            if (cancelled) return;
+            setCaMonth(null); setCaHtMonth(null); setCouvertsMonth(null); setTicketsMonth(null);
+          }),
+      ]);
+      if (!cancelled) {
+        setPresences((presData.data ?? []) as ComboPresence[]);
+        setLoading(false);
+      }
+    };
+    doLoad();
     return () => { cancelled = true; };
-  }, [loadKey, etab, selected, loadPresences, loadCA]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [etabId, selectedFrom, selectedTo]); // eslint-disable-line react-hooks/set-state-in-effect
 
   // Aggregate by employee (merge multiple weeks)
   const aggregated = useMemo(() => {
