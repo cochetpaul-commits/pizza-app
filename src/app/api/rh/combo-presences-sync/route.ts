@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { getContracts, getShifts, getLocations, COMBO_LOCATIONS, type ComboContract, type ComboShift } from "@/lib/combo/api";
+import { getContracts, getPlannings, getLocations, COMBO_LOCATIONS } from "@/lib/combo/api";
 
 /**
  * POST /api/rh/combo-presences-sync
  * Body: { from: string, to: string }
  *
- * Fetches shifts from Combo API for all locations, aggregates by employee,
+ * Fetches plannings from Combo API for all locations, aggregates by employee,
  * and upserts into combo_presences.
  */
 export async function POST(req: NextRequest) {
@@ -31,79 +31,102 @@ export async function POST(req: NextRequest) {
       const etabId = etabMap[loc.id];
       if (!etabId) continue;
 
-      // Load contracts and shifts
-      const [contracts, shifts] = await Promise.all([
+      // Load contracts (for contract_time) and plannings
+      const [contracts, plannings] = await Promise.all([
         getContracts(loc.id, from),
-        getShifts(loc.id, from, to),
+        getPlannings(loc.id, from, to),
       ]);
 
-      // Map contract_id → contract details
-      const contractMap = new Map<string, ComboContract>();
-      for (const c of contracts) contractMap.set(c.id, c);
+      // Map employee_number → contract for contract_time
+      const contractByEmpNum = new Map<string, number>();
+      for (const c of contracts) {
+        if (c.employee_number) contractByEmpNum.set(c.employee_number, c.contract_time);
+      }
 
-      // Aggregate shifts by contract
-      const shiftsByContract = new Map<string, ComboShift[]>();
-      for (const s of shifts) {
-        const arr = shiftsByContract.get(s.contract_id) ?? [];
-        arr.push(s);
-        shiftsByContract.set(s.contract_id, arr);
+      // Aggregate plannings by employee name
+      const empMap = new Map<string, {
+        firstname: string; lastname: string; employee_number: string | null;
+        team: string | null; totalMinutes: number; totalBreak: number;
+        daysWorked: Set<string>; repas: number;
+      }>();
+
+      for (const p of plannings) {
+        const key = `${p.firstname} ${p.lastname}`.trim();
+        const entry = empMap.get(key) ?? {
+          firstname: p.firstname, lastname: p.lastname,
+          employee_number: p.employee_number,
+          team: p.team_name, totalMinutes: 0, totalBreak: 0,
+          daysWorked: new Set<string>(), repas: 0,
+        };
+
+        const start = new Date(p.starts_at);
+        const end = new Date(p.ends_at);
+        const shiftMin = (end.getTime() - start.getTime()) / 60000;
+        entry.totalMinutes += shiftMin;
+        entry.totalBreak += p.break_duration;
+        entry.daysWorked.add(start.toISOString().slice(0, 10));
+        // Count meals: shift net > 5h = 1 meal
+        if ((shiftMin - p.break_duration) >= 300) entry.repas++;
+
+        empMap.set(key, entry);
       }
 
       // Build presence rows
       const rows: Record<string, unknown>[] = [];
 
-      for (const [contractId, contractShifts] of shiftsByContract) {
-        const contract = contractMap.get(contractId);
-        if (!contract) continue;
-
-        const comboNom = `${contract.firstname} ${contract.lastname}`.trim();
-
-        // Calculate hours
-        let totalMinutes = 0;
-        let totalBreak = 0;
-        const daysWorked = new Set<string>();
-        let repas = 0;
-
-        for (const s of contractShifts) {
-          const start = new Date(s.start_date);
-          const end = new Date(s.end_date);
-          const shiftMin = (end.getTime() - start.getTime()) / 60000;
-          totalMinutes += shiftMin;
-          totalBreak += s.break_duration;
-          daysWorked.add(start.toISOString().slice(0, 10));
-          // Count meals: shift > 5h = 1 meal
-          if ((shiftMin - s.break_duration) >= 300) repas++;
-        }
-
-        const workMinutes = totalMinutes - totalBreak;
+      for (const [comboNom, emp] of empMap) {
+        const workMinutes = emp.totalMinutes - emp.totalBreak;
         const heuresTravaillees = Math.round(workMinutes / 60 * 100) / 100;
-        const heuresPlanifiees = heuresTravaillees; // shifts are the plan
-        const heuresContrat = contract.contract_time ?? 0;
+        const heuresContrat = emp.employee_number ? (contractByEmpNum.get(emp.employee_number) ?? 0) : 0;
 
-        // Find team
-        const teamId = contractShifts[0]?.team_id;
-        const team = teamId ? loc.teams.find(t => t.id === teamId) : null;
-
-        // Match to employee
+        // Match to employee in DB
+        const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
         const { data: empMatch } = await supabaseAdmin
           .from("employes")
           .select("id")
-          .or(`combo_id.eq.${contract.id},and(nom.ilike.${contract.lastname},prenom.ilike.${contract.firstname})`)
           .eq("etablissement_id", etabId)
-          .limit(1);
+          .eq("actif", true);
+
+        const matched = (empMatch ?? []).find(e => {
+          // We need name to match — fetch full data
+          return false; // Will match by employee_number below
+        });
+
+        // Try match by employee_number or name
+        let employeId: string | null = null;
+        if (emp.employee_number) {
+          const { data: byMatricule } = await supabaseAdmin
+            .from("employes")
+            .select("id")
+            .eq("matricule", emp.employee_number)
+            .eq("etablissement_id", etabId)
+            .limit(1);
+          if (byMatricule?.[0]) employeId = byMatricule[0].id;
+        }
+        if (!employeId) {
+          const { data: byName } = await supabaseAdmin
+            .from("employes")
+            .select("id, prenom, nom")
+            .eq("etablissement_id", etabId)
+            .eq("actif", true);
+          const found = (byName ?? []).find(e =>
+            norm(e.nom) === norm(emp.lastname) && norm(e.prenom) === norm(emp.firstname)
+          );
+          if (found) employeId = found.id;
+        }
 
         rows.push({
           etablissement_id: etabId,
           combo_nom: comboNom,
-          equipe: team?.name ?? null,
-          employe_id: empMatch?.[0]?.id ?? null,
-          matched: !!empMatch?.[0],
-          heures_planifiees: heuresPlanifiees,
+          equipe: emp.team,
+          employe_id: employeId,
+          matched: !!employeId,
+          heures_planifiees: heuresTravaillees,
           heures_travaillees: heuresTravaillees,
           heures_contrat: heuresContrat,
-          nb_repas: repas,
-          nb_jours_travailles: daysWorked.size,
-          ecart_total: Math.round((heuresTravaillees - heuresPlanifiees) * 100) / 100,
+          nb_repas: emp.repas,
+          nb_jours_travailles: emp.daysWorked.size,
+          ecart_total: 0,
           periode_debut: from,
           periode_fin: to,
         });

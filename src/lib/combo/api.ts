@@ -61,13 +61,18 @@ export type ComboContract = {
 };
 
 export type ComboShift = {
-  id: string;
-  contract_id: string;
-  team_id: string | null;
-  start_date: string; // ISO datetime
-  end_date: string; // ISO datetime
+  starts_at: string; // ISO datetime with timezone
+  ends_at: string;
   break_duration: number; // minutes
   note: string | null;
+  firstname: string;
+  lastname: string;
+  employee_number: string | null;
+  location_id: string;
+  location_name: string;
+  team_name: string | null;
+  team_id: string | null;
+  label_name: string | null;
 };
 
 // ── Endpoints ──
@@ -81,8 +86,12 @@ export async function getContracts(locationId: string, day?: string): Promise<Co
   return comboGet(`contracts?location_id=${locationId}&day=${d}`);
 }
 
-export async function getShifts(locationId: string, startDate: string, endDate: string): Promise<ComboShift[]> {
-  return comboGet(`shifts?location_id=${locationId}&start_date=${startDate}&end_date=${endDate}`);
+export async function getPlannings(locationId: string, startDate: string, endDate: string): Promise<ComboShift[]> {
+  // end_date is EXCLUSIVE in Combo API, so add 1 day
+  const end = new Date(endDate + "T12:00:00");
+  end.setDate(end.getDate() + 1);
+  const endExcl = end.toISOString().slice(0, 10);
+  return comboGet(`plannings?location_id=${locationId}&start_date=${startDate}&end_date=${endExcl}`);
 }
 
 // ── Location IDs ──
