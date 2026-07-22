@@ -72,7 +72,6 @@ export type SidebarEntry = NavEtabGroup | NavSettingsGroup | NavStandaloneItem |
 // PILOTAGE (analyse & performance)
 const PILOTAGE_ITEMS: NavItemV2[] = [
   { label: "Ventes", href: "/ventes", icon: "barChart" },
-  { label: "Ventes live", href: "/ventes/live", icon: "trendingUp" },
   { label: "Produits", href: "/ventes/marges", icon: "wallet" },
   { label: "Masse salariale", href: "/rh/masse-salariale", icon: "calculator" },
   { label: "Tresorerie", href: "/tresorerie", icon: "wallet" },
@@ -134,11 +133,11 @@ export const PERFORMANCES_ITEMS: NavItemV2[] = [];
 export const OPERATIONS_ITEMS = PRODUCTION_ITEMS;
 
 // Sections
-export const PILOTAGE_SECTION: NavSubSection = { label: "Pilotage", icon: "barChart", href: "/ventes", roles: ["group_admin"], items: PILOTAGE_ITEMS };
-export const PERSONNEL_SECTION: NavSubSection = { label: "Personnel", icon: "users", href: "/personnel", items: PLANNING_ITEMS };
-export const PRODUCTION_SECTION: NavSubSection = { label: "Production", icon: "package", roles: ["group_admin"], items: PRODUCTION_ITEMS };
-export const PRODUCTION_SECTION_PICCOLA: NavSubSection = { label: "Production", icon: "package", roles: ["group_admin"], items: PRODUCTION_ITEMS_PICCOLA };
-export const ACHATS_SECTION: NavSubSection = { label: "Achats", icon: "shoppingBag", roles: ["group_admin"], items: ACHATS_ITEMS };
+export const PILOTAGE_SECTION: NavSubSection = { label: "Pilotage", icon: "barChart", href: "/ventes", roles: ["group_admin", "manager"], items: PILOTAGE_ITEMS };
+export const PERSONNEL_SECTION: NavSubSection = { label: "Personnel", icon: "users", href: "/personnel", roles: ["group_admin", "manager"], items: PLANNING_ITEMS };
+export const PRODUCTION_SECTION: NavSubSection = { label: "Production", icon: "package", roles: ["group_admin", "manager", "equipier"], items: PRODUCTION_ITEMS };
+export const PRODUCTION_SECTION_PICCOLA: NavSubSection = { label: "Production", icon: "package", roles: ["group_admin", "manager", "equipier"], items: PRODUCTION_ITEMS_PICCOLA };
+export const ACHATS_SECTION: NavSubSection = { label: "Achats", icon: "shoppingBag", roles: ["group_admin", "manager", "equipier"], items: ACHATS_ITEMS };
 export const HACCP_SECTION: NavSubSection = { label: "HACCP", icon: "clipboard", href: "/haccp", items: HACCP_ITEMS };
 export const EVENEMENTIEL_SECTION: NavSubSection = { label: "Evenementiel", icon: "calendarEvent", items: EVENEMENTIEL_ITEMS };
 

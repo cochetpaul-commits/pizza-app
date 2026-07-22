@@ -335,18 +335,17 @@ function BelloMioContent() {
       {liveCA != null && liveCA > 0 && (
         <>
           <SectionTitle>Popina live</SectionTitle>
-          <Link href="/ventes/live" style={{ textDecoration: "none" }}>
-            <div style={{
+          <div style={{
               background: `linear-gradient(135deg, #2563EB10 0%, #2563EB05 100%)`,
               borderRadius: 14, padding: "14px 16px", border: "1.5px solid #2563EB25",
-              marginBottom: 20, cursor: "pointer",
+              marginBottom: 20,
             }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                 <div>
                   <div style={{ fontSize: 24, fontWeight: 700, fontFamily: OSWALD, color: "#2563EB" }}>
-                    {fmtEur(liveCA)} €
+                    {fmtEur(liveCA)} {"\u20AC"}
                   </div>
-                  <div style={{ fontSize: 11, color: "#666" }}>{liveCouverts} couverts — en direct</div>
+                  <div style={{ fontSize: 11, color: "#666" }}>{liveCouverts} couverts : en direct</div>
                 </div>
                 <span style={{ fontSize: 10, color: "#2563EB", fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: "#2563EB15" }}>
                   LIVE
@@ -362,7 +361,6 @@ function BelloMioContent() {
                 </div>
               )}
             </div>
-          </Link>
         </>
       )}
 
