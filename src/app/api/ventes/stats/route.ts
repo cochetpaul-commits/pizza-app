@@ -404,14 +404,21 @@ function aggregate(rows: Row[]) {
   // Top 3 par catégorie
   const top3_cats = mixEntries.slice(0, 8).map(([cat]) => {
     const prods = catProds[cat] || [];
+    const totalQty = prods.reduce((s, p) => s + p.qty, 0);
+    const totalCA_ttc = prods.reduce((s, p) => s + p.ca_ttc, 0);
+    const totalCA_ht = prods.reduce((s, p) => s + p.ca_ht, 0);
     const top3 = prods.slice(0, 3).map(p => ({
       n: p.n,
+      qty: p.qty,
       ca_ttc: `${p.ca_ttc.toLocaleString("fr-FR")}\u20AC`,
       ca_ht: `${p.ca_ht.toLocaleString("fr-FR")}\u20AC`,
     }));
     const flop = prods.length > 3 ? prods[prods.length - 1] : null;
     return {
       cat,
+      total_qty: totalQty,
+      total_ca_ttc: Math.round(totalCA_ttc),
+      total_ca_ht: Math.round(totalCA_ht),
       rows: top3,
       flop: flop ? {
         n: flop.n,

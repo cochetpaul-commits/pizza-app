@@ -36,7 +36,7 @@ type WeekData = {
   cat_products_sur: Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]>;
   cat_products_emp: Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]>;
   cat_products_zones: Record<string, Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]>>;
-  top3_cats: { cat: string; rows: { n: string; ca_ttc: string; ca_ht: string }[]; flop: { n: string; ca_ttc: string; ca_ht: string; qty: number } | null }[];
+  top3_cats: { cat: string; total_qty?: number; total_ca_ttc?: number; total_ca_ht?: number; rows: { n: string; qty?: number; ca_ttc: string; ca_ht: string }[]; flop: { n: string; ca_ttc: string; ca_ht: string; qty: number } | null }[];
   serveurs: string[]; serv_ca_ttc: number[]; serv_ca_ht: number[]; serv_tickets: number[]; serv_cov: number[];
   ratios: {
     anti: { tables: number; coverts: number; ca_ttc: number; ca_ht: number };
@@ -1691,17 +1691,30 @@ function PerformancesPage() {
                 <div className="ventes-top3-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
                   {W.top3_cats.filter(c => !c.cat.toLowerCase().includes("bambini")).map((cat, ci) => (
                     <div key={ci} style={{ background: "#fff", borderRadius: 10, padding: "12px 14px", border: "1px solid rgba(0,0,0,.08)" }}>
-                      <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".1em", color: getCategoryColor(cat.cat, ci), fontWeight: 600, marginBottom: 8 }}>{cat.cat}</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+                        <span style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".1em", color: getCategoryColor(cat.cat, ci), fontWeight: 600 }}>{cat.cat}</span>
+                        {cat.total_qty != null && (
+                          <span style={{ fontSize: 10, color: "#999" }}>
+                            {cat.total_qty}x · {(mode === "ttc" ? cat.total_ca_ttc : cat.total_ca_ht)?.toLocaleString("fr-FR")}{"\u20AC"}
+                          </span>
+                        )}
+                      </div>
                       {cat.rows.map((r, ri) => (
                         <div key={ri} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", borderBottom: "1px solid rgba(0,0,0,.04)", fontSize: 11 }}>
                           <span><span style={{ fontSize: 9, color: "#bbb", marginRight: 4 }}>{ri + 1}</span>{r.n}</span>
-                          <span style={{ fontFamily: "var(--font-cormorant), Cormorant Garamond, serif", fontSize: 13, fontWeight: 600, color: accent }}>{mode === "ttc" ? r.ca_ttc : r.ca_ht}</span>
+                          <span style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                            {r.qty != null && <span style={{ fontSize: 9, color: "#999" }}>{r.qty}x</span>}
+                            <span style={{ fontFamily: "var(--font-cormorant), Cormorant Garamond, serif", fontSize: 13, fontWeight: 600, color: accent }}>{mode === "ttc" ? r.ca_ttc : r.ca_ht}</span>
+                          </span>
                         </div>
                       ))}
                       {cat.flop && (
                         <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0 2px", marginTop: 4, borderTop: "1px dashed rgba(0,0,0,.08)", fontSize: 11 }}>
                           <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ fontSize: 9, color: "#c62828", fontWeight: 600 }}>▼</span><span style={{ color: "#777" }}>{cat.flop.n}</span></span>
-                          <span style={{ fontFamily: "var(--font-cormorant), Cormorant Garamond, serif", fontSize: 13, fontWeight: 600, color: "#777" }}>{mode === "ttc" ? cat.flop.ca_ttc : cat.flop.ca_ht}</span>
+                          <span style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                            <span style={{ fontSize: 9, color: "#999" }}>{cat.flop.qty}x</span>
+                            <span style={{ fontFamily: "var(--font-cormorant), Cormorant Garamond, serif", fontSize: 13, fontWeight: 600, color: "#777" }}>{mode === "ttc" ? cat.flop.ca_ttc : cat.flop.ca_ht}</span>
+                          </span>
                         </div>
                       )}
                     </div>
