@@ -70,7 +70,6 @@ export default function InventairePage() {
   const [showManageZones, setShowManageZones] = useState(false);
 
   const [packInfo, setPackInfo] = useState<Record<string, { pack_count: number; pack_each_qty: number | null; pack_each_unit: string | null }>>({}); // ingredient_id -> pack info
-  const [invUnitModes, setInvUnitModes] = useState<Record<string, "individual" | "carton">>({});
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -858,26 +857,17 @@ export default function InventairePage() {
                     <div style={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 2 }}>
                       {items.map((ing) => {
                         const pack = packInfo[ing.id];
-                        const invMode = invUnitModes[ing.id] ?? "individual";
                         const rawQty = quantities[ing.id];
                         const rawQtyNum = typeof rawQty === "number" ? rawQty : 0;
-
-                        // Display qty: if in carton mode, show cartons
-                        const displayQty = (invMode === "carton" && pack)
-                          ? (rawQtyNum > 0 ? Math.round(rawQtyNum / pack.pack_count) : rawQty)
-                          : rawQty;
-                        const displayQtyNum = typeof displayQty === "number" ? displayQty : 0;
                         const hasQty = rawQtyNum > 0;
                         const isZeroConfirmed = quantities[ing.id] === 0;
                         const valeur = hasQty && ing.cost_per_unit != null
                           ? rawQtyNum * ing.cost_per_unit : null;
 
-                        // Carton info line
-                        const cartonInfo = (pack && hasQty)
-                          ? (rawQtyNum % pack.pack_count === 0
-                            ? `${rawQtyNum / pack.pack_count} carton(s)`
-                            : `${Math.floor(rawQtyNum / pack.pack_count)} carton(s) + ${rawQtyNum % pack.pack_count}`)
-                          : null;
+                        // For pack items: decompose stored qty into cartons + loose
+                        const nbCartons = pack ? Math.floor(rawQtyNum / pack.pack_count) : 0;
+                        const nbLoose = pack ? rawQtyNum % pack.pack_count : rawQtyNum;
+                        const packUnit = pack?.pack_each_unit ?? ing.default_unit ?? "pcs";
 
                         return (
                           <div
@@ -905,35 +895,12 @@ export default function InventairePage() {
                                 {ing.name}
                               </div>
                               <div style={{ fontSize: 10, color: "#999", marginTop: 1 }}>
-                                {invMode === "carton" && pack
-                                  ? `carton de ${pack.pack_count}`
+                                {pack
+                                  ? `carton de ${pack.pack_count} × ${pack.pack_each_qty ?? 1}${packUnit}`
                                   : (ing.default_unit ?? "pcs")}
-                                {cartonInfo && invMode === "individual" && (
-                                  <span style={{ marginLeft: 6, color: "#7C3AED" }}>({cartonInfo})</span>
-                                )}
+                                {hasQty && <span style={{ marginLeft: 6, color: "#7C3AED" }}>= {rawQtyNum} {packUnit}</span>}
                               </div>
                             </div>
-
-                            {/* Pack toggle */}
-                            {pack && !readOnly && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setInvUnitModes(prev => ({
-                                    ...prev,
-                                    [ing.id]: invMode === "individual" ? "carton" : "individual",
-                                  }));
-                                }}
-                                style={{
-                                  fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
-                                  border: "1px solid #7C3AED", background: invMode === "carton" ? "#7C3AED" : "transparent",
-                                  color: invMode === "carton" ? "#fff" : "#7C3AED", cursor: "pointer",
-                                  flexShrink: 0, fontFamily: "DM Sans, sans-serif",
-                                }}
-                              >
-                                {invMode === "carton" ? "cartons" : "crt"}
-                              </button>
-                            )}
 
                             {/* Value */}
                             {valeur != null && (
@@ -942,34 +909,73 @@ export default function InventairePage() {
                               </span>
                             )}
 
-                            {/* Qty input */}
+                            {/* Qty inputs */}
                             {readOnly ? (
                               <span style={{
                                 fontSize: 15, fontWeight: 700, color: hasQty ? "#D4775A" : "#ccc",
                                 minWidth: 50, textAlign: "right", flexShrink: 0,
                               }}>
-                                {hasQty ? (invMode === "carton" && pack ? `${displayQtyNum}` : `${rawQtyNum}`) : "-"}
+                                {hasQty ? (pack ? `${nbCartons}c + ${nbLoose}` : `${rawQtyNum}`) : "-"}
                               </span>
+                            ) : pack ? (
+                              /* Dual input: cartons + loose units */
+                              <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                                  <input
+                                    type="number"
+                                    step="1"
+                                    min="0"
+                                    value={hasQty || isZeroConfirmed ? nbCartons : ""}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      const c = val === "" ? 0 : Math.max(0, Math.round(Number(val)));
+                                      const total = c * pack.pack_count + nbLoose;
+                                      handleQtyChange(ing.id, String(total));
+                                    }}
+                                    placeholder="0"
+                                    style={{
+                                      width: 48, height: 36, borderRadius: 8,
+                                      border: nbCartons > 0 ? `1.5px solid #7C3AED` : "1px solid #ddd6c8",
+                                      padding: "0 4px", fontSize: 14, fontWeight: 600,
+                                      textAlign: "center", background: "#fff", outline: "none",
+                                      color: nbCartons > 0 ? "#7C3AED" : "#1a1a1a",
+                                    }}
+                                  />
+                                  <span style={{ fontSize: 8, color: "#7C3AED", fontWeight: 700, marginTop: 1 }}>crt</span>
+                                </div>
+                                <span style={{ fontSize: 11, color: "#999", fontWeight: 600 }}>+</span>
+                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                                  <input
+                                    type="number"
+                                    step="1"
+                                    min="0"
+                                    value={hasQty || isZeroConfirmed ? nbLoose : ""}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      const l = val === "" ? 0 : Math.max(0, Math.round(Number(val)));
+                                      const total = nbCartons * pack.pack_count + l;
+                                      handleQtyChange(ing.id, String(total));
+                                    }}
+                                    placeholder="0"
+                                    style={{
+                                      width: 48, height: 36, borderRadius: 8,
+                                      border: nbLoose > 0 ? `1.5px solid ${color}` : "1px solid #ddd6c8",
+                                      padding: "0 4px", fontSize: 14, fontWeight: 600,
+                                      textAlign: "center", background: "#fff", outline: "none",
+                                      color: nbLoose > 0 ? color : "#1a1a1a",
+                                    }}
+                                  />
+                                  <span style={{ fontSize: 8, color: "#999", fontWeight: 600, marginTop: 1 }}>{packUnit}</span>
+                                </div>
+                              </div>
                             ) : (
+                              /* Simple input for items without pack */
                               <input
                                 type="number"
-                                step={invMode === "carton" && pack ? "1" : "0.5"}
+                                step="0.5"
                                 min="0"
-                                value={displayQty ?? ""}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (val === "") {
-                                    handleQtyChange(ing.id, "");
-                                  } else {
-                                    const num = Number(val);
-                                    if (invMode === "carton" && pack) {
-                                      // Convert cartons to individual units for storage
-                                      handleQtyChange(ing.id, String(Math.round(num * pack.pack_count)));
-                                    } else {
-                                      handleQtyChange(ing.id, val);
-                                    }
-                                  }
-                                }}
+                                value={rawQty ?? ""}
+                                onChange={(e) => handleQtyChange(ing.id, e.target.value)}
                                 placeholder="0"
                                 style={{
                                   width: 70, height: 36, borderRadius: 8,

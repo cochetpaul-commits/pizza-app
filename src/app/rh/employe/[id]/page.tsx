@@ -91,6 +91,8 @@ export default function EmployeDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState("");
   const [mainTab] = useState<MainTab>("infos");
 
   // ── Employee fields ──
@@ -357,17 +359,87 @@ export default function EmployeDetailPage() {
       payload.note = note || null;
     } catch { /* ignore */ }
 
+    // Also update equipe from the hidden select
+    const newEquipe = (document.getElementById("contrat-equipe") as HTMLSelectElement)?.value;
+    if (newEquipe) {
+      const currentAccess = ((emp as Record<string, unknown>).equipes_access as string[]) ?? [];
+      if (!currentAccess.includes(newEquipe)) {
+        payload.equipes_access = [newEquipe, ...currentAccess];
+      } else if (currentAccess[0] !== newEquipe) {
+        payload.equipes_access = [newEquipe, ...currentAccess.filter((e: string) => e !== newEquipe)];
+      }
+    }
+
     const { error } = await supabase
       .from("employes")
       .update(payload)
       .eq("id", id);
 
+    if (error) { setSaving(false); alert("Erreur : " + error.message); return; }
+
+    // Update equipe local state
+    if (payload.equipes_access) {
+      setEmp((prev: Record<string, unknown>) => ({ ...prev, equipes_access: payload.equipes_access }));
+    }
+
+    // Also update active contrat fields (type, remuneration) if there is one
+    if (editContratId) {
+      const { error: cErr } = await supabase
+        .from("contrats")
+        .update({ type: cType, remuneration: cRemuneration })
+        .eq("id", editContratId);
+      if (cErr) { setSaving(false); alert("Erreur contrat : " + cErr.message); return; }
+      // Reload contrats
+      const { data } = await supabase.from("contrats").select("*").eq("employe_id", id).order("date_debut", { ascending: false });
+      setContrats(data ?? []);
+    }
+
     setSaving(false);
-    if (error) { alert("Erreur : " + error.message); return; }
     setSaveOk(true);
     setTimeout(() => setSaveOk(false), 2000);
   };
 
+  /* ── Combo sync ── */
+  const handleComboSync = async () => {
+    if (!id) return;
+    setSyncing(true);
+    setSyncMsg("");
+    try {
+      const res = await fetch("/api/combo/sync-employee", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employe_id: id }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        setSyncMsg(data.error ?? "Erreur inconnue");
+        setSyncing(false);
+        return;
+      }
+      // Update local state from synced data
+      const e = data.employee;
+      setEmp(e);
+      setPrenom(e.prenom ?? "");
+      setNom(e.nom ?? "");
+      setEmail(e.email ?? "");
+      setTelMobile(e.tel_mobile ?? "");
+      setAdresse(e.adresse ?? "");
+      setCodePostal(e.code_postal ?? "");
+      setVille(e.ville ?? "");
+      setNumeroSecu(e.numero_secu ?? "");
+      setMatricule(e.matricule ?? "");
+      setActif(e.actif ?? true);
+
+      // Update contrats
+      setContrats(data.contrats ?? []);
+
+      setSyncMsg("OK");
+      setTimeout(() => setSyncMsg(""), 3000);
+    } catch (err) {
+      setSyncMsg(err instanceof Error ? err.message : "Erreur");
+    }
+    setSyncing(false);
+  };
 
   /* ── Save contrat ── */
   const handleSaveContrat = async () => {
@@ -582,13 +654,26 @@ export default function EmployeDetailPage() {
                 </span>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center" }}>
               {canWrite && (
-                <button type="button" onClick={handleSave} disabled={saving} style={{
-                  ...saveBtnStyle, background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.3)",
-                }}>
-                  {saving ? "..." : saveOk ? "OK" : "Sauvegarder"}
-                </button>
+                <>
+                  <button type="button" onClick={handleComboSync} disabled={syncing} style={{
+                    padding: "6px 14px", borderRadius: 20, fontSize: 11, fontWeight: 700,
+                    background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)",
+                    color: "#fff", cursor: syncing ? "wait" : "pointer", opacity: syncing ? 0.5 : 1,
+                    fontFamily: "var(--font-oswald), Oswald, sans-serif", textTransform: "uppercase", letterSpacing: ".04em",
+                  }}>
+                    {syncing ? "Sync..." : syncMsg === "OK" ? "Synced" : "Sync Combo"}
+                  </button>
+                  <button type="button" onClick={handleSave} disabled={saving} style={{
+                    ...saveBtnStyle, background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.3)",
+                  }}>
+                    {saving ? "..." : saveOk ? "OK" : "Sauvegarder"}
+                  </button>
+                </>
+              )}
+              {syncMsg && syncMsg !== "OK" && (
+                <span style={{ fontSize: 10, color: "#fca5a5", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{syncMsg}</span>
               )}
             </div>
           </div>
@@ -751,6 +836,127 @@ export default function EmployeDetailPage() {
               disabled={!canWrite}
             />
           </div>
+        </AccordionSection>
+
+        {/* ═══ REGISTRE UNIQUE DU PERSONNEL ═══ */}
+        <AccordionSection
+          title="Registre Unique du Personnel (RUP)"
+          icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>}
+          iconColor="#2563EB" iconBg="rgba(37,99,235,0.08)"
+        >
+          {(() => {
+            const e = emp as Record<string, unknown>;
+            const dateEntree = (e.date_entree as string) ?? "";
+            const dateSortie = (e.date_sortie as string) ?? "";
+            const motifSortie = (e.motif_sortie as string) ?? "";
+            const authType = (e.autorisation_travail_type as string) ?? "";
+            const authNum = (e.autorisation_travail_numero as string) ?? "";
+            const authFin = (e.autorisation_travail_fin as string) ?? "";
+            const isEtranger = travailleurEtranger;
+
+            const updateRup = async (field: string, value: unknown) => {
+              await supabase.from("employes").update({ [field]: value || null }).eq("id", emp.id);
+              setEmp((prev: Record<string, unknown>) => ({ ...prev, [field]: value || null }));
+            };
+
+            // RUP completeness check
+            const rupFields = [
+              prenom, nom, dateNaissance, genre, nationalite,
+              cType, cEmploi, dateEntree,
+            ];
+            if (isEtranger) rupFields.push(authType, authNum);
+            const filled = rupFields.filter(f => f && f !== "").length;
+            const total = rupFields.length;
+
+            return (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                  <span style={{ fontSize: 11, color: filled === total ? "#2D6A4F" : "#D4775A", fontWeight: 700 }}>
+                    {filled}/{total} champs remplis
+                  </span>
+                  {filled === total && (
+                    <span style={{ fontSize: 10, color: "#2D6A4F", fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: "rgba(45,106,79,0.08)" }}>Complet</span>
+                  )}
+                </div>
+
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>IDENTITE</div>
+                <div style={grid2}>
+                  <div><div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Nom</div><div style={{ fontSize: 13, fontWeight: 600 }}>{nom || "—"}</div></div>
+                  <div><div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Prenom</div><div style={{ fontSize: 13, fontWeight: 600 }}>{prenom || "—"}</div></div>
+                </div>
+                <div style={{ ...grid2, marginTop: 8 }}>
+                  <div><div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Date de naissance</div><div style={{ fontSize: 13, fontWeight: 600 }}>{dateNaissance || "—"}</div></div>
+                  <div><div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Sexe</div><div style={{ fontSize: 13, fontWeight: 600 }}>{genre === "M" ? "Masculin" : genre === "F" ? "Feminin" : genre || "—"}</div></div>
+                </div>
+                <div style={{ ...grid2, marginTop: 8 }}>
+                  <div><div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Nationalite</div><div style={{ fontSize: 13, fontWeight: 600 }}>{nationalite || "—"}</div></div>
+                  <div><div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>N° Securite sociale</div><div style={{ fontSize: 13, fontWeight: 600 }}>{numeroSecu || "—"}</div></div>
+                </div>
+
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, marginTop: 16 }}>EMPLOI</div>
+                <div style={grid2}>
+                  <div><div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Type de contrat</div><div style={{ fontSize: 13, fontWeight: 600 }}>{CONTRAT_LABELS[cType] ?? (cType || "—")}</div></div>
+                  <div><div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Emploi / Qualification</div><div style={{ fontSize: 13, fontWeight: 600 }}>{cEmploi || cQualification || "—"}</div></div>
+                </div>
+                <div style={{ ...grid2, marginTop: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Date d&apos;entree</div>
+                    <input type="date" style={inputSt} value={dateEntree} onChange={(e) => updateRup("date_entree", e.target.value)} disabled={!canWrite} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Date de sortie</div>
+                    <input type="date" style={inputSt} value={dateSortie} onChange={(e) => updateRup("date_sortie", e.target.value)} disabled={!canWrite} />
+                  </div>
+                </div>
+                {dateSortie && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Motif de sortie</div>
+                    <select style={inputSt} value={motifSortie} onChange={(e) => updateRup("motif_sortie", e.target.value)} disabled={!canWrite}>
+                      <option value="">—</option>
+                      <option value="demission">Demission</option>
+                      <option value="licenciement">Licenciement</option>
+                      <option value="rupture_conventionnelle">Rupture conventionnelle</option>
+                      <option value="fin_cdd">Fin de CDD</option>
+                      <option value="fin_periode_essai">Fin de periode d&apos;essai</option>
+                      <option value="depart_retraite">Depart en retraite</option>
+                      <option value="autre">Autre</option>
+                    </select>
+                  </div>
+                )}
+
+                {isEtranger && (
+                  <>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, marginTop: 16 }}>AUTORISATION DE TRAVAIL</div>
+                    <div style={grid2}>
+                      <div>
+                        <div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Type d&apos;autorisation</div>
+                        <select style={inputSt} value={authType} onChange={(e) => updateRup("autorisation_travail_type", e.target.value)} disabled={!canWrite}>
+                          <option value="">—</option>
+                          <option value="titre_sejour">Titre de sejour</option>
+                          <option value="autorisation_provisoire">Autorisation provisoire de travail</option>
+                          <option value="visa_long_sejour">Visa long sejour</option>
+                          <option value="carte_resident">Carte de resident</option>
+                          <option value="recepisse">Recepisse</option>
+                        </select>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Numero</div>
+                        <input style={inputSt} value={authNum} onChange={(e) => updateRup("autorisation_travail_numero", e.target.value)} disabled={!canWrite} placeholder="N° du titre" />
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Date de fin de validite</div>
+                      <input type="date" style={inputSt} value={authFin} onChange={(e) => updateRup("autorisation_travail_fin", e.target.value)} disabled={!canWrite} />
+                    </div>
+                  </>
+                )}
+
+                <div style={{ marginTop: 16, padding: 10, borderRadius: 8, background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.12)", fontSize: 11, color: "#2563EB", lineHeight: 1.5 }}>
+                  Le Registre Unique du Personnel est obligatoire (art. L1221-13 du Code du travail). Il doit contenir l&apos;identite, l&apos;emploi, les dates d&apos;entree/sortie, et pour les travailleurs etrangers, le type et numero d&apos;autorisation de travail.
+                </div>
+              </div>
+            );
+          })()}
         </AccordionSection>
 
         {/* ═══ TAB: CONTRATS (hidden — kept for legacy) ═══ */}
@@ -2282,21 +2488,6 @@ const contratPill = (type: string): React.CSSProperties => {
   return { display: "inline-block", padding: "2px 10px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: c.bg, color: c.fg };
 };
 
-
-const completionBarBg: React.CSSProperties = {
-  width: 120,
-  height: 6,
-  borderRadius: 3,
-  background: "#f0ebe3",
-  overflow: "hidden",
-};
-
-const completionBarFill: React.CSSProperties = {
-  height: "100%",
-  borderRadius: 3,
-  background: "#e27f57",
-  transition: "width 0.3s ease",
-};
 
 const tabsRow: React.CSSProperties = {
   display: "flex",
