@@ -190,7 +190,7 @@ export default function EquipePage() {
                 const summary = (data.results as { location: string; created: number; updated: number }[])
                   .map((r: { location: string; created: number; updated: number }) => `${r.location} : ${r.created} crees, ${r.updated} mis a jour`).join(" ; ");
                 setSyncResult(summary);
-                loadData();
+                setTimeout(loadData, 1500);
               } else {
                 setSyncResult("Erreur : " + (data.error ?? "inconnue"));
               }

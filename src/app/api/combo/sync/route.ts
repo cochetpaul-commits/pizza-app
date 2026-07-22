@@ -60,6 +60,7 @@ export async function POST() {
           combo_id: contract.id,
           combo_contract_id: contract.original_contract_id,
           etablissement_id: etabId,
+          etablissements_ids: [etabId],
           equipes_access: teamName ? [teamName] : [],
           actif: true,
           // Infos from Combo
