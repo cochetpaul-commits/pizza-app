@@ -223,6 +223,36 @@ function MargesPage() {
   const [trendFilter, setTrendFilter] = useState<"all" | "product" | "category">("all");
   const [trendProduct, setTrendProduct] = useState<string | null>(null);
   const [trendCategory, setTrendCategory] = useState<string | null>(null);
+  const [trendSubCat, setTrendSubCat] = useState<string | null>(null);
+
+  // Sub-categories from popina_products (name → sub_category mapping)
+  const [popinaSubCats, setPopinaSubCats] = useState<Record<string, string>>({});
+  const [allSubCats, setAllSubCats] = useState<Record<string, string[]>>({});
+  useEffect(() => {
+    (async () => {
+      const { data: pp } = await (await import("@/lib/supabaseClient")).supabase
+        .from("popina_products")
+        .select("name, category, sub_category")
+        .eq("active", true)
+        .not("sub_category", "is", null);
+      const nameMap: Record<string, string> = {};
+      const catSubs: Record<string, Set<string>> = {};
+      for (const p of pp ?? []) {
+        if (p.sub_category) {
+          const n = (p.name ?? "").trim().toLowerCase();
+          nameMap[n] = p.sub_category;
+          if (!catSubs[p.category]) catSubs[p.category] = new Set();
+          catSubs[p.category].add(p.sub_category);
+        }
+      }
+      setPopinaSubCats(nameMap);
+      const result: Record<string, string[]> = {};
+      for (const [cat, subs] of Object.entries(catSubs)) {
+        result[cat] = [...subs].sort();
+      }
+      setAllSubCats(result);
+    })();
+  }, []);
   const [trendMode, _setTrendMode] = useState<TrendMode>("par_mois");
   const [trendMetric, setTrendMetric] = useState<"qty" | "ca_ht">("qty");
   const [trendService, setTrendService] = useState<"all" | "midi" | "soir">("all");
@@ -863,10 +893,12 @@ function MargesPage() {
                       setTrendFilter("category");
                       setTrendCategory(v);
                       setTrendProduct(null);
+                      setTrendSubCat(null);
                     } else {
                       setTrendFilter("all");
                       setTrendCategory(null);
                       setTrendProduct(null);
+                      setTrendSubCat(null);
                     }
                   }}
                   style={{
@@ -881,6 +913,28 @@ function MargesPage() {
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
+
+                {/* Sub-category dropdown (only when category has sub-categories) */}
+                {trendCategory && (allSubCats[trendCategory]?.length ?? 0) > 0 && (
+                  <select
+                    value={trendSubCat ?? ""}
+                    onChange={(e) => {
+                      setTrendSubCat(e.target.value || null);
+                      setTrendProduct(null);
+                    }}
+                    style={{
+                      height: 40, borderRadius: 10, border: "1px solid #e0d8ce",
+                      padding: "0 12px", fontSize: 13, background: "#fff",
+                      color: "#1a1a1a", cursor: "pointer", flex: 1, minWidth: 0,
+                      appearance: "auto" as CSSProperties["appearance"],
+                    }}
+                  >
+                    <option value="">Toutes sous-cat.</option>
+                    {(allSubCats[trendCategory] ?? []).map((sc) => (
+                      <option key={sc} value={sc}>{sc}</option>
+                    ))}
+                  </select>
+                )}
 
                 {/* Product dropdown (only when a category is selected) */}
                 {trendCategory && (
@@ -906,6 +960,7 @@ function MargesPage() {
                     <option value="">Tous les produits</option>
                     {(data?.products ?? [])
                       .filter((p) => p.categorie === trendCategory)
+                      .filter((p) => !trendSubCat || popinaSubCats[p.name.trim().toLowerCase()] === trendSubCat)
                       .sort((a, b) => b.ca_ttc - a.ca_ttc)
                       .map((p) => (
                         <option key={p.name} value={p.name}>{p.name}</option>
@@ -1011,7 +1066,10 @@ function MargesPage() {
 
               {/* Drill-down: products (from trend data, filtered by service) */}
               {trendProducts.length > 0 && (trendFilter === "category" || trendFilter === "all") && (() => {
-                const catProducts = trendProducts.slice(0, 15);
+                const catProducts = (trendSubCat
+                  ? trendProducts.filter(p => popinaSubCats[p.name.trim().toLowerCase()] === trendSubCat)
+                  : trendProducts
+                ).slice(0, 15);
                 if (catProducts.length === 0) return null;
                 const maxCA = catProducts[0]?.ca_ht ?? 1;
                 const catColor = getCategoryColor(trendCategory ?? "Autre");

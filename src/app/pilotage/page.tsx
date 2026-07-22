@@ -690,6 +690,24 @@ export default function PilotagePage() {
       <>
         <main style={{ maxWidth: 720, margin: "0 auto", padding: "20px 16px 56px", boxSizing: "border-box" }}>
 
+          {/* ── TABS : Ventes | Produits ── */}
+          <div style={{ display: "flex", gap: 4, marginBottom: 14 }}>
+            {(["ventes", "produits"] as const).map(t => (
+              <button key={t} type="button" onClick={() => { setPilotageTab(t); if (t === "produits") loadProdData(); }} style={{
+                flex: 1, padding: "10px 0", borderRadius: 10,
+                background: pilotageTab === t ? "#1a1a1a" : "#fff",
+                color: pilotageTab === t ? "#fff" : "#999",
+                fontSize: 13, fontWeight: 700, cursor: "pointer",
+                fontFamily: "var(--font-oswald), Oswald, sans-serif",
+                textTransform: "uppercase", letterSpacing: ".06em",
+                boxShadow: pilotageTab === t ? "0 2px 8px rgba(0,0,0,0.12)" : "none",
+                border: pilotageTab === t ? "1.5px solid #1a1a1a" : "1px solid #ede6d9",
+              }}>
+                {t === "ventes" ? "Ventes" : "Produits"}
+              </button>
+            ))}
+          </div>
+
           {/* ── BLOC 0 : WEEK SELECTOR (desktop only) ─────────────────────────── */}
           <div className="desktop-only">
             <WeekSelector weekStr={weekStr} currentWeek={currentWeek} onPrev={goPrevWeek} onNext={goNextWeek} />
@@ -740,24 +758,6 @@ export default function PilotagePage() {
                 <span style={{ fontSize: 12, color: "#ccc" }}>Météo…</span>
               )}
             </div>
-          </div>
-
-          {/* ── TABS : Ventes | Produits ── */}
-          <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
-            {(["ventes", "produits"] as const).map(t => (
-              <button key={t} type="button" onClick={() => { setPilotageTab(t); if (t === "produits") loadProdData(); }} style={{
-                flex: 1, padding: "10px 0", borderRadius: 10,
-                background: pilotageTab === t ? "#1a1a1a" : "#fff",
-                color: pilotageTab === t ? "#fff" : "#999",
-                fontSize: 13, fontWeight: 700, cursor: "pointer",
-                fontFamily: "var(--font-oswald), Oswald, sans-serif",
-                textTransform: "uppercase", letterSpacing: ".06em",
-                boxShadow: pilotageTab === t ? "0 2px 8px rgba(0,0,0,0.12)" : "none",
-                border: pilotageTab === t ? "1.5px solid #1a1a1a" : "1px solid #ede6d9",
-              }}>
-                {t === "ventes" ? "Ventes" : "Produits"}
-              </button>
-            ))}
           </div>
 
           {pilotageTab === "produits" ? (
