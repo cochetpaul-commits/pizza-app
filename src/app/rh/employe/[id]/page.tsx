@@ -1079,7 +1079,7 @@ export default function EmployeDetailPage() {
           const customPerms: Record<string, boolean> = ((emp as Record<string, unknown>)?.custom_permissions as Record<string, boolean>) ?? {};
 
           const changeRole = async (newRole: PermRole) => {
-            const dbRole = newRole === "admin" ? "group_admin" : "equipier";
+            const dbRole = newRole === "admin" ? "group_admin" : newRole === "manager" ? "manager" : "equipier";
             await supabase.from("employes").update({ role: dbRole, custom_permissions: {} }).eq("id", emp.id);
             setEmp((prev: Record<string, unknown>) => ({ ...prev, role: dbRole, custom_permissions: {} }));
             // Sync profiles.role via auth_user_id
@@ -1095,17 +1095,6 @@ export default function EmployeDetailPage() {
             setEmp((prev: Record<string, unknown>) => ({ ...prev, custom_permissions: next }));
           };
 
-          const CheckIcon = () => (
-            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" opacity="0.15" /><polyline points="9 12 11.5 14.5 15 9.5" />
-            </svg>
-          );
-          const XIcon = () => (
-            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.6">
-              <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
-            </svg>
-          );
-
           return (
             <>
               <AccordionSection
@@ -1114,8 +1103,8 @@ export default function EmployeDetailPage() {
                 iconColor="#D4775A" iconBg="rgba(212,119,90,0.1)"
               >
                 {/* Role cards */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
-                  {(["equipier", "admin"] as PermRole[]).map(r => {
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
+                  {(["equipier", "manager", "admin"] as PermRole[]).map(r => {
                     const info = ROLE_INFO[r];
                     const active = empRole === r;
                     return (
@@ -1154,21 +1143,33 @@ export default function EmployeDetailPage() {
                         <span style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a" }}>{sec.label}</span>
                       </div>
                       {sec.permissions.map(p => {
-                        const defaultVal = perms[p.key];
-                        const isToggle = defaultVal === "toggle";
-                        const isOn = isToggle ? (customPerms[p.key] ?? false) : defaultVal === true;
+                        const defaultVal = perms[p.key] === true;
+                        const hasCustom = p.key in customPerms;
+                        const isOn = hasCustom ? customPerms[p.key] : defaultVal;
+                        const isOverridden = hasCustom && customPerms[p.key] !== defaultVal;
                         return (
                           <div key={p.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderBottom: "1px solid #f0ebe3" }}>
-                            <span style={{ fontSize: 12, color: "#1a1a1a" }}>{p.label}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <span style={{ fontSize: 12, color: "#1a1a1a" }}>{p.label}</span>
+                              {isOverridden && <span style={{ fontSize: 9, fontWeight: 700, color: "#D4775A", marginLeft: 6 }}>modifie</span>}
+                            </div>
                             <span style={{ flexShrink: 0, marginLeft: 12 }}>
-                              {isToggle ? (
-                                <button type="button" onClick={() => togglePerm(p.key, isOn)} style={{
-                                  width: 36, height: 20, borderRadius: 10, border: "none", cursor: "pointer",
-                                  background: isOn ? "#2D6A4F" : "#ddd6c8", position: "relative",
-                                }}>
-                                  <span style={{ position: "absolute", top: 2, left: isOn ? 18 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
-                                </button>
-                              ) : defaultVal === true ? <CheckIcon /> : <XIcon />}
+                              <button type="button" onClick={() => {
+                                if (hasCustom && customPerms[p.key] === !defaultVal) {
+                                  // Reset to default: remove custom override
+                                  const next = { ...customPerms };
+                                  delete next[p.key];
+                                  supabase.from("employes").update({ custom_permissions: next }).eq("id", emp.id);
+                                  setEmp((prev: Record<string, unknown>) => ({ ...prev, custom_permissions: next }));
+                                } else {
+                                  togglePerm(p.key, isOn);
+                                }
+                              }} style={{
+                                width: 36, height: 20, borderRadius: 10, border: "none", cursor: "pointer",
+                                background: isOn ? "#2D6A4F" : "#ddd6c8", position: "relative",
+                              }}>
+                                <span style={{ position: "absolute", top: 2, left: isOn ? 18 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
+                              </button>
                             </span>
                           </div>
                         );
