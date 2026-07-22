@@ -192,13 +192,12 @@ function MargesPage() {
   const { current: etab } = useEtablissement();
   const accent = etab?.couleur ?? COLORS.accent;
 
-  const [range, setRange] = useState<DateRange>(() => {
+  const [internalRange, setInternalRange] = useState<DateRange>(() => {
     const qf = searchParams.get("from");
     const qt = searchParams.get("to");
     if (qf && qt && /^\d{4}-\d{2}-\d{2}$/.test(qf) && /^\d{4}-\d{2}-\d{2}$/.test(qt)) {
       return { from: qf, to: qt };
     }
-    // Default to yesterday (skip weekends)
     const d = new Date();
     d.setDate(d.getDate() - 1);
     if (d.getDay() === 0) d.setDate(d.getDate() - 2);
@@ -206,6 +205,9 @@ function MargesPage() {
     const iso = d.toISOString().slice(0, 10);
     return { from: iso, to: iso };
   });
+  const range = internalRange;
+  const setRange = setInternalRange;
+  const isEmbedded = false;
   const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -738,15 +740,14 @@ function MargesPage() {
   }, [allCategories.length]);
 
 
-  return (
-    <RequireRole allowedRoles={["group_admin"]}>
-      <PilotageSwipeWrapper dateFrom={range.from} dateTo={range.to}>
+  const content = (
+      <>
       <div
         className="ventes-marges-container"
         style={{
           maxWidth: 1100,
           margin: "0 auto",
-          padding: "16px 16px 120px",
+          padding: isEmbedded ? "0" : "16px 16px 120px",
           fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
         }}
       >
@@ -756,10 +757,12 @@ function MargesPage() {
             .marges-toolbar-desktop { display: none !important; }
           }
         `}</style>
-        {/* DateRangePicker — centered (desktop) */}
+        {/* DateRangePicker — centered (desktop), hidden when embedded */}
+        {!isEmbedded && (
         <div className="desktop-only" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginBottom: 10 }}>
           <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
         </div>
+        )}
 
         {/* TTC/HT toggle + actions desktop */}
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
@@ -2047,6 +2050,15 @@ function MargesPage() {
           </button>
         </div>
       </BottomSheet>
+      </>
+  );
+
+  if (isEmbedded) return content;
+
+  return (
+    <RequireRole allowedRoles={["group_admin"]}>
+      <PilotageSwipeWrapper dateFrom={range.from} dateTo={range.to}>
+        {content}
       </PilotageSwipeWrapper>
     </RequireRole>
   );

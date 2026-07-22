@@ -11,6 +11,7 @@ import { BottomSheet } from "@/components/layout/BottomSheet";
 import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 import { supabase } from "@/lib/supabaseClient";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
+import { MargesContent } from "@/components/ventes/MargesContent";
 
 /* ── Types ── */
 type WeekData = {
@@ -189,6 +190,7 @@ function PerformancesPage() {
     if (m === "ttc" || m === "ht") return m;
     return "ttc";
   });
+  const [ventesTab, setVentesTab] = useState<"ventes" | "produits">("ventes");
   const [data, setData] = useState<WeekData | null>(null);
   const [prev, setPrev] = useState<WeekData | null>(null); // A-1
   const [prevWeek, setPrevWeek] = useState<WeekData | null>(null); // S-1
@@ -639,6 +641,26 @@ function PerformancesPage() {
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>{"→"}</button>
         </div>
+
+        {/* Tabs: Ventes / Produits */}
+        <div style={{ display: "flex", gap: 4, padding: 4, background: "#f0ebe2", borderRadius: 12, marginBottom: 14, border: "1px solid #e8e0d0" }}>
+          {([["ventes", "Ventes"], ["produits", "Produits"]] as const).map(([key, label]) => (
+            <button key={key} type="button" onClick={() => setVentesTab(key)} style={{
+              flex: 1, padding: "8px 10px", borderRadius: 10, border: "none",
+              background: ventesTab === key ? "#fff" : "transparent",
+              color: ventesTab === key ? "#1a1a1a" : "#777",
+              fontSize: 12, fontWeight: 700, cursor: "pointer",
+              boxShadow: ventesTab === key ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+              whiteSpace: "nowrap",
+            }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {ventesTab === "produits" ? (
+          <MargesContent externalRange={range} />
+        ) : (<>
 
         {/* TTC/HT toggle + actions desktop */}
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
@@ -1858,6 +1880,8 @@ function PerformancesPage() {
             </div>
           </>
         )}
+      </>
+      )}
       </div>
 
       {/* ── Mobile Bottom Bar: ← date → ── */}
