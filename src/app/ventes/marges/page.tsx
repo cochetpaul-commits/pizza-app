@@ -75,7 +75,7 @@ type SortKey =
 const STRING_SORT_KEYS: SortKey[] = ["name", "categorie"];
 
 /* ── Helpers ── */
-const fmt = (v: number) => Math.round(v).toLocaleString("fr-FR") + "\u20AC";
+const fmt = (v: number) => v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "\u20AC";
 const fmtDec = (v: number) =>
   v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "\u20AC";
 const fmtPct = (v: number | null) => (v !== null ? v.toFixed(1) + "%" : "-");

@@ -46,7 +46,7 @@ type VenteLigne = {
 const OSWALD = "var(--font-oswald), Oswald, sans-serif";
 const DM = "var(--font-dm), DM Sans, sans-serif";
 
-const fmtEur = (n: number) => Math.round(n).toLocaleString("fr-FR") + "\u202F\u20AC";
+const fmtEur = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "\u202F\u20AC";
 const fmtEurDec = (n: number) =>
   n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "\u202F\u20AC";
 const fmtPct = (n: number) =>

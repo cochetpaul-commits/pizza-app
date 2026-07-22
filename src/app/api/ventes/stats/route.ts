@@ -476,12 +476,12 @@ function aggregate(rows: Row[]) {
   // Ratios upsell (based on unique tables/tickets + couverts)
   const orderKey = (r: Row) => `${r.date_service}:${r.num_fiscal}`;
 
-  // Build order-level data: couverts per order, categories ordered
-  const orderData = new Map<string, { cov: number; cats: Set<string>; ca_ttc: number; ca_ht: number }>();
+  // Build order-level data: couverts per order, categories ordered, service
+  const orderData = new Map<string, { cov: number; cats: Set<string>; ca_ttc: number; ca_ht: number; svc: string; op: string }>();
   for (const r of allRows) {
     const key = orderKey(r);
     if (!orderData.has(key)) {
-      orderData.set(key, { cov: Number(r.couverts) || 0, cats: new Set(), ca_ttc: 0, ca_ht: 0 });
+      orderData.set(key, { cov: Number(r.couverts) || 0, cats: new Set(), ca_ttc: 0, ca_ht: 0, svc: r.service || "", op: r.operateur?.trim() || "" });
     }
     const od = orderData.get(key)!;
     const nc = normCat(r.categorie);

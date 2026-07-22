@@ -116,8 +116,8 @@ const JOURS_LABELS: Record<number, string> = {
 };
 
 /* ── Helpers ── */
-const fmt = (v: number) => Math.round(v).toLocaleString("fr-FR") + "\u20AC";
-const fmtK = (v: number) => Math.round(v / 1000) + "k\u20AC";
+const fmt = (v: number) => v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "\u20AC";
+const fmtK = (v: number) => (v / 1000).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + "k\u20AC";
 const ZC: Record<string, string> = { Salle: "#46655a", Pergolas: "#5e8278", Terrasse: "#c4a882", emp: "#D4775A" };
 
 /* ── Week aggregation helpers (for monthly view) ── */
@@ -1691,8 +1691,8 @@ function PerformancesPage() {
                               </tr>
                               <tr>
                                 <td style={{ ...labelSt, color: "#46655a" }}>CVT M SP</td>
-                                <td style={{ ...cellSt, color: "#46655a" }}>{midi ? `${(mode === "ttc" ? midi.tm_sp_ttc : midi.tm_sp_ht).toFixed(0)}€` : dash}</td>
-                                <td style={{ ...cellSt, color: "#46655a" }}>{soir ? `${(mode === "ttc" ? soir.tm_sp_ttc : soir.tm_sp_ht).toFixed(0)}€` : dash}</td>
+                                <td style={{ ...cellSt, color: "#46655a" }}>{midi ? `${(mode === "ttc" ? midi.tm_sp_ttc : midi.tm_sp_ht).toFixed(2)}€` : dash}</td>
+                                <td style={{ ...cellSt, color: "#46655a" }}>{soir ? `${(mode === "ttc" ? soir.tm_sp_ttc : soir.tm_sp_ht).toFixed(2)}€` : dash}</td>
                               </tr>
                               <tr>
                                 <td style={{ ...labelSt, color: "#D4775A" }}>EMP</td>

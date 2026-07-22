@@ -119,7 +119,7 @@ const GREEN = "#4a6741";
 const RED = "#8B1A1A";
 
 function fmtEuro(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"; }
-function fmtEuroInt(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + " €"; }
+function fmtEuroInt(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"; }
 
 function delta(current: number, previous: number): string | null {
   if (!previous) return null;

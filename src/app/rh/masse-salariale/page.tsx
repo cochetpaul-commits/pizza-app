@@ -68,7 +68,7 @@ const CARD = { background: "#fff", borderRadius: 14, padding: 20, border: "1px s
 const KPI = { fontSize: 28, fontWeight: 700 as const, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" };
 const LABEL = { fontSize: 10, fontWeight: 700 as const, color: "#999", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 6 };
 
-function fmt(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+function fmt(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function fmtDec(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 function getMonthOptions(): PeriodOption[] {
