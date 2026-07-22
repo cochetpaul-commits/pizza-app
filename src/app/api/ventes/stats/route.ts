@@ -531,6 +531,38 @@ function aggregate(rows: Row[]) {
   const totalOrderCov = Array.from(orderData.values()).reduce((s, od) => s + od.cov, 0);
   const avgCovPerTable = totalTickets > 0 ? Math.round(totalOrderCov / totalTickets * 10) / 10 : 0;
 
+  // Upsell ratios by service (midi/soir)
+  function upsellStatsBySvc(catFilter: (cats: Set<string>) => boolean, svcFilter: string) {
+    let tables = 0, coverts = 0;
+    let totalSvc = 0;
+    for (const od of orderData.values()) {
+      if (od.svc !== svcFilter) continue;
+      totalSvc++;
+      if (catFilter(od.cats)) { tables++; coverts += od.cov; }
+    }
+    return { tables, coverts, total: totalSvc };
+  }
+  const ratiosBySvc: Record<string, Record<string, { tables: number; total: number }>> = {};
+  for (const svc of ["midi", "soir"]) {
+    ratiosBySvc[svc] = {
+      anti: upsellStatsBySvc(cats => cats.has("Antipasti"), svc),
+      dolci: upsellStatsBySvc(cats => cats.has("Dolci"), svc),
+      pizze: upsellStatsBySvc(cats => cats.has("Pizze"), svc),
+      plats: upsellStatsBySvc(cats => cats.has("Plats") || cats.has("Cuisine"), svc),
+      vin: upsellStatsBySvc(cats => cats.has("Vins"), svc),
+      alcool: upsellStatsBySvc(cats => cats.has("Alcool"), svc),
+      boissons: upsellStatsBySvc(cats => cats.has("Boissons") || cats.has("Alcool") || cats.has("Vins"), svc),
+      cafe: upsellStatsBySvc(cats => cats.has("Boissons chaudes"), svc),
+      digestif: upsellStatsBySvc(cats => cats.has("Digestifs"), svc),
+    };
+  }
+
+  // Couverts by service (for remplissage)
+  const covMidi = Array.from(orderData.values()).filter(od => od.svc === "midi").reduce((s, od) => s + od.cov, 0);
+  const covSoir = Array.from(orderData.values()).filter(od => od.svc === "soir").reduce((s, od) => s + od.cov, 0);
+  const ticketsMidi = Array.from(orderData.values()).filter(od => od.svc === "midi").length;
+  const ticketsSoir = Array.from(orderData.values()).filter(od => od.svc === "soir").length;
+
   // Avg time per table (from ouvert_a to ferme_a)
   // We'd need ferme_a but aggregate doesn't have it — skip for now
 
@@ -694,6 +726,9 @@ function aggregate(rows: Row[]) {
     food_ttc: Math.round(food_ttc), food_ht: Math.round(food_ht),
     drink_ttc: Math.round(drink_ttc), drink_ht: Math.round(drink_ht),
     bottom5,
+    ratios_by_svc: ratiosBySvc,
+    cov_midi: covMidi, cov_soir: covSoir,
+    tickets_midi: ticketsMidi, tickets_soir: ticketsSoir,
   };
 }
 

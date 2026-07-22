@@ -76,6 +76,10 @@ type WeekData = {
   drink_ttc?: number; drink_ht?: number;
   // Plats qui dorment
   bottom5?: { n: string; qty: number; ca_ttc: number; ca_ht: number }[];
+  // Ratios par service + couverts par service
+  ratios_by_svc?: Record<string, Record<string, { tables: number; total: number }>>;
+  cov_midi?: number; cov_soir?: number;
+  tickets_midi?: number; tickets_soir?: number;
 };
 
 /* ── Helpers: compute default range (today, weekend-safe) ── */
@@ -880,6 +884,26 @@ function PerformancesPage() {
                         const prevSP = (mode === "ttc" ? activePrev.place_sur_ttc : activePrev.place_sur_ht) / activePrev.cov_sur;
                         return <DeltaBadge cur={curSP} prev={prevSP} decimals={1} suffix={"\u20AC"} />;
                       })()}
+                      {/* Ecart TM vs objectif */}
+                      {(() => {
+                        const objMidi = objectifs["tm_midi"]?.valeur;
+                        const objSoir = objectifs["tm_soir"]?.valeur;
+                        const tmSP = W.cov_sur > 0 ? (mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur : 0;
+                        if (!objMidi && !objSoir) return null;
+                        const covMidi = W.cov_midi ?? 0;
+                        const covSoir = W.cov_soir ?? 0;
+                        let manque = 0;
+                        if (objMidi && covMidi > 0) {
+                          const tmMidi = W.tickets_midi && W.tickets_midi > 0 && covMidi > 0 ? (mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) * (covMidi / (covMidi + covSoir)) / covMidi : tmSP;
+                          manque += Math.max(0, (objMidi - tmMidi) * covMidi);
+                        }
+                        if (objSoir && covSoir > 0) {
+                          const tmSoir2 = covSoir > 0 ? (mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) * (covSoir / (covMidi + covSoir)) / covSoir : tmSP;
+                          manque += Math.max(0, (objSoir - tmSoir2) * covSoir);
+                        }
+                        if (manque <= 0) return null;
+                        return <div style={{ fontSize: 10, color: "#fca5a5", marginTop: 3 }}>Potentiel : +{fmt(Math.round(manque))}{"\u20AC"} si obj. TM atteint</div>;
+                      })()}
                     </div>
                     <div style={{ width: 1, background: "rgba(255,255,255,.1)", alignSelf: "stretch" }} />
                     <div style={{ minWidth: 0, flex: "1 1 0" }}>
@@ -1151,6 +1175,62 @@ function PerformancesPage() {
               })()}
             </div>}
 
+            {/* Attache midi vs soir */}
+            {W.ratios_by_svc && W.ratios_by_svc["midi"] && W.ratios_by_svc["soir"] && (() => {
+              const cats = [
+                { key: "anti", label: "Antipasti" },
+                { key: "pizze", label: "Pizze" },
+                { key: "plats", label: "Plats" },
+                { key: "dolci", label: "Desserts" },
+                { key: "vin", label: "Vins" },
+                { key: "alcool", label: "Alcool" },
+              ];
+              const midi = W.ratios_by_svc["midi"];
+              const soir = W.ratios_by_svc["soir"];
+              const hasMidi = Object.values(midi).some(v => v.total > 0);
+              const hasSoir = Object.values(soir).some(v => v.total > 0);
+              if (!hasMidi && !hasSoir) return null;
+              return (
+                <div style={S.card}>
+                  <div style={S.sec}>Attache midi vs soir</div>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                      <thead>
+                        <tr style={{ borderBottom: "2px solid #ddd6c8" }}>
+                          <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}></th>
+                          {cats.map(c => (
+                            <th key={c.key} style={{ textAlign: "center", padding: "6px 4px", fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: ".04em" }}>{c.label}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {hasMidi && (
+                          <tr style={{ borderBottom: "1px solid #f0ebe3" }}>
+                            <td style={{ padding: "6px 0", fontWeight: 600, fontSize: 11 }}>Midi</td>
+                            {cats.map(c => {
+                              const d = midi[c.key];
+                              const pct = d && d.total > 0 ? Math.round(d.tables / d.total * 100) : 0;
+                              return <td key={c.key} style={{ textAlign: "center", padding: "6px 4px", fontWeight: 700, color: pct >= 50 ? "#2e7d32" : pct >= 25 ? "#1a1a1a" : "#DC2626" }}>{pct}%</td>;
+                            })}
+                          </tr>
+                        )}
+                        {hasSoir && (
+                          <tr>
+                            <td style={{ padding: "6px 0", fontWeight: 600, fontSize: 11 }}>Soir</td>
+                            {cats.map(c => {
+                              const d = soir[c.key];
+                              const pct = d && d.total > 0 ? Math.round(d.tables / d.total * 100) : 0;
+                              return <td key={c.key} style={{ textAlign: "center", padding: "6px 4px", fontWeight: 700, color: pct >= 50 ? "#2e7d32" : pct >= 25 ? "#1a1a1a" : "#DC2626" }}>{pct}%</td>;
+                            })}
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Duration & Rotation */}
             {W.duration && W.duration.totalOrders > 0 && (() => {
               const P = activePrev?.duration;
@@ -1311,6 +1391,75 @@ function PerformancesPage() {
                       <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>{dPct} %</div>
                     </div>
                   </div>
+                </div>
+              );
+            })()}
+
+            {/* Taux de remplissage + Panier decompose */}
+            {(W.cov_midi || W.cov_soir) && W.dates.length > 0 && (() => {
+              const nbDays = W.dates.length;
+              const capMidi = objectifs["capacite_midi"]?.valeur;
+              const capSoir = objectifs["capacite_soir"]?.valeur;
+              const covMidiDay = nbDays > 0 ? (W.cov_midi ?? 0) / nbDays : 0;
+              const covSoirDay = nbDays > 0 ? (W.cov_soir ?? 0) / nbDays : 0;
+              const rempMidi = capMidi ? Math.round(covMidiDay / capMidi * 100) : null;
+              const rempSoir = capSoir ? Math.round(covSoirDay / capSoir * 100) : null;
+              // Panier decompose
+              const totalCov = W.couverts || 1;
+              const ca = mode === "ttc" ? W.ca_ttc : W.ca_ht;
+              const foodPerCov = (W.food_ttc ?? 0) > 0 ? ((mode === "ttc" ? W.food_ttc! : W.food_ht!) / totalCov) : null;
+              const drinkPerCov = (W.drink_ttc ?? 0) > 0 ? ((mode === "ttc" ? W.drink_ttc! : W.drink_ht!) / totalCov) : null;
+              const tmGlobal = ca / totalCov;
+              if (!rempMidi && !rempSoir && !foodPerCov) return null;
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 6 }}>
+                  {/* Remplissage */}
+                  {(rempMidi || rempSoir) && (
+                    <div style={S.card}>
+                      <div style={S.sec}>Taux de remplissage</div>
+                      {rempMidi != null && (
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                            <span style={{ fontSize: 11, color: "#777" }}>Midi</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif", color: rempMidi >= 80 ? "#2e7d32" : rempMidi >= 50 ? "#D97706" : "#DC2626" }}>{rempMidi}%</span>
+                          </div>
+                          <div style={{ height: 6, background: "#f0ebe3", borderRadius: 3, overflow: "hidden" }}>
+                            <div style={{ height: "100%", width: `${Math.min(100, rempMidi)}%`, background: rempMidi >= 80 ? "#2e7d32" : rempMidi >= 50 ? "#D97706" : "#DC2626", borderRadius: 3 }} />
+                          </div>
+                          <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>{covMidiDay.toFixed(0)} / {capMidi} cvt/j</div>
+                        </div>
+                      )}
+                      {rempSoir != null && (
+                        <div>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                            <span style={{ fontSize: 11, color: "#777" }}>Soir</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif", color: rempSoir >= 80 ? "#2e7d32" : rempSoir >= 50 ? "#D97706" : "#DC2626" }}>{rempSoir}%</span>
+                          </div>
+                          <div style={{ height: 6, background: "#f0ebe3", borderRadius: 3, overflow: "hidden" }}>
+                            <div style={{ height: "100%", width: `${Math.min(100, rempSoir)}%`, background: rempSoir >= 80 ? "#2e7d32" : rempSoir >= 50 ? "#D97706" : "#DC2626", borderRadius: 3 }} />
+                          </div>
+                          <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>{covSoirDay.toFixed(0)} / {capSoir} cvt/j</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {/* Panier decompose */}
+                  {foodPerCov != null && (
+                    <div style={S.card}>
+                      <div style={S.sec}>Panier moyen decompose</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color: "#1a1a1a", marginBottom: 8 }}>{tmGlobal.toFixed(1)}{"\u20AC"}<span style={{ fontSize: 12, color: "#999", fontWeight: 400 }}> / couvert</span></div>
+                      <div style={{ display: "flex", gap: 0 }}>
+                        <div style={{ flex: 1, textAlign: "center", borderRight: "1px solid #f0ebe3" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#8a6b3e", textTransform: "uppercase", letterSpacing: ".06em" }}>Food</div>
+                          <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>{foodPerCov.toFixed(1)}{"\u20AC"}</div>
+                        </div>
+                        <div style={{ flex: 1, textAlign: "center" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#5e8278", textTransform: "uppercase", letterSpacing: ".06em" }}>Boissons</div>
+                          <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>{drinkPerCov?.toFixed(1) ?? "0"}{"\u20AC"}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })()}

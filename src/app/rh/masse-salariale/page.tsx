@@ -117,6 +117,7 @@ export default function MasseSalarialePage() {
   const [couvertsMonth, setCouvertsMonth] = useState<number | null>(null);
   const [ticketsMonth, setTicketsMonth] = useState<number | null>(null);
   const [tauxHoraire, setTauxHoraire] = useState<number>(15);
+  const [monthlyHS, setMonthlyHS] = useState<{ nom: string; equipe: string | null; hs: number }[] | null>(null);
 
   const [periodMode, setPeriodMode] = useState<PeriodMode>("month");
   const monthOptions = useMemo(() => getMonthOptions(), []);
@@ -167,6 +168,32 @@ export default function MasseSalarialePage() {
           }),
       ]);
       setPresences((presData.data ?? []) as ComboPresence[]);
+      // Cumul mensuel HS (load full month when viewing a week)
+      const fromDate = new Date(from + "T12:00:00");
+      const monthStart = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, "0")}-01`;
+      const monthEndD = new Date(fromDate.getFullYear(), fromDate.getMonth() + 1, 0);
+      const monthEnd = `${monthEndD.getFullYear()}-${String(monthEndD.getMonth() + 1).padStart(2, "0")}-${String(monthEndD.getDate()).padStart(2, "0")}`;
+      if (monthStart !== from || monthEnd !== to) {
+        supabase
+          .from("combo_presences")
+          .select("combo_nom, equipe, ecart_total")
+          .eq("etablissement_id", eId)
+          .gte("periode_debut", monthStart)
+          .lte("periode_fin", monthEnd)
+          .then(({ data: monthData }) => {
+            if (!monthData) { setMonthlyHS(null); return; }
+            const map = new Map<string, { nom: string; equipe: string | null; hs: number }>();
+            for (const r of monthData) {
+              const prev = map.get(r.combo_nom);
+              const ecart = Math.max(0, Number(r.ecart_total) || 0);
+              if (prev) { prev.hs += ecart; }
+              else { map.set(r.combo_nom, { nom: r.combo_nom, equipe: r.equipe, hs: ecart }); }
+            }
+            setMonthlyHS(Array.from(map.values()).filter(e => e.hs > 0).sort((a, b) => b.hs - a.hs));
+          });
+      } else {
+        setMonthlyHS(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -588,6 +615,23 @@ export default function MasseSalarialePage() {
             </div>
           </div>
         </>)}
+
+        {/* Cumul mensuel HS */}
+        {monthlyHS && monthlyHS.length > 0 && (
+          <div style={{ ...CARD, marginBottom: 14, borderLeft: `4px solid #DC2626` }}>
+            <div style={{ ...LABEL, marginBottom: 10 }}>Cumul heures sup · mois en cours</div>
+            <div style={{ display: "flex", gap: 12, alignItems: "baseline", marginBottom: 10 }}>
+              <div style={{ ...KPI, color: "#DC2626" }}>{fmtDec(monthlyHS.reduce((s, e) => s + e.hs, 0))}h</div>
+              <div style={{ fontSize: 12, color: "#DC2626", fontWeight: 600 }}>~{fmt(Math.round(monthlyHS.reduce((s, e) => s + e.hs, 0) * tauxHoraire * 1.1 * 1.42))}{"\u20AC"} cout</div>
+            </div>
+            {monthlyHS.map((e, i) => (
+              <div key={e.nom} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: i < monthlyHS.length - 1 ? "1px solid #f0ebe3" : "none", fontSize: 12 }}>
+                <span><span style={{ fontWeight: 600 }}>{e.nom}</span> <span style={{ color: "#999" }}>{e.equipe ?? ""}</span></span>
+                <span style={{ fontWeight: 700, color: "#DC2626" }}>+{fmtDec(e.hs)}h</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Employee table */}
         <div style={CARD}>
