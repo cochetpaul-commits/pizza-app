@@ -67,6 +67,7 @@ type WeekData = {
   hourly_totals?: number[];
   // Champs ajoutés (Popina API)
   remises_ttc?: number;
+  remises_detail?: { operateur: string; count: number; total: number }[];
   hourly_ttc?: number[];
   // Split Food / Boissons
   food_ttc?: number; food_ht?: number;
@@ -963,6 +964,22 @@ function PerformancesPage() {
                       {prevR > 0 && (
                         <div style={{ fontSize: 11, color: "#999", marginTop: 6 }}>
                           S-1 : {Math.round(prevR).toLocaleString("fr-FR")}{"\u20AC"} ({remises >= prevR ? "+" : ""}{prevR > 0 ? Math.round((remises - prevR) / prevR * 100) : 0}%)
+                        </div>
+                      )}
+                      {/* Detail par operateur */}
+                      {W.remises_detail && W.remises_detail.length > 0 && (
+                        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid #f0ebe3" }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 6 }}>Detail par serveur</div>
+                          {W.remises_detail.map((r) => (
+                            <div key={r.operateur} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0", fontSize: 12 }}>
+                              <span style={{ fontWeight: 600, color: "#1a1a1a" }}>{r.operateur}</span>
+                              <span style={{ color: "#777" }}>
+                                <span style={{ fontWeight: 700, color: "#c15f2e" }}>{r.total.toLocaleString("fr-FR")}{"\u20AC"}</span>
+                                {" "}
+                                <span style={{ fontSize: 10, color: "#999" }}>({r.count} ticket{r.count > 1 ? "s" : ""})</span>
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>

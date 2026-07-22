@@ -210,15 +210,28 @@ function aggregate(rows: Row[]) {
   const tm_ht = dates.map((_, i) => day_cov[i] > 0 ? day_ht[i] / day_cov[i] : 0);
 
   // Remises totales (dédup par num_fiscal — la remise est portée par la 1ʳᵉ ligne)
-  const remisesSeen = new Map<string, number>();
+  const remisesSeen = new Map<string, { montant: number; date: string; operateur: string }>();
   for (const r of productRows) {
     const key = `${r.date_service}:${r.num_fiscal}`;
     const rem = Number(r.remise_totale) || 0;
     if (rem > 0 && !remisesSeen.has(key)) {
-      remisesSeen.set(key, rem);
+      remisesSeen.set(key, { montant: rem, date: r.date_service, operateur: (r as Record<string, unknown>).operateur as string ?? "" });
     }
   }
-  const remises_ttc = Array.from(remisesSeen.values()).reduce((s, v) => s + v, 0);
+  const remises_ttc = Array.from(remisesSeen.values()).reduce((s, v) => s + v.montant, 0);
+
+  // Détail remises par opérateur
+  const remisesByOp = new Map<string, { count: number; total: number }>();
+  for (const r of remisesSeen.values()) {
+    const op = r.operateur || "Inconnu";
+    const prev = remisesByOp.get(op) ?? { count: 0, total: 0 };
+    prev.count++;
+    prev.total += r.montant;
+    remisesByOp.set(op, prev);
+  }
+  const remises_detail = [...remisesByOp.entries()]
+    .map(([operateur, v]) => ({ operateur, count: v.count, total: Math.round(v.total * 100) / 100 }))
+    .sort((a, b) => b.total - a.total);
 
   // Répartition horaire (CA TTC par heure Paris, basée sur ouvert_a)
   const hourly_ttc: number[] = Array.from({ length: 24 }, () => 0);
@@ -653,6 +666,7 @@ function aggregate(rows: Row[]) {
       totalOrders: orderDurs.length,
     },
     remises_ttc: Math.round(remises_ttc * 100) / 100,
+    remises_detail,
     hourly_ttc: hourly_ttc.map(v => Math.round(v * 100) / 100),
     food_ttc: Math.round(food_ttc), food_ht: Math.round(food_ht),
     drink_ttc: Math.round(drink_ttc), drink_ht: Math.round(drink_ht),
