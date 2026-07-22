@@ -605,12 +605,14 @@ export default function PilotagePage() {
 
   function goPrevWeek() {
     setWeekStr((w) => shiftWeek(w, -1));
+    if (pilotageTab === "produits") setTimeout(loadProdData, 50);
   }
   function goNextWeek() {
     setWeekStr((w) => {
       const next = shiftWeek(w, 1);
       return next <= currentWeek ? next : w;
     });
+    if (pilotageTab === "produits") setTimeout(loadProdData, 50);
   }
 
   // Day-by-day navigation
@@ -681,6 +683,7 @@ export default function PilotagePage() {
     } catch { setProdData(null); }
     setProdLoading(false);
   }, [weekStr, currentEtabId]);
+
 
   return (
     <RequireRole permission="performances.pilotage">
