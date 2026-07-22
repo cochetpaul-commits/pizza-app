@@ -671,12 +671,23 @@ export function CatalogueContent() {
   // Custom category order (persisted in localStorage)
   const SORT_KEY = `catalogue-cat-order-${etabSlug ?? "all"}`;
   const [catOrder, setCatOrder] = useState<string[]>([]);
+  const [subCatOrders, setSubCatOrders] = useState<Record<string, string[]>>({});
 
   // Load saved order on mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem(SORT_KEY);
       if (saved) setCatOrder(JSON.parse(saved));
+      // Load sub-category orders
+      const subOrders: Record<string, string[]> = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k?.startsWith(`${SORT_KEY}:subs:`)) {
+          const type = k.replace(`${SORT_KEY}:subs:`, "");
+          try { subOrders[type] = JSON.parse(localStorage.getItem(k) ?? "[]"); } catch { /* ignore */ }
+        }
+      }
+      if (Object.keys(subOrders).length > 0) setSubCatOrders(subOrders);
     } catch { /* ignore */ }
   }, [SORT_KEY]);
 
@@ -776,8 +787,21 @@ export function CatalogueContent() {
       });
     }
 
+    // Apply sub-category orders
+    for (const tg of result) {
+      const subOrder = subCatOrders[tg.type];
+      if (subOrder && subOrder.length > 0 && tg.subGroups.length > 1) {
+        const orderMap = new Map(subOrder.map((k, i) => [k, i]));
+        tg.subGroups.sort((a, b) => {
+          const ia = orderMap.get(a.key) ?? 999;
+          const ib = orderMap.get(b.key) ?? 999;
+          return ia - ib;
+        });
+      }
+    }
+
     return result;
-  }, [groups, catOrder, groupLabel, groupColor]);
+  }, [groups, catOrder, subCatOrders, groupLabel, groupColor]);
 
   // Track open types separately
   const [openTypes, setOpenTypes] = useState<Set<string>>(new Set());
@@ -826,6 +850,24 @@ export function CatalogueContent() {
         .then(({ error }) => {
           if (error) console.error("Failed to move recipe:", error);
         });
+      return;
+    }
+
+    // Sub-category reorder
+    if (result.type === "subcategories") {
+      const parentType = result.source.droppableId.replace("subcats:", "");
+      const group = nestedGroups.find(g => g.type === parentType);
+      if (!group) return;
+      if (result.source.index === result.destination.index) return;
+      const subs = [...group.subGroups];
+      const [moved] = subs.splice(result.source.index, 1);
+      subs.splice(result.destination.index, 0, moved);
+      // Persist sub-category order for this type
+      const subKey = `${SORT_KEY}:subs:${parentType}`;
+      const subOrder = subs.map(s => s.key);
+      try { localStorage.setItem(subKey, JSON.stringify(subOrder)); } catch { /* ignore */ }
+      // Force re-render by updating catOrder (triggers nestedGroups recompute)
+      setSubCatOrders(prev => ({ ...prev, [parentType]: subOrder }));
       return;
     }
 
@@ -1071,10 +1113,19 @@ export function CatalogueContent() {
                       + Sous-categorie
                     </button>
                   )}
-                  {tg.subGroups.map((sg) => {
+                  <Droppable droppableId={`subcats:${tg.type}`} type="subcategories">
+                    {(subCatDropProvided) => (
+                      <div ref={subCatDropProvided.innerRef} {...subCatDropProvided.droppableProps}>
+                  {tg.subGroups.map((sg, sgIdx) => {
                     const subOpen = !hasSubs || openCats.has(sg.key);
                     return (
-                      <div key={sg.key} style={{ marginBottom: hasSubs ? 8 : 0 }}>
+                      <Draggable key={sg.key} draggableId={`subcat:${sg.key}`} index={sgIdx} isDragDisabled={!hasSubs}>
+                        {(sgDragProvided, sgDragSnap) => (
+                      <div
+                        ref={sgDragProvided.innerRef}
+                        {...sgDragProvided.draggableProps}
+                        style={{ ...sgDragProvided.draggableProps.style, marginBottom: hasSubs ? 8 : 0 }}
+                      >
                         {/* Sub-category header (only if multiple sub-groups) */}
                         {hasSubs && (
                           <div
@@ -1082,11 +1133,20 @@ export function CatalogueContent() {
                             style={{
                               display: "flex", alignItems: "center", gap: 10,
                               padding: "10px 18px", cursor: "pointer",
-                              background: `${sg.color}08`, borderRadius: 10,
-                              border: `1px solid ${sg.color}18`,
+                              background: sgDragSnap.isDragging ? `${sg.color}15` : `${sg.color}08`, borderRadius: 10,
+                              border: sgDragSnap.isDragging ? `2px solid ${sg.color}` : `1px solid ${sg.color}18`,
                               marginBottom: subOpen ? 6 : 0,
+                              boxShadow: sgDragSnap.isDragging ? `0 6px 20px rgba(0,0,0,0.12)` : "none",
                             }}
                           >
+                            <div
+                              {...sgDragProvided.dragHandleProps}
+                              style={{ cursor: "grab", color: "#ccc", flexShrink: 0, touchAction: "none", display: "flex", alignItems: "center", padding: "2px 4px" }}
+                              onClick={e => e.stopPropagation()}
+                              title="Glisser pour réordonner"
+                            >
+                              <svg width={12} height={12} viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="4" r="1.5"/><circle cx="16" cy="4" r="1.5"/><circle cx="8" cy="12" r="1.5"/><circle cx="16" cy="12" r="1.5"/><circle cx="8" cy="20" r="1.5"/><circle cx="16" cy="20" r="1.5"/></svg>
+                            </div>
                             <span style={{
                               width: 8, height: 8, borderRadius: "50%",
                               background: sg.color, flexShrink: 0,
@@ -1467,8 +1527,14 @@ export function CatalogueContent() {
                           </Droppable>
                         )}
                       </div>
+                        )}
+                      </Draggable>
                     );
                   })}
+                  {subCatDropProvided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
                 </div>
               )}
             </div>

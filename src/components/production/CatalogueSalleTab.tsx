@@ -285,7 +285,8 @@ export function CatalogueSalleContent() {
   const [fiches, setFiches] = useState<Fiche[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filterCat, setFilterCat] = useState("ALL");
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [filterCat] = useState("ALL");
   const [showHidden, setShowHidden] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
@@ -383,27 +384,14 @@ export function CatalogueSalleContent() {
         </button>
       </div>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
-        <button onClick={() => setFilterCat("ALL")} style={{
-          padding: "5px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer",
-          border: filterCat === "ALL" ? "2px solid #D4775A" : "1px solid #ddd6c8",
-          background: filterCat === "ALL" ? "#FFF5F0" : "#fff", color: filterCat === "ALL" ? "#D4775A" : "#666",
-        }}>Tout ({visibleFiches.length})</button>
-        {categories.map((cat) => {
-          const col = CAT_COLORS[cat] ?? { bg: "#eee", fg: "#666" };
-          const count = visibleFiches.filter((f) => f.category === cat).length;
-          return <button key={cat} onClick={() => setFilterCat(filterCat === cat ? "ALL" : cat)} style={{
-            padding: "5px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer",
-            border: filterCat === cat ? `2px solid ${col.fg}` : "1px solid transparent", background: col.bg, color: col.fg,
-          }}>{CAT_LABELS[cat] ?? cat} ({count})</button>;
-        })}
-        {canEdit && hiddenCount > 0 && (
+      {canEdit && hiddenCount > 0 && (
+        <div style={{ marginBottom: 14 }}>
           <button onClick={() => setShowHidden(!showHidden)} style={{
             padding: "5px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer",
             border: showHidden ? "2px solid #999" : "1px solid #ddd6c8", background: showHidden ? "#f0ebe0" : "#fff", color: "#999",
           }}>{showHidden ? "Masquer retires" : `+ ${hiddenCount} masque${hiddenCount > 1 ? "s" : ""}`}</button>
-        )}
-      </div>
+        </div>
+      )}
 
       {loading ? <p style={{ textAlign: "center", color: "#999", padding: 40 }}>Chargement...</p> : (
         <DragDropContext onDragEnd={handleDragEnd}>
