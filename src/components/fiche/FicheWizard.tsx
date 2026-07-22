@@ -48,6 +48,7 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
   const [showNewSubCat, setShowNewSubCat] = useState(false);
   const [newSubCatName, setNewSubCatName] = useState("");
   const [salleView, setSalleView] = useState<"salle" | "cuisine">("salle");
+  const [existingSubCats, setExistingSubCats] = useState<Record<string, string[]>>({});
   const [popinaProducts, setPopinaProducts] = useState<{ id: string; name: string; category: string; price_ttc: number; kitchen_recipe_id: string | null }[]>([]);
   const [linkedPopina, setLinkedPopina] = useState<string | null>(null);
   const [popinaSearch, setPopinaSearch] = useState("");
@@ -70,6 +71,26 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
       setEmpatements((empRes.data ?? []).map((r: Record<string, unknown>) => ({ id: r.id as string, name: (r.name as string).trim() })));
       const popProducts = (popRes.data ?? []) as { id: string; name: string; category: string; price_ttc: number; kitchen_recipe_id: string | null }[];
       setPopinaProducts(popProducts);
+
+      // Load existing sous_categories from recipes (grouped by category)
+      const { data: scData } = await supabase
+        .from("kitchen_recipes")
+        .select("category, sous_categorie")
+        .not("sous_categorie", "is", null);
+      const scMap: Record<string, Set<string>> = {};
+      for (const r of (scData ?? []) as { category: string; sous_categorie: string }[]) {
+        if (!r.sous_categorie) continue;
+        if (!scMap[r.category]) scMap[r.category] = new Set();
+        scMap[r.category].add(r.sous_categorie);
+      }
+      // Merge with categories.sous_categories from DB
+      for (const c of (cRes.data ?? []) as Categorie[]) {
+        if (!scMap[c.slug]) scMap[c.slug] = new Set();
+        for (const sc of c.sous_categories ?? []) scMap[c.slug].add(sc);
+      }
+      const scResult: Record<string, string[]> = {};
+      for (const [k, v] of Object.entries(scMap)) scResult[k] = [...v].sort();
+      setExistingSubCats(scResult);
 
       // Build CPU map from supplier offers
       const cpuMap: Record<string, CpuByUnit> = {};
@@ -465,11 +486,20 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
                   <input type="text" autoFocus value={newSubCatName} onChange={e => setNewSubCatName(e.target.value)} placeholder="Nom de la sous-categorie"
                     style={{ flex: 1, border: `1.5px solid ${COLORS.terra}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", outline: "none", fontFamily: "inherit" }}
                     onKeyDown={async e => {
-                      if (e.key === "Enter" && newSubCatName.trim() && cat) {
-                        const newSubs = [...(cat.sous_categories ?? []), newSubCatName.trim()];
-                        await supabase.from("categories").update({ sous_categories: newSubs }).eq("id", cat.id);
-                        setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, sous_categories: newSubs } : c));
-                        update({ sous_categorie: newSubCatName.trim() });
+                      if (e.key === "Enter" && newSubCatName.trim()) {
+                        const scName = newSubCatName.trim();
+                        // Save to categories table if cat exists
+                        if (cat) {
+                          const newSubs = [...(cat.sous_categories ?? []), scName];
+                          await supabase.from("categories").update({ sous_categories: newSubs }).eq("id", cat.id);
+                          setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, sous_categories: newSubs } : c));
+                        }
+                        // Update local existing sub-cats
+                        setExistingSubCats(prev => ({
+                          ...prev,
+                          [fiche.categorie_slug]: [...new Set([...(prev[fiche.categorie_slug] ?? []), scName])].sort(),
+                        }));
+                        update({ sous_categorie: scName });
                         setNewSubCatName(""); setShowNewSubCat(false);
                       }
                       if (e.key === "Escape") { setNewSubCatName(""); setShowNewSubCat(false); }
@@ -484,7 +514,7 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
                   update({ sous_categorie: v });
                 }} style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", fontFamily: "inherit" }}>
                   <option value="">Aucune</option>
-                  {(cat?.sous_categories ?? []).map(s => <option key={s} value={s}>{s}</option>)}
+                  {(existingSubCats[fiche.categorie_slug] ?? []).map(s => <option key={s} value={s}>{s}</option>)}
                   <option value="__new__">+ Creer une sous-categorie</option>
                 </select>
               )}
