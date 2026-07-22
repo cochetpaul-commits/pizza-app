@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback, Suspense, type CSSProperties } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo, Suspense, type CSSProperties } from "react";
 import { useSearchParams } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -620,6 +620,12 @@ function MargesPage() {
     return () => { cancelled = true; };
   }, [trendFilter, trendProduct, trendCategory, trendService, etab, trendFrom, trendTo]);
 
+  // Filter trendProducts by sub-category (client-side)
+  const filteredTrendProducts = useMemo(() => {
+    if (!trendSubCat) return trendProducts;
+    return trendProducts.filter(p => popinaSubCats[p.name.trim().toLowerCase()] === trendSubCat);
+  }, [trendProducts, trendSubCat, popinaSubCats]);
+
   // Aggregate trend data for chart
   const aggregateTrend = useCallback((daily: TrendDaily[], mode: TrendMode, metric: "qty" | "ca_ht") => {
     // Category mode (single day with group_by=category)
@@ -659,9 +665,25 @@ function MargesPage() {
 
   // Render trend chart
   useEffect(() => {
-    if (!trendData || !trendChartRef.current) return;
+    if (!trendChartRef.current) return;
     destroyChart("trendBar");
-    const { labels, values } = aggregateTrend(trendData, trendMode, trendMetric);
+
+    let labels: string[];
+    let values: number[];
+
+    // If sub-category is selected, show product-level chart from filtered products
+    if (trendSubCat && filteredTrendProducts.length > 0) {
+      const sorted = [...filteredTrendProducts].sort((a, b) => (trendMetric === "qty" ? b.qty - a.qty : b.ca_ht - a.ca_ht));
+      labels = sorted.map(p => p.name);
+      values = sorted.map(p => trendMetric === "qty" ? p.qty : p.ca_ht);
+    } else if (trendData) {
+      const agg = aggregateTrend(trendData, trendMode, trendMetric);
+      labels = agg.labels;
+      values = agg.values;
+    } else {
+      return;
+    }
+
     if (labels.length === 0) return;
     charts["trendBar"] = new Chart(trendChartRef.current, {
       type: "bar",
@@ -686,7 +708,7 @@ function MargesPage() {
     });
     return () => destroyChart("trendBar");
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trendData, trendMode, trendMetric, accent, trendFilter, trendCategory]);
+  }, [trendData, trendMode, trendMetric, accent, trendFilter, trendCategory, trendSubCat, filteredTrendProducts]);
 
   const K = data?.kpis;
   const filtered = getFilteredProducts();
@@ -1055,21 +1077,18 @@ function MargesPage() {
                 </div>
               )}
 
-              {/* Summary line */}
-              {trendData && trendData.length > 0 && (
+              {/* Summary line — uses filtered products if sub-cat selected */}
+              {filteredTrendProducts.length > 0 && (
                 <div style={{ marginTop: 12, display: "flex", gap: 20, fontSize: 12, color: COLORS.muted }}>
-                  <span>Total: <strong style={{ color: COLORS.dark }}>{Math.round(trendData.reduce((s, d) => s + d.qty, 0))} vendus</strong></span>
-                  <span>CA HT: <strong style={{ color: COLORS.dark }}>{fmtDec(trendData.reduce((s, d) => s + d.ca_ht, 0))}</strong></span>
-                  <span>CA TTC: <strong style={{ color: COLORS.dark }}>{fmtDec(trendData.reduce((s, d) => s + d.ca_ttc, 0))}</strong></span>
+                  <span>Total: <strong style={{ color: COLORS.dark }}>{Math.round(filteredTrendProducts.reduce((s, d) => s + d.qty, 0))} vendus</strong></span>
+                  <span>CA HT: <strong style={{ color: COLORS.dark }}>{fmtDec(filteredTrendProducts.reduce((s, d) => s + d.ca_ht, 0))}</strong></span>
+                  <span>CA TTC: <strong style={{ color: COLORS.dark }}>{fmtDec(filteredTrendProducts.reduce((s, d) => s + d.ca_ttc, 0))}</strong></span>
                 </div>
               )}
 
-              {/* Drill-down: products (from trend data, filtered by service) */}
-              {trendProducts.length > 0 && (trendFilter === "category" || trendFilter === "all") && (() => {
-                const catProducts = (trendSubCat
-                  ? trendProducts.filter(p => popinaSubCats[p.name.trim().toLowerCase()] === trendSubCat)
-                  : trendProducts
-                ).slice(0, 15);
+              {/* Drill-down: products (from trend data, filtered by service + sub-cat) */}
+              {filteredTrendProducts.length > 0 && (trendFilter === "category" || trendFilter === "all") && (() => {
+                const catProducts = filteredTrendProducts.slice(0, 15);
                 if (catProducts.length === 0) return null;
                 const maxCA = catProducts[0]?.ca_ht ?? 1;
                 const catColor = getCategoryColor(trendCategory ?? "Autre");
