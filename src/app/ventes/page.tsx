@@ -68,6 +68,7 @@ type WeekData = {
   // Champs ajoutés (Popina API)
   remises_ttc?: number;
   remises_detail?: { operateur: string; count: number; total: number }[];
+  produits_offerts?: { name: string; qty: number; operateurs: string[] }[];
   hourly_ttc?: number[];
   // Split Food / Boissons
   food_ttc?: number; food_ht?: number;
@@ -977,6 +978,21 @@ function PerformancesPage() {
                                 <span style={{ fontWeight: 700, color: "#c15f2e" }}>{r.total.toLocaleString("fr-FR")}{"\u20AC"}</span>
                                 {" "}
                                 <span style={{ fontSize: 10, color: "#999" }}>({r.count} ticket{r.count > 1 ? "s" : ""})</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* Produits offerts */}
+                      {W.produits_offerts && W.produits_offerts.length > 0 && (
+                        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid #f0ebe3" }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 6 }}>Produits offerts</div>
+                          {W.produits_offerts.map((p) => (
+                            <div key={p.name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "3px 0", fontSize: 12 }}>
+                              <span style={{ color: "#1a1a1a" }}>{p.name}</span>
+                              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <span style={{ fontSize: 10, color: "#999" }}>x{p.qty}</span>
+                                <span style={{ fontSize: 10, color: "#bbb" }}>{p.operateurs.join(", ")}</span>
                               </span>
                             </div>
                           ))}

@@ -233,6 +233,21 @@ function aggregate(rows: Row[]) {
     .map(([operateur, v]) => ({ operateur, count: v.count, total: Math.round(v.total * 100) / 100 }))
     .sort((a, b) => b.total - a.total);
 
+  // Produits offerts (ttc = 0, type Produit, non annulé, hors messages/commandes internes)
+  const offertsMap = new Map<string, { qty: number; operateurs: Set<string> }>();
+  for (const r of productRows) {
+    if (Number(r.ttc) !== 0) continue;
+    const name = r.description?.trim();
+    if (!name || name === "FINITO" || name.startsWith("Ne pas") || name.startsWith("Seau") || name.startsWith("Verre gla")) continue;
+    const prev = offertsMap.get(name) ?? { qty: 0, operateurs: new Set<string>() };
+    prev.qty += Number(r.quantite) || 1;
+    if ((r as Record<string, unknown>).operateur) prev.operateurs.add(String((r as Record<string, unknown>).operateur));
+    offertsMap.set(name, prev);
+  }
+  const produits_offerts = [...offertsMap.entries()]
+    .map(([name, v]) => ({ name, qty: v.qty, operateurs: [...v.operateurs] }))
+    .sort((a, b) => b.qty - a.qty);
+
   // Répartition horaire (CA TTC par heure Paris, basée sur ouvert_a)
   const hourly_ttc: number[] = Array.from({ length: 24 }, () => 0);
   for (const r of validRows) {
@@ -674,6 +689,7 @@ function aggregate(rows: Row[]) {
     },
     remises_ttc: Math.round(remises_ttc * 100) / 100,
     remises_detail,
+    produits_offerts,
     hourly_ttc: hourly_ttc.map(v => Math.round(v * 100) / 100),
     food_ttc: Math.round(food_ttc), food_ht: Math.round(food_ht),
     drink_ttc: Math.round(drink_ttc), drink_ht: Math.round(drink_ht),
