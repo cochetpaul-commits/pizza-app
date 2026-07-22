@@ -304,6 +304,16 @@ export default function MasseSalarialePage() {
   // Range factice pour le PilotageNavBar — représente la période sélectionnée (mois/semaine)
   const navRange = { from: selected?.from ?? "", to: selected?.to ?? "" };
 
+  if (!etab) {
+    return (
+      <RequireRole permission="paie.manage">
+        <div style={{ maxWidth: 900, margin: "0 auto", padding: "40px 16px", textAlign: "center", color: "#999", fontSize: 14 }}>
+          Selectionnez un etablissement pour afficher la masse salariale.
+        </div>
+      </RequireRole>
+    );
+  }
+
   return (
     <RequireRole permission="paie.manage">
       <PilotageSwipeWrapper accent={etabColor} dateFrom={navRange.from} dateTo={navRange.to}>
