@@ -451,7 +451,7 @@ export default function InventairePage() {
 
   if (loading) {
     return (
-      <RequireRole allowedRoles={["group_admin", "manager", "equipier"]}>
+      <RequireRole permission="achats.inventaire">
         <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px" }}>
           <p style={{ color: "#999", fontSize: 13, textAlign: "center", marginTop: 40 }}>Chargement...</p>
         </div>
@@ -463,7 +463,7 @@ export default function InventairePage() {
 
   if (!isActive && !isViewing) {
     return (
-      <RequireRole allowedRoles={["group_admin", "manager", "equipier"]}>
+      <RequireRole permission="achats.inventaire">
         <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
           <div style={{
             background: "#fff", borderRadius: 16, border: "1.5px solid #ddd6c8",
@@ -543,7 +543,7 @@ export default function InventairePage() {
   const progressPct = zoneSummary.articles > 0 ? Math.round((zoneSummary.saisis / zoneSummary.articles) * 100) : 0;
 
   return (
-    <RequireRole allowedRoles={["group_admin", "manager", "equipier"]}>
+    <RequireRole permission="achats.inventaire">
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
 
         {/* Header */}
