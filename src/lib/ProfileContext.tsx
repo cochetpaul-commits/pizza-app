@@ -27,12 +27,13 @@ const ProfileContext = createContext<ProfileCtx>({
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [customPerms, setCustomPerms] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function fetchProfile(userId: string) {
+    async function fetchProfile(userId: string, userEmail?: string) {
       const { data, error } = await supabase
         .from("profiles")
         .select("role, display_name")
@@ -60,13 +61,28 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         setRole("equipier");
         setDisplayName(null);
       }
+
+      // Load custom permissions from employes table (matched by email)
+      const email = userEmail ?? data?.display_name;
+      if (email) {
+        const { data: empData } = await supabase
+          .from("employes")
+          .select("custom_permissions")
+          .eq("email", email)
+          .eq("actif", true)
+          .maybeSingle();
+        if (!cancelled && empData?.custom_permissions) {
+          setCustomPerms(empData.custom_permissions as Record<string, boolean>);
+        }
+      }
+
       setLoading(false);
     }
 
     supabase.auth.getUser().then(({ data }) => {
       if (cancelled) return;
       if (data.user) {
-        fetchProfile(data.user.id);
+        fetchProfile(data.user.id, data.user.email);
       } else {
         setLoading(false);
       }
@@ -80,10 +96,12 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") return;
       if (session?.user) {
         setLoading(true);
-        fetchProfile(session.user.id);
+        setCustomPerms({});
+        fetchProfile(session.user.id, session.user.email);
       } else {
         setRole(null);
         setDisplayName(null);
+        setCustomPerms({});
         setLoading(false);
       }
     });
@@ -96,7 +114,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   const isGroupAdmin = role === "group_admin";
   const cw = role === "group_admin" || role === "manager";
-  const can = (permission: string) => role ? hasPermission(role, permission) : false;
+  const can = (permission: string) => role ? hasPermission(role, permission, customPerms) : false;
 
   return (
     <ProfileContext.Provider value={{ role, displayName, loading, isGroupAdmin, canWrite: cw, can }}>

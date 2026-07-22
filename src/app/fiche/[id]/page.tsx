@@ -7,7 +7,7 @@ import { RequireRole } from "@/components/RequireRole";
 export default function EditFichePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   return (
-    <RequireRole allowedRoles={["group_admin", "manager"]}>
+    <RequireRole permission="operations.edit_recettes">
       <FicheWizard recipeId={id} />
     </RequireRole>
   );

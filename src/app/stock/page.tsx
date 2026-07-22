@@ -63,7 +63,7 @@ function fmtDateTime(iso: string): string {
 
 export default function StockPage() {
   return (
-    <RequireRole allowedRoles={["group_admin", "manager"]}>
+    <RequireRole permission="achats.inventaire">
       <StockContent />
     </RequireRole>
   );

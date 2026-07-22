@@ -5,7 +5,7 @@ import { RequireRole } from "@/components/RequireRole";
 
 export default function RecettesPage() {
   return (
-    <RequireRole allowedRoles={["group_admin", "manager", "equipier"]}>
+    <RequireRole permission="operations.recettes">
       <CatalogueContent />
     </RequireRole>
   );

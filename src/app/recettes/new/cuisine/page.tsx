@@ -14,7 +14,7 @@ function Inner() {
 
 export default function NewCuisineV2Page() {
   return (
-    <RequireRole allowedRoles={["group_admin", "manager"]}>
+    <RequireRole permission="operations.edit_recettes">
       <Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: "#999" }}>Chargement...</div>}>
         <Inner />
       </Suspense>

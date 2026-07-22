@@ -5,7 +5,7 @@ import { RequireRole } from "@/components/RequireRole";
 
 export default function NewCocktailV2Page() {
   return (
-    <RequireRole allowedRoles={["group_admin", "manager"]}>
+    <RequireRole permission="operations.edit_recettes">
       <CocktailFormV2 />
     </RequireRole>
   );

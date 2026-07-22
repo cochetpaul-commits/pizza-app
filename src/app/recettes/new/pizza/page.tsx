@@ -5,7 +5,7 @@ import { RequireRole } from "@/components/RequireRole";
 
 export default function NewPizzaV2Page() {
   return (
-    <RequireRole allowedRoles={["group_admin", "manager"]}>
+    <RequireRole permission="operations.edit_recettes">
       <PizzaFormV2 />
     </RequireRole>
   );
