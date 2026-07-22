@@ -614,11 +614,6 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
       )}
 
       {/* ÉTAPE 4 : PRIX & MARGE (managers et admins uniquement) */}
-      {step === 3 && !canWrite && (
-        <div style={{ background: COLORS.card, borderRadius: 18, padding: "22px 24px", marginBottom: 14, boxShadow: "0 4px 14px #0000000a", textAlign: "center" }}>
-          <div style={{ fontSize: 13, color: COLORS.muted, padding: 20 }}>Les tarifs et marges sont reserves aux managers et administrateurs.</div>
-        </div>
-      )}
       {step === 3 && canWrite && (
         <div style={{ background: COLORS.card, borderRadius: 18, padding: "22px 24px", marginBottom: 14, boxShadow: "0 4px 14px #0000000a" }}>
           <h2 style={{ fontSize: 13, letterSpacing: ".15em", textTransform: "uppercase", color: COLORS.bordeaux, marginBottom: 16, fontWeight: 800 }}>
@@ -906,7 +901,11 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
 
       {/* NAV */}
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 4 }}>
-        <button disabled={step === 0} onClick={() => setStep(s => Math.max(0, s - 1))}
+        <button disabled={step === 0} onClick={() => setStep(s => {
+            let prev = s - 1;
+            if (prev === 3 && !canWrite) prev = 2; // skip prix for equipiers
+            return Math.max(0, prev);
+          })}
           style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "13px 28px", fontSize: 14.5, fontWeight: 800, cursor: step === 0 ? "default" : "pointer", background: "transparent", color: COLORS.muted, opacity: step === 0 ? 0.45 : 1, fontFamily: "inherit" }}>
           Retour
         </button>
@@ -916,7 +915,13 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
             {saving ? "..." : "Sauvegarder"}
           </button>
         )}
-        <button onClick={() => { if (step < 4) setStep(s => s + 1); else { handleSave(); router.push("/recettes"); } }}
+        <button onClick={() => {
+            if (step < 4) {
+              let next = step + 1;
+              if (next === 3 && !canWrite) next = 4; // skip prix for equipiers
+              setStep(next);
+            } else { handleSave(); router.push("/recettes"); }
+          }}
           style={{ border: "none", borderRadius: 999, padding: "13px 28px", fontSize: 14.5, fontWeight: 800, cursor: "pointer", background: COLORS.terra, color: "#fff", boxShadow: "0 6px 16px #c97b5b44", fontFamily: "inherit" }}>
           {step === 4 ? "Terminer" : "Continuer"}
         </button>
