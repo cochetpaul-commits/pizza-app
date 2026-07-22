@@ -172,11 +172,29 @@ export async function GET(req: NextRequest) {
     const krMap = new Map((linkedKR ?? []).map(r => [r.id, r]));
 
     // Batch: get all linked ingredients by ID
-    const ingIds = popinaProducts.filter(p => p.ingredient_id).map(p => p.ingredient_id!);
+    const ingIds = [...new Set(popinaProducts.filter(p => p.ingredient_id).map(p => p.ingredient_id!))];
     const { data: linkedIngs } = ingIds.length > 0
       ? await supabaseAdmin.from("ingredients").select("id, name, cost_per_unit, cost_per_kg, piece_volume_ml").in("id", ingIds)
       : { data: [] };
     const ingMap = new Map((linkedIngs ?? []).map(i => [i.id, i]));
+
+    // Also load offers for these linked ingredients (they may not have popina_name)
+    const missingOfferIds = ingIds.filter(id => !offerPriceMap.has(id));
+    if (missingOfferIds.length > 0) {
+      const { data: extraOffers } = await supabaseAdmin
+        .from("supplier_offers")
+        .select("ingredient_id, unit_price, pack_price, pack_count, pack_each_qty, price_kind")
+        .eq("is_active", true)
+        .in("ingredient_id", missingOfferIds);
+      for (const o of extraOffers ?? []) {
+        if (offerPriceMap.has(o.ingredient_id)) continue;
+        if (o.unit_price && o.unit_price > 0) { offerPriceMap.set(o.ingredient_id, o.unit_price); continue; }
+        if (o.pack_price && o.pack_count) {
+          const perUnit = o.pack_price / (o.pack_count * (o.pack_each_qty ?? 1));
+          if (perUnit > 0) offerPriceMap.set(o.ingredient_id, perUnit);
+        }
+      }
+    }
 
     // Batch: get all dose mappings for these popina products
     const ppIds = popinaProducts.map(p => p.id);
