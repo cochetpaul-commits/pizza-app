@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
   /* ── 2. Fetch recipe costs (kitchen incl. pizza, cocktails) ── */
   const { data: kitchenData } = await supabaseAdmin
     .from("kitchen_recipes")
-    .select("name,category,total_cost,cost_per_portion,cost_per_kg")
+    .select("id,name,category,total_cost,cost_per_portion,cost_per_kg")
     .eq("is_draft", false)
     .eq("etablissement_id", etabId);
 
@@ -154,6 +154,81 @@ export async function GET(req: NextRequest) {
         type: "ingredient",
         recipeCategory: "Ingredients",
       });
+    }
+  }
+
+  /* ── 2c. Popina product links → recipe/ingredient mapping ── */
+  const { data: popinaProducts } = await supabaseAdmin
+    .from("popina_products")
+    .select("id, name, linked_type, kitchen_recipe_id, ingredient_id")
+    .not("linked_type", "is", null);
+
+  if (popinaProducts && popinaProducts.length > 0) {
+    // Batch: get all linked kitchen_recipes by ID
+    const krIds = popinaProducts.filter(p => p.kitchen_recipe_id).map(p => p.kitchen_recipe_id!);
+    const { data: linkedKR } = krIds.length > 0
+      ? await supabaseAdmin.from("kitchen_recipes").select("id, name, category, total_cost, cost_per_portion, cost_per_kg").in("id", krIds)
+      : { data: [] };
+    const krMap = new Map((linkedKR ?? []).map(r => [r.id, r]));
+
+    // Batch: get all linked ingredients by ID
+    const ingIds = popinaProducts.filter(p => p.ingredient_id).map(p => p.ingredient_id!);
+    const { data: linkedIngs } = ingIds.length > 0
+      ? await supabaseAdmin.from("ingredients").select("id, name, cost_per_unit, cost_per_kg, piece_volume_ml").in("id", ingIds)
+      : { data: [] };
+    const ingMap = new Map((linkedIngs ?? []).map(i => [i.id, i]));
+
+    // Batch: get all dose mappings for these popina products
+    const ppIds = popinaProducts.map(p => p.id);
+    const { data: allDoses } = ppIds.length > 0
+      ? await supabaseAdmin.from("popina_dose_map").select("popina_product_id, ingredient_id, dose, dose_unit").in("popina_product_id", ppIds)
+      : { data: [] };
+    const doseMap = new Map((allDoses ?? []).map(d => [d.popina_product_id, d]));
+
+    for (const pp of popinaProducts) {
+      if (!pp.name) continue;
+      const key = normalize(pp.name);
+      if (recipeCosts.has(key)) continue;
+
+      if (pp.kitchen_recipe_id) {
+        const kr = krMap.get(pp.kitchen_recipe_id);
+        if (kr) {
+          const isPizza = kr.category === "pizza";
+          const cost = isPizza
+            ? (kr.total_cost ?? 0)
+            : (kr.cost_per_portion ?? kr.total_cost ?? kr.cost_per_kg ?? 0);
+          if (cost > 0) {
+            recipeCosts.set(key, {
+              name: pp.name,
+              cost,
+              type: isPizza ? "pizza" : "kitchen",
+              recipeCategory: kr.category || "Cuisine",
+            });
+          }
+        }
+      } else if (pp.ingredient_id) {
+        const ing = ingMap.get(pp.ingredient_id);
+        if (ing) {
+          let unitCost = ing.cost_per_unit ?? ing.cost_per_kg ?? offerPriceMap.get(ing.id) ?? 0;
+          const dose = doseMap.get(pp.id);
+          if (dose) {
+            const volumeMl = Number(ing.piece_volume_ml) || 0;
+            if (dose.dose_unit === "cl" && volumeMl > 0) {
+              unitCost = (dose.dose * 10 / volumeMl) * unitCost;
+            } else {
+              unitCost = dose.dose * unitCost;
+            }
+          }
+          if (unitCost > 0) {
+            recipeCosts.set(key, {
+              name: pp.name,
+              cost: Math.round(unitCost * 100) / 100,
+              type: "ingredient",
+              recipeCategory: "Ingredients",
+            });
+          }
+        }
+      }
     }
   }
 
