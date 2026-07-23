@@ -58,6 +58,8 @@ type CatalogItem = {
   stock_min: number | null;
 };
 
+type StockInfo = { stock: number; unit: string | null; avg_daily: number; qty_to_order: number };
+
 type HistItem = {
   id: string;
   status: string;
@@ -554,6 +556,9 @@ function CommandesPage() {
   // Unit mode: carton vs individual (per ingredient)
   const [unitModes, setUnitModes] = useState<Record<string, "individual" | "carton">>({});
 
+  // Stock data (current stock + theoretical order qty per ingredient)
+  const [stockData, setStockData] = useState<Record<string, StockInfo>>({});
+
   // Confirmation banner
   const [confirmation, setConfirmation] = useState<string | null>(null);
 
@@ -838,6 +843,41 @@ function CommandesPage() {
     setCatalog(items);
     setLoadingSupplier(false);
   }, [etab, supplierAliases]);
+
+  // Load stock + commandes théoriques data
+  useEffect(() => {
+    if (!etab) return;
+    (async () => {
+      try {
+        const [stockRes, ordersRes] = await Promise.all([
+          fetchApi("/api/stock"),
+          fetchApi("/api/stock/commandes-theoriques"),
+        ]);
+        const map: Record<string, StockInfo> = {};
+        if (stockRes.ok) {
+          const sd = await stockRes.json();
+          for (const item of sd.items ?? []) {
+            map[item.ingredient_id] = { stock: item.stock, unit: item.unit, avg_daily: 0, qty_to_order: 0 };
+          }
+        }
+        if (ordersRes.ok) {
+          const od = await ordersRes.json();
+          for (const supplier of od.suppliers ?? []) {
+            for (const line of supplier.lines ?? []) {
+              const existing = map[line.ingredient_id];
+              if (existing) {
+                existing.avg_daily = line.avg_daily;
+                existing.qty_to_order = line.qty_to_order;
+              } else {
+                map[line.ingredient_id] = { stock: line.current_stock, unit: line.unit, avg_daily: line.avg_daily, qty_to_order: line.qty_to_order };
+              }
+            }
+          }
+        }
+        setStockData(map);
+      } catch { /* ignore */ }
+    })();
+  }, [etab]);
 
   useEffect(() => {
     if (selectedSupplierId) {
@@ -1436,6 +1476,38 @@ function CommandesPage() {
                 <div style={{ fontSize: 18, fontWeight: 700, color: stockColor, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
                   {objIndiv} {stockUnitLabel}{objIndiv > 1 ? "." : ""}
                 </div>
+              </div>
+            );
+          })()}
+
+          {/* Stock actuel + Commande théorique */}
+          {(() => {
+            const si = stockData[item.id];
+            if (!si) return null;
+            return (
+              <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Stock</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: si.stock <= (item.stock_min ?? 0) ? "#DC2626" : "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
+                    {Math.round(si.stock * 10) / 10}
+                  </div>
+                </div>
+                {si.qty_to_order > 0 && (
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#2563EB", textTransform: "uppercase" }}>A commander</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#2563EB", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
+                      {si.qty_to_order} {si.unit ?? ""}
+                    </div>
+                  </div>
+                )}
+                {si.avg_daily > 0 && (
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Conso/j</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "#777" }}>
+                      {(Math.round(si.avg_daily * 10) / 10)}/j
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })()}
