@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 async function getCallerRole(req: NextRequest): Promise<string | null> {
@@ -7,22 +6,21 @@ async function getCallerRole(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get("authorization");
   if (authHeader) {
     const token = authHeader.replace("Bearer ", "");
-    const userClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    );
-    const { data } = await userClient.auth.getUser(token);
-    if (data.user) {
-      const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("role")
-        .eq("id", data.user.id)
-        .maybeSingle();
-      return profile?.role ?? null;
-    }
+    try {
+      // Use admin client to verify token (avoids JWT kid issues)
+      const { data } = await supabaseAdmin.auth.getUser(token);
+      if (data.user) {
+        const { data: profile } = await supabaseAdmin
+          .from("profiles")
+          .select("role")
+          .eq("id", data.user.id)
+          .maybeSingle();
+        return profile?.role ?? null;
+      }
+    } catch { /* token invalid */ }
   }
 
-  // Try cookie-based auth (for client-side fetch without explicit token)
+  // Try cookie-based auth
   const cookieHeader = req.headers.get("cookie") ?? "";
   const sbAccessToken = cookieHeader
     .split(";")
@@ -34,11 +32,7 @@ async function getCallerRole(req: NextRequest): Promise<string | null> {
     try {
       const decoded = JSON.parse(decodeURIComponent(sbAccessToken));
       const token = decoded?.[0] ?? decoded?.access_token ?? sbAccessToken;
-      const userClient = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      );
-      const { data } = await userClient.auth.getUser(token);
+      const { data } = await supabaseAdmin.auth.getUser(token);
       if (data.user) {
         const { data: profile } = await supabaseAdmin
           .from("profiles")
