@@ -134,7 +134,7 @@ export const PERFORMANCES_ITEMS: NavItemV2[] = [];
 export const OPERATIONS_ITEMS = PRODUCTION_ITEMS;
 
 // Sections
-export const PILOTAGE_SECTION: NavSubSection = { label: "Pilotage", icon: "barChart", href: "/ventes", roles: ["group_admin", "manager"], items: PILOTAGE_ITEMS };
+export const PILOTAGE_SECTION: NavSubSection = { label: "Pilotage", icon: "barChart", href: "/ventes", permission: "performances.view", items: PILOTAGE_ITEMS };
 export const PERSONNEL_SECTION: NavSubSection = { label: "Personnel", icon: "users", href: "/rh/equipe", roles: ["group_admin", "manager"], items: PLANNING_ITEMS };
 export const PRODUCTION_SECTION: NavSubSection = { label: "Production", icon: "package", roles: ["group_admin", "manager", "equipier"], items: PRODUCTION_ITEMS };
 export const PRODUCTION_SECTION_PICCOLA: NavSubSection = { label: "Production", icon: "package", roles: ["group_admin", "manager", "equipier"], items: PRODUCTION_ITEMS_PICCOLA };

@@ -261,7 +261,7 @@ const SECTION_PILOTAGE: TabSection = {
   href: "/ventes",
   match: ["/ventes", "/tresorerie", "/rh/masse-salariale"],
   icon: (a) => <IconWallet active={a} />,
-  roles: ["group_admin", "manager"],
+  permission: "performances.view",
   tabs: [
     { label: "Ventes", href: "/ventes", match: ["/ventes"], icon: (a) => <IconWallet active={a} /> },
     { label: "Produits", href: "/ventes/marges", match: ["/ventes/marges"], icon: (a) => <IconTag active={a} /> },
