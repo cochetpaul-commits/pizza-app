@@ -154,14 +154,18 @@ select.input option {
 
 *{ box-sizing: border-box; }
 
-/* ── Global button/input style: card look ─────────── */
-button, input[type="button"], input[type="submit"], select {
-  border-radius: 12px !important;
+/* ── macOS global button/input style ───────────────── */
+button, input[type="button"], input[type="submit"] {
+  border-radius: 10px !important;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+}
+select {
+  border-radius: 10px !important;
 }
 input[type="text"], input[type="search"], input[type="email"],
 input[type="password"], input[type="number"], input[type="tel"],
 textarea {
-  border-radius: 12px !important;
+  border-radius: 10px !important;
 }
 
 h1, h2, h3, h4 {
@@ -382,13 +386,14 @@ a{
 select.input,
 textarea.input{
   width: 100%;
-  border-radius: var(--radius2);
-  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.12);
   background: #fff;
   color: var(--text);
   padding: 0 14px;
   outline: none;
-  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  box-shadow: 0 0.5px 1px rgba(0,0,0,0.03);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
 .input{
@@ -412,39 +417,44 @@ textarea.input{
 
 .btn{
   height: 34px;
-  border-radius: var(--radius2);
-  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.12);
   background: #fff;
   color: var(--noir);
-  padding: 0 12px;
+  padding: 0 14px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   gap: 8px;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 13px;
-  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+  box-shadow: 0 0.5px 1px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.04);
+  transition: all 0.15s ease;
 }
 
 .btn:hover{
-  background: var(--creme-dark);
+  background: rgba(0,0,0,0.03);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04);
 }
 
 .btn:active{
-  transform: scale(0.98);
+  transform: scale(0.97);
+  box-shadow: 0 0.5px 1px rgba(0,0,0,0.04);
 }
 
 .btnPrimary{
   background: var(--terre);
-  border-color: var(--terre);
+  border-color: transparent;
   color: var(--primary-text);
+  box-shadow: 0 1px 2px rgba(212,119,90,0.3), 0 2px 8px rgba(212,119,90,0.15);
 }
 
 .btnPrimary:hover{
   background: var(--primary-hover);
-  border-color: var(--primary-hover);
+  border-color: transparent;
+  box-shadow: 0 2px 4px rgba(212,119,90,0.4), 0 4px 12px rgba(212,119,90,0.2);
 }
 
 .btn:disabled{
@@ -847,6 +857,22 @@ input[type='number'] {
     overflow: visible !important;
   }
   @page { size: A4; margin: 16mm; }
+}
+
+/* ── macOS segmented controls (inline tab toggles) ── */
+div[style*="background: #f0ebe2"],
+div[style*="background: rgb(240, 235, 226)"],
+div[style*="background: #f0ebe3"] {
+  background: rgba(0,0,0,0.05) !important;
+  border: none !important;
+  border-radius: 10px !important;
+}
+div[style*="background: #f0ebe2"] > button,
+div[style*="background: rgb(240, 235, 226)"] > button,
+div[style*="background: #f0ebe3"] > button {
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  transition: all 0.15s ease !important;
 }
 
 /* ── macOS modal overlays (targets inline styled overlays) ── */
