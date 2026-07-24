@@ -62,37 +62,37 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  /* ── 1. Fetch ventes_lignes (paginated) ── */
-  const PAGE = 1000;
-  const allVentes: VenteLigne[] = [];
-  let offset = 0;
-  let hasMore = true;
-  while (hasMore) {
-    const { data, error } = await supabaseAdmin
-      .from("ventes_lignes")
-      .select(
-        "date_service,description,categorie,quantite,ttc,ht,annule,type_ligne",
-      )
-      .eq("etablissement_id", etabId)
-      .gte("date_service", from)
-      .lte("date_service", to)
-      .order("date_service", { ascending: true })
-      .range(offset, offset + PAGE - 1);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+  /* ── 1+2. Fetch ventes + recipe costs in parallel ── */
+  async function fetchVentes() {
+    const PAGE = 1000;
+    const all: VenteLigne[] = [];
+    let offset = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const { data, error } = await supabaseAdmin
+        .from("ventes_lignes")
+        .select("date_service,description,categorie,quantite,ttc,ht,annule,type_ligne")
+        .eq("etablissement_id", etabId)
+        .gte("date_service", from)
+        .lte("date_service", to)
+        .order("date_service", { ascending: true })
+        .range(offset, offset + PAGE - 1);
+      if (error) throw new Error(error.message);
+      all.push(...((data ?? []) as VenteLigne[]));
+      hasMore = (data?.length ?? 0) === PAGE;
+      offset += PAGE;
     }
-    allVentes.push(...((data ?? []) as VenteLigne[]));
-    hasMore = (data?.length ?? 0) === PAGE;
-    offset += PAGE;
+    return all;
   }
 
-  /* ── 2. Fetch recipe costs (kitchen incl. pizza, cocktails) ── */
-  const { data: kitchenData } = await supabaseAdmin
-    .from("kitchen_recipes")
-    .select("id,name,category,total_cost,cost_per_portion,cost_per_kg")
-    .eq("is_draft", false)
-    .eq("etablissement_id", etabId);
+  const [allVentes, { data: kitchenData }] = await Promise.all([
+    fetchVentes(),
+    supabaseAdmin
+      .from("kitchen_recipes")
+      .select("id,name,category,total_cost,cost_per_portion,cost_per_kg")
+      .eq("is_draft", false)
+      .eq("etablissement_id", etabId),
+  ]);
 
   const recipeCosts = new Map<string, RecipeCost>();
 

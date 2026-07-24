@@ -80,19 +80,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "etablissement_id, from, to requis" }, { status: 400 });
   }
 
-  // Load popina sub-categories for all categories
-  const { data: popinaProds } = await supabase
-    .from("popina_products")
-    .select("name, sub_category")
-    .eq("active", true)
-    .not("sub_category", "is", null);
+  // Load popina sub-categories + current period data in parallel
+  const [{ data: popinaProds }, rows] = await Promise.all([
+    supabase
+      .from("popina_products")
+      .select("name, sub_category")
+      .eq("active", true)
+      .not("sub_category", "is", null),
+    fetchRange(etabId, from, to),
+  ]);
   subCatByName = new Map();
   for (const p of popinaProds ?? []) {
     if (p.name && p.sub_category) subCatByName.set(p.name.trim().toLowerCase(), p.sub_category);
   }
-
-  // ── Période courante ───────────────────────────────────────────────────
-  const rows = await fetchRange(etabId, from, to);
 
   if (rows.length === 0) {
     // Fallback: try daily_sales (Kezia / aggregated data)

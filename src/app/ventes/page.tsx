@@ -271,40 +271,37 @@ function PerformancesPage() {
     return { from, to };
   }, [range]);
 
-  // Load data
+  // Load data — stats + meteo in parallel
   const loadData = useCallback(async () => {
     if (!etab) return;
     setLoading(true);
     const { from, to } = getRange();
     try {
-      const res = await fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${from}&to=${to}`);
-      const json = await res.json();
+      const [statsRes, meteoRes] = await Promise.all([
+        fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${from}&to=${to}`),
+        fetch(`/api/meteo?from=${from}&to=${to}`).catch(() => null),
+      ]);
+      const json = await statsRes.json();
       if (json.empty || !json.stats) {
-        setData(null);
-        setPrev(null);
-        setPrevWeek(null);
-        setDataSource(null);
+        setData(null); setPrev(null); setPrevWeek(null); setDataSource(null);
       } else {
         setData(json.stats);
         setPrev(json.prev ?? null);
         setPrevWeek(json.prevWeek ?? null);
         setDataSource(json.source ?? "ventes_lignes");
       }
-      // Fetch meteo
-      try {
-        const mRes = await fetch(`/api/meteo?from=${from}&to=${to}`);
-        const mJson = await mRes.json();
-        const mMap: Record<string, { emoji: string; desc: string; temp: number }> = {};
-        for (const m of mJson.meteo ?? []) {
-          mMap[`${m.date_service}:${m.service}`] = { emoji: m.emoji, desc: m.description, temp: m.temp };
-        }
-        setMeteo(mMap);
-      } catch { setMeteo({}); }
-
+      if (meteoRes) {
+        try {
+          const mJson = await meteoRes.json();
+          const mMap: Record<string, { emoji: string; desc: string; temp: number }> = {};
+          for (const m of mJson.meteo ?? []) {
+            mMap[`${m.date_service}:${m.service}`] = { emoji: m.emoji, desc: m.description, temp: m.temp };
+          }
+          setMeteo(mMap);
+        } catch { setMeteo({}); }
+      }
     } catch {
-      setData(null);
-      setPrev(null);
-      setPrevWeek(null);
+      setData(null); setPrev(null); setPrevWeek(null);
     }
     setLoading(false);
   }, [etab, getRange]);
