@@ -11,6 +11,7 @@ import { BottomSheet } from "@/components/layout/BottomSheet";
 import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 import { supabase } from "@/lib/supabaseClient";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
+import { useProfile } from "@/lib/ProfileContext";
 
 /* ── Types ── */
 type WeekData = {
@@ -119,7 +120,9 @@ const JOURS_LABELS: Record<number, string> = {
 };
 
 /* ── Helpers ── */
-const fmt = (v: number) => v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "\u20AC";
+const HIDDEN = "\u2022\u2022\u2022";
+const _fmt = (v: number) => v.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const fmt = (v: number) => _fmt(v) + "\u20AC";
 const fmtK = (v: number) => (v / 1000).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + "k\u20AC";
 const ZC: Record<string, string> = { Salle: "#46655a", Pergolas: "#5e8278", Terrasse: "#c4a882", emp: "#D4775A" };
 
@@ -176,6 +179,9 @@ export default function PerformancesPageWrapper() {
 function PerformancesPage() {
   const searchParams = useSearchParams();
   const { current: etab } = useEtablissement();
+  const { can } = useProfile();
+  const showMoney = can("performances.show_money");
+  const mc = showMoney ? undefined : "hide-money"; // money class
   const accent = etab?.couleur ?? "#D4775A";
 
   const hasUrlRange = !!(searchParams.get("from") && searchParams.get("to"));
@@ -612,9 +618,9 @@ function PerformancesPage() {
   }], [accent]);
 
   return (
-    <RequireRole allowedRoles={["group_admin"]}>
+    <RequireRole permission="performances.view">
       <PilotageSwipeWrapper dateFrom={range.from} dateTo={range.to}>
-      <div className="ventes-container" style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 16px 120px" }}>
+      <div className={`ventes-container${showMoney ? "" : " no-money"}`} style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 16px 120px" }}>
 
         {/* DateRangePicker — centered (desktop) */}
         <div className="desktop-only" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginBottom: 10 }}>
@@ -648,7 +654,7 @@ function PerformancesPage() {
 
         {/* TTC/HT toggle + actions desktop */}
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", gap: 0, background: "#f0ebe2", border: "1px solid #e8e0d0", borderRadius: 999, padding: 2 }}>
+          {showMoney && <div style={{ display: "flex", gap: 0, background: "#f0ebe2", border: "1px solid #e8e0d0", borderRadius: 999, padding: 2 }}>
             <button type="button" onClick={() => setMode("ttc")} style={{
               padding: "4px 14px", borderRadius: 999, border: "none", cursor: "pointer",
               background: mode === "ttc" ? accent : "transparent", color: mode === "ttc" ? "#fff" : "#999",
@@ -659,7 +665,7 @@ function PerformancesPage() {
               background: mode === "ht" ? accent : "transparent", color: mode === "ht" ? "#fff" : "#999",
               fontSize: 11, fontWeight: 700, letterSpacing: ".03em",
             }}>HT</button>
-          </div>
+          </div>}
           <label className="desktop-only" style={{
             padding: "6px 14px", borderRadius: 8, border: "none",
             background: accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
@@ -778,8 +784,8 @@ function PerformancesPage() {
                     <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".16em", color: "rgba(255,255,255,.7)", fontWeight: 600, marginBottom: 8 }}>
                       CA {mode.toUpperCase()}
                     </div>
-                    <div style={{ ...S.bigNum, textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>{fmt(ca)}</div>
-                    {mode === "ttc" && <div style={{ fontSize: 13, color: "rgba(255,255,255,.85)", marginTop: 6, fontWeight: 500 }}>HT <span style={{ color: "#fff", fontWeight: 700 }}>{fmt(W.ca_ht)}</span></div>}
+                    <div data-money style={{ ...S.bigNum, textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>{fmt(ca)}</div>
+                    {mode === "ttc" && <div data-money style={{ fontSize: 13, color: "rgba(255,255,255,.85)", marginTop: 6, fontWeight: 500 }}>HT <span style={{ color: "#fff", fontWeight: 700 }}>{fmt(W.ca_ht)}</span></div>}
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
                     {activePrevWeek && (() => {
@@ -855,10 +861,10 @@ function PerformancesPage() {
                     <div style={{ width: 1, background: "rgba(255,255,255,.1)", alignSelf: "stretch" }} />
                     <div style={{ minWidth: 0, flex: "1 1 0" }}>
                       <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color: "rgba(255,255,255,.8)", fontWeight: 700, marginBottom: 4 }}>Ticket moyen sur place</div>
-                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>
+                      <div data-money style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>
                         {W.cov_sur > 0 ? ((mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur).toFixed(1) + "\u20AC" : "\u2014"}
                       </div>
-                      {W.cov_emp > 0 && W.couverts > 0 && <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>Global <span style={{ color: "#fff", fontWeight: 700 }}>{(ca / W.couverts).toFixed(1) + "\u20AC"}</span></div>}
+                      {W.cov_emp > 0 && W.couverts > 0 && <div data-money style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>Global <span style={{ color: "#fff", fontWeight: 700 }}>{(ca / W.couverts).toFixed(1) + "\u20AC"}</span></div>}
                       {activePrev && activePrev.cov_sur > 0 && W.cov_sur > 0 && (() => {
                         const curSP = (mode === "ttc" ? W.place_sur_ttc : W.place_sur_ht) / W.cov_sur;
                         const prevSP = (mode === "ttc" ? activePrev.place_sur_ttc : activePrev.place_sur_ht) / activePrev.cov_sur;
@@ -2074,6 +2080,10 @@ function PerformancesPage() {
         .ventes-nav-btn:hover, .ventes-nav-btn:active {
           background: rgba(0,0,0,0.06) !important;
         }
+        ${!showMoney ? `
+          .no-money [data-money] { filter: blur(8px); pointer-events: none; user-select: none; }
+          .no-money .money-hide { display: none !important; }
+        ` : ""}
       `}</style>
       </PilotageSwipeWrapper>
     </RequireRole>

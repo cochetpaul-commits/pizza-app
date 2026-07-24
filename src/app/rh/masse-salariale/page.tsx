@@ -9,6 +9,7 @@ import { fetchApi } from "@/lib/fetchApi";
 import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 import Chart from "chart.js/auto";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
+import { useProfile } from "@/lib/ProfileContext";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -106,6 +107,8 @@ function getWeekOptions(): PeriodOption[] {
 export default function MasseSalarialePage() {
   const router = useRouter();
   const { current: etab } = useEtablissement();
+  const { can } = useProfile();
+  const showMoney = can("performances.show_money");
   const [presences, setPresences] = useState<ComboPresence[]>([]);
   const [loading, setLoading] = useState(true);
   const [importMsg, setImportMsg] = useState("");
@@ -381,7 +384,8 @@ export default function MasseSalarialePage() {
   return (
     <RequireRole permission="performances.pilotage">
       <PilotageSwipeWrapper accent={etabColor} dateFrom={navRange.from} dateTo={navRange.to}>
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "20px 16px 100px" }}>
+      <div className={showMoney ? undefined : "no-money"} style={{ maxWidth: 900, margin: "0 auto", padding: "20px 16px 100px" }}>
+        {!showMoney && <style>{`.no-money [data-money] { filter: blur(8px); pointer-events: none; user-select: none; }`}</style>}
 
         {/* Tabs: Reelle / TNS / Simulateur */}
         <div style={{ display: "flex", gap: 4, padding: 4, background: "#f0ebe2", borderRadius: 12, marginBottom: 18, border: "1px solid #e8e0d0" }}>
@@ -493,7 +497,7 @@ export default function MasseSalarialePage() {
             </div>
           </div>
           <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", marginTop: 8 }}>
-            {fmt(masseSalarialeChargee)}{"\u20AC"} chargee {"\u00B7"} {caMonth ? `${fmt(caMonth)}\u20AC CA TTC` : "CA non disponible"}
+            <span data-money>{fmt(masseSalarialeChargee)}{"\u20AC"} chargee</span> {"\u00B7"} {caMonth ? <span data-money>{fmt(caMonth)}{"\u20AC"} CA TTC</span> : "CA non disponible"}
           </div>
         </div>
 
@@ -502,12 +506,12 @@ export default function MasseSalarialePage() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
           <div style={CARD}>
             <div style={LABEL}>CA TTC</div>
-            <div style={KPI}>{caMonth ? `${fmt(caMonth)}\u20AC` : "\u2014"}</div>
+            <div data-money style={KPI}>{caMonth ? `${fmt(caMonth)}\u20AC` : "\u2014"}</div>
             {caHtMonth != null && <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>{fmt(caHtMonth)}{"\u20AC"} HT</div>}
           </div>
           <div style={CARD}>
             <div style={LABEL}>Ticket moyen</div>
-            <div style={KPI}>{ticketMoyen ? `${fmtDec(ticketMoyen)}\u20AC` : "\u2014"}</div>
+            <div data-money style={KPI}>{ticketMoyen ? `${fmtDec(ticketMoyen)}\u20AC` : "\u2014"}</div>
             {couvertsMonth != null && <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>{couvertsMonth} cvts {"\u00B7"} {ticketsMonth} tickets</div>}
           </div>
         </div>
@@ -527,7 +531,7 @@ export default function MasseSalarialePage() {
           </div>
           <div style={CARD}>
             <div style={LABEL}>Productivite</div>
-            <div style={KPI}>{productivite ? `${fmt(productivite)}\u20AC/h` : "\u2014"}</div>
+            <div data-money style={KPI}>{productivite ? `${fmt(productivite)}\u20AC/h` : "\u2014"}</div>
             <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>CA / heure travaillee</div>
           </div>
         </div>
@@ -537,7 +541,7 @@ export default function MasseSalarialePage() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
           <div style={CARD}>
             <div style={LABEL}>Brute estimee</div>
-            <div style={KPI}>{fmt(masseSalarialeBrute)}{"\u20AC"}</div>
+            <div data-money style={KPI}>{fmt(masseSalarialeBrute)}{"\u20AC"}</div>
             <div style={{ fontSize: 11, color: "#999", marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
               Taux:
               <input type="number" value={tauxHoraire} onChange={e => setTauxHoraire(Number(e.target.value) || 15)}
@@ -546,7 +550,7 @@ export default function MasseSalarialePage() {
           </div>
           <div style={CARD}>
             <div style={LABEL}>Chargee (~42%)</div>
-            <div style={KPI}>{fmt(masseSalarialeChargee)}{"\u20AC"}</div>
+            <div data-money style={KPI}>{fmt(masseSalarialeChargee)}{"\u20AC"}</div>
             <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>+ {fmt(chargesPatronales)}{"\u20AC"} charges</div>
           </div>
         </div>

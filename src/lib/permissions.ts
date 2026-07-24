@@ -44,6 +44,7 @@ export const PERM_SECTIONS: PermSection[] = [
     permissions: [
       { key: "performances.view", label: "Ventes et indicateurs" },
       { key: "performances.pilotage", label: "Marges et pilotage" },
+      { key: "performances.show_money", label: "Voir les valeurs monetaires (CA, marges, euros)" },
     ],
   },
   {
@@ -98,7 +99,7 @@ export const DEFAULT_PERMS: Record<PermRole, Record<string, PermValue>> = {
     "absences.edit_cp": false, "paie.manage": false,
     "achats.view": false, "achats.edit": true, "achats.inventaire": true,
     "operations.recettes": true, "operations.edit_recettes": false, "operations.commandes": true, "commandes.valider": false,
-    "performances.view": false, "performances.pilotage": false,
+    "performances.view": false, "performances.pilotage": false, "performances.show_money": false,
     "settings.etablissements": false, "settings.employes": false, "settings.roles": false,
   },
   manager: {
@@ -111,7 +112,7 @@ export const DEFAULT_PERMS: Record<PermRole, Record<string, PermValue>> = {
     "absences.edit_cp": false, "paie.manage": false,
     "achats.view": false, "achats.edit": true, "achats.inventaire": true,
     "operations.recettes": true, "operations.edit_recettes": true, "operations.commandes": true, "commandes.valider": true,
-    "performances.view": true, "performances.pilotage": true,
+    "performances.view": true, "performances.pilotage": true, "performances.show_money": true,
     "settings.etablissements": false, "settings.employes": false, "settings.roles": false,
   },
   admin: {
@@ -124,7 +125,7 @@ export const DEFAULT_PERMS: Record<PermRole, Record<string, PermValue>> = {
     "absences.edit_cp": true, "paie.manage": true,
     "achats.view": true, "achats.edit": true, "achats.inventaire": true,
     "operations.recettes": true, "operations.edit_recettes": true, "operations.commandes": true, "commandes.valider": true,
-    "performances.view": true, "performances.pilotage": true,
+    "performances.view": true, "performances.pilotage": true, "performances.show_money": true,
     "settings.etablissements": true, "settings.employes": true, "settings.roles": true,
   },
 };
