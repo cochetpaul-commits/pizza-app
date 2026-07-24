@@ -224,7 +224,7 @@ export default function EquipePage() {
                   <th style={{ ...thStyle, textAlign: "left" }} className="hide-mobile">Email</th>
                   <th style={{ ...thStyle, textAlign: "left" }} className="hide-mobile">Telephone</th>
                   <th style={{ ...thStyle, textAlign: "center" }} className="hide-mobile">Completude</th>
-                  <th style={{ ...thStyle, textAlign: "center" }} className="hide-mobile">Actions</th>
+                  <th style={{ ...thStyle, textAlign: "center" }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -318,7 +318,7 @@ export default function EquipePage() {
                       </td>
 
                       {/* Actions */}
-                      <td style={{ ...tdStyle, textAlign: "center" }} className="hide-mobile">
+                      <td style={{ ...tdStyle, textAlign: "center" }}>
                         {emp.auth_user_id ? (
                           <span style={{ fontSize: 10, fontWeight: 700, color: "#2D6A4F", padding: "3px 8px", borderRadius: 6, background: "#2D6A4F10", border: "1px solid #2D6A4F30" }}>Connecte</span>
                         ) : emp.email ? (
