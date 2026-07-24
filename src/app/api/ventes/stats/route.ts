@@ -566,15 +566,25 @@ function aggregate(rows: Row[]) {
     return { tables, coverts, ca_ttc: Math.round(ca_ttc_total), ca_ht: Math.round(ca_ht_total) };
   }
 
-  const anti = upsellStats(cats => cats.has("Antipasti"));
-  const dolci = upsellStats(cats => cats.has("Dolci"));
-  const pizze = upsellStats(cats => cats.has("Pizze"));
-  const plats = upsellStats(cats => cats.has("Plats") || cats.has("Cuisine"));
-  const vin = upsellStats(cats => cats.has("Vins"));
-  const alcool = upsellStats(cats => cats.has("Alcool"));
-  const boissons = upsellStats(cats => cats.has("Boissons") || cats.has("Alcool") || cats.has("Vins"));
-  const digestif = upsellStats(cats => cats.has("Digestifs"));
-  const cafe = upsellStats(cats => cats.has("Boissons chaudes"));
+  // Helper: check if any cat in set matches any of the given names
+  const hasAny = (cats: Set<string>, ...names: string[]) => names.some(n => cats.has(n));
+
+  const VIN_CATS = ["Vins", "Vins blancs", "Vins rouges", "Vins roses", "Bollicine", "Carafes", "Stellati", "Verres de vin"];
+  const ALCOOL_CATS = ["Alcool", "Aperitifs", "Bieres", "Cocktails", "Spritz"];
+  const BOISSON_CATS = ["Boissons", "Mocktails", "Softs", "Jus de fruits"];
+  const CAFE_CATS = ["Boissons chaudes", "Cafe", "Deca", "The"];
+  const DIGESTIF_CATS = ["Digestifs", "Amaretti", "Amari", "Brandy", "Crema Alpina", "Gin", "Grappa", "Limoncelli", "Liqueurs", "Marsala", "Rhum", "Tequila", "Whisky"];
+  const PLAT_CATS = ["Plats", "Cuisine", "Sides"];
+
+  const anti = upsellStats(cats => hasAny(cats, "Antipasti"));
+  const dolci = upsellStats(cats => hasAny(cats, "Dolci"));
+  const pizze = upsellStats(cats => hasAny(cats, "Pizze"));
+  const plats = upsellStats(cats => hasAny(cats, ...PLAT_CATS));
+  const vin = upsellStats(cats => hasAny(cats, ...VIN_CATS));
+  const alcool = upsellStats(cats => hasAny(cats, ...ALCOOL_CATS));
+  const boissons = upsellStats(cats => hasAny(cats, ...BOISSON_CATS, ...ALCOOL_CATS, ...VIN_CATS));
+  const digestif = upsellStats(cats => hasAny(cats, ...DIGESTIF_CATS));
+  const cafe = upsellStats(cats => hasAny(cats, ...CAFE_CATS));
 
   // Avg couverts per table
   const totalOrderCov = Array.from(orderData.values()).reduce((s, od) => s + od.cov, 0);
@@ -594,15 +604,15 @@ function aggregate(rows: Row[]) {
   const ratiosBySvc: Record<string, Record<string, { tables: number; total: number }>> = {};
   for (const svc of ["midi", "soir"]) {
     ratiosBySvc[svc] = {
-      anti: upsellStatsBySvc(cats => cats.has("Antipasti"), svc),
-      dolci: upsellStatsBySvc(cats => cats.has("Dolci"), svc),
-      pizze: upsellStatsBySvc(cats => cats.has("Pizze"), svc),
-      plats: upsellStatsBySvc(cats => cats.has("Plats") || cats.has("Cuisine"), svc),
-      vin: upsellStatsBySvc(cats => cats.has("Vins"), svc),
-      alcool: upsellStatsBySvc(cats => cats.has("Alcool"), svc),
-      boissons: upsellStatsBySvc(cats => cats.has("Boissons") || cats.has("Alcool") || cats.has("Vins"), svc),
-      cafe: upsellStatsBySvc(cats => cats.has("Boissons chaudes"), svc),
-      digestif: upsellStatsBySvc(cats => cats.has("Digestifs"), svc),
+      anti: upsellStatsBySvc(cats => hasAny(cats, "Antipasti"), svc),
+      dolci: upsellStatsBySvc(cats => hasAny(cats, "Dolci"), svc),
+      pizze: upsellStatsBySvc(cats => hasAny(cats, "Pizze"), svc),
+      plats: upsellStatsBySvc(cats => hasAny(cats, ...PLAT_CATS), svc),
+      vin: upsellStatsBySvc(cats => hasAny(cats, ...VIN_CATS), svc),
+      alcool: upsellStatsBySvc(cats => hasAny(cats, ...ALCOOL_CATS), svc),
+      boissons: upsellStatsBySvc(cats => hasAny(cats, ...BOISSON_CATS, ...ALCOOL_CATS, ...VIN_CATS), svc),
+      cafe: upsellStatsBySvc(cats => hasAny(cats, ...CAFE_CATS), svc),
+      digestif: upsellStatsBySvc(cats => hasAny(cats, ...DIGESTIF_CATS), svc),
     };
   }
 
