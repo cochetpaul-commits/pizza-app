@@ -474,9 +474,10 @@ textarea.input{
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(0,0,0,0.06);
   background: #fff;
-  border-radius: var(--radius2);
+  border-radius: 12px;
+  box-shadow: 0 0.5px 1px rgba(0,0,0,0.03), 0 2px 6px rgba(0,0,0,0.03);
 }
 
 .kvKey{
@@ -560,6 +561,19 @@ textarea.input{
   :root {
     --pil-grid-cols: 1fr;
   }
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes modalScaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes bottomSheetSlideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
 }
 
 @keyframes slideUp {
@@ -701,15 +715,16 @@ input[type='number'] {
   border-radius: 16px;
   padding: 22px 24px;
   cursor: pointer;
-  border: 1px solid rgba(221,214,200,0.3);
+  border: 1px solid rgba(0,0,0,0.06);
   overflow: hidden;
   transition:
     transform .22s cubic-bezier(.34,1.56,.64,1),
     box-shadow .22s ease,
     border-color .22s ease;
   box-shadow:
-    0 1px 3px rgba(0,0,0,0.03),
-    0 4px 14px rgba(0,0,0,0.05);
+    0 0.5px 1px rgba(0,0,0,0.04),
+    0 2px 8px rgba(0,0,0,0.04),
+    0 6px 20px rgba(0,0,0,0.03);
 }
 .dash-card::before {
   content: '';
@@ -725,9 +740,9 @@ input[type='number'] {
 .dash-card:hover {
   transform: translateY(-3px);
   box-shadow:
-    0 4px 8px rgba(0,0,0,0.04),
-    0 14px 32px rgba(0,0,0,0.10);
-  border-color: rgba(221,214,200,0.6);
+    0 2px 4px rgba(0,0,0,0.04),
+    0 8px 24px rgba(0,0,0,0.08);
+  border-color: rgba(0,0,0,0.08);
 }
 .dash-card:hover::before {
   top: 10px;
@@ -832,6 +847,30 @@ input[type='number'] {
     overflow: visible !important;
   }
   @page { size: A4; margin: 16mm; }
+}
+
+/* ── macOS modal overlays (targets inline styled overlays) ── */
+div[style*="position: fixed"][style*="inset: 0"][style*="z-index"] {
+  backdrop-filter: blur(12px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
+}
+/* Modal panels — glass effect */
+div[style*="position: fixed"][style*="inset: 0"] > div[style*="background: #fff"],
+div[style*="position: fixed"][style*="inset: 0"] > div[style*="background: rgb(255"],
+div[style*="position: fixed"][style*="inset: 0"] > div[style*="background: white"] {
+  background: rgba(255,255,255,0.88) !important;
+  backdrop-filter: blur(40px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(200%) !important;
+  border: 1px solid rgba(255,255,255,0.6) !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06), 0 16px 48px rgba(0,0,0,0.12) !important;
+  border-radius: 16px !important;
+}
+
+/* ── macOS card styling (inline styled cards) ── */
+div[style*="border: 1px solid"][style*="border-radius"][style*="background: #fff"],
+div[style*="border: 1px solid"][style*="border-radius"][style*="background: rgb(255, 255, 255)"] {
+  box-shadow: 0 0.5px 1px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.03) !important;
+  border-color: rgba(0,0,0,0.06) !important;
 }
 
 /* ── macOS scrollbars ──────────────────────────────── */
