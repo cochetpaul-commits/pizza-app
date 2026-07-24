@@ -333,17 +333,28 @@ export default function EquipePage() {
                               <button type="button" onClick={async (e) => {
                                 e.stopPropagation();
                                 setInviteStatus(prev => ({ ...prev, [emp.id]: "sending" }));
-                                const { data: { session } } = await supabase.auth.getSession();
-                                const res = await fetch("/api/admin/invite", {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
-                                  body: JSON.stringify({ email: emp.email, displayName: `${emp.prenom} ${emp.nom}`, role: emp.role ?? "equipier" }),
-                                });
-                                if (res.ok) {
-                                  setInviteStatus(prev => ({ ...prev, [emp.id]: "sent" }));
-                                } else {
-                                  const errData = await res.json().catch(() => ({}));
-                                  setInviteStatus(prev => ({ ...prev, [emp.id]: `err:${errData.error || res.status}` }));
+                                try {
+                                  // Refresh session to avoid expired token
+                                  await supabase.auth.refreshSession();
+                                  const { data: { session } } = await supabase.auth.getSession();
+                                  if (!session?.access_token) {
+                                    setInviteStatus(prev => ({ ...prev, [emp.id]: "err:Session expiree, reconnectez-vous" }));
+                                    return;
+                                  }
+                                  const res = await fetch("/api/admin/invite", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+                                    body: JSON.stringify({ email: emp.email, displayName: `${emp.prenom} ${emp.nom}`, role: emp.role ?? "equipier" }),
+                                  });
+                                  if (res.ok) {
+                                    setInviteStatus(prev => ({ ...prev, [emp.id]: "sent" }));
+                                  } else {
+                                    const errData = await res.json().catch(() => ({}));
+                                    const msg = errData.error?.includes("JWT") ? "Session expiree, reconnectez-vous" : (errData.error || `Erreur ${res.status}`);
+                                    setInviteStatus(prev => ({ ...prev, [emp.id]: `err:${msg}` }));
+                                  }
+                                } catch {
+                                  setInviteStatus(prev => ({ ...prev, [emp.id]: "err:Erreur reseau" }));
                                 }
                               }} style={{
                                 padding: "4px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700,
