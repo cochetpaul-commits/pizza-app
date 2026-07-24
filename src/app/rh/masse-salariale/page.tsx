@@ -38,7 +38,6 @@ function toISO(d: Date): string {
 }
 
 function getWeekKey(d: Date): string {
-  // ISO week: monday-based, year-week
   const t = new Date(d);
   t.setDate(t.getDate() + 4 - (t.getDay() || 7));
   const yearStart = new Date(t.getFullYear(), 0, 1);
@@ -55,8 +54,8 @@ function getWeekBounds(d: Date): { from: string; to: string; label: string } {
   const mMonth = mon.toLocaleDateString("fr-FR", { month: "short" });
   const sMonth = sun.toLocaleDateString("fr-FR", { month: "short" });
   const label = mon.getMonth() === sun.getMonth()
-    ? `Sem. ${mDay}–${sDay} ${sMonth} ${sun.getFullYear()}`
-    : `Sem. ${mDay} ${mMonth} – ${sDay} ${sMonth} ${sun.getFullYear()}`;
+    ? `Sem. ${mDay}\u2013${sDay} ${sMonth} ${sun.getFullYear()}`
+    : `Sem. ${mDay} ${mMonth} \u2013 ${sDay} ${sMonth} ${sun.getFullYear()}`;
   return { from: toISO(mon), to: toISO(sun), label };
 }
 
@@ -68,8 +67,8 @@ const CARD = { background: "#fff", borderRadius: 14, padding: 20, border: "1px s
 const KPI = { fontSize: 28, fontWeight: 700 as const, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" };
 const LABEL = { fontSize: 10, fontWeight: 700 as const, color: "#999", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 6 };
 
-function fmt(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-function fmtDec(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmt(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+function fmtDec(v: number) { return v.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
 
 function getMonthOptions(): PeriodOption[] {
   const opts: PeriodOption[] = [];
@@ -90,7 +89,6 @@ function getMonthOptions(): PeriodOption[] {
 function getWeekOptions(): PeriodOption[] {
   const opts: PeriodOption[] = [];
   const now = new Date();
-  // 12 weeks back including current
   for (let i = 0; i < 12; i++) {
     const d = new Date(now);
     d.setDate(now.getDate() - i * 7);
@@ -110,7 +108,6 @@ export default function MasseSalarialePage() {
   const { current: etab } = useEtablissement();
   const [presences, setPresences] = useState<ComboPresence[]>([]);
   const [loading, setLoading] = useState(true);
-  const [, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState("");
   const [caMonth, setCaMonth] = useState<number | null>(null);
   const [caHtMonth, setCaHtMonth] = useState<number | null>(null);
@@ -127,25 +124,21 @@ export default function MasseSalarialePage() {
   const [selectedWeek, setSelectedWeek] = useState(weekOptions[0]?.value ?? "");
   const selectedValue = periodMode === "month" ? selectedMonth : selectedWeek;
   const selected = options.find(o => o.value === selectedValue);
-  const setSelectedValue = (v: string) => {
-    if (periodMode === "month") setSelectedMonth(v); else setSelectedWeek(v);
-    // Reload with new period
-    const opt = options.find(o => o.value === v);
-    if (opt && etabId) setTimeout(() => loadAllData(etabId, opt.from, opt.to), 0);
-  };
   const currentIdx = options.findIndex(o => o.value === selectedValue);
-  const goPrev = () => { if (currentIdx < options.length - 1) setSelectedValue(options[currentIdx + 1].value); };
-  const goNext = () => { if (currentIdx > 0) setSelectedValue(options[currentIdx - 1].value); };
 
-  // Load all data for selected period
   const etabId = etab?.id;
   const selectedFrom = selected?.from;
   const selectedTo = selected?.to;
 
+  // Stable ref for loading guard
+  const loadingRef = useRef(false);
 
   const loadAllData = useCallback(async (eId: string, from: string, to: string) => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
     try {
+      // Fetch presences + CA in parallel
       const [presData] = await Promise.all([
         supabase
           .from("combo_presences")
@@ -168,46 +161,57 @@ export default function MasseSalarialePage() {
           }),
       ]);
       setPresences((presData.data ?? []) as ComboPresence[]);
+
       // Cumul mensuel HS (load full month when viewing a week)
       const fromDate = new Date(from + "T12:00:00");
       const monthStart = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, "0")}-01`;
       const monthEndD = new Date(fromDate.getFullYear(), fromDate.getMonth() + 1, 0);
       const monthEnd = `${monthEndD.getFullYear()}-${String(monthEndD.getMonth() + 1).padStart(2, "0")}-${String(monthEndD.getDate()).padStart(2, "0")}`;
       if (monthStart !== from || monthEnd !== to) {
-        supabase
+        const { data: monthData } = await supabase
           .from("combo_presences")
           .select("combo_nom, equipe, ecart_total")
           .eq("etablissement_id", eId)
           .gte("periode_debut", monthStart)
-          .lte("periode_fin", monthEnd)
-          .then(({ data: monthData }) => {
-            if (!monthData) { setMonthlyHS(null); return; }
-            const map = new Map<string, { nom: string; equipe: string | null; hs: number }>();
-            for (const r of monthData) {
-              const prev = map.get(r.combo_nom);
-              const ecart = Math.max(0, Number(r.ecart_total) || 0);
-              if (prev) { prev.hs += ecart; }
-              else { map.set(r.combo_nom, { nom: r.combo_nom, equipe: r.equipe, hs: ecart }); }
-            }
-            setMonthlyHS(Array.from(map.values()).filter(e => e.hs > 0).sort((a, b) => b.hs - a.hs));
-          });
+          .lte("periode_fin", monthEnd);
+        if (monthData) {
+          const map = new Map<string, { nom: string; equipe: string | null; hs: number }>();
+          for (const r of monthData) {
+            const prev = map.get(r.combo_nom);
+            const ecart = Math.max(0, Number(r.ecart_total) || 0);
+            if (prev) { prev.hs += ecart; }
+            else { map.set(r.combo_nom, { nom: r.combo_nom, equipe: r.equipe, hs: ecart }); }
+          }
+          setMonthlyHS(Array.from(map.values()).filter(e => e.hs > 0).sort((a, b) => b.hs - a.hs));
+        } else {
+          setMonthlyHS(null);
+        }
       } else {
         setMonthlyHS(null);
       }
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   }, []);
 
-  // Initial load on mount
-  const didMount = useRef(false);
+  // Initial load + reload on period/etab change
   useEffect(() => {
-    if (didMount.current) return;
     if (etabId && selectedFrom && selectedTo) {
-      didMount.current = true;
       loadAllData(etabId, selectedFrom, selectedTo);
     }
-  }); // no deps — runs until mount fires
+  }, [etabId, selectedFrom, selectedTo, loadAllData]);
+
+  const setSelectedValue = useCallback((v: string) => {
+    if (periodMode === "month") setSelectedMonth(v); else setSelectedWeek(v);
+  }, [periodMode]);
+
+  const goPrev = useCallback(() => {
+    if (currentIdx < options.length - 1) setSelectedValue(options[currentIdx + 1].value);
+  }, [currentIdx, options, setSelectedValue]);
+  const goNext = useCallback(() => {
+    if (currentIdx > 0) setSelectedValue(options[currentIdx - 1].value);
+  }, [currentIdx, options, setSelectedValue]);
 
   // Aggregate by employee (merge multiple weeks)
   const aggregated = useMemo(() => {
@@ -245,8 +249,6 @@ export default function MasseSalarialePage() {
     jours: aggregated.reduce((s, e) => s + e.jours, 0),
   }), [aggregated]);
 
-  // Masse salariale estimée (heures × taux horaire brut moyen configurable)
-  // Charges patronales ~ 42% sur restauration
   const masseSalarialeBrute = totals.hTrav * tauxHoraire;
   const chargesPatronales = masseSalarialeBrute * 0.42;
   const masseSalarialeChargee = masseSalarialeBrute + chargesPatronales;
@@ -271,7 +273,7 @@ export default function MasseSalarialePage() {
     return Array.from(map.values()).sort((a, b) => b.hTrav - a.hTrav);
   }, [aggregated]);
 
-  // Chart ref
+  // Chart
   const chartRef = useRef<HTMLCanvasElement>(null);
   const chartInstance = useRef<Chart | null>(null);
 
@@ -300,10 +302,9 @@ export default function MasseSalarialePage() {
     return () => { chartInstance.current?.destroy(); chartInstance.current = null; };
   }, [teams]);
 
-  // Import handler
-  const handleImport = async (file: File) => {
+  // Import handler (stable ref)
+  const handleImport = useCallback(async (file: File) => {
     if (!etab) return;
-    setImporting(true);
     setImportMsg("");
     const fd = new FormData();
     fd.append("file", file);
@@ -322,7 +323,7 @@ export default function MasseSalarialePage() {
       });
       const json = await res.json();
       if (json.ok) {
-        setImportMsg(`${json.nb_employes} employes importes (${json.periode.debut} → ${json.periode.fin})`);
+        setImportMsg(`${json.nb_employes} employes importes (${json.periode.debut} \u2192 ${json.periode.fin})`);
         if (etabId && selectedFrom && selectedTo) await loadAllData(etabId, selectedFrom, selectedTo);
       } else {
         setImportMsg("Erreur : " + (json.error ?? "inconnue"));
@@ -330,15 +331,14 @@ export default function MasseSalarialePage() {
     } catch (e) {
       setImportMsg("Erreur : " + String(e));
     }
-    setImporting(false);
-  };
+  }, [etab, etabId, selectedFrom, selectedTo, loadAllData]);
 
   const etabColor = etab?.couleur ?? ACCENT;
 
-  // Sync Combo API (fetch shifts for current period)
+  // Sync Combo API
   const [syncing, setSyncing] = useState(false);
-  const handleComboSync = async () => {
-    if (!selected) return;
+  const handleComboSync = useCallback(async () => {
+    if (!selected || !etabId) return;
     setSyncing(true);
     try {
       const res = await fetch("/api/rh/combo-presences-sync", {
@@ -348,16 +348,16 @@ export default function MasseSalarialePage() {
       });
       const d = await res.json();
       if (d.ok) {
-        setImportMsg(`Combo sync: ${d.inserted} employes (${selected.from} → ${selected.to})`);
-        await loadAllData(etabId!, selected.from, selected.to);
+        setImportMsg(`Combo sync: ${d.inserted} employes (${selected.from} \u2192 ${selected.to})`);
+        await loadAllData(etabId, selected.from, selected.to);
       } else {
         setImportMsg("Erreur sync: " + (d.error ?? "inconnue"));
       }
     } catch (e) { setImportMsg("Erreur: " + String(e)); }
     setSyncing(false);
-  };
+  }, [selected, etabId, loadAllData]);
 
-  // Bottom bar FAB: Import Combo
+  // Bottom bar FAB (stable deps)
   useBottomBarActions(() => [{
     key: "import", label: "Import PDF", accent: ACCENT,
     onClick: () => {},
@@ -366,7 +366,6 @@ export default function MasseSalarialePage() {
     icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>,
   }], [handleImport]);
 
-  // Range factice pour le PilotageNavBar — représente la période sélectionnée (mois/semaine)
   const navRange = { from: selected?.from ?? "", to: selected?.to ?? "" };
 
   if (!etab) {
@@ -383,7 +382,6 @@ export default function MasseSalarialePage() {
     <RequireRole permission="performances.pilotage">
       <PilotageSwipeWrapper accent={etabColor} dateFrom={navRange.from} dateTo={navRange.to}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "20px 16px 100px" }}>
-
 
         {/* Tabs: Reelle / TNS / Simulateur */}
         <div style={{ display: "flex", gap: 4, padding: 4, background: "#f0ebe2", borderRadius: 12, marginBottom: 18, border: "1px solid #e8e0d0" }}>
@@ -411,7 +409,7 @@ export default function MasseSalarialePage() {
           </button>
         </div>
 
-        {/* Mode toggle Mois / Semaine — centré */}
+        {/* Mode toggle Mois / Semaine */}
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
           <div style={{ display: "inline-flex", gap: 4, padding: 3, background: "#f0ebe2", borderRadius: 10, border: "1px solid #e8e0d0" }}>
             {(["month", "week"] as const).map(m => (
@@ -428,7 +426,7 @@ export default function MasseSalarialePage() {
           </div>
         </div>
 
-        {/* Period selector with arrows — centré */}
+        {/* Period selector */}
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", maxWidth: 420 }}>
             <button type="button" onClick={goPrev} disabled={currentIdx >= options.length - 1} style={{
@@ -438,7 +436,7 @@ export default function MasseSalarialePage() {
               fontSize: 16, fontWeight: 700,
               cursor: currentIdx >= options.length - 1 ? "not-allowed" : "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            }}>{"←"}</button>
+            }}>{"\u2190"}</button>
             <select
               value={selectedValue}
               onChange={e => setSelectedValue(e.target.value)}
@@ -459,7 +457,7 @@ export default function MasseSalarialePage() {
               fontSize: 16, fontWeight: 700,
               cursor: currentIdx <= 0 ? "not-allowed" : "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            }}>{"→"}</button>
+            }}>{"\u2192"}</button>
           </div>
         </div>
 
@@ -477,40 +475,40 @@ export default function MasseSalarialePage() {
 
         {importMsg && <div style={{ fontSize: 12, color: ACCENT, marginBottom: 10, textAlign: "center" }}>{importMsg}</div>}
 
-        {/* ── KPIs RH + Popina ── */}
+        {/* ── KPIs ── */}
 
         {/* Highlight card : Ratio masse / CA */}
         <div style={{
           ...CARD,
-          background: `linear-gradient(135deg, ${etab?.couleur ?? ACCENT} 0%, ${etab?.couleur ?? ACCENT}dd 100%)`,
+          background: `linear-gradient(135deg, ${etabColor} 0%, ${etabColor}dd 100%)`,
           border: "none", color: "#fff", marginBottom: 14,
         }}>
           <div style={{ ...LABEL, color: "rgba(255,255,255,0.75)" }}>Ratio masse salariale / CA</div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
             <div style={{ fontSize: 40, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif", color: "#fff" }}>
-              {ratioCA ? `${ratioCA.toFixed(1)}%` : "—"}
+              {ratioCA ? `${ratioCA.toFixed(1)}%` : "\u2014"}
             </div>
             <div style={{ fontSize: 12, color: "rgba(255,255,255,0.85)" }}>
-              cible &lt; 35% · {ratioCA && ratioCA < 35 ? "OK" : ratioCA && ratioCA < 45 ? "Vigilance" : ratioCA ? "Alerte" : ""}
+              cible &lt; 35% {"\u00B7"} {ratioCA && ratioCA < 35 ? "OK" : ratioCA && ratioCA < 45 ? "Vigilance" : ratioCA ? "Alerte" : ""}
             </div>
           </div>
           <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", marginTop: 8 }}>
-            {fmt(masseSalarialeChargee)}€ chargee · {caMonth ? `${fmt(caMonth)}€ CA TTC` : "CA non disponible"}
+            {fmt(masseSalarialeChargee)}{"\u20AC"} chargee {"\u00B7"} {caMonth ? `${fmt(caMonth)}\u20AC CA TTC` : "CA non disponible"}
           </div>
         </div>
 
-        {/* Row 1 — CA Popina */}
+        {/* Row 1 — CA */}
         <div style={{ ...LABEL, marginBottom: 8, marginTop: 4 }}>Chiffre d&apos;affaires</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
           <div style={CARD}>
             <div style={LABEL}>CA TTC</div>
-            <div style={KPI}>{caMonth ? `${fmt(caMonth)}€` : "—"}</div>
-            {caHtMonth && <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>{fmt(caHtMonth)}€ HT</div>}
+            <div style={KPI}>{caMonth ? `${fmt(caMonth)}\u20AC` : "\u2014"}</div>
+            {caHtMonth != null && <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>{fmt(caHtMonth)}{"\u20AC"} HT</div>}
           </div>
           <div style={CARD}>
             <div style={LABEL}>Ticket moyen</div>
-            <div style={KPI}>{ticketMoyen ? `${fmt(ticketMoyen)}€` : "—"}</div>
-            {couvertsMonth && <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>{couvertsMonth} cvts · {ticketsMonth} tickets</div>}
+            <div style={KPI}>{ticketMoyen ? `${fmtDec(ticketMoyen)}\u20AC` : "\u2014"}</div>
+            {couvertsMonth != null && <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>{couvertsMonth} cvts {"\u00B7"} {ticketsMonth} tickets</div>}
           </div>
         </div>
 
@@ -523,13 +521,13 @@ export default function MasseSalarialePage() {
             <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>
               <span style={{ color: heuresSup > 0 ? GREEN : "#999" }}>+{fmtDec(heuresSup)}h sup.</span>
               {heuresSup > 0 && <span style={{ color: "#DC2626", fontWeight: 600 }}> (~{fmt(Math.round(heuresSup * tauxHoraire * 1.1 * 1.42))}{"\u20AC"} cout)</span>}
-              {" · "}
+              {" \u00B7 "}
               <span style={{ color: heuresManquantes > 0 ? "#DC2626" : "#999" }}>-{fmtDec(heuresManquantes)}h</span>
             </div>
           </div>
           <div style={CARD}>
             <div style={LABEL}>Productivite</div>
-            <div style={KPI}>{productivite ? `${fmt(productivite)}€/h` : "—"}</div>
+            <div style={KPI}>{productivite ? `${fmt(productivite)}\u20AC/h` : "\u2014"}</div>
             <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>CA / heure travaillee</div>
           </div>
         </div>
@@ -539,17 +537,17 @@ export default function MasseSalarialePage() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
           <div style={CARD}>
             <div style={LABEL}>Brute estimee</div>
-            <div style={KPI}>{fmt(masseSalarialeBrute)}€</div>
+            <div style={KPI}>{fmt(masseSalarialeBrute)}{"\u20AC"}</div>
             <div style={{ fontSize: 11, color: "#999", marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
               Taux:
               <input type="number" value={tauxHoraire} onChange={e => setTauxHoraire(Number(e.target.value) || 15)}
-                style={{ width: 48, border: "1px solid #ddd6c8", borderRadius: 6, padding: "2px 6px", fontSize: 11, textAlign: "center" }} />€/h
+                style={{ width: 48, border: "1px solid #ddd6c8", borderRadius: 6, padding: "2px 6px", fontSize: 11, textAlign: "center" }} />{"\u20AC"}/h
             </div>
           </div>
           <div style={CARD}>
             <div style={LABEL}>Chargee (~42%)</div>
-            <div style={KPI}>{fmt(masseSalarialeChargee)}€</div>
-            <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>+ {fmt(chargesPatronales)}€ charges</div>
+            <div style={KPI}>{fmt(masseSalarialeChargee)}{"\u20AC"}</div>
+            <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>+ {fmt(chargesPatronales)}{"\u20AC"} charges</div>
           </div>
         </div>
 
@@ -574,7 +572,6 @@ export default function MasseSalarialePage() {
           <div style={{ display: "grid", gridTemplateColumns: teams.length === 1 ? "1fr" : "1fr 1fr", gap: 10, marginBottom: 14 }}>
             {teams.map(t => {
               const teamColor = t.label === "Cuisine" ? "#D97706" : t.label === "Salle" ? "#5e8278" : t.label === "Bar" ? "#8a6b3e" : "#999";
-              const teamProductivite = t.hTrav > 0 && caMonth ? caMonth / totals.hTrav * (t.hTrav / totals.hTrav) : null;
               return (
                 <div key={t.label} style={{ ...CARD, borderLeft: `4px solid ${teamColor}` }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
@@ -597,11 +594,9 @@ export default function MasseSalarialePage() {
                       <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{t.repas}</div>
                     </div>
                   </div>
-                  {teamProductivite != null && caMonth != null && (
-                    <div style={{ fontSize: 11, color: "#999", marginTop: 8 }}>
-                      {Math.round(t.hTrav / totals.hTrav * 100)}% des heures · ratio {totals.hTrav > 0 ? fmtDec(caMonth / totals.hTrav) : "—"}€/h
-                    </div>
-                  )}
+                  <div style={{ fontSize: 11, color: "#999", marginTop: 8 }}>
+                    {totals.hTrav > 0 ? Math.round(t.hTrav / totals.hTrav * 100) : 0}% des heures {"\u00B7"} ratio {totals.hTrav > 0 && caMonth ? fmtDec(caMonth / totals.hTrav) : "\u2014"}{"\u20AC"}/h
+                  </div>
                 </div>
               );
             })}
@@ -618,8 +613,8 @@ export default function MasseSalarialePage() {
 
         {/* Cumul mensuel HS */}
         {monthlyHS && monthlyHS.length > 0 && (
-          <div style={{ ...CARD, marginBottom: 14, borderLeft: `4px solid #DC2626` }}>
-            <div style={{ ...LABEL, marginBottom: 10 }}>Cumul heures sup · mois en cours</div>
+          <div style={{ ...CARD, marginBottom: 14, borderLeft: "4px solid #DC2626" }}>
+            <div style={{ ...LABEL, marginBottom: 10 }}>Cumul heures sup {"\u00B7"} mois en cours</div>
             <div style={{ display: "flex", gap: 12, alignItems: "baseline", marginBottom: 10 }}>
               <div style={{ ...KPI, color: "#DC2626" }}>{fmtDec(monthlyHS.reduce((s, e) => s + e.hs, 0))}h</div>
               <div style={{ fontSize: 12, color: "#DC2626", fontWeight: 600 }}>~{fmt(Math.round(monthlyHS.reduce((s, e) => s + e.hs, 0) * tauxHoraire * 1.1 * 1.42))}{"\u20AC"} cout</div>
@@ -635,7 +630,7 @@ export default function MasseSalarialePage() {
 
         {/* Employee table */}
         <div style={CARD}>
-          <div style={{ ...LABEL, marginBottom: 12 }}>Detail par employe — {selected?.label ?? ""}</div>
+          <div style={{ ...LABEL, marginBottom: 12 }}>Detail par employe {"\u2014"} {selected?.label ?? ""}</div>
           {loading ? (
             <div style={{ textAlign: "center", padding: 40, color: "#999", fontSize: 13 }}>Chargement...</div>
           ) : aggregated.length === 0 ? (
@@ -665,7 +660,7 @@ export default function MasseSalarialePage() {
                         {e.nom}
                         {!e.matched && <span style={{ fontSize: 9, color: "#DC2626", marginLeft: 4 }}>?</span>}
                       </td>
-                      <td style={{ padding: "10px 4px", color: "#777" }}>{e.equipe ?? "—"}</td>
+                      <td style={{ padding: "10px 4px", color: "#777" }}>{e.equipe ?? "\u2014"}</td>
                       <td style={{ padding: "10px 4px", textAlign: "right" }}>{fmtDec(e.hPlan)}</td>
                       <td style={{ padding: "10px 4px", textAlign: "right", fontWeight: 600 }}>{fmtDec(e.hTrav)}</td>
                       <td style={{ padding: "10px 4px", textAlign: "right", color: e.ecart >= 0 ? GREEN : "#DC2626", fontWeight: 600 }}>
@@ -678,7 +673,6 @@ export default function MasseSalarialePage() {
                       <td style={{ padding: "10px 0 10px 4px", textAlign: "right" }}>{e.jours}</td>
                     </tr>
                   ))}
-                  {/* Totals row */}
                   <tr style={{ borderTop: "2px solid #ddd6c8", fontWeight: 700 }}>
                     <td style={{ padding: "10px 8px 10px 0" }}>Total</td>
                     <td style={{ padding: "10px 4px" }}>{aggregated.length} emp.</td>
