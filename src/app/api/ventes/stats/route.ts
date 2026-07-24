@@ -80,11 +80,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "etablissement_id, from, to requis" }, { status: 400 });
   }
 
-  // Load popina sub-categories for CUCINA split (Antipasti vs Piatti)
+  // Load popina sub-categories for all categories
   const { data: popinaProds } = await supabase
     .from("popina_products")
     .select("name, sub_category")
-    .eq("category", "CUCINA")
     .eq("active", true)
     .not("sub_category", "is", null);
   subCatByName = new Map();
@@ -172,30 +171,50 @@ const CAT_MAP: Record<string, string> = {
   PIZZE: "Pizze", CUCINA: "Cuisine", DOLCI: "Dolci", VINI: "Vins",
   ALCOOL: "Alcool", ANTIPASTI: "Antipasti", BEVANDE: "Boissons",
   "BEVANDE CALDE": "Boissons chaudes", DIGESTIVI: "Digestifs",
-  MESSAGES: "Messages",
+  MESSAGES: "__skip__",
 };
 
-// Sub-category overrides: CUCINA products with sub_category ANTIPASTI → "Antipasti"
-const SUB_CAT_OVERRIDES: Record<string, string> = {
-  ANTIPASTI: "Antipasti",
-  PIATTI: "Cuisine",
-  BAMBINI: "Bambini",
-  SIDES: "Sides",
+// Sub-category overrides: resolve Popina sub_category → display name
+const SUB_CAT_MAP: Record<string, string> = {
+  // CUCINA
+  ANTIPASTI: "Antipasti", PIATTI: "Cuisine", BAMBINI: "Bambini", SIDES: "Sides",
+  // ALCOOL
+  Aperitivi: "Aperitifs", Birre: "Bieres", Cocktail: "Cocktails", Spritz: "Spritz",
+  // BEVANDE
+  Mocktails: "Mocktails", Softs: "Softs", "Succi Di Frutta": "Jus de fruits",
+  // BEVANDE CALDE
+  CAFFE: "Cafe", DECA: "Deca", THE: "The",
+  // DIGESTIVI
+  AMARETTI: "Amaretti", AMARI: "Amari", BRANDY: "Brandy", "CREMA ALPINA": "Crema Alpina",
+  GIN: "Gin", GRAPPA: "Grappa", LIMONCELLI: "Limoncelli", LIQUORI: "Liqueurs",
+  MARSALA: "Marsala", RHUM: "Rhum", TEQUILA: "Tequila", WHISKY: "Whisky",
+  // VINI
+  Bianchi: "Vins blancs", Bollicini: "Bollicine", "Carafe 50cl": "Carafes",
+  Rosati: "Vins roses", Rosso: "Vins rouges", Stellati: "Stellati", "Verres de vino": "Verres de vin",
+  // DOLCI / PIZZE (pas de split)
+  Dolci: "Dolci", Pizze: "Pizze",
 };
 
-const FOOD_CATS = new Set(["Pizze", "Antipasti", "Cuisine", "Dolci", "Plats", "Bambini", "Sides"]);
-const DRINK_CATS = new Set(["Vins", "Alcool", "Boissons", "Boissons chaudes", "Digestifs"]);
+const FOOD_CATS = new Set(["Pizze", "Antipasti", "Cuisine", "Dolci", "Bambini", "Sides"]);
+const DRINK_CATS = new Set([
+  "Vins", "Alcool", "Boissons", "Boissons chaudes", "Digestifs",
+  "Aperitifs", "Bieres", "Cocktails", "Spritz", "Mocktails", "Softs", "Jus de fruits",
+  "Cafe", "Deca", "The",
+  "Amaretti", "Amari", "Brandy", "Crema Alpina", "Gin", "Grappa", "Limoncelli", "Liqueurs", "Marsala", "Rhum", "Tequila", "Whisky",
+  "Vins blancs", "Bollicine", "Carafes", "Vins roses", "Vins rouges", "Stellati", "Verres de vin",
+]);
 // Sub-cat lookup filled at runtime from popina_products
 let subCatByName: Map<string, string> | null = null;
 
 function normCat(cat: string | null, productName?: string): string {
   if (!cat) return "Autre";
   const base = CAT_MAP[cat.toUpperCase()] ?? CAT_MAP[cat] ?? cat;
-  // For CUCINA, check sub-category via popina product name
-  if ((base === "Cuisine" || cat.toUpperCase() === "CUCINA") && productName && subCatByName) {
+  if (base === "__skip__") return "__skip__";
+  // Resolve sub-category via popina product name
+  if (productName && subCatByName) {
     const key = productName.trim().toLowerCase();
     const subCat = subCatByName.get(key);
-    if (subCat && SUB_CAT_OVERRIDES[subCat]) return SUB_CAT_OVERRIDES[subCat];
+    if (subCat && SUB_CAT_MAP[subCat]) return SUB_CAT_MAP[subCat];
   }
   return base;
 }
@@ -365,7 +384,7 @@ function aggregate(rows: Row[]) {
     catMap[cat].ht += Number(r.ht);
   }
   const mixEntries = Object.entries(catMap)
-    .filter(([k, v]) => v.ttc > 0 && k !== "Messages" && k !== "Autre")
+    .filter(([k, v]) => v.ttc > 0 && k !== "Messages" && k !== "Autre" && k !== "__skip__")
     .sort((a, b) => b[1].ttc - a[1].ttc);
   const mix_labels = mixEntries.map(([k]) => k);
   const mix_ttc = mixEntries.map(([, v]) => Math.round(v.ttc));
@@ -376,7 +395,7 @@ function aggregate(rows: Row[]) {
   for (const r of validRows) {
     if (!r.description) continue;
     const nc = normCat(r.categorie, r.description);
-    if (nc === "Messages" || nc === "Autre") continue;
+    if (nc === "Messages" || nc === "Autre" || nc === "__skip__") continue;
     const key = r.description;
     if (!prodMap[key]) prodMap[key] = { ca_ttc: 0, ca_ht: 0, qty: 0 };
     prodMap[key].ca_ttc += Number(r.ttc);
@@ -394,7 +413,7 @@ function aggregate(rows: Row[]) {
   for (const r of validRows) {
     if (!r.description) continue;
     const cat = normCat(r.categorie, r.description);
-    if (cat === "Messages" || cat === "Autre") continue;
+    if (cat === "Messages" || cat === "Autre" || cat === "__skip__") continue;
     if (!catProds[cat]) catProds[cat] = [];
     const existing = catProds[cat].find(p => p.n === r.description);
     if (existing) {
@@ -416,7 +435,7 @@ function aggregate(rows: Row[]) {
     for (const r of rows) {
       if (!r.description) continue;
       const cat = normCat(r.categorie, r.description);
-      if (cat === "Messages" || cat === "Autre") continue;
+      if (cat === "Messages" || cat === "Autre" || cat === "__skip__") continue;
       if (!cp[cat]) cp[cat] = [];
       const existing = cp[cat].find(p => p.n === r.description);
       if (existing) {
@@ -515,7 +534,7 @@ function aggregate(rows: Row[]) {
     }
     const od = orderData.get(key)!;
     const nc = normCat(r.categorie, r.description);
-    if (nc !== "Messages" && nc !== "Autre" && !r.annule) {
+    if (nc !== "Messages" && nc !== "Autre" && nc !== "__skip__" && !r.annule) {
       od.cats.add(nc);
       od.ca_ttc += Number(r.ttc);
       od.ca_ht += Number(r.ht);
