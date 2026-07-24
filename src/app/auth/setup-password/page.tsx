@@ -60,17 +60,35 @@ export default function SetupPasswordPage() {
         return;
       }
 
-      // Ensure profile exists with correct role
+      // Ensure profile exists with correct role + establishment access
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const role = user.user_metadata?.role || "equipier";
         const displayName = user.user_metadata?.display_name || user.email;
+
+        // Find matching employee by email to get establishment
+        const { data: emp } = await supabase
+          .from("employes")
+          .select("id, etablissement_id")
+          .eq("email", user.email ?? "")
+          .eq("actif", true)
+          .limit(1)
+          .maybeSingle();
+
+        const etabAccess = emp?.etablissement_id ? [emp.etablissement_id] : [];
+
         await supabase.from("profiles").upsert({
           id: user.id,
           role,
           display_name: displayName,
+          etablissements_access: etabAccess,
           updated_at: new Date().toISOString(),
         }, { onConflict: "id" });
+
+        // Link auth_user_id on employee record
+        if (emp && emp.id) {
+          await supabase.from("employes").update({ auth_user_id: user.id }).eq("id", emp.id);
+        }
       }
 
       router.push("/");

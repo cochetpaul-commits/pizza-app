@@ -115,13 +115,30 @@ export async function POST(req: NextRequest) {
 
   // Update profile role + establishment access
   if (inviteData.user) {
+    // Auto-detect establishment from employes table if not explicitly provided
+    let etabAccess = etablissementsAccess ?? [];
+    if (etabAccess.length === 0) {
+      const { data: emp } = await supabaseAdmin
+        .from("employes")
+        .select("id, etablissement_id")
+        .eq("email", email)
+        .eq("actif", true)
+        .limit(1)
+        .maybeSingle();
+      if (emp?.etablissement_id) {
+        etabAccess = [emp.etablissement_id];
+        // Link auth_user_id
+        await supabaseAdmin.from("employes").update({ auth_user_id: inviteData.user.id }).eq("id", emp.id);
+      }
+    }
+
     const profileUpdate: Record<string, unknown> = {
       role: profileRole,
       display_name: displayName || email,
       updated_at: new Date().toISOString(),
     };
-    if (etablissementsAccess && etablissementsAccess.length > 0) {
-      profileUpdate.etablissements_access = etablissementsAccess;
+    if (etabAccess.length > 0) {
+      profileUpdate.etablissements_access = etabAccess;
     }
     await supabaseAdmin
       .from("profiles")
