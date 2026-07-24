@@ -123,7 +123,7 @@ const JOURS_LABELS: Record<number, string> = {
 const HIDDEN = "\u2022\u2022\u2022";
 const _fmt = (v: number) => v.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const fmt = (v: number) => _fmt(v) + "\u20AC";
-const fmtK = (v: number) => (v / 1000).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + "k\u20AC";
+const fmtK = (v: number) => Math.round(v).toLocaleString("fr-FR") + "\u20AC";
 const ZC: Record<string, string> = { Salle: "#46655a", Pergolas: "#5e8278", Terrasse: "#c4a882", emp: "#D4775A" };
 
 /* ── Week aggregation helpers (for monthly view) ── */
