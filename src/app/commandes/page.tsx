@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { RequireRole } from "@/components/RequireRole";
@@ -46,6 +46,7 @@ type CatalogItem = {
   id: string;
   name: string;
   category: string | null;
+  sub_category: string | null;
   default_unit: string | null;
   order_unit: string | null;
   order_unit_label: string | null;
@@ -161,9 +162,16 @@ function groupCatalog(items: CatalogItem[]): Record<string, { favoris: CatalogIt
       result[cat].others.push(item);
     }
   }
+  // Sort by sub_category then name
+  const sortFn = (a: CatalogItem, b: CatalogItem) => {
+    const sa = a.sub_category ?? "";
+    const sb = b.sub_category ?? "";
+    if (sa !== sb) return sa.localeCompare(sb, "fr");
+    return a.name.localeCompare(b.name, "fr");
+  };
   for (const cat of Object.keys(result)) {
-    result[cat].favoris.sort((a, b) => a.name.localeCompare(b.name, "fr"));
-    result[cat].others.sort((a, b) => a.name.localeCompare(b.name, "fr"));
+    result[cat].favoris.sort(sortFn);
+    result[cat].others.sort(sortFn);
   }
   return result;
 }
@@ -795,7 +803,7 @@ function CommandesPage() {
     let items: CatalogItem[] = [];
     if (allIds.length > 0) {
       // Try with favori_commande, fallback without if column doesn't exist
-      const selectCols = "id, name, category, default_unit, favori_commande, order_unit_label, order_quantity, stock_objectif, stock_min";
+      const selectCols = "id, name, category, sub_category, default_unit, favori_commande, order_unit_label, order_quantity, stock_objectif, stock_min";
       let ingDataQ = supabase
         .from("ingredients")
         .select(selectCols)
@@ -810,7 +818,7 @@ function CommandesPage() {
         console.warn("[commandes] ingredient query error, retrying without favori_commande:", ingErr.message);
         let fallbackQ = supabase
           .from("ingredients")
-          .select("id, name, category, default_unit, order_unit_label, order_quantity, stock_objectif, stock_min")
+          .select("id, name, category, sub_category, default_unit, order_unit_label, order_quantity, stock_objectif, stock_min")
           .in("id", allIds)
           .order("category")
           .order("name");
@@ -1928,11 +1936,30 @@ function CommandesPage() {
                   </>
                 )}
 
-                {others.length > 0 && (
-                  <div className="commandes-grid" style={{ display: "grid", gap: 10, padding: "6px 10px 10px" }}>
-                    {others.map((item) => renderProductCard(item, false))}
-                  </div>
-                )}
+                {others.length > 0 && (() => {
+                  const hasSubCats = others.some(i => i.sub_category);
+                  let lastSub: string | null | undefined = undefined;
+                  return (
+                    <div style={{ padding: "6px 10px 10px" }}>
+                      {others.map((item) => {
+                        const showSubHeader = hasSubCats && item.sub_category !== lastSub;
+                        lastSub = item.sub_category;
+                        return (
+                          <React.Fragment key={item.id}>
+                            {showSubHeader && (
+                              <div style={{ padding: "10px 4px 4px", fontSize: 10, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "0.06em", borderTop: lastSub !== undefined ? "1px solid rgba(0,0,0,0.04)" : "none" }}>
+                                {item.sub_category ?? "Autre"}
+                              </div>
+                            )}
+                            <div className="commandes-grid" style={{ display: "grid", gap: 10, marginBottom: 4 }}>
+                              {renderProductCard(item, false)}
+                            </div>
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           );
