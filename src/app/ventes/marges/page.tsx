@@ -257,12 +257,12 @@ function MargesPage() {
     })();
   }, []);
   // Auto-detect trend mode from date range
-  const trendMode: TrendMode = (() => {
+  const trendRangeDays = (() => {
     const from = new Date(trendFrom + "T12:00:00");
     const to = new Date(trendTo + "T12:00:00");
-    const days = Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
-    return days <= 7 ? "par_jour_semaine" : "par_mois";
+    return Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
   })();
+  const trendMode: TrendMode = trendRangeDays <= 7 ? "par_jour_semaine" : "par_mois";
   const [trendMetric, setTrendMetric] = useState<"qty" | "ca_ht">("qty");
   const [trendService, setTrendService] = useState<"all" | "midi" | "soir">("all");
   const [trendProducts, setTrendProducts] = useState<{ name: string; qty: number; ca_ht: number; ca_ttc: number }[]>([]);
@@ -659,18 +659,24 @@ function MargesPage() {
       return { labels: JOURS.slice(0, 5), values: buckets };
     }
     if (mode === "par_mois") {
-      const buckets: Record<number, number> = {};
+      // Show only days with data, with readable date labels
+      const dayJours = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+      const dayData: { label: string; value: number }[] = [];
+      const dateMap = new Map<string, number>();
       for (const d of daily) {
-        const day = new Date(d.date + "T12:00:00").getDate();
-        buckets[day] = (buckets[day] ?? 0) + (metric === "qty" ? d.qty : d.ca_ht);
+        dateMap.set(d.date, (dateMap.get(d.date) ?? 0) + (metric === "qty" ? d.qty : d.ca_ht));
       }
-      const maxDay = Math.max(...Object.keys(buckets).map(Number), 31);
-      const labels: string[] = [];
-      const values: number[] = [];
-      for (let i = 1; i <= maxDay; i++) {
-        labels.push(String(i));
-        values.push(buckets[i] ?? 0);
+      // Sort dates chronologically
+      const sortedDates = [...dateMap.keys()].sort();
+      for (const date of sortedDates) {
+        const dt = new Date(date + "T12:00:00");
+        const dow = dt.getDay();
+        if (dow === 0 || dow === 6) continue; // skip weekends
+        const label = `${dayJours[dow]} ${dt.getDate()}`;
+        dayData.push({ label, value: dateMap.get(date) ?? 0 });
       }
+      const labels = dayData.map(d => d.label);
+      const values = dayData.map(d => d.value);
       return { labels, values };
     }
     // fallback (should not happen)
