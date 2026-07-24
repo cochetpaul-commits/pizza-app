@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -10,6 +9,7 @@ import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 import Chart from "chart.js/auto";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { useProfile } from "@/lib/ProfileContext";
+import { SimulationContent } from "@/components/rh/SimulationContent";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -105,10 +105,10 @@ function getWeekOptions(): PeriodOption[] {
 // ── Component ────────────────────────────────────────────────────────────
 
 export default function MasseSalarialePage() {
-  const router = useRouter();
   const { current: etab } = useEtablissement();
   const { can } = useProfile();
   const showMoney = can("performances.show_money");
+  const [msTab, setMsTab] = useState<"reelle" | "tns" | "simulateur">("reelle");
   const [presences, setPresences] = useState<ComboPresence[]>([]);
   const [loading, setLoading] = useState(true);
   const [importMsg, setImportMsg] = useState("");
@@ -410,29 +410,27 @@ export default function MasseSalarialePage() {
 
         {/* Tabs: Reelle / TNS / Simulateur */}
         <div style={{ display: "flex", gap: 4, padding: 4, background: "#f0ebe2", borderRadius: 12, marginBottom: 18, border: "1px solid #e8e0d0" }}>
-          <button type="button" style={{
-            flex: 1, padding: "8px 10px", borderRadius: 10, border: "none",
-            background: "#fff", color: "#1a1a1a",
-            fontSize: 12, fontWeight: 700, cursor: "default",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.08)", whiteSpace: "nowrap",
-          }}>
-            Masse salariale reelle
-          </button>
-          <button type="button" onClick={() => router.push("/ventes/simulation?tab=tns")} style={{
-            flex: 1, padding: "8px 10px", borderRadius: 10, border: "none",
-            background: "transparent", color: "#777",
-            fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
-          }}>
-            Statuts TNS
-          </button>
-          <button type="button" onClick={() => router.push("/ventes/simulation?tab=simulateur")} style={{
-            flex: 1, padding: "8px 10px", borderRadius: 10, border: "none",
-            background: "transparent", color: "#777",
-            fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
-          }}>
-            Simulateur d&apos;embauche
-          </button>
+          {([
+            { key: "reelle" as const, label: "Masse salariale reelle" },
+            { key: "tns" as const, label: "Statuts TNS" },
+            { key: "simulateur" as const, label: "Simulateur d\u2019embauche" },
+          ]).map(t => (
+            <button key={t.key} type="button" onClick={() => setMsTab(t.key)} style={{
+              flex: 1, padding: "8px 10px", borderRadius: 10, border: "none",
+              background: msTab === t.key ? "#fff" : "transparent",
+              color: msTab === t.key ? "#1a1a1a" : "#777",
+              fontSize: 12, fontWeight: 700, cursor: msTab === t.key ? "default" : "pointer",
+              boxShadow: msTab === t.key ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+              whiteSpace: "nowrap",
+            }}>
+              {t.label}
+            </button>
+          ))}
         </div>
+
+        {msTab !== "reelle" ? (
+          <SimulationContent activeTab={msTab} />
+        ) : (<>
 
         {/* Mode toggle Mois / Semaine */}
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
@@ -716,6 +714,7 @@ export default function MasseSalarialePage() {
           )}
         </div>
 
+        </>)}
       </div>
       </PilotageSwipeWrapper>
     </RequireRole>
