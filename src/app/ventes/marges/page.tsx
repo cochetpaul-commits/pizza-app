@@ -256,7 +256,13 @@ function MargesPage() {
       setAllSubCats(result);
     })();
   }, []);
-  const [trendMode, _setTrendMode] = useState<TrendMode>("par_mois");
+  // Auto-detect trend mode from date range
+  const trendMode: TrendMode = (() => {
+    const from = new Date(trendFrom + "T12:00:00");
+    const to = new Date(trendTo + "T12:00:00");
+    const days = Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
+    return days <= 7 ? "par_jour_semaine" : "par_mois";
+  })();
   const [trendMetric, setTrendMetric] = useState<"qty" | "ca_ht">("qty");
   const [trendService, setTrendService] = useState<"all" | "midi" | "soir">("all");
   const [trendProducts, setTrendProducts] = useState<{ name: string; qty: number; ca_ht: number; ca_ttc: number }[]>([]);
