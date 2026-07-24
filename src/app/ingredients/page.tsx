@@ -1277,12 +1277,22 @@ function IngredientsPageInner() {
                       isCollapsed={collapsedCats.has(cat)}
                       onToggle={toggleCat}
                     />
-                    {!collapsedCats.has(cat) && catItems.map((x) => {
+                    {!collapsedCats.has(cat) && (() => {
+                      let lastSubCat: string | null | undefined = undefined;
+                      const hasSubCats = catItems.some(x => x.sub_category);
+                      return catItems.map((x) => {
                       const offer = offersByIngredientId.get(x.id);
                       const supplierIdForDisplay = offer?.supplier_id ?? x.supplier_id ?? null;
                       const supplierName = supplierIdForDisplay ? suppliersMap.get(supplierIdForDisplay)?.name ?? null : null;
+                      const showSubHeader = hasSubCats && x.sub_category !== lastSubCat;
+                      lastSubCat = x.sub_category;
                       return (
                         <div key={x.id} id={`ing-${x.id}`}>
+                          {showSubHeader && (
+                            <div style={{ padding: "8px 16px 4px", fontSize: 10, fontWeight: 700, color: CAT_COLORS[cat] ?? "#999", textTransform: "uppercase", letterSpacing: "0.06em", borderTop: lastSubCat !== undefined ? "1px solid rgba(0,0,0,0.04)" : "none" }}>
+                              {x.sub_category ?? "Autre"}
+                            </div>
+                          )}
                           <IngredientRow
                             item={x}
                             offer={offer}
@@ -1310,7 +1320,8 @@ function IngredientsPageInner() {
                           />
                         </div>
                       );
-                    })}
+                    });
+                    })()}
                   </div>
                 ))}
 
