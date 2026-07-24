@@ -567,9 +567,22 @@ export function Sidebar() {
 export function SidebarDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   if (!open) return null;
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.5)" }} onClick={onClose}>
-      <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 260, overflowY: "auto", boxShadow: "4px 0 20px rgba(0,0,0,0.3)" }}
-        onClick={e => e.stopPropagation()}>
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 200,
+      background: "rgba(0,0,0,0.25)",
+      backdropFilter: "blur(2px)",
+      WebkitBackdropFilter: "blur(2px)",
+    }} onClick={onClose}>
+      <div
+        className="sidebar-desktop"
+        style={{
+          position: "absolute", top: 0, left: 0, bottom: 0, width: 280,
+          overflowY: "auto", overflowX: "hidden",
+          boxShadow: "4px 0 24px rgba(0,0,0,0.12), 1px 0 0 rgba(255,255,255,0.1)",
+          borderRadius: "0 16px 16px 0",
+        }}
+        onClick={e => e.stopPropagation()}
+      >
         <SidebarContent onNavigate={onClose} />
       </div>
     </div>
