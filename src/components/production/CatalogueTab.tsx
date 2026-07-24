@@ -825,7 +825,7 @@ export function CatalogueContent() {
   }, []);
 
   const handleDragEnd = useCallback((result: DropResult) => {
-    if (!result.destination) return;
+    if (!result.destination || !canWrite) return;
 
     // Recipe drag between sub-groups
     if (result.type === "recipes") {
@@ -1037,7 +1037,7 @@ export function CatalogueContent() {
           const typeOpen = openTypes.has(tg.type);
           const hasSubs = tg.subGroups.length > 1 || (tg.subGroups.length === 1 && tg.subGroups[0].label);
           return (
-            <Draggable key={tg.type} draggableId={tg.type} index={groupIdx}>
+            <Draggable key={tg.type} draggableId={tg.type} index={groupIdx} isDragDisabled={!canWrite}>
               {(provided, snapshot) => (
             <div
               ref={provided.innerRef}
@@ -1134,7 +1134,7 @@ export function CatalogueContent() {
                   {tg.subGroups.map((sg, sgIdx) => {
                     const subOpen = !hasSubs || openCats.has(sg.key);
                     return (
-                      <Draggable key={sg.key} draggableId={`subcat:${sg.key}`} index={sgIdx} isDragDisabled={!hasSubs}>
+                      <Draggable key={sg.key} draggableId={`subcat:${sg.key}`} index={sgIdx} isDragDisabled={!canWrite || !hasSubs}>
                         {(sgDragProvided, sgDragSnap) => (
                       <div
                         ref={sgDragProvided.innerRef}
@@ -1209,7 +1209,7 @@ export function CatalogueContent() {
                   || !!recipe.pivot_ingredient_id;
 
                 return (
-                  <Draggable key={recipe.id} draggableId={recipe.id} index={recipeIdx}>
+                  <Draggable key={recipe.id} draggableId={recipe.id} index={recipeIdx} isDragDisabled={!canWrite}>
                     {(recDragProvided, recDragSnap) => (
                   <div
                     ref={recDragProvided.innerRef}

@@ -302,14 +302,14 @@ export function CatalogueSalleContent() {
   const [catOrder, setCatOrder] = useState<string[]>([]);
   const [showNewCat, setShowNewCat] = useState(false);
   const [newCatName, setNewCatName] = useState("");
-  const { role } = useProfile();
+  const { can } = useProfile();
   const { current: etab } = useEtablissement();
 
   // Load saved category order
   useEffect(() => {
     try { const s = localStorage.getItem("catalogue-salle-cat-order"); if (s) setCatOrder(JSON.parse(s)); } catch { /* */ }
   }, []);
-  const canEdit = role === "group_admin";
+  const canEdit = can("operations.edit_recettes");
 
   const load = useCallback(async () => {
     setLoading(true);
