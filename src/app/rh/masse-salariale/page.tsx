@@ -205,6 +205,27 @@ export default function MasseSalarialePage() {
     }
   }, [etabId, selectedFrom, selectedTo, loadAllData]);
 
+  // Auto-sync Combo in background (once per session, if data older than 6h)
+  const autoSyncDone = useRef(false);
+  useEffect(() => {
+    if (autoSyncDone.current || !selectedFrom || !selectedTo) return;
+    autoSyncDone.current = true;
+    const lastSync = localStorage.getItem("combo_last_sync");
+    const sixHoursAgo = Date.now() - 6 * 3600 * 1000;
+    if (lastSync && Number(lastSync) > sixHoursAgo) return;
+    // Sync in background
+    fetch("/api/rh/combo-presences-sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from: selectedFrom, to: selectedTo }),
+    }).then(r => r.json()).then(d => {
+      if (d.ok) {
+        localStorage.setItem("combo_last_sync", String(Date.now()));
+        if (etabId && selectedFrom && selectedTo) loadAllData(etabId, selectedFrom, selectedTo);
+      }
+    }).catch(() => {});
+  }, [selectedFrom, selectedTo, etabId, loadAllData]);
+
   const setSelectedValue = useCallback((v: string) => {
     if (periodMode === "month") setSelectedMonth(v); else setSelectedWeek(v);
   }, [periodMode]);
