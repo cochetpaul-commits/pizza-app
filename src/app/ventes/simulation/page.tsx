@@ -317,48 +317,32 @@ function SimulationPageInner() {
     );
   }
 
-  const etabName = etab?.nom?.toUpperCase() ?? "ETABLISSEMENT";
-
   return (
     <RequireRole allowedRoles={["group_admin"]}>
       <div className="ventes-sim-container" style={pageStyle}>
 
-        {/* ── Header ── */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <h1 style={{
-              margin: 0, fontSize: 22, fontWeight: 700, color: accent,
-              fontFamily: "var(--font-oswald), 'Oswald', sans-serif", letterSpacing: 1,
-            }}>
-              {etabName}
-            </h1>
-            <span style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a" }}>Charges &amp; Masse Salariale</span>
-          </div>
-        </div>
-
-        {/* ── Tabs ── */}
-        <div style={{ display: "inline-flex", gap: 4, padding: 4, background: "#e8e0d0", borderRadius: 12, marginBottom: 20 }}>
-          {/* Masse salariale reelle → redirige vers la nouvelle page */}
+        {/* ── Tabs (aligned with masse salariale page) ── */}
+        <div style={{ display: "flex", gap: 4, padding: 4, background: "#f0ebe2", borderRadius: 12, marginBottom: 18, border: "1px solid #e8e0d0" }}>
           <button type="button" onClick={() => router.push("/rh/masse-salariale")} style={{
-            background: "transparent", border: "none", cursor: "pointer", padding: "8px 16px",
-            fontSize: 13, fontWeight: 600, borderRadius: 10, color: "#999",
-            transition: "all 0.15s", whiteSpace: "nowrap",
+            flex: 1, padding: "8px 10px", borderRadius: 10, border: "none",
+            background: "transparent", color: "#777",
+            fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
           }}>
-            📊 Masse salariale reelle
+            Masse salariale reelle
           </button>
           {([
-            { key: "tns" as Tab, label: "Statuts TNS", icon: "\uD83D\uDCCB" },
-            { key: "simulateur" as Tab, label: "Simulateur d\u2019embauche", icon: "\uD83C\uDFAF" },
+            { key: "tns" as Tab, label: "Statuts TNS" },
+            { key: "simulateur" as Tab, label: "Simulateur d\u2019embauche" },
           ]).map((t) => (
             <button key={t.key} type="button" onClick={() => setTab(t.key)} style={{
-              background: tab === t.key ? (etab?.couleur ? etab.couleur + "25" : "#fff") : "transparent",
-              border: "none", cursor: "pointer", padding: "8px 16px",
-              fontSize: 13, fontWeight: 600, borderRadius: 10,
-              color: tab === t.key ? "#1a1a1a" : "#999",
-              boxShadow: tab === t.key ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
-              transition: "all 0.15s", whiteSpace: "nowrap",
+              flex: 1, padding: "8px 10px", borderRadius: 10, border: "none",
+              background: tab === t.key ? "#fff" : "transparent",
+              color: tab === t.key ? "#1a1a1a" : "#777",
+              fontSize: 12, fontWeight: 700, cursor: tab === t.key ? "default" : "pointer",
+              boxShadow: tab === t.key ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+              whiteSpace: "nowrap",
             }}>
-              {t.icon} {t.label}
+              {t.label}
             </button>
           ))}
         </div>
@@ -1091,7 +1075,7 @@ function SimulationPageInner() {
 
 /* ── Styles ────────────────────────────────────────────────────── */
 
-const pageStyle: CSSProperties = { maxWidth: 1100, margin: "0 auto", padding: "16px 16px 60px" };
+const pageStyle: CSSProperties = { maxWidth: 900, margin: "0 auto", padding: "20px 16px 100px" };
 
 const card: CSSProperties = {
   background: "#fff", border: "1px solid #ddd6c8",
