@@ -37,24 +37,25 @@
 
 /* ── Liquid Glass — iOS 26 style ───────────────────── */
 
-/* Glass surface tokens */
+/* Glass surface tokens — macOS Finder style */
 :root {
   --glass-bg: rgba(255,255,255,0.55);
   --glass-bg-hover: rgba(255,255,255,0.70);
   --glass-border: rgba(255,255,255,0.35);
-  --glass-blur: 20px;
-  --glass-shadow: 0 2px 12px rgba(0,0,0,0.06), 0 0 0 0.5px rgba(0,0,0,0.04);
-  --glass-shadow-hover: 0 8px 28px rgba(0,0,0,0.10), 0 0 0 0.5px rgba(0,0,0,0.06);
-  --glass-sidebar: rgba(245,245,247,0.82);
-  --glass-sidebar-border: rgba(0,0,0,0.08);
+  --glass-blur: 28px;
+  --glass-shadow: 0 0.5px 1px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.03);
+  --glass-shadow-hover: 0 2px 4px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08);
+  --glass-sidebar: rgba(255,255,255,0.72);
+  --glass-sidebar-border: rgba(0,0,0,0.06);
 }
 
-/* Glassmorphism sidebar */
+/* macOS Finder sidebar */
 .sidebar-desktop {
   background: var(--glass-sidebar) !important;
-  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(200%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(200%);
   border-right: 1px solid var(--glass-sidebar-border);
+  box-shadow: 1px 0 8px rgba(0,0,0,0.03);
 }
 
 /* Glass cards */
@@ -356,10 +357,10 @@ a{
 
 .card{
   background: #fff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 16px;
   padding: 16px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--glass-shadow);
 }
 
 .cardTitle{
@@ -405,7 +406,7 @@ textarea.input{
 
 .input:focus{
   border-color: var(--terre);
-  box-shadow: 0 0 0 3px rgba(122,74,42,0.12);
+  box-shadow: 0 0 0 3px rgba(212,119,90,0.15);
   background: #fff;
 }
 
@@ -432,7 +433,7 @@ textarea.input{
 }
 
 .btn:active{
-  transform: translateY(1px);
+  transform: scale(0.98);
 }
 
 .btnPrimary{
@@ -832,6 +833,16 @@ input[type='number'] {
   }
   @page { size: A4; margin: 16mm; }
 }
+
+/* ── macOS scrollbars ──────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.22); }
+
+/* ── macOS button feedback ────────────────────────── */
+button { transition: all 0.15s ease; }
+button:active { transform: scale(0.98); }
 
 /* ── Ventes pages responsive ───────────────────────── */
 

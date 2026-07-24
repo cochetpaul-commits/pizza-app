@@ -46,12 +46,12 @@ const ROLE_LABELS: Record<string, string> = {
 
 const C = {
   bg: "transparent",
-  bgItem: "rgba(0,0,0,0.03)",
-  bgItemActive: "rgba(0,0,0,0.06)",
-  textMuted: "rgba(0,0,0,0.40)",
-  textNormal: "rgba(0,0,0,0.65)",
-  textActive: "#2c2c2c",
-  divider: "rgba(0,0,0,0.06)",
+  bgItem: "rgba(0,0,0,0.035)",
+  bgItemActive: "rgba(212,119,90,0.10)",
+  textMuted: "rgba(0,0,0,0.42)",
+  textNormal: "rgba(0,0,0,0.68)",
+  textActive: "#1a1a1a",
+  divider: "rgba(0,0,0,0.05)",
   ifratelli: "#b45f57",
   piccolaMia: "#e6c428",
 };
@@ -142,14 +142,13 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         onMouseLeave={() => setHoveredItem(null)}
         style={{
           display: "flex", alignItems: "center", gap: 6,
-          padding: "5px 16px 5px 44px",
-          margin: "1px 8px", borderRadius: 6,
+          padding: "6px 12px 6px 40px",
+          margin: "1px 8px", borderRadius: 8,
           textDecoration: "none",
           fontSize: 13, fontWeight: active ? 600 : 400,
           color: active ? C.textActive : hovered ? C.textNormal : C.textMuted,
-          background: active ? `${etabColor}12` : hovered ? C.bgItem : "transparent",
-          borderLeft: active ? `2px solid ${etabColor}60` : "2px solid transparent",
-          transition: "background 0.12s, color 0.12s",
+          background: active ? C.bgItemActive : hovered ? C.bgItem : "transparent",
+          transition: "background 0.15s ease, color 0.15s ease",
           whiteSpace: "nowrap", overflow: "hidden",
         }}
       >
@@ -177,14 +176,13 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     const hubBtnStyle: CSSProperties = {
       display: "flex", alignItems: "center", gap: 8,
       width: "calc(100% - 16px)", padding: "8px 12px 8px 16px",
-      margin: "1px 8px", borderRadius: 6,
-      background: isOpen ? `${etabColor}14` : hovered ? C.bgItem : "transparent",
+      margin: "1px 8px", borderRadius: 8,
+      background: (isOpen || hasActiveChild) ? C.bgItemActive : hovered ? C.bgItem : "transparent",
       border: "none", cursor: items.length > 0 ? "pointer" : "default",
-      borderLeft: isOpen ? `2px solid ${etabColor}80` : "2px solid transparent",
       color: (isOpen || hasActiveChild) ? C.textActive : hovered ? C.textNormal : C.textMuted,
-      fontSize: 14, fontWeight: 700,
+      fontSize: 14, fontWeight: 600,
       whiteSpace: "nowrap", overflow: "hidden",
-      transition: "background 0.15s, color 0.15s, border-color 0.15s",
+      transition: "background 0.15s ease, color 0.15s ease",
     };
 
     return (
@@ -253,8 +251,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           style={{
             display: "flex", alignItems: "center", gap: 10,
             padding: "8px 16px", margin: "1px 8px", width: "calc(100% - 16px)",
-            borderRadius: 6, border: "none", cursor: "pointer",
-            borderLeft: settingsOpen ? `2px solid ${etabColor}80` : "2px solid transparent",
+            borderRadius: 8, border: "none", cursor: "pointer",
             fontSize: 14, fontWeight: 700, color: settingsOpen ? C.textActive : C.textNormal,
             background: settingsOpen ? C.bgItemActive : "transparent",
             transition: "background 0.15s, color 0.15s",
@@ -276,7 +273,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 <Link key={item.href} href={item.href} onClick={handleNav}
                   style={{
                     display: "flex", alignItems: "center", gap: 8,
-                    padding: "7px 16px 7px 28px", margin: "1px 8px", borderRadius: 6,
+                    padding: "7px 16px 7px 28px", margin: "1px 8px", borderRadius: 8,
                     textDecoration: "none", fontSize: 12, fontWeight: active ? 600 : 500,
                     color: active ? C.textActive : C.textNormal,
                     background: active ? C.bgItemActive : "transparent",
@@ -297,10 +294,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               <button type="button" onClick={() => toggleSettingsSub(subKey)} style={{
                 display: "flex", alignItems: "center", gap: 8,
                 width: "calc(100% - 16px)", padding: "8px 12px 8px 28px",
-                margin: "1px 8px", borderRadius: 6,
+                margin: "1px 8px", borderRadius: 8,
                 background: isOpen ? C.bgItem : "transparent",
                 border: "none", cursor: "pointer",
-                borderLeft: isOpen ? `2px solid ${etabColor}60` : "2px solid transparent",
                 color: isOpen ? C.textActive : C.textMuted,
                 fontSize: 14, fontWeight: 700, whiteSpace: "nowrap",
                 transition: "background 0.15s, color 0.15s",
@@ -314,7 +310,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                   <Link key={item.href} href={item.href} onClick={handleNav}
                     style={{
                       display: "flex", alignItems: "center", gap: 8,
-                      padding: "5px 16px 5px 44px", margin: "1px 8px", borderRadius: 6,
+                      padding: "5px 16px 5px 44px", margin: "1px 8px", borderRadius: 8,
                       textDecoration: "none", fontSize: 13, fontWeight: active ? 600 : 400,
                       color: active ? C.textActive : C.textMuted,
                       background: active ? C.bgItemActive : "transparent",
@@ -340,7 +336,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <Link key={entry.href} href={entry.href} onClick={handleNav}
         style={{
           display: "flex", alignItems: "center", gap: 10,
-          padding: "8px 16px", margin: "1px 8px", borderRadius: 6,
+          padding: "8px 16px", margin: "1px 8px", borderRadius: 8,
           textDecoration: "none", fontSize: 13, fontWeight: active ? 600 : 500,
           color: active ? C.textActive : C.textNormal,
           background: active ? C.bgItemActive : "transparent",
@@ -367,7 +363,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       {/* Header */}
       <div style={{ padding: "20px 16px 12px", borderBottom: `1px solid ${C.divider}`, display: "flex", alignItems: "center", gap: 8 }}>
         <Image src="/logo-ifratelli.png" alt="iFratelli" width={32} height={32}
-          style={{ width: 32, height: 32, objectFit: "contain", borderRadius: 6, flexShrink: 0 }} />
+          style={{ width: 32, height: 32, objectFit: "contain", borderRadius: 8, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <span style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontSize: 15, fontWeight: 700, color: C.textActive, letterSpacing: 0.5, lineHeight: 1 }}>
             iFratelli
@@ -491,10 +487,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                               style={{
                                 display: "flex", alignItems: "center", gap: 8,
                                 width: "calc(100% - 16px)", padding: "6px 12px 6px 28px",
-                                margin: "1px 8px", borderRadius: 6,
+                                margin: "1px 8px", borderRadius: 8,
                                 background: subOpen ? `${color}10` : "transparent",
                                 border: "none", cursor: "pointer",
-                                borderLeft: subOpen ? `2px solid ${color}60` : "2px solid transparent",
                                 color: (subOpen || hasActiveChild) ? C.textActive : C.textMuted,
                                 fontSize: 13, fontWeight: 600,
                                 whiteSpace: "nowrap", overflow: "hidden",
