@@ -158,12 +158,12 @@ function getCouvertsByKey(rows: Row[], keyFn: (r: Row) => string): Record<string
 /** Normalize category names: PIZZE→Pizze, CUCINA→Cuisine, etc. */
 const CAT_MAP: Record<string, string> = {
   PIZZE: "Pizze", CUCINA: "Cuisine", DOLCI: "Dolci", VINI: "Vins",
-  ALCOOL: "Alcool", ANTIPASTI: "Antipasti", BEVANDE: "Boissons",
+  ALCOOL: "Alcool", ANTIPASTI: "Cuisine", BEVANDE: "Boissons",
   "BEVANDE CALDE": "Boissons chaudes", DIGESTIVI: "Digestifs",
   MESSAGES: "Messages",
 };
 
-const FOOD_CATS = new Set(["Pizze", "Antipasti", "Cuisine", "Dolci", "Plats"]);
+const FOOD_CATS = new Set(["Pizze", "Cuisine", "Dolci", "Plats"]);
 const DRINK_CATS = new Set(["Vins", "Alcool", "Boissons", "Boissons chaudes", "Digestifs"]);
 function normCat(cat: string | null): string {
   if (!cat) return "Autre";

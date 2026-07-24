@@ -1106,42 +1106,25 @@ function MargesPage() {
                       Produits{trendCategory ? ` (${trendCategory})` : ""}{trendService !== "all" ? ` · ${trendService}` : ""}
                     </div>
                     {catProducts.map((p, i) => {
-                      // Enrich with margin data from main data
                       const margeInfo = (data?.products ?? []).find(dp => dp.name === p.name);
                       return (
-                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-                        <div style={{ width: 140, fontSize: 12, color: COLORS.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 0 }}>
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
+                        <div style={{ flex: "1 1 0", minWidth: 0, fontSize: 12, color: COLORS.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {p.name}
+                          {!margeInfo?.matched && <span style={{ fontSize: 8, color: "#D4775A", fontWeight: 600, marginLeft: 3 }}>?</span>}
                         </div>
-                        <div style={{ flex: 1, minWidth: 60, height: 18, background: "#f5f0e8", borderRadius: 4, overflow: "hidden" }}>
-                          <div style={{
-                            width: `${Math.max(2, (p.ca_ht / maxCA) * 100)}%`,
-                            height: "100%",
-                            background: catColor + "CC",
-                            borderRadius: 4,
-                          }} />
-                        </div>
-                        <div style={{ width: 60, textAlign: "right", fontSize: 11, fontVariantNumeric: "tabular-nums", color: COLORS.dark }}>
+                        <div style={{ width: 70, textAlign: "right", fontSize: 11, fontVariantNumeric: "tabular-nums", color: COLORS.dark, flexShrink: 0 }}>
                           {fmtDec(p.ca_ht)}
                         </div>
-                        <div style={{ width: 30, textAlign: "right", fontSize: 10, color: COLORS.muted }}>
+                        <div style={{ width: 24, textAlign: "right", fontSize: 10, color: COLORS.muted, flexShrink: 0 }}>
                           {p.qty}x
                         </div>
-                        {margeInfo?.marge_brute != null && (
-                          <div style={{ width: 55, textAlign: "right", fontSize: 10, fontWeight: 600, color: "#2D6A4F" }}>
-                            {fmtDec(margeInfo.marge_brute)}
-                          </div>
-                        )}
-                        {margeInfo?.food_cost_pct != null && (
-                          <div style={{
-                            width: 38, textAlign: "right", fontSize: 10, fontWeight: 600,
-                            color: foodCostColor(margeInfo.food_cost_pct),
-                          }}>
+                        {margeInfo?.food_cost_pct != null ? (
+                          <div style={{ width: 32, textAlign: "right", fontSize: 10, fontWeight: 700, color: foodCostColor(margeInfo.food_cost_pct), flexShrink: 0 }}>
                             {margeInfo.food_cost_pct.toFixed(0)}%
                           </div>
-                        )}
-                        {!margeInfo?.matched && (
-                          <span style={{ fontSize: 8, color: "#D4775A", fontWeight: 600 }}>?</span>
+                        ) : (
+                          <div style={{ width: 32, flexShrink: 0 }} />
                         )}
                       </div>
                     );})}
