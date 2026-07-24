@@ -12,6 +12,7 @@ import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 import { supabase } from "@/lib/supabaseClient";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { useProfile } from "@/lib/ProfileContext";
+import { getCached, setCache } from "@/lib/apiCache";
 
 /* ── Types ── */
 type WeekData = {
@@ -271,11 +272,28 @@ function PerformancesPage() {
     return { from, to };
   }, [range]);
 
-  // Load data — stats + meteo in parallel
+  // Load data — stats + meteo in parallel, with cache
   const loadData = useCallback(async () => {
     if (!etab) return;
-    setLoading(true);
     const { from, to } = getRange();
+    const cacheKey = `ventes:${etab.id}:${from}:${to}`;
+
+    // Try cache first — instant display
+    const cached = getCached<{ json: Record<string, unknown>; meteo: Record<string, unknown> }>(cacheKey);
+    if (cached) {
+      const json = cached.json as Record<string, unknown>;
+      if (!json.empty && json.stats) {
+        setData(json.stats as WeekData);
+        setPrev((json.prev as WeekData) ?? null);
+        setPrevWeek((json.prevWeek as WeekData) ?? null);
+        setDataSource((json.source as string) ?? "ventes_lignes");
+      }
+      setMeteo(cached.meteo as Record<string, { emoji: string; desc: string; temp: number }>);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
     try {
       const [statsRes, meteoRes] = await Promise.all([
         fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${from}&to=${to}`),
@@ -290,16 +308,18 @@ function PerformancesPage() {
         setPrevWeek(json.prevWeek ?? null);
         setDataSource(json.source ?? "ventes_lignes");
       }
+      const meteoData: Record<string, { emoji: string; desc: string; temp: number }> = {};
       if (meteoRes) {
         try {
           const mJson = await meteoRes.json();
-          const mMap: Record<string, { emoji: string; desc: string; temp: number }> = {};
           for (const m of mJson.meteo ?? []) {
-            mMap[`${m.date_service}:${m.service}`] = { emoji: m.emoji, desc: m.description, temp: m.temp };
+            meteoData[`${m.date_service}:${m.service}`] = { emoji: m.emoji, desc: m.description, temp: m.temp };
           }
-          setMeteo(mMap);
+          setMeteo(meteoData);
         } catch { setMeteo({}); }
       }
+      // Cache for instant return
+      setCache(cacheKey, { json, meteo: meteoData }, 5 * 60 * 1000);
     } catch {
       setData(null); setPrev(null); setPrevWeek(null);
     }

@@ -12,6 +12,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, type CSSProperties }
 import { useEtablissement } from "@/lib/EtablissementContext";
 import type { DateRange } from "@/components/ui/DateRangePicker";
 import { supabase } from "@/lib/supabaseClient";
+import { getCached, setCache } from "@/lib/apiCache";
 
 type ApiData = {
   kpis: { ca_ttc: number; ca_ht: number; cogs: number; marge_brute: number; food_cost_pct: number; nb_produits: number; nb_matched: number; total_qty: number };
@@ -64,10 +65,15 @@ export function MargesContent({ externalRange }: { externalRange: DateRange }) {
 
   const loadData = useCallback(async () => {
     if (!etab) return;
+    const cacheKey = `marges:${etab.id}:${externalRange.from}:${externalRange.to}`;
+    const cached = getCached<ApiData>(cacheKey);
+    if (cached) { setData(cached); setLoading(false); return; }
     setLoading(true);
     try {
       const r = await fetch(`/api/ventes/marges?etablissement_id=${etab.id}&from=${externalRange.from}&to=${externalRange.to}`);
-      setData(await r.json());
+      const d = await r.json();
+      setData(d);
+      setCache(cacheKey, d, 5 * 60 * 1000);
     } catch { setData(null); }
     setLoading(false);
   }, [etab, externalRange.from, externalRange.to]);

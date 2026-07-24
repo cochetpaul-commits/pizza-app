@@ -12,6 +12,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { useRouter } from "next/navigation";
+import { getCached, setCache } from "@/lib/apiCache";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -562,6 +563,19 @@ export default function PilotagePage() {
 
   const loadStats = useCallback(async (week: string) => {
     if (!currentEtabId) return;
+    const cacheKey = `pilotage:${currentEtabId}:${week}`;
+
+    // Try cache first
+    const cached = getCached<{ s: StatsData | null; m: MeteoData | null; c: CostData | null }>(cacheKey);
+    if (cached) {
+      if (cached.s) setStats(cached.s);
+      if (cached.m) setMeteo(cached.m);
+      if (cached.c) setCosts(cached.c);
+      setLastUpdate("cache");
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     const [s, m, c] = await Promise.all([
       loadDailySalesStats(currentEtabId, week),
@@ -572,6 +586,7 @@ export default function PilotagePage() {
     if (m) setMeteo(m);
     if (c) setCosts(c);
     setLastUpdate(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
+    setCache(cacheKey, { s, m, c }, 5 * 60 * 1000);
     setLoading(false);
   }, [currentEtabId]);
 
