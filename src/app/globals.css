@@ -224,8 +224,8 @@ html, body{
     margin-left: 0;
     /* Reserve space for fixed mobile header (52px) + safe-area */
     padding-top: calc(52px + env(safe-area-inset-top, 0px));
-    /* Reserve space for floating bottom pill (pill height ~50 + 14 + safe-area) */
-    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    /* Reserve space for bottom pill + FAB + safe-area */
+    padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
   }
   .bottom-tab-bar {
     display: block !important;
@@ -916,11 +916,11 @@ button:active { transform: scale(0.98); }
 
   /* ── Global containers ── */
   .ventes-container {
-    padding: 12px 10px 60px !important;
+    padding: 12px 10px 120px !important;
     max-width: 100% !important;
   }
   .ventes-marges-container {
-    padding: 12px 10px 60px !important;
+    padding: 12px 10px 120px !important;
     max-width: 100% !important;
   }
   .ventes-articles-container {
@@ -1006,11 +1006,11 @@ button:active { transform: scale(0.98); }
 
   /* ── Duration card ── */
   .ventes-duration-kpis {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: 1fr 1fr !important;
     gap: 8px !important;
   }
   .ventes-duration-zones {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: 1fr 1fr !important;
     gap: 8px !important;
   }
   .ventes-duration-svc {
@@ -1179,6 +1179,17 @@ button:active { transform: scale(0.98); }
   }
 }
 
+/* ── Masse salariale responsive ── */
+@media (max-width: 767px) {
+  /* Tabs row — horizontal scroll */
+  .masse-sal-tabs {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap !important;
+  }
+  .masse-sal-tabs::-webkit-scrollbar { display: none; }
+}
+
 /* ── Catalogue / Recettes / Inventaire responsive ── */
 @media (max-width: 767px) {
   /* Recettes FAB — above enterprise button */
@@ -1199,6 +1210,12 @@ button:active { transform: scale(0.98); }
   /* Recipe/catalogue cards grid — single column on mobile */
   .recipe-grid {
     grid-template-columns: 1fr !important;
+  }
+
+  /* Catalogue recipe rows — prevent overflow on mobile */
+  .ventes-marges-container,
+  .ventes-container {
+    overflow-x: hidden !important;
   }
 
   /* Pagination — compact on mobile */

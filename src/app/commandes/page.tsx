@@ -1938,25 +1938,33 @@ function CommandesPage() {
 
                 {others.length > 0 && (() => {
                   const hasSubCats = others.some(i => i.sub_category);
-                  let lastSub: string | null | undefined = undefined;
+                  if (!hasSubCats) {
+                    return (
+                      <div className="commandes-grid" style={{ display: "grid", gap: 10, padding: "6px 10px 10px" }}>
+                        {others.map((item) => renderProductCard(item, false))}
+                      </div>
+                    );
+                  }
+                  // Group by sub_category, render each group with a header
+                  const subGroups: { sub: string; items: CatalogItem[] }[] = [];
+                  for (const item of others) {
+                    const sub = item.sub_category ?? "Autre";
+                    const last = subGroups[subGroups.length - 1];
+                    if (last && last.sub === sub) { last.items.push(item); }
+                    else { subGroups.push({ sub, items: [item] }); }
+                  }
                   return (
                     <div style={{ padding: "6px 10px 10px" }}>
-                      {others.map((item) => {
-                        const showSubHeader = hasSubCats && item.sub_category !== lastSub;
-                        lastSub = item.sub_category;
-                        return (
-                          <React.Fragment key={item.id}>
-                            {showSubHeader && (
-                              <div style={{ padding: "10px 4px 4px", fontSize: 10, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "0.06em", borderTop: lastSub !== undefined ? "1px solid rgba(0,0,0,0.04)" : "none" }}>
-                                {item.sub_category ?? "Autre"}
-                              </div>
-                            )}
-                            <div className="commandes-grid" style={{ display: "grid", gap: 10, marginBottom: 4 }}>
-                              {renderProductCard(item, false)}
-                            </div>
-                          </React.Fragment>
-                        );
-                      })}
+                      {subGroups.map((sg, gi) => (
+                        <div key={sg.sub}>
+                          <div style={{ padding: gi > 0 ? "10px 4px 4px" : "2px 4px 4px", fontSize: 10, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "0.06em", borderTop: gi > 0 ? "1px solid rgba(0,0,0,0.06)" : "none" }}>
+                            {sg.sub}
+                          </div>
+                          <div className="commandes-grid" style={{ display: "grid", gap: 10 }}>
+                            {sg.items.map((item) => renderProductCard(item, false))}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   );
                 })()}
