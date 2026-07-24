@@ -649,13 +649,14 @@ function MargesPage() {
       };
     }
     if (mode === "par_jour_semaine") {
-      const buckets = Array.from({ length: 7 }, () => 0);
+      // Lun-Ven only (no Sam/Dim)
+      const buckets = Array.from({ length: 5 }, () => 0);
       for (const d of daily) {
         const dow = new Date(d.date + "T12:00:00").getDay();
-        const idx = dow === 0 ? 6 : dow - 1; // Mon=0 ... Sun=6
-        buckets[idx] += metric === "qty" ? d.qty : d.ca_ht;
+        if (dow === 0 || dow === 6) continue; // skip weekend
+        buckets[dow - 1] += metric === "qty" ? d.qty : d.ca_ht;
       }
-      return { labels: JOURS, values: buckets };
+      return { labels: JOURS.slice(0, 5), values: buckets };
     }
     if (mode === "par_mois") {
       const buckets: Record<number, number> = {};
