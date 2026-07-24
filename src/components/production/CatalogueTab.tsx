@@ -9,6 +9,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { calculerPate, type EmpatementType, type FlourMixItem, type PateResult } from "@/lib/pateEngine";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
+import { useCategories } from "@/lib/useCategories";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -479,6 +480,20 @@ export function CatalogueContent() {
   const etabSlug = resolvedEtab?.slug ?? null;
   const { can } = useProfile();
   const canWrite = can("operations.edit_recettes");
+  const { categories: dbCategories } = useCategories();
+
+  // Build dynamic label/color maps from DB categories
+  const dynamicCatLabels = useMemo(() => {
+    const map: Record<string, string> = { ...CUISINE_CAT_LABELS };
+    for (const c of dbCategories) map[c.slug] = c.nom;
+    return map;
+  }, [dbCategories]);
+
+  const dynamicCatColors = useMemo(() => {
+    const map: Record<string, string> = { ...CUISINE_CAT_COLORS };
+    for (const c of dbCategories) map[c.slug] = c.couleur;
+    return map;
+  }, [dbCategories]);
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
@@ -626,9 +641,9 @@ export function CatalogueContent() {
   // Counts per main filter (independent of current filter)
   // Build a label for a cuisine category id (built-in or custom slug)
   const cuisineCatLabel = useCallback((id: string): string => {
-    return CUISINE_CAT_LABELS[id]
+    return dynamicCatLabels[id]
       ?? id.replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
-  }, []);
+  }, [dynamicCatLabels]);
 
   // Group by type, then by category (cuisine categories sorted alphabetically)
   const groups = useMemo(() => {
@@ -725,7 +740,7 @@ export function CatalogueContent() {
         continue;
       }
       const subs = typeMap.get(type) ?? [];
-      const subColor = type === "cuisine" && cat ? (CUISINE_CAT_COLORS[cat] ?? "#4a6741") : groupColor(key);
+      const subColor = type === "cuisine" && cat ? (dynamicCatColors[cat] ?? CUISINE_CAT_COLORS[cat] ?? "#4a6741") : groupColor(key);
 
       // Split items by sous_categorie within each category
       const subCatMap = new Map<string, Recipe[]>();

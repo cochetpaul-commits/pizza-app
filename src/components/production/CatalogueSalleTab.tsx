@@ -6,6 +6,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { BottomSheet } from "@/components/layout/BottomSheet";
+import { useCategories } from "@/lib/useCategories";
 
 type PairingItem = { id: string; name: string; category: string };
 
@@ -282,6 +283,14 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
 /* ── Exported content (used in /recettes tab + /catalogue/fiches) ── */
 
 export function CatalogueSalleContent() {
+  const { categories: dbCategories } = useCategories();
+  // Dynamic labels from DB
+  const catLabels = useMemo(() => {
+    const map: Record<string, string> = { ...CAT_LABELS };
+    for (const c of dbCategories) map[c.slug] = c.nom;
+    return map;
+  }, [dbCategories]);
+
   const [fiches, setFiches] = useState<Fiche[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -417,7 +426,7 @@ export function CatalogueSalleContent() {
                 <div onClick={() => setOpenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })}
                   style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
                   <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 14, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: col.fg }}>
-                    {CAT_LABELS[cat] ?? cat}
+                    {catLabels[cat] ?? cat}
                   </span>
                   <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 8px", borderRadius: 12, background: col.bg, color: col.fg }}>
                     {items.length}
