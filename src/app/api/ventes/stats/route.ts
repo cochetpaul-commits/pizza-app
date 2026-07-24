@@ -80,6 +80,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "etablissement_id, from, to requis" }, { status: 400 });
   }
 
+  // Load popina sub-categories for CUCINA split (Antipasti vs Piatti)
+  const { data: popinaProds } = await supabase
+    .from("popina_products")
+    .select("name, sub_category")
+    .eq("category", "CUCINA")
+    .eq("active", true)
+    .not("sub_category", "is", null);
+  subCatByName = new Map();
+  for (const p of popinaProds ?? []) {
+    if (p.name && p.sub_category) subCatByName.set(p.name.trim().toLowerCase(), p.sub_category);
+  }
+
   // ── Période courante ───────────────────────────────────────────────────
   const rows = await fetchRange(etabId, from, to);
 
@@ -158,16 +170,34 @@ function getCouvertsByKey(rows: Row[], keyFn: (r: Row) => string): Record<string
 /** Normalize category names: PIZZE→Pizze, CUCINA→Cuisine, etc. */
 const CAT_MAP: Record<string, string> = {
   PIZZE: "Pizze", CUCINA: "Cuisine", DOLCI: "Dolci", VINI: "Vins",
-  ALCOOL: "Alcool", ANTIPASTI: "Cuisine", BEVANDE: "Boissons",
+  ALCOOL: "Alcool", ANTIPASTI: "Antipasti", BEVANDE: "Boissons",
   "BEVANDE CALDE": "Boissons chaudes", DIGESTIVI: "Digestifs",
   MESSAGES: "Messages",
 };
 
-const FOOD_CATS = new Set(["Pizze", "Cuisine", "Dolci", "Plats"]);
+// Sub-category overrides: CUCINA products with sub_category ANTIPASTI → "Antipasti"
+const SUB_CAT_OVERRIDES: Record<string, string> = {
+  ANTIPASTI: "Antipasti",
+  PIATTI: "Cuisine",
+  BAMBINI: "Bambini",
+  SIDES: "Sides",
+};
+
+const FOOD_CATS = new Set(["Pizze", "Antipasti", "Cuisine", "Dolci", "Plats", "Bambini", "Sides"]);
 const DRINK_CATS = new Set(["Vins", "Alcool", "Boissons", "Boissons chaudes", "Digestifs"]);
-function normCat(cat: string | null): string {
+// Sub-cat lookup filled at runtime from popina_products
+let subCatByName: Map<string, string> | null = null;
+
+function normCat(cat: string | null, productName?: string): string {
   if (!cat) return "Autre";
-  return CAT_MAP[cat.toUpperCase()] ?? CAT_MAP[cat] ?? cat;
+  const base = CAT_MAP[cat.toUpperCase()] ?? CAT_MAP[cat] ?? cat;
+  // For CUCINA, check sub-category via popina product name
+  if ((base === "Cuisine" || cat.toUpperCase() === "CUCINA") && productName && subCatByName) {
+    const key = productName.trim().toLowerCase();
+    const subCat = subCatByName.get(key);
+    if (subCat && SUB_CAT_OVERRIDES[subCat]) return SUB_CAT_OVERRIDES[subCat];
+  }
+  return base;
 }
 
 function aggregate(rows: Row[]) {
@@ -329,7 +359,7 @@ function aggregate(rows: Row[]) {
   // Mix catégories (TTC + HT)
   const catMap: Record<string, { ttc: number; ht: number }> = {};
   for (const r of validRows) {
-    const cat = normCat(r.categorie);
+    const cat = normCat(r.categorie, r.description);
     if (!catMap[cat]) catMap[cat] = { ttc: 0, ht: 0 };
     catMap[cat].ttc += Number(r.ttc);
     catMap[cat].ht += Number(r.ht);
@@ -345,7 +375,7 @@ function aggregate(rows: Row[]) {
   const prodMap: Record<string, { ca_ttc: number; ca_ht: number; qty: number }> = {};
   for (const r of validRows) {
     if (!r.description) continue;
-    const nc = normCat(r.categorie);
+    const nc = normCat(r.categorie, r.description);
     if (nc === "Messages" || nc === "Autre") continue;
     const key = r.description;
     if (!prodMap[key]) prodMap[key] = { ca_ttc: 0, ca_ht: 0, qty: 0 };
@@ -363,7 +393,7 @@ function aggregate(rows: Row[]) {
   const catProds: Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]> = {};
   for (const r of validRows) {
     if (!r.description) continue;
-    const cat = normCat(r.categorie);
+    const cat = normCat(r.categorie, r.description);
     if (cat === "Messages" || cat === "Autre") continue;
     if (!catProds[cat]) catProds[cat] = [];
     const existing = catProds[cat].find(p => p.n === r.description);
@@ -385,7 +415,7 @@ function aggregate(rows: Row[]) {
     const cp: Record<string, { n: string; qty: number; ca_ttc: number; ca_ht: number }[]> = {};
     for (const r of rows) {
       if (!r.description) continue;
-      const cat = normCat(r.categorie);
+      const cat = normCat(r.categorie, r.description);
       if (cat === "Messages" || cat === "Autre") continue;
       if (!cp[cat]) cp[cat] = [];
       const existing = cp[cat].find(p => p.n === r.description);
@@ -484,7 +514,7 @@ function aggregate(rows: Row[]) {
       orderData.set(key, { cov: Number(r.couverts) || 0, cats: new Set(), ca_ttc: 0, ca_ht: 0, svc: r.service || "", op: r.operateur?.trim() || "" });
     }
     const od = orderData.get(key)!;
-    const nc = normCat(r.categorie);
+    const nc = normCat(r.categorie, r.description);
     if (nc !== "Messages" && nc !== "Autre" && !r.annule) {
       od.cats.add(nc);
       od.ca_ttc += Number(r.ttc);
@@ -508,7 +538,7 @@ function aggregate(rows: Row[]) {
     }
     // CA for the category
     for (const r of validRows) {
-      const nc = normCat(r.categorie);
+      const nc = normCat(r.categorie, r.description);
       if (catFilter(new Set([nc]))) {
         ca_ttc_total += Number(r.ttc);
         ca_ht_total += Number(r.ht);
@@ -668,7 +698,7 @@ function aggregate(rows: Row[]) {
   // Split Food vs Boissons
   let food_ttc = 0, food_ht = 0, drink_ttc = 0, drink_ht = 0;
   for (const r of validRows) {
-    const cat = normCat(r.categorie);
+    const cat = normCat(r.categorie, r.description);
     if (FOOD_CATS.has(cat)) { food_ttc += Number(r.ttc); food_ht += Number(r.ht); }
     else if (DRINK_CATS.has(cat)) { drink_ttc += Number(r.ttc); drink_ht += Number(r.ht); }
   }
@@ -678,7 +708,7 @@ function aggregate(rows: Row[]) {
     .filter(([, v]) => v.qty >= 1)
     .filter(([name]) => {
       const row = validRows.find(r => r.description === name);
-      return row ? FOOD_CATS.has(normCat(row.categorie)) : false;
+      return row ? FOOD_CATS.has(normCat(row.categorie, row.description)) : false;
     })
     .sort((a, b) => a[1].qty - b[1].qty)
     .slice(0, 5)
