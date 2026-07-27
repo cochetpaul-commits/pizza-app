@@ -99,7 +99,7 @@ export const DEFAULT_PERMS: Record<PermRole, Record<string, PermValue>> = {
     "absences.edit_cp": false, "paie.manage": false,
     "achats.view": false, "achats.edit": true, "achats.inventaire": true,
     "operations.recettes": true, "operations.edit_recettes": false, "operations.commandes": true, "commandes.valider": false,
-    "performances.view": false, "performances.pilotage": false, "performances.show_money": false,
+    "performances.view": true, "performances.pilotage": false, "performances.show_money": false,
     "settings.etablissements": false, "settings.employes": false, "settings.roles": false,
   },
   manager: {

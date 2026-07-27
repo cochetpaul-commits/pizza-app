@@ -81,8 +81,8 @@ type PendingDelivery = { supplier: string; status: string; created: string };
 
 function BelloMioContent() {
   const { etablissements, setCurrent, setGroupView } = useEtablissement();
-  const { role } = useProfile();
-  const canSeePilotage = role === "group_admin" || role === "manager";
+  const { can } = useProfile();
+  const canSeePilotage = can("performances.view");
 
   const today = useMemo(
     () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(new Date()),
