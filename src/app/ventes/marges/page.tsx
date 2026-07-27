@@ -256,6 +256,12 @@ function MargesPage() {
       setAllSubCats(result);
     })();
   }, []);
+  const [trendMetric, setTrendMetric] = useState<"qty" | "ca_ht">("qty");
+  const [trendService, setTrendService] = useState<"all" | "midi" | "soir">("all");
+  const [trendProducts, setTrendProducts] = useState<{ name: string; qty: number; ca_ht: number; ca_ttc: number }[]>([]);
+  // Trend dates sync avec la page par défaut
+  const [trendFrom, setTrendFrom] = useState(range.from);
+  const [trendTo, setTrendTo] = useState(range.to);
   // Auto-detect trend mode from date range
   const trendRangeDays = (() => {
     const from = new Date(trendFrom + "T12:00:00");
@@ -263,12 +269,6 @@ function MargesPage() {
     return Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
   })();
   const trendMode: TrendMode = trendRangeDays <= 7 ? "par_jour_semaine" : "par_mois";
-  const [trendMetric, setTrendMetric] = useState<"qty" | "ca_ht">("qty");
-  const [trendService, setTrendService] = useState<"all" | "midi" | "soir">("all");
-  const [trendProducts, setTrendProducts] = useState<{ name: string; qty: number; ca_ht: number; ca_ttc: number }[]>([]);
-  // Trend dates sync avec la page par défaut
-  const [trendFrom, setTrendFrom] = useState(range.from);
-  const [trendTo, setTrendTo] = useState(range.to);
   useEffect(() => {
     setTrendFrom(range.from);
     setTrendTo(range.to);
