@@ -321,6 +321,8 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
     if (!matchEstab(k.establishments)) continue;
     // Skip if category is "preparation" — those go to Production section below
     if (k.category === "preparation") continue;
+    // Skip pizzas — already loaded in the Pizza section above
+    if (k.category === "pizza") continue;
     const isProduit = k.category?.startsWith("produit_");
     const isCocktail = k.category === "cocktail";
     const kIngs = (kitchenIngs ?? []).filter((i: Record<string, unknown>) => i.recipe_id === k.id);
