@@ -123,9 +123,7 @@ export default function EmployeDetailPage() {
   const [dateVisiteMedicale, setDateVisiteMedicale] = useState("");
   const [visiteRenforcee, setVisiteRenforcee] = useState(false);
   const [prochaineVisite, setProchaineVisite] = useState("");
-  const [iban, setIban] = useState("");
-  const [bic, setBic] = useState("");
-  const [titulaireCompte, setTitulaireCompte] = useState("");
+  // IBAN/BIC removed — not displayed, not needed for completude
   const [matricule, setMatricule] = useState("");
   const [dateAnciennete, setDateAnciennete] = useState("");
   const [travailleurEtranger, setTravailleurEtranger] = useState(false);
@@ -285,9 +283,6 @@ export default function EmployeDetailPage() {
       setDateVisiteMedicale(empData.date_visite_medicale ?? "");
       setVisiteRenforcee(empData.visite_renforcee ?? false);
       setProchaineVisite(empData.prochaine_visite_medicale ?? "");
-      setIban(empData.iban ?? "");
-      setBic(empData.bic ?? "");
-      setTitulaireCompte(empData.titulaire_compte ?? "");
       setMatricule(empData.matricule ?? "");
       setDateAnciennete(empData.date_anciennete ?? "");
       setTravailleurEtranger(empData.travailleur_etranger ?? false);
@@ -348,7 +343,6 @@ export default function EmployeDetailPage() {
       date_visite_medicale: dateVisiteMedicale || null,
       visite_renforcee: visiteRenforcee,
       prochaine_visite_medicale: prochaineVisite || null,
-      iban: iban || null, bic: bic || null, titulaire_compte: titulaireCompte || null,
       matricule: matricule || null, date_anciennete: dateAnciennete || null,
       travailleur_etranger: travailleurEtranger, actif,
       poste_id: posteId || null,
