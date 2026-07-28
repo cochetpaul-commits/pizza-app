@@ -2524,7 +2524,7 @@ function ChartCanvas({ id, height, data, mode, type, onBarClick }: {
                 ctx.fillStyle = "#555";
                 ctx.textAlign = "left";
                 ctx.textBaseline = "middle";
-                ctx.fillText(`${Math.round(val / 1000)}k\u20AC  ${pct}%`, bar.x + 6, bar.y);
+                ctx.fillText(`${Math.round(val).toLocaleString("fr-FR")}\u20AC  ${pct}%`, bar.x + 6, bar.y);
                 ctx.restore();
               });
             });

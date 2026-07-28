@@ -608,7 +608,7 @@ function TresoreriePage() {
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 10 } } }, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${(ctx.parsed.y ?? 0).toLocaleString("fr-FR")} \u20AC` } } },
-        scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } }, y: { grid: { color: "#f0ebe2" }, ticks: { font: { size: 10 }, callback: v => `${(Number(v) / 1000).toFixed(0)}k` } } },
+        scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } }, y: { grid: { color: "#f0ebe2" }, ticks: { font: { size: 10 }, callback: v => `${Math.round(Number(v)).toLocaleString("fr-FR")}\u20AC` } } },
       },
     });
     return () => { margeChartInstance.current?.destroy(); margeChartInstance.current = null; };

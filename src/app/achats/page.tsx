@@ -548,7 +548,7 @@ function AchatsContent() {
             ticks: {
               callback: (v) => {
                 const n = typeof v === "number" ? v : parseFloat(String(v));
-                return n >= 1000 ? Math.round(n / 1000) + "k" : String(Math.round(n));
+                return Math.round(n).toLocaleString("fr-FR") + "\u20AC";
               },
               font: { size: 10 },
               color: "#999",
@@ -597,7 +597,7 @@ function AchatsContent() {
             ticks: {
               callback: (v) => {
                 const n = typeof v === "number" ? v : parseFloat(String(v));
-                return n >= 1000 ? Math.round(n / 1000) + "k" : String(Math.round(n));
+                return Math.round(n).toLocaleString("fr-FR") + "\u20AC";
               },
               font: { size: 10 },
               color: "#999",

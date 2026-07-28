@@ -425,7 +425,7 @@ function aggregate(rows: Row[]) {
     }
   }
   for (const cat of Object.keys(catProds)) {
-    catProds[cat].sort((a, b) => b.ca_ttc - a.ca_ttc);
+    catProds[cat].sort((a, b) => b.qty - a.qty);
     catProds[cat] = catProds[cat].map(p => ({ ...p, ca_ttc: Math.round(p.ca_ttc), ca_ht: Math.round(p.ca_ht) }));
   }
 
