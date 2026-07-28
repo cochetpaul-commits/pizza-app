@@ -71,17 +71,42 @@ export async function POST() {
           emploi: contract.function || null,
         };
 
+        let employeId: string;
         if (match) {
-          // Update existing employee
           await supabaseAdmin.from("employes").update(employeData).eq("id", match.id);
+          employeId = match.id;
           updated++;
         } else {
-          // Create new employee
-          await supabaseAdmin.from("employes").insert({
+          const { data: inserted } = await supabaseAdmin.from("employes").insert({
             ...employeData,
             role: contract.role === "main_owner" || contract.role === "owner" ? "group_admin" : "equipier",
-          });
+          }).select("id").single();
+          employeId = inserted?.id ?? "";
           created++;
+        }
+
+        // Upsert active contract
+        if (employeId) {
+          const typeMap: Record<string, string> = { CDI: "CDI", CDD: "CDD", seasonal: "extra", apprenticeship: "apprenti", internship: "stagiaire" };
+          const contratType = typeMap[contract.contract_type] ?? contract.contract_type ?? "CDI";
+          const { data: existingContrat } = await supabaseAdmin
+            .from("contrats").select("id").eq("employe_id", employeId).eq("actif", true).limit(1);
+          const contratPayload = {
+            employe_id: employeId,
+            type: contratType,
+            date_debut: contract.start_date,
+            date_fin: contract.end_date || null,
+            remuneration: contract.monthly_gross_salary,
+            emploi: contract.function || null,
+            heures_semaine: contract.contract_time,
+            jours_semaine: 5,
+            actif: !contract.end_date || new Date(contract.end_date) >= new Date(),
+          };
+          if (existingContrat && existingContrat.length > 0) {
+            await supabaseAdmin.from("contrats").update(contratPayload).eq("id", existingContrat[0].id);
+          } else {
+            await supabaseAdmin.from("contrats").insert(contratPayload);
+          }
         }
       }
 
