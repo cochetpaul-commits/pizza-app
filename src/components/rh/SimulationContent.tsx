@@ -157,6 +157,7 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
   const [loading, setLoading] = useState(true);
   const tab = activeTab;
   const [caSimule, setCaSimule] = useState(85000);
+  const [caLoaded, setCaLoaded] = useState(false);
   const [simRows, setSimRows] = useState<SimRow[]>([]);
   const [selectedTns, setSelectedTns] = useState<string | null>(null);
   // Salary overrides for simulation (empId → new brut/net amount)
@@ -186,9 +187,26 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
       })) as Employe[];
       setEmployes(emps);
       setLoading(false);
+
+      // Load CA from ventes stats (current month)
+      if (!caLoaded) {
+        const now = new Date();
+        const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        const to = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${lastDay}`;
+        try {
+          const caRes = await fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${from}&to=${to}`);
+          const caJson = await caRes.json();
+          const ca = caJson?.stats?.ca_ttc ?? caJson?.stats?.total_ttc ?? null;
+          if (ca && ca > 0 && !cancelled) {
+            setCaSimule(Math.round(ca));
+            setCaLoaded(true);
+          }
+        } catch { /* ignore */ }
+      }
     })();
     return () => { cancelled = true; };
-  }, [etab]);
+  }, [etab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Costs (base from contracts) ── */
   const baseCosts = useMemo(() => {
@@ -834,9 +852,21 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
                     <div style={{ height: "100%", borderRadius: 4, width: `${OBJECTIF_MS_CA}%`, background: accent, opacity: 0.3 }} />
                   </div>
 
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, marginBottom: 4 }}>
                     <span style={{ color: "#6f6a61" }}>CA actuel mensuel</span>
-                    <span style={{ fontWeight: 700 }}>{fmt(caSimule)} {"\u20AC"}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <input
+                        type="number"
+                        value={caSimule}
+                        onChange={e => setCaSimule(Number(e.target.value) || 0)}
+                        style={{
+                          width: 100, textAlign: "right", fontWeight: 700, fontSize: 13,
+                          border: "1px solid #ddd6c8", borderRadius: 8, padding: "4px 8px",
+                          background: "#fff", fontFamily: "var(--font-oswald), Oswald, sans-serif",
+                        }}
+                      />
+                      <span style={{ fontWeight: 700 }}>{"\u20AC"}</span>
+                    </div>
                   </div>
                   <div style={{ ...barBg, marginBottom: 16 }}>
                     <div style={{
