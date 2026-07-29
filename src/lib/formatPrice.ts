@@ -22,22 +22,31 @@ function unitLabel(ingredient?: { purchase_unit_label?: string | null } | null):
   return "pc";
 }
 
+/** Format volume/weight info: "75cl", "1kg", "500g", etc. */
+function fmtContent(volMl: number | null | undefined, weightG: number | null | undefined): string {
+  if (volMl != null && volMl > 0) {
+    if (volMl >= 1000) return `${n2(volMl / 1000)}L`;
+    return `${Math.round(volMl)}cl`;
+  }
+  if (weightG != null && weightG > 0) {
+    if (weightG >= 1000) return `${n2(weightG / 1000)}kg`;
+    return `${Math.round(weightG)}g`;
+  }
+  return "";
+}
+
 function fromOffer(ingredient: Pick<Ingredient, "piece_volume_ml" | "purchase_unit_label">, o: LatestOffer): string | null {
   const pk = o.price_kind;
+  const ul = unitLabel(ingredient);
+  const content = fmtContent(ingredient.piece_volume_ml, o.piece_weight_g);
 
   if (pk === "unit") {
     if (!o.unit || o.unit_price == null || !(o.unit_price > 0)) return null;
     if (o.unit === "kg") return `${fmtMoney(o.unit_price)} €/kg`;
     if (o.unit === "l") return `${fmtMoney(o.unit_price)} €/L`;
     if (o.unit === "pc") {
-      const pw = n2(o.piece_weight_g);
-      if (pw > 0) return `${fmtMoney((o.unit_price / pw) * 1000)} €/kg`;
-      const volMl = ingredient.piece_volume_ml;
-      if (volMl != null && volMl > 0) {
-        const eurL = (o.unit_price / volMl) * 1000;
-        return `${fmtMoney(o.unit_price)} €/pc · ${fmtMoney(eurL)} €/L`;
-      }
-      return `${fmtMoney(o.unit_price)} €/${unitLabel(ingredient)}`;
+      // Show price per purchase unit + content info (e.g. "1,50 € btl 75cl")
+      return `${fmtMoney(o.unit_price)} € ${ul}${content ? ` ${content}` : ""}`;
     }
     return null;
   }
@@ -46,21 +55,14 @@ function fromOffer(ingredient: Pick<Ingredient, "piece_volume_ml" | "purchase_un
     if (o.pack_price == null || !o.pack_total_qty || !o.pack_unit) return null;
     const per = o.pack_price / o.pack_total_qty;
     const baseUnit = o.pack_unit === "kg" ? "kg" : "L";
-    return `${fmtMoney(o.pack_price)} €/pc\n${fmtMoney(per)} €/${baseUnit}`;
+    return `${fmtMoney(per)} €/${baseUnit}`;
   }
 
   if (pk === "pack_composed") {
     if (o.pack_price == null || !o.pack_count || !o.pack_each_unit) return null;
     if (o.pack_each_unit === "pc") {
       const perPc = o.pack_price / o.pack_count;
-      const pw = n2(o.piece_weight_g);
-      if (pw > 0) return `${fmtMoney((perPc / pw) * 1000)} €/kg`;
-      const volMl = ingredient.piece_volume_ml;
-      if (volMl != null && volMl > 0) {
-        const eurPerL = (perPc / volMl) * 1000;
-        return `${fmtMoney(perPc)} €/pc · ${fmtMoney(eurPerL)} €/L`;
-      }
-      return `${fmtMoney(perPc)} €/${unitLabel(ingredient)}`;
+      return `${fmtMoney(perPc)} € ${ul}${content ? ` ${content}` : ""}`;
     }
     if (!o.pack_each_qty || o.pack_each_qty <= 0) return null;
     const per = o.pack_price / (o.pack_count * o.pack_each_qty);
@@ -77,20 +79,18 @@ function fromLegacy(x: IngredientPriceFields): string {
   const cpu = x.cost_per_unit;
   const lbl = (x.purchase_unit_label ?? "").toLowerCase().trim();
 
+  const content = fmtContent(x.piece_volume_ml, x.piece_weight_g);
+
   if (cpu != null && Number.isFinite(cpu) && cpu > 0) {
     if (lbl === "kg") return `${fmtMoney(cpu)} €/kg`;
     if (lbl === "l") return `${fmtMoney(cpu)} €/L`;
     if (lbl === "g") return `${fmtMoney(cpu * 1000)} €/kg`;
     if (lbl === "ml") return `${fmtMoney(cpu * 1000)} €/L`;
     if (lbl === "pc") {
-      const pw = n2(x.piece_weight_g);
-      if (pw > 0 && x.purchase_price != null) return `${fmtMoney((x.purchase_price / pw) * 1000)} €/kg`;
-      const volMl = x.piece_volume_ml;
-      if (volMl != null && volMl > 0 && x.purchase_price != null) {
-        const eurL = (x.purchase_price / volMl) * 1000;
-        return `${fmtMoney(x.purchase_price)} €/${unitLabel(x)} · ${fmtMoney(eurL)} €/L`;
+      if (x.purchase_price != null) {
+        const ul = unitLabel(x);
+        return `${fmtMoney(x.purchase_price)} € ${ul}${content ? ` ${content}` : ""}`;
       }
-      if (x.purchase_price != null) return `${fmtMoney(x.purchase_price)} €/${unitLabel(x)}`;
     }
   }
 
@@ -102,15 +102,10 @@ function fromLegacy(x: IngredientPriceFields): string {
     if (lbl === "g") return `${fmtMoney(pp * 1000)} €/kg`;
     if (lbl === "ml") return `${fmtMoney(pp * 1000)} €/L`;
     if (lbl === "pc") {
-      const pw = n2(x.piece_weight_g);
-      if (pw > 0) return `${fmtMoney((pp / pw) * 1000)} €/kg`;
-      const volMl = x.piece_volume_ml;
-      if (volMl != null && volMl > 0) {
-        return `${fmtMoney(pp)} €/${unitLabel(x)} · ${fmtMoney((pp / volMl) * 1000)} €/L`;
-      }
-      return `${fmtMoney(pp)} €/${unitLabel(x)}`;
+      const ul = unitLabel(x);
+      return `${fmtMoney(pp)} € ${ul}${content ? ` ${content}` : ""}`;
     }
-    // Label inconnu — affiche en €/kg par défaut
+    // Label inconnu — affiche en €/kg par defaut
     return `${fmtMoney(pp)} €/kg`;
   }
 
