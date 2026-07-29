@@ -635,9 +635,13 @@ function MargesPage() {
 
   // Filter trendProducts by sub-category (client-side)
   const filteredTrendProducts = useMemo(() => {
-    if (!trendSubCat) return trendProducts;
-    return trendProducts.filter(p => popinaSubCats[p.name.trim().toLowerCase()] === trendSubCat);
-  }, [trendProducts, trendSubCat, popinaSubCats]);
+    const prods = trendSubCat
+      ? trendProducts.filter(p => popinaSubCats[p.name.trim().toLowerCase()] === trendSubCat)
+      : [...trendProducts];
+    // Sort by current metric
+    prods.sort((a, b) => trendMetric === "qty" ? b.qty - a.qty : b.ca_ht - a.ca_ht);
+    return prods;
+  }, [trendProducts, trendSubCat, popinaSubCats, trendMetric]);
 
   // Aggregate trend data for chart
   const aggregateTrend = useCallback((daily: TrendDaily[], mode: TrendMode, metric: "qty" | "ca_ht") => {
