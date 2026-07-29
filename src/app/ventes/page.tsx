@@ -1780,13 +1780,32 @@ function PerformancesPage() {
               const bCADay = beforeDates.length > 0 ? bCA / beforeDates.length : 0;
               const aCADay = afterDates.length > 0 ? aCA / afterDates.length : 0;
 
+              // Midi / Soir breakdown
+              const svcBySvc = (svcName: string, dates: string[]) => {
+                const svcs = W.services.filter(s => (svcName === "midi" ? s.svc === "midi" : s.svc !== "midi") && dates.includes(s.jour));
+                const ca = svcs.reduce((s, sv) => s + (mode === "ttc" ? sv.ttc : sv.ht), 0);
+                const cov = svcs.reduce((s, sv) => s + sv.cov, 0);
+                return { ca, cov, tm: cov > 0 ? ca / cov : 0, caDay: dates.length > 0 ? ca / dates.length : 0, covDay: dates.length > 0 ? cov / dates.length : 0 };
+              };
+              const bMidi = svcBySvc("midi", beforeDates);
+              const aMidi = svcBySvc("midi", afterDates);
+              const bSoir = svcBySvc("soir", beforeDates);
+              const aSoir = svcBySvc("soir", afterDates);
+
               const pivotLabel = new Date(pivotDate + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 
-              type CompRow = { label: string; before: string; after: string; delta: string; positive: boolean };
+              type CompRow = { label: string; before: string; after: string; delta: string; positive: boolean; bold?: boolean };
+              const mkDelta = (b: number, a: number, suffix = "\u20AC") => `${a >= b ? "+" : ""}${suffix === "\u20AC" ? fmt(Math.round(a - b)) : (a - b).toFixed(1)}${suffix}`;
               const rows: CompRow[] = [
-                { label: "CA / jour", before: `${fmt(bCADay)}\u20AC`, after: `${fmt(aCADay)}\u20AC`, delta: `${aCADay >= bCADay ? "+" : ""}${fmt(Math.round(aCADay - bCADay))}\u20AC`, positive: aCADay >= bCADay },
-                { label: "Couverts / jour", before: `${(bCov / beforeDates.length).toFixed(0)}`, after: `${(aCov / afterDates.length).toFixed(0)}`, delta: `${aCov / afterDates.length >= bCov / beforeDates.length ? "+" : ""}${((aCov / afterDates.length) - (bCov / beforeDates.length)).toFixed(0)}`, positive: aCov / afterDates.length >= bCov / beforeDates.length },
-                { label: "Ticket moyen", before: `${bTM.toFixed(1)}\u20AC`, after: `${aTM.toFixed(1)}\u20AC`, delta: `${aTM >= bTM ? "+" : ""}${(aTM - bTM).toFixed(1)}\u20AC`, positive: aTM >= bTM },
+                { label: "CA / jour", before: `${fmt(bCADay)}\u20AC`, after: `${fmt(aCADay)}\u20AC`, delta: mkDelta(bCADay, aCADay), positive: aCADay >= bCADay, bold: true },
+                { label: "   Midi", before: `${fmt(bMidi.caDay)}\u20AC`, after: `${fmt(aMidi.caDay)}\u20AC`, delta: mkDelta(bMidi.caDay, aMidi.caDay), positive: aMidi.caDay >= bMidi.caDay },
+                { label: "   Soir", before: `${fmt(bSoir.caDay)}\u20AC`, after: `${fmt(aSoir.caDay)}\u20AC`, delta: mkDelta(bSoir.caDay, aSoir.caDay), positive: aSoir.caDay >= bSoir.caDay },
+                { label: "Couverts / jour", before: `${(bCov / beforeDates.length).toFixed(0)}`, after: `${(aCov / afterDates.length).toFixed(0)}`, delta: `${aCov / afterDates.length >= bCov / beforeDates.length ? "+" : ""}${((aCov / afterDates.length) - (bCov / beforeDates.length)).toFixed(0)}`, positive: aCov / afterDates.length >= bCov / beforeDates.length, bold: true },
+                { label: "   Midi", before: `${bMidi.covDay.toFixed(0)}`, after: `${aMidi.covDay.toFixed(0)}`, delta: `${aMidi.covDay >= bMidi.covDay ? "+" : ""}${(aMidi.covDay - bMidi.covDay).toFixed(0)}`, positive: aMidi.covDay >= bMidi.covDay },
+                { label: "   Soir", before: `${bSoir.covDay.toFixed(0)}`, after: `${aSoir.covDay.toFixed(0)}`, delta: `${aSoir.covDay >= bSoir.covDay ? "+" : ""}${(aSoir.covDay - bSoir.covDay).toFixed(0)}`, positive: aSoir.covDay >= bSoir.covDay },
+                { label: "Ticket moyen", before: `${bTM.toFixed(1)}\u20AC`, after: `${aTM.toFixed(1)}\u20AC`, delta: mkDelta(bTM, aTM, "\u20AC"), positive: aTM >= bTM, bold: true },
+                { label: "   Midi", before: `${bMidi.tm.toFixed(1)}\u20AC`, after: `${aMidi.tm.toFixed(1)}\u20AC`, delta: mkDelta(bMidi.tm, aMidi.tm, "\u20AC"), positive: aMidi.tm >= bMidi.tm },
+                { label: "   Soir", before: `${bSoir.tm.toFixed(1)}\u20AC`, after: `${aSoir.tm.toFixed(1)}\u20AC`, delta: mkDelta(bSoir.tm, aSoir.tm, "\u20AC"), positive: aSoir.tm >= bSoir.tm },
               ];
 
               return (
@@ -1798,10 +1817,10 @@ function PerformancesPage() {
                     <div style={{ fontWeight: 700, color: "#999", padding: "6px 0", fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", textAlign: "right" }}>Apres</div>
                     <div style={{ fontWeight: 700, color: "#999", padding: "6px 0", fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", textAlign: "right" }}>Delta</div>
                     {rows.map((r, i) => (<>
-                      <div key={`l${i}`} style={{ padding: "6px 0", fontWeight: 500, borderTop: "1px solid #f0ebe3" }}>{r.label}</div>
-                      <div key={`b${i}`} style={{ padding: "6px 0", textAlign: "right", color: "#777", borderTop: "1px solid #f0ebe3" }}>{r.before}</div>
-                      <div key={`a${i}`} style={{ padding: "6px 0", textAlign: "right", fontWeight: 600, borderTop: "1px solid #f0ebe3" }}>{r.after}</div>
-                      <div key={`d${i}`} style={{ padding: "6px 0", textAlign: "right", fontWeight: 700, color: r.positive ? "#2e7d32" : "#c62828", borderTop: "1px solid #f0ebe3" }}>{r.delta}</div>
+                      <div key={`l${i}`} style={{ padding: "5px 0", fontWeight: r.bold ? 600 : 400, fontSize: r.bold ? 11 : 10, color: r.bold ? "#1a1a1a" : "#888", borderTop: r.bold ? "1px solid #e0d8ce" : "none" }}>{r.label}</div>
+                      <div key={`b${i}`} style={{ padding: "5px 0", textAlign: "right", color: "#777", fontSize: r.bold ? 11 : 10, borderTop: r.bold ? "1px solid #e0d8ce" : "none" }}>{r.before}</div>
+                      <div key={`a${i}`} style={{ padding: "5px 0", textAlign: "right", fontWeight: r.bold ? 700 : 500, fontSize: r.bold ? 11 : 10, borderTop: r.bold ? "1px solid #e0d8ce" : "none" }}>{r.after}</div>
+                      <div key={`d${i}`} style={{ padding: "5px 0", textAlign: "right", fontWeight: 700, fontSize: r.bold ? 11 : 10, color: r.positive ? "#2e7d32" : "#c62828", borderTop: r.bold ? "1px solid #e0d8ce" : "none" }}>{r.delta}</div>
                     </>))}
                   </div>
                   <div style={{ fontSize: 10, color: "#999", marginTop: 8 }}>
