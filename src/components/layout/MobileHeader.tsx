@@ -179,11 +179,10 @@ function UserAvatar() {
   type Item = { label: string; onClick: () => void; danger?: boolean; show: boolean };
   const items: Item[] = [
     { label: "Mon compte", onClick: () => go("/settings/account"), show: true },
+    { label: "Mes conges", onClick: () => go("/rh/conges"), show: true },
     { label: "Etablissements", onClick: () => go("/settings/etablissements"), show: isGroupAdmin },
     { label: "Employes", onClick: () => go("/rh/equipe"), show: isGroupAdmin },
-    { label: "Conges", onClick: () => go("/rh/conges"), show: isGroupAdmin },
     { label: "Fournisseurs", onClick: () => go("/fournisseurs"), show: isGroupAdmin },
-    { label: "Planning", onClick: () => go("/settings/planning"), show: isGroupAdmin },
     { label: "Finance", onClick: () => go("/settings/finance"), show: isGroupAdmin },
   ].filter(i => i.show);
 
