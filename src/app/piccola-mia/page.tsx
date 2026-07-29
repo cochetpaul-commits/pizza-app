@@ -231,7 +231,7 @@ function PiccolaMiaContent() {
   };
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 32px 60px", fontFamily: DM_SANS }}>
+    <div className="dashboard-page" style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 32px 60px", fontFamily: DM_SANS }}>
 
       {/* ── Header + DateRangePicker ── */}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 28, gap: 16, flexWrap: "wrap" }}>
@@ -255,7 +255,7 @@ function PiccolaMiaContent() {
       </div>
 
       {/* ── Main 2-col layout ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 20, marginBottom: 28, alignItems: "start" }}>
+      <div className="dashboard-grid" style={{ display: "grid", gap: 20, marginBottom: 28, alignItems: "start" }}>
         {/* Left */}
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {dailyCa.length > 0 && (
@@ -272,12 +272,12 @@ function PiccolaMiaContent() {
                 {mixCats.map((m, i) => {
                   const pct = ca > 0 ? (m.ca / ca) * 100 : 0;
                   return (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: i < mixCats.length - 1 ? "1px solid rgba(0,0,0,0.04)" : "none" }}>
-                      <span style={{ flex: 1, fontSize: 12, color: T.dark }}>{m.cat}</span>
-                      <span style={{ fontSize: 12, fontWeight: 700, fontFamily: OSWALD, color: T.dark, minWidth: 65, textAlign: "right" }}>{fmtEur(m.ca)} {"\u20AC"}</span>
-                      <span style={{ fontSize: 11, color: T.muted, minWidth: 40, textAlign: "right" }}>{fmtPct(pct)}%</span>
-                      <div style={{ width: 50, height: 5, background: "rgba(0,0,0,0.05)", borderRadius: 3, overflow: "hidden" }}>
-                        <div style={{ width: `${Math.min(pct, 100)}%`, height: "100%", background: COLOR_DARK, borderRadius: 3 }} />
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 0", borderBottom: i < mixCats.length - 1 ? "1px solid rgba(0,0,0,0.04)" : "none" }}>
+                      <span style={{ flex: 1, fontSize: 12, color: T.dark, minWidth: 0 }}>{m.cat}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, fontFamily: OSWALD, color: T.dark, flexShrink: 0 }}>{fmtEur(m.ca)}{"\u00A0"}{"\u20AC"}</span>
+                      <span style={{ fontSize: 10, color: T.muted, flexShrink: 0, width: 38, textAlign: "right" }}>{fmtPct(pct)}%</span>
+                      <div style={{ width: 40, height: 4, background: "rgba(0,0,0,0.05)", borderRadius: 2, overflow: "hidden", flexShrink: 0 }}>
+                        <div style={{ width: `${Math.min(pct, 100)}%`, height: "100%", background: COLOR_DARK, borderRadius: 2 }} />
                       </div>
                     </div>
                   );
@@ -403,7 +403,14 @@ function PiccolaMiaContent() {
         Retour vue groupe
       </Link>
 
-      <style>{`.hover-lift:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.08) !important; transform: translateY(-1px); }`}</style>
+      <style>{`
+        .hover-lift:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.08) !important; transform: translateY(-1px); }
+        .dashboard-grid { grid-template-columns: 1fr 340px; }
+        @media (max-width: 767px) {
+          .dashboard-page { padding: 16px 14px 100px !important; }
+          .dashboard-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </div>
   );
 }
