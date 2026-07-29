@@ -235,12 +235,11 @@ function IconHeart({ active: _active }: { active: boolean }) {
 }
 
 const SECTION_MY_PLANNING: TabSection = {
-  label: "Planning",
-  href: "/mes-shifts",
-  match: ["/mes-shifts"],
+  label: "Conges",
+  href: "/rh/conges",
+  match: ["/rh/conges"],
   icon: (a) => <IconCalendar active={a} />,
   roles: ["group_admin", "manager"],
-  permission: "planning.view_own",
   tabs: [],
 };
 
@@ -390,7 +389,7 @@ function getActiveSection(pathname: string, sections: TabSection[]): TabSection 
 const SECTION_SHORT_LABEL: Record<string, string> = {
   Pilotage: "Pilotage",
   Personnel: "Personnel",
-  Planning: "Planning",
+  Conges: "Conges",
   "Prod.": "Prod.",
   Achats: "Achats",
   HACCP: "HACCP",
