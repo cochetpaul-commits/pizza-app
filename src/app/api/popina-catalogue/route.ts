@@ -95,13 +95,29 @@ export async function POST(req: NextRequest) {
     : type === "cocktail" ? "kitchen_recipes"
     : "ingredients";
 
-  const { data, error } = await supabase
-    .from(table)
-    .select("id, name")
-    .ilike("name", `%${q}%`)
-    .limit(20)
-    .order("name");
+  // Split query into words — match products containing ANY word
+  const words = (q as string).split(/\s+/).filter((w: string) => w.length >= 2);
+  if (words.length === 0) return NextResponse.json([]);
+
+  // Use first word for the DB query, then filter client-side for remaining words
+  let query = supabase.from(table).select("id, name").limit(100).order("name");
+  // Search with first word to narrow results
+  query = query.ilike("name", `%${words[0]}%`);
+  const { data, error } = await query;
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+
+  // Filter: keep items matching at least 1 word (sorted by number of matches)
+  const results = (data ?? [])
+    .map(item => {
+      const lower = item.name.toLowerCase();
+      const matches = words.filter((w: string) => lower.includes(w.toLowerCase())).length;
+      return { ...item, matches };
+    })
+    .filter(item => item.matches > 0)
+    .sort((a, b) => b.matches - a.matches)
+    .slice(0, 20)
+    .map(({ matches: _, ...rest }) => rest);
+
+  return NextResponse.json(results);
 }
