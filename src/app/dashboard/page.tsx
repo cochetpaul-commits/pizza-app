@@ -448,7 +448,7 @@ function GroupContent() {
   });
 
   return (
-    <div style={{ maxWidth: 700, margin: "0 auto", padding: "16px 16px 40px" }}>
+    <div style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 24px 40px" }}>
       {/* ── Hero header ── */}
       <div
         style={{
@@ -602,11 +602,11 @@ function GroupContent() {
         )}
       </div>
 
-      {/* ── KPIs 2x2 ── */}
+      {/* ── KPIs ── */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1fr",
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
           gap: 10,
           marginBottom: 24,
         }}
@@ -715,7 +715,7 @@ function GroupContent() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1fr",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
           gap: 10,
           marginBottom: 24,
         }}
