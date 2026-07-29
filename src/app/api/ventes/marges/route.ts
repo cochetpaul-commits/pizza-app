@@ -252,7 +252,7 @@ export async function GET(req: NextRequest) {
 
   /* ── 3. Filter valid product lines & aggregate by product ── */
   const validRows = allVentes.filter(
-    (r) => r.type_ligne === "Produit" && !r.annule && Number(r.ttc) > 0,
+    (r) => r.type_ligne === "Produit" && !r.annule && Number(r.ttc) > 0 && (r.categorie ?? "").toUpperCase() !== "MESSAGES",
   );
 
   const prodMap = new Map<

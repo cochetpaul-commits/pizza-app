@@ -220,8 +220,9 @@ function normCat(cat: string | null, productName?: string): string {
 }
 
 function aggregate(rows: Row[]) {
-  // IMPORTANT: only use "Produit" lines — ignore "Paiement" and "Total"
-  const productRows = rows.filter(r => r.type_ligne === "Produit");
+  // IMPORTANT: only use "Produit" lines — ignore "Paiement", "Total" and "MESSAGES"
+  const isMessage = (r: Row) => (r.categorie ?? "").toUpperCase() === "MESSAGES";
+  const productRows = rows.filter(r => r.type_ligne === "Produit" && !isMessage(r));
   const validRows = productRows.filter(r => !r.annule && Number(r.ttc) > 0);
   // For couverts/tickets, use all product rows (even annulés) to count orders
   const allRows = productRows;
