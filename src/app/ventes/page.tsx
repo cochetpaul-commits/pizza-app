@@ -669,6 +669,34 @@ function PerformancesPage() {
 
         {(<>
 
+        {/* DateRangePicker mobile — top */}
+        <div className="mobile-only" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginBottom: 10 }}>
+          <button type="button" onClick={() => {
+            const nf = new Date(new Date(range.from + "T12:00:00").getTime() - 86400000);
+            const nt = new Date(new Date(range.to + "T12:00:00").getTime() - 86400000);
+            setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
+          }} style={{
+            width: 30, height: 30, borderRadius: 8, border: "1px solid #e0d8ce",
+            background: "#fff", color: accent, fontSize: 13, fontWeight: 700,
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+          }}>{"<"}</button>
+          <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
+          <button type="button" onClick={() => {
+            const todayStr = new Date().toISOString().slice(0, 10);
+            if (range.from >= todayStr) return;
+            const nf = new Date(new Date(range.from + "T12:00:00").getTime() + 86400000);
+            const nt = new Date(new Date(range.to + "T12:00:00").getTime() + 86400000);
+            setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
+          }} style={{
+            width: 30, height: 30, borderRadius: 8, border: "1px solid #e0d8ce",
+            background: range.from >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : "#fff",
+            color: range.from >= new Date().toISOString().slice(0, 10) ? "#ccc" : accent,
+            fontSize: 13, fontWeight: 700,
+            cursor: range.from >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>{">"}</button>
+        </div>
+
         {/* TTC/HT toggle + actions desktop */}
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
           {showMoney && <div style={{ display: "flex", gap: 0, background: "#f0ebe2", border: "1px solid #e8e0d0", borderRadius: 999, padding: 2 }}>
@@ -2036,12 +2064,13 @@ function PerformancesPage() {
       )}
       </div>
 
-      {/* ── Mobile Bottom Bar: ← date → ── */}
+      {/* ── Mobile Bottom Bar: ← date → (hidden — moved to top) ── */}
       <div className="mobile-only" style={{
+        display: "none",
         position: "fixed",
         bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
         left: 0, right: 0, zIndex: 100,
-        display: "flex", justifyContent: "center",
+        justifyContent: "center",
       }}>
         <div style={{
           height: 44,
