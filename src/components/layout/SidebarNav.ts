@@ -193,6 +193,7 @@ export function buildDynamicNav(
         label: "",
         items: [
           { label: "Établissement", href: "/settings/etablissements", icon: "building" },
+          { label: "Categories", href: "/settings/categories", icon: "tag" },
           { label: "Employés", href: "/settings/employes", icon: "users" },
           { label: "Fournisseurs", href: "/fournisseurs", icon: "truck" },
         ],
