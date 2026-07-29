@@ -12,6 +12,7 @@ import { formatCpuLabel, formatIngredientPriceLine } from "@/lib/formatPrice";
 import type { LatestOffer } from "@/types/ingredients";
 import { compressImage } from "@/lib/compressImage";
 
+import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { fetchApi } from "@/lib/fetchApi";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -108,6 +109,33 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const allLines = useMemo(() => [...preLines, ...postLines], [preLines, postLines]);
+
+  // Cross-list drag handler (avant four ↔ apres four)
+  function onCrossDragEnd(result: DropResult) {
+    const { source, destination } = result;
+    if (!destination) return;
+
+    const srcId = source.droppableId; // "pre" or "post"
+    const dstId = destination.droppableId;
+
+    const srcItems = srcId === "pre" ? [...preLines] : [...postLines];
+    const setSrc = srcId === "pre" ? setPreLines : setPostLines;
+
+    if (srcId === dstId) {
+      // Reorder within same list
+      const [moved] = srcItems.splice(source.index, 1);
+      srcItems.splice(destination.index, 0, moved);
+      setSrc(srcItems.map((item, i) => ({ ...item, sort_order: i })));
+    } else {
+      // Move across lists
+      const dstItems = dstId === "pre" ? [...preLines] : [...postLines];
+      const setDst = dstId === "pre" ? setPreLines : setPostLines;
+      const [moved] = srcItems.splice(source.index, 1);
+      dstItems.splice(destination.index, 0, moved);
+      setSrc(srcItems.map((item, i) => ({ ...item, sort_order: i })));
+      setDst(dstItems.map((item, i) => ({ ...item, sort_order: i })));
+    }
+  }
 
   // Computed allergens
   const computedAllergens = useMemo(() => {
@@ -739,41 +767,44 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                   </div>
                 </div>
 
-                {/* Ingredients Avant four */}
-                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
-                    Ingredients — Avant four
-                  </h3>
-                  <IngredientListDnD
-                    droppableId="pre"
-                    items={preLines}
-                    ingredients={ingredients}
-                    priceByIngredient={priceByIngredient}
-                    units={PIZZA_UNITS}
-                    onChange={setPreLines}
-                    priceLabelByIngredient={priceLabelByIngredient}
-                    pivotId={pivotIngredientId}
-                    onPivotChange={setPivotIngredientId}
-                  />
-                </div>
+                {/* Ingredients Avant four + Apres four — shared drag context */}
+                <DragDropContext onDragEnd={onCrossDragEnd}>
+                  <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
+                    <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
+                      Ingredients — Avant four
+                    </h3>
+                    <IngredientListDnD
+                      droppableId="pre"
+                      items={preLines}
+                      ingredients={ingredients}
+                      priceByIngredient={priceByIngredient}
+                      units={PIZZA_UNITS}
+                      onChange={setPreLines}
+                      priceLabelByIngredient={priceLabelByIngredient}
+                      pivotId={pivotIngredientId}
+                      onPivotChange={setPivotIngredientId}
+                      externalDragContext
+                    />
+                  </div>
 
-                {/* Ingredients Apres four */}
-                <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
-                  <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
-                    Ingredients — Apres four
-                  </h3>
-                  <IngredientListDnD
-                    droppableId="post"
-                    items={postLines}
-                    ingredients={ingredients}
-                    priceByIngredient={priceByIngredient}
-                    units={PIZZA_UNITS}
-                    onChange={setPostLines}
-                    priceLabelByIngredient={priceLabelByIngredient}
-                    pivotId={pivotIngredientId}
-                    onPivotChange={setPivotIngredientId}
-                  />
-                </div>
+                  <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
+                    <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
+                      Ingredients — Apres four
+                    </h3>
+                    <IngredientListDnD
+                      droppableId="post"
+                      items={postLines}
+                      ingredients={ingredients}
+                      priceByIngredient={priceByIngredient}
+                      units={PIZZA_UNITS}
+                      onChange={setPostLines}
+                      priceLabelByIngredient={priceLabelByIngredient}
+                      pivotId={pivotIngredientId}
+                      onPivotChange={setPivotIngredientId}
+                      externalDragContext
+                    />
+                  </div>
+                </DragDropContext>
 
                 {/* Etapes */}
                 <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>

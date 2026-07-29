@@ -25,6 +25,8 @@ interface Props {
   /** id of the pivot ingredient; shows ★/☆ on each row */
   pivotId?: string | null;
   onPivotChange?: (id: string | null) => void;
+  /** When true, skip internal DragDropContext — parent handles it */
+  externalDragContext?: boolean;
 }
 
 function tmpId() {
@@ -87,7 +89,7 @@ function computeCost(line: IngredientLine, cpu: CpuByUnit | undefined, ing?: Ing
 export function IngredientListDnD({
   droppableId = "ingredients",
   items, ingredients, priceByIngredient, units, onChange, priceLabelByIngredient,
-  pivotId, onPivotChange,
+  pivotId, onPivotChange, externalDragContext,
 }: Props) {
   const ingredientOptions: SmartSelectOption[] = ingredients.map(i => {
     const isMaison = i.source === "recette_maison";
@@ -126,9 +128,7 @@ export function IngredientListDnD({
     }]);
   }
 
-  return (
-    <div>
-      <DragDropContext onDragEnd={onDragEnd}>
+  const droppableContent = (
         <Droppable droppableId={droppableId}>
           {(provided) => (
             <div ref={provided.innerRef} {...provided.droppableProps} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -254,7 +254,13 @@ export function IngredientListDnD({
             </div>
           )}
         </Droppable>
-      </DragDropContext>
+  );
+
+  return (
+    <div>
+      {externalDragContext ? droppableContent : (
+        <DragDropContext onDragEnd={onDragEnd}>{droppableContent}</DragDropContext>
+      )}
 
       <button
         type="button"
