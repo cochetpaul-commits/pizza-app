@@ -132,7 +132,7 @@ function PiccolaMiaContent() {
         fetchAllRows(etab.id, monday, ld, "ttc, description"),
         supabase.from("shifts").select("id").eq("date", today).eq("etablissement_id", etab.id),
         supabase.from("commande_sessions").select("id").in("status", ["brouillon", "en_attente", "validee"]).eq("etablissement_id", etab.id),
-        supabase.from("supplier_invoice_lines").select("id", { count: "exact", head: true }).eq("needs_review", true),
+        Promise.resolve({ count: 0 }), // needs_review removed
         supabase.from("events").select("id, name, date, covers, type, status").gte("date", today).order("date").limit(20),
       ]);
 

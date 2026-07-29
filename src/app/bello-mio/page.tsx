@@ -152,7 +152,7 @@ function BelloMioContent() {
         fetchAllRows(etab.id, monday, ld, "ttc, description"),
         supabase.from("shifts").select("id").eq("date", today).eq("etablissement_id", etab.id),
         supabase.from("commande_sessions").select("id").in("status", ["brouillon", "en_attente", "validee"]).eq("etablissement_id", etab.id),
-        supabase.from("supplier_invoice_lines").select("id", { count: "exact", head: true }).eq("needs_review", true),
+        Promise.resolve({ count: 0 }), // needs_review removed
         // Pending deliveries
         supabase.from("commande_sessions").select("status, created_at, suppliers(name)")
           .in("status", ["validee", "en_attente"]).eq("etablissement_id", etab.id).order("created_at", { ascending: false }).limit(5),
