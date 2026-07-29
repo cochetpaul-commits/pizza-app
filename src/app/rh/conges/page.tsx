@@ -1860,9 +1860,6 @@ export default function CongesPage() {
             </div>
           </>
         )}
-        <FloatingActions actions={[
-          { icon: <FAIconPlus size={22} color="#fff" />, label: "Nouvelle demande", onClick: () => calendarRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), primary: true },
-        ]} />
       </div>
     </RequireRole>
   );
