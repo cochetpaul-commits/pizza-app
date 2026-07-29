@@ -134,12 +134,11 @@ function IngredientDetailInner() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Non connecté");
 
-        const ingQuery = supabase.from("ingredients").select("*").eq("id", id).eq("user_id", user.id);
+        const ingQuery = supabase.from("ingredients").select("*").eq("id", id);
 
         const offQuery = supabase.from("supplier_offers")
           .select("id, supplier_id, unit, unit_price, supplier_label, is_active, created_at, establishment, price_kind")
           .eq("ingredient_id", id)
-          .eq("user_id", user.id)
           .not("unit_price", "is", null)
           .order("created_at", { ascending: true });
 
