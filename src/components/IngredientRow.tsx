@@ -575,7 +575,7 @@ export const IngredientRow = React.memo(function IngredientRow({
         };
 
         // ── Pricing helpers (IIFE scope) ──
-        const CONTENT_UNITS = ["cl", "ml", "L", "g", "kg"] as const;
+        const CONTENT_UNITS = ["cl", "ml", "L", "g", "kg", "pcs"] as const;
         const contentToMl = (qty: number, unit: string): number | null => {
           if (unit === "cl") return qty * 10; if (unit === "ml") return qty; if (unit === "L") return qty * 1000; return null;
         };
