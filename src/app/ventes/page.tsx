@@ -2414,8 +2414,6 @@ function RecapTable({ services, mode, meteo, dates, days, useWeeks: useWeeksProp
             const z = mode === "ttc" ? s.z_ttc : s.z_ht;
             const tmSp = mode === "ttc" ? s.tm_sp_ttc : s.tm_sp_ht;
             const bg = di % 2 === 0 ? "#fff" : "#faf7f2";
-            const _tmColor = tmSp >= 80 ? "#2e7d32" : tmSp >= 65 ? "#e65100" : "#c62828";
-            const _tmBg = tmSp >= 80 ? "#e8f5e9" : tmSp >= 65 ? "#fff3e0" : "#ffebee";
             return (
               <tr key={`${group.groupLabel}-${s.jour}-${s.svc}`} style={{ background: bg, borderTop: si === 0 && di > 0 ? "1px solid #e0d8ce" : si > 0 ? "1px solid rgba(0,0,0,.05)" : "none" }}>
                 {si === 0 && <td rowSpan={svcs.length} style={{ padding: "0 16px", fontWeight: 700, fontSize: useWeeks ? 12 : 15, verticalAlign: "middle", borderRight: "1px solid #e0d8ce" }}>{useWeeks ? group.groupLabel : s.jour}</td>}
@@ -2450,6 +2448,49 @@ function RecapTable({ services, mode, meteo, dates, days, useWeeks: useWeeksProp
             );
           });
         })}
+        {/* Total row */}
+        {groups.length > 1 && (() => {
+          const allSvcs = groups.flatMap(g => g.services);
+          const midiSvcs = allSvcs.filter(s => s.svc === "midi");
+          const soirSvcs = allSvcs.filter(s => s.svc !== "midi");
+          const sumZ = (svcs: typeof allSvcs, key: "z_ttc" | "z_ht") => {
+            const r: Record<string, number> = {};
+            for (const s of svcs) for (const [k, v] of Object.entries(s[key] ?? {})) r[k] = (r[k] ?? 0) + v;
+            return r;
+          };
+          const totalRows = [
+            { label: "Midi", svcs: midiSvcs },
+            { label: "Soir", svcs: soirSvcs },
+          ];
+          return totalRows.map((tr, ti) => {
+            const ca = tr.svcs.reduce((s, x) => s + (mode === "ttc" ? x.ttc : x.ht), 0);
+            const cov = tr.svcs.reduce((s, x) => s + x.cov, 0);
+            const spCov = tr.svcs.reduce((s, x) => s + x.sp_cov, 0);
+            const spCa = tr.svcs.reduce((s, x) => s + (mode === "ttc" ? x.sp_ttc : x.sp_ht), 0);
+            const empCov = cov - spCov;
+            const empCa = tr.svcs.reduce((s, x) => s + (mode === "ttc" ? x.emp_ttc : x.emp_ht), 0);
+            const tmSp = spCov > 0 ? spCa / spCov : 0;
+            const tmEmp = empCov > 0 ? empCa / empCov : 0;
+            const z = sumZ(tr.svcs, mode === "ttc" ? "z_ttc" : "z_ht");
+            return (
+              <tr key={`total-${tr.label}`} style={{ background: "#f5f0e8", borderTop: ti === 0 ? "2px solid #d4c8b4" : "1px solid rgba(0,0,0,.05)", fontWeight: 700 }}>
+                {ti === 0 && <td rowSpan={2} style={{ padding: "0 16px", fontWeight: 800, fontSize: 11, verticalAlign: "middle", borderRight: "1px solid #e0d8ce", textTransform: "uppercase", letterSpacing: ".06em", color: "#555" }}>Total</td>}
+                <td style={tdSt}><span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: tr.label === "Midi" ? ZC.Pergolas : "#1a1a1a" }}>{tr.label}</span></td>
+                {zCell(z.Salle, ZC.Salle)}
+                {zCell(z.Pergolas, ZC.Pergolas)}
+                {zCell(z.Terrasse, ZC.Terrasse)}
+                {zCell(z.emp, ZC.emp)}
+                <td style={{ ...tdSt, fontWeight: 700, fontSize: 13, color: "#D4775A" }}>{fmt(ca)}</td>
+                <td style={{ ...tdSt, fontWeight: 700 }}>{cov}</td>
+                <td style={{ ...tdSt, fontSize: 11, fontWeight: 700, color: "#46655a" }}>{spCov || "\u2014"}</td>
+                <td style={tdSt}><span style={{ background: "#46655a18", color: "#46655a", padding: "3px 9px", borderRadius: 5, fontSize: 11, fontWeight: 700 }}>{tmSp.toFixed(0)}{"\u20AC"}</span></td>
+                <td style={{ ...tdSt, fontSize: 11, fontWeight: 700, color: "#D4775A" }}>{empCov > 0 ? empCov : "\u2014"}</td>
+                <td style={tdSt}>{empCov > 0 ? <span style={{ background: "#FFF0EB", color: "#D4775A", padding: "3px 9px", borderRadius: 5, fontSize: 11, fontWeight: 700 }}>{tmEmp.toFixed(0)}{"\u20AC"}</span> : "\u2014"}</td>
+                <td style={{ ...tdSt, textAlign: "center" }}></td>
+              </tr>
+            );
+          });
+        })()}
       </tbody>
     </table>
   );
