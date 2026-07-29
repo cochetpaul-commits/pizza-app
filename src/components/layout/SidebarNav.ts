@@ -162,11 +162,11 @@ export function buildDynamicNav(
     const isPiccola = etab.slug?.includes("piccola");
     const sections: NavSubSection[] = [
       PILOTAGE_SECTION,
-      PERSONNEL_SECTION,
       isPiccola ? PRODUCTION_SECTION_PICCOLA : PRODUCTION_SECTION,
       isPiccola ? ACHATS_SECTION_PICCOLA : ACHATS_SECTION,
       HACCP_SECTION,
       ...(isPiccola ? [EVENEMENTIEL_SECTION] : []),
+      PERSONNEL_SECTION,
     ];
 
     entries.push({

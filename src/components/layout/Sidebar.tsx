@@ -116,11 +116,11 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       ? []  // Vue groupe = pas de sections, juste le dashboard
       : [   // Établissement = toutes les sections
           PILOTAGE_SECTION,
-          PERSONNEL_SECTION,
           isPiccola ? PRODUCTION_SECTION_PICCOLA : PRODUCTION_SECTION,
           isPiccola ? ACHATS_SECTION_PICCOLA : ACHATS_SECTION,
           HACCP_SECTION,
           ...(isPiccola ? [EVENEMENTIEL_SECTION] : []),
+          PERSONNEL_SECTION,
         ]
     : [];
 
@@ -414,11 +414,11 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
               const etabSections: NavSubSection[] = [
                 PILOTAGE_SECTION,
-                PERSONNEL_SECTION,
                 isPiccolaEtab ? PRODUCTION_SECTION_PICCOLA : PRODUCTION_SECTION,
                 isPiccolaEtab ? ACHATS_SECTION_PICCOLA : ACHATS_SECTION,
                 HACCP_SECTION,
                 ...(isPiccolaEtab ? [EVENEMENTIEL_SECTION] : []),
+                PERSONNEL_SECTION,
               ];
 
               return (
