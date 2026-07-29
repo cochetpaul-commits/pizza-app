@@ -1426,71 +1426,121 @@ function PerformancesPage() {
               );
             })()}
 
-            {/* Taux de remplissage + Panier decompose */}
+            {/* Taux de remplissage + Panier decompose midi/soir */}
             {(W.cov_midi || W.cov_soir) && W.dates.length > 0 && (() => {
+              // Zone capacities (hors Salon = limonade uniquement)
+              const ZONE_CAPS: Record<string, number> = { "Salle": 47, "Pergolas": 20, "Terrasse": 49 };
+              const TOTAL_CAP = 116; // 47 + 20 + 49
+
+              // Compute capacity based on which zones were active each day
               const nbDays = W.dates.length;
-              const capMidi = objectifs["capacite_midi"]?.valeur;
-              const capSoir = objectifs["capacite_soir"]?.valeur;
-              const covMidiDay = nbDays > 0 ? (W.cov_midi ?? 0) / nbDays : 0;
-              const covSoirDay = nbDays > 0 ? (W.cov_soir ?? 0) / nbDays : 0;
-              const rempMidi = capMidi ? Math.round(covMidiDay / capMidi * 100) : null;
-              const rempSoir = capSoir ? Math.round(covSoirDay / capSoir * 100) : null;
-              // Panier decompose
+              // Check which zones had CA > 0 during the period
+              const activeZones = Object.keys(W.zones_ttc).filter(z => {
+                const vals = W.zones_ttc[z];
+                return vals && vals.some(v => v > 0) && ZONE_CAPS[z] != null;
+              });
+              const activeCap = activeZones.length > 0
+                ? activeZones.reduce((s, z) => s + (ZONE_CAPS[z] ?? 0), 0)
+                : TOTAL_CAP;
+
+              const covMidi = W.cov_midi ?? 0;
+              const covSoir = W.cov_soir ?? 0;
+              const covMidiDay = nbDays > 0 ? covMidi / nbDays : 0;
+              const covSoirDay = nbDays > 0 ? covSoir / nbDays : 0;
+              const rempMidi = activeCap > 0 ? Math.round(covMidiDay / activeCap * 100) : null;
+              const rempSoir = activeCap > 0 ? Math.round(covSoirDay / activeCap * 100) : null;
+              const rempTotal = activeCap > 0 && nbDays > 0 ? Math.round(((covMidi + covSoir) / nbDays) / activeCap * 100) : null;
+
+              // Panier moyen midi/soir from services data
+              const midiSvcs = W.services.filter(s => s.svc === "midi");
+              const soirSvcs = W.services.filter(s => s.svc !== "midi");
+              const covMidiTotal = midiSvcs.reduce((s, sv) => s + sv.cov, 0) || 1;
+              const covSoirTotal = soirSvcs.reduce((s, sv) => s + sv.cov, 0) || 1;
+              const caMidi = midiSvcs.reduce((s, sv) => s + (mode === "ttc" ? sv.ttc : sv.ht), 0);
+              const caSoir = soirSvcs.reduce((s, sv) => s + (mode === "ttc" ? sv.ttc : sv.ht), 0);
+              const tmMidi = caMidi / covMidiTotal;
+              const tmSoir = caSoir / covSoirTotal;
+
+              // Global food/drink per cover
               const totalCov = W.couverts || 1;
-              const ca = mode === "ttc" ? W.ca_ttc : W.ca_ht;
               const foodPerCov = (W.food_ttc ?? 0) > 0 ? ((mode === "ttc" ? W.food_ttc! : W.food_ht!) / totalCov) : null;
               const drinkPerCov = (W.drink_ttc ?? 0) > 0 ? ((mode === "ttc" ? W.drink_ttc! : W.drink_ht!) / totalCov) : null;
-              const tmGlobal = ca / totalCov;
-              if (!rempMidi && !rempSoir && !foodPerCov) return null;
+
+              const rempColor = (pct: number) => pct >= 80 ? "#2e7d32" : pct >= 50 ? "#D97706" : "#DC2626";
+              const OSWALD_F = "var(--font-oswald), Oswald, sans-serif";
+
               return (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 6 }}>
                   {/* Remplissage */}
-                  {(rempMidi || rempSoir) && (
-                    <div style={S.card}>
-                      <div style={S.sec}>Taux de remplissage</div>
-                      {rempMidi != null && (
-                        <div style={{ marginBottom: 8 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                            <span style={{ fontSize: 11, color: "#777" }}>Midi</span>
-                            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif", color: rempMidi >= 80 ? "#2e7d32" : rempMidi >= 50 ? "#D97706" : "#DC2626" }}>{rempMidi}%</span>
-                          </div>
-                          <div style={{ height: 6, background: "#f0ebe3", borderRadius: 3, overflow: "hidden" }}>
-                            <div style={{ height: "100%", width: `${Math.min(100, rempMidi)}%`, background: rempMidi >= 80 ? "#2e7d32" : rempMidi >= 50 ? "#D97706" : "#DC2626", borderRadius: 3 }} />
-                          </div>
-                          <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>{covMidiDay.toFixed(0)} / {capMidi} cvt/j</div>
-                        </div>
-                      )}
-                      {rempSoir != null && (
-                        <div>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                            <span style={{ fontSize: 11, color: "#777" }}>Soir</span>
-                            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif", color: rempSoir >= 80 ? "#2e7d32" : rempSoir >= 50 ? "#D97706" : "#DC2626" }}>{rempSoir}%</span>
-                          </div>
-                          <div style={{ height: 6, background: "#f0ebe3", borderRadius: 3, overflow: "hidden" }}>
-                            <div style={{ height: "100%", width: `${Math.min(100, rempSoir)}%`, background: rempSoir >= 80 ? "#2e7d32" : rempSoir >= 50 ? "#D97706" : "#DC2626", borderRadius: 3 }} />
-                          </div>
-                          <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>{covSoirDay.toFixed(0)} / {capSoir} cvt/j</div>
-                        </div>
-                      )}
+                  <div style={S.card}>
+                    <div style={S.sec}>Taux de remplissage</div>
+                    <div style={{ fontSize: 10, color: "#999", marginBottom: 8 }}>
+                      Capacite : {activeCap} places ({activeZones.join(" + ") || "toutes zones"})
                     </div>
-                  )}
-                  {/* Panier decompose */}
-                  {foodPerCov != null && (
-                    <div style={S.card}>
-                      <div style={S.sec}>Panier moyen decompose</div>
-                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color: "#1a1a1a", marginBottom: 8 }}>{tmGlobal.toFixed(1)}{"\u20AC"}<span style={{ fontSize: 12, color: "#999", fontWeight: 400 }}> / couvert</span></div>
-                      <div style={{ display: "flex", gap: 0 }}>
-                        <div style={{ flex: 1, textAlign: "center", borderRight: "1px solid #f0ebe3" }}>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: "#8a6b3e", textTransform: "uppercase", letterSpacing: ".06em" }}>Food</div>
-                          <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>{foodPerCov.toFixed(1)}{"\u20AC"}</div>
+                    {rempMidi != null && (
+                      <div style={{ marginBottom: 8 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                          <span style={{ fontSize: 11, color: "#777" }}>Midi</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, fontFamily: OSWALD_F, color: rempColor(rempMidi) }}>{rempMidi}%</span>
                         </div>
-                        <div style={{ flex: 1, textAlign: "center" }}>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: "#5e8278", textTransform: "uppercase", letterSpacing: ".06em" }}>Boissons</div>
-                          <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 18, fontWeight: 700 }}>{drinkPerCov?.toFixed(1) ?? "0"}{"\u20AC"}</div>
+                        <div style={{ height: 6, background: "#f0ebe3", borderRadius: 3, overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${Math.min(100, rempMidi)}%`, background: rempColor(rempMidi), borderRadius: 3 }} />
                         </div>
+                        <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>{covMidiDay.toFixed(0)} / {activeCap} cvt/j</div>
+                      </div>
+                    )}
+                    {rempSoir != null && (
+                      <div style={{ marginBottom: 8 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                          <span style={{ fontSize: 11, color: "#777" }}>Soir</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, fontFamily: OSWALD_F, color: rempColor(rempSoir) }}>{rempSoir}%</span>
+                        </div>
+                        <div style={{ height: 6, background: "#f0ebe3", borderRadius: 3, overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${Math.min(100, rempSoir)}%`, background: rempColor(rempSoir), borderRadius: 3 }} />
+                        </div>
+                        <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>{covSoirDay.toFixed(0)} / {activeCap} cvt/j</div>
+                      </div>
+                    )}
+                    {rempTotal != null && (
+                      <div style={{ borderTop: "1px solid #f0ebe3", paddingTop: 6 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: "#555" }}>Total jour</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, fontFamily: OSWALD_F, color: rempColor(rempTotal) }}>{rempTotal}%</span>
+                        </div>
+                        <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>{((covMidi + covSoir) / nbDays).toFixed(0)} / {activeCap} cvt/j</div>
+                      </div>
+                    )}
+                  </div>
+                  {/* Panier moyen midi / soir */}
+                  <div style={S.card}>
+                    <div style={S.sec}>Panier moyen decompose</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, marginBottom: 10 }}>
+                      <div style={{ textAlign: "center", borderRight: "1px solid #f0ebe3", paddingBottom: 8 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#5e8278", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>Midi</div>
+                        <div style={{ fontFamily: OSWALD_F, fontSize: 22, fontWeight: 700, color: "#1a1a1a" }}>{tmMidi.toFixed(1)}{"\u20AC"}</div>
+                        <div style={{ fontSize: 10, color: "#999" }}>{midiSvcs.reduce((s, sv) => s + sv.cov, 0)} cvt</div>
+                      </div>
+                      <div style={{ textAlign: "center", paddingBottom: 8 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#1a1a1a", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>Soir</div>
+                        <div style={{ fontFamily: OSWALD_F, fontSize: 22, fontWeight: 700, color: "#1a1a1a" }}>{tmSoir.toFixed(1)}{"\u20AC"}</div>
+                        <div style={{ fontSize: 10, color: "#999" }}>{soirSvcs.reduce((s, sv) => s + sv.cov, 0)} cvt</div>
                       </div>
                     </div>
-                  )}
+                    {foodPerCov != null && (
+                      <div style={{ borderTop: "1px solid #f0ebe3", paddingTop: 8 }}>
+                        <div style={{ display: "flex", gap: 0 }}>
+                          <div style={{ flex: 1, textAlign: "center", borderRight: "1px solid #f0ebe3" }}>
+                            <div style={{ fontSize: 9, fontWeight: 700, color: "#8a6b3e", textTransform: "uppercase", letterSpacing: ".06em" }}>Food</div>
+                            <div style={{ fontFamily: OSWALD_F, fontSize: 16, fontWeight: 700 }}>{foodPerCov.toFixed(1)}{"\u20AC"}</div>
+                          </div>
+                          <div style={{ flex: 1, textAlign: "center" }}>
+                            <div style={{ fontSize: 9, fontWeight: 700, color: "#5e8278", textTransform: "uppercase", letterSpacing: ".06em" }}>Boissons</div>
+                            <div style={{ fontFamily: OSWALD_F, fontSize: 16, fontWeight: 700 }}>{drinkPerCov?.toFixed(1) ?? "0"}{"\u20AC"}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })()}
