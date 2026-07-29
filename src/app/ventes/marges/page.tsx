@@ -1736,14 +1736,6 @@ function MargesPage() {
               </div>
             </div>
 
-            {/* ── IA Conseils marge ── */}
-            <AiInsightCard
-              type="margin"
-              label="Conseils marge IA"
-              icon={"\uD83D\uDCC8"}
-              color="#c4a882"
-            />
-
             {/* ── Menu Engineering ── */}
             {(() => {
               const matched = data.products.filter(

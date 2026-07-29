@@ -674,10 +674,6 @@ function GroupContent() {
         ))}
       </div>
 
-      {/* ── IA ── */}
-      <SectionTitle style={{ marginBottom: 12 }}>Intelligence artificielle</SectionTitle>
-      <AiInsightCard type="trends" label="Analyse des tendances" icon={"\uD83D\uDCC9"} color="#5e7a8a" />
-
       {/* Hover lift CSS */}
       <style>{`
         .hover-lift:hover {
