@@ -139,7 +139,7 @@ export const PERSONNEL_SECTION: NavSubSection = { label: "Personnel", icon: "use
 export const PRODUCTION_SECTION: NavSubSection = { label: "Production", icon: "package", roles: ["group_admin", "manager", "equipier"], items: PRODUCTION_ITEMS };
 export const PRODUCTION_SECTION_PICCOLA: NavSubSection = { label: "Production", icon: "package", roles: ["group_admin", "manager", "equipier"], items: PRODUCTION_ITEMS_PICCOLA };
 export const ACHATS_SECTION: NavSubSection = { label: "Achats", icon: "shoppingBag", roles: ["group_admin", "manager", "equipier"], items: ACHATS_ITEMS };
-export const HACCP_SECTION: NavSubSection = { label: "HACCP", icon: "clipboard", href: "/haccp", items: HACCP_ITEMS };
+export const HACCP_SECTION: NavSubSection = { label: "HACCP", icon: "clipboard", items: HACCP_ITEMS };
 export const EVENEMENTIEL_SECTION: NavSubSection = { label: "Evenementiel", icon: "calendarEvent", items: EVENEMENTIEL_ITEMS };
 
 // Backward compat
