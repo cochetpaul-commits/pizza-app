@@ -302,11 +302,15 @@ export const IngredientRow = React.memo(function IngredientRow({
   const canValidate = hasPrice;
   const alg = parseAllergens(x.allergens);
   const sb = stBadge(st);
+  const pul = (x.purchase_unit_label ?? "").toLowerCase();
+  const shortUnit = pul.includes("bouteille") || pul === "btl" || pul === "bt" ? "btl"
+    : pul.includes("carton") ? "crt" : pul.includes("sachet") ? "sac"
+    : pul.includes("fut") || pul.includes("fût") ? "fût" : pul ? pul.slice(0, 4) : "pc";
   const condInfo = offer?.density_kg_per_l != null ? `${fmtQty(offer.density_kg_per_l)} kg/L`
-    : offer?.piece_weight_g != null ? `${fmtQty(offer.piece_weight_g)} g/pc`
-    : x.piece_volume_ml != null ? fmtVolume(x.piece_volume_ml) + "/pc"
+    : offer?.piece_weight_g != null ? `${fmtQty(offer.piece_weight_g)} g/${shortUnit}`
+    : x.piece_volume_ml != null ? fmtVolume(x.piece_volume_ml) + `/${shortUnit}`
     : x.purchase_unit_name === "l" ? `${x.density_g_per_ml ?? 1} kg/L`
-    : x.piece_weight_g ? `${x.piece_weight_g} g/pc` : "—";
+    : x.piece_weight_g ? `${x.piece_weight_g} g/${shortUnit}` : "—";
 
   const catAccent = CAT_COLORS[x.category];
 
