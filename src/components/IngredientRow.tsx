@@ -448,63 +448,69 @@ export const IngredientRow = React.memo(function IngredientRow({
         style={{ padding: "12px 14px", background: "white", cursor: "pointer" }}
       >
         {compactMode ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{ fontWeight: 600, fontSize: 13, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: CAT_COLORS[x.category] }}>{x.name}</div>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", flexShrink: 0, whiteSpace: "pre-line" }}>{price}</span>
-            {alert && <span style={{ fontSize: 10, color: alert.direction === "up" ? "#DC2626" : "#16A34A", flexShrink: 0 }}>{alert.direction === "up" ? "↑" : "↓"}</span>}
-            {isEditing && <button onClick={(e) => { e.stopPropagation(); onSaveEdit(); }} style={{ ...BTN_ACTION, background: "#4a6741", color: "white", fontSize: 10, fontWeight: 700 }}>{st !== "validated" ? "✓" : "OK"}</button>}
-            {!isEditing && <button onClick={(e) => { e.stopPropagation(); onDelete(x.id, x.name); }} style={{ ...BTN_ACTION, background: "rgba(220,38,38,0.10)", color: "#DC2626" }}>✕</button>}
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", flexShrink: 0, whiteSpace: "nowrap" }}>{price}</span>
+            {alert && <span style={{ fontSize: 10, color: alert.direction === "up" ? "#DC2626" : "#16A34A", flexShrink: 0 }}>{alert.direction === "up" ? "+" : "-"}{(Math.abs(alert.change_pct) * 100).toFixed(0)}%</span>}
+            {isEditing && <button onClick={(e) => { e.stopPropagation(); onSaveEdit(); }} style={{ ...BTN_ACTION, background: "#4a6741", color: "white", fontSize: 10, fontWeight: 700 }}>{st !== "validated" ? "OK" : "OK"}</button>}
+            {!isEditing && <button onClick={(e) => { e.stopPropagation(); onDelete(x.id, x.name); }} style={{ ...BTN_ACTION, background: "rgba(220,38,38,0.10)", color: "#DC2626" }}>x</button>}
           </div>
         ) : (
           <>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-              <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={36} editable />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ fontWeight: 600, fontSize: 13, color: CAT_COLORS[x.category] }}>{x.name}</span>
-                  {x.sub_category && <span style={{ fontSize: 9, fontWeight: 600, padding: "1px 5px", borderRadius: 4, background: `${CAT_COLORS[x.category]}15`, color: CAT_COLORS[x.category], marginLeft: 2 }}>{x.sub_category}</span>}
-                  {x.is_derived && <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED" }}>DÉRIVÉ</span>}
-                </div>
-                <div style={{ fontSize: 10, color: "#999999", marginTop: 2 }}>
-                  <span style={{ fontFamily: "monospace", color: "#bbb" }}>{x.id.slice(0, 8)}</span>
-                  {" · "}{supplierName || CAT_LABELS[x.category]}
-                  {x.status_note ? ` · ${x.status_note}` : ""}
-                  {x.is_derived && x.rendement ? ` · ${(x.rendement * 100).toFixed(1)}%` : ""}
-                </div>
-                {alg.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 4 }}>
-                    {alg.map(a => (
-                      <span key={a} style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "rgba(220,38,38,0.08)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.18)" }}>
-                        {ALLERGEN_SHORT[a as keyof typeof ALLERGEN_SHORT] ?? a}
-                      </span>
-                    ))}
-                  </div>
-                )}
+            {/* Row 1: Avatar + Name (truncated) + Price */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={32} editable />
+              <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+                <div style={{
+                  fontWeight: 600, fontSize: 13, color: CAT_COLORS[x.category],
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>{x.name}</div>
               </div>
-              <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", whiteSpace: "pre-line" }}>{price}</div>
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 999, background: sb.bg, color: sb.color, display: "inline-block", marginTop: 3 }}>{sb.label}</span>
-                {alert && <div style={{ fontSize: 10, fontWeight: 800, color: alert.direction === "up" ? "#DC2626" : "#16A34A", marginTop: 2 }}>{alert.direction === "up" ? "↑" : "↓"} {(Math.abs(alert.change_pct) * 100).toFixed(0)}%</div>}
-                {priceComparison && !priceComparison.isCheapest && priceComparison.cheapestName && (
-                  <div style={{ fontSize: 9, color: "#16A34A", fontWeight: 600, marginTop: 2 }}>
-                    - cher : {priceComparison.cheapestName}
-                  </div>
-                )}
-                {priceComparison && priceComparison.isCheapest && priceComparison.count > 1 && (
-                  <div style={{ fontSize: 9, color: "#16A34A", fontWeight: 600, marginTop: 2 }}>
-                    Meilleur prix
-                  </div>
-                )}
+              <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 4 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap" }}>{price}</div>
               </div>
             </div>
-            {!hasPrice && <div style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", marginTop: 4 }}>prix manquant</div>}
+            {/* Row 2: Meta info */}
+            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, flexWrap: "wrap", paddingLeft: 42 }}>
+              {x.sub_category && <span style={{ fontSize: 9, fontWeight: 600, padding: "1px 5px", borderRadius: 4, background: `${CAT_COLORS[x.category]}12`, color: CAT_COLORS[x.category] }}>{x.sub_category}</span>}
+              {x.is_derived && <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED" }}>DERIVE</span>}
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 999, background: sb.bg, color: sb.color }}>{sb.label}</span>
+              {alert && <span style={{ fontSize: 9, fontWeight: 700, color: alert.direction === "up" ? "#DC2626" : "#16A34A" }}>{alert.direction === "up" ? "+" : "-"}{(Math.abs(alert.change_pct) * 100).toFixed(0)}%</span>}
+              <span style={{ fontSize: 10, color: "#aaa" }}>{supplierName || CAT_LABELS[x.category]}</span>
+            </div>
+            {/* Row 3: Price comparison */}
+            {priceComparison && (
+              <div style={{ paddingLeft: 42, marginTop: 3 }}>
+                {!priceComparison.isCheapest && priceComparison.cheapestName ? (
+                  <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600 }}>
+                    Moins cher chez {priceComparison.cheapestName} ({priceComparison.cheapest.unit_price!.toFixed(2)}{"\u00A0"}{"\u20AC"}/{priceComparison.cheapest.unit ?? "kg"})
+                  </span>
+                ) : priceComparison.count > 1 ? (
+                  <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600 }}>
+                    Meilleur prix ({priceComparison.count} fournisseurs)
+                  </span>
+                ) : null}
+              </div>
+            )}
+            {/* Allergenes */}
+            {alg.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 4, paddingLeft: 42 }}>
+                {alg.map(a => (
+                  <span key={a} style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "rgba(220,38,38,0.08)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.18)" }}>
+                    {ALLERGEN_SHORT[a as keyof typeof ALLERGEN_SHORT] ?? a}
+                  </span>
+                ))}
+              </div>
+            )}
+            {!hasPrice && <div style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", marginTop: 4, paddingLeft: 42 }}>prix manquant</div>}
+            {/* Actions */}
             {!isEditing && (
               <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                 {st !== "validated" && <button onClick={(e) => { e.stopPropagation(); if (!canValidate) return; onSetStatus(x.id, "validated"); }} disabled={!canValidate} style={{ flex: 1, height: 30, borderRadius: 7, border: "1px solid #4a6741", background: "rgba(74,103,65,0.08)", fontSize: 11, fontWeight: 700, cursor: canValidate ? "pointer" : "not-allowed", color: "#4a6741", opacity: !canValidate ? 0.4 : 1 }}>Valider</button>}
                 {!x.is_derived && onCreateDerived && (
-                  <button onClick={(e) => { e.stopPropagation(); onCreateDerived(x); }} title="Créer un dérivé" style={{ width: 30, height: 30, borderRadius: 7, border: "1px solid rgba(124,58,237,0.25)", background: "rgba(124,58,237,0.08)", color: "#7C3AED", fontSize: 13, cursor: "pointer" }}>⚗</button>
+                  <button onClick={(e) => { e.stopPropagation(); onCreateDerived(x); }} title="Creer un derive" style={{ width: 30, height: 30, borderRadius: 7, border: "1px solid rgba(124,58,237,0.25)", background: "rgba(124,58,237,0.08)", color: "#7C3AED", fontSize: 13, cursor: "pointer" }}>*</button>
                 )}
-                <button onClick={(e) => { e.stopPropagation(); onDelete(x.id, x.name); }} style={{ width: 30, height: 30, borderRadius: 7, border: "none", background: "rgba(220,38,38,0.10)", color: "#DC2626", fontSize: 14, cursor: "pointer" }}>✕</button>
+                <button onClick={(e) => { e.stopPropagation(); onDelete(x.id, x.name); }} style={{ width: 30, height: 30, borderRadius: 7, border: "none", background: "rgba(220,38,38,0.10)", color: "#DC2626", fontSize: 14, cursor: "pointer" }}>x</button>
               </div>
             )}
           </>
