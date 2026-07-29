@@ -229,6 +229,65 @@ function IngredientsPageInner() {
 
   const filterActive = filterCategory !== "all" || filterSupplier !== "all";
 
+  // Multi-select
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const toggleSelect = (id: string) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const selectAll = () => {
+    const allIds = filtered.map(i => i.id);
+    setSelectedIds(prev => prev.size === allIds.length ? new Set() : new Set(allIds));
+  };
+  const clearSelection = () => setSelectedIds(new Set());
+
+  // Bulk actions
+  const [bulkCatTarget, setBulkCatTarget] = useState("");
+  const [bulkSubCatTarget, setBulkSubCatTarget] = useState("");
+  const [bulkActing, setBulkActing] = useState(false);
+
+  const bulkChangeCategory = async () => {
+    if (!bulkCatTarget || selectedIds.size === 0) return;
+    setBulkActing(true);
+    const ids = [...selectedIds];
+    const update: Record<string, unknown> = { category: bulkCatTarget };
+    if (bulkSubCatTarget) update.sub_category = bulkSubCatTarget;
+    const { error } = await supabase.from("ingredients").update(update).in("id", ids);
+    if (error) { alert(error.message); setBulkActing(false); return; }
+    mutate();
+    clearSelection();
+    setBulkCatTarget("");
+    setBulkSubCatTarget("");
+    setBulkActing(false);
+  };
+
+  const bulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Supprimer ${selectedIds.size} produit(s) ? Les produits utilises dans des recettes seront ignores.`)) return;
+    setBulkActing(true);
+    let deleted = 0;
+    for (const id of selectedIds) {
+      // Check usage in recipes
+      const checks = await Promise.all([
+        supabase.from("kitchen_recipe_lines").select("id", { count: "exact", head: true }).eq("ingredient_id", id),
+        supabase.from("prep_recipe_lines").select("id", { count: "exact", head: true }).eq("ingredient_id", id),
+        supabase.from("recipe_ingredients").select("id", { count: "exact", head: true }).eq("ingredient_id", id),
+      ]);
+      if (checks.some(c => (c.count ?? 0) > 0)) continue; // skip used ingredients
+      await Promise.all([
+        supabase.from("commande_lignes").delete().eq("ingredient_id", id),
+        supabase.from("supplier_invoice_lines").delete().eq("ingredient_id", id),
+        supabase.from("supplier_offers").delete().eq("ingredient_id", id),
+      ]);
+      await supabase.from("ingredients").delete().eq("id", id);
+      deleted++;
+    }
+    if (deleted > 0) mutate();
+    clearSelection();
+    setBulkActing(false);
+  };
+
   const [compactMode, setCompactMode] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("ingredients:compactMode") === "1";
@@ -1287,7 +1346,18 @@ function IngredientsPageInner() {
                       const showSubHeader = hasSubCats && x.sub_category !== lastSubCat;
                       lastSubCat = x.sub_category;
                       return (
-                        <div key={x.id} id={`ing-${x.id}`}>
+                        <div key={x.id} id={`ing-${x.id}`} style={{ display: "flex", alignItems: "flex-start", gap: 0 }}>
+                          {userCanWrite && (
+                            <div style={{ paddingTop: showSubHeader ? 30 : 12, paddingLeft: 4, paddingRight: 2, flexShrink: 0 }}>
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.has(x.id)}
+                                onChange={() => toggleSelect(x.id)}
+                                style={{ width: 16, height: 16, accentColor: "#D4775A", cursor: "pointer" }}
+                              />
+                            </div>
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
                           {showSubHeader && (
                             <div style={{ padding: "8px 16px 4px", fontSize: 10, fontWeight: 700, color: CAT_COLORS[cat] ?? "#999", textTransform: "uppercase", letterSpacing: "0.06em", borderTop: lastSubCat !== undefined ? "1px solid rgba(0,0,0,0.04)" : "none" }}>
                               {x.sub_category ?? "Autre"}
@@ -1318,6 +1388,7 @@ function IngredientsPageInner() {
                             onMergeDuplicate={userCanWrite ? handleMergeDuplicate : undefined}
                             subCategorySuggestions={subCategorySuggestions}
                           />
+                          </div>
                         </div>
                       );
                     });
@@ -1694,6 +1765,72 @@ function IngredientsPageInner() {
           )}
         </div>
       </BottomSheet>
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div style={{
+          position: "fixed", bottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
+          left: 12, right: 12, zIndex: 150,
+          background: "rgba(26,26,26,0.92)", backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          borderRadius: 16, padding: "12px 16px",
+          display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+          color: "#fff",
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+            {selectedIds.size} selectionne{selectedIds.size > 1 ? "s" : ""}
+          </span>
+
+          {/* Change category */}
+          <select value={bulkCatTarget} onChange={e => setBulkCatTarget(e.target.value)} style={{
+            padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.2)",
+            background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: 12,
+          }}>
+            <option value="">Categorie...</option>
+            {CATEGORIES.map(c => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
+          </select>
+          {bulkCatTarget && (
+            <input
+              value={bulkSubCatTarget}
+              onChange={e => setBulkSubCatTarget(e.target.value)}
+              placeholder="Sous-cat. (optionnel)"
+              style={{
+                padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.2)",
+                background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: 12, width: 130,
+              }}
+            />
+          )}
+          {bulkCatTarget && (
+            <button onClick={bulkChangeCategory} disabled={bulkActing} style={{
+              padding: "6px 14px", borderRadius: 8, border: "none",
+              background: "#4a6741", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
+              opacity: bulkActing ? 0.5 : 1,
+            }}>
+              Deplacer
+            </button>
+          )}
+
+          <div style={{ flex: 1 }} />
+
+          {/* Delete */}
+          <button onClick={bulkDelete} disabled={bulkActing} style={{
+            padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(220,38,38,0.4)",
+            background: "rgba(220,38,38,0.15)", color: "#fca5a5", fontSize: 12, fontWeight: 700,
+            cursor: "pointer", opacity: bulkActing ? 0.5 : 1,
+          }}>
+            Supprimer
+          </button>
+
+          {/* Clear */}
+          <button onClick={clearSelection} style={{
+            padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.2)",
+            background: "transparent", color: "#999", fontSize: 11, cursor: "pointer",
+          }}>
+            Annuler
+          </button>
+        </div>
+      )}
     </div>
   );
 }
