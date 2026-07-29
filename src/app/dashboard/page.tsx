@@ -362,7 +362,7 @@ function GroupContent() {
   const prevLabel = period === "semaine" ? "sem. prec." : period === "mois" ? "mois prec." : "exercice prec.";
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 32px 60px", fontFamily: DM_SANS }}>
+    <div className="dashboard-page" style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 32px 60px", fontFamily: DM_SANS }}>
 
       {/* ── Hero + Period controls ── */}
       <div style={{
@@ -432,8 +432,8 @@ function GroupContent() {
       </div>
 
       {/* ── KPIs row ── */}
-      <div style={{
-        display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
+      <div className="kpi-grid" style={{
+        display: "grid",
         gap: 12, marginBottom: 28,
       }}>
         <KpiCard
@@ -474,8 +474,8 @@ function GroupContent() {
       </div>
 
       {/* ── Main content: 2 columns ── */}
-      <div style={{
-        display: "grid", gridTemplateColumns: "1fr 380px",
+      <div className="dashboard-grid" style={{
+        display: "grid",
         gap: 20, marginBottom: 28, alignItems: "start",
       }}>
         {/* Left: Chart + Etabs */}
@@ -683,6 +683,13 @@ function GroupContent() {
         .hover-lift:hover {
           box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06) !important;
           transform: translateY(-1px);
+        }
+        .kpi-grid { grid-template-columns: repeat(4, 1fr); }
+        .dashboard-grid { grid-template-columns: 1fr 380px; }
+        @media (max-width: 767px) {
+          .dashboard-page { padding: 16px 14px 100px !important; }
+          .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .dashboard-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
     </div>
