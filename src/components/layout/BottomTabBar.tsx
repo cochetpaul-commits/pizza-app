@@ -344,8 +344,14 @@ const SECTION_HACCP: TabSection = {
   ],
 };
 
+const SECTION_ACHATS_PICCOLA: TabSection = {
+  ...SECTION_ACHATS,
+  tabs: SECTION_ACHATS.tabs.filter(t => t.href !== "/admin/popina-catalogue"),
+  match: SECTION_ACHATS.match.filter(m => m !== "/admin/popina-catalogue"),
+};
+
 const SECTIONS_BELLO: TabSection[] = [SECTION_PILOTAGE, SECTION_MY_PLANNING, SECTION_PRODUCTION, SECTION_ACHATS, SECTION_HACCP];
-const SECTIONS_PICCOLA: TabSection[] = [SECTION_PILOTAGE, SECTION_MY_PLANNING, SECTION_PRODUCTION_PICCOLA, SECTION_ACHATS, SECTION_HACCP, SECTION_EVENTS];
+const SECTIONS_PICCOLA: TabSection[] = [SECTION_PILOTAGE, SECTION_MY_PLANNING, SECTION_PRODUCTION_PICCOLA, SECTION_ACHATS_PICCOLA, SECTION_HACCP, SECTION_EVENTS];
 
 /* ── Helpers ──────────────────────────────────────── */
 

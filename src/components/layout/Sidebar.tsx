@@ -10,7 +10,7 @@ import {
   SIDEBAR_NAV_SIMPLE,
   PERSONNEL_SECTION,
   PILOTAGE_SECTION,
-  ACHATS_SECTION,
+  ACHATS_SECTION, ACHATS_SECTION_PICCOLA,
   PRODUCTION_SECTION, PRODUCTION_SECTION_PICCOLA,
   HACCP_SECTION,
   EVENEMENTIEL_SECTION,
@@ -117,8 +117,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       : [   // Établissement = toutes les sections
           PILOTAGE_SECTION,
           PERSONNEL_SECTION,
-          PRODUCTION_SECTION,
-          ACHATS_SECTION,
+          isPiccola ? PRODUCTION_SECTION_PICCOLA : PRODUCTION_SECTION,
+          isPiccola ? ACHATS_SECTION_PICCOLA : ACHATS_SECTION,
           HACCP_SECTION,
           ...(isPiccola ? [EVENEMENTIEL_SECTION] : []),
         ]
@@ -416,7 +416,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 PILOTAGE_SECTION,
                 PERSONNEL_SECTION,
                 isPiccolaEtab ? PRODUCTION_SECTION_PICCOLA : PRODUCTION_SECTION,
-                ACHATS_SECTION,
+                isPiccolaEtab ? ACHATS_SECTION_PICCOLA : ACHATS_SECTION,
                 HACCP_SECTION,
                 ...(isPiccolaEtab ? [EVENEMENTIEL_SECTION] : []),
               ];

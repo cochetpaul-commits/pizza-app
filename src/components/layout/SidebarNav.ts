@@ -138,7 +138,9 @@ export const PILOTAGE_SECTION: NavSubSection = { label: "Pilotage", icon: "barCh
 export const PERSONNEL_SECTION: NavSubSection = { label: "Personnel", icon: "users", href: "/rh/equipe", roles: ["group_admin", "manager"], items: PLANNING_ITEMS };
 export const PRODUCTION_SECTION: NavSubSection = { label: "Production", icon: "package", roles: ["group_admin", "manager", "equipier"], items: PRODUCTION_ITEMS };
 export const PRODUCTION_SECTION_PICCOLA: NavSubSection = { label: "Production", icon: "package", roles: ["group_admin", "manager", "equipier"], items: PRODUCTION_ITEMS_PICCOLA };
+const ACHATS_ITEMS_PICCOLA: NavItemV2[] = ACHATS_ITEMS.filter(i => i.href !== "/admin/popina-catalogue");
 export const ACHATS_SECTION: NavSubSection = { label: "Achats", icon: "shoppingBag", roles: ["group_admin", "manager", "equipier"], items: ACHATS_ITEMS };
+export const ACHATS_SECTION_PICCOLA: NavSubSection = { label: "Achats", icon: "shoppingBag", roles: ["group_admin", "manager", "equipier"], items: ACHATS_ITEMS_PICCOLA };
 export const HACCP_SECTION: NavSubSection = { label: "HACCP", icon: "clipboard", items: HACCP_ITEMS };
 export const EVENEMENTIEL_SECTION: NavSubSection = { label: "Evenementiel", icon: "calendarEvent", items: EVENEMENTIEL_ITEMS };
 
@@ -162,7 +164,7 @@ export function buildDynamicNav(
       PILOTAGE_SECTION,
       PERSONNEL_SECTION,
       isPiccola ? PRODUCTION_SECTION_PICCOLA : PRODUCTION_SECTION,
-      ACHATS_SECTION,
+      isPiccola ? ACHATS_SECTION_PICCOLA : ACHATS_SECTION,
       HACCP_SECTION,
       ...(isPiccola ? [EVENEMENTIEL_SECTION] : []),
     ];
