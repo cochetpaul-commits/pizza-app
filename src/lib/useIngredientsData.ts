@@ -21,27 +21,30 @@ const OFFER_COLS =
 async function fetchOffersForIds(ids: string[]): Promise<LatestOffer[]> {
   if (ids.length === 0) return [];
 
-  // Query supplier_offers directly instead of v_latest_offers view
-  // to avoid stale data from a potentially materialized view
-  // Do NOT filter by establishment — if the ingredient is visible, its price should be too
-  const query = supabase
-    .from("supplier_offers")
-    .select(OFFER_COLS)
-    .eq("is_active", true)
-    .in("ingredient_id", ids)
-    .order("updated_at", { ascending: false });
-
-  const { data, error } = await query;
-
-  if (error) throw new Error(error.message);
+  // Batch IDs to avoid URL length limits (Supabase rejects >100 IDs in .in())
+  const BATCH = 80;
+  const allData: Record<string, unknown>[] = [];
+  for (let i = 0; i < ids.length; i += BATCH) {
+    const batch = ids.slice(i, i + BATCH);
+    const { data, error } = await supabase
+      .from("supplier_offers")
+      .select(OFFER_COLS)
+      .eq("is_active", true)
+      .in("ingredient_id", batch)
+      .order("updated_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    allData.push(...(data ?? []));
+  }
+  const data = allData;
 
   // Keep only the latest active offer per ingredient_id
   const seen = new Set<string>();
   const offers: LatestOffer[] = [];
-  for (const row of data ?? []) {
-    if (!seen.has(row.ingredient_id)) {
-      seen.add(row.ingredient_id);
-      offers.push(row as LatestOffer);
+  for (const row of data) {
+    const r = row as LatestOffer;
+    if (!seen.has(r.ingredient_id)) {
+      seen.add(r.ingredient_id);
+      offers.push(r);
     }
   }
 
