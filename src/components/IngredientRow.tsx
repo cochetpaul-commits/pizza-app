@@ -258,6 +258,8 @@ export type StorageZoneOption = { id: string; name: string };
 export type IngredientRowProps = {
   item: Ingredient;
   offer: LatestOffer | undefined;
+  altOffers?: LatestOffer[];
+  suppliersMap?: Map<string, Supplier>;
   supplierName: string | null;
   supplierIdForDisplay: string | null;
   alert: PriceAlert | undefined;
@@ -282,7 +284,7 @@ export type IngredientRowProps = {
 };
 
 export const IngredientRow = React.memo(function IngredientRow({
-  item: x, offer, supplierName, supplierIdForDisplay, alert, isEditing, compactMode, edit,
+  item: x, offer, altOffers, suppliersMap, supplierName, supplierIdForDisplay, alert, isEditing, compactMode, edit,
   suppliers, storageZones,
   onStartEdit, onSaveEdit, onDelete, onSetStatus, onEditChange, onEditImportName, onCreateDerived, onOpenSupplier, onToggleEstablishment,
   duplicateMatch, onMergeDuplicate, subCategorySuggestions,
@@ -300,6 +302,29 @@ export const IngredientRow = React.memo(function IngredientRow({
   const st = (x.status ?? "to_check") as IngredientStatus;
   const hasPrice = offerHasPrice(offer, { piece_volume_ml: x.piece_volume_ml }) || legacyHasPrice(x);
   const canValidate = hasPrice;
+
+  // Price comparison: find cheapest among all active offers with unit_price
+  const priceComparison = React.useMemo(() => {
+    if (!altOffers || altOffers.length <= 1 || !suppliersMap) return null;
+    const withPrice = altOffers.filter(o => o.unit_price != null && o.unit_price > 0);
+    if (withPrice.length <= 1) return null;
+    // Deduplicate by supplier_id (keep cheapest per supplier)
+    const bySupplier = new Map<string, typeof withPrice[0]>();
+    for (const o of withPrice) {
+      const existing = bySupplier.get(o.supplier_id);
+      if (!existing || (o.unit_price! < existing.unit_price!)) {
+        bySupplier.set(o.supplier_id, o);
+      }
+    }
+    if (bySupplier.size <= 1) return null;
+    const sorted = [...bySupplier.values()].sort((a, b) => a.unit_price! - b.unit_price!);
+    const cheapest = sorted[0];
+    const cheapestName = suppliersMap.get(cheapest.supplier_id)?.name ?? null;
+    const currentSupId = offer?.supplier_id ?? x.supplier_id;
+    const isCheapest = currentSupId === cheapest.supplier_id;
+    return { cheapest, cheapestName, count: sorted.length, isCheapest, sorted };
+  }, [altOffers, suppliersMap, offer, x.supplier_id]);
+
   const alg = parseAllergens(x.allergens);
   const sb = stBadge(st);
   const pul = (x.purchase_unit_label ?? "").toLowerCase();
@@ -375,6 +400,17 @@ export const IngredientRow = React.memo(function IngredientRow({
         {/* Prix */}
         <div style={{ flex: 1 }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", whiteSpace: "pre-line" }}>{price}</span>
+          {priceComparison && !priceComparison.isCheapest && priceComparison.cheapestName && (
+            <div style={{ fontSize: 10, color: "#16A34A", fontWeight: 600, marginTop: 2 }}>
+              Moins cher : {priceComparison.cheapestName}
+              {" "}({priceComparison.cheapest.unit_price!.toFixed(2)}\u00A0\u20AC/{priceComparison.cheapest.unit ?? "kg"})
+            </div>
+          )}
+          {priceComparison && priceComparison.isCheapest && priceComparison.count > 1 && (
+            <div style={{ fontSize: 10, color: "#16A34A", fontWeight: 600, marginTop: 2 }}>
+              Meilleur prix ({priceComparison.count} fournisseurs)
+            </div>
+          )}
         </div>
 
         {/* Conditionnement */}
@@ -449,6 +485,16 @@ export const IngredientRow = React.memo(function IngredientRow({
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", whiteSpace: "pre-line" }}>{price}</div>
                 <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 999, background: sb.bg, color: sb.color, display: "inline-block", marginTop: 3 }}>{sb.label}</span>
                 {alert && <div style={{ fontSize: 10, fontWeight: 800, color: alert.direction === "up" ? "#DC2626" : "#16A34A", marginTop: 2 }}>{alert.direction === "up" ? "↑" : "↓"} {(Math.abs(alert.change_pct) * 100).toFixed(0)}%</div>}
+                {priceComparison && !priceComparison.isCheapest && priceComparison.cheapestName && (
+                  <div style={{ fontSize: 9, color: "#16A34A", fontWeight: 600, marginTop: 2 }}>
+                    - cher : {priceComparison.cheapestName}
+                  </div>
+                )}
+                {priceComparison && priceComparison.isCheapest && priceComparison.count > 1 && (
+                  <div style={{ fontSize: 9, color: "#16A34A", fontWeight: 600, marginTop: 2 }}>
+                    Meilleur prix
+                  </div>
+                )}
               </div>
             </div>
             {!hasPrice && <div style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", marginTop: 4 }}>prix manquant</div>}

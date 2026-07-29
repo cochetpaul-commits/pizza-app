@@ -100,7 +100,7 @@ function IngredientsPageInner() {
 
   const [q, setQ] = useState("");
   const debouncedQ = useDebounce(q, 300);
-  const { items, suppliers, supplierAliases, offers, alertMap, loading, loadingMore, hasMore, totalCount, loadMore, error: dataError, mutate, mutateOne, removeItem } = useIngredientsData(debouncedQ, etab?.id, etab?.slug);
+  const { items, suppliers, supplierAliases, offers, allOffers, alertMap, loading, loadingMore, hasMore, totalCount, loadMore, error: dataError, mutate, mutateOne, removeItem } = useIngredientsData(debouncedQ, etab?.id, etab?.slug);
 
   const [session, setSession] = useState<Session | null>(null);
 
@@ -151,6 +151,16 @@ function IngredientsPageInner() {
     }
     return m;
   }, [suppliers, supplierAliases]);
+
+  const allOffersByIngredientId = useMemo(() => {
+    const m = new Map<string, LatestOffer[]>();
+    for (const o of allOffers) {
+      const list = m.get(o.ingredient_id) ?? [];
+      list.push(o);
+      m.set(o.ingredient_id, list);
+    }
+    return m;
+  }, [allOffers]);
 
   const offersByIngredientId = useMemo(() => {
     const m = new Map<string, LatestOffer>();
@@ -1366,6 +1376,8 @@ function IngredientsPageInner() {
                           <IngredientRow
                             item={x}
                             offer={offer}
+                            altOffers={allOffersByIngredientId.get(x.id) ?? []}
+                            suppliersMap={suppliersMap}
                             supplierName={supplierName}
                             supplierIdForDisplay={supplierIdForDisplay}
                             alert={alertMap.get(x.id)}

@@ -18,7 +18,7 @@ const INGREDIENT_COLS =
 const OFFER_COLS =
   "ingredient_id,supplier_id,price_kind,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g,establishment,updated_at";
 
-async function fetchOffersForIds(ids: string[]): Promise<LatestOffer[]> {
+async function fetchAllActiveOffers(ids: string[]): Promise<LatestOffer[]> {
   if (ids.length === 0) return [];
 
   // Batch IDs to avoid URL length limits (Supabase rejects >100 IDs in .in())
@@ -35,23 +35,26 @@ async function fetchOffersForIds(ids: string[]): Promise<LatestOffer[]> {
     if (error) throw new Error(error.message);
     allData.push(...(data ?? []));
   }
-  const data = allData;
 
-  // Keep only the latest active offer per ingredient_id
+  return allData.map(r => r as LatestOffer);
+}
+
+/** Keep only the latest active offer per ingredient_id */
+function pickLatestOffers(all: LatestOffer[]): LatestOffer[] {
   const seen = new Set<string>();
   const offers: LatestOffer[] = [];
-  for (const row of data) {
-    const r = row as LatestOffer;
+  for (const r of all) {
     if (!seen.has(r.ingredient_id)) {
       seen.add(r.ingredient_id);
       offers.push(r);
     }
   }
-
   return offers;
 }
 
-async function fetchPage(page: number, etabId?: string | null, etabSlug?: string | null): Promise<{ items: Ingredient[]; offers: LatestOffer[]; hasMore: boolean }> {
+type FetchResult = { items: Ingredient[]; offers: LatestOffer[]; allOffers: LatestOffer[]; hasMore: boolean };
+
+async function fetchPage(page: number, etabId?: string | null, etabSlug?: string | null): Promise<FetchResult> {
   const from = page * PAGE_SIZE;
   let query = supabase
     .from("ingredients")
@@ -69,12 +72,13 @@ async function fetchPage(page: number, etabId?: string | null, etabSlug?: string
 
   if (error) throw new Error(error.message);
   const items = (data ?? []) as Ingredient[];
-  const offers = await fetchOffersForIds(items.map((i) => i.id));
+  const allOffers = await fetchAllActiveOffers(items.map((i) => i.id));
+  const offers = pickLatestOffers(allOffers);
 
-  return { items, offers, hasMore: items.length === PAGE_SIZE };
+  return { items, offers, allOffers, hasMore: items.length === PAGE_SIZE };
 }
 
-async function searchIngredients(q: string, etabId?: string | null, etabSlug?: string | null): Promise<{ items: Ingredient[]; offers: LatestOffer[] }> {
+async function searchIngredients(q: string, etabId?: string | null, etabSlug?: string | null): Promise<{ items: Ingredient[]; offers: LatestOffer[]; allOffers: LatestOffer[] }> {
   let query = supabase
     .from("ingredients")
     .select(INGREDIENT_COLS)
@@ -90,14 +94,16 @@ async function searchIngredients(q: string, etabId?: string | null, etabSlug?: s
 
   if (error) throw new Error(error.message);
   const items = (data ?? []) as Ingredient[];
-  const offers = await fetchOffersForIds(items.map((i) => i.id));
+  const allOffers = await fetchAllActiveOffers(items.map((i) => i.id));
+  const offers = pickLatestOffers(allOffers);
 
-  return { items, offers };
+  return { items, offers, allOffers };
 }
 
 export function useIngredientsData(searchQuery: string, etablissementId?: string | null, etablissementSlug?: string | null) {
   const [items, setItems] = useState<Ingredient[]>([]);
   const [offers, setOffers] = useState<LatestOffer[]>([]);
+  const [allOffers, setAllOffers] = useState<LatestOffer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [supplierAliases, setSupplierAliases] = useState<Map<string, Set<string>>>(new Map());
   const [alertMap, setAlertMap] = useState<Map<string, PriceAlert>>(new Map());
@@ -179,12 +185,14 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
         if (fetchIdRef.current !== fetchId) return;
         setItems(bundle.items);
         setOffers(bundle.offers);
+        setAllOffers(bundle.allOffers);
         setHasMore(false);
       } else {
         const bundle = await fetchPage(0, etabRef.current, etabSlugRef.current);
         if (fetchIdRef.current !== fetchId) return;
         setItems(bundle.items);
         setOffers(bundle.offers);
+        setAllOffers(bundle.allOffers);
         setHasMore(bundle.hasMore);
         pageRef.current = 1;
       }
@@ -214,6 +222,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
         const seen = new Set(prev.map((o) => o.ingredient_id));
         return [...prev, ...bundle.offers.filter((o) => !seen.has(o.ingredient_id))];
       });
+      setAllOffers((prev) => [...prev, ...bundle.allOffers]);
       setHasMore(bundle.hasMore);
       pageRef.current += 1;
     } catch (e) {
@@ -242,18 +251,24 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
       return;
     }
     const updated = row as Ingredient;
-    const newOffers = await fetchOffersForIds([ingredientId]);
+    const newAllOffers = await fetchAllActiveOffers([ingredientId]);
+    const newOffers = pickLatestOffers(newAllOffers);
 
     setItems((prev) => prev.map((i) => (i.id === ingredientId ? updated : i)));
     setOffers((prev) => {
       const without = prev.filter((o) => o.ingredient_id !== ingredientId);
       return newOffers.length > 0 ? [...without, ...newOffers] : without;
     });
+    setAllOffers((prev) => {
+      const without = prev.filter((o) => o.ingredient_id !== ingredientId);
+      return [...without, ...newAllOffers];
+    });
   }, [searchQuery, doLoad]);
 
   const removeItem = useCallback((id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
     setOffers((prev) => prev.filter((o) => o.ingredient_id !== id));
+    setAllOffers((prev) => prev.filter((o) => o.ingredient_id !== id));
   }, []);
 
   return {
@@ -261,6 +276,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     suppliers,
     supplierAliases,
     offers,
+    allOffers,
     alertMap,
     loading,
     loadingMore,
