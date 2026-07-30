@@ -51,6 +51,7 @@ async function processAccount(
   account: typeof ACCOUNTS[0],
   supabase: AnySupabase,
   etabId: string | null,
+  dbg?: string[],
 ): Promise<ImportedFile[]> {
   if (!account.user || !account.pass) return [];
 
@@ -73,9 +74,11 @@ async function processAccount(
       const since = new Date();
       since.setDate(since.getDate() - 30);
       const uids = await client.search({ since }, { uid: true });
-      if (!uids || uids.length === 0) return results;
+      const uidList = Array.isArray(uids) ? uids : [];
+      dbg?.push(`${account.label}: ${uidList.length} mails depuis 30j`);
+      if (uidList.length === 0) return results;
 
-      for (const uid of uids) {
+      for (const uid of uidList) {
         try {
           const msg = await client.fetchOne(String(uid), {
             envelope: true,
@@ -105,9 +108,9 @@ async function processAccount(
 
           // Find PDF attachments in body structure
           const attachments = findPdfParts(msg.bodyStructure);
+          dbg?.push(`  UID ${uidStr}: "${subject.slice(0, 50)}" — ${attachments.length} PDF(s), structure: ${JSON.stringify(msg.bodyStructure?.type ?? "?").slice(0, 80)}`);
 
           if (attachments.length === 0) {
-            // No PDF — skip
             continue;
           }
 
@@ -244,8 +247,10 @@ export async function GET(req: Request) {
     if (e.slug?.includes("piccola")) etabMap["piccola_mia"] = e.id;
   }
 
+  const debug = new URL(req.url).searchParams.get("debug") === "1";
   const allResults: ImportedFile[] = [];
   const errors: string[] = [];
+  const debugInfo: string[] = [];
 
   for (const account of ACCOUNTS) {
     if (!account.user || !account.pass) {
@@ -254,7 +259,7 @@ export async function GET(req: Request) {
     }
     const etabId = etabMap[account.etabSlug] ?? null;
     try {
-      const results = await processAccount(account, supabase, etabId);
+      const results = await processAccount(account, supabase, etabId, debug ? debugInfo : undefined);
       allResults.push(...results);
     } catch (e) {
       errors.push(`${account.label}: ${e instanceof Error ? e.message : String(e)}`);
@@ -266,5 +271,6 @@ export async function GET(req: Request) {
     processed: allResults.length,
     results: allResults,
     errors: errors.length > 0 ? errors : undefined,
+    debug: debug ? debugInfo : undefined,
   });
 }

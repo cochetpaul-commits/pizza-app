@@ -55,13 +55,13 @@ export function EmailInvoicesTab() {
     setSyncing(true);
     setSyncResult(null);
     try {
-      const res = await fetch("/api/invoices/email-import");
+      const res = await fetch("/api/invoices/email-import?debug=1");
       const json = await res.json();
-      if (json.errors && json.errors.length > 0) {
-        setSyncResult(`Erreurs: ${json.errors.join(" | ")}`);
-      } else {
-        setSyncResult(`${json.processed ?? 0} facture(s) trouvee(s)`);
-      }
+      const parts: string[] = [];
+      if (json.errors && json.errors.length > 0) parts.push(`Erreurs: ${json.errors.join(" | ")}`);
+      parts.push(`${json.processed ?? 0} facture(s) importee(s)`);
+      if (json.debug && json.debug.length > 0) parts.push(json.debug.join("\n"));
+      setSyncResult(parts.join("\n"));
       await load();
     } catch (e) {
       setSyncResult(`Erreur: ${e instanceof Error ? e.message : String(e)}`);
@@ -116,9 +116,9 @@ export function EmailInvoicesTab() {
       </div>
 
       {syncResult && (
-        <div style={{ padding: "8px 12px", borderRadius: 8, marginBottom: 10, fontSize: 11, fontWeight: 600, background: syncResult.startsWith("Erreur") ? "rgba(220,38,38,0.08)" : "rgba(22,163,74,0.08)", color: syncResult.startsWith("Erreur") ? "#DC2626" : "#16A34A" }}>
+        <pre style={{ padding: "8px 12px", borderRadius: 8, marginBottom: 10, fontSize: 10, fontWeight: 500, background: syncResult.startsWith("Erreur") ? "rgba(220,38,38,0.08)" : "rgba(0,0,0,0.03)", color: syncResult.startsWith("Erreur") ? "#DC2626" : "#555", whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0, fontFamily: "monospace" }}>
           {syncResult}
-        </div>
+        </pre>
       )}
 
       <div style={{ display: "flex", gap: 0, marginBottom: 14, borderRadius: 8, overflow: "hidden", border: `1px solid ${T.border}` }}>
