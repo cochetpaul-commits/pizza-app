@@ -75,11 +75,12 @@ async function processAccount(
       dbg?.push(`${account.label}: ${totalMsgs} mails`);
       if (totalMsgs === 0) { lock.release(); await client.logout(); return results; }
 
-      // Fetch ONLY the last message to stay within timeout
-      dbg?.push(`  Fetch seq ${totalMsgs}:${totalMsgs}...`);
+      // Fetch the last 10 messages
+      const startSeq = Math.max(1, totalMsgs - 9);
+      dbg?.push(`  Fetch seq ${startSeq}:${totalMsgs} (${totalMsgs - startSeq + 1} mails)...`);
 
       let msgCount = 0;
-      for await (const msg of client.fetch(`${totalMsgs}:${totalMsgs}`, { envelope: true, bodyStructure: true, uid: true })) {
+      for await (const msg of client.fetch(`${startSeq}:${totalMsgs}`, { envelope: true, bodyStructure: true, uid: true })) {
         msgCount++;
         try {
           const uidStr = String(msg.uid);
