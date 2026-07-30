@@ -75,9 +75,9 @@ async function processAccount(
       dbg?.push(`${account.label}: ${totalMsgs} mails`);
       if (totalMsgs === 0) { lock.release(); await client.logout(); return results; }
 
-      // Fetch the last 10 messages
-      const startSeq = Math.max(1, totalMsgs - 9);
-      dbg?.push(`  Fetch seq ${startSeq}:${totalMsgs} (${totalMsgs - startSeq + 1} mails)...`);
+      // Fetch the last 3 messages (Vercel Hobby = 10s timeout)
+      const startSeq = Math.max(1, totalMsgs - 2);
+      dbg?.push(`  Fetch seq ${startSeq}:${totalMsgs}...`);
 
       let msgCount = 0;
       for await (const msg of client.fetch(`${startSeq}:${totalMsgs}`, { envelope: true, bodyStructure: true, uid: true })) {
