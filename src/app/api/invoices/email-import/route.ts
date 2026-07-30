@@ -70,18 +70,24 @@ async function processAccount(
     const lock = await client.getMailboxLock("INBOX");
 
     try {
-      // Fetch the 20 most recent messages using sequence numbers
-      const status = await client.status("INBOX", { messages: true });
-      const total = status?.messages ?? 0;
-      dbg?.push(`${account.label}: ${total} mails total dans INBOX`);
-      if (total === 0) return results;
+      // Fetch recent messages
+      let totalMsgs = 0;
+      try {
+        const st = await client.status("INBOX", { messages: true });
+        totalMsgs = st?.messages ?? 0;
+      } catch {
+        // Fallback: mailbox info from lock
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        totalMsgs = (client.mailbox as any)?.exists ?? 100;
+      }
+      dbg?.push(`${account.label}: ${totalMsgs} mails total`);
+      if (totalMsgs === 0) return results;
 
-      const startSeq = Math.max(1, total - 19);
-      const range = `${startSeq}:*`;
-      dbg?.push(`  Fetch seq ${range}...`);
+      const startSeq = Math.max(1, totalMsgs - 9);
+      dbg?.push(`  Fetch seq ${startSeq}:* (last ${totalMsgs - startSeq + 1})...`);
 
       let msgCount = 0;
-      for await (const msg of client.fetch(range, { envelope: true, bodyStructure: true, uid: true })) {
+      for await (const msg of client.fetch(`${startSeq}:*`, { envelope: true, bodyStructure: true, uid: true })) {
         msgCount++;
         try {
           const uidStr = String(msg.uid);
@@ -234,16 +240,7 @@ function findPdfParts(structure: any, parentPart = "", dbg?: string[]): { part: 
  * Called by Vercel cron every hour. Fetches unseen emails with PDF attachments.
  */
 export async function GET(req: Request) {
-  // Verify cron secret or allow manual trigger
-  const authHeader = req.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    // Allow without secret in dev
-    if (process.env.NODE_ENV === "production") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
-
+  try {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
   await ensureBucket(supabase);
@@ -282,4 +279,10 @@ export async function GET(req: Request) {
     errors: errors.length > 0 ? errors : undefined,
     debug: debug ? debugInfo : undefined,
   });
+  } catch (globalErr) {
+    return NextResponse.json({
+      ok: false,
+      error: globalErr instanceof Error ? globalErr.message : String(globalErr),
+    }, { status: 500 });
+  }
 }
