@@ -161,7 +161,7 @@ function destroyChart(id: string) { if (charts[id]) { charts[id].destroy(); dele
 /* ── Styles ── */
 const S = {
   card: { background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 } as CSSProperties,
-  sec: { fontSize: 9, textTransform: "uppercase" as const, letterSpacing: ".12em", color: "#777", fontWeight: 500, marginBottom: 12 } as CSSProperties,
+  sec: { fontSize: 11, textTransform: "uppercase" as const, letterSpacing: ".08em", color: "#666", fontWeight: 700, marginBottom: 12 } as CSSProperties,
   bigNum: { fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 46, fontWeight: 700, color: "#fff", lineHeight: 1, letterSpacing: "-.02em" } as CSSProperties,
 };
 
@@ -933,7 +933,7 @@ function PerformancesPage() {
                           manque += Math.max(0, (objSoir - tmSoir2) * covSoir);
                         }
                         if (manque <= 0) return null;
-                        return <div style={{ fontSize: 10, color: "#fca5a5", marginTop: 3 }}>Potentiel : +{fmt(Math.round(manque))}{"\u20AC"} si obj. TM atteint</div>;
+                        return <div style={{ fontSize: 10, color: "#fca5a5", marginTop: 3 }}>Potentiel : +{fmt(Math.round(manque))} si obj. TM atteint</div>;
                       })()}
                     </div>
                     <div style={{ width: 1, background: "rgba(255,255,255,.1)", alignSelf: "stretch" }} />
@@ -1412,13 +1412,13 @@ function PerformancesPage() {
                   <div className="ventes-food-drink" style={{ display: "flex", gap: 0 }}>
                     <div style={{ flex: 1, textAlign: "center" }}>
                       <div style={{ fontSize: 10, fontWeight: 700, color: "#8a6b3e", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 4 }}>Food</div>
-                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color: "#1a1a1a" }}>{fmt(fCA)}{"\u20AC"}</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color: "#1a1a1a" }}>{fmt(fCA)}</div>
                       <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>{fPct} %</div>
                     </div>
                     <div style={{ width: 1, background: "rgba(0,0,0,.08)", margin: "0 20px", flexShrink: 0 }} />
                     <div style={{ flex: 1, textAlign: "center" }}>
                       <div style={{ fontSize: 10, fontWeight: 700, color: "#5e8278", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 4 }}>Boissons</div>
-                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color: "#1a1a1a" }}>{fmt(dCA)}{"\u20AC"}</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color: "#1a1a1a" }}>{fmt(dCA)}</div>
                       <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>{dPct} %</div>
                     </div>
                   </div>
@@ -1443,17 +1443,16 @@ function PerformancesPage() {
                 ? activeZones.reduce((s, z) => s + (ZONE_CAPS[z] ?? 0), 0)
                 : TOTAL_CAP;
 
-              const covMidi = W.cov_midi ?? 0;
-              const covSoir = W.cov_soir ?? 0;
-              const covMidiDay = nbDays > 0 ? covMidi / nbDays : 0;
-              const covSoirDay = nbDays > 0 ? covSoir / nbDays : 0;
-              const rempMidi = activeCap > 0 ? Math.round(covMidiDay / activeCap * 100) : null;
-              const rempSoir = activeCap > 0 ? Math.round(covSoirDay / activeCap * 100) : null;
-              const rempTotal = activeCap > 0 && nbDays > 0 ? Math.round(((covMidi + covSoir) / nbDays) / activeCap * 100) : null;
-
-              // Panier moyen midi/soir from services data
+              // Couverts SUR PLACE uniquement (exclure emporter)
               const midiSvcs = W.services.filter(s => s.svc === "midi");
               const soirSvcs = W.services.filter(s => s.svc !== "midi");
+              const covMidiSP = midiSvcs.reduce((s, sv) => s + sv.sp_cov, 0);
+              const covSoirSP = soirSvcs.reduce((s, sv) => s + sv.sp_cov, 0);
+              const covMidiDay = nbDays > 0 ? covMidiSP / nbDays : 0;
+              const covSoirDay = nbDays > 0 ? covSoirSP / nbDays : 0;
+              const rempMidi = activeCap > 0 ? Math.round(covMidiDay / activeCap * 100) : null;
+              const rempSoir = activeCap > 0 ? Math.round(covSoirDay / activeCap * 100) : null;
+              const rempTotal = activeCap > 0 && nbDays > 0 ? Math.round(((covMidiSP + covSoirSP) / nbDays) / activeCap * 100) : null;
               const covMidiTotal = midiSvcs.reduce((s, sv) => s + sv.cov, 0) || 1;
               const covSoirTotal = soirSvcs.reduce((s, sv) => s + sv.cov, 0) || 1;
               const caMidi = midiSvcs.reduce((s, sv) => s + (mode === "ttc" ? sv.ttc : sv.ht), 0);
@@ -1507,35 +1506,43 @@ function PerformancesPage() {
                           <span style={{ fontSize: 11, fontWeight: 600, color: "#555" }}>Total jour</span>
                           <span style={{ fontSize: 12, fontWeight: 700, fontFamily: OSWALD_F, color: rempColor(rempTotal) }}>{rempTotal}%</span>
                         </div>
-                        <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>{((covMidi + covSoir) / nbDays).toFixed(0)} / {activeCap} cvt/j</div>
+                        <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>{((covMidiSP + covSoirSP) / nbDays).toFixed(0)} / {activeCap} cvt/j</div>
                       </div>
                     )}
                   </div>
-                  {/* Panier moyen midi / soir */}
+                  {/* Panier moyen midi / soir + food/boissons */}
                   <div style={S.card}>
                     <div style={S.sec}>Panier moyen decompose</div>
+                    {/* TM Midi / Soir */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, marginBottom: 10 }}>
                       <div style={{ textAlign: "center", borderRight: "1px solid #f0ebe3", paddingBottom: 8 }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "#5e8278", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>Midi</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#5e8278", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>Midi</div>
                         <div style={{ fontFamily: OSWALD_F, fontSize: 22, fontWeight: 700, color: "#1a1a1a" }}>{tmMidi.toFixed(1)}{"\u20AC"}</div>
                         <div style={{ fontSize: 10, color: "#999" }}>{midiSvcs.reduce((s, sv) => s + sv.cov, 0)} cvt</div>
                       </div>
                       <div style={{ textAlign: "center", paddingBottom: 8 }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "#1a1a1a", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>Soir</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>Soir</div>
                         <div style={{ fontFamily: OSWALD_F, fontSize: 22, fontWeight: 700, color: "#1a1a1a" }}>{tmSoir.toFixed(1)}{"\u20AC"}</div>
                         <div style={{ fontSize: 10, color: "#999" }}>{soirSvcs.reduce((s, sv) => s + sv.cov, 0)} cvt</div>
                       </div>
                     </div>
+                    {/* Food / Boissons decompose midi-soir */}
                     {foodPerCov != null && (
-                      <div style={{ borderTop: "1px solid #f0ebe3", paddingTop: 8 }}>
-                        <div style={{ display: "flex", gap: 0 }}>
-                          <div style={{ flex: 1, textAlign: "center", borderRight: "1px solid #f0ebe3" }}>
-                            <div style={{ fontSize: 9, fontWeight: 700, color: "#8a6b3e", textTransform: "uppercase", letterSpacing: ".06em" }}>Food</div>
-                            <div style={{ fontFamily: OSWALD_F, fontSize: 16, fontWeight: 700 }}>{foodPerCov.toFixed(1)}{"\u20AC"}</div>
+                      <div style={{ borderTop: "1px solid #f0ebe3", paddingTop: 10 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: "#8a6b3e", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Food /cvt</div>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                              <span style={{ color: "#888" }}>Global</span>
+                              <span style={{ fontFamily: OSWALD_F, fontWeight: 700 }}>{foodPerCov.toFixed(1)}{"\u20AC"}</span>
+                            </div>
                           </div>
-                          <div style={{ flex: 1, textAlign: "center" }}>
-                            <div style={{ fontSize: 9, fontWeight: 700, color: "#5e8278", textTransform: "uppercase", letterSpacing: ".06em" }}>Boissons</div>
-                            <div style={{ fontFamily: OSWALD_F, fontSize: 16, fontWeight: 700 }}>{drinkPerCov?.toFixed(1) ?? "0"}{"\u20AC"}</div>
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: "#5e8278", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Boissons /cvt</div>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                              <span style={{ color: "#888" }}>Global</span>
+                              <span style={{ fontFamily: OSWALD_F, fontWeight: 700 }}>{drinkPerCov?.toFixed(1) ?? "0"}{"\u20AC"}</span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1727,13 +1734,13 @@ function PerformancesPage() {
                   <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 10, color: "#999", fontWeight: 600, marginBottom: 4 }}>Cumul au {toD.getDate()}/{m2 + 1}</div>
-                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#1a1a1a" }}>{fmt(ca)}{"\u20AC"}</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#1a1a1a" }}>{fmt(ca)}</div>
                       <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>{daysCovered}j / {daysInMonth}j</div>
                     </div>
                     <div style={{ width: 1, height: 50, background: "rgba(0,0,0,.08)" }} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 10, color: "#999", fontWeight: 600, marginBottom: 4 }}>Projection lineaire</div>
-                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: accent }}>{fmt(projected)}{"\u20AC"}</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: accent }}>{fmt(projected)}</div>
                       {prevMonthCA != null && prevMonthCA > 0 && (() => {
                         const d = projected - prevMonthCA;
                         const pct = (d / prevMonthCA * 100).toFixed(1);
@@ -1797,9 +1804,9 @@ function PerformancesPage() {
               type CompRow = { label: string; before: string; after: string; delta: string; positive: boolean; bold?: boolean };
               const mkDelta = (b: number, a: number, suffix = "\u20AC") => `${a >= b ? "+" : ""}${suffix === "\u20AC" ? fmt(Math.round(a - b)) : (a - b).toFixed(1)}${suffix}`;
               const rows: CompRow[] = [
-                { label: "CA / jour", before: `${fmt(bCADay)}\u20AC`, after: `${fmt(aCADay)}\u20AC`, delta: mkDelta(bCADay, aCADay), positive: aCADay >= bCADay, bold: true },
-                { label: "   Midi", before: `${fmt(bMidi.caDay)}\u20AC`, after: `${fmt(aMidi.caDay)}\u20AC`, delta: mkDelta(bMidi.caDay, aMidi.caDay), positive: aMidi.caDay >= bMidi.caDay },
-                { label: "   Soir", before: `${fmt(bSoir.caDay)}\u20AC`, after: `${fmt(aSoir.caDay)}\u20AC`, delta: mkDelta(bSoir.caDay, aSoir.caDay), positive: aSoir.caDay >= bSoir.caDay },
+                { label: "CA / jour", before: `${fmt(bCADay)}`, after: `${fmt(aCADay)}`, delta: mkDelta(bCADay, aCADay), positive: aCADay >= bCADay, bold: true },
+                { label: "   Midi", before: `${fmt(bMidi.caDay)}`, after: `${fmt(aMidi.caDay)}`, delta: mkDelta(bMidi.caDay, aMidi.caDay), positive: aMidi.caDay >= bMidi.caDay },
+                { label: "   Soir", before: `${fmt(bSoir.caDay)}`, after: `${fmt(aSoir.caDay)}`, delta: mkDelta(bSoir.caDay, aSoir.caDay), positive: aSoir.caDay >= bSoir.caDay },
                 { label: "Couverts / jour", before: `${(bCov / beforeDates.length).toFixed(0)}`, after: `${(aCov / afterDates.length).toFixed(0)}`, delta: `${aCov / afterDates.length >= bCov / beforeDates.length ? "+" : ""}${((aCov / afterDates.length) - (bCov / beforeDates.length)).toFixed(0)}`, positive: aCov / afterDates.length >= bCov / beforeDates.length, bold: true },
                 { label: "   Midi", before: `${bMidi.covDay.toFixed(0)}`, after: `${aMidi.covDay.toFixed(0)}`, delta: `${aMidi.covDay >= bMidi.covDay ? "+" : ""}${(aMidi.covDay - bMidi.covDay).toFixed(0)}`, positive: aMidi.covDay >= bMidi.covDay },
                 { label: "   Soir", before: `${bSoir.covDay.toFixed(0)}`, after: `${aSoir.covDay.toFixed(0)}`, delta: `${aSoir.covDay >= bSoir.covDay ? "+" : ""}${(aSoir.covDay - bSoir.covDay).toFixed(0)}`, positive: aSoir.covDay >= bSoir.covDay },
@@ -2021,7 +2028,7 @@ function PerformancesPage() {
                       <span style={{ fontSize: 12, color: "#555", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.n}</span>
                     </span>
                     <span style={{ fontSize: 11, color: "#999", marginLeft: 8, flexShrink: 0 }}>x{p.qty}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#999", marginLeft: 12, flexShrink: 0, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{fmt(mode === "ttc" ? p.ca_ttc : p.ca_ht)}{"\u20AC"}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#999", marginLeft: 12, flexShrink: 0, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{fmt(mode === "ttc" ? p.ca_ttc : p.ca_ht)}</span>
                   </div>
                 ))}
               </div>
