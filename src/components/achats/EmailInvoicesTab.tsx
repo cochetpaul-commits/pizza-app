@@ -31,6 +31,7 @@ export function EmailInvoicesTab() {
   const [invoices, setInvoices] = useState<EmailInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
   const [filter, setFilter] = useState("pending");
 
   const load = useCallback(async () => {
@@ -46,7 +47,19 @@ export function EmailInvoicesTab() {
 
   const triggerSync = async () => {
     setSyncing(true);
-    try { await fetch("/api/invoices/email-import"); await load(); } catch { /* ignore */ }
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/invoices/email-import");
+      const json = await res.json();
+      if (json.errors && json.errors.length > 0) {
+        setSyncResult(`Erreurs: ${json.errors.join(" | ")}`);
+      } else {
+        setSyncResult(`${json.processed ?? 0} facture(s) trouvee(s)`);
+      }
+      await load();
+    } catch (e) {
+      setSyncResult(`Erreur: ${e instanceof Error ? e.message : String(e)}`);
+    }
     setSyncing(false);
   };
 
@@ -95,6 +108,12 @@ export function EmailInvoicesTab() {
           {syncing ? "Sync..." : "Synchroniser"}
         </button>
       </div>
+
+      {syncResult && (
+        <div style={{ padding: "8px 12px", borderRadius: 8, marginBottom: 10, fontSize: 11, fontWeight: 600, background: syncResult.startsWith("Erreur") ? "rgba(220,38,38,0.08)" : "rgba(22,163,74,0.08)", color: syncResult.startsWith("Erreur") ? "#DC2626" : "#16A34A" }}>
+          {syncResult}
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 0, marginBottom: 14, borderRadius: 8, overflow: "hidden", border: `1px solid ${T.border}` }}>
         {[

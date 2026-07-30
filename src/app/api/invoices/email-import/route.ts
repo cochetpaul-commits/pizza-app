@@ -18,13 +18,13 @@ const IMAP_PORT = parseInt(process.env.IMAP_PORT ?? "993");
 const ACCOUNTS = [
   {
     user: process.env.IMAP_USER_BELLOMIO ?? "",
-    pass: process.env.IMAP_PASSWORD_BELLOMIO ?? "",
+    pass: process.env.IMAP_PASSWORD_BELLOMIO ?? process.env.IMAP_PASS_BELLOMIO ?? "",
     etabSlug: "bello_mio",
     label: "Bello Mio",
   },
   {
     user: process.env.IMAP_USER_PICCOLAMIA ?? "",
-    pass: process.env.IMAP_PASSWORD_PICCOLAMIA ?? "",
+    pass: process.env.IMAP_PASSWORD_PICCOLAMIA ?? process.env.IMAP_PASS_PICCOLAMIA ?? "",
     etabSlug: "piccola_mia",
     label: "Piccola Mia",
   },
@@ -248,16 +248,26 @@ export async function GET(req: Request) {
   }
 
   const allResults: ImportedFile[] = [];
+  const errors: string[] = [];
 
   for (const account of ACCOUNTS) {
+    if (!account.user || !account.pass) {
+      errors.push(`${account.label}: identifiants manquants (user=${account.user ? "ok" : "vide"}, pass=${account.pass ? "ok" : "vide"})`);
+      continue;
+    }
     const etabId = etabMap[account.etabSlug] ?? null;
-    const results = await processAccount(account, supabase, etabId);
-    allResults.push(...results);
+    try {
+      const results = await processAccount(account, supabase, etabId);
+      allResults.push(...results);
+    } catch (e) {
+      errors.push(`${account.label}: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   return NextResponse.json({
-    ok: true,
+    ok: errors.length === 0,
     processed: allResults.length,
     results: allResults,
+    errors: errors.length > 0 ? errors : undefined,
   });
 }
