@@ -285,7 +285,7 @@ const SECTION_ACHATS: TabSection = {
     { label: "Produits", href: "/ingredients", match: ["/ingredients"], icon: () => <ShoppingBasket size={24} strokeWidth={1.8} /> },
     { label: "Commandes", href: "/commandes", match: ["/commandes"], icon: () => <IconTruck /> },
     { label: "Stock", href: "/stock", match: ["/stock"], icon: () => <IconBox /> },
-    { label: "Factures", href: "/achats", match: ["/achats", "/invoices", "/variations-prix"], icon: () => <IconFileText /> },
+    { label: "Factures", href: "/achats", match: ["/achats", "/invoices", "/variations-prix", "/achats/email"], icon: () => <IconFileText /> },
     { label: "Catalogue Popina", href: "/admin/popina-catalogue", match: ["/admin/popina-catalogue"], icon: () => <IconTag /> },
   ],
 };
