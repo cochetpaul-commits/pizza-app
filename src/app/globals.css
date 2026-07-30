@@ -49,13 +49,16 @@
   --glass-sidebar-border: rgba(0,0,0,0.06);
 }
 
-/* macOS Finder sidebar */
+/* macOS Finder sidebar — floating rounded */
 .sidebar-desktop {
   background: var(--glass-sidebar) !important;
   backdrop-filter: blur(var(--glass-blur)) saturate(200%);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(200%);
-  border-right: 1px solid var(--glass-sidebar-border);
-  box-shadow: 1px 0 8px rgba(0,0,0,0.03);
+  border-right: none;
+  border-radius: 16px;
+  box-shadow: 2px 0 16px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
+  margin: 8px 0 8px 8px;
+  height: calc(100dvh - 16px) !important;
 }
 
 /* Glass cards */
@@ -203,7 +206,7 @@ html, body{
 .mobile-header { display: none !important; }
 
 .app-main {
-  margin-left: var(--sidebar-width);
+  margin-left: calc(var(--sidebar-width) + 16px);
   min-height: 100dvh;
   background: var(--creme);
 }

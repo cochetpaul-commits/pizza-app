@@ -200,8 +200,8 @@ export function offerHasPrice(
 ): boolean {
   if (!o) return false;
 
-  if (o.price_kind === "unit") {
-    return o.unit != null && o.unit_price != null && Number.isFinite(o.unit_price) && o.unit_price > 0;
+  if (o.price_kind === "unit" || !o.price_kind) {
+    if (o.unit_price != null && Number.isFinite(o.unit_price) && o.unit_price > 0) return true;
   }
 
   if (o.price_kind === "pack_simple") {

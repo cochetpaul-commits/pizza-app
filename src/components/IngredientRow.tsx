@@ -280,6 +280,7 @@ export type IngredientRowProps = {
   onToggleEstablishment?: (id: string, estab: "bellomio" | "piccola", current: string[]) => void;
   duplicateMatch?: { id: string; name: string; score: number } | null;
   onMergeDuplicate?: (keepId: string, deleteId: string) => void;
+  onIgnoreDuplicate?: (id1: string, id2: string) => void;
   subCategorySuggestions?: string[];
 };
 
@@ -287,7 +288,7 @@ export const IngredientRow = React.memo(function IngredientRow({
   item: x, offer, altOffers, suppliersMap, supplierName, supplierIdForDisplay, alert, isEditing, compactMode, edit,
   suppliers, storageZones,
   onStartEdit, onSaveEdit, onDelete, onSetStatus, onEditChange, onEditImportName, onCreateDerived, onOpenSupplier, onToggleEstablishment,
-  duplicateMatch, onMergeDuplicate, subCategorySuggestions,
+  duplicateMatch, onMergeDuplicate, onIgnoreDuplicate, subCategorySuggestions,
 }: IngredientRowProps) {
   const [mobileSection, setMobileSection] = React.useState<string>("prix"); // mobile accordion: only one open at a time
   const toggleMobileSection = React.useCallback((key: string) => {
@@ -547,6 +548,15 @@ export const IngredientRow = React.memo(function IngredientRow({
                 cursor: "pointer", fontFamily: "inherit",
               }}>
               Supprimer
+            </button>
+            <button type="button"
+              onClick={() => onIgnoreDuplicate?.(x.id, duplicateMatch.id)}
+              style={{
+                padding: "6px 16px", borderRadius: 8, border: "1.5px solid #999",
+                background: "#fff", color: "#777", fontWeight: 600, fontSize: 12,
+                cursor: "pointer", fontFamily: "inherit", marginLeft: "auto",
+              }}>
+              Ignorer
             </button>
           </div>
         </div>

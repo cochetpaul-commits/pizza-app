@@ -1398,6 +1398,15 @@ function IngredientsPageInner() {
                             onToggleEstablishment={userCanWrite ? toggleEstablishment : undefined}
                             duplicateMatch={editingId === x.id ? editingDuplicateMatch : null}
                             onMergeDuplicate={userCanWrite ? handleMergeDuplicate : undefined}
+                            onIgnoreDuplicate={(id1, id2) => {
+                              const key = [id1, id2].sort().join(":");
+                              setIgnoreKeys(prev => {
+                                const next = new Set(prev);
+                                next.add(key);
+                                localStorage.setItem("ingredient-duplicate-ignores", JSON.stringify([...next]));
+                                return next;
+                              });
+                            }}
                             subCategorySuggestions={subCategorySuggestions}
                           />
                           </div>
