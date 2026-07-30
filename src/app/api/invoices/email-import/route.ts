@@ -51,6 +51,7 @@ async function processAccount(
   account: typeof ACCOUNTS[0],
   supabase: AnySupabase,
   etabId: string | null,
+  reqUrl: string,
   dbg?: string[],
 ): Promise<ImportedFile[]> {
   if (!account.user || !account.pass) return [];
@@ -70,16 +71,21 @@ async function processAccount(
     const lock = await client.getMailboxLock("INBOX");
 
     try {
+      // Use NOOP to refresh mailbox state, then get real count
+      try { await client.noop(); } catch { /* ignore */ }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const totalMsgs = (client.mailbox as any)?.exists ?? 0;
       dbg?.push(`${account.label}: ${totalMsgs} mails`);
       if (totalMsgs === 0) { lock.release(); await client.logout(); return results; }
 
-      // Fetch ONLY the last message (Vercel Hobby = 10s timeout)
-      dbg?.push(`  Fetch seq ${totalMsgs}:${totalMsgs}...`);
+      // Fetch 1 message at offset from the end
+      const offset = parseInt(new URL(reqUrl).searchParams.get("offset") ?? "0") || 0;
+      // Use "*" for offset 0 to always get the absolute last message
+      const seqStr = offset === 0 ? "*" : String(Math.max(1, totalMsgs - offset));
+      dbg?.push(`  Fetch seq ${seqStr} (offset ${offset})...`);
 
       let msgCount = 0;
-      for await (const msg of client.fetch(`${totalMsgs}:${totalMsgs}`, { envelope: true, bodyStructure: true, uid: true })) {
+      for await (const msg of client.fetch(`${seqStr}:${seqStr}`, { envelope: true, bodyStructure: true, uid: true })) {
         msgCount++;
         try {
           const uidStr = String(msg.uid);
@@ -304,7 +310,7 @@ export async function GET(req: Request) {
     }
     const etabId = etabMap[account.etabSlug] ?? null;
     try {
-      const results = await processAccount(account, supabase, etabId, debug ? debugInfo : undefined);
+      const results = await processAccount(account, supabase, etabId, req.url, debug ? debugInfo : undefined);
       allResults.push(...results);
     } catch (e) {
       errors.push(`${account.label}: ${e instanceof Error ? e.message : String(e)}`);

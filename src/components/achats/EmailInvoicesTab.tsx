@@ -56,18 +56,23 @@ export function EmailInvoicesTab() {
     setSyncResult(null);
     try {
       const acct = emailAccount?.includes("piccola") ? "pm" : "bm";
-      const res = await fetch(`/api/invoices/email-import?debug=1&account=${acct}`);
-      const text = await res.text();
-      try {
-        const json = JSON.parse(text);
-        const parts: string[] = [];
-        if (json.errors && json.errors.length > 0) parts.push(`Erreurs: ${json.errors.join(" | ")}`);
-        parts.push(`${json.processed ?? 0} facture(s) importee(s)`);
-        if (json.debug && json.debug.length > 0) parts.push(json.debug.join("\n"));
-        setSyncResult(parts.join("\n"));
-      } catch {
-        setSyncResult(`Reponse serveur: ${text.slice(0, 200)}`);
+      const allParts: string[] = [];
+      let totalImported = 0;
+      // Scan backwards in batches of 1 message, up to 30 attempts
+      for (let offset = 0; offset < 30; offset++) {
+        setSyncResult(`Scan mail ${offset + 1}/30...`);
+        const res = await fetch(`/api/invoices/email-import?debug=1&account=${acct}&offset=${offset}`);
+        const text = await res.text();
+        let json;
+        try { json = JSON.parse(text); } catch { allParts.push(`Erreur: ${text.slice(0, 100)}`); break; }
+        if (json.errors?.length) { allParts.push(`Erreur: ${json.errors.join(", ")}`); break; }
+        totalImported += json.processed ?? 0;
+        if (json.debug) allParts.push(...json.debug);
+        // Stop if we found PDFs or reached end
+        if ((json.processed ?? 0) > 0 || json.noMoreMails) break;
       }
+      allParts.unshift(`${totalImported} facture(s) importee(s)`);
+      setSyncResult(allParts.join("\n"));
       await load();
     } catch (e) {
       setSyncResult(`Erreur: ${e instanceof Error ? e.message : String(e)}`);
