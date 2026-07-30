@@ -75,12 +75,11 @@ async function processAccount(
       dbg?.push(`${account.label}: ${totalMsgs} mails`);
       if (totalMsgs === 0) { lock.release(); await client.logout(); return results; }
 
-      // Fetch the last 3 messages (Vercel Hobby = 10s timeout)
-      const startSeq = Math.max(1, totalMsgs - 2);
-      dbg?.push(`  Fetch seq ${startSeq}:${totalMsgs}...`);
+      // Fetch ONLY the last message (Vercel Hobby = 10s timeout)
+      dbg?.push(`  Fetch seq ${totalMsgs}:${totalMsgs}...`);
 
       let msgCount = 0;
-      for await (const msg of client.fetch(`${startSeq}:${totalMsgs}`, { envelope: true, bodyStructure: true, uid: true })) {
+      for await (const msg of client.fetch(`${totalMsgs}:${totalMsgs}`, { envelope: true, bodyStructure: true, uid: true })) {
         msgCount++;
         try {
           const uidStr = String(msg.uid);
@@ -236,9 +235,11 @@ export async function GET(req: Request) {
   const testOnly = new URL(req.url).searchParams.get("test") === "1";
 
   if (testOnly) {
-    // Quick IMAP connectivity test — no Supabase
+    // Quick IMAP test + fetch last message metadata
     const testResults: string[] = [];
-    for (const account of ACCOUNTS) {
+    const acctParam = new URL(req.url).searchParams.get("account");
+    const accts = acctParam === "pm" ? [ACCOUNTS[1]] : acctParam === "bm" ? [ACCOUNTS[0]] : ACCOUNTS;
+    for (const account of accts) {
       if (!account.user || !account.pass) {
         testResults.push(`${account.label}: identifiants manquants`);
         continue;
@@ -248,8 +249,24 @@ export async function GET(req: Request) {
         await c.connect();
         const lock = await c.getMailboxLock("INBOX");
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const exists = (c.mailbox as any)?.exists ?? "?";
-        testResults.push(`${account.label}: OK — ${exists} mails dans INBOX`);
+        const exists = (c.mailbox as any)?.exists ?? 0;
+        testResults.push(`${account.label}: ${exists} mails`);
+        // Fetch last message envelope + bodyStructure
+        if (exists > 0) {
+          for await (const msg of c.fetch(`${exists}:${exists}`, { envelope: true, bodyStructure: true, uid: true })) {
+            const subject = msg.envelope?.subject ?? "(sans objet)";
+            const partTypes: string[] = [];
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const collectTypes = (s: any) => {
+              if (!s) return;
+              if (s.type) partTypes.push(`${s.type}${s.dispositionParameters?.filename ? ` [${s.dispositionParameters.filename}]` : s.parameters?.name ? ` [${s.parameters.name}]` : ""}`);
+              if (s.childNodes) for (const ch of s.childNodes) collectTypes(ch);
+            };
+            collectTypes(msg.bodyStructure);
+            const pdfs = findPdfParts(msg.bodyStructure);
+            testResults.push(`  Dernier: "${subject.slice(0, 50)}" — ${pdfs.length} PDF | ${partTypes.join(", ").slice(0, 120)}`);
+          }
+        }
         lock.release();
         await c.logout();
       } catch (e) {
