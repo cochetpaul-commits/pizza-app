@@ -78,7 +78,11 @@ async function processAccount(
       dbg?.push(`${account.label}: ${uidList.length} mails depuis 30j`);
       if (uidList.length === 0) return results;
 
-      for (const uid of uidList) {
+      // Process only the 20 most recent to avoid timeout
+      const recentUids = uidList.slice(-20);
+      dbg?.push(`  Traitement des ${recentUids.length} plus recents...`);
+
+      for (const uid of recentUids) {
         try {
           const msg = await client.fetchOne(String(uid), {
             envelope: true,
@@ -107,8 +111,17 @@ async function processAccount(
           }
 
           // Find PDF attachments in body structure
-          const attachments = findPdfParts(msg.bodyStructure);
-          dbg?.push(`  UID ${uidStr}: "${subject.slice(0, 50)}" — ${attachments.length} PDF(s), structure: ${JSON.stringify(msg.bodyStructure?.type ?? "?").slice(0, 80)}`);
+          const attachments = findPdfParts(msg.bodyStructure, "", dbg);
+          // Collect all part types for debug
+          const partTypes: string[] = [];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const collectTypes = (s: any) => {
+            if (!s) return;
+            if (s.type) partTypes.push(`${s.type}${s.dispositionParameters?.filename ? ` [${s.dispositionParameters.filename}]` : s.parameters?.name ? ` [${s.parameters.name}]` : ""}`);
+            if (s.childNodes) for (const c of s.childNodes) collectTypes(c);
+          };
+          collectTypes(msg.bodyStructure);
+          dbg?.push(`  UID ${uidStr}: "${subject.slice(0, 40)}" — ${attachments.length} PDF | parts: ${partTypes.join(", ").slice(0, 150)}`);
 
           if (attachments.length === 0) {
             continue;
@@ -191,29 +204,36 @@ async function processAccount(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function findPdfParts(structure: any, parentPart = ""): { part: string; filename: string | null }[] {
+function findPdfParts(structure: any, parentPart = "", dbg?: string[]): { part: string; filename: string | null }[] {
   const results: { part: string; filename: string | null }[] = [];
   if (!structure) return results;
 
   const part = parentPart || structure.part || "";
+  const type = (structure.type ?? "").toLowerCase();
+  const disp = (structure.disposition ?? "").toLowerCase();
+
+  // Get filename from various locations
+  const filename = structure.dispositionParameters?.filename
+    ?? structure.parameters?.name
+    ?? null;
+  const fnLower = (filename ?? "").toLowerCase();
 
   // Check if this part is a PDF
   if (
-    structure.type === "application/pdf" ||
-    (structure.disposition === "attachment" && structure.parameters?.name?.toLowerCase().endsWith(".pdf")) ||
-    structure.parameters?.name?.toLowerCase()?.endsWith(".pdf")
+    type === "application/pdf" ||
+    type === "application/x-pdf" ||
+    type === "application/octet-stream" && fnLower.endsWith(".pdf") ||
+    (disp === "attachment" && fnLower.endsWith(".pdf")) ||
+    fnLower.endsWith(".pdf")
   ) {
-    const name = structure.dispositionParameters?.filename
-      ?? structure.parameters?.name
-      ?? null;
-    results.push({ part: part || "1", filename: name });
+    results.push({ part: part || "1", filename });
   }
 
   // Recurse into child parts
   if (structure.childNodes && Array.isArray(structure.childNodes)) {
     for (let i = 0; i < structure.childNodes.length; i++) {
       const childPart = part ? `${part}.${i + 1}` : String(i + 1);
-      results.push(...findPdfParts(structure.childNodes[i], childPart));
+      results.push(...findPdfParts(structure.childNodes[i], childPart, dbg));
     }
   }
 
