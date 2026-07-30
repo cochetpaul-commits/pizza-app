@@ -70,28 +70,20 @@ async function processAccount(
     const lock = await client.getMailboxLock("INBOX");
 
     try {
-      // Search messages from the last 30 days (not just unseen)
-      const since = new Date();
-      since.setDate(since.getDate() - 30);
-      const uids = await client.search({ since }, { uid: true });
-      const uidList = Array.isArray(uids) ? uids : [];
-      dbg?.push(`${account.label}: ${uidList.length} mails depuis 30j`);
-      if (uidList.length === 0) return results;
+      // Fetch the 20 most recent messages using sequence numbers
+      const status = await client.status("INBOX", { messages: true });
+      const total = status?.messages ?? 0;
+      dbg?.push(`${account.label}: ${total} mails total dans INBOX`);
+      if (total === 0) return results;
 
-      // Process only the 20 most recent to avoid timeout
-      const recentUids = uidList.slice(-20);
-      dbg?.push(`  Traitement des ${recentUids.length} plus recents...`);
+      const startSeq = Math.max(1, total - 19);
+      const range = `${startSeq}:*`;
+      dbg?.push(`  Fetch seq ${range}...`);
 
-      for (const uid of recentUids) {
+      let msgCount = 0;
+      for await (const msg of client.fetch(range, { envelope: true, bodyStructure: true, uid: true })) {
+        msgCount++;
         try {
-          const msg = await client.fetchOne(String(uid), {
-            envelope: true,
-            bodyStructure: true,
-            uid: true,
-          });
-
-          if (!msg) continue;
-
           const uidStr = String(msg.uid);
           const subject = msg.envelope?.subject ?? "(sans objet)";
           const fromAddr = msg.envelope?.from?.[0]?.address ?? "";
@@ -105,14 +97,11 @@ async function processAccount(
             .eq("email_uid", uidStr)
             .limit(1);
 
-          if (existing && existing.length > 0) {
-            // Already processed — skip
-            continue;
-          }
+          if (existing && existing.length > 0) { continue; }
 
           // Find PDF attachments in body structure
-          const attachments = findPdfParts(msg.bodyStructure, "", dbg);
-          // Collect all part types for debug
+          const attachments = findPdfParts(msg.bodyStructure);
+          // Debug: collect all part types
           const partTypes: string[] = [];
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const collectTypes = (s: any) => {
@@ -121,17 +110,15 @@ async function processAccount(
             if (s.childNodes) for (const c of s.childNodes) collectTypes(c);
           };
           collectTypes(msg.bodyStructure);
-          dbg?.push(`  UID ${uidStr}: "${subject.slice(0, 40)}" — ${attachments.length} PDF | parts: ${partTypes.join(", ").slice(0, 150)}`);
+          dbg?.push(`  #${msgCount} UID ${uidStr}: "${subject.slice(0, 35)}" — ${attachments.length} PDF | ${partTypes.join(", ").slice(0, 100)}`);
 
-          if (attachments.length === 0) {
-            continue;
-          }
+          if (attachments.length === 0) { continue; }
 
           for (const att of attachments) {
             const filename = att.filename ?? `facture_${uidStr}.pdf`;
 
             // Download the attachment
-            const { content } = await client.download(String(uid), att.part, { uid: true });
+            const { content } = await client.download(uidStr, att.part, { uid: true });
             const chunks: Buffer[] = [];
             for await (const chunk of content) {
               chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
@@ -188,8 +175,8 @@ async function processAccount(
 
         } catch (msgErr) {
           const errMsg = msgErr instanceof Error ? msgErr.message : String(msgErr);
-          console.error(`[email-import] Error processing UID ${uid}:`, errMsg);
-          dbg?.push(`  UID ${uid}: ERREUR — ${errMsg.slice(0, 120)}`);
+          console.error(`[email-import] Error processing msg:`, errMsg);
+          dbg?.push(`  #${msgCount}: ERREUR — ${errMsg.slice(0, 120)}`);
         }
       }
     } finally {
