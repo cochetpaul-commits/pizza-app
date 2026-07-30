@@ -70,24 +70,16 @@ async function processAccount(
     const lock = await client.getMailboxLock("INBOX");
 
     try {
-      // Fetch recent messages
-      let totalMsgs = 0;
-      try {
-        const st = await client.status("INBOX", { messages: true });
-        totalMsgs = st?.messages ?? 0;
-      } catch {
-        // Fallback: mailbox info from lock
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        totalMsgs = (client.mailbox as any)?.exists ?? 100;
-      }
-      dbg?.push(`${account.label}: ${totalMsgs} mails total`);
-      if (totalMsgs === 0) return results;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const totalMsgs = (client.mailbox as any)?.exists ?? 0;
+      dbg?.push(`${account.label}: ${totalMsgs} mails`);
+      if (totalMsgs === 0) { lock.release(); await client.logout(); return results; }
 
-      const startSeq = Math.max(1, totalMsgs - 9);
-      dbg?.push(`  Fetch seq ${startSeq}:* (last ${totalMsgs - startSeq + 1})...`);
+      const startSeq = Math.max(1, totalMsgs - 4); // last 5 only
+      dbg?.push(`  Fetch seq ${startSeq}:${totalMsgs}...`);
 
       let msgCount = 0;
-      for await (const msg of client.fetch(`${startSeq}:*`, { envelope: true, bodyStructure: true, uid: true })) {
+      for await (const msg of client.fetch(`${startSeq}:${totalMsgs}`, { envelope: true, bodyStructure: true, uid: true })) {
         msgCount++;
         try {
           const uidStr = String(msg.uid);
@@ -268,8 +260,7 @@ export async function GET(req: Request) {
 
   try {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-
-  await ensureBucket(supabase);
+  // Bucket creation skipped — do it lazily on first upload or create manually
 
   // Resolve etablissement IDs
   const { data: etabs } = await supabase.from("etablissements").select("id, slug");
