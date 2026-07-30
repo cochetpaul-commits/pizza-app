@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { useEtablissement } from "@/lib/EtablissementContext";
 import { T } from "@/lib/tokens";
 
 type EmailInvoice = {
@@ -28,20 +29,25 @@ const ST: Record<string, { label: string; color: string; bg: string }> = {
 };
 
 export function EmailInvoicesTab() {
+  const { current: etab } = useEtablissement();
   const [invoices, setInvoices] = useState<EmailInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [filter, setFilter] = useState("pending");
 
+  // Map current etab to email account
+  const emailAccount = etab?.slug?.includes("piccola") ? "facture@piccolamia.fr" : etab?.slug?.includes("bello") ? "facture@bellomio.fr" : null;
+
   const load = useCallback(async () => {
     setLoading(true);
     let query = supabase.from("email_invoices").select("*").order("created_at", { ascending: false }).limit(100);
     if (filter !== "all") query = query.eq("status", filter);
+    if (emailAccount) query = query.eq("email_account", emailAccount);
     const { data } = await query;
     setInvoices((data ?? []) as EmailInvoice[]);
     setLoading(false);
-  }, [filter]);
+  }, [filter, emailAccount]);
 
   useEffect(() => { load(); }, [load]); // eslint-disable-line react-hooks/set-state-in-effect
 
@@ -99,7 +105,7 @@ export function EmailInvoicesTab() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-        <p style={{ fontSize: 12, color: T.muted, margin: 0 }}>facture@bellomio.fr + facture@piccolamia.fr</p>
+        <p style={{ fontSize: 12, color: T.muted, margin: 0 }}>{emailAccount ?? "Toutes les boites"}</p>
         <button onClick={triggerSync} disabled={syncing} style={{
           padding: "7px 16px", borderRadius: 8, border: "none",
           background: T.terracotta, color: "#fff", fontSize: 12, fontWeight: 700,
