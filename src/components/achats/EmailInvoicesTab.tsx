@@ -55,13 +55,19 @@ export function EmailInvoicesTab() {
     setSyncing(true);
     setSyncResult(null);
     try {
-      const res = await fetch("/api/invoices/email-import?debug=1");
-      const json = await res.json();
-      const parts: string[] = [];
-      if (json.errors && json.errors.length > 0) parts.push(`Erreurs: ${json.errors.join(" | ")}`);
-      parts.push(`${json.processed ?? 0} facture(s) importee(s)`);
-      if (json.debug && json.debug.length > 0) parts.push(json.debug.join("\n"));
-      setSyncResult(parts.join("\n"));
+      const acct = emailAccount?.includes("piccola") ? "pm" : "bm";
+      const res = await fetch(`/api/invoices/email-import?debug=1&account=${acct}`);
+      const text = await res.text();
+      try {
+        const json = JSON.parse(text);
+        const parts: string[] = [];
+        if (json.errors && json.errors.length > 0) parts.push(`Erreurs: ${json.errors.join(" | ")}`);
+        parts.push(`${json.processed ?? 0} facture(s) importee(s)`);
+        if (json.debug && json.debug.length > 0) parts.push(json.debug.join("\n"));
+        setSyncResult(parts.join("\n"));
+      } catch {
+        setSyncResult(`Reponse serveur: ${text.slice(0, 200)}`);
+      }
       await load();
     } catch (e) {
       setSyncResult(`Erreur: ${e instanceof Error ? e.message : String(e)}`);

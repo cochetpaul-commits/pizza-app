@@ -75,11 +75,11 @@ async function processAccount(
       dbg?.push(`${account.label}: ${totalMsgs} mails`);
       if (totalMsgs === 0) { lock.release(); await client.logout(); return results; }
 
-      const startSeq = Math.max(1, totalMsgs - 4); // last 5 only
-      dbg?.push(`  Fetch seq ${startSeq}:${totalMsgs}...`);
+      // Fetch ONLY the last message to stay within timeout
+      dbg?.push(`  Fetch seq ${totalMsgs}:${totalMsgs}...`);
 
       let msgCount = 0;
-      for await (const msg of client.fetch(`${startSeq}:${totalMsgs}`, { envelope: true, bodyStructure: true, uid: true })) {
+      for await (const msg of client.fetch(`${totalMsgs}:${totalMsgs}`, { envelope: true, bodyStructure: true, uid: true })) {
         msgCount++;
         try {
           const uidStr = String(msg.uid);
@@ -275,9 +275,13 @@ export async function GET(req: Request) {
   const errors: string[] = [];
   const debugInfo: string[] = [];
 
-  for (const account of ACCOUNTS) {
+  // Process only one account per call to stay within timeout
+  const acctParam = new URL(req.url).searchParams.get("account");
+  const accountsToProcess = acctParam === "pm" ? [ACCOUNTS[1]] : acctParam === "bm" ? [ACCOUNTS[0]] : [ACCOUNTS[0]]; // default to BM
+
+  for (const account of accountsToProcess) {
     if (!account.user || !account.pass) {
-      errors.push(`${account.label}: identifiants manquants (user=${account.user ? "ok" : "vide"}, pass=${account.pass ? "ok" : "vide"})`);
+      errors.push(`${account.label}: identifiants manquants`);
       continue;
     }
     const etabId = etabMap[account.etabSlug] ?? null;
