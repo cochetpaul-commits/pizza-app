@@ -69,8 +69,10 @@ async function processAccount(
     const lock = await client.getMailboxLock("INBOX");
 
     try {
-      // Search unseen messages
-      const uids = await client.search({ seen: false }, { uid: true });
+      // Search messages from the last 30 days (not just unseen)
+      const since = new Date();
+      since.setDate(since.getDate() - 30);
+      const uids = await client.search({ since }, { uid: true });
       if (!uids || uids.length === 0) return results;
 
       for (const uid of uids) {
@@ -97,8 +99,7 @@ async function processAccount(
             .limit(1);
 
           if (existing && existing.length > 0) {
-            // Already processed — mark as seen and skip
-            await client.messageFlagsAdd(String(uid), ["\\Seen"], { uid: true });
+            // Already processed — skip
             continue;
           }
 
@@ -106,8 +107,7 @@ async function processAccount(
           const attachments = findPdfParts(msg.bodyStructure);
 
           if (attachments.length === 0) {
-            // No PDF — mark as seen, skip
-            await client.messageFlagsAdd(String(uid), ["\\Seen"], { uid: true });
+            // No PDF — skip
             continue;
           }
 
@@ -169,9 +169,6 @@ async function processAccount(
               status: errorMsg ? "error" : "pending",
             });
           }
-
-          // Mark as seen after processing
-          await client.messageFlagsAdd(String(uid), ["\\Seen"], { uid: true });
 
         } catch (msgErr) {
           console.error(`[email-import] Error processing UID ${uid}:`, msgErr);
