@@ -2033,7 +2033,7 @@ function PerformancesPage() {
                 <span>Ventes par categorie · CA {mode.toUpperCase()}</span>
                 <span style={{ fontSize: 10, color: "#777", fontStyle: "italic", textTransform: "none", letterSpacing: 0 }}>Cliquer une barre pour le detail</span>
               </div>
-              <ChartCanvas id="mix" height={220} data={W} mode={mode} type="mix" onBarClick={(label, color) => setMixDDOpen({ label, color })} />
+              <ChartCanvas id="mix" height={Math.max(220, W.mix_labels.length * 32)} data={W} mode={mode} type="mix" onBarClick={(label, color) => setMixDDOpen({ label, color })} />
               {mixDDOpen && W.cat_products[mixDDOpen.label] && (
                 <MixDropdown label={mixDDOpen.label} color={mixDDOpen.color} products={W.cat_products[mixDDOpen.label]} onClose={() => setMixDDOpen(null)} mode={mode} />
               )}
@@ -2578,14 +2578,19 @@ function ChartCanvas({ id, height, data, mode, type, onBarClick }: {
       const total = vals.reduce((a, b) => a + b, 0);
       charts[id] = new Chart(canvasRef.current, {
         type: "bar",
-        data: { labels: data.mix_labels, datasets: [{ data: vals, backgroundColor: getCategoryColors(data.mix_labels), borderRadius: 4, borderSkipped: false }] },
+        data: { labels: data.mix_labels, datasets: [{
+          data: vals,
+          backgroundColor: getCategoryColors(data.mix_labels),
+          borderRadius: 4, borderSkipped: false,
+          barPercentage: 0.7, categoryPercentage: 0.85,
+        }] },
         options: {
           indexAxis: "y", responsive: true, maintainAspectRatio: false,
-          layout: { padding: { right: 80 } },
+          layout: { padding: { right: 100 } },
           plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${fmt(ctx.raw as number)} — ${((ctx.raw as number) / total * 100).toFixed(1)}%` } } },
           scales: {
-            x: { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { callback: v => fmtK(v as number), color: "#aaa", font: { size: 11 } }, border: { display: false } },
-            y: { grid: { display: false }, ticks: { color: "#444", font: { size: 12 } }, border: { display: false } },
+            x: { display: false },
+            y: { grid: { display: false }, ticks: { color: "#444", font: { size: 12, weight: "bold" as const }, padding: 4 }, border: { display: false } },
           },
           onClick: (_evt, elements) => {
             if (elements.length && onBarClick) {
@@ -2603,11 +2608,11 @@ function ChartCanvas({ id, height, data, mode, type, onBarClick }: {
                 const val = ds.data[i] as number;
                 const pct = (val / total * 100).toFixed(0);
                 ctx.save();
-                ctx.font = "500 11px DM Sans, sans-serif";
-                ctx.fillStyle = "#555";
+                ctx.font = "600 11px DM Sans, sans-serif";
+                ctx.fillStyle = "#777";
                 ctx.textAlign = "left";
                 ctx.textBaseline = "middle";
-                ctx.fillText(`${Math.round(val).toLocaleString("fr-FR")}\u20AC  ${pct}%`, bar.x + 6, bar.y);
+                ctx.fillText(`${Math.round(val).toLocaleString("fr-FR")}\u20AC  ${pct}%`, bar.x + 8, bar.y);
                 ctx.restore();
               });
             });
