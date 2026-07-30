@@ -1356,18 +1356,7 @@ function IngredientsPageInner() {
                       const showSubHeader = hasSubCats && x.sub_category !== lastSubCat;
                       lastSubCat = x.sub_category;
                       return (
-                        <div key={x.id} id={`ing-${x.id}`} style={{ display: "flex", alignItems: "flex-start", gap: 0 }}>
-                          {userCanWrite && (
-                            <div style={{ paddingTop: showSubHeader ? 30 : 12, paddingLeft: 4, paddingRight: 2, flexShrink: 0 }}>
-                              <input
-                                type="checkbox"
-                                checked={selectedIds.has(x.id)}
-                                onChange={() => toggleSelect(x.id)}
-                                style={{ width: 16, height: 16, accentColor: "#D4775A", cursor: "pointer" }}
-                              />
-                            </div>
-                          )}
-                          <div style={{ flex: 1, minWidth: 0 }}>
+                        <div key={x.id} id={`ing-${x.id}`}>
                           {showSubHeader && (
                             <div style={{ padding: "8px 16px 4px", fontSize: 10, fontWeight: 700, color: CAT_COLORS[cat] ?? "#999", textTransform: "uppercase", letterSpacing: "0.06em", borderTop: lastSubCat !== undefined ? "1px solid rgba(0,0,0,0.04)" : "none" }}>
                               {x.sub_category ?? "Autre"}
@@ -1380,6 +1369,8 @@ function IngredientsPageInner() {
                             suppliersMap={suppliersMap}
                             supplierName={supplierName}
                             supplierIdForDisplay={supplierIdForDisplay}
+                            selected={selectedIds.has(x.id)}
+                            onToggleSelect={userCanWrite ? toggleSelect : undefined}
                             alert={alertMap.get(x.id)}
                             isEditing={editingId === x.id}
                             compactMode={compactMode}
@@ -1409,7 +1400,6 @@ function IngredientsPageInner() {
                             }}
                             subCategorySuggestions={subCategorySuggestions}
                           />
-                          </div>
                         </div>
                       );
                     });

@@ -278,6 +278,8 @@ export type IngredientRowProps = {
   onCreateDerived?: (x: Ingredient) => void;
   onOpenSupplier?: (supplierId: string) => void;
   onToggleEstablishment?: (id: string, estab: "bellomio" | "piccola", current: string[]) => void;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
   duplicateMatch?: { id: string; name: string; score: number } | null;
   onMergeDuplicate?: (keepId: string, deleteId: string) => void;
   onIgnoreDuplicate?: (id1: string, id2: string) => void;
@@ -288,7 +290,7 @@ export const IngredientRow = React.memo(function IngredientRow({
   item: x, offer, altOffers, suppliersMap, supplierName, supplierIdForDisplay, alert, isEditing, compactMode, edit,
   suppliers, storageZones,
   onStartEdit, onSaveEdit, onDelete, onSetStatus, onEditChange, onEditImportName, onCreateDerived, onOpenSupplier, onToggleEstablishment,
-  duplicateMatch, onMergeDuplicate, onIgnoreDuplicate, subCategorySuggestions,
+  selected, onToggleSelect, duplicateMatch, onMergeDuplicate, onIgnoreDuplicate, subCategorySuggestions,
 }: IngredientRowProps) {
   const [mobileSection, setMobileSection] = React.useState<string>("prix"); // mobile accordion: only one open at a time
   const toggleMobileSection = React.useCallback((key: string) => {
@@ -446,66 +448,54 @@ export const IngredientRow = React.memo(function IngredientRow({
       <div
         className="md:hidden"
         onClick={() => { if (isEditing) onSaveEdit(); else onStartEdit(x); }}
-        style={{ padding: "12px 14px", background: "white", cursor: "pointer" }}
+        style={{ padding: "10px 12px", background: "white", cursor: "pointer" }}
       >
-        {compactMode ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div style={{ fontWeight: 600, fontSize: 13, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: CAT_COLORS[x.category] }}>{x.name}</div>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", flexShrink: 0, whiteSpace: "nowrap" }}>{price}</span>
-            {alert && <span style={{ fontSize: 10, color: alert.direction === "up" ? "#DC2626" : "#16A34A", flexShrink: 0 }}>{alert.direction === "up" ? "+" : "-"}{(Math.abs(alert.change_pct) * 100).toFixed(0)}%</span>}
-            {isEditing && <button onClick={(e) => { e.stopPropagation(); onSaveEdit(); }} style={{ ...BTN_ACTION, background: "#4a6741", color: "white", fontSize: 10, fontWeight: 700 }}>{st !== "validated" ? "OK" : "OK"}</button>}
-            {!isEditing && <button onClick={(e) => { e.stopPropagation(); onDelete(x.id, x.name); }} style={{ ...BTN_ACTION, background: "rgba(220,38,38,0.10)", color: "#DC2626" }}>x</button>}
+        {/* Row 1: Checkbox + Avatar + Name + Price */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {onToggleSelect && (
+            <input
+              type="checkbox"
+              checked={selected ?? false}
+              onChange={(e) => { e.stopPropagation(); onToggleSelect(x.id); }}
+              onClick={(e) => e.stopPropagation()}
+              style={{ width: 16, height: 16, accentColor: catAccent, cursor: "pointer", flexShrink: 0 }}
+            />
+          )}
+          {!compactMode && <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={30} editable />}
+          <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+            <div style={{
+              fontWeight: 600, fontSize: 13, color: catAccent,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>{x.name}</div>
           </div>
-        ) : (
-          <>
-            {/* Row 1: Avatar + Name (truncated) + Price */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={32} editable />
-              <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
-                <div style={{
-                  fontWeight: 600, fontSize: 13, color: CAT_COLORS[x.category],
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                }}>{x.name}</div>
-              </div>
-              <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 4 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap" }}>{price}</div>
-              </div>
-            </div>
-            {/* Row 2: Meta info */}
-            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, flexWrap: "wrap", paddingLeft: 42 }}>
-              {x.sub_category && <span style={{ fontSize: 9, fontWeight: 600, padding: "1px 5px", borderRadius: 4, background: `${CAT_COLORS[x.category]}12`, color: CAT_COLORS[x.category] }}>{x.sub_category}</span>}
-              {x.is_derived && <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED" }}>DERIVE</span>}
-              <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 999, background: sb.bg, color: sb.color }}>{sb.label}</span>
-              {alert && <span style={{ fontSize: 9, fontWeight: 700, color: alert.direction === "up" ? "#DC2626" : "#16A34A" }}>{alert.direction === "up" ? "+" : "-"}{(Math.abs(alert.change_pct) * 100).toFixed(0)}%</span>}
-              <span style={{ fontSize: 10, color: "#aaa" }}>{supplierName || CAT_LABELS[x.category]}</span>
-            </div>
-            {/* Row 3: Price comparison */}
-            {priceComparison && (
-              <div style={{ paddingLeft: 42, marginTop: 3 }}>
-                {!priceComparison.isCheapest && priceComparison.cheapestName ? (
-                  <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600 }}>
-                    Moins cher chez {priceComparison.cheapestName} ({priceComparison.cheapest.unit_price!.toFixed(2)}{"\u00A0"}{"\u20AC"}/{priceComparison.cheapest.unit ?? "kg"})
-                  </span>
-                ) : priceComparison.count > 1 ? (
-                  <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600 }}>
-                    Meilleur prix ({priceComparison.count} fournisseurs)
-                  </span>
-                ) : null}
-              </div>
-            )}
-            {/* Allergenes */}
-            {alg.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 4, paddingLeft: 42 }}>
-                {alg.map(a => (
-                  <span key={a} style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "rgba(220,38,38,0.08)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.18)" }}>
-                    {ALLERGEN_SHORT[a as keyof typeof ALLERGEN_SHORT] ?? a}
-                  </span>
-                ))}
-              </div>
-            )}
-            {!hasPrice && <div style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", marginTop: 4, paddingLeft: 42 }}>prix manquant</div>}
-          </>
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap" }}>{price}</div>
+          </div>
+        </div>
+        {/* Row 2: Meta */}
+        {!compactMode && (
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, flexWrap: "wrap", paddingLeft: onToggleSelect ? 54 : 38 }}>
+            {x.sub_category && <span style={{ fontSize: 9, fontWeight: 600, padding: "1px 5px", borderRadius: 4, background: `${catAccent}12`, color: catAccent }}>{x.sub_category}</span>}
+            <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 999, background: sb.bg, color: sb.color }}>{sb.label}</span>
+            {alert && <span style={{ fontSize: 9, fontWeight: 700, color: alert.direction === "up" ? "#DC2626" : "#16A34A" }}>{alert.direction === "up" ? "+" : "-"}{(Math.abs(alert.change_pct) * 100).toFixed(0)}%</span>}
+            <span style={{ fontSize: 10, color: "#aaa" }}>{supplierName || CAT_LABELS[x.category]}</span>
+          </div>
         )}
+        {/* Row 3: Price comparison */}
+        {!compactMode && priceComparison && (
+          <div style={{ paddingLeft: onToggleSelect ? 54 : 38, marginTop: 3 }}>
+            {!priceComparison.isCheapest && priceComparison.cheapestName ? (
+              <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600 }}>
+                - cher : {priceComparison.cheapestName} ({priceComparison.cheapest.unit_price!.toFixed(2)}{"\u00A0\u20AC"}/{priceComparison.cheapest.unit ?? "kg"})
+              </span>
+            ) : priceComparison.count > 1 ? (
+              <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600 }}>
+                Meilleur prix ({priceComparison.count} fournisseurs)
+              </span>
+            ) : null}
+          </div>
+        )}
+        {!compactMode && !hasPrice && <div style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", marginTop: 4, paddingLeft: onToggleSelect ? 54 : 38 }}>prix manquant</div>}
       </div>
 
       {/* ── DUPLICATE ALERT ── */}
