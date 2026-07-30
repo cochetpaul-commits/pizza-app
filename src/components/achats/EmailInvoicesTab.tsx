@@ -106,6 +106,21 @@ export function EmailInvoicesTab() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <p style={{ fontSize: 12, color: T.muted, margin: 0 }}>{emailAccount ?? "Toutes les boites"}</p>
+        <button onClick={async () => {
+          setSyncing(true); setSyncResult(null);
+          try {
+            const r = await fetch("/api/invoices/email-import?test=1");
+            const j = await r.json();
+            setSyncResult((j.test ?? []).join("\n"));
+          } catch (e) { setSyncResult(`Erreur test: ${e instanceof Error ? e.message : String(e)}`); }
+          setSyncing(false);
+        }} disabled={syncing} style={{
+          padding: "7px 16px", borderRadius: 8, border: `1px solid ${T.border}`,
+          background: "#fff", color: T.dark, fontSize: 12, fontWeight: 600,
+          cursor: syncing ? "wait" : "pointer", marginRight: 6,
+        }}>
+          Tester
+        </button>
         <button onClick={triggerSync} disabled={syncing} style={{
           padding: "7px 16px", borderRadius: 8, border: "none",
           background: T.terracotta, color: "#fff", fontSize: 12, fontWeight: 700,

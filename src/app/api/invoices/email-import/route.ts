@@ -240,6 +240,32 @@ function findPdfParts(structure: any, parentPart = "", dbg?: string[]): { part: 
  * Called by Vercel cron every hour. Fetches unseen emails with PDF attachments.
  */
 export async function GET(req: Request) {
+  const testOnly = new URL(req.url).searchParams.get("test") === "1";
+
+  if (testOnly) {
+    // Quick IMAP connectivity test — no Supabase
+    const testResults: string[] = [];
+    for (const account of ACCOUNTS) {
+      if (!account.user || !account.pass) {
+        testResults.push(`${account.label}: identifiants manquants`);
+        continue;
+      }
+      try {
+        const c = new ImapFlow({ host: IMAP_HOST, port: IMAP_PORT, secure: true, auth: { user: account.user, pass: account.pass }, logger: false });
+        await c.connect();
+        const lock = await c.getMailboxLock("INBOX");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const exists = (c.mailbox as any)?.exists ?? "?";
+        testResults.push(`${account.label}: OK — ${exists} mails dans INBOX`);
+        lock.release();
+        await c.logout();
+      } catch (e) {
+        testResults.push(`${account.label}: ERREUR — ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    return NextResponse.json({ ok: true, test: testResults });
+  }
+
   try {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
