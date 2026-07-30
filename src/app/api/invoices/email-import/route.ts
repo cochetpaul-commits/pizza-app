@@ -187,7 +187,9 @@ async function processAccount(
           }
 
         } catch (msgErr) {
-          console.error(`[email-import] Error processing UID ${uid}:`, msgErr);
+          const errMsg = msgErr instanceof Error ? msgErr.message : String(msgErr);
+          console.error(`[email-import] Error processing UID ${uid}:`, errMsg);
+          dbg?.push(`  UID ${uid}: ERREUR — ${errMsg.slice(0, 120)}`);
         }
       }
     } finally {
