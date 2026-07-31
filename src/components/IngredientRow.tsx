@@ -416,9 +416,6 @@ export const IngredientRow = React.memo(function IngredientRow({
           )}
         </div>
 
-        {/* Conditionnement */}
-        <div style={{ flex: 1, fontSize: 12, color: "#666" }}>{condInfo}</div>
-
         {/* Statut */}
         <div style={{ flex: 1 }}>
           <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 999, background: sb.bg, color: sb.color }}>{sb.label}</span>
@@ -471,6 +468,12 @@ export const IngredientRow = React.memo(function IngredientRow({
           <div style={{ textAlign: "right", flexShrink: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap" }}>{price}</div>
           </div>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(x.id, x.name); }} style={{
+            width: 24, height: 24, borderRadius: 6, border: "none",
+            background: "rgba(220,38,38,0.08)", color: "#DC2626",
+            fontSize: 12, cursor: "pointer", flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>x</button>
         </div>
         {/* Row 2: Meta */}
         {!compactMode && (
