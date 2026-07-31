@@ -903,11 +903,12 @@ function IngredientsPageInner() {
         }
       }
     }
-    // Auto-validate if still "to_check" — one click instead of two
+    // Auto-validate: if we just saved an offer OR the ingredient already has a price
     const ing = items.find((i) => i.id === editingId);
     if (ing && ing.status !== "validated" && userId) {
+      const justSavedOffer = edit.useOffer && supplier_id;
       const off = offersByIngredientId.get(editingId);
-      const hasP = offerHasPrice(off, { piece_volume_ml: ing.piece_volume_ml }) || legacyHasPrice(ing);
+      const hasP = justSavedOffer || offerHasPrice(off, { piece_volume_ml: ing.piece_volume_ml }) || legacyHasPrice(ing);
       if (hasP) {
         await supabase.from("ingredients").update({
           status: "validated" as IngredientStatus,
