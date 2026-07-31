@@ -855,25 +855,6 @@ export const IngredientRow = React.memo(function IngredientRow({
               <button type="button" onClick={() => onEditImportName(x.id, edit.importName)}
                 style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, border: "1.5px solid #e5ddd0", background: "white", color: "#888", cursor: "pointer", height: 32 }}>✎</button>
             </div>
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <span style={{ fontSize: 10, color: "#aaa", fontWeight: 600, flexShrink: 0 }}>Popina:</span>
-              <input
-                value={edit.popinaName}
-                onChange={(e) => onEditChange({ ...edit, popinaName: e.target.value })}
-                placeholder="Nom dans la caisse"
-                style={{ flex: 1, fontSize: 11, padding: "6px 10px", border: "1.5px solid #e5ddd0", borderRadius: 8, background: "#fff", outline: "none", color: "#1a1a1a", height: 32 }}
-              />
-              {LIQUID_CATS.has(edit.category) && <>
-                <input
-                  value={edit.popinaDoseCl}
-                  onChange={(e) => onEditChange({ ...edit, popinaDoseCl: e.target.value })}
-                  placeholder="Dose cl"
-                  inputMode="decimal"
-                  style={{ width: 70, fontSize: 11, padding: "6px 10px", border: "1.5px solid #e5ddd0", borderRadius: 8, background: "#fff", outline: "none", color: "#1a1a1a", height: 32, textAlign: "center" }}
-                />
-                {edit.popinaDoseCl && <span style={{ fontSize: 10, color: "#aaa", flexShrink: 0 }}>cl</span>}
-              </>}
-            </div>
           </div>
 
           {/* ═══ MOBILE TOP BAR: stacked rows ═══ */}
@@ -923,21 +904,6 @@ export const IngredientRow = React.memo(function IngredientRow({
               </div>
               <button type="button" onClick={() => onEditImportName(x.id, edit.importName)}
                 style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, border: "1.5px solid #e5ddd0", background: "white", color: "#888", cursor: "pointer", height: 36 }}>✎</button>
-            </div>
-            <div style={{ display: "flex", gap: 6 }}>
-              <input
-                value={edit.popinaName}
-                onChange={(e) => onEditChange({ ...edit, popinaName: e.target.value })}
-                placeholder="Nom Popina (caisse)"
-                style={{ flex: 1, fontSize: 11, padding: "8px 10px", border: "1.5px solid #e5ddd0", borderRadius: 8, background: "#fff", outline: "none", color: "#1a1a1a" }}
-              />
-              {LIQUID_CATS.has(edit.category) && <input
-                value={edit.popinaDoseCl}
-                onChange={(e) => onEditChange({ ...edit, popinaDoseCl: e.target.value })}
-                placeholder="cl"
-                inputMode="decimal"
-                style={{ width: 55, fontSize: 11, padding: "8px 6px", border: "1.5px solid #e5ddd0", borderRadius: 8, background: "#fff", outline: "none", color: "#1a1a1a", textAlign: "center" }}
-              />}
             </div>
           </div>
 
