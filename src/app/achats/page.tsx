@@ -12,7 +12,6 @@ import { setPendingInvoiceFile } from "@/lib/pendingInvoiceFile";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { useSearchParams } from "next/navigation";
 import { StatsAchatsContent } from "@/components/achats/StatsAchatsContent";
-import { EmailInvoicesTab } from "@/components/achats/EmailInvoicesTab";
 
 /* ── Types ── */
 
@@ -139,11 +138,8 @@ function AchatsContent() {
   const searchParams = useSearchParams();
   const etab = useEtablissement();
   const etabId = etab.current?.id ?? null;
-  const [activeTab, setActiveTab] = useState<"factures" | "stats" | "email">(() => {
-    const t = searchParams.get("tab");
-    if (t === "stats") return "stats";
-    if (t === "email") return "email";
-    return "factures";
+  const [activeTab, setActiveTab] = useState<"factures" | "stats">(() => {
+    return searchParams.get("tab") === "stats" ? "stats" : "factures";
   });
 
   // ── Date range (default: current month) ──
@@ -795,7 +791,7 @@ function AchatsContent() {
         {/*  TABS — Factures / Stats prix                    */}
         {/* ══════════════════════════════════════════════════ */}
         <div style={{ display: "flex", gap: 4, padding: 4, background: "#f0ebe2", borderRadius: 12, marginBottom: 18, border: "1px solid #e8e0d0" }}>
-          {([["factures", "Factures"], ["stats", "Stats prix"], ["email", "Email"]] as const).map(([key, label]) => (
+          {([["factures", "Factures"], ["stats", "Stats prix"]] as const).map(([key, label]) => (
             <button key={key} type="button" onClick={() => setActiveTab(key)} style={{
               flex: 1, padding: "8px 10px", borderRadius: 10, border: "none",
               background: activeTab === key ? "#fff" : "transparent",
@@ -814,9 +810,7 @@ function AchatsContent() {
           <DateRangePicker value={range} onChange={(r) => setRange(r)} />
         </div>
 
-        {activeTab === "email" ? (
-          <EmailInvoicesTab />
-        ) : activeTab === "stats" ? (
+        {activeTab === "stats" ? (
           <StatsAchatsContent />
         ) : (<>
 
