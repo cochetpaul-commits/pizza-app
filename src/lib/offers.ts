@@ -222,10 +222,8 @@ export function offerHasPrice(
     if (o.pack_each_unit == null) return false;
 
     if (o.pack_each_unit === "pc") {
-      if (o.piece_weight_g != null && Number.isFinite(o.piece_weight_g) && o.piece_weight_g > 0) return true;
-      const vol = extras?.piece_volume_ml;
-      if (vol != null && Number.isFinite(vol) && vol > 0) return true;
-      return false;
+      // pack_composed with pc: always valid if pack_price and pack_count are set
+      return true;
     }
 
     return o.pack_each_qty != null && Number.isFinite(o.pack_each_qty) && o.pack_each_qty > 0;
