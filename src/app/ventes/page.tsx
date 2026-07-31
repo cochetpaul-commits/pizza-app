@@ -1460,10 +1460,21 @@ function PerformancesPage() {
               const tmMidi = caMidi / covMidiTotal;
               const tmSoir = caSoir / covSoirTotal;
 
-              // Global food/drink per cover
-              const totalCov = W.couverts || 1;
-              const foodPerCov = (W.food_ttc ?? 0) > 0 ? ((mode === "ttc" ? W.food_ttc! : W.food_ht!) / totalCov) : null;
-              const drinkPerCov = (W.drink_ttc ?? 0) > 0 ? ((mode === "ttc" ? W.drink_ttc! : W.drink_ht!) / totalCov) : null;
+              // Food/drink per cover per service via ratios_by_svc
+              const FOOD_KEYS = ["anti", "dolci", "pizze", "plats"];
+              const DRINK_KEYS = ["vin", "alcool", "boissons", "digestif", "cafe"];
+              const sumRatioCA = (svc: string, keys: string[]) => {
+                const r = W.ratios_by_svc?.[svc];
+                if (!r) return 0;
+                return keys.reduce((s, k) => s + (r[k]?.total ?? 0), 0);
+              };
+              const foodMidi = sumRatioCA("midi", FOOD_KEYS);
+              const drinkMidi = sumRatioCA("midi", DRINK_KEYS);
+              const foodSoir = sumRatioCA("soir", FOOD_KEYS);
+              const drinkSoir = sumRatioCA("soir", DRINK_KEYS);
+              const covMidiT = midiSvcs.reduce((s, sv) => s + sv.cov, 0) || 1;
+              const covSoirT = soirSvcs.reduce((s, sv) => s + sv.cov, 0) || 1;
+              const hasFoodDrink = (foodMidi + foodSoir + drinkMidi + drinkSoir) > 0;
 
               const rempColor = (pct: number) => pct >= 80 ? "#2e7d32" : pct >= 50 ? "#D97706" : "#DC2626";
               const OSWALD_F = "var(--font-oswald), Oswald, sans-serif";
@@ -1526,22 +1537,32 @@ function PerformancesPage() {
                         <div style={{ fontSize: 10, color: "#999" }}>{soirSvcs.reduce((s, sv) => s + sv.cov, 0)} cvt</div>
                       </div>
                     </div>
-                    {/* Food / Boissons decompose midi-soir */}
-                    {foodPerCov != null && (
+                    {/* Food / Boissons par service */}
+                    {hasFoodDrink && (
                       <div style={{ borderTop: "1px solid #f0ebe3", paddingTop: 10 }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                          <div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
+                          {/* Food */}
+                          <div style={{ borderRight: "1px solid #f0ebe3", paddingRight: 8 }}>
                             <div style={{ fontSize: 10, fontWeight: 700, color: "#8a6b3e", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Food /cvt</div>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
+                              <span style={{ color: "#5e8278", fontWeight: 600 }}>Midi</span>
+                              <span style={{ fontFamily: OSWALD_F, fontWeight: 700 }}>{(foodMidi / covMidiT).toFixed(1)}{"\u20AC"}</span>
+                            </div>
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                              <span style={{ color: "#888" }}>Global</span>
-                              <span style={{ fontFamily: OSWALD_F, fontWeight: 700 }}>{foodPerCov.toFixed(1)}{"\u20AC"}</span>
+                              <span style={{ color: "#1a1a1a", fontWeight: 600 }}>Soir</span>
+                              <span style={{ fontFamily: OSWALD_F, fontWeight: 700 }}>{(foodSoir / covSoirT).toFixed(1)}{"\u20AC"}</span>
                             </div>
                           </div>
-                          <div>
+                          {/* Boissons */}
+                          <div style={{ paddingLeft: 8 }}>
                             <div style={{ fontSize: 10, fontWeight: 700, color: "#5e8278", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Boissons /cvt</div>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
+                              <span style={{ color: "#5e8278", fontWeight: 600 }}>Midi</span>
+                              <span style={{ fontFamily: OSWALD_F, fontWeight: 700 }}>{(drinkMidi / covMidiT).toFixed(1)}{"\u20AC"}</span>
+                            </div>
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                              <span style={{ color: "#888" }}>Global</span>
-                              <span style={{ fontFamily: OSWALD_F, fontWeight: 700 }}>{drinkPerCov?.toFixed(1) ?? "0"}{"\u20AC"}</span>
+                              <span style={{ color: "#1a1a1a", fontWeight: 600 }}>Soir</span>
+                              <span style={{ fontFamily: OSWALD_F, fontWeight: 700 }}>{(drinkSoir / covSoirT).toFixed(1)}{"\u20AC"}</span>
                             </div>
                           </div>
                         </div>
