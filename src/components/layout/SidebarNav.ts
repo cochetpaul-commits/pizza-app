@@ -141,7 +141,7 @@ export const PRODUCTION_SECTION_PICCOLA: NavSubSection = { label: "Production", 
 const ACHATS_ITEMS_PICCOLA: NavItemV2[] = ACHATS_ITEMS.filter(i => i.href !== "/admin/popina-catalogue");
 export const ACHATS_SECTION: NavSubSection = { label: "Achats", icon: "shoppingBag", roles: ["group_admin", "manager", "equipier"], items: ACHATS_ITEMS };
 export const ACHATS_SECTION_PICCOLA: NavSubSection = { label: "Achats", icon: "shoppingBag", roles: ["group_admin", "manager", "equipier"], items: ACHATS_ITEMS_PICCOLA };
-export const HACCP_SECTION: NavSubSection = { label: "HACCP", icon: "clipboard", items: HACCP_ITEMS };
+export const HACCP_SECTION: NavSubSection = { label: "HACCP", icon: "clipboard", roles: ["group_admin", "manager"], items: HACCP_ITEMS };
 export const EVENEMENTIEL_SECTION: NavSubSection = { label: "Evenementiel", icon: "calendarEvent", items: EVENEMENTIEL_ITEMS };
 
 // Backward compat
@@ -174,7 +174,7 @@ export function buildDynamicNav(
       etabSlug: etab.slug,
       label: etab.nom,
       color: etab.couleur ?? "#D4775A",
-      roles: ["group_admin", "equipier"],
+      roles: ["group_admin", "manager", "equipier"],
       sections,
     });
   }

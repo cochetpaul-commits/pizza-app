@@ -294,6 +294,7 @@ const SECTION_PRODUCTION: TabSection = {
   label: "Production",
   href: "/recettes",
   match: ["/catalogue", "/recettes", "/inventaire", "/prep"],
+  roles: ["group_admin", "manager", "equipier"],
   icon: () => <IconPackage />,
   tabs: [
     { label: "Recettes", href: "/recettes", match: ["/recettes", "/prep"], icon: () => <IconBook /> },
@@ -319,6 +320,7 @@ const SECTION_EVENTS: TabSection = {
   label: "Events",
   href: "/evenements",
   match: ["/evenements", "/clients", "/devis"],
+  roles: ["group_admin", "manager"],
   icon: () => <IconHeart />,
   tabs: [
     { label: "Evenements", href: "/evenements", match: ["/evenements"], icon: () => <IconCalendar /> },

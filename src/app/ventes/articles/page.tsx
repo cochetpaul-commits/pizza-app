@@ -1,7 +1,12 @@
 "use client";
 
 import { ArticlesContent } from "@/components/production/ArticlesTab";
+import { RequireRole } from "@/components/RequireRole";
 
 export default function ArticlesVentePage() {
-  return <ArticlesContent />;
+  return (
+    <RequireRole permission="performances.view">
+      <ArticlesContent />
+    </RequireRole>
+  );
 }

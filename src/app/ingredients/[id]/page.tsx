@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect, useMemo, useRef } from "react";
+import { RequireRole } from "@/components/RequireRole";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
@@ -787,12 +788,14 @@ function IngredientDetailInner() {
 
 export default function IngredientDetailPage() {
   return (
-    <Suspense fallback={
-      <main className="container">
-        <div className="card" style={{ textAlign: "center", padding: 40, color: "var(--muted)" }}>Chargement…</div>
-      </main>
-    }>
-      <IngredientDetailInner />
-    </Suspense>
+    <RequireRole allowedRoles={["group_admin", "manager", "equipier"]}>
+      <Suspense fallback={
+        <main className="container">
+          <div className="card" style={{ textAlign: "center", padding: 40, color: "var(--muted)" }}>Chargement…</div>
+        </main>
+      }>
+        <IngredientDetailInner />
+      </Suspense>
+    </RequireRole>
   );
 }
