@@ -1222,8 +1222,7 @@ export function CatalogueContent() {
                     <div
                       onClick={() => toggleOpen(recipe.id)}
                       style={{
-                        display: "flex", alignItems: "center", gap: 14,
-                        padding: "14px 18px", background: recDragSnap.isDragging ? "#faf7f2" : "#fff",
+                        padding: "12px 14px", background: recDragSnap.isDragging ? "#faf7f2" : "#fff",
                         border: recDragSnap.isDragging ? `2px solid ${color}` : "1px solid #ede6d9",
                         borderRadius: isOpen ? "12px 12px 0 0" : 12,
                         borderBottom: isOpen ? "1px solid #f2ede4" : recDragSnap.isDragging ? `2px solid ${color}` : "1px solid #ede6d9",
@@ -1234,202 +1233,61 @@ export function CatalogueContent() {
                       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = `${color}40`; (e.currentTarget as HTMLElement).style.boxShadow = `0 2px 8px ${color}12`; }}
                       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = isOpen ? "#f2ede4" : "#ede6d9"; (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 2px rgba(0,0,0,0.02)"; }}
                     >
-                      {/* Drag handle */}
-                      {canWrite && (
-                        <div
-                          {...recDragProvided.dragHandleProps}
-                          style={{
-                            cursor: "grab", color: "#ccc", flexShrink: 0,
-                            touchAction: "none", padding: "4px 2px",
-                            display: "flex", alignItems: "center",
-                            WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none",
-                          }}
-                          title="Glisser pour deplacer"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="4" r="1.5"/><circle cx="16" cy="4" r="1.5"/><circle cx="8" cy="12" r="1.5"/><circle cx="16" cy="12" r="1.5"/><circle cx="8" cy="20" r="1.5"/><circle cx="16" cy="20" r="1.5"/></svg>
-                        </div>
-                      )}
-
-                      {/* Thumbnail */}
-                      <div style={{
-                        width: 46, height: 46, borderRadius: 10, flexShrink: 0, overflow: "hidden",
-                        background: recipe.photo_url
-                          ? `url(${recipe.photo_url}) center/cover`
-                          : `linear-gradient(135deg, ${color}25 0%, ${color}10 100%)`,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        border: `1px solid ${color}20`,
-                      }}>
-                        {!recipe.photo_url && (
-                          <span style={{ fontSize: 14, fontWeight: 700, color: `${color}60`, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
-                            {initials(recipe.name)}
-                          </span>
+                      {/* Line 1: Handle + Thumbnail + Name + Chevron */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                        {canWrite && (
+                          <div {...recDragProvided.dragHandleProps} style={{ cursor: "grab", color: "#ccc", flexShrink: 0, touchAction: "none", WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }} onClick={e => e.stopPropagation()}>
+                            <svg width={12} height={12} viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="4" r="1.5"/><circle cx="16" cy="4" r="1.5"/><circle cx="8" cy="12" r="1.5"/><circle cx="16" cy="12" r="1.5"/><circle cx="8" cy="20" r="1.5"/><circle cx="16" cy="20" r="1.5"/></svg>
+                          </div>
                         )}
+                        <div style={{
+                          width: 36, height: 36, borderRadius: 8, flexShrink: 0, overflow: "hidden",
+                          background: recipe.photo_url ? `url(${recipe.photo_url}) center/cover` : `linear-gradient(135deg, ${color}25 0%, ${color}10 100%)`,
+                          display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${color}20`,
+                        }}>
+                          {!recipe.photo_url && <span style={{ fontSize: 12, fontWeight: 700, color: `${color}60`, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{initials(recipe.name)}</span>}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 14, color: "#1a1a1a", textTransform: "uppercase", letterSpacing: "0.03em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {recipe.name}
+                          </div>
+                        </div>
+                        <span style={{ fontSize: 10, color: "#b0a894", flexShrink: 0, transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "rotate(0)" }}>▼</span>
                       </div>
 
-                      {/* Name + meta */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 15,
-                          color: "#1a1a1a",
-                          textTransform: "uppercase", letterSpacing: "0.03em",
-                        }}>
-                          {recipe.name}
-                        </div>
-                        <div style={{ fontSize: 11, color: "#999", marginTop: 3 }}>
+                      {/* Line 2: Meta + buttons */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", paddingLeft: canWrite ? 22 : 0 }}>
+                        <span style={{ fontSize: 11, color: "#999" }}>
                           {recipe.type === "vin" ? (
                             <>
-                              <span style={{
-                                fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 4,
-                                background: (WINE_COLOR_COLORS[String(recipe.metadata?.color ?? "")] ?? "#8a6b3e") + "15",
-                                color: WINE_COLOR_COLORS[String(recipe.metadata?.color ?? "")] ?? "#8a6b3e",
-                                textTransform: "uppercase", marginRight: 4,
-                              }}>
+                              <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4, background: (WINE_COLOR_COLORS[String(recipe.metadata?.color ?? "")] ?? "#8a6b3e") + "15", color: WINE_COLOR_COLORS[String(recipe.metadata?.color ?? "")] ?? "#8a6b3e", textTransform: "uppercase", marginRight: 3 }}>
                                 {WINE_COLOR_LABELS[String(recipe.metadata?.color ?? "")] ?? ""}
                               </span>
                               {recipe.metadata?.domaine && String(recipe.metadata.domaine)}
-                              {recipe.metadata?.region && ` · ${String(recipe.metadata.region)}`}
                             </>
                           ) : (
-                            <>
-                              {recipe.lines.length} ingr.
-                              {recipe.steps.length > 0 && ` · ${recipe.steps.length} étape${recipe.steps.length > 1 ? "s" : ""}`}
-                              {recipe.yield_info && ` · ${recipe.yield_info}`}
-                            </>
+                            <>{recipe.lines.length} ingr.{recipe.steps.length > 0 && ` · ${recipe.steps.length} et.`}{recipe.yield_info && ` · ${recipe.yield_info}`}</>
                           )}
-                        </div>
+                        </span>
+                        <a href={recipe.type === "production" && recipe.category === "empatement" ? `/recettes/empatement/${recipe.id.replace(/^emp-/, "")}` : recipe.type === "pizza" ? `/recettes/pizza/${recipe.id}` : `/fiche/${recipe.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ padding: "2px 8px", borderRadius: 12, border: `1px solid ${color}30`, background: `${color}06`, color, fontSize: 10, fontWeight: 700, textDecoration: "none", flexShrink: 0 }}>
+                          Fiche
+                        </a>
+                        {canProduce && <button type="button" onClick={(e) => { e.stopPropagation(); setModalRecipe(recipe); }} style={{ padding: "2px 8px", borderRadius: 12, border: "none", background: "rgba(45,106,79,0.1)", color: "#2D6A4F", fontSize: 10, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>Prod.</button>}
+                        {recipe.allergens.length > 0 && (
+                          <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+                            {recipe.allergens.slice(0, 3).map(a => (<span key={a} style={{ fontSize: 7, fontWeight: 800, padding: "1px 4px", borderRadius: 3, background: "rgba(220,38,38,0.08)", color: "#DC2626" }}>{a.slice(0, 3).toUpperCase()}</span>))}
+                            {recipe.allergens.length > 3 && <span style={{ fontSize: 7, color: "#999" }}>+{recipe.allergens.length - 3}</span>}
+                          </div>
+                        )}
+                        {canWrite && <button type="button" onClick={(e) => { e.stopPropagation(); handleDuplicate(recipe); }} title="Dupliquer" style={{ width: 24, height: 24, borderRadius: 6, border: "1px solid rgba(37,99,235,0.15)", background: "rgba(37,99,235,0.05)", color: "#2563EB", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}>
+                          <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                        </button>}
+                        {canWrite && <button type="button" onClick={(e) => { e.stopPropagation(); handleDelete(recipe); }} title="Supprimer" style={{ width: 24, height: 24, borderRadius: 6, border: "1px solid rgba(220,38,38,0.15)", background: "rgba(220,38,38,0.05)", color: "#DC2626", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
+                        </button>}
                       </div>
-
-                      {/* Production pill */}
-                      {canProduce && (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); setModalRecipe(recipe); }}
-                          style={{
-                            padding: "3px 10px", borderRadius: 20, border: "none",
-                            background: "rgba(45,106,79,0.1)", color: "#2D6A4F",
-                            fontSize: 10, fontWeight: 700, cursor: "pointer",
-                            flexShrink: 0, letterSpacing: "0.02em",
-                          }}
-                        >
-                          Production
-                        </button>
-                      )}
-
-                      {/* Voir la fiche */}
-                      <a
-                        href={recipe.type === "production" && recipe.category === "empatement" ? `/recettes/empatement/${recipe.id.replace(/^emp-/, "")}`
-                          : recipe.type === "pizza" ? `/recettes/pizza/${recipe.id}`
-                          : `/fiche/${recipe.id}`}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          padding: "3px 10px", borderRadius: 20, border: `1px solid ${color}40`,
-                          background: `${color}08`, color,
-                          fontSize: 10, fontWeight: 700, cursor: "pointer",
-                          flexShrink: 0, letterSpacing: "0.02em", textDecoration: "none",
-                        }}
-                      >
-                        Voir la fiche
-                      </a>
-
-                      {/* Allergen dots */}
-                      {recipe.allergens.length > 0 && (
-                        <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
-                          {recipe.allergens.slice(0, 3).map(a => (
-                            <span key={a} style={{
-                              fontSize: 8, fontWeight: 800, padding: "2px 5px", borderRadius: 4,
-                              background: "rgba(220,38,38,0.08)", color: "#DC2626",
-                              border: "1px solid rgba(220,38,38,0.18)",
-                            }}>
-                              {a.slice(0, 3).toUpperCase()}
-                            </span>
-                          ))}
-                          {recipe.allergens.length > 3 && (
-                            <span style={{ fontSize: 8, color: "#999" }}>+{recipe.allergens.length - 3}</span>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Duplicate button */}
-                      {canWrite && (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleDuplicate(recipe); }}
-                          title="Dupliquer la recette"
-                          aria-label="Dupliquer"
-                          style={{
-                            width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(37,99,235,0.2)",
-                            background: "rgba(37,99,235,0.06)", color: "#2563EB", cursor: "pointer",
-                            flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-                          }}
-                        >
-                          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="9" y="9" width="13" height="13" rx="2" />
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                          </svg>
-                        </button>
-                      )}
-
-                      {/* Edit category button */}
-                      {canWrite && recipe.type !== "production" && (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); setEditCatTarget(recipe); setEditCatValue(recipe.category ?? ""); setEditSubCatValue(recipe.sous_categorie ?? ""); }}
-                          title="Modifier la categorie"
-                          aria-label="Categorie"
-                          style={{
-                            width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(212,119,90,0.2)",
-                            background: "rgba(212,119,90,0.06)", color: "#D4775A", cursor: "pointer",
-                            flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-                          }}
-                        >
-                          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                          </svg>
-                        </button>
-                      )}
-
-                      {/* Delete button */}
-                      {canWrite && (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleDelete(recipe); }}
-                          title="Supprimer la recette"
-                          aria-label="Supprimer"
-                          style={{
-                            width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(220,38,38,0.2)",
-                            background: "rgba(220,38,38,0.06)", color: "#DC2626", cursor: "pointer",
-                            flexShrink: 0,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            transition: "all 0.15s",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = "#DC2626";
-                            e.currentTarget.style.color = "#fff";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = "rgba(220,38,38,0.06)";
-                            e.currentTarget.style.color = "#DC2626";
-                          }}
-                        >
-                          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="3 6 5 6 21 6" />
-                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                            <path d="M10 11v6M14 11v6" />
-                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                          </svg>
-                        </button>
-                      )}
-
-                      {/* Chevron */}
-                      <span style={{
-                        fontSize: 10, color: "#b0a894", flexShrink: 0,
-                        transition: "transform 0.2s",
-                        transform: isOpen ? "rotate(180deg)" : "rotate(0)",
-                      }}>
-                        ▼
-                      </span>
                     </div>
 
                     {/* Expanded fiche */}

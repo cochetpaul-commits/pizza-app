@@ -30,6 +30,7 @@ function timeAgo(iso: string): string {
 /* ── Sub: Notification bell ──────────────────────── */
 
 function NotifBell() {
+  const router = useRouter();
   const { notifications, unreadCount, markAsRead, markAllAsRead, remove } = useNotifications();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -120,7 +121,7 @@ function NotifBell() {
                 <button
                   key={n.id}
                   type="button"
-                  onClick={() => { markAsRead(n.id); }}
+                  onClick={() => { markAsRead(n.id); if (n.lien) { setOpen(false); router.push(n.lien); } }}
                   style={{
                     display: "flex", gap: 10, alignItems: "flex-start",
                     width: "100%", padding: "10px 14px", border: "none", cursor: "pointer",
