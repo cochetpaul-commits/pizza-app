@@ -29,10 +29,10 @@ const s = StyleSheet.create({
   tHead: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: c.border, paddingBottom: 4, marginBottom: 4 },
   tH: { fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, fontFamily: "Helvetica-Bold" },
   tRow: { flexDirection: "row", paddingVertical: 3, borderBottomWidth: 0.3, borderBottomColor: "#eee" },
-  tCell: { fontSize: 10 },
-  tCellBold: { fontSize: 14, fontFamily: "Helvetica-Bold" },
-  tCellAccent: { fontSize: 14, fontFamily: "Helvetica-Bold", color: c.accent },
-  tCellMuted: { fontSize: 14, color: c.muted },
+  tCell: { fontSize: 8 },
+  tCellBold: { fontSize: 9, fontFamily: "Helvetica-Bold" },
+  tCellAccent: { fontSize: 9, fontFamily: "Helvetica-Bold", color: c.accent },
+  tCellMuted: { fontSize: 8, color: c.muted },
   kpi: { backgroundColor: "#faf8f5", borderRadius: 6, padding: 10, borderWidth: 0.5, borderColor: c.border, alignItems: "center" as const },
   kpiVal: { fontSize: 16, fontWeight: "bold", fontFamily: "Helvetica-Bold" },
   kpiLabel: { fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, marginTop: 3 },
@@ -165,7 +165,7 @@ function KpiCardsRow({ stats, prev }: { stats: any; prev: any }) {
     <View style={{ ...s.row, marginBottom: 8 }}>
       <View style={{ ...s.kpi, flex: 1 }}>
         <Text style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>Couverts</Text>
-        <Text style={{ ...s.kpiVal, fontSize: 14 }}>{fmtNum(W.couverts)}</Text>
+        <Text style={{ ...s.kpiVal, fontSize: 13 }}>{fmtNum(W.couverts)}</Text>
         <Text style={{ fontSize: 8, color: c.muted }}>{fmtNum(W.tickets)} tickets</Text>
         {prevCov > 0 && (
           <Text style={{ fontSize: 8, color: W.couverts >= prevCov ? c.good : c.bad, marginTop: 2 }}>
@@ -175,7 +175,7 @@ function KpiCardsRow({ stats, prev }: { stats: any; prev: any }) {
       </View>
       <View style={{ ...s.kpi, flex: 1 }}>
         <Text style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>CVT Moyen TTC</Text>
-        <Text style={{ ...s.kpiVal, fontSize: 14 }}>{fmtSp(tmTtc)}{"\u20AC"}</Text>
+        <Text style={{ ...s.kpiVal, fontSize: 13 }}>{fmtSp(tmTtc)}{"\u20AC"}</Text>
         <Text style={{ fontSize: 8, color: c.muted }}>HT {fmtSp(tmHt)}{"\u20AC"} · SP {fmtSp(tmSP)}{"\u20AC"}</Text>
         {prevTm > 0 && (
           <Text style={{ fontSize: 8, color: tmTtc >= prevTm ? c.good : c.bad, marginTop: 2 }}>
@@ -186,7 +186,7 @@ function KpiCardsRow({ stats, prev }: { stats: any; prev: any }) {
       {prevCA != null && prevCA > 0 && (
         <View style={{ ...s.kpi, flex: 1 }}>
           <Text style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>VS A-1</Text>
-          <Text style={{ ...s.kpiVal, fontSize: 14, color: W.ca_ttc >= prevCA ? c.good : c.bad }}>{deltaAbs(Math.round(W.ca_ttc), Math.round(prevCA))}{"\u20AC"}</Text>
+          <Text style={{ ...s.kpiVal, fontSize: 13, color: W.ca_ttc >= prevCA ? c.good : c.bad }}>{deltaAbs(Math.round(W.ca_ttc), Math.round(prevCA))}{"\u20AC"}</Text>
           <Text style={{ fontSize: 8, color: c.muted }}>A-1: {fmt(prevCA)}</Text>
         </View>
       )}
@@ -228,8 +228,8 @@ function UpsellCard({ stats }: { stats: any }) {
             return (
               <View key={u.label} style={{ flex: 1, backgroundColor: c.white, borderRadius: 5, padding: 5, borderWidth: 0.5, borderColor: c.border }}>
                 <Text style={{ fontSize: 8, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>{u.label}</Text>
-                <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: u.color }}>{pct}%</Text>
-                <Text style={{ fontSize: 11, color: c.muted }}>{tables}/{W.tickets} tbl · {coverts} cvt ({pctCov}%)</Text>
+                <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold", color: u.color }}>{pct}%</Text>
+                <Text style={{ fontSize: 8, color: c.muted }}>{tables}/{W.tickets} tbl · {coverts} cvt ({pctCov}%)</Text>
                 <View style={{ ...s.barBg, marginTop: 3, marginBottom: 2 }}>
                   <View style={{ ...s.barFill, width: `${Math.min(100, pct)}%`, backgroundColor: u.color }} />
                 </View>
@@ -294,12 +294,12 @@ function DurationCard({ stats, prev }: { stats: any; prev: any }) {
                 <Text style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: zoneColors[z.zone] ?? c.muted, fontFamily: "Helvetica-Bold", marginBottom: 3 }}>{z.zone}</Text>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                   <View>
-                    <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: c.accent }}>{z.avgDur}<Text style={{ fontSize: 8, color: c.muted }}>min</Text></Text>
+                    <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold", color: c.accent }}>{z.avgDur}<Text style={{ fontSize: 7, color: c.muted }}>min</Text></Text>
                     <Text style={{ fontSize: 11, color: c.muted }}>duree moy.</Text>
                   </View>
                   {rot && (
                     <View style={{ alignItems: "flex-end" as const }}>
-                      <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: c.green }}>{rot.avgRotation}x</Text>
+                      <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold", color: c.green }}>{rot.avgRotation}x</Text>
                       <Text style={{ fontSize: 11, color: c.muted }}>rotation</Text>
                     </View>
                   )}
@@ -397,7 +397,7 @@ function _ZonesDetailCard({ stats, mode }: { stats: any; mode: string }) {
         return (
           <View key={zone} style={{ flex: 1, backgroundColor: c.white, borderRadius: 5, padding: 6, borderWidth: 0.5, borderColor: c.border }}>
             <Text style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: zoneColors[zone] ?? c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>{zone}</Text>
-            <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: zoneColors[zone] ?? c.text }}>{fmt(zoneTotal)}</Text>
+            <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold", color: zoneColors[zone] ?? c.text }}>{fmt(zoneTotal)}</Text>
             <Text style={{ fontSize: 11, color: c.muted }}>{pct}% du CA</Text>
             {weekTotals && buckets && (
               <View style={{ marginTop: 4 }}>
@@ -560,40 +560,39 @@ function ServicesTable({ stats }: { stats: any }) {
     <View style={s.card} wrap>
       <Text style={s.sec}>Par service · TTC · couverts</Text>
       <View style={s.tHead}>
-        <Text style={{ ...s.tH, width: 30 }}>{useWeeks ? "Sem." : "Jour"}</Text>
-        <Text style={{ ...s.tH, width: 22 }}>Svc</Text>
-        <Text style={{ ...s.tH, width: 40, textAlign: "right", color: c.salle }}>Salle</Text>
-        <Text style={{ ...s.tH, width: 40, textAlign: "right", color: c.pergolas }}>Pergolas</Text>
-        <Text style={{ ...s.tH, width: 40, textAlign: "right", color: c.terrasse }}>Terrasse</Text>
-        <Text style={{ ...s.tH, width: 35, textAlign: "right", color: c.emp }}>Emp.</Text>
-        <Text style={{ ...s.tH, width: 42, textAlign: "right", color: c.accent }}>Total</Text>
-        <Text style={{ ...s.tH, width: 22, textAlign: "right" }}>Cvts</Text>
-        <Text style={{ ...s.tH, width: 18, textAlign: "right", color: c.green }}>SP</Text>
-        <Text style={{ ...s.tH, width: 25, textAlign: "right", color: c.green }}>M SP</Text>
-        <Text style={{ ...s.tH, width: 18, textAlign: "right", color: c.emp }}>EMP</Text>
-        <Text style={{ ...s.tH, width: 25, textAlign: "right", color: c.emp }}>M EMP</Text>
+        <Text style={{ ...s.tH, width: 36 }}>{useWeeks ? "Sem." : "Jour"}</Text>
+        <Text style={{ ...s.tH, width: 24 }}>Svc</Text>
+        <Text style={{ ...s.tH, flex: 1, textAlign: "right", color: c.salle }}>Salle</Text>
+        <Text style={{ ...s.tH, flex: 1, textAlign: "right", color: c.pergolas }}>Pergolas</Text>
+        <Text style={{ ...s.tH, flex: 1, textAlign: "right", color: c.terrasse }}>Terrasse</Text>
+        <Text style={{ ...s.tH, flex: 1, textAlign: "right", color: c.emp }}>Emp.</Text>
+        <Text style={{ ...s.tH, flex: 1, textAlign: "right", color: c.accent }}>Total</Text>
+        <Text style={{ ...s.tH, width: 28, textAlign: "right" }}>Cvts</Text>
+        <Text style={{ ...s.tH, width: 24, textAlign: "right", color: c.green }}>SP</Text>
+        <Text style={{ ...s.tH, width: 30, textAlign: "right", color: c.green }}>TM SP</Text>
+        <Text style={{ ...s.tH, width: 24, textAlign: "right", color: c.emp }}>Emp</Text>
+        <Text style={{ ...s.tH, width: 30, textAlign: "right", color: c.emp }}>TM E</Text>
       </View>
       {groups.map((group, di) =>
         group.services.map((sv: any, si: number) => {
           const caVal = sv.ttc;
           const z = sv.z_ttc;
           const tmSp = sv.tm_sp_ttc;
-          const _tmColor = tmSp >= 80 ? c.good : tmSp >= 65 ? "#e65100" : c.bad;
           return (
             <View key={`${di}-${si}`} style={{ ...s.tRow, backgroundColor: di % 2 === 0 ? c.white : "#faf7f2" }} wrap={false}>
-              {si === 0 && <Text style={{ ...s.tCellBold, width: 30 }}>{group.groupLabel}</Text>}
-              {si > 0 && <Text style={{ width: 30 }} />}
-              <Text style={{ ...s.tCellMuted, width: 22, fontSize: 6 }}>{sv.svc === "midi" ? "Midi" : "Soir"}</Text>
-              <Text style={{ ...s.tCellBold, width: 40, textAlign: "right", color: z?.Salle ? c.salle : c.faint }}>{z?.Salle ? fmt(z.Salle) : "\u2014"}</Text>
-              <Text style={{ ...s.tCellBold, width: 40, textAlign: "right", color: z?.Pergolas ? c.pergolas : c.faint }}>{z?.Pergolas ? fmt(z.Pergolas) : "\u2014"}</Text>
-              <Text style={{ ...s.tCellBold, width: 40, textAlign: "right", color: z?.Terrasse ? c.terrasse : c.faint }}>{z?.Terrasse ? fmt(z.Terrasse) : "\u2014"}</Text>
-              <Text style={{ ...s.tCellBold, width: 35, textAlign: "right", color: z?.emp ? c.emp : c.faint }}>{z?.emp ? fmt(z.emp) : "\u2014"}</Text>
-              <Text style={{ ...s.tCellAccent, width: 42, textAlign: "right" }}>{fmt(caVal)}</Text>
-              <Text style={{ ...s.tCell, width: 22, textAlign: "right" }}>{sv.cov}</Text>
-              <Text style={{ ...s.tCell, width: 18, textAlign: "right", color: c.green }}>{sv.sp_cov || "\u2014"}</Text>
-              <Text style={{ width: 25, textAlign: "right", fontSize: 11, fontFamily: "Helvetica-Bold", color: c.green }}>{tmSp > 0 ? `${tmSp.toFixed(0)}\u20AC` : "\u2014"}</Text>
-              <Text style={{ ...s.tCell, width: 18, textAlign: "right", color: c.emp }}>{sv.cov - (sv.sp_cov ?? 0) > 0 ? sv.cov - sv.sp_cov : "\u2014"}</Text>
-              <Text style={{ width: 25, textAlign: "right", fontSize: 11, fontFamily: "Helvetica-Bold", color: c.emp }}>{(() => { const ec = sv.cov - (sv.sp_cov ?? 0); if (ec <= 0) return "\u2014"; return sv.emp_ttc ? `${Math.round(sv.emp_ttc / ec)}\u20AC` : "\u2014"; })()}</Text>
+              {si === 0 && <Text style={{ ...s.tCellBold, width: 36 }}>{group.groupLabel}</Text>}
+              {si > 0 && <Text style={{ width: 36 }} />}
+              <Text style={{ ...s.tCellMuted, width: 24, fontSize: 7 }}>{sv.svc === "midi" ? "Midi" : "Soir"}</Text>
+              <Text style={{ ...s.tCellBold, flex: 1, textAlign: "right", color: z?.Salle ? c.salle : c.faint }}>{z?.Salle ? fmt(z.Salle) : "\u2014"}</Text>
+              <Text style={{ ...s.tCellBold, flex: 1, textAlign: "right", color: z?.Pergolas ? c.pergolas : c.faint }}>{z?.Pergolas ? fmt(z.Pergolas) : "\u2014"}</Text>
+              <Text style={{ ...s.tCellBold, flex: 1, textAlign: "right", color: z?.Terrasse ? c.terrasse : c.faint }}>{z?.Terrasse ? fmt(z.Terrasse) : "\u2014"}</Text>
+              <Text style={{ ...s.tCellBold, flex: 1, textAlign: "right", color: z?.emp ? c.emp : c.faint }}>{z?.emp ? fmt(z.emp) : "\u2014"}</Text>
+              <Text style={{ ...s.tCellAccent, flex: 1, textAlign: "right" }}>{fmt(caVal)}</Text>
+              <Text style={{ ...s.tCell, width: 28, textAlign: "right" }}>{sv.cov}</Text>
+              <Text style={{ ...s.tCell, width: 24, textAlign: "right", color: c.green }}>{sv.sp_cov || "\u2014"}</Text>
+              <Text style={{ width: 30, textAlign: "right", fontSize: 8, fontFamily: "Helvetica-Bold", color: c.green }}>{tmSp > 0 ? `${tmSp.toFixed(0)}\u20AC` : "\u2014"}</Text>
+              <Text style={{ ...s.tCell, width: 24, textAlign: "right", color: c.emp }}>{sv.cov - (sv.sp_cov ?? 0) > 0 ? sv.cov - sv.sp_cov : "\u2014"}</Text>
+              <Text style={{ width: 30, textAlign: "right", fontSize: 8, fontFamily: "Helvetica-Bold", color: c.emp }}>{(() => { const ec = sv.cov - (sv.sp_cov ?? 0); if (ec <= 0) return "\u2014"; return sv.emp_ttc ? `${Math.round(sv.emp_ttc / ec)}\u20AC` : "\u2014"; })()}</Text>
             </View>
           );
         })
