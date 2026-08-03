@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo, Suspense, type CSSPr
 import { useSearchParams } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { useProfile } from "@/lib/ProfileContext";
 import { AiInsightCard } from "@/components/AiInsightCard";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
 import { BottomSheet } from "@/components/layout/BottomSheet";
@@ -190,6 +191,8 @@ export default function MargesPageWrapper() {
 function MargesPage() {
   const searchParams = useSearchParams();
   const { current: etab } = useEtablissement();
+  const { can } = useProfile();
+  const showMoney = can("performances.show_money");
   const accent = etab?.couleur ?? COLORS.accent;
 
   const [internalRange, setInternalRange] = useState<DateRange>(() => {
@@ -2048,9 +2051,11 @@ function MargesPage() {
   if (isEmbedded) return content;
 
   return (
-    <RequireRole allowedRoles={["group_admin"]}>
+    <RequireRole permission="performances.view">
       <PilotageSwipeWrapper dateFrom={range.from} dateTo={range.to}>
-        {content}
+        <div className={showMoney ? "" : "no-money"}>
+          {content}
+        </div>
       </PilotageSwipeWrapper>
     </RequireRole>
   );

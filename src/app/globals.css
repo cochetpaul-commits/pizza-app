@@ -238,6 +238,10 @@ html, body{
   }
 }
 
+/* Hide monetary values when user lacks show_money permission */
+.no-money [data-money] { filter: blur(8px); pointer-events: none; user-select: none; }
+.no-money .money-hide { display: none !important; }
+
 /* Hide bottom tab bar pill when a bottom sheet drawer is open */
 body.bottom-sheet-open .bottom-tab-bar,
 body.bottom-sheet-open .bottom-bar-fab {

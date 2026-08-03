@@ -180,8 +180,9 @@ export default function PerformancesPageWrapper() {
 function PerformancesPage() {
   const searchParams = useSearchParams();
   const { current: etab } = useEtablissement();
-  const { can } = useProfile();
+  const { can, role, displayName } = useProfile();
   const showMoney = can("performances.show_money");
+  const isEquipier = role === "equipier";
   const mc = showMoney ? undefined : "hide-money"; // money class
   const accent = etab?.couleur ?? "#D4775A";
 
@@ -2068,16 +2069,43 @@ function PerformancesPage() {
             </div>}
 
 
-            {/* Serveurs */}
-            {W.serveurs.length > 0 && (
+            {/* Serveurs — equipiers voient uniquement leur propre performance */}
+            {W.serveurs.length > 0 && !isEquipier && (
               <div style={S.card}>
                 <div style={S.sec}>Performance serveurs · CA {mode.toUpperCase()}</div>
                 <ChartCanvas id="serv" height={Math.max(120, W.serveurs.length * 38)} data={W} mode={mode} type="serv" />
               </div>
             )}
+            {isEquipier && displayName && (() => {
+              const myIdx = W.serveurs.findIndex(s => s.toLowerCase() === displayName.toLowerCase());
+              if (myIdx < 0) return null;
+              const myCa = mode === "ttc" ? W.serv_ca_ttc[myIdx] : W.serv_ca_ht[myIdx];
+              const myTickets = W.serv_tickets?.[myIdx] ?? 0;
+              const myCov = W.serv_cov?.[myIdx] ?? 0;
+              const myTm = myCov > 0 ? myCa / myCov : 0;
+              return (
+                <div style={S.card}>
+                  <div style={S.sec}>Ma performance</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, textAlign: "center" }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: "#999", fontWeight: 600 }}>Tickets</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700 }}>{myTickets}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: "#999", fontWeight: 600 }}>Couverts</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700 }}>{myCov}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: "#999", fontWeight: 600 }}>TM</div>
+                      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700 }}>{myTm.toFixed(1)}{"\u20AC"}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
-            {/* Paiements */}
-            {W.pay && W.pay.length > 0 && (
+            {/* Paiements — masque pour equipiers */}
+            {!isEquipier && W.pay && W.pay.length > 0 && (
               <div style={S.card}>
                 <div style={S.sec}>Modes de paiement</div>
                 <div className="ventes-payment-grid" style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: 20, alignItems: "center" }}>
