@@ -238,6 +238,25 @@ html, body{
   }
 }
 
+/* ── Tablet (768–1024px) ── */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .sidebar-desktop {
+    width: 200px !important;
+    font-size: 12px;
+  }
+  .app-main {
+    margin-left: calc(200px + 16px) !important;
+  }
+  /* Dashboards */
+  .dashboard-grid { grid-template-columns: 1fr !important; }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  /* Ventes */
+  .ventes-remp-grid { grid-template-columns: 1fr !important; }
+  .ventes-zone-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .ventes-marge-kpis { grid-template-columns: repeat(2, 1fr) !important; }
+  .ventes-duration-kpis { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
 /* Hide monetary values when user lacks show_money permission */
 .no-money [data-money] { filter: blur(8px); pointer-events: none; user-select: none; }
 .no-money .money-hide { display: none !important; }

@@ -1481,7 +1481,7 @@ function PerformancesPage() {
               const OSWALD_F = "var(--font-oswald), Oswald, sans-serif";
 
               return (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 6 }}>
+                <div className="ventes-remp-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 6 }}>
                   {/* Remplissage */}
                   <div style={S.card}>
                     <div style={S.sec}>Taux de remplissage</div>
