@@ -858,9 +858,8 @@ function IngredientsPageInner() {
     }
 
     const up: Partial<IngredientUpsert> = {
-      name, category: edit.category, sub_category: edit.subCategory.trim() || null, is_active: edit.is_active, supplier_id,
-      popina_name: edit.popinaName.trim() || null,
-      popina_dose_cl: edit.popinaDoseCl ? parseFloat(edit.popinaDoseCl) || null : null,
+      name, category: edit.category, sub_category: edit.subCategory.trim() || null, is_active: edit.is_active,
+      ...(edit.useOffer ? {} : { supplier_id }), // Don't update supplier_id when using offers (managed via supplier_offers table)
       piece_volume_ml: pieceVolumeMl,
       piece_weight_g: pieceWeightG,
       purchase_unit_label: purchaseUnitLabel,
@@ -876,9 +875,9 @@ function IngredientsPageInner() {
     const u1 = await supabase.from("ingredients").update(up).eq("id", editingId);
     if (u1.error) {
       if (u1.error.message.includes("ingredients_etab_name")) {
-        alert(`Un ingrédient "${name}" existe déjà. Choisissez un autre nom.`);
-      } else if (u1.error.message.includes("unique_supplier_sku_per_user")) {
-        alert(`Un ingrédient avec le même code article (SKU) existe déjà pour ce fournisseur.`);
+        alert(`Un ingredient "${name}" existe deja. Choisissez un autre nom.`);
+      } else if (u1.error.message.includes("supplier_sku") || u1.error.message.includes("supplier_id_supplier_sku")) {
+        alert(`Un ingredient avec le meme code article (SKU) existe deja pour ce fournisseur. Verifiez les doublons.`);
       } else {
         alert(u1.error.message);
       }
