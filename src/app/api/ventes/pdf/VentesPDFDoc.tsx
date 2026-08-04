@@ -1,7 +1,10 @@
 import React from "react";
-import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, View, Text, StyleSheet, Font } from "@react-pdf/renderer";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+// Sans ce callback, react-pdf coupe les mots avec des tirets ("PERGO-LAS", "TARTU-FATA")
+Font.registerHyphenationCallback((word) => [word]);
 
 const c = {
   accent: "#D4775A", green: "#46655a", gold: "#c4a882",
@@ -20,14 +23,14 @@ const s = StyleSheet.create({
   hero: { backgroundColor: c.accent, borderRadius: 8, padding: 16, marginBottom: 12, color: c.white },
   heroBig: { fontSize: 28, fontWeight: "bold", fontFamily: "Helvetica-Bold", color: c.white },
   heroSub: { fontSize: 11, color: "rgba(255,255,255,0.7)", marginTop: 2 },
-  heroRow: { flexDirection: "row", marginTop: 12, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: "rgba(255,255,255,0.15)", gap: 18 },
-  heroKpiLabel: { fontSize: 11, textTransform: "uppercase", letterSpacing: 0.8, color: "rgba(255,255,255,0.6)", marginBottom: 2 },
+  heroRow: { flexDirection: "row", marginTop: 12, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: "#e0906f", gap: 18 },
+  heroKpiLabel: { fontSize: 7, textTransform: "uppercase", letterSpacing: 0.8, color: "rgba(255,255,255,0.6)", marginBottom: 2 },
   heroKpiVal: { fontSize: 16, fontWeight: "bold", fontFamily: "Helvetica-Bold", color: c.white },
   card: { backgroundColor: "#faf8f5", borderRadius: 6, padding: 12, marginBottom: 10, borderWidth: 0.5, borderColor: c.border },
-  sec: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: c.muted, marginBottom: 8, fontFamily: "Helvetica-Bold" },
+  sec: { fontSize: 9, textTransform: "uppercase", letterSpacing: 1, color: c.muted, marginBottom: 8, fontFamily: "Helvetica-Bold" },
   row: { flexDirection: "row", gap: 8 },
   tHead: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: c.border, paddingBottom: 4, marginBottom: 4 },
-  tH: { fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, fontFamily: "Helvetica-Bold" },
+  tH: { fontSize: 6.5, textTransform: "uppercase", letterSpacing: 0.3, color: c.muted, fontFamily: "Helvetica-Bold" },
   tRow: { flexDirection: "row", paddingVertical: 3, borderBottomWidth: 0.3, borderBottomColor: "#eee" },
   tCell: { fontSize: 8 },
   tCellBold: { fontSize: 9, fontFamily: "Helvetica-Bold" },
@@ -35,11 +38,11 @@ const s = StyleSheet.create({
   tCellMuted: { fontSize: 8, color: c.muted },
   kpi: { backgroundColor: "#faf8f5", borderRadius: 6, padding: 10, borderWidth: 0.5, borderColor: c.border, alignItems: "center" as const },
   kpiVal: { fontSize: 16, fontWeight: "bold", fontFamily: "Helvetica-Bold" },
-  kpiLabel: { fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, marginTop: 3 },
+  kpiLabel: { fontSize: 7, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, marginTop: 3 },
   barBg: { height: 4, backgroundColor: "#eee", borderRadius: 2, overflow: "hidden" as const },
   barFill: { height: 4, borderRadius: 2 },
   top3Card: { backgroundColor: "#faf8f5", borderRadius: 6, padding: 8, borderWidth: 0.5, borderColor: c.border },
-  top3Cat: { fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: c.accent, fontFamily: "Helvetica-Bold", marginBottom: 5 },
+  top3Cat: { fontSize: 8, textTransform: "uppercase", letterSpacing: 0.6, color: c.accent, fontFamily: "Helvetica-Bold", marginBottom: 5 },
   top3Row: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2, borderBottomWidth: 0.2, borderBottomColor: "#eee" },
 });
 
@@ -143,7 +146,7 @@ function HeroCard({ stats, prev }: { stats: any; prev: any }) {
       </View>
       <View style={s.heroRow}>
         <View><Text style={s.heroKpiLabel}>Couverts</Text><Text style={s.heroKpiVal}>{fmtNum(W.couverts || W.tickets)}</Text></View>
-        <View><Text style={s.heroKpiLabel}>CVT moyen TTC</Text><Text style={s.heroKpiVal}>{cvtTtc}{"\u20AC"}</Text><Text style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>HT {cvtHt}{"\u20AC"}</Text></View>
+        <View><Text style={s.heroKpiLabel}>CVT moyen TTC</Text><Text style={s.heroKpiVal}>{cvtTtc}{"\u20AC"}</Text><Text style={{ fontSize: 8, color: "rgba(255,255,255,0.5)" }}>HT {cvtHt}{"\u20AC"}</Text></View>
         <View><Text style={s.heroKpiLabel}>Tickets</Text><Text style={s.heroKpiVal}>{fmtNum(W.tickets)}</Text></View>
         <View><Text style={s.heroKpiLabel}>Annulations</Text><Text style={s.heroKpiVal}>{W.ann_pct?.toFixed(1) ?? "0"}%</Text></View>
       </View>
@@ -161,10 +164,13 @@ function KpiCardsRow({ stats, prev }: { stats: any; prev: any }) {
   const prevTm = prevCov > 0 && prevCA ? prevCA / prevCov : 0;
   const tmSP = W.cov_sur > 0 ? W.place_sur_ttc / W.cov_sur : 0;
 
+  // Sans comparatif A-1, ces cartes ne font que dupliquer le bandeau héro
+  if (prevCA == null || prevCA <= 0) return null;
+
   return (
     <View style={{ ...s.row, marginBottom: 8 }}>
       <View style={{ ...s.kpi, flex: 1 }}>
-        <Text style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>Couverts</Text>
+        <Text style={{ fontSize: 7, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>Couverts</Text>
         <Text style={{ ...s.kpiVal, fontSize: 13 }}>{fmtNum(W.couverts)}</Text>
         <Text style={{ fontSize: 8, color: c.muted }}>{fmtNum(W.tickets)} tickets</Text>
         {prevCov > 0 && (
@@ -174,7 +180,7 @@ function KpiCardsRow({ stats, prev }: { stats: any; prev: any }) {
         )}
       </View>
       <View style={{ ...s.kpi, flex: 1 }}>
-        <Text style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>CVT Moyen TTC</Text>
+        <Text style={{ fontSize: 7, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>CVT Moyen TTC</Text>
         <Text style={{ ...s.kpiVal, fontSize: 13 }}>{fmtSp(tmTtc)}{"\u20AC"}</Text>
         <Text style={{ fontSize: 8, color: c.muted }}>HT {fmtSp(tmHt)}{"\u20AC"} · SP {fmtSp(tmSP)}{"\u20AC"}</Text>
         {prevTm > 0 && (
@@ -185,7 +191,7 @@ function KpiCardsRow({ stats, prev }: { stats: any; prev: any }) {
       </View>
       {prevCA != null && prevCA > 0 && (
         <View style={{ ...s.kpi, flex: 1 }}>
-          <Text style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>VS A-1</Text>
+          <Text style={{ fontSize: 7, textTransform: "uppercase", letterSpacing: 0.6, color: c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>VS A-1</Text>
           <Text style={{ ...s.kpiVal, fontSize: 13, color: W.ca_ttc >= prevCA ? c.good : c.bad }}>{deltaAbs(Math.round(W.ca_ttc), Math.round(prevCA))}{"\u20AC"}</Text>
           <Text style={{ fontSize: 8, color: c.muted }}>A-1: {fmt(prevCA)}</Text>
         </View>
@@ -257,28 +263,30 @@ function DurationCard({ stats, prev }: { stats: any; prev: any }) {
       {/* Global KPIs */}
       <View style={{ flexDirection: "row", gap: 6, marginBottom: 6 }}>
         <View style={{ ...s.kpi, flex: 1 }}>
-          <Text style={{ ...s.kpiVal, color: c.accent }}>{W.duration.avgDurMin}<Text style={{ fontSize: 11, color: c.muted }}>min</Text></Text>
+          <Text style={{ ...s.kpiVal, color: c.accent }}>{W.duration.avgDurMin}<Text style={{ fontSize: 8, color: c.muted }}>min</Text></Text>
           <Text style={s.kpiLabel}>Duree moy. / table</Text>
           {prevDur?.avgDurMin > 0 && (
-            <Text style={{ fontSize: 11, color: W.duration.avgDurMin <= prevDur.avgDurMin ? c.good : c.bad, marginTop: 1 }}>
+            <Text style={{ fontSize: 7, color: W.duration.avgDurMin <= prevDur.avgDurMin ? c.good : c.bad, marginTop: 1 }}>
               {deltaAbs(W.duration.avgDurMin, prevDur.avgDurMin)}min vs A-1
             </Text>
           )}
         </View>
-        <View style={{ ...s.kpi, flex: 1 }}>
-          <Text style={{ ...s.kpiVal, color: c.green }}>{W.duration.avgRotation}x</Text>
-          <Text style={s.kpiLabel}>Rotation moy. / table</Text>
-          {prevDur?.avgRotation > 0 && (
-            <Text style={{ fontSize: 11, color: W.duration.avgRotation >= prevDur.avgRotation ? c.good : c.bad, marginTop: 1 }}>
-              {(W.duration.avgRotation - prevDur.avgRotation) >= 0 ? "+" : ""}{(W.duration.avgRotation - prevDur.avgRotation).toFixed(1)}x vs A-1
-            </Text>
-          )}
-        </View>
+        {W.duration.avgRotation > 0 && (
+          <View style={{ ...s.kpi, flex: 1 }}>
+            <Text style={{ ...s.kpiVal, color: c.green }}>{W.duration.avgRotation}x</Text>
+            <Text style={s.kpiLabel}>Rotation moy. / table</Text>
+            {prevDur?.avgRotation > 0 && (
+              <Text style={{ fontSize: 7, color: W.duration.avgRotation >= prevDur.avgRotation ? c.good : c.bad, marginTop: 1 }}>
+                {(W.duration.avgRotation - prevDur.avgRotation) >= 0 ? "+" : ""}{(W.duration.avgRotation - prevDur.avgRotation).toFixed(1)}x vs A-1
+              </Text>
+            )}
+          </View>
+        )}
         <View style={{ ...s.kpi, flex: 1 }}>
           <Text style={{ ...s.kpiVal, color: "#7c5c3a" }}>{fmtNum(W.duration.totalOrders)}</Text>
           <Text style={s.kpiLabel}>Tables servies</Text>
           {prevDur?.totalOrders > 0 && (
-            <Text style={{ fontSize: 11, color: W.duration.totalOrders >= prevDur.totalOrders ? c.good : c.bad, marginTop: 1 }}>
+            <Text style={{ fontSize: 7, color: W.duration.totalOrders >= prevDur.totalOrders ? c.good : c.bad, marginTop: 1 }}>
               {deltaAbs(W.duration.totalOrders, prevDur.totalOrders)} ({deltaPct(W.duration.totalOrders, prevDur.totalOrders)})
             </Text>
           )}
@@ -291,21 +299,21 @@ function DurationCard({ stats, prev }: { stats: any; prev: any }) {
             const rot = W.duration.rotByZone?.find((r: any) => r.zone === z.zone);
             return (
               <View key={z.zone} style={{ flex: 1, backgroundColor: c.white, borderRadius: 5, padding: 6, borderWidth: 0.5, borderColor: c.border }}>
-                <Text style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: zoneColors[z.zone] ?? c.muted, fontFamily: "Helvetica-Bold", marginBottom: 3 }}>{z.zone}</Text>
+                <Text style={{ fontSize: 8, textTransform: "uppercase", letterSpacing: 0.6, color: zoneColors[z.zone] ?? c.muted, fontFamily: "Helvetica-Bold", marginBottom: 3 }}>{z.zone}</Text>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                   <View>
                     <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold", color: c.accent }}>{z.avgDur}<Text style={{ fontSize: 7, color: c.muted }}>min</Text></Text>
-                    <Text style={{ fontSize: 11, color: c.muted }}>duree moy.</Text>
+                    <Text style={{ fontSize: 7, color: c.muted }}>duree moy.</Text>
                   </View>
                   {rot && (
                     <View style={{ alignItems: "flex-end" as const }}>
                       <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold", color: c.green }}>{rot.avgRotation}x</Text>
-                      <Text style={{ fontSize: 11, color: c.muted }}>rotation</Text>
+                      <Text style={{ fontSize: 7, color: c.muted }}>rotation</Text>
                     </View>
                   )}
                 </View>
-                <Text style={{ fontSize: 11, color: c.muted, marginTop: 2 }}>{z.tables} tables · {z.couverts} cvts</Text>
-                {rot?.maxRotation && <Text style={{ fontSize: 11, color: zoneColors[z.zone] ?? c.muted }}>max {rot.maxRotation}x rotation</Text>}
+                <Text style={{ fontSize: 7, color: c.muted, marginTop: 2 }}>{z.tables} tables · {z.couverts} cvts</Text>
+                {rot?.maxRotation > 0 && <Text style={{ fontSize: 7, color: zoneColors[z.zone] ?? c.muted }}>max {rot.maxRotation}x rotation</Text>}
               </View>
             );
           })}
@@ -349,9 +357,9 @@ function SurPlaceEmporterCard({ stats }: { stats: any }) {
             <View style={{ ...s.barFill, height: 4, width: `${surPct}%`, backgroundColor: c.green }} />
           </View>
           <View style={{ flexDirection: "row", gap: 8 }}>
-            <View><Text style={{ fontSize: 11, color: c.muted }}>CA TTC</Text><Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold" }}>{fmt(W.place_sur_ttc)}</Text><Text style={{ fontSize: 8, color: c.muted }}>HT {fmt(W.place_sur_ht)}</Text></View>
-            <View><Text style={{ fontSize: 11, color: c.muted }}>CVT</Text><Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold" }}>{fmtNum(W.cov_sur)}</Text></View>
-            <View><Text style={{ fontSize: 11, color: c.muted }}>TM</Text><Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color: c.green }}>{fmtSp(surTM)}{"\u20AC"}</Text></View>
+            <View><Text style={{ fontSize: 7, color: c.muted }}>CA TTC</Text><Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold" }}>{fmt(W.place_sur_ttc)}</Text><Text style={{ fontSize: 8, color: c.muted }}>HT {fmt(W.place_sur_ht)}</Text></View>
+            <View><Text style={{ fontSize: 7, color: c.muted }}>CVT</Text><Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold" }}>{fmtNum(W.cov_sur)}</Text></View>
+            <View><Text style={{ fontSize: 7, color: c.muted }}>TM</Text><Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold", color: c.green }}>{fmtSp(surTM)}{"\u20AC"}</Text></View>
           </View>
         </View>
         <View style={{ width: 0.5, backgroundColor: c.border }} />
@@ -364,9 +372,9 @@ function SurPlaceEmporterCard({ stats }: { stats: any }) {
             <View style={{ ...s.barFill, height: 4, width: `${empPct}%`, backgroundColor: c.accent }} />
           </View>
           <View style={{ flexDirection: "row", gap: 8 }}>
-            <View><Text style={{ fontSize: 11, color: c.muted }}>CA TTC</Text><Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold" }}>{fmt(W.place_emp_ttc)}</Text><Text style={{ fontSize: 8, color: c.muted }}>HT {fmt(W.place_emp_ht)}</Text></View>
-            <View><Text style={{ fontSize: 11, color: c.muted }}>CVT</Text><Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold" }}>{fmtNum(W.cov_emp)}</Text></View>
-            <View><Text style={{ fontSize: 11, color: c.muted }}>TM</Text><Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color: c.accent }}>{fmtSp(empTM)}{"\u20AC"}</Text></View>
+            <View><Text style={{ fontSize: 7, color: c.muted }}>CA TTC</Text><Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold" }}>{fmt(W.place_emp_ttc)}</Text><Text style={{ fontSize: 8, color: c.muted }}>HT {fmt(W.place_emp_ht)}</Text></View>
+            <View><Text style={{ fontSize: 7, color: c.muted }}>CVT</Text><Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold" }}>{fmtNum(W.cov_emp)}</Text></View>
+            <View><Text style={{ fontSize: 7, color: c.muted }}>TM</Text><Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold", color: c.accent }}>{fmtSp(empTM)}{"\u20AC"}</Text></View>
           </View>
         </View>
       </View>
@@ -396,7 +404,7 @@ function _ZonesDetailCard({ stats, mode }: { stats: any; mode: string }) {
 
         return (
           <View key={zone} style={{ flex: 1, backgroundColor: c.white, borderRadius: 5, padding: 6, borderWidth: 0.5, borderColor: c.border }}>
-            <Text style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: zoneColors[zone] ?? c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>{zone}</Text>
+            <Text style={{ fontSize: 8, textTransform: "uppercase", letterSpacing: 0.6, color: zoneColors[zone] ?? c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>{zone}</Text>
             <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold", color: zoneColors[zone] ?? c.text }}>{fmt(zoneTotal)}</Text>
             <Text style={{ fontSize: 11, color: c.muted }}>{pct}% du CA</Text>
             {weekTotals && buckets && (
@@ -464,11 +472,11 @@ function ComparatifCard({ stats, prev }: { stats: any; prev: any }) {
               </Text>
             </View>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ width: 30, fontSize: 11, color: c.muted }}>A-1</Text>
+              <Text style={{ width: 30, fontSize: 7, color: c.muted }}>A-1</Text>
               <View style={{ flex: 1, ...s.barBg, height: 3 }}>
                 <View style={{ ...s.barFill, height: 3, width: `${(prv / maxVal) * 100}%`, backgroundColor: c.green, opacity: 0.6 }} />
               </View>
-              <Text style={{ width: 42, textAlign: "right", fontSize: 11, color: c.muted }}>{prv > 0 ? fmt(prv) : "\u2014"}</Text>
+              <Text style={{ width: 42, textAlign: "right", fontSize: 7, color: c.muted }}>{prv > 0 ? fmt(prv) : "\u2014"}</Text>
               <Text style={{ width: 38 }} />
             </View>
           </View>
@@ -556,8 +564,11 @@ function ServicesTable({ stats }: { stats: any }) {
     for (const d of dayOrder) groups.push({ groupLabel: d, services: byDay[d] });
   }
 
+  const totalRows = groups.reduce((n, g) => n + g.services.length, 0);
+
   return (
-    <View style={s.card} wrap>
+    // wrap={false} sur les petits tableaux : évite un en-tête orphelin en bas de page
+    <View style={s.card} wrap={totalRows > 12} minPresenceAhead={80}>
       <Text style={s.sec}>Par service · TTC · couverts</Text>
       <View style={s.tHead}>
         <Text style={{ ...s.tH, width: 36 }}>{useWeeks ? "Sem." : "Jour"}</Text>
@@ -617,7 +628,7 @@ function ZonesRow({ stats }: { stats: any }) {
         const totHt = htVals.reduce((a: number, b: number) => a + b, 0);
         return (
           <View key={zone} style={{ ...s.kpi, flex: 1 }}>
-            <Text style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: zoneColors[zone] ?? c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>{zone}</Text>
+            <Text style={{ fontSize: 8, textTransform: "uppercase", letterSpacing: 0.6, color: zoneColors[zone] ?? c.muted, fontFamily: "Helvetica-Bold", marginBottom: 2 }}>{zone}</Text>
             <Text style={{ ...s.kpiVal, color: c.text }}>{fmt(totTtc)}</Text>
             <Text style={{ fontSize: 8, color: c.muted }}>HT {fmt(totHt)}</Text>
           </View>
@@ -727,11 +738,11 @@ function MixCategoriesCard({ stats }: { stats: any }) {
         const pct = total > 0 ? ((v / total) * 100).toFixed(0) : "0";
         return (
           <View key={label} style={{ flexDirection: "row", alignItems: "center", marginBottom: 3 }}>
-            <Text style={{ width: 55, fontSize: 7 }}>{label}</Text>
+            <Text style={{ width: 60, fontSize: 7 }}>{label}</Text>
             <View style={{ flex: 1, ...s.barBg }}>
               <View style={{ ...s.barFill, width: `${(v / maxV) * 100}%`, backgroundColor: colors[i % colors.length] }} />
             </View>
-            <Text style={{ width: 40, textAlign: "right", fontSize: 11, fontFamily: "Helvetica-Bold" }}>{fmt(v)}</Text>
+            <Text style={{ width: 42, textAlign: "right", fontSize: 9, fontFamily: "Helvetica-Bold" }}>{fmt(v)}</Text>
             <Text style={{ width: 30, textAlign: "right", fontSize: 8, color: c.muted }}>{fmt(valsHt[i] ?? 0)}</Text>
             <Text style={{ width: 22, textAlign: "right", fontSize: 8, color: c.muted }}>{pct}%</Text>
           </View>
@@ -755,12 +766,12 @@ function Top10Card({ stats }: { stats: any }) {
         const qty = W.top10_qty?.[i] ?? 0;
         return (
           <View key={name} style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }} wrap={false}>
-            <Text style={{ width: 10, fontSize: 8, color: c.faint, textAlign: "right" }}>{i + 1}</Text>
-            <Text style={{ width: 80, fontSize: 11, marginLeft: 4 }}>{name}</Text>
+            <Text style={{ width: 12, fontSize: 7, color: c.faint, textAlign: "right" }}>{i + 1}</Text>
+            <Text style={{ width: 120, fontSize: 8, marginLeft: 5, marginRight: 4 }}>{name}</Text>
             <View style={{ flex: 1, ...s.barBg }}>
               <View style={{ ...s.barFill, width: `${(v / maxV) * 100}%`, backgroundColor: c.accent }} />
             </View>
-            <Text style={{ width: 40, textAlign: "right", fontSize: 11, fontFamily: "Helvetica-Bold" }}>{fmt(v)}</Text>
+            <Text style={{ width: 42, textAlign: "right", fontSize: 9, fontFamily: "Helvetica-Bold" }}>{fmt(v)}</Text>
             <Text style={{ width: 30, textAlign: "right", fontSize: 8, color: c.muted }}>{fmt(valsHt[i] ?? 0)}</Text>
             <Text style={{ width: 22, textAlign: "right", fontSize: 8, color: c.muted }}>{qty}x</Text>
           </View>
@@ -782,14 +793,16 @@ function Top3CatsCard({ stats }: { stats: any }) {
             <Text style={s.top3Cat}>{cat.cat}</Text>
             {cat.rows.map((r: any, ri: number) => (
               <View key={ri} style={s.top3Row}>
-                <Text style={{ fontSize: 6 }}>{ri + 1} {r.n}</Text>
-                <Text style={{ fontSize: 8, fontFamily: "Helvetica-Bold", color: c.accent }}>{r.ca_ttc}</Text>
+                <Text style={{ fontSize: 6, color: c.faint, width: 8 }}>{ri + 1}</Text>
+                <Text style={{ fontSize: 7, flex: 1, marginRight: 3 }}>{r.n}</Text>
+                <Text style={{ fontSize: 7.5, fontFamily: "Helvetica-Bold", color: c.accent }}>{r.ca_ttc}</Text>
               </View>
             ))}
             {cat.flop && (
               <View style={{ ...s.top3Row, borderTopWidth: 0.3, borderTopColor: "#f0ebe3", marginTop: 2, paddingTop: 2 }}>
-                <Text style={{ fontSize: 11, color: c.bad }}>&#9660; {cat.flop.n}</Text>
-                <Text style={{ fontSize: 11, color: c.bad }}>{cat.flop.ca_ttc}</Text>
+                <Text style={{ fontSize: 6, color: c.bad, width: 8, fontFamily: "Helvetica-Bold" }}>!</Text>
+                <Text style={{ fontSize: 7, color: c.bad, flex: 1, marginRight: 3 }}>{cat.flop.n}</Text>
+                <Text style={{ fontSize: 7.5, color: c.bad, fontFamily: "Helvetica-Bold" }}>{cat.flop.ca_ttc}</Text>
               </View>
             )}
           </View>
@@ -817,14 +830,14 @@ function ServeursCard({ stats }: { stats: any }) {
         const pctCA = totalCA > 0 ? ((v / totalCA) * 100).toFixed(1) : "0";
         return (
           <View key={name} style={{ flexDirection: "row", alignItems: "center", marginBottom: 3 }}>
-            <Text style={{ width: 50, fontSize: 11, fontFamily: "Helvetica-Bold" }}>{name}</Text>
+            <Text style={{ width: 55, fontSize: 8, fontFamily: "Helvetica-Bold" }}>{name}</Text>
             <View style={{ flex: 1, ...s.barBg }}>
               <View style={{ ...s.barFill, width: `${(v / maxV) * 100}%`, backgroundColor: c.green }} />
             </View>
-            <Text style={{ width: 40, textAlign: "right", fontSize: 11, fontFamily: "Helvetica-Bold" }}>{fmt(v)}</Text>
-            <Text style={{ width: 30, textAlign: "right", fontSize: 8, color: c.muted }}>{fmt(valsHt[i] ?? 0)}</Text>
-            <Text style={{ width: 22, textAlign: "right", fontSize: 11, color: c.muted }}>{pctCA}%</Text>
-            <Text style={{ width: 50, textAlign: "right", fontSize: 11, color: c.muted }}>{tkt}t · {cov}c · {cvtM}{"\u20AC"}</Text>
+            <Text style={{ width: 42, textAlign: "right", fontSize: 9, fontFamily: "Helvetica-Bold" }}>{fmt(v)}</Text>
+            <Text style={{ width: 34, textAlign: "right", fontSize: 7, color: c.muted }}>{fmt(valsHt[i] ?? 0)}</Text>
+            <Text style={{ width: 26, textAlign: "right", fontSize: 7, color: c.muted }}>{pctCA}%</Text>
+            <Text style={{ width: 78, textAlign: "right", fontSize: 7, color: c.muted }}>{tkt}t · {cov}c · {cvtM}{"\u20AC"}</Text>
           </View>
         );
       })}
@@ -842,8 +855,8 @@ function PaiementsCard({ stats }: { stats: any }) {
       {W.pay.map((p: any, i: number) => (
         <View key={i} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 2, borderBottomWidth: 0.3, borderBottomColor: "#f0ebe3" }}>
           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors[i % colors.length], marginRight: 6 }} />
-          <Text style={{ flex: 1, fontSize: 11, color: c.muted }}>{p.l}</Text>
-          <Text style={{ width: 45, textAlign: "right", fontSize: 11, fontFamily: "Helvetica-Bold" }}>{fmt(p.v)}</Text>
+          <Text style={{ flex: 1, fontSize: 8, color: c.muted }}>{p.l}</Text>
+          <Text style={{ width: 45, textAlign: "right", fontSize: 9, fontFamily: "Helvetica-Bold" }}>{fmt(p.v)}</Text>
           <Text style={{ width: 25, textAlign: "right", fontSize: 8, color: c.muted }}>{p.pct}%</Text>
         </View>
       ))}
