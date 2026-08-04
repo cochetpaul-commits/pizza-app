@@ -117,7 +117,7 @@ function HeaderBlock({ etabName, rangeLabel, stats, exportType }: { etabName: st
     <View style={s.header}>
       <Text style={s.eyebrow}>{etabName} · {typeLabel}</Text>
       <Text style={s.title}>{rangeLabel}</Text>
-      <Text style={s.subtitle}>{stats.tickets} tickets · {stats.couverts} couverts · {stats.days?.length ?? 0} jours</Text>
+      <Text style={s.subtitle}>{stats.tickets} tickets · {stats.couverts} couverts · {stats.days?.length ?? 0} jour{(stats.days?.length ?? 0) > 1 ? "s" : ""}</Text>
     </View>
   );
 }
