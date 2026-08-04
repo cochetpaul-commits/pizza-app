@@ -199,16 +199,18 @@ function CataloguePage() {
     const editingId = editing.id;
     setSaving(true);
 
-    // For ingredients with a dose → use dose_map
-    if (linkType === "ingredient" && doseValue) {
+    // For ingredients → use dose_map (default 1 pcs if no dose specified)
+    if (linkType === "ingredient") {
+      const actualDose = doseValue || 1;
+      const actualUnit = doseValue ? doseUnit : "pcs";
       await fetch("/api/popina-catalogue/doses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           popina_product_id: editingId,
           ingredient_id: linkedId,
-          dose: doseValue,
-          dose_unit: doseUnit,
+          dose: actualDose,
+          dose_unit: actualUnit,
         }),
       });
       // Also set the simple link for display
@@ -658,11 +660,11 @@ function CataloguePage() {
                 const existingDoses = doses.filter((d) => d.ingredient_id === r.id);
                 return (
                   <div key={r.id}>
-                    <button onClick={() => linkProduct(r.id)} disabled={saving || (linkType === "ingredient" && !doseValue)} style={{
+                    <button onClick={() => linkProduct(r.id)} disabled={saving} style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%",
                       padding: "10px 14px", borderRadius: 8, border: "1px solid #e5ddd0", background: "#f9f6f0",
-                      cursor: (linkType === "ingredient" && !doseValue) ? "not-allowed" : "pointer",
-                      textAlign: "left", fontSize: 13, opacity: saving ? 0.6 : (linkType === "ingredient" && !doseValue) ? 0.5 : 1,
+                      cursor: "pointer",
+                      textAlign: "left", fontSize: 13, opacity: saving ? 0.6 : 1,
                     }}>
                       <span style={{ fontWeight: 600, color: "#1a1a1a" }}>{r.name}</span>
                       <span style={{ fontSize: 11, color: "#D4775A", fontWeight: 700 }}>

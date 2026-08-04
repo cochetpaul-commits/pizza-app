@@ -8,6 +8,7 @@ import { StepperInput } from "@/components/StepperInput";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { useProfile } from "@/lib/ProfileContext";
 import { IngredientAvatar } from "@/components/IngredientAvatar";
 import type { Category } from "@/types/ingredients";
 import { FloatingActions, FAIconPdf, FAIconMail, FAIconTrash, FAIconCheck, FAIconPause } from "@/components/layout/FloatingActions";
@@ -543,6 +544,8 @@ function ReceptionModal({ sessionId, onClose, onDone }: {
 
 function CommandesPage() {
   const { current: etab } = useEtablissement();
+  const { can } = useProfile();
+  const canValidateOrders = can("commandes.valider");
   const searchParams = useSearchParams();
 
   // All suppliers
@@ -1172,6 +1175,10 @@ function CommandesPage() {
   // ── Envoi mail via Resend (serveur, zero friction) ──────────────────
 
   async function sendEmailOnly(sessionId: string) {
+    if (!canValidateOrders) {
+      alert("Vous n'avez pas la permission d'envoyer les commandes. Demandez a un manager de valider.");
+      return;
+    }
     setSendingEmail(true);
     try {
       const res = await fetchApi("/api/commandes/send-email", {
