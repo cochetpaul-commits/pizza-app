@@ -972,9 +972,7 @@ export default function FournisseursPage() {
               </div>
 
               <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginTop: 4 }}>
-                {s.contact_name || s.email || s.phone
-                  ? [s.contact_name, s.email, s.phone].filter(Boolean).join(" · ")
-                  : "Coordonnees non renseignees"}
+                {[s.contact_name, s.email, s.phone, s.client_code ? `Code: ${s.client_code}` : null].filter(Boolean).join(" · ") || "Coordonnees non renseignees"}
               </div>
 
               <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, marginTop: 6, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
@@ -993,6 +991,33 @@ export default function FournisseursPage() {
             </div>
 
             <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
+              {/* Dupliquer pour l'autre etab */}
+              {(() => {
+                const otherEtab = etablissements.find(e => e.id !== s.etablissement_id);
+                const alreadyExists = otherEtab && suppliers.some(x => x.name.toLowerCase() === s.name.toLowerCase() && x.etablissement_id === otherEtab.id);
+                if (!otherEtab || alreadyExists) return null;
+                return (
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!confirm(`Dupliquer "${s.name}" pour ${otherEtab.nom} ?`)) return;
+                      const { id: _id, etablissement_id: _eid, ...rest } = s;
+                      const { error } = await supabase.from("suppliers").insert({ ...rest, etablissement_id: otherEtab.id, client_code: null });
+                      if (error) { alert(error.message); return; }
+                      window.location.reload();
+                    }}
+                    title={`Dupliquer pour ${otherEtab.nom}`}
+                    style={{
+                      height: 28, padding: "0 10px", borderRadius: 8, border: "1px solid rgba(37,99,235,0.2)",
+                      background: "rgba(37,99,235,0.06)", color: "#2563EB", cursor: "pointer",
+                      fontSize: 10, fontWeight: 700, whiteSpace: "nowrap",
+                    }}
+                  >
+                    + {otherEtab.nom.slice(0, 10)}
+                  </button>
+                );
+              })()}
               <button
                 type="button"
                 onClick={(e) => handleDeleteSupplier(s, e)}
