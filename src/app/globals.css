@@ -1003,7 +1003,7 @@ button:active { transform: scale(0.98); }
 
   /* ── Upsell grids ── */
   .ventes-upsell-grid {
-    grid-template-columns: 1fr 1fr !important;
+    grid-template-columns: 1fr !important;
     gap: 8px !important;
   }
   .ventes-upsell-mini-grid {
