@@ -2273,8 +2273,9 @@ function UpsellCard({ label, emoji, data, totalTables, totalCov, color, targets,
         )}
       </div>
       <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color, lineHeight: 1, marginBottom: 2 }}>{pct}%</div>
-      <div style={{ fontSize: 10, color: "#777", marginBottom: 6 }}>
-        {data.tables}/{totalTables} tables ({Math.round(data.tables / totalTables * 100)}%)
+      {covRatio && <div style={{ fontSize: 10, color: "#555", marginBottom: 2 }}>{covRatio}</div>}
+      <div style={{ fontSize: 10, color: "#999", marginBottom: 6 }}>
+        {data.tables}/{totalTables} tables
       </div>
       <div style={{ position: "relative", height: 6, background: "rgba(0,0,0,.07)", borderRadius: 3, overflow: "hidden", marginBottom: 4 }}>
         <div style={{ position: "absolute", top: 0, left: 0, height: "100%", width: `${Math.min(100, pct)}%`, background: color, borderRadius: 3, transition: "width .5s" }} />
