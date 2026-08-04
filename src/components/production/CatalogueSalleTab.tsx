@@ -232,7 +232,7 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
               <div style={{ marginTop: 12 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Composition</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  {fiche.ingredients.map((name, i) => <div key={i} style={{ fontSize: 12, color: "#1a1a1a", padding: "2px 0" }}>{name}</div>)}
+                  {fiche.ingredients.map((name, i) => <div key={i} style={{ fontSize: 12, color: "#888", padding: "2px 0" }}>{name}</div>)}
                 </div>
               </div>
               {fiche.sub_recipes.length > 0 && (

@@ -279,6 +279,30 @@ export default function InventairePage() {
     }).eq("id", session.id);
 
     if (error) { alert(error.message); setSaving(false); return; }
+
+    // Create stock movements from inventory (adjustment to match real stock)
+    const movements = ingredients
+      .filter(ing => {
+        const qty = Number(quantities[ing.id] ?? 0);
+        return qty > 0;
+      })
+      .map(ing => ({
+        etablissement_id: etab?.id,
+        ingredient_id: ing.id,
+        type: "inventaire",
+        quantity: Number(quantities[ing.id] ?? 0),
+        unit: ing.purchase_unit_label || "pcs",
+        reference_type: `inventaire_${session.id}`,
+        note: `Inventaire du ${new Date().toLocaleDateString("fr-FR")}`,
+      }));
+
+    if (movements.length > 0) {
+      // Delete previous inventory movements for this session (idempotent)
+      await supabase.from("stock_movements").delete()
+        .eq("reference_type", `inventaire_${session.id}`);
+      await supabase.from("stock_movements").insert(movements);
+    }
+
     await reload();
     setSaving(false);
   }
