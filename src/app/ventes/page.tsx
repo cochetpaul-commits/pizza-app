@@ -820,49 +820,46 @@ function PerformancesPage() {
             <div style={{ ...S.card, padding: 0, overflow: "hidden", marginBottom: 18 }}>
               <div style={{
                 background: `linear-gradient(135deg, #b85a3a 0%, ${accent} 50%, #e09070 100%)`,
-                padding: "22px 24px 20px", position: "relative",
+                padding: "24px 20px 20px", position: "relative",
               }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div>
-                    <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 16, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: ".02em", marginBottom: 4, textShadow: "0 1px 4px rgba(0,0,0,.15)" }}>
-                      {rangeLabel}
-                    </div>
-                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".16em", color: "rgba(255,255,255,.7)", fontWeight: 600, marginBottom: 8 }}>
-                      CA {mode.toUpperCase()}
-                    </div>
-                    <div data-money style={{ ...S.bigNum, textShadow: "0 2px 6px rgba(0,0,0,.2)" }}>{fmt(ca)}</div>
-                    {mode === "ttc" && <div data-money style={{ fontSize: 13, color: "rgba(255,255,255,.85)", marginTop: 6, fontWeight: 500 }}>HT <span style={{ color: "#fff", fontWeight: 700 }}>{fmt(W.ca_ht)}</span></div>}
+                {/* Title + CA */}
+                <div style={{ textAlign: "center", marginBottom: 16 }}>
+                  <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,.8)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 }}>
+                    {rangeLabel}
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-                    {activePrevWeek && (() => {
-                      const prevCA = mode === "ttc" ? activePrevWeek.ca_ttc : activePrevWeek.ca_ht;
-                      if (prevCA <= 0) return null;
-                      const d = ca - prevCA;
-                      const pct = (d / prevCA * 100);
-                      return (
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: 12, fontWeight: 500, color: d >= 0 ? "rgba(165,214,167,.9)" : "#fca5a5" }}>
-                            {d >= 0 ? "+" : ""}{pct.toFixed(1)}%
-                          </div>
-                          <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>vs S-1</div>
+                  <div data-money style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 48, fontWeight: 700, color: "#fff", lineHeight: 1, letterSpacing: "-.02em", textShadow: "0 2px 8px rgba(0,0,0,.2)" }}>{fmt(ca)}</div>
+                  {mode === "ttc" && <div data-money style={{ fontSize: 13, color: "rgba(255,255,255,.7)", marginTop: 6 }}>HT {fmt(W.ca_ht)}</div>}
+                </div>
+                {/* Deltas row */}
+                <div style={{ display: "flex", justifyContent: "center", gap: 16, marginBottom: 12 }}>
+                  {activePrevWeek && (() => {
+                    const prevCA = mode === "ttc" ? activePrevWeek.ca_ttc : activePrevWeek.ca_ht;
+                    if (prevCA <= 0) return null;
+                    const d = ca - prevCA;
+                    const pct = (d / prevCA * 100);
+                    return (
+                      <div style={{ background: "rgba(255,255,255,.12)", borderRadius: 8, padding: "6px 12px", textAlign: "center" }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: d >= 0 ? "#a5d6a7" : "#fca5a5" }}>
+                          {d >= 0 ? "+" : ""}{pct.toFixed(1)}%
                         </div>
-                      );
-                    })()}
-                    {activePrev && (() => {
-                      const prevCA = mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht;
-                      if (prevCA <= 0) return null;
-                      const d = ca - prevCA;
-                      const pct = (d / prevCA * 100);
-                      return (
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: 12, fontWeight: 500, color: d >= 0 ? "rgba(165,214,167,.9)" : "#fca5a5" }}>
-                            {d >= 0 ? "+" : ""}{pct.toFixed(1)}%
-                          </div>
-                          <div style={{ fontSize: 10, color: "rgba(255,255,255,.85)", marginTop: 2 }}>vs A-1</div>
+                        <div style={{ fontSize: 9, color: "rgba(255,255,255,.6)", marginTop: 1 }}>vs S-1</div>
+                      </div>
+                    );
+                  })()}
+                  {activePrev && (() => {
+                    const prevCA = mode === "ttc" ? activePrev.ca_ttc : activePrev.ca_ht;
+                    if (prevCA <= 0) return null;
+                    const d = ca - prevCA;
+                    const pct = (d / prevCA * 100);
+                    return (
+                      <div style={{ background: "rgba(255,255,255,.12)", borderRadius: 8, padding: "6px 12px", textAlign: "center" }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: d >= 0 ? "#a5d6a7" : "#fca5a5" }}>
+                          {d >= 0 ? "+" : ""}{pct.toFixed(1)}%
                         </div>
-                      );
-                    })()}
-                  </div>
+                        <div style={{ fontSize: 9, color: "rgba(255,255,255,.6)", marginTop: 1 }}>vs A-1</div>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="ventes-hero-kpis" style={{ display: "flex", gap: 20, marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,.12)", flexWrap: "wrap", alignItems: "flex-start" }}>
                   {dataSource === "daily_sales" ? (<>
