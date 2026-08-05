@@ -45,7 +45,7 @@
   --glass-blur: 28px;
   --glass-shadow: 0 0.5px 1px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.03);
   --glass-shadow-hover: 0 2px 4px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08);
-  --glass-sidebar: rgba(255,255,255,0.72);
+  --glass-sidebar: rgba(255,255,255,0.55);
   --glass-sidebar-border: rgba(0,0,0,0.06);
 }
 
@@ -208,7 +208,15 @@ html, body{
 .app-main {
   margin-left: calc(var(--sidebar-width) + 16px);
   min-height: 100dvh;
-  background: var(--creme);
+  background: rgba(246,238,223,0.75);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+}
+
+/* Wallpaper behind the app — subtle warm gradient */
+body {
+  background: linear-gradient(145deg, #f0e4cc 0%, #e8d8be 25%, #ddd0b8 50%, #e5d6c0 75%, #f2eade 100%) !important;
+  background-attachment: fixed !important;
 }
 
 /* Mobile bottom tab bar — hidden on desktop */
