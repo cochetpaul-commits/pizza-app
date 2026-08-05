@@ -1046,7 +1046,7 @@ button:active { transform: scale(0.98); }
 
   /* ── Top 3 grid ── */
   .ventes-top3-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: 1fr !important;
   }
 
   /* ── Payment donut + list ── */

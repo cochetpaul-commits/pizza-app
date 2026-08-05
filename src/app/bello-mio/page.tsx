@@ -250,7 +250,7 @@ function BelloMioContent() {
       {/* ── KPIs ── */}
       {canSeePilotage && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 28 }}>
-          <KpiCard label="CA TTC" value={`${fmtEur(ca)} \u20AC`} accent={COLOR} delta={deltaCa} loading={loading} />
+          <KpiCard label="CA TTC" value={`${fmtEur(ca)} \u20AC`} accent={COLOR} delta={deltaCa} loading={loading} href={`/ventes?from=${range.from}&to=${range.to}`} />
           <KpiCard label="Couverts" value={String(couverts)} accent={T.dark} delta={deltaCouverts} loading={loading} />
           <KpiCard label="Ticket moyen" value={`${ticketMoyen.toFixed(1).replace(".", ",")} \u20AC`} accent={T.dore} delta={deltaTm} loading={loading} />
           <KpiCard label="Achats HT" value={`${fmtEur(achatsHt)} \u20AC`} accent={T.sauge} loading={loading} subtitle={ca > 0 ? `Food cost ${fmtPct(foodCost)}%` : undefined} />
@@ -412,11 +412,11 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: T.muted, marginBottom: 8 }}>{children}</div>;
 }
 
-function KpiCard({ label, value, accent, delta, loading, subtitle }: {
-  label: string; value: string; accent: string; delta?: number | null; loading: boolean; subtitle?: string;
+function KpiCard({ label, value, accent, delta, loading, subtitle, href }: {
+  label: string; value: string; accent: string; delta?: number | null; loading: boolean; subtitle?: string; href?: string;
 }) {
-  return (
-    <div style={{ ...CARD, padding: "18px 20px", display: "flex", flexDirection: "column", gap: 2 }}>
+  const content = (
+    <div style={{ ...CARD, padding: "18px 20px", display: "flex", flexDirection: "column", gap: 2, cursor: href ? "pointer" : "default" }}>
       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.muted }}>{label}</span>
       <span style={{ fontSize: 28, fontWeight: 700, color: accent, fontFamily: OSWALD, lineHeight: 1.15, marginTop: 6, opacity: loading ? 0.4 : 1, transition: "opacity 0.2s" }}>{value}</span>
       {subtitle && <span style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>{subtitle}</span>}
@@ -427,6 +427,8 @@ function KpiCard({ label, value, accent, delta, loading, subtitle }: {
       )}
     </div>
   );
+  if (href) return <Link href={href} style={{ textDecoration: "none" }}>{content}</Link>;
+  return content;
 }
 
 function QuickStat({ label, value, color, href }: { label: string; value: string; color: string; href?: string }) {

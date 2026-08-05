@@ -125,7 +125,7 @@ const HIDDEN = "\u2022\u2022\u2022";
 const _fmt = (v: number) => v.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const fmt = (v: number) => _fmt(v) + "\u20AC";
 const fmtK = (v: number) => Math.round(v).toLocaleString("fr-FR") + "\u20AC";
-const ZC: Record<string, string> = { Salle: "#46655a", Pergolas: "#5e8278", Terrasse: "#c4a882", emp: "#D4775A" };
+const ZC: Record<string, string> = { Salle: "#46655a", Pergolas: "#5e8278", Terrasse: "#c4a882", Salon: "#8a6b3e", emp: "#D4775A" };
 
 /* ── Week aggregation helpers (for monthly view) ── */
 type WeekBucket = { label: string; indices: number[] };
@@ -1430,7 +1430,7 @@ function PerformancesPage() {
             {/* Taux de remplissage + Panier decompose midi/soir */}
             {(W.cov_midi || W.cov_soir) && W.dates.length > 0 && (() => {
               // Zone capacities (hors Salon = limonade uniquement)
-              const ZONE_CAPS: Record<string, number> = { "Salle": 47, "Pergolas": 20, "Terrasse": 49 };
+              const ZONE_CAPS: Record<string, number> = { "Salle": 47, "Pergolas": 20, "Terrasse": 49, "Salon": 20 };
               const TOTAL_CAP = 116; // 47 + 20 + 49
 
               // Compute capacity based on which zones were active each day
@@ -1461,21 +1461,19 @@ function PerformancesPage() {
               const tmMidi = caMidi / covMidiTotal;
               const tmSoir = caSoir / covSoirTotal;
 
-              // Food/drink per cover per service via ratios_by_svc
-              const FOOD_KEYS = ["anti", "dolci", "pizze", "plats"];
-              const DRINK_KEYS = ["vin", "alcool", "boissons", "digestif", "cafe"];
-              const sumRatioCA = (svc: string, keys: string[]) => {
-                const r = W.ratios_by_svc?.[svc];
-                if (!r) return 0;
-                return keys.reduce((s, k) => s + (r[k]?.total ?? 0), 0);
-              };
-              const foodMidi = sumRatioCA("midi", FOOD_KEYS);
-              const drinkMidi = sumRatioCA("midi", DRINK_KEYS);
-              const foodSoir = sumRatioCA("soir", FOOD_KEYS);
-              const drinkSoir = sumRatioCA("soir", DRINK_KEYS);
+              // Food/drink per cover — use global food/drink ratio applied to midi/soir TM
+              const totalCa = mode === "ttc" ? W.ca_ttc : W.ca_ht;
+              const foodCa = mode === "ttc" ? (W.food_ttc ?? 0) : (W.food_ht ?? 0);
+              const drinkCa = mode === "ttc" ? (W.drink_ttc ?? 0) : (W.drink_ht ?? 0);
+              const foodRatio = totalCa > 0 ? foodCa / totalCa : 0;
+              const drinkRatio = totalCa > 0 ? drinkCa / totalCa : 0;
               const covMidiT = midiSvcs.reduce((s, sv) => s + sv.cov, 0) || 1;
               const covSoirT = soirSvcs.reduce((s, sv) => s + sv.cov, 0) || 1;
-              const hasFoodDrink = (foodMidi + foodSoir + drinkMidi + drinkSoir) > 0;
+              const foodMidiPerCvt = tmMidi * foodRatio;
+              const drinkMidiPerCvt = tmMidi * drinkRatio;
+              const foodSoirPerCvt = tmSoir * foodRatio;
+              const drinkSoirPerCvt = tmSoir * drinkRatio;
+              const hasFoodDrink = foodCa > 0 || drinkCa > 0;
 
               const rempColor = (pct: number) => pct >= 80 ? "#2e7d32" : pct >= 50 ? "#D97706" : "#DC2626";
               const OSWALD_F = "var(--font-oswald), Oswald, sans-serif";
@@ -1547,11 +1545,11 @@ function PerformancesPage() {
                             <div style={{ fontSize: 10, fontWeight: 700, color: "#8a6b3e", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Food /cvt</div>
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
                               <span style={{ color: "#5e8278", fontWeight: 600 }}>Midi</span>
-                              <span style={{ fontFamily: OSWALD_F, fontWeight: 700 }}>{(foodMidi / covMidiT).toFixed(1)}{"\u20AC"}</span>
+                              <span style={{ fontFamily: OSWALD_F, fontWeight: 700 }}>{foodMidiPerCvt.toFixed(1)}{"\u20AC"}</span>
                             </div>
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
                               <span style={{ color: "#1a1a1a", fontWeight: 600 }}>Soir</span>
-                              <span style={{ fontFamily: OSWALD_F, fontWeight: 700 }}>{(foodSoir / covSoirT).toFixed(1)}{"\u20AC"}</span>
+                              <span style={{ fontFamily: OSWALD_F, fontWeight: 700 }}>{foodSoirPerCvt.toFixed(1)}{"\u20AC"}</span>
                             </div>
                           </div>
                           {/* Boissons */}
@@ -1559,11 +1557,11 @@ function PerformancesPage() {
                             <div style={{ fontSize: 10, fontWeight: 700, color: "#5e8278", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Boissons /cvt</div>
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
                               <span style={{ color: "#5e8278", fontWeight: 600 }}>Midi</span>
-                              <span style={{ fontFamily: OSWALD_F, fontWeight: 700 }}>{(drinkMidi / covMidiT).toFixed(1)}{"\u20AC"}</span>
+                              <span style={{ fontFamily: OSWALD_F, fontWeight: 700 }}>{drinkMidiPerCvt.toFixed(1)}{"\u20AC"}</span>
                             </div>
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
                               <span style={{ color: "#1a1a1a", fontWeight: 600 }}>Soir</span>
-                              <span style={{ fontFamily: OSWALD_F, fontWeight: 700 }}>{(drinkSoir / covSoirT).toFixed(1)}{"\u20AC"}</span>
+                              <span style={{ fontFamily: OSWALD_F, fontWeight: 700 }}>{drinkSoirPerCvt.toFixed(1)}{"\u20AC"}</span>
                             </div>
                           </div>
                         </div>
