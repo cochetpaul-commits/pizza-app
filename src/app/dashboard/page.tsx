@@ -101,7 +101,7 @@ type SupplierTotal = { name: string; total: number };
 
 export default function GroupDashboard() {
   return (
-    <RequireRole allowedRoles={["group_admin", "equipier"]}>
+    <RequireRole allowedRoles={["group_admin"]}>
       <GroupContent />
     </RequireRole>
   );
