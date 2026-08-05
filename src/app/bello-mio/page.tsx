@@ -427,7 +427,7 @@ function KpiCard({ label, value, accent, delta, loading, subtitle, href }: {
       )}
     </div>
   );
-  if (href) return <Link href={href} style={{ textDecoration: "none" }}>{content}</Link>;
+  if (href) return <Link href={href} style={{ textDecoration: "none", display: "block" }}>{content}</Link>;
   return content;
 }
 
