@@ -416,8 +416,8 @@ function KpiCard({ label, value, accent, delta, loading, subtitle, href }: {
   label: string; value: string; accent: string; delta?: number | null; loading: boolean; subtitle?: string; href?: string;
 }) {
   const content = (
-    <div style={{ ...CARD, padding: "18px 20px", display: "flex", flexDirection: "column", gap: 2, cursor: href ? "pointer" : "default" }}>
-      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.muted }}>{label}</span>
+    <div className={href ? "hover-lift" : ""} style={{ ...CARD, padding: "18px 20px", display: "flex", flexDirection: "column", gap: 2, cursor: href ? "pointer" : "default", transition: "box-shadow 0.2s, transform 0.2s" }}>
+      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.muted }}>{label} {href ? "→" : ""}</span>
       <span style={{ fontSize: 28, fontWeight: 700, color: accent, fontFamily: OSWALD, lineHeight: 1.15, marginTop: 6, opacity: loading ? 0.4 : 1, transition: "opacity 0.2s" }}>{value}</span>
       {subtitle && <span style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>{subtitle}</span>}
       {delta != null && (
