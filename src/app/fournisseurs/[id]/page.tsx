@@ -680,7 +680,7 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
             {invoices.map((inv) => (
               <div key={inv.id} style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "8px 12px", background: "#f6eedf", borderRadius: 8, fontSize: 13,
+                padding: "8px 12px", background: "#f5f3f0", borderRadius: 8, fontSize: 13,
                 fontFamily: "DM Sans, sans-serif",
               }}>
                 <span>

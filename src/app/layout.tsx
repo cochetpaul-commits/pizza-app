@@ -35,7 +35,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   userScalable: false,
-  themeColor: "#f6eedf",
+  themeColor: "#e4dfd6",
 };
 
 export const metadata: Metadata = {

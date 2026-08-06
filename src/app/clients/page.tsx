@@ -391,7 +391,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 const cancelBtn: React.CSSProperties = {
-  background: "#f6eedf",
+  background: "#f5f3f0",
   color: "#999",
   border: "none",
   borderRadius: 20,

@@ -1,8 +1,8 @@
 /** Flat design tokens — used directly as T.xxx in hub pages */
 export const T = {
   // Colors (updated brief Komia)
-  creme: "#f6eedf",
-  cremeLegacy: "#f2ede4",
+  creme: "#fafafa",
+  cremeLegacy: "#fafafa",
   terracotta: "#e27f57",
   jaune: "#f8edb0",
   jauneDark: "#a8893a",

@@ -179,7 +179,7 @@ export default function EmargementPage() {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            background: "#f6eedf",
+            background: "#f5f3f0",
             borderRadius: 12,
             padding: "10px 16px",
             marginBottom: 20,
@@ -395,7 +395,7 @@ export default function EmargementPage() {
                     );
                   })}
                   {/* Grand total row */}
-                  <tr style={{ borderTop: "2px solid #ddd6c8", background: "#f6eedf" }}>
+                  <tr style={{ borderTop: "2px solid #ddd6c8", background: "#f5f3f0" }}>
                     <td
                       style={{
                         padding: "10px 8px",
@@ -403,7 +403,7 @@ export default function EmargementPage() {
                         fontWeight: 700,
                         position: "sticky",
                         left: 0,
-                        background: "#f6eedf",
+                        background: "#f5f3f0",
                       }}
                     >
                       Total equipe
@@ -485,7 +485,7 @@ export default function EmargementPage() {
                 gap: 16,
                 marginTop: 16,
                 padding: "10px 14px",
-                background: "#f6eedf",
+                background: "#f5f3f0",
                 borderRadius: 10,
                 fontSize: 12,
                 color: "#666",

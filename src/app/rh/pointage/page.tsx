@@ -436,7 +436,7 @@ export default function PointagePage() {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            background: "#f6eedf",
+            background: "#f5f3f0",
             borderRadius: 12,
             padding: "10px 16px",
             marginBottom: 12,

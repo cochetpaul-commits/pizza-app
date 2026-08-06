@@ -44,7 +44,7 @@ export default function RootPage() {
   return (
     <div style={{
       minHeight: "100dvh",
-      background: "#f6eedf",
+      background: "#f5f3f0",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
