@@ -13,6 +13,7 @@ type Category = {
   famille_id: string;
   sous_categories: string[];
   sort_order: number;
+  establishments: string[] | null;
 };
 
 const FAMILLE_LABELS: Record<string, string> = {
@@ -30,11 +31,13 @@ export default function CategoriesPage() {
   const [editCouleur, setEditCouleur] = useState("#4a6741");
   const [editFamille, setEditFamille] = useState("cuisine");
   const [editSousCats, setEditSousCats] = useState("");
+  const [editEstabs, setEditEstabs] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [newNom, setNewNom] = useState("");
   const [newCouleur, setNewCouleur] = useState("#4a6741");
   const [newFamille, setNewFamille] = useState("cuisine");
+  const [newEstabs, setNewEstabs] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     const { data } = await supabase
@@ -61,6 +64,7 @@ export default function CategoriesPage() {
       couleur: editCouleur,
       famille_id: editFamille,
       sous_categories: editSousCats.split(",").map(s => s.trim()).filter(Boolean),
+      establishments: editEstabs.length > 0 ? editEstabs : null,
     }).eq("id", editId);
     setEditId(null);
     setSaving(false);
@@ -79,6 +83,7 @@ export default function CategoriesPage() {
       famille_id: newFamille,
       sous_categories: [],
       sort_order: maxOrder + 1,
+      establishments: newEstabs.length > 0 ? newEstabs : null,
     });
     setNewNom("");
     setShowNew(false);
@@ -112,6 +117,7 @@ export default function CategoriesPage() {
     setEditCouleur(c.couleur);
     setEditFamille(c.famille_id);
     setEditSousCats((c.sous_categories ?? []).join(", "));
+    setEditEstabs(c.establishments ?? []);
   };
 
   return (
@@ -197,6 +203,18 @@ export default function CategoriesPage() {
                                 </select>
                               </div>
                               <input value={editSousCats} onChange={e => setEditSousCats(e.target.value)} placeholder="Sous-categories (separees par des virgules)" style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd6c8", fontSize: 12 }} />
+                              <div style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 12 }}>
+                                <span style={{ color: "#999", fontWeight: 600 }}>Etabs :</span>
+                                <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                                  <input type="checkbox" checked={editEstabs.includes("bellomio")} onChange={e => setEditEstabs(prev => e.target.checked ? [...prev.filter(x => x !== "bellomio"), "bellomio"] : prev.filter(x => x !== "bellomio"))} style={{ accentColor: "#D4775A" }} />
+                                  Bello Mio
+                                </label>
+                                <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                                  <input type="checkbox" checked={editEstabs.includes("piccola")} onChange={e => setEditEstabs(prev => e.target.checked ? [...prev.filter(x => x !== "piccola"), "piccola"] : prev.filter(x => x !== "piccola"))} style={{ accentColor: "#e6c428" }} />
+                                  Piccola Mia
+                                </label>
+                                <span style={{ fontSize: 10, color: "#bbb" }}>(vide = tous)</span>
+                              </div>
                               <div style={{ display: "flex", gap: 6 }}>
                                 <button onClick={handleSave} disabled={saving} style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Sauver</button>
                                 <button onClick={() => setEditId(null)} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff", color: "#777", fontSize: 11, cursor: "pointer" }}>Annuler</button>
@@ -207,9 +225,14 @@ export default function CategoriesPage() {
                               {/* Name + info */}
                               <div style={{ flex: 1 }}>
                                 <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{c.nom}</div>
-                                <div style={{ fontSize: 11, color: "#999" }}>
-                                  {FAMILLE_LABELS[c.famille_id] ?? c.famille_id}
-                                  {c.sous_categories?.length > 0 && ` · ${c.sous_categories.join(", ")}`}
+                                <div style={{ fontSize: 11, color: "#999", display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+                                  <span>{FAMILLE_LABELS[c.famille_id] ?? c.famille_id}</span>
+                                  {c.sous_categories?.length > 0 && <span> · {c.sous_categories.join(", ")}</span>}
+                                  {c.establishments && c.establishments.length > 0 && (
+                                    <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4, background: c.establishments.includes("bellomio") && !c.establishments.includes("piccola") ? "rgba(212,119,90,0.1)" : c.establishments.includes("piccola") && !c.establishments.includes("bellomio") ? "rgba(230,196,40,0.1)" : "rgba(0,0,0,0.04)", color: c.establishments.includes("bellomio") && !c.establishments.includes("piccola") ? "#D4775A" : c.establishments.includes("piccola") && !c.establishments.includes("bellomio") ? "#b5960f" : "#999" }}>
+                                      {c.establishments.map(e => e === "bellomio" ? "BM" : "PM").join(" + ")}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
 
