@@ -550,13 +550,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
     if (!pizzaId) return;
     setPdfLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) { alert("Non authentifie"); return; }
-      const res = await fetchApi("/api/pizzas/pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ pizzaId }),
+      const res = await fetch(`/api/recettes/pdf?id=${pizzaId}&portions=${nbParts}`, {
       });
       if (!res.ok) { const e = await res.json().catch(() => ({ message: "Erreur inconnue" })); alert(`Erreur PDF: ${e.message}`); return; }
       const blob = await res.blob();
