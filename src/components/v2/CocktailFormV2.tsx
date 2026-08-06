@@ -178,7 +178,9 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) { setStatus("error"); setError({ message: "NOT_LOGGED" }); return; }
 
-      const ingsQ = supabase.from("ingredients").select("*").eq("is_active", true);
+      const myEstab = etab?.slug?.includes("piccola") ? "piccola" : "bellomio";
+      const ingsQ = supabase.from("ingredients").select("*").eq("is_active", true)
+        .or(`establishments.cs.{"${myEstab}"},establishments.is.null`);
       const offQ = supabase.from("v_latest_offers").select("*");
       const [{ data: ingsData, error: iErr }, { data: offers }] = await Promise.all([
         ingsQ.order("name"),

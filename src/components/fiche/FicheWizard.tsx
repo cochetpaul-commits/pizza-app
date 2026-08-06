@@ -60,7 +60,8 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
     const [fRes, cRes, iRes, empRes, offRes, popRes] = await Promise.all([
       supabase.from("familles").select("*"),
       supabase.from("categories").select("*").order("sort_order").order("nom"),
-      supabase.from("ingredients").select("id, name, category, allergens, cost_per_unit, purchase_price, purchase_unit, purchase_unit_label, density_g_per_ml, piece_weight_g, piece_volume_ml"),
+      supabase.from("ingredients").select("id, name, category, allergens, cost_per_unit, purchase_price, purchase_unit, purchase_unit_label, density_g_per_ml, piece_weight_g, piece_volume_ml, establishments")
+        .or(`establishments.cs.{"${etabSlug === "piccola" ? "piccola" : "bellomio"}"},establishments.is.null`),
       supabase.from("recipes").select("id, name").order("name"),
       supabase.from("v_latest_offers").select("*"),
       supabase.from("popina_products").select("id, name, category, price_ttc, kitchen_recipe_id").eq("active", true).order("name"),
@@ -566,7 +567,7 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
                   update({ lignes });
                 }} onDelete={() => update({ lignes: fiche.lignes.filter(ll => ll.key !== l.key) })} />
               ))}
-              <button onClick={() => update({ lignes: [...fiche.lignes, { key: tmpKey(), ingredient_id: null, ingredient: null, quantite: 10, unite: "g", zone: "avant_four" }] })}
+              <button onClick={() => update({ lignes: [...fiche.lignes, { key: tmpKey(), ingredient_id: null, ingredient: null, quantite: 0, unite: "g", zone: "avant_four" }] })}
                 style={{ border: `1.5px dashed ${COLORS.terra}`, background: "transparent", color: COLORS.terraDark, borderRadius: 999, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", marginTop: 4, fontFamily: "inherit" }}>
                 + Ajouter un ingredient
               </button>
@@ -586,7 +587,7 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
           ))}
           <button onClick={() => {
             const defaultBase = isBar ? "cl" : "g";
-            update({ lignes: [...fiche.lignes, { key: tmpKey(), ingredient_id: null, ingredient: null, quantite: isBar ? 4 : 10, unite: defaultBase, zone: "apres_four" }] });
+            update({ lignes: [...fiche.lignes, { key: tmpKey(), ingredient_id: null, ingredient: null, quantite: 0, unite: defaultBase, zone: "apres_four" }] });
           }}
             style={{ border: `1.5px dashed ${COLORS.terra}`, background: "transparent", color: COLORS.terraDark, borderRadius: 999, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", marginTop: 4, fontFamily: "inherit" }}>
             + Ajouter un ingredient
