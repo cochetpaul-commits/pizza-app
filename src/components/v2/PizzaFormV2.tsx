@@ -193,6 +193,30 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
   const totalCost = round2((doughCostPerBall ?? 0) + ingredientCostTotal);
 
+  // Total weight (g) — sum all ingredient lines in grams
+  const totalWeightG = useMemo(() => {
+    let w = 0;
+    for (const l of allLines) {
+      if (l.qty === "" || !(Number(l.qty) > 0)) continue;
+      const qty = Number(l.qty);
+      const unit = l.unit.toLowerCase();
+      if (unit === "g") w += qty;
+      else if (unit === "kg") w += qty * 1000;
+      else if (unit === "cl" || unit === "ml" || unit === "l") {
+        // Convert liquid to grams via density if available
+        const ing = ingredients.find(i => i.id === l.ingredient_id);
+        const dens = ing?.density_g_per_ml;
+        if (dens && dens > 0) {
+          const ml = unit === "cl" ? qty * 10 : unit === "l" ? qty * 1000 : qty;
+          w += ml * dens;
+        }
+      }
+    }
+    // Add dough weight if applicable
+    if (ballWeightG !== "" && Number(ballWeightG) > 0) w += Number(ballWeightG);
+    return Math.round(w);
+  }, [allLines, ingredients, ballWeightG]);
+
   const doughOptions: SmartSelectOption[] = doughRecipes.map(r => ({
     id: r.id,
     name: r.name ?? "Empatement",
@@ -612,6 +636,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
             {/* Food Cost & Marges */}
             <PizzaPricing
               costPerPizza={costPerPizza}
+              totalWeightG={totalWeightG}
               nbParts={nbParts}
               onNbPartsChange={setNbParts}
               costPerPart={costPerPart}
@@ -882,7 +907,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
 // ── Pizza Pricing Panel — Hero KPI + Tiroir ─────────────────────
 function PizzaPricing({
-  costPerPizza, nbParts, onNbPartsChange, costPerPart,
+  costPerPizza, totalWeightG, nbParts, onNbPartsChange, costPerPart,
   sellCoeff, onSellCoeffChange,
   derivedSellPerPart, derivedSellPerPizza,
   foodCostPct, fcTarget, onFcTargetChange,
@@ -890,6 +915,7 @@ function PizzaPricing({
   vatRate, onVatChange,
 }: {
   costPerPizza: number | null;
+  totalWeightG?: number;
   nbParts: number;
   onNbPartsChange: (n: number) => void;
   costPerPart: number | null;

@@ -737,8 +737,8 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
             </div>
           </div>
 
-          {/* Liaison Popina */}
-          <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1.5px solid ${COLORS.line}` }}>
+          {/* Liaison Popina — Bello Mio uniquement */}
+          {etabSlug !== "piccola" && <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1.5px solid ${COLORS.line}` }}>
             <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 6 }}>
               Touche vente Popina
             </label>
@@ -810,7 +810,7 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
               </div>
             )}
             {!linkedPopina && <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 4 }}>Associer cette fiche a un produit de la caisse Popina pour le suivi des ventes.</div>}
-          </div>
+          </div>}
 
           {/* Bouton valider */}
           <div style={{ marginTop: 20, textAlign: "right" }}>

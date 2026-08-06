@@ -84,14 +84,22 @@ export function SmartSelect(props: {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const filtered = useMemo(() => {
-    const qq = q.trim().toLowerCase();
-    if (!qq) return options.slice(0, menuMax);
+    const raw = q.trim().toLowerCase();
+    if (!raw) return options.slice(0, menuMax);
+    // Normalize: remove accents for tolerant search
+    const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const qq = norm(raw);
+    const words = qq.split(/\s+/).filter(Boolean);
     return options
       .map((o) => {
-        const n = o.name.toLowerCase();
+        const n = norm(o.name);
+        const extra = norm(o.rightBottom ?? ""); // includes supplier name
+        const full = n + " " + extra;
+        // Score: starts > includes > multi-word match > no match
         const starts = n.startsWith(qq);
-        const includes = n.includes(qq);
-        const score = starts ? 0 : includes ? 1 : 9;
+        const includes = full.includes(qq);
+        const allWords = words.every(w => full.includes(w));
+        const score = starts ? 0 : includes ? 1 : allWords ? 2 : 9;
         return { o, score };
       })
       .filter((x) => x.score < 9)
