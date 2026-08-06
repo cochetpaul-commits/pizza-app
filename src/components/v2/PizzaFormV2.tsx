@@ -70,6 +70,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   const [sellPrice, setSellPrice] = useState<number | "">("");
   const [sellCoeff, setSellCoeff] = useState<number | null>(null);
   const [nbParts, setNbParts] = useState(1);
+  const [cookedWeightG, setCookedWeightG] = useState<number | "">(""); // poids apres cuisson
 
   // Dough recipes
   const [doughRecipes, setDoughRecipes] = useState<DoughRecipeRow[]>([]);
@@ -637,6 +638,8 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
             <PizzaPricing
               costPerPizza={costPerPizza}
               totalWeightG={totalWeightG}
+              cookedWeightG={cookedWeightG}
+              onCookedWeightChange={setCookedWeightG}
               nbParts={nbParts}
               onNbPartsChange={setNbParts}
               costPerPart={costPerPart}
@@ -907,7 +910,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
 // ── Pizza Pricing Panel — Hero KPI + Tiroir ─────────────────────
 function PizzaPricing({
-  costPerPizza, totalWeightG, nbParts, onNbPartsChange, costPerPart,
+  costPerPizza, totalWeightG, cookedWeightG, onCookedWeightChange, nbParts, onNbPartsChange, costPerPart,
   sellCoeff, onSellCoeffChange,
   derivedSellPerPart, derivedSellPerPizza,
   foodCostPct, fcTarget, onFcTargetChange,
@@ -916,6 +919,8 @@ function PizzaPricing({
 }: {
   costPerPizza: number | null;
   totalWeightG?: number;
+  cookedWeightG: number | "";
+  onCookedWeightChange: (v: number | "") => void;
   nbParts: number;
   onNbPartsChange: (n: number) => void;
   costPerPart: number | null;
@@ -1034,6 +1039,27 @@ function PizzaPricing({
           )}
         </div>
       </div>
+
+      {/* ── Poids + Prix/kg + Cuisson ── */}
+      {(totalWeightG ?? 0) > 0 && (
+        <div style={{ borderTop: "1px solid #ece4d4", padding: "10px 16px" }}>
+          <div style={{ display: "flex", justifyContent: "center", gap: 16, fontSize: 12, color: "#888", flexWrap: "wrap", alignItems: "center" }}>
+            <span>Poids cru : <strong style={{ color: "#1a1a1a" }}>{(totalWeightG ?? 0) >= 1000 ? `${((totalWeightG ?? 0) / 1000).toFixed(2)} kg` : `${totalWeightG} g`}</strong></span>
+            {costPerPizza != null && (totalWeightG ?? 0) > 0 && (
+              <span>Prix/kg : <strong style={{ color: "#8B1A1A" }}>{fmtMoney(costPerPizza / (totalWeightG ?? 1) * 1000)}{"\u20AC"}</strong></span>
+            )}
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              Poids cuit :
+              <input type="number" value={cookedWeightG} onChange={e => onCookedWeightChange(e.target.value ? Number(e.target.value) : "")}
+                placeholder="g" style={{ width: 60, padding: "3px 6px", borderRadius: 6, border: "1px solid #e0d8ce", fontSize: 12, textAlign: "center" }} />
+              g
+            </span>
+            {cookedWeightG !== "" && Number(cookedWeightG) > 0 && (totalWeightG ?? 0) > 0 && (
+              <span>Reduction : <strong style={{ color: "#D4775A" }}>{((1 - Number(cookedWeightG) / (totalWeightG ?? 1)) * 100).toFixed(0)}%</strong></span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Food Cost + Marge bar ── */}
       <div style={{

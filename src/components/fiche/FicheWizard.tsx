@@ -672,6 +672,26 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
             <KPI label="Marge brute" value={eur(marge)} color={COLORS.ok} sub={fiche.portions > 1 ? `/ ${fam.portions_label}, recette : ${eur(marge * fiche.portions)}` : `/ ${fam.portions_label}`} />
           </div>
 
+          {/* Poids total + Prix/kg + Cuisson */}
+          {(() => {
+            const weightG = fiche.lignes.reduce((acc: number, l: LigneIngredient) => {
+              if (!l.quantite || l.quantite <= 0) return acc;
+              const u = (l.unite ?? "g").toLowerCase();
+              if (u === "g") return acc + l.quantite;
+              if (u === "kg") return acc + l.quantite * 1000;
+              return acc;
+            }, 0) + (isPizza && fiche.paton_poids ? fiche.paton_poids : 0);
+            if (weightG <= 0) return null;
+            const pricePerKg = totalCost > 0 ? totalCost / weightG * 1000 : 0;
+            return (
+              <div style={{ display: "flex", justifyContent: "center", gap: 16, fontSize: 12, color: "#888", marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+                <span>Poids cru : <strong style={{ color: "#1a1a1a" }}>{weightG >= 1000 ? `${(weightG / 1000).toFixed(2)} kg` : `${Math.round(weightG)} g`}</strong></span>
+                {pricePerKg > 0 && <span>Prix/kg : <strong style={{ color: COLORS.bordeaux }}>{pricePerKg.toFixed(2)}{"\u20AC"}</strong></span>}
+                {fiche.portions > 0 && weightG > 0 && <span>Poids/portion : <strong style={{ color: "#1a1a1a" }}>{Math.round(weightG / fiche.portions)} g</strong></span>}
+              </div>
+            );
+          })()}
+
           {/* Bandeau prix conseillé */}
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
