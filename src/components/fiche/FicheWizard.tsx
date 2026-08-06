@@ -6,8 +6,9 @@ import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
 import { StepsList } from "@/components/v2/StepsList";
+import { IngredientListDnD, type IngredientLine } from "@/components/v2/IngredientListDnD";
 import {
-  type FicheState, type Categorie, type Famille, type IngredientRef, type LigneIngredient,
+  type FicheState, type Categorie, type Famille, type IngredientRef, type LigneIngredient, type Zone,
   UNITS, unitsFor, ALLERGENES_14, PATON_BASE,
   coutLigne, coutRecetteTotal, coutPaton, coutPortion, prixTTC, prixHT,
   foodCostPct, margeBrute, prixConseille, fcColor, allergenesActifs, resumeAuto,
@@ -562,42 +563,44 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
             2. Ingredients
           </h2>
 
-          {isPizza && (
-            <>
-              <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, margin: "18px 0 8px" }}>Avant four</div>
-              {fiche.lignes.filter(l => l.zone === "avant_four").map((l) => (
-                <IngredientRow key={l.key} ligne={l} mercuriale={mercuriale} onChange={nl => {
-                  const lignes = [...fiche.lignes];
-                  const idx = lignes.findIndex(ll => ll.key === l.key);
-                  if (idx >= 0) lignes[idx] = nl;
-                  update({ lignes });
-                }} onDelete={() => update({ lignes: fiche.lignes.filter(ll => ll.key !== l.key) })} />
-              ))}
-              <button onClick={() => update({ lignes: [...fiche.lignes, { key: tmpKey(), ingredient_id: null, ingredient: null, quantite: 0, unite: "g", zone: "avant_four" }] })}
-                style={{ border: `1.5px dashed ${COLORS.terra}`, background: "transparent", color: COLORS.terraDark, borderRadius: 999, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", marginTop: 4, fontFamily: "inherit" }}>
-                + Ajouter un ingredient
-              </button>
-            </>
-          )}
+          {/* Ingredient list with drag & drop */}
+          {(() => {
+            // Convert LigneIngredient → IngredientLine for IngredientListDnD
+            const toLines = (zone: string): IngredientLine[] =>
+              fiche.lignes.filter(l => l.zone === zone).map((l, i) => ({
+                id: l.key, ingredient_id: l.ingredient_id ?? "", qty: l.quantite || "", unit: l.unite, sort_order: i,
+              }));
+            const fromLines = (lines: IngredientLine[], zone: string): LigneIngredient[] =>
+              lines.map(l => ({
+                key: l.id, ingredient_id: l.ingredient_id || null,
+                ingredient: mercuriale.find((m: IngredientRef) => m.id === l.ingredient_id) ?? null,
+                quantite: typeof l.qty === "number" ? l.qty : 0, unite: l.unit, zone: zone as Zone,
+              }));
+            const updateZone = (lines: IngredientLine[], zone: string) => {
+              const otherLines = fiche.lignes.filter(l => l.zone !== zone);
+              update({ lignes: [...otherLines, ...fromLines(lines, zone)] });
+            };
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const ingList = mercuriale.map(m => ({ id: m.id, name: m.nom_produit || m.nom_court, category: "" as any, allergens: m.allergenes })) as any[];
+            const priceMap: Record<string, CpuByUnit> = {};
+            for (const m of mercuriale) { if (m.prix_base > 0) priceMap[m.id] = { g: m.prix_base }; }
+            const units = isBar ? ["cl", "ml", "L", "g", "pcs"] : ["g", "kg", "cl", "pcs"];
 
-          <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, margin: "18px 0 8px" }}>
-            {isPizza ? "Apres four" : isBar ? "Composition" : "Ingredients"}
-          </div>
-          {fiche.lignes.filter(l => l.zone === "apres_four").map((l) => (
-            <IngredientRow key={l.key} ligne={l} mercuriale={mercuriale} onChange={nl => {
-              const lignes = [...fiche.lignes];
-              const idx = lignes.findIndex(ll => ll.key === l.key);
-              if (idx >= 0) lignes[idx] = nl;
-              update({ lignes });
-            }} onDelete={() => update({ lignes: fiche.lignes.filter(ll => ll.key !== l.key) })} />
-          ))}
-          <button onClick={() => {
-            const defaultBase = isBar ? "cl" : "g";
-            update({ lignes: [...fiche.lignes, { key: tmpKey(), ingredient_id: null, ingredient: null, quantite: 0, unite: defaultBase, zone: "apres_four" }] });
-          }}
-            style={{ border: `1.5px dashed ${COLORS.terra}`, background: "transparent", color: COLORS.terraDark, borderRadius: 999, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", marginTop: 4, fontFamily: "inherit" }}>
-            + Ajouter un ingredient
-          </button>
+            return (
+              <>
+                {isPizza && (
+                  <>
+                    <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, margin: "18px 0 8px" }}>Avant four</div>
+                    <IngredientListDnD droppableId="avant_four" items={toLines("avant_four")} ingredients={ingList} priceByIngredient={priceMap} units={units} onChange={lines => updateZone(lines, "avant_four")} />
+                  </>
+                )}
+                <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, margin: "18px 0 8px" }}>
+                  {isPizza ? "Apres four" : isBar ? "Composition" : "Ingredients"}
+                </div>
+                <IngredientListDnD droppableId="apres_four" items={toLines("apres_four")} ingredients={ingList} priceByIngredient={priceMap} units={units} onChange={lines => updateZone(lines, "apres_four")} />
+              </>
+            );
+          })()}
 
           {/* Total + poids + allergènes */}
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1.5px solid ${COLORS.line}` }}>
