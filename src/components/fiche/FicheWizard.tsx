@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
+import { StepsList } from "@/components/v2/StepsList";
 import {
   type FicheState, type Categorie, type Famille, type IngredientRef, type LigneIngredient,
   UNITS, unitsFor, ALLERGENES_14, PATON_BASE,
@@ -598,10 +599,29 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
             + Ajouter un ingredient
           </button>
 
-          {/* Total + allergènes */}
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 14, paddingTop: 12, borderTop: `1.5px solid ${COLORS.line}`, fontWeight: 800 }}>
-            <span>Cout matiere, recette complete</span>
-            <span style={{ color: COLORS.bordeaux, fontSize: 18 }}>{eur(totalCost)}</span>
+          {/* Total + poids + allergènes */}
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1.5px solid ${COLORS.line}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, marginBottom: 6 }}>
+              <span>Cout matiere, recette complete</span>
+              <span style={{ color: COLORS.bordeaux, fontSize: 18 }}>{eur(totalCost)}</span>
+            </div>
+            {(() => {
+              const wG = fiche.lignes.reduce((acc: number, l: LigneIngredient) => {
+                if (!l.quantite || l.quantite <= 0) return acc;
+                const u = (l.unite ?? "g").toLowerCase();
+                if (u === "g") return acc + l.quantite;
+                if (u === "kg") return acc + l.quantite * 1000;
+                return acc;
+              }, 0) + (isPizza && fiche.paton_poids ? fiche.paton_poids : 0);
+              if (wG <= 0) return null;
+              return (
+                <div style={{ display: "flex", gap: 16, fontSize: 12, color: "#888" }}>
+                  <span>Poids total : <strong style={{ color: "#1a1a1a" }}>{wG >= 1000 ? `${(wG / 1000).toFixed(2)} kg` : `${Math.round(wG)} g`}</strong></span>
+                  {fiche.portions > 1 && <span>Poids/portion : <strong style={{ color: "#1a1a1a" }}>{Math.round(wG / fiche.portions)} g</strong></span>}
+                  {totalCost > 0 && wG > 0 && <span>Prix/kg : <strong style={{ color: COLORS.bordeaux }}>{(totalCost / wG * 1000).toFixed(2)}€</strong></span>}
+                </div>
+              );
+            })()}
           </div>
           <div style={{ marginTop: 16 }}>
             <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, marginBottom: 8 }}>Allergenes, detectes automatiquement</div>
@@ -624,25 +644,14 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
           <h2 style={{ fontSize: 13, letterSpacing: ".15em", textTransform: "uppercase", color: COLORS.bordeaux, marginBottom: 16, fontWeight: 800 }}>
             3. Preparation <span style={{ color: COLORS.muted, fontWeight: 600, letterSpacing: ".02em", textTransform: "none", fontSize: 12 }}>(facultatif)</span>
           </h2>
-          {fiche.etapes.map((e, i) => (
-            <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 8 }}>
-              <span style={{ width: 26, height: 26, borderRadius: "50%", background: COLORS.pill, color: COLORS.bordeaux, fontWeight: 800, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 8 }}>{i + 1}</span>
-              <input type="text" value={e} onChange={ev => {
-                const etapes = [...fiche.etapes]; etapes[i] = ev.target.value;
-                const resume_salle = fiche.resume_manuel ? fiche.resume_salle : resumeAuto(etapes);
-                update({ etapes, resume_salle });
-              }} style={{ flex: 1, border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", outline: "none", fontFamily: "inherit" }} />
-              <button onClick={() => {
-                const etapes = fiche.etapes.filter((_, j) => j !== i);
-                const resume_salle = fiche.resume_manuel ? fiche.resume_salle : resumeAuto(etapes);
-                update({ etapes, resume_salle });
-              }} style={{ border: "none", background: "#f7e3df", color: COLORS.warn, width: 26, height: 26, borderRadius: "50%", cursor: "pointer", fontWeight: 800, marginTop: 8, flexShrink: 0 }}>x</button>
-            </div>
-          ))}
-          <button onClick={() => update({ etapes: [...fiche.etapes, ""] })}
-            style={{ border: `1.5px dashed ${COLORS.terra}`, background: "transparent", color: COLORS.terraDark, borderRadius: 999, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-            + Ajouter une etape
-          </button>
+          <StepsList
+            steps={fiche.etapes}
+            onChange={(etapes) => {
+              const resume_salle = fiche.resume_manuel ? fiche.resume_salle : resumeAuto(etapes);
+              update({ etapes, resume_salle });
+            }}
+            recipeId={fiche.id}
+          />
           <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "14px 0 6px" }}>Notes libres</label>
           <textarea value={fiche.notes} onChange={e => update({ notes: e.target.value })} placeholder="Cuisson, dressage, point d'attention..."
             style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", outline: "none", resize: "vertical", minHeight: 70, fontFamily: "inherit", boxSizing: "border-box" }} />
@@ -720,6 +729,8 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
           </div>
 
           {/* Contrôles coeff / prix / TVA */}
+          <div style={{ background: "rgba(255,255,255,0.8)", borderRadius: 14, border: "1px solid rgba(0,0,0,0.06)", padding: 16, marginBottom: 14 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>Parametres de calcul</div>
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 150 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>Coefficient</label>
@@ -761,6 +772,7 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
                 background: fcCol === "ok" ? COLORS.ok : fcCol === "warn" ? COLORS.amber : COLORS.warn,
               }} />
             </div>
+          </div>
           </div>
 
           {/* Tarifs traiteur */}
