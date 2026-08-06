@@ -59,7 +59,8 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
     (async () => {
     const [fRes, cRes, iRes, empRes, offRes, popRes] = await Promise.all([
       supabase.from("familles").select("*"),
-      supabase.from("categories").select("*").order("sort_order").order("nom"),
+      supabase.from("categories").select("*").order("sort_order").order("nom")
+        .or(`establishments.cs.{"${etabSlug === "piccola" ? "piccola" : "bellomio"}"},establishments.is.null`),
       supabase.from("ingredients").select("id, name, category, allergens, cost_per_unit, purchase_price, purchase_unit, purchase_unit_label, density_g_per_ml, piece_weight_g, piece_volume_ml, establishments")
         .or(`establishments.cs.{"${etabSlug === "piccola" ? "piccola" : "bellomio"}"},establishments.is.null`),
       supabase.from("recipes").select("id, name").order("name"),

@@ -9,6 +9,7 @@ export type AppCategory = {
   famille_id: string;
   sous_categories: string[];
   sort_order: number;
+  establishments?: string[] | null;
 };
 
 let cached: AppCategory[] | null = null;
@@ -45,6 +46,13 @@ export function useCategories(): { categories: AppCategory[]; reload: () => void
     categories: cats,
     reload: () => { cached = null; fetchCategories(); },
   };
+}
+
+/** Filter categories for a specific establishment. */
+export function filterCategoriesForEtab(cats: AppCategory[], etabSlug: string | null | undefined): AppCategory[] {
+  if (!etabSlug) return cats;
+  const key = etabSlug.includes("piccola") ? "piccola" : "bellomio";
+  return cats.filter(c => !c.establishments || c.establishments.includes(key));
 }
 
 /** Get category color by slug (synchronous, uses cache). */

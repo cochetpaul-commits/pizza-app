@@ -9,7 +9,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { calculerPate, type EmpatementType, type FlourMixItem, type PateResult } from "@/lib/pateEngine";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
-import { useCategories } from "@/lib/useCategories";
+import { useCategories, filterCategoriesForEtab } from "@/lib/useCategories";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -482,7 +482,8 @@ export function CatalogueContent() {
   const etabSlug = resolvedEtab?.slug ?? null;
   const { can } = useProfile();
   const canWrite = can("operations.edit_recettes");
-  const { categories: dbCategories } = useCategories();
+  const { categories: allDbCategories } = useCategories();
+  const dbCategories = useMemo(() => filterCategoriesForEtab(allDbCategories, etab?.slug), [allDbCategories, etab?.slug]);
 
   // Build dynamic label/color maps from DB categories
   const dynamicCatLabels = useMemo(() => {
