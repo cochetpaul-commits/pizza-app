@@ -72,7 +72,9 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   const [nbParts, setNbParts] = useState(1);
   const [cookedWeightG, setCookedWeightG] = useState<number | "">(""); // poids apres cuisson
   const [sellPriceEmporter, setSellPriceEmporter] = useState<number | "">("");
-  const [vatEmporter, setVatEmporter] = useState(0.055); // 5.5% TVA emporter
+  const [vatEmporter, setVatEmporter] = useState(0.055);
+  const [sellPricePerKg, setSellPricePerKg] = useState<number | "">("");
+  const [sellPricePerPortion, setSellPricePerPortion] = useState<number | "">("");
 
   // Dough recipes
   const [doughRecipes, setDoughRecipes] = useState<DoughRecipeRow[]>([]);
@@ -428,6 +430,9 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
           if (p.sell_price != null) setSellPrice(Number(p.sell_price));
           if (p.sell_price_emporter != null) setSellPriceEmporter(Number(p.sell_price_emporter));
           if (p.vat_rate_emporter != null) setVatEmporter(Number(p.vat_rate_emporter));
+          if (p.sell_price_per_kg != null) setSellPricePerKg(Number(p.sell_price_per_kg));
+          if (p.sell_price_per_portion != null) setSellPricePerPortion(Number(p.sell_price_per_portion));
+          if (p.cooked_weight_g != null) setCookedWeightG(Number(p.cooked_weight_g));
           setPivotIngredientId(String(p.pivot_ingredient_id ?? "") || null);
         }
         if (pLines) {
@@ -497,6 +502,9 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         vat_rate: vatRate,
         sell_price_emporter: sellPriceEmporter !== "" ? Number(sellPriceEmporter) : null,
         vat_rate_emporter: vatEmporter,
+        sell_price_per_kg: sellPricePerKg !== "" ? Number(sellPricePerKg) : null,
+        sell_price_per_portion: sellPricePerPortion !== "" ? Number(sellPricePerPortion) : null,
+        cooked_weight_g: cookedWeightG !== "" ? Number(cookedWeightG) : null,
         margin_rate,
         nb_parts: nbParts,
         sell_price: derivedSellPerPizza ?? (sellPrice !== "" ? Number(sellPrice) : null),
@@ -653,6 +661,10 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
               onSellPriceEmporterChange={setSellPriceEmporter}
               vatEmporter={vatEmporter}
               onVatEmporterChange={setVatEmporter}
+              sellPricePerKg={sellPricePerKg}
+              onSellPricePerKgChange={setSellPricePerKg}
+              sellPricePerPortion={sellPricePerPortion}
+              onSellPricePerPortionChange={setSellPricePerPortion}
               nbParts={nbParts}
               onNbPartsChange={setNbParts}
               costPerPart={costPerPart}
@@ -923,7 +935,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
 // ── Pizza Pricing Panel — Hero KPI + Tiroir ─────────────────────
 function PizzaPricing({
-  costPerPizza, totalWeightG, cookedWeightG, onCookedWeightChange, sellPriceEmporter, onSellPriceEmporterChange, vatEmporter, onVatEmporterChange, nbParts, onNbPartsChange, costPerPart,
+  costPerPizza, totalWeightG, cookedWeightG, onCookedWeightChange, sellPriceEmporter, onSellPriceEmporterChange, vatEmporter, onVatEmporterChange, sellPricePerKg, onSellPricePerKgChange, sellPricePerPortion, onSellPricePerPortionChange, nbParts, onNbPartsChange, costPerPart,
   sellCoeff, onSellCoeffChange,
   derivedSellPerPart, derivedSellPerPizza,
   foodCostPct, fcTarget, onFcTargetChange,
@@ -938,6 +950,10 @@ function PizzaPricing({
   onSellPriceEmporterChange?: (v: number | "") => void;
   vatEmporter?: number;
   onVatEmporterChange?: (v: number) => void;
+  sellPricePerKg?: number | "";
+  onSellPricePerKgChange?: (v: number | "") => void;
+  sellPricePerPortion?: number | "";
+  onSellPricePerPortionChange?: (v: number | "") => void;
   nbParts: number;
   onNbPartsChange: (n: number) => void;
   costPerPart: number | null;
@@ -1312,6 +1328,33 @@ function PizzaPricing({
                     style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                     {[0, 5.5, 10, 20].map(v => <option key={v} value={v}>{v}%</option>)}
                   </select>
+                </div>
+              </div>
+            )}
+            {/* Tarifs traiteur */}
+            {(onSellPricePerKgChange || onSellPricePerPortionChange) && (
+              <div style={{ borderTop: "1px solid #ece4d4", paddingTop: 10, marginTop: 10 }}>
+                <div style={{ ...lbl, marginBottom: 8, fontSize: 10, color: "#8a6b3e" }}>Tarifs traiteur</div>
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 11, color: "#888" }}>Prix/kg</span>
+                    <input type="number" step={0.5} min={0} value={sellPricePerKg ?? ""}
+                      onChange={e => onSellPricePerKgChange?.(e.target.value ? Number(e.target.value) : "")}
+                      placeholder="—" style={{ width: 70, padding: "4px 8px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14, fontWeight: 700, textAlign: "center" }} />
+                    <span style={{ fontSize: 12, color: "#999" }}>€</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 11, color: "#888" }}>Prix/portion</span>
+                    <input type="number" step={0.5} min={0} value={sellPricePerPortion ?? ""}
+                      onChange={e => onSellPricePerPortionChange?.(e.target.value ? Number(e.target.value) : "")}
+                      placeholder="—" style={{ width: 70, padding: "4px 8px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14, fontWeight: 700, textAlign: "center" }} />
+                    <span style={{ fontSize: 12, color: "#999" }}>€</span>
+                  </div>
+                  {sellPricePerKg !== "" && Number(sellPricePerKg) > 0 && costPerPizza != null && (totalWeightG ?? 0) > 0 && (
+                    <span style={{ fontSize: 10, color: "#4a6741", fontWeight: 600 }}>
+                      Marge/kg : {fmtMoney(Number(sellPricePerKg) - costPerPizza / (totalWeightG ?? 1) * 1000)}€
+                    </span>
+                  )}
                 </div>
               </div>
             )}

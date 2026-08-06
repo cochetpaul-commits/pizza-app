@@ -59,6 +59,9 @@ export type FicheState = {
   coeff: number;
   tva: number;
   prix_ttc_manuel: number | null;
+  // Traiteur
+  sell_price_per_kg: number | null;
+  sell_price_per_portion: number | null;
   // Salle
   description: string;
   accord: string;
@@ -183,6 +186,8 @@ export function defaultFiche(etabSlug: string): FicheState {
     coeff: 3,
     tva: 10,
     prix_ttc_manuel: null,
+    sell_price_per_kg: null,
+    sell_price_per_portion: null,
     description: "",
     accord: "",
     resume_salle: "",

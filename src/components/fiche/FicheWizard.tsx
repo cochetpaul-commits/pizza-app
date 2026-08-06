@@ -218,6 +218,8 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
             coeff: rec.sell_price && rec.cost_per_portion ? Number(rec.sell_price) / Number(rec.cost_per_portion) : 3,
             tva: rec.vat_rate ? Number(rec.vat_rate) * 100 : 10,
             prix_ttc_manuel: rec.sell_price ? Number(rec.sell_price) * (1 + (rec.vat_rate ? Number(rec.vat_rate) : 0.1)) : null,
+            sell_price_per_kg: rec.sell_price_per_kg ? Number(rec.sell_price_per_kg) : null,
+            sell_price_per_portion: rec.sell_price_per_portion ? Number(rec.sell_price_per_portion) : null,
             description: (rec.description_courte as string) ?? "",
             accord: (rec.accord as string) ?? (rec.wine_pairing as string) ?? "",
             resume_salle: (rec.resume_salle as string) ?? "",
@@ -291,6 +293,8 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
       sell_price: saveHt > 0 ? saveHt : null,
       vat_rate: fiche.tva / 100,
       margin_rate: saveHt > 0 ? (1 - saveCostPerPortion / saveHt) : 0.65,
+      sell_price_per_kg: fiche.sell_price_per_kg,
+      sell_price_per_portion: fiche.sell_price_per_portion,
       description_courte: fiche.description || null,
       wine_pairing: fiche.accord || null,
       accord: fiche.accord || null,
@@ -756,6 +760,29 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
                 width: `${Math.min(100, (fam.objectif_fc > 0 ? fc / fam.objectif_fc : 0) * 50)}%`,
                 background: fcCol === "ok" ? COLORS.ok : fcCol === "warn" ? COLORS.amber : COLORS.warn,
               }} />
+            </div>
+          </div>
+
+          {/* Tarifs traiteur */}
+          <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1.5px solid ${COLORS.line}` }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#8a6b3e", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>
+              Tarifs traiteur
+            </label>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 12, color: "#888" }}>Prix/kg</span>
+                <input type="number" step={0.5} min={0} value={fiche.sell_price_per_kg ?? ""}
+                  onChange={e => update({ sell_price_per_kg: e.target.value ? Number(e.target.value) : null })}
+                  placeholder="—" style={{ width: 80, padding: "6px 10px", borderRadius: 8, border: `1.5px solid ${COLORS.line}`, fontSize: 14, fontWeight: 700, textAlign: "center" }} />
+                <span style={{ fontSize: 12, color: "#999" }}>€</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 12, color: "#888" }}>Prix/portion</span>
+                <input type="number" step={0.5} min={0} value={fiche.sell_price_per_portion ?? ""}
+                  onChange={e => update({ sell_price_per_portion: e.target.value ? Number(e.target.value) : null })}
+                  placeholder="—" style={{ width: 80, padding: "6px 10px", borderRadius: 8, border: `1.5px solid ${COLORS.line}`, fontSize: 14, fontWeight: 700, textAlign: "center" }} />
+                <span style={{ fontSize: 12, color: "#999" }}>€</span>
+              </div>
             </div>
           </div>
 
