@@ -71,6 +71,8 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   const [sellCoeff, setSellCoeff] = useState<number | null>(null);
   const [nbParts, setNbParts] = useState(1);
   const [cookedWeightG, setCookedWeightG] = useState<number | "">(""); // poids apres cuisson
+  const [sellPriceEmporter, setSellPriceEmporter] = useState<number | "">("");
+  const [vatEmporter, setVatEmporter] = useState(0.055); // 5.5% TVA emporter
 
   // Dough recipes
   const [doughRecipes, setDoughRecipes] = useState<DoughRecipeRow[]>([]);
@@ -424,6 +426,8 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
           }
           if (p.nb_parts != null && Number(p.nb_parts) > 0) setNbParts(Number(p.nb_parts));
           if (p.sell_price != null) setSellPrice(Number(p.sell_price));
+          if (p.sell_price_emporter != null) setSellPriceEmporter(Number(p.sell_price_emporter));
+          if (p.vat_rate_emporter != null) setVatEmporter(Number(p.vat_rate_emporter));
           setPivotIngredientId(String(p.pivot_ingredient_id ?? "") || null);
         }
         if (pLines) {
@@ -491,6 +495,8 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         total_cost: totalCost > 0 ? totalCost : null,
         ball_weight_g: ballWeightG !== "" ? Number(ballWeightG) : null,
         vat_rate: vatRate,
+        sell_price_emporter: sellPriceEmporter !== "" ? Number(sellPriceEmporter) : null,
+        vat_rate_emporter: vatEmporter,
         margin_rate,
         nb_parts: nbParts,
         sell_price: derivedSellPerPizza ?? (sellPrice !== "" ? Number(sellPrice) : null),
@@ -590,7 +596,14 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
           onBack={() => router.push("/recettes")}
           actions={<>
             {isEdit && pivotIngredientId && <HeroBtn onClick={() => setShowProdModal(true)}>Production</HeroBtn>}
-            <HeroBtn onClick={handleExportPdf} disabled={!isEdit || pdfLoading} title={!isEdit ? "Enregistrer la recette pour exporter le PDF" : undefined}>{pdfLoading ? "Export…" : "PDF"}</HeroBtn>
+            <HeroBtn onClick={handleExportPdf} disabled={!isEdit || pdfLoading}>{pdfLoading ? "Export…" : "PDF"}</HeroBtn>
+            <HeroBtn onClick={() => {
+              if (!pizzaId) return;
+              const n = prompt("Nombre de portions / personnes ?", "10");
+              if (!n) return;
+              const portions = parseInt(n);
+              if (portions > 0) window.open(`/api/recettes/pdf?id=${pizzaId}&portions=${portions}`, "_blank");
+            }} disabled={!isEdit}>PDF Prod.</HeroBtn>
             {isEdit ? <PublishCatalogueButton recipeType="pizza" recipeId={pizzaId!} /> : <HeroBtn disabled title="Enregistrer la recette pour publier au catalogue">Catalogue</HeroBtn>}
             {userCanWrite && <HeroBtn onClick={handleSave} disabled={saving} primary>{saving ? "Sauvegarde…" : "Enregistrer"}</HeroBtn>}
             {isEdit && userCanWrite && (
@@ -636,6 +649,10 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
               totalWeightG={totalWeightG}
               cookedWeightG={cookedWeightG}
               onCookedWeightChange={setCookedWeightG}
+              sellPriceEmporter={sellPriceEmporter}
+              onSellPriceEmporterChange={setSellPriceEmporter}
+              vatEmporter={vatEmporter}
+              onVatEmporterChange={setVatEmporter}
               nbParts={nbParts}
               onNbPartsChange={setNbParts}
               costPerPart={costPerPart}
@@ -906,7 +923,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
 // ── Pizza Pricing Panel — Hero KPI + Tiroir ─────────────────────
 function PizzaPricing({
-  costPerPizza, totalWeightG, cookedWeightG, onCookedWeightChange, nbParts, onNbPartsChange, costPerPart,
+  costPerPizza, totalWeightG, cookedWeightG, onCookedWeightChange, sellPriceEmporter, onSellPriceEmporterChange, vatEmporter, onVatEmporterChange, nbParts, onNbPartsChange, costPerPart,
   sellCoeff, onSellCoeffChange,
   derivedSellPerPart, derivedSellPerPizza,
   foodCostPct, fcTarget, onFcTargetChange,
@@ -917,6 +934,10 @@ function PizzaPricing({
   totalWeightG?: number;
   cookedWeightG: number | "";
   onCookedWeightChange: (v: number | "") => void;
+  sellPriceEmporter?: number | "";
+  onSellPriceEmporterChange?: (v: number | "") => void;
+  vatEmporter?: number;
+  onVatEmporterChange?: (v: number) => void;
   nbParts: number;
   onNbPartsChange: (n: number) => void;
   costPerPart: number | null;
@@ -1272,6 +1293,28 @@ function PizzaPricing({
                 <span style={{ fontSize: 12, color: "#999" }}>%</span>
               </div>
             </div>
+
+            {/* Prix emporter */}
+            {onSellPriceEmporterChange && (
+              <div style={{ borderTop: "1px solid #ece4d4", paddingTop: 10, marginTop: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span style={{ ...lbl, minWidth: 80 }}>Prix emporter</span>
+                  <input
+                    type="number" step={0.5} min={0}
+                    value={sellPriceEmporter ?? ""}
+                    onChange={e => onSellPriceEmporterChange(e.target.value ? Number(e.target.value) : "")}
+                    placeholder="TTC"
+                    style={{ width: 70, padding: "4px 8px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14, fontWeight: 700, textAlign: "center" }}
+                  />
+                  <span style={{ fontSize: 12, color: "#999" }}>€ TTC</span>
+                  <span style={{ ...lbl, marginLeft: 10 }}>TVA</span>
+                  <select value={Math.round((vatEmporter ?? 0.055) * 100)} onChange={e => onVatEmporterChange?.(Number(e.target.value) / 100)}
+                    style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                    {[0, 5.5, 10, 20].map(v => <option key={v} value={v}>{v}%</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

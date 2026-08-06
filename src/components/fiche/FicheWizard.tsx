@@ -975,6 +975,23 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
             {saving ? "..." : "Sauvegarder"}
           </button>
         )}
+        {fiche.id && (
+          <>
+            <button onClick={() => window.open(`/api/recettes/pdf?id=${fiche.id}`, "_blank")}
+              style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "13px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", background: "#fff", color: COLORS.muted, fontFamily: "inherit" }}>
+              PDF
+            </button>
+            <button onClick={() => {
+              const n = prompt("Nombre de portions / personnes ?", String(fiche.portions > 1 ? fiche.portions : 10));
+              if (!n) return;
+              const p = parseInt(n);
+              if (p > 0) window.open(`/api/recettes/pdf?id=${fiche.id}&portions=${p}`, "_blank");
+            }}
+              style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "13px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", background: "#fff", color: COLORS.muted, fontFamily: "inherit" }}>
+              PDF Prod.
+            </button>
+          </>
+        )}
         <button onClick={() => {
             if (step < 4) {
               let next = step + 1;
