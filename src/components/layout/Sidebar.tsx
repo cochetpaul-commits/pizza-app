@@ -202,7 +202,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           onMouseLeave={() => setHoveredHub(null)}
           style={hubBtnStyle}
         >
-          {SectionIcon && <SectionIcon size={15} color={(isOpen || hasActiveChild) ? `${etabColor}CC` : hovered ? C.textMuted : C.textMuted} />}
+          {SectionIcon && <SectionIcon size={18} color={(isOpen || hasActiveChild) ? `${etabColor}CC` : hovered ? C.textMuted : C.textMuted} />}
           <span style={{ flex: 1, textAlign: "left" }}>{sub.label}</span>
         </button>
         {isOpen && (
@@ -258,7 +258,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             transition: "background 0.15s, color 0.15s",
           }}
         >
-          {SettingsIcon && <SettingsIcon size={15} color={settingsOpen ? etabColor : C.textMuted} />}
+          {SettingsIcon && <SettingsIcon size={18} color={settingsOpen ? etabColor : C.textMuted} />}
           <span style={{ flex: 1, textAlign: "left" }}>{settingsEntry.label}</span>
         </button>
         {settingsOpen && settingsEntry.sections.map((sub, si) => {
@@ -279,7 +279,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                     color: active ? C.textActive : C.textNormal,
                     background: active ? C.bgItemActive : "transparent",
                   }}>
-                  {IconComp && <IconComp size={14} color={active ? etabColor : C.textMuted} />}
+                  {IconComp && <IconComp size={18} color={active ? etabColor : C.textMuted} />}
                   <span>{item.label}</span>
                 </Link>
               );
@@ -302,7 +302,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 fontSize: 14, fontWeight: 700, whiteSpace: "nowrap",
                 transition: "background 0.15s, color 0.15s",
               }}>
-                {SubIcon && <SubIcon size={15} color={isOpen ? etabColor : C.textMuted} />}
+                {SubIcon && <SubIcon size={18} color={isOpen ? etabColor : C.textMuted} />}
                 <span style={{ flex: 1, textAlign: "left" }}>{sub.label}</span>
               </button>
               {isOpen && items.map(item => {
@@ -345,7 +345,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           transition: "background 0.12s",
           whiteSpace: "nowrap", overflow: "hidden",
         }}>
-        {IconComp && <IconComp size={16} color={active ? etabColor : C.textMuted} />}
+        {IconComp && <IconComp size={18} color={active ? etabColor : C.textMuted} />}
         <span>{entry.label}</span>
       </Link>
     );
@@ -400,7 +400,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 whiteSpace: "nowrap", overflow: "hidden",
               }}
             >
-              <IconBuilding size={16} color={C.ifratelli} />
+              <IconBuilding size={18} color={C.ifratelli} />
               <span style={{ flex: 1, letterSpacing: 0.3 }}>iFratelli Group</span>
             </Link>
 
@@ -454,7 +454,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                       boxShadow: isEtabSelected ? `0 2px 8px ${color}20` : "none",
                     }}
                   >
-                    <IconStore size={16} color={color} />
+                    <IconStore size={18} color={color} />
                     <span style={{ flex: 1, textAlign: "left", letterSpacing: 0.3 }}>{etab.nom}</span>
                     <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5"
                       style={{ transform: etabOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s", flexShrink: 0, opacity: 0.7 }}>
@@ -497,7 +497,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                                 transition: "background 0.15s, color 0.15s",
                               }}
                             >
-                              {SectionIcon && <SectionIcon size={14} color={(subOpen || hasActiveChild) ? `${color}CC` : C.textMuted} />}
+                              {SectionIcon && <SectionIcon size={18} color={(subOpen || hasActiveChild) ? `${color}CC` : C.textMuted} />}
                               <span style={{ flex: 1, textAlign: "left" }}>{sub.label}</span>
                               <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={(subOpen || hasActiveChild) ? `${color}CC` : C.textMuted} strokeWidth="2.5"
                                 style={{ transform: subOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s", flexShrink: 0, opacity: 0.6 }}>
@@ -547,7 +547,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         )}
         <Link href="/session" onClick={onNavigate}
           style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, textDecoration: "none", fontSize: 12, color: C.textMuted }}>
-          <IconSwitch size={14} color={C.textMuted} />
+          <IconSwitch size={18} color={C.textMuted} />
           <span>Changer de session</span>
         </Link>
       </div>
