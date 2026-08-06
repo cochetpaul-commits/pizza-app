@@ -278,7 +278,7 @@ export function MobileHeader() {
       top: 0, left: 0, right: 0,
       zIndex: 110,
       paddingTop: "env(safe-area-inset-top, 0px)",
-      background: "rgba(246,238,223,0.78)",
+      background: "rgba(255,255,255,0.85)",
       backdropFilter: "blur(28px) saturate(200%)",
       WebkitBackdropFilter: "blur(28px) saturate(200%)",
       borderBottom: "1px solid rgba(0,0,0,0.05)",
