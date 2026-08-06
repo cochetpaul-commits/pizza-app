@@ -4,6 +4,14 @@ export type FicheStatut = "brouillon" | "validee" | "publiee";
 export type FamilleId = "pizza" | "cuisine" | "cocktail" | "soft" | "vin" | "autre";
 export type Zone = "avant_four" | "apres_four";
 
+export type PrixLigne = {
+  mode: "portion" | "kg" | "piece" | "litre" | "custom";
+  label: string;
+  prix_ht: number;
+  tva: number; // ex: 10, 5.5, 20
+  coeff: number;
+};
+
 export type Famille = {
   id: FamilleId;
   label: string;
@@ -62,6 +70,9 @@ export type FicheState = {
   // Traiteur
   sell_price_per_kg: number | null;
   sell_price_per_portion: number | null;
+  cooked_weight_g: number | null;
+  // Multi-prix: [{mode: "portion"|"kg"|"piece"|"litre", prix: number, tva: number, label?: string}]
+  prix_lignes: PrixLigne[];
   // Salle
   description: string;
   accord: string;
@@ -188,6 +199,8 @@ export function defaultFiche(etabSlug: string): FicheState {
     prix_ttc_manuel: null,
     sell_price_per_kg: null,
     sell_price_per_portion: null,
+    cooked_weight_g: null,
+    prix_lignes: [],
     description: "",
     accord: "",
     resume_salle: "",

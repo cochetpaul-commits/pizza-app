@@ -8,7 +8,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { StepsList } from "@/components/v2/StepsList";
 import { IngredientListDnD, type IngredientLine } from "@/components/v2/IngredientListDnD";
 import {
-  type FicheState, type Categorie, type Famille, type IngredientRef, type LigneIngredient, type Zone,
+  type FicheState, type Categorie, type Famille, type IngredientRef, type LigneIngredient, type Zone, type PrixLigne,
   UNITS, unitsFor, ALLERGENES_14, PATON_BASE,
   coutLigne, coutRecetteTotal, coutPaton, coutPortion, prixTTC, prixHT,
   foodCostPct, margeBrute, prixConseille, fcColor, allergenesActifs, resumeAuto,
@@ -222,6 +222,8 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
             prix_ttc_manuel: rec.sell_price ? Number(rec.sell_price) * (1 + (rec.vat_rate ? Number(rec.vat_rate) : 0.1)) : null,
             sell_price_per_kg: rec.sell_price_per_kg ? Number(rec.sell_price_per_kg) : null,
             sell_price_per_portion: rec.sell_price_per_portion ? Number(rec.sell_price_per_portion) : null,
+            cooked_weight_g: rec.cooked_weight_g ? Number(rec.cooked_weight_g) : null,
+            prix_lignes: Array.isArray(rec.prix_lignes) ? rec.prix_lignes as PrixLigne[] : [],
             description: (rec.description_courte as string) ?? "",
             accord: (rec.accord as string) ?? (rec.wine_pairing as string) ?? "",
             resume_salle: (rec.resume_salle as string) ?? "",
@@ -297,6 +299,8 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
       margin_rate: saveHt > 0 ? (1 - saveCostPerPortion / saveHt) : 0.65,
       sell_price_per_kg: fiche.sell_price_per_kg,
       sell_price_per_portion: fiche.sell_price_per_portion,
+      cooked_weight_g: fiche.cooked_weight_g,
+      prix_lignes: fiche.prix_lignes.length > 0 ? fiche.prix_lignes : null,
       description_courte: fiche.description || null,
       wine_pairing: fiche.accord || null,
       accord: fiche.accord || null,
@@ -584,7 +588,7 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
             const ingList = mercuriale.map(m => ({ id: m.id, name: m.nom_produit || m.nom_court, category: "" as any, allergens: m.allergenes })) as any[];
             const priceMap: Record<string, CpuByUnit> = {};
             for (const m of mercuriale) { if (m.prix_base > 0) priceMap[m.id] = { g: m.prix_base }; }
-            const units = isBar ? ["cl", "ml", "L", "g", "pcs"] : ["g", "kg", "cl", "pcs"];
+            const units = ["g", "kg", "cl", "ml", "L", "pcs"];
 
             return (
               <>
@@ -778,27 +782,77 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
           </div>
           </div>
 
-          {/* Tarifs traiteur */}
-          <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1.5px solid ${COLORS.line}` }}>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#8a6b3e", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>
-              Tarifs traiteur
-            </label>
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 12, color: "#888" }}>Prix/kg</span>
-                <input type="number" step={0.5} min={0} value={fiche.sell_price_per_kg ?? ""}
-                  onChange={e => update({ sell_price_per_kg: e.target.value ? Number(e.target.value) : null })}
-                  placeholder="—" style={{ width: 80, padding: "6px 10px", borderRadius: 8, border: `1.5px solid ${COLORS.line}`, fontSize: 14, fontWeight: 700, textAlign: "center" }} />
-                <span style={{ fontSize: 12, color: "#999" }}>€</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 12, color: "#888" }}>Prix/portion</span>
-                <input type="number" step={0.5} min={0} value={fiche.sell_price_per_portion ?? ""}
-                  onChange={e => update({ sell_price_per_portion: e.target.value ? Number(e.target.value) : null })}
-                  placeholder="—" style={{ width: 80, padding: "6px 10px", borderRadius: 8, border: `1.5px solid ${COLORS.line}`, fontSize: 14, fontWeight: 700, textAlign: "center" }} />
-                <span style={{ fontSize: 12, color: "#999" }}>€</span>
-              </div>
+          {/* Poids apres cuisson */}
+          <div style={{ marginTop: 14, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 12, color: "#888" }}>Poids apres cuisson</span>
+              <input type="number" step={10} min={0} value={fiche.cooked_weight_g ?? ""}
+                onChange={e => update({ cooked_weight_g: e.target.value ? Number(e.target.value) : null })}
+                placeholder="g" style={{ width: 80, padding: "6px 10px", borderRadius: 8, border: `1.5px solid ${COLORS.line}`, fontSize: 14, fontWeight: 700, textAlign: "center" }} />
+              <span style={{ fontSize: 12, color: "#999" }}>g</span>
             </div>
+            {fiche.cooked_weight_g != null && fiche.cooked_weight_g > 0 && (() => {
+              const wCru = fiche.lignes.reduce((a: number, l: LigneIngredient) => {
+                if (!l.quantite) return a;
+                const u = (l.unite ?? "g").toLowerCase();
+                return u === "g" ? a + l.quantite : u === "kg" ? a + l.quantite * 1000 : a;
+              }, 0);
+              const reduction = wCru > 0 ? ((1 - fiche.cooked_weight_g / wCru) * 100).toFixed(0) : 0;
+              return <span style={{ fontSize: 12, color: COLORS.terra, fontWeight: 700 }}>Reduction : {reduction}%</span>;
+            })()}
+          </div>
+
+          {/* Lignes de prix multi-mode */}
+          <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1.5px solid ${COLORS.line}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: "#8a6b3e", textTransform: "uppercase", letterSpacing: ".08em" }}>
+                Tarifs de vente
+              </label>
+              <button onClick={() => update({ prix_lignes: [...fiche.prix_lignes, { mode: "portion", label: "", prix_ht: 0, tva: 10, coeff: fiche.coeff }] })}
+                style={{ border: `1.5px dashed ${COLORS.terra}`, background: "transparent", color: COLORS.terraDark, borderRadius: 999, padding: "4px 14px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                + Ajouter un tarif
+              </button>
+            </div>
+            {fiche.prix_lignes.length === 0 && (
+              <div style={{ fontSize: 12, color: "#bbb", fontStyle: "italic", marginBottom: 8 }}>Aucun tarif supplementaire. Utilisez le prix principal ci-dessus ou ajoutez des lignes.</div>
+            )}
+            {fiche.prix_lignes.map((pl, i) => {
+              const ttc = pl.prix_ht * (1 + pl.tva / 100);
+              return (
+                <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap", padding: "8px 10px", background: "rgba(255,255,255,0.6)", borderRadius: 10, border: `1px solid ${COLORS.line}` }}>
+                  <select value={pl.mode} onChange={e => {
+                    const next = [...fiche.prix_lignes]; next[i] = { ...pl, mode: e.target.value as PrixLigne["mode"] }; update({ prix_lignes: next });
+                  }} style={{ padding: "4px 8px", borderRadius: 6, border: `1px solid ${COLORS.line}`, fontSize: 12, fontWeight: 600 }}>
+                    <option value="portion">Portion</option>
+                    <option value="kg">Kilo</option>
+                    <option value="piece">Piece</option>
+                    <option value="litre">Litre</option>
+                    <option value="custom">Autre</option>
+                  </select>
+                  {pl.mode === "custom" && (
+                    <input value={pl.label} onChange={e => { const next = [...fiche.prix_lignes]; next[i] = { ...pl, label: e.target.value }; update({ prix_lignes: next }); }}
+                      placeholder="Label" style={{ width: 80, padding: "4px 8px", borderRadius: 6, border: `1px solid ${COLORS.line}`, fontSize: 12 }} />
+                  )}
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ fontSize: 11, color: "#888" }}>HT</span>
+                    <input type="number" step={0.5} min={0} value={pl.prix_ht || ""}
+                      onChange={e => { const next = [...fiche.prix_lignes]; next[i] = { ...pl, prix_ht: Number(e.target.value) || 0 }; update({ prix_lignes: next }); }}
+                      style={{ width: 65, padding: "4px 8px", borderRadius: 6, border: `1px solid ${COLORS.line}`, fontSize: 13, fontWeight: 700, textAlign: "center" }} />
+                    <span style={{ fontSize: 11, color: "#888" }}>€</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ fontSize: 11, color: "#888" }}>TVA</span>
+                    <select value={pl.tva} onChange={e => { const next = [...fiche.prix_lignes]; next[i] = { ...pl, tva: Number(e.target.value) }; update({ prix_lignes: next }); }}
+                      style={{ padding: "4px 6px", borderRadius: 6, border: `1px solid ${COLORS.line}`, fontSize: 11, fontWeight: 600 }}>
+                      {[0, 5.5, 10, 20].map(v => <option key={v} value={v}>{v}%</option>)}
+                    </select>
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{ttc.toFixed(2)}€ TTC</span>
+                  <button onClick={() => { const next = fiche.prix_lignes.filter((_, j) => j !== i); update({ prix_lignes: next }); }}
+                    style={{ border: "none", background: "rgba(220,38,38,0.08)", color: "#DC2626", width: 24, height: 24, borderRadius: 6, cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>x</button>
+                </div>
+              );
+            })}
           </div>
 
           {/* Liaison Popina — Bello Mio uniquement */}
