@@ -15,6 +15,7 @@ import {
   eur, tmpKey, defaultFiche,
 } from "./ficheTypes";
 import { offerRowToCpu, enrichCpuWithConversions, type CpuByUnit } from "@/lib/offerPricing";
+import { formatCpuLabel } from "@/lib/formatPrice";
 
 // ── Styles ──
 const COLORS = {
@@ -55,7 +56,7 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
   const [linkedPopina, setLinkedPopina] = useState<string | null>(null);
   const [popinaSearch, setPopinaSearch] = useState("");
   const [showPopinaList, setShowPopinaList] = useState(false);
-  const [supplierByIngredient, setSupplierByIngredient] = useState<Record<string, string>>({});
+  const [priceLabelByIngredient, setPriceLabelByIngredient] = useState<Record<string, string>>({});
 
   // ── Load data ──
   useEffect(() => {
@@ -115,13 +116,13 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
           if (s.id && s.name) supNameById[s.id] = s.name;
         }
       }
-      const supByIng: Record<string, string> = {};
+      // Build price labels: "METRO · 9,30 €/kg"
+      const supByIng: Record<string, string | null> = {};
       for (const o of offerRows) {
         const iid = String(o.ingredient_id ?? "");
         const sid = String(o.supplier_id ?? "");
-        if (iid && sid && supNameById[sid]) supByIng[iid] = supNameById[sid];
+        if (iid && sid) supByIng[iid] = supNameById[sid] ?? null;
       }
-      setSupplierByIngredient(supByIng);
 
       // Build mercuriale from ingredients + offers
       const ingList = (iRes.data ?? []) as Record<string, unknown>[];
@@ -189,6 +190,21 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
         };
       });
       setMercuriale(mercs);
+
+      // Build price labels for dropdown: "METRO · 9,30 €/kg"
+      const labelMap: Record<string, string> = {};
+      for (const i of ingList) {
+        const id = i.id as string;
+        const cpu = cpuMap[id] ?? {};
+        const meta = {
+          density_kg_per_l: (i.density_g_per_ml as number) ?? null,
+          piece_weight_g: (i.piece_weight_g as number) ?? null,
+        };
+        const pvml = (i.piece_volume_ml as number) ?? null;
+        const label = formatCpuLabel(cpu, meta, pvml, supByIng[id] ?? null);
+        if (label && label !== "Prix ND") labelMap[id] = label;
+      }
+      setPriceLabelByIngredient(labelMap);
 
       // Load existing recipe if recipeId is provided
       if (recipeId) {
@@ -615,13 +631,13 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
                 {isPizza && (
                   <>
                     <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, margin: "18px 0 8px" }}>Avant four</div>
-                    <IngredientListDnD droppableId="avant_four" items={toLines("avant_four")} ingredients={ingList} priceByIngredient={priceMap} supplierByIngredient={supplierByIngredient} units={units} onChange={lines => updateZone(lines, "avant_four")} returnUrl={currentUrl} />
+                    <IngredientListDnD droppableId="avant_four" items={toLines("avant_four")} ingredients={ingList} priceByIngredient={priceMap} priceLabelByIngredient={priceLabelByIngredient} units={units} onChange={lines => updateZone(lines, "avant_four")} returnUrl={currentUrl} />
                   </>
                 )}
                 <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, margin: "18px 0 8px" }}>
                   {isPizza ? "Apres four" : isBar ? "Composition" : "Ingredients"}
                 </div>
-                <IngredientListDnD droppableId="apres_four" items={toLines("apres_four")} ingredients={ingList} priceByIngredient={priceMap} supplierByIngredient={supplierByIngredient} units={units} onChange={lines => updateZone(lines, "apres_four")} returnUrl={currentUrl} />
+                <IngredientListDnD droppableId="apres_four" items={toLines("apres_four")} ingredients={ingList} priceByIngredient={priceMap} priceLabelByIngredient={priceLabelByIngredient} units={units} onChange={lines => updateZone(lines, "apres_four")} returnUrl={currentUrl} />
               </>
             );
           })()}

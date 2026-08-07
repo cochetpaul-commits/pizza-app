@@ -732,7 +732,6 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                     units={COCKTAIL_UNITS}
                     onChange={setLines}
                     priceLabelByIngredient={priceLabelByIngredient}
-                    supplierByIngredient={Object.fromEntries(Object.entries(supplierByIngredient).filter(([,v]) => v != null) as [string,string][])}
                     pivotId={pivotIngredientId}
                     onPivotChange={setPivotIngredientId}
                     returnUrl={typeof window !== "undefined" ? window.location.pathname + window.location.search : ""}

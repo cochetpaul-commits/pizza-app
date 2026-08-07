@@ -22,8 +22,6 @@ interface Props {
   units: string[];
   onChange: (items: IngredientLine[]) => void;
   priceLabelByIngredient?: Record<string, string>;
-  /** Supplier name per ingredient id — shown in search dropdown */
-  supplierByIngredient?: Record<string, string>;
   /** id of the pivot ingredient; shows ★/☆ on each row */
   pivotId?: string | null;
   onPivotChange?: (id: string | null) => void;
@@ -93,7 +91,7 @@ function computeCost(line: IngredientLine, cpu: CpuByUnit | undefined, ing?: Ing
 export function IngredientListDnD({
   droppableId = "ingredients",
   items, ingredients, priceByIngredient, units, onChange, priceLabelByIngredient,
-  supplierByIngredient, pivotId, onPivotChange, externalDragContext, returnUrl,
+  pivotId, onPivotChange, externalDragContext, returnUrl,
 }: Props) {
   const ingredientOptions: SmartSelectOption[] = ingredients.map(i => {
     const isMaison = i.source === "recette_maison";
@@ -102,11 +100,6 @@ export function IngredientListDnD({
       const pul = (i.purchase_unit_label ?? "kg").toLowerCase().trim();
       const unitLabel = pul === "l" ? "€/L" : pul === "pc" || pul === "pcs" ? "€/pc" : "€/kg";
       rightBottom = `maison · ${i.purchase_price.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${unitLabel}`;
-    }
-    // Add supplier name if available and not already in rightBottom
-    const sup = supplierByIngredient?.[i.id];
-    if (sup && !isMaison) {
-      rightBottom = rightBottom ? `${sup} · ${rightBottom}` : sup;
     }
     return { id: i.id, name: i.name, category: i.category, rightBottom, isPreparation: isMaison };
   });
