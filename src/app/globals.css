@@ -211,9 +211,9 @@ html, body{
   background: #ffffff;
 }
 
-/* Wallpaper behind the app */
+/* Body background matches content */
 body {
-  background: #d9d4cb !important;
+  background: #ffffff !important;
 }
 
 /* Mobile bottom tab bar — hidden on desktop */
