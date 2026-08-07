@@ -353,57 +353,52 @@ export const IngredientRow = React.memo(function IngredientRow({
       onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; e.currentTarget.style.borderColor = catAccent; }}
       onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor = "#ddd6c8"; e.currentTarget.style.borderLeftColor = catAccent; }}
     >
-      {/* ── DESKTOP ROW ── */}
+      {/* ── DESKTOP ROW — single line ── */}
       <div
         className="hidden md:block"
         onClick={() => { if (isEditing) onSaveEdit(); else onStartEdit(x); }}
-        style={{ padding: "10px 16px", background: "white", transition: "background 0.1s", cursor: "pointer" }}
+        style={{ padding: "8px 16px", background: "white", transition: "background 0.1s", cursor: "pointer" }}
       >
-        {/* Line 1: Avatar + Name (full width) + delete */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-          <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={32} editable />
-          <span style={{ fontWeight: 600, fontSize: 14, color: catAccent, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.name}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={28} editable />
+          <span style={{ fontWeight: 600, fontSize: 13, color: catAccent, flex: "1 1 0", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.name}</span>
           {x.is_derived && <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED", flexShrink: 0 }}>DERIVE</span>}
           {alert && <span style={{ fontSize: 10, fontWeight: 800, padding: "1px 5px", borderRadius: 6, color: alert.direction === "up" ? "#DC2626" : "#16A34A", background: alert.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)", flexShrink: 0 }}>{alert.direction === "up" ? "+" : "-"}{(Math.abs(alert.change_pct) * 100).toFixed(0)}%</span>}
-          <a href={`/ingredients/${x.id}`} onClick={(e) => e.stopPropagation()} title="Fiche detail" style={{ ...BTN_ACTION, background: "rgba(26,26,26,0.06)", color: "#1a1a1a", fontSize: 13, fontWeight: 700, textDecoration: "none", flexShrink: 0 }}>→</a>
-          {!isEditing && <button onClick={(e) => { e.stopPropagation(); onDelete(x.id, x.name); }} title="Supprimer" style={{ ...BTN_ACTION, background: "rgba(220,38,38,0.10)", color: "#DC2626", flexShrink: 0 }}>✕</button>}
-        </div>
-        {/* Line 2: Price + Status + Supplier + BM/PM + actions */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, paddingLeft: 42, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap" }}>{price}</span>
-          <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 999, background: sb.bg, color: sb.color }}>{sb.label}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap", flexShrink: 0 }}>{price}</span>
+          <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 999, background: sb.bg, color: sb.color, flexShrink: 0 }}>{sb.label}</span>
           {supplierName && supplierIdForDisplay ? (
-            <button onClick={(e) => { e.stopPropagation(); onOpenSupplier?.(supplierIdForDisplay); }} style={{ color: "#888", textDecoration: "underline dotted", textUnderlineOffset: 2, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11 }}>{supplierName}</button>
-          ) : <span style={{ fontSize: 11, color: "#ccc" }}>{CAT_LABELS[x.category]}</span>}
-          <button onClick={(e) => { e.stopPropagation(); onToggleEstablishment?.(x.id, "bellomio", ingEstabs); }} style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: hasBM ? "rgba(212,119,90,0.1)" : "rgba(0,0,0,0.04)", color: hasBM ? "#D4775A" : "#ccc", border: "none", cursor: "pointer" }}>BM</button>
-          <button onClick={(e) => { e.stopPropagation(); onToggleEstablishment?.(x.id, "piccola", ingEstabs); }} style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: hasPM ? "rgba(212,160,60,0.1)" : "rgba(0,0,0,0.04)", color: hasPM ? "#D4A03C" : "#ccc", border: "none", cursor: "pointer" }}>PM</button>
+            <button onClick={(e) => { e.stopPropagation(); onOpenSupplier?.(supplierIdForDisplay); }} style={{ color: "#888", textDecoration: "underline dotted", textUnderlineOffset: 2, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11, whiteSpace: "nowrap", flexShrink: 0 }}>{supplierName}</button>
+          ) : <span style={{ fontSize: 11, color: "#ccc", flexShrink: 0 }}>{CAT_LABELS[x.category]}</span>}
+          <button onClick={(e) => { e.stopPropagation(); onToggleEstablishment?.(x.id, "bellomio", ingEstabs); }} style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: hasBM ? "rgba(212,119,90,0.1)" : "rgba(0,0,0,0.04)", color: hasBM ? "#D4775A" : "#ccc", border: "none", cursor: "pointer", flexShrink: 0 }}>BM</button>
+          <button onClick={(e) => { e.stopPropagation(); onToggleEstablishment?.(x.id, "piccola", ingEstabs); }} style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: hasPM ? "rgba(212,160,60,0.1)" : "rgba(0,0,0,0.04)", color: hasPM ? "#D4A03C" : "#ccc", border: "none", cursor: "pointer", flexShrink: 0 }}>PM</button>
+          {alg.length > 0 && (
+            <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+              {alg.map(a => (
+                <span key={a} title={a} style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "rgba(220,38,38,0.08)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.20)" }}>
+                  {ALLERGEN_SHORT[a as keyof typeof ALLERGEN_SHORT] ?? a}
+                </span>
+              ))}
+            </div>
+          )}
           {priceComparison && !priceComparison.isCheapest && priceComparison.cheapestName && (
-            <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600 }}>
-              Moins cher : {priceComparison.cheapestName} ({priceComparison.cheapest.unit_price!.toFixed(2)}{"\u00A0\u20AC"}/{priceComparison.cheapest.unit ?? "kg"})
+            <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>
+              {priceComparison.cheapestName} ({priceComparison.cheapest.unit_price!.toFixed(2)}{"\u00A0\u20AC"}/{priceComparison.cheapest.unit ?? "kg"})
             </span>
           )}
           {priceComparison && priceComparison.isCheapest && priceComparison.count > 1 && (
-            <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600 }}>Meilleur prix ({priceComparison.count} fournisseurs)</span>
+            <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>Meilleur prix ({priceComparison.count})</span>
           )}
-          {!hasPrice && <span style={{ fontSize: 10, fontWeight: 700, color: "#DC2626" }}>prix manquant</span>}
+          {!hasPrice && <span style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", flexShrink: 0 }}>prix manquant</span>}
           {st !== "validated" && canValidate && (
-            <button disabled={!canValidate} onClick={(e) => { e.stopPropagation(); onSetStatus(x.id, "validated"); }} style={{ height: 20, padding: "0 8px", borderRadius: 5, border: "1px solid #4a6741", background: "rgba(74,103,65,0.08)", fontSize: 10, fontWeight: 600, cursor: "pointer", color: "#4a6741" }}>Valider</button>
+            <button disabled={!canValidate} onClick={(e) => { e.stopPropagation(); onSetStatus(x.id, "validated"); }} style={{ height: 20, padding: "0 8px", borderRadius: 5, border: "1px solid #4a6741", background: "rgba(74,103,65,0.08)", fontSize: 10, fontWeight: 600, cursor: "pointer", color: "#4a6741", flexShrink: 0 }}>Valider</button>
           )}
           {!x.is_derived && onCreateDerived && (
-            <button onClick={(e) => { e.stopPropagation(); onCreateDerived(x); }} title="Derive" style={{ ...BTN_ACTION, background: "rgba(124,58,237,0.10)", color: "#7C3AED", fontSize: 11, fontWeight: 700 }}>⚗</button>
+            <button onClick={(e) => { e.stopPropagation(); onCreateDerived(x); }} title="Derive" style={{ ...BTN_ACTION, background: "rgba(124,58,237,0.10)", color: "#7C3AED", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>⚗</button>
           )}
-          {isEditing && <button onClick={(e) => { e.stopPropagation(); onSaveEdit(); }} style={{ ...BTN_ACTION, background: "#4a6741", color: "white", fontSize: 10, fontWeight: 700 }}>OK</button>}
+          {isEditing && <button onClick={(e) => { e.stopPropagation(); onSaveEdit(); }} style={{ ...BTN_ACTION, background: "#4a6741", color: "white", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>OK</button>}
+          <a href={`/ingredients/${x.id}`} onClick={(e) => e.stopPropagation()} title="Fiche detail" style={{ ...BTN_ACTION, background: "rgba(26,26,26,0.06)", color: "#1a1a1a", fontSize: 13, fontWeight: 700, textDecoration: "none", flexShrink: 0 }}>→</a>
+          {!isEditing && <button onClick={(e) => { e.stopPropagation(); onDelete(x.id, x.name); }} title="Supprimer" style={{ ...BTN_ACTION, background: "rgba(220,38,38,0.10)", color: "#DC2626", flexShrink: 0 }}>✕</button>}
         </div>
-        {/* Allergenes */}
-        {alg.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 4, paddingLeft: 42 }}>
-            {alg.map(a => (
-              <span key={a} title={a} style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "rgba(220,38,38,0.08)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.20)" }}>
-                {ALLERGEN_SHORT[a as keyof typeof ALLERGEN_SHORT] ?? a}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* ── MOBILE ROW ── */}
