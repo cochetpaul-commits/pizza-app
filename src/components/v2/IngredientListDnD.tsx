@@ -180,36 +180,44 @@ export function IngredientListDnD({
                           </button>
                         )}
 
-                        {/* Ingredient select */}
-                        <div style={{ flex: "1 1 160px", minWidth: 140, display: "flex", alignItems: "center", gap: 4 }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <SmartSelect
-                              options={ingredientOptions}
-                              value={line.ingredient_id}
-                              onChange={id => {
-                                const ing = ingredients.find(i => i.id === id);
-                                const du = normalizeUnit(ing?.default_unit);
-                                updateLine(line.id, { ingredient_id: id, unit: du });
-                              }}
-                              placeholder="Ingrédient…"
-                              inputStyle={{ height: 34, fontSize: 13 }}
-                            />
+                        {/* Ingredient select + supplier/price info */}
+                        <div style={{ flex: "1 1 160px", minWidth: 140 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <SmartSelect
+                                options={ingredientOptions}
+                                value={line.ingredient_id}
+                                onChange={id => {
+                                  const ing = ingredients.find(i => i.id === id);
+                                  const du = normalizeUnit(ing?.default_unit);
+                                  updateLine(line.id, { ingredient_id: id, unit: du });
+                                }}
+                                placeholder="Ingrédient…"
+                                inputStyle={{ height: 34, fontSize: 13 }}
+                              />
+                            </div>
+                            {/* Edit ingredient link */}
+                            {line.ingredient_id && (
+                              <a
+                                href={`/ingredients?edit=${line.ingredient_id}${returnUrl ? `&back=${encodeURIComponent(returnUrl)}` : ""}`}
+                                title="Modifier l'ingrédient"
+                                style={{
+                                  flexShrink: 0, width: 24, height: 24, borderRadius: 6,
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  color: "#9a8f84", fontSize: 12, textDecoration: "none",
+                                }}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M7 17L17 7" /><path d="M7 7h10v10" />
+                                </svg>
+                              </a>
+                            )}
                           </div>
-                          {/* Edit ingredient link */}
-                          {line.ingredient_id && (
-                            <a
-                              href={`/ingredients?edit=${line.ingredient_id}${returnUrl ? `&back=${encodeURIComponent(returnUrl)}` : ""}`}
-                              title="Modifier l'ingrédient"
-                              style={{
-                                flexShrink: 0, width: 24, height: 24, borderRadius: 6,
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                color: "#9a8f84", fontSize: 12, textDecoration: "none",
-                              }}
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M7 17L17 7" /><path d="M7 7h10v10" />
-                              </svg>
-                            </a>
+                          {/* Supplier + price label under the name */}
+                          {line.ingredient_id && priceLabelByIngredient?.[line.ingredient_id] && (
+                            <div style={{ fontSize: 11, color: "#9a8f84", marginTop: 2, paddingLeft: 2, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {priceLabelByIngredient[line.ingredient_id]}
+                            </div>
                           )}
                         </div>
 
