@@ -232,6 +232,9 @@ body {
   }
   .app-main {
     margin-left: 0;
+    background: #fafafa !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     /* Reserve space for fixed mobile header (52px) + safe-area */
     padding-top: calc(52px + env(safe-area-inset-top, 0px));
     /* Reserve space for bottom pill + FAB + safe-area */
