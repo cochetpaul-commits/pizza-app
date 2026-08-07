@@ -83,7 +83,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, CpuByUnit>>({});
   const [priceLabelByIngredient, setPriceLabelByIngredient] = useState<Record<string, string>>({});
-  const [_supplierByIngredient, setSupplierByIngredient] = useState<Record<string, string | null>>({});
+  const [supplierByIngredientMap, setSupplierByIngredient] = useState<Record<string, string | null>>({});
 
   // Pre/post ingredient lines
   const [preLines, setPreLines] = useState<IngredientLine[]>([]);
@@ -834,9 +834,11 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                       units={PIZZA_UNITS}
                       onChange={setPreLines}
                       priceLabelByIngredient={priceLabelByIngredient}
+                      supplierByIngredient={Object.fromEntries(Object.entries(supplierByIngredientMap).filter(([,v]) => v != null) as [string,string][])}
                       pivotId={pivotIngredientId}
                       onPivotChange={setPivotIngredientId}
                       externalDragContext
+                      returnUrl={typeof window !== "undefined" ? window.location.pathname + window.location.search : ""}
                     />
                   </div>
 
@@ -852,9 +854,11 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                       units={PIZZA_UNITS}
                       onChange={setPostLines}
                       priceLabelByIngredient={priceLabelByIngredient}
+                      supplierByIngredient={Object.fromEntries(Object.entries(supplierByIngredientMap).filter(([,v]) => v != null) as [string,string][])}
                       pivotId={pivotIngredientId}
                       onPivotChange={setPivotIngredientId}
                       externalDragContext
+                      returnUrl={typeof window !== "undefined" ? window.location.pathname + window.location.search : ""}
                     />
                   </div>
                 </DragDropContext>

@@ -55,6 +55,7 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
   const [linkedPopina, setLinkedPopina] = useState<string | null>(null);
   const [popinaSearch, setPopinaSearch] = useState("");
   const [showPopinaList, setShowPopinaList] = useState(false);
+  const [supplierByIngredient, setSupplierByIngredient] = useState<Record<string, string>>({});
 
   // ── Load data ──
   useEffect(() => {
@@ -98,11 +99,29 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
 
       // Build CPU map from supplier offers
       const cpuMap: Record<string, CpuByUnit> = {};
-      for (const o of (offRes.data ?? []) as Record<string, unknown>[]) {
+      const offerRows = (offRes.data ?? []) as Record<string, unknown>[];
+      for (const o of offerRows) {
         const iid = String(o.ingredient_id ?? "");
         if (!iid) continue;
         cpuMap[iid] = offerRowToCpu(o);
       }
+
+      // Fetch supplier names for dropdown display
+      const supplierIds = Array.from(new Set(offerRows.map(o => String(o.supplier_id ?? "")).filter(Boolean)));
+      const supNameById: Record<string, string> = {};
+      if (supplierIds.length) {
+        const { data: sups } = await supabase.from("suppliers").select("id,name").in("id", supplierIds);
+        for (const s of (sups ?? []) as { id: string; name: string }[]) {
+          if (s.id && s.name) supNameById[s.id] = s.name;
+        }
+      }
+      const supByIng: Record<string, string> = {};
+      for (const o of offerRows) {
+        const iid = String(o.ingredient_id ?? "");
+        const sid = String(o.supplier_id ?? "");
+        if (iid && sid && supNameById[sid]) supByIng[iid] = supNameById[sid];
+      }
+      setSupplierByIngredient(supByIng);
 
       // Build mercuriale from ingredients + offers
       const ingList = (iRes.data ?? []) as Record<string, unknown>[];
@@ -589,19 +608,20 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
             const priceMap: Record<string, CpuByUnit> = {};
             for (const m of mercuriale) { if (m.prix_base > 0) priceMap[m.id] = { g: m.prix_base }; }
             const units = ["g", "kg", "cl", "ml", "L", "pcs"];
+            const currentUrl = typeof window !== "undefined" ? window.location.pathname + window.location.search : "";
 
             return (
               <>
                 {isPizza && (
                   <>
                     <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, margin: "18px 0 8px" }}>Avant four</div>
-                    <IngredientListDnD droppableId="avant_four" items={toLines("avant_four")} ingredients={ingList} priceByIngredient={priceMap} units={units} onChange={lines => updateZone(lines, "avant_four")} />
+                    <IngredientListDnD droppableId="avant_four" items={toLines("avant_four")} ingredients={ingList} priceByIngredient={priceMap} supplierByIngredient={supplierByIngredient} units={units} onChange={lines => updateZone(lines, "avant_four")} returnUrl={currentUrl} />
                   </>
                 )}
                 <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, margin: "18px 0 8px" }}>
                   {isPizza ? "Apres four" : isBar ? "Composition" : "Ingredients"}
                 </div>
-                <IngredientListDnD droppableId="apres_four" items={toLines("apres_four")} ingredients={ingList} priceByIngredient={priceMap} units={units} onChange={lines => updateZone(lines, "apres_four")} />
+                <IngredientListDnD droppableId="apres_four" items={toLines("apres_four")} ingredients={ingList} priceByIngredient={priceMap} supplierByIngredient={supplierByIngredient} units={units} onChange={lines => updateZone(lines, "apres_four")} returnUrl={currentUrl} />
               </>
             );
           })()}

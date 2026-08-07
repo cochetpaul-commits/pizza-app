@@ -22,11 +22,15 @@ interface Props {
   units: string[];
   onChange: (items: IngredientLine[]) => void;
   priceLabelByIngredient?: Record<string, string>;
+  /** Supplier name per ingredient id — shown in search dropdown */
+  supplierByIngredient?: Record<string, string>;
   /** id of the pivot ingredient; shows ★/☆ on each row */
   pivotId?: string | null;
   onPivotChange?: (id: string | null) => void;
   /** When true, skip internal DragDropContext — parent handles it */
   externalDragContext?: boolean;
+  /** Base path for the current recipe page, used for "back" link from ingredient edit */
+  returnUrl?: string;
 }
 
 function tmpId() {
@@ -89,7 +93,7 @@ function computeCost(line: IngredientLine, cpu: CpuByUnit | undefined, ing?: Ing
 export function IngredientListDnD({
   droppableId = "ingredients",
   items, ingredients, priceByIngredient, units, onChange, priceLabelByIngredient,
-  pivotId, onPivotChange, externalDragContext,
+  supplierByIngredient, pivotId, onPivotChange, externalDragContext, returnUrl,
 }: Props) {
   const ingredientOptions: SmartSelectOption[] = ingredients.map(i => {
     const isMaison = i.source === "recette_maison";
@@ -98,6 +102,11 @@ export function IngredientListDnD({
       const pul = (i.purchase_unit_label ?? "kg").toLowerCase().trim();
       const unitLabel = pul === "l" ? "€/L" : pul === "pc" || pul === "pcs" ? "€/pc" : "€/kg";
       rightBottom = `maison · ${i.purchase_price.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${unitLabel}`;
+    }
+    // Add supplier name if available and not already in rightBottom
+    const sup = supplierByIngredient?.[i.id];
+    if (sup && !isMaison) {
+      rightBottom = rightBottom ? `${sup} · ${rightBottom}` : sup;
     }
     return { id: i.id, name: i.name, category: i.category, rightBottom, isPreparation: isMaison };
   });
@@ -179,18 +188,36 @@ export function IngredientListDnD({
                         )}
 
                         {/* Ingredient select */}
-                        <div style={{ flex: "1 1 160px", minWidth: 140 }}>
-                          <SmartSelect
-                            options={ingredientOptions}
-                            value={line.ingredient_id}
-                            onChange={id => {
-                              const ing = ingredients.find(i => i.id === id);
-                              const du = normalizeUnit(ing?.default_unit);
-                              updateLine(line.id, { ingredient_id: id, unit: du });
-                            }}
-                            placeholder="Ingrédient…"
-                            inputStyle={{ height: 34, fontSize: 13 }}
-                          />
+                        <div style={{ flex: "1 1 160px", minWidth: 140, display: "flex", alignItems: "center", gap: 4 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <SmartSelect
+                              options={ingredientOptions}
+                              value={line.ingredient_id}
+                              onChange={id => {
+                                const ing = ingredients.find(i => i.id === id);
+                                const du = normalizeUnit(ing?.default_unit);
+                                updateLine(line.id, { ingredient_id: id, unit: du });
+                              }}
+                              placeholder="Ingrédient…"
+                              inputStyle={{ height: 34, fontSize: 13 }}
+                            />
+                          </div>
+                          {/* Edit ingredient link */}
+                          {line.ingredient_id && (
+                            <a
+                              href={`/ingredients?edit=${line.ingredient_id}${returnUrl ? `&back=${encodeURIComponent(returnUrl)}` : ""}`}
+                              title="Modifier l'ingrédient"
+                              style={{
+                                flexShrink: 0, width: 24, height: 24, borderRadius: 6,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                color: "#9a8f84", fontSize: 12, textDecoration: "none",
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M7 17L17 7" /><path d="M7 7h10v10" />
+                              </svg>
+                            </a>
+                          )}
                         </div>
 
                         {/* Qty */}

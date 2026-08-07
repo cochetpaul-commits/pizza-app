@@ -89,7 +89,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, CpuByUnit>>({});
   const [priceLabelByIngredient, setPriceLabelByIngredient] = useState<Record<string, string>>({});
-  const [, setSupplierByIngredient] = useState<Record<string, string | null>>({});
+  const [supplierByIngredientMap, setSupplierByIngredient] = useState<Record<string, string | null>>({});
   const [lines, setLines] = useState<IngredientLine[]>([]);
 
   // Steps
@@ -1052,8 +1052,10 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
                     units={CUISINE_UNITS}
                     onChange={setLines}
                     priceLabelByIngredient={priceLabelByIngredient}
+                    supplierByIngredient={Object.fromEntries(Object.entries(supplierByIngredientMap).filter(([,v]) => v != null) as [string,string][])}
                     pivotId={pivotIngredientId}
                     onPivotChange={setPivotIngredientId}
+                    returnUrl={typeof window !== "undefined" ? window.location.pathname + window.location.search : ""}
                   />
                 </div>}
 
