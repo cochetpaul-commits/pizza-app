@@ -1092,48 +1092,69 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
       )}
 
       {/* NAV */}
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 4 }}>
-        <button disabled={step === 0} onClick={() => setStep(s => {
-            let prev = s - 1;
-            if (prev === 3 && !canWrite) prev = 2; // skip prix for equipiers
-            return Math.max(0, prev);
-          })}
-          style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "13px 28px", fontSize: 14.5, fontWeight: 800, cursor: step === 0 ? "default" : "pointer", background: "transparent", color: COLORS.muted, opacity: step === 0 ? 0.45 : 1, fontFamily: "inherit" }}>
-          Retour
-        </button>
-        {canWrite && (
-          <button disabled={saving} onClick={handleSave}
-            style={{ border: `1.5px solid ${COLORS.green}`, borderRadius: 999, padding: "13px 28px", fontSize: 14.5, fontWeight: 800, cursor: "pointer", background: "#fff", color: COLORS.green, fontFamily: "inherit", opacity: saving ? 0.5 : 1 }}>
-            {saving ? "..." : "Sauvegarder"}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 4, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button disabled={step === 0} onClick={() => setStep(s => {
+              let prev = s - 1;
+              if (prev === 3 && !canWrite) prev = 2;
+              return Math.max(0, prev);
+            })}
+            style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "13px 28px", fontSize: 14.5, fontWeight: 800, cursor: step === 0 ? "default" : "pointer", background: "transparent", color: COLORS.muted, opacity: step === 0 ? 0.45 : 1, fontFamily: "inherit" }}>
+            Retour
           </button>
-        )}
-        {fiche.id && (
-          <>
-            <button onClick={() => window.open(`/api/recettes/pdf?id=${fiche.id}`, "_blank")}
-              style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "13px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", background: "#fff", color: COLORS.muted, fontFamily: "inherit" }}>
-              PDF
-            </button>
-            <button onClick={() => {
-              const n = prompt("Nombre de portions / personnes ?", String(fiche.portions > 1 ? fiche.portions : 10));
-              if (!n) return;
-              const p = parseInt(n);
-              if (p > 0) window.open(`/api/recettes/pdf?id=${fiche.id}&portions=${p}`, "_blank");
+          <button onClick={() => {
+              if (confirm("Quitter sans sauvegarder ?")) router.push("/recettes");
             }}
-              style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "13px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", background: "#fff", color: COLORS.muted, fontFamily: "inherit" }}>
-              PDF Prod.
+            style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "13px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", background: "transparent", color: COLORS.muted, fontFamily: "inherit" }}>
+            Annuler
+          </button>
+          {fiche.id && canWrite && (
+            <button onClick={async () => {
+                if (!confirm(`Supprimer la recette "${fiche.nom}" ?`)) return;
+                await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", fiche.id!);
+                await supabase.from("kitchen_recipes").delete().eq("id", fiche.id!);
+                router.push("/recettes");
+              }}
+              style={{ border: `1.5px solid ${COLORS.warn}`, borderRadius: 999, padding: "13px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", background: "transparent", color: COLORS.warn, fontFamily: "inherit" }}>
+              Supprimer
             </button>
-          </>
-        )}
-        <button onClick={() => {
-            if (step < 4) {
-              let next = step + 1;
-              if (next === 3 && !canWrite) next = 4; // skip prix for equipiers
-              setStep(next);
-            } else { handleSave(); router.push("/recettes"); }
-          }}
-          style={{ border: "none", borderRadius: 999, padding: "13px 28px", fontSize: 14.5, fontWeight: 800, cursor: "pointer", background: COLORS.terra, color: "#fff", boxShadow: "0 6px 16px #c97b5b44", fontFamily: "inherit" }}>
-          {step === 4 ? "Terminer" : "Continuer"}
-        </button>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {canWrite && (
+            <button disabled={saving} onClick={handleSave}
+              style={{ border: `1.5px solid ${COLORS.green}`, borderRadius: 999, padding: "13px 28px", fontSize: 14.5, fontWeight: 800, cursor: "pointer", background: "#fff", color: COLORS.green, fontFamily: "inherit", opacity: saving ? 0.5 : 1 }}>
+              {saving ? "..." : "Sauvegarder"}
+            </button>
+          )}
+          {fiche.id && (
+            <>
+              <button onClick={() => window.open(`/api/recettes/pdf?id=${fiche.id}`, "_blank")}
+                style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "13px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", background: "#fff", color: COLORS.muted, fontFamily: "inherit" }}>
+                PDF
+              </button>
+              <button onClick={() => {
+                const n = prompt("Nombre de portions / personnes ?", String(fiche.portions > 1 ? fiche.portions : 10));
+                if (!n) return;
+                const p = parseInt(n);
+                if (p > 0) window.open(`/api/recettes/pdf?id=${fiche.id}&portions=${p}`, "_blank");
+              }}
+                style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "13px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", background: "#fff", color: COLORS.muted, fontFamily: "inherit" }}>
+                PDF Prod.
+              </button>
+            </>
+          )}
+          <button onClick={() => {
+              if (step < 4) {
+                let next = step + 1;
+                if (next === 3 && !canWrite) next = 4;
+                setStep(next);
+              } else { handleSave(); router.push("/recettes"); }
+            }}
+            style={{ border: "none", borderRadius: 999, padding: "13px 28px", fontSize: 14.5, fontWeight: 800, cursor: "pointer", background: COLORS.terra, color: "#fff", boxShadow: "0 6px 16px #c97b5b44", fontFamily: "inherit" }}>
+            {step === 4 ? "Terminer" : "Continuer"}
+          </button>
+        </div>
       </div>
 
       {/* TOAST */}
