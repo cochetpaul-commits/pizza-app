@@ -789,6 +789,20 @@ export function CatalogueContent() {
       const label = cat.replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
       result.push({ type: `custom:${cat}`, label, color, count: items.length, subGroups: [{ key: `cuisine:${cat}`, label: "", color, items }], isCustom: true });
     }
+
+    // Add empty categories from DB that don't have recipes yet
+    const existingTypes = new Set(result.map(r => r.type));
+    for (const dbCat of dbCategories) {
+      const typeKey = `custom:${dbCat.slug}`;
+      if (!existingTypes.has(typeKey) && !existingTypes.has(dbCat.slug) && dbCat.famille_id !== "pizza") {
+        // Check it's not already shown as a cuisine sub-category
+        const isCuisineSub = result.some(r => r.subGroups.some(sg => sg.key === `cuisine:${dbCat.slug}`));
+        if (!isCuisineSub) {
+          result.push({ type: typeKey, label: dbCat.nom, color: dbCat.couleur || customColors[ci % customColors.length], count: 0, subGroups: [{ key: `cuisine:${dbCat.slug}`, label: "", color: dbCat.couleur || "#999", items: [] }], isCustom: true });
+          ci++;
+        }
+      }
+    }
     result.sort((a, b) => {
       const ia = typeOrder.indexOf(a.type);
       const ib = typeOrder.indexOf(b.type);
