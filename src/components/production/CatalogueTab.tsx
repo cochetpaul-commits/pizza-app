@@ -482,7 +482,7 @@ export function CatalogueContent() {
   const etabSlug = resolvedEtab?.slug ?? null;
   const { can } = useProfile();
   const canWrite = can("operations.edit_recettes");
-  const { categories: allDbCategories } = useCategories();
+  const { categories: allDbCategories, reload: reloadCategories } = useCategories();
   const dbCategories = useMemo(() => filterCategoriesForEtab(allDbCategories, etab?.slug), [allDbCategories, etab?.slug]);
 
   // Build dynamic label/color maps from DB categories
@@ -2025,20 +2025,27 @@ export function CatalogueContent() {
             disabled={!newCatName.trim()}
             onClick={async () => {
               if (!resolvedEtab || !newCatName.trim()) return;
-              const slug = newCatName.trim().toLowerCase().replace(/[^a-z0-9àâäéèêëïîôùûüç]+/g, "_").replace(/^_|_$/g, "");
-              // Check if category already exists
-              const existing = recipes.find(r => r.category === slug);
-              if (existing) { alert(`La categorie "${newCatName.trim()}" existe deja.`); return; }
-              const eSlug = resolvedEtab.slug?.includes("piccola") ? "piccola" : "bello_mio";
-              const { error } = await supabase.from("kitchen_recipes").insert({
-                name: `Nouvelle recette ${newCatName.trim()}`,
-                category: slug,
+              const slug = newCatName.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+              // Check if category already exists in DB
+              const existingCat = dbCategories.find(c => c.slug === slug);
+              if (existingCat) { alert(`La categorie "${newCatName.trim()}" existe deja.`); return; }
+              const eSlug = resolvedEtab.slug?.includes("piccola") ? "piccola" : "bellomio";
+              // Create in categories table (Parametres)
+              const maxOrder = dbCategories.reduce((m, c) => Math.max(m, c.sort_order), 0);
+              const { error: catErr } = await supabase.from("categories").insert({
+                nom: newCatName.trim(),
+                slug,
+                couleur: "#8a6b3e",
+                famille_id: "cuisine",
+                sous_categories: [],
+                sort_order: maxOrder + 1,
                 establishments: [eSlug],
-                is_active: true,
               });
-              if (error) { alert("Erreur: " + error.message); return; }
+              if (catErr) { alert("Erreur: " + catErr.message); return; }
               setNewCatName("");
               setShowNewCatModal(false);
+              // Reload categories + recipes
+              reloadCategories();
               fetchAllRecipes(etabSlug).then(r => setRecipes(r));
             }}
             style={{
@@ -2070,18 +2077,36 @@ export function CatalogueContent() {
             type="button"
             disabled={!newSubCatName.trim()}
             onClick={async () => {
-              if (!resolvedEtab || !newSubCatName.trim()) return;
-              const slug = newSubCatName.trim().toLowerCase().replace(/[^a-z0-9àâäéèêëïîôùûüç]+/g, "_").replace(/^_|_$/g, "");
-              const eSlug2 = resolvedEtab.slug?.includes("piccola") ? "piccola" : "bello_mio";
-              const { error } = await supabase.from("kitchen_recipes").insert({
-                name: `Nouvelle recette ${newSubCatName.trim()}`,
-                category: slug,
-                establishments: [eSlug2],
-                is_active: true,
-              });
-              if (error) { alert("Erreur: " + error.message); return; }
+              if (!newSubCatName.trim() || !newSubCatType) return;
+              // Find the parent category slug from the type
+              const parentSlug = newSubCatType.startsWith("custom:") ? newSubCatType.replace("custom:", "") : newSubCatType;
+              // Find DB category
+              const parentCat = dbCategories.find(c => c.slug === parentSlug);
+              if (parentCat) {
+                // Add sub-category to existing category in DB
+                const existingSubs = parentCat.sous_categories ?? [];
+                if (!existingSubs.includes(newSubCatName.trim())) {
+                  await supabase.from("categories").update({
+                    sous_categories: [...existingSubs, newSubCatName.trim()],
+                  }).eq("id", parentCat.id);
+                }
+              } else {
+                // Create category with the sub-category
+                const eSlug2 = resolvedEtab?.slug?.includes("piccola") ? "piccola" : "bellomio";
+                const maxOrder = dbCategories.reduce((m, c) => Math.max(m, c.sort_order), 0);
+                await supabase.from("categories").insert({
+                  nom: parentSlug.replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase()),
+                  slug: parentSlug,
+                  couleur: "#8a6b3e",
+                  famille_id: "cuisine",
+                  sous_categories: [newSubCatName.trim()],
+                  sort_order: maxOrder + 1,
+                  establishments: [eSlug2],
+                });
+              }
               setNewSubCatName("");
               setShowNewSubCatModal(false);
+              reloadCategories();
               fetchAllRecipes(etabSlug).then(r => setRecipes(r));
             }}
             style={{
