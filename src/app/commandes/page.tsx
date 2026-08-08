@@ -613,12 +613,14 @@ function CommandesPage() {
 
   useEffect(() => {
     async function init() {
-      // Load ALL suppliers (not filtered by etablissement) so we can build aliases
-      const { data } = await supabase
+      // Load suppliers filtered by current establishment
+      let supQuery = supabase
         .from("suppliers")
         .select("id, name, franco_minimum, delivery_schedule, color, website, portal_login, portal_password")
         .eq("is_active", true)
         .order("name");
+      if (etab?.id) supQuery = supQuery.eq("etablissement_id", etab.id);
+      const { data } = await supQuery;
       // Deduplicate by name (accent+case insensitive) with alias tracking
       const seen = new Map<string, Supplier>();
       const aliases = new Map<string, Set<string>>();
