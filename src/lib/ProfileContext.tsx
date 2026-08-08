@@ -54,15 +54,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         setLoading(false);
         return;
       }
-      if (data) {
-        setRole(normalizeRole(data.role as string));
-        setDisplayName(data.display_name);
-      } else {
-        setRole("equipier");
-        setDisplayName(null);
-      }
+      const profileRole = data ? normalizeRole(data.role as string) : "equipier";
+      setDisplayName(data?.display_name ?? null);
 
-      // Load custom permissions from employes table (linked by auth_user_id, fallback email)
+      // Load custom permissions + role from employes table (linked by auth_user_id)
       const { data: empData } = await supabase
         .from("employes")
         .select("custom_permissions, role")
@@ -72,6 +67,12 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       if (!cancelled && empData?.custom_permissions) {
         setCustomPerms(empData.custom_permissions as Record<string, boolean>);
       }
+
+      // Use the highest role between profiles and employes
+      const empRole = empData?.role ? normalizeRole(empData.role as string) : "equipier";
+      const ROLE_RANK: Record<Role, number> = { group_admin: 3, manager: 2, equipier: 1 };
+      const effectiveRole = ROLE_RANK[empRole] > ROLE_RANK[profileRole] ? empRole : profileRole;
+      setRole(effectiveRole);
 
       setLoading(false);
     }
