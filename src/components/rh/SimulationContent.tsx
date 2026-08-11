@@ -586,12 +586,34 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
                           {totalMS > baseTotalMS ? "+" : ""}{fmt(totalMS - baseTotalMS)} {"\u20AC"}/mois
                         </strong>
                       </span>
-                      <button type="button" onClick={() => setSalaryOverrides({})} style={{
-                        fontSize: 11, color: "#999", background: "none", border: "1px solid #ddd6c8",
-                        borderRadius: 12, padding: "3px 12px", cursor: "pointer",
-                      }}>
-                        Tout reinitialiser
-                      </button>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button type="button" onClick={() => setSalaryOverrides({})} style={{
+                          fontSize: 11, color: "#999", background: "none", border: "1px solid #ddd6c8",
+                          borderRadius: 12, padding: "3px 12px", cursor: "pointer",
+                        }}>
+                          Annuler
+                        </button>
+                        <button type="button" onClick={async () => {
+                          for (const [empId, brut] of Object.entries(salaryOverrides)) {
+                            const emp = employes.find(e => e.id === empId);
+                            const contrat = emp?.contrats?.find(c => c.actif);
+                            if (contrat) {
+                              await supabase.from("contrats").update({ remuneration: brut }).eq("id", contrat.id);
+                            }
+                          }
+                          setSalaryOverrides({});
+                          // Reload data
+                          const { data } = await supabase.from("employes")
+                            .select("id, prenom, nom, matricule, actif, contrats(id, employe_id, type, heures_semaine, salaire_brut:remuneration, remuneration, taux_horaire:remuneration, actif)")
+                            .eq("actif", true).eq("etablissement_id", etab!.id).eq("contrats.actif", true).order("nom");
+                          if (data) setEmployes(data as unknown as Employe[]);
+                        }} style={{
+                          fontSize: 11, color: "#fff", background: "#4a6741", border: "none",
+                          borderRadius: 12, padding: "3px 12px", cursor: "pointer", fontWeight: 700,
+                        }}>
+                          Sauvegarder
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
