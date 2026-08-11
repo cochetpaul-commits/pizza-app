@@ -35,7 +35,7 @@ export function SimulateurRentabiliteMS() {
     const cvX3 = denom > 0 ? Math.round((msSal * 3) / denom) : 0;
     const cvObjN = denom > 0 ? Math.round((msTot / (obj / 100)) / denom) : 0;
 
-    // Repartition a l'objectif
+    // Repartition a l&apos;objectif
     const caMoisObj = msTot / (obj / 100);
     const pSalObj = caMoisObj > 0 ? (msSal / caMoisObj) * 100 : 0;
     const pGerObj = caMoisObj > 0 ? (msGer / caMoisObj) * 100 : 0;
@@ -126,8 +126,8 @@ export function SimulateurRentabiliteMS() {
           <span>
             A cette activite : CA HT <b>{eur(calc.caMois)}</b>/mois → MS = <b>{pct(calc.pTot)}</b> du CA
             {calc.pTot <= obj
-              ? ` (sous l'objectif de ${obj} %)`
-              : ` (au-dessus de l'objectif de ${obj} %)`}
+              ? ` (sous l&apos;objectif de ${obj} %)`
+              : ` (au-dessus de l&apos;objectif de ${obj} %)`}
           </span>
         </div>
       </div>
@@ -177,7 +177,7 @@ export function SimulateurRentabiliteMS() {
       {/* Repartition */}
       <div style={{ background: "#fff", border: "1px solid #e7e1d9", borderRadius: 16, padding: 20, marginBottom: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
         <h2 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: ".06em", color: "#8a8079", marginBottom: 6, fontWeight: 600 }}>
-          Repartition du CA a l'objectif
+          Repartition du CA a l&apos;objectif
         </h2>
         <div style={{ display: "flex", gap: 18, flexWrap: "wrap", fontSize: 13, marginBottom: 8 }}>
           <span><span style={{ ...dot, background: C.sal }} /> Salaries</span>
