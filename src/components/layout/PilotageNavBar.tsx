@@ -14,7 +14,7 @@ const ACCENT = "#D4775A";
 const TABS = [
   { label: "Ventes", href: "/ventes", match: (p: string) => p === "/ventes" },
   { label: "Produits", href: "/ventes/marges", match: (p: string) => p === "/ventes/marges" },
-  { label: "Masse sal.", href: "/rh/masse-salariale", match: (p: string) => p.startsWith("/rh/masse-salariale") || p === "/ventes/simulation" },
+  { label: "Masse sal.", href: "/rh/masse-salariale", match: (p: string) => p.startsWith("/rh/masse-salariale") },
   { label: "Trésorerie", href: "/tresorerie", match: (p: string) => p.startsWith("/tresorerie") },
 ];
 

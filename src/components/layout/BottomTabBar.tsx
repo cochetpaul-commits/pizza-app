@@ -270,7 +270,7 @@ const SECTION_PILOTAGE: TabSection = {
   tabs: [
     { label: "Ventes", href: "/ventes", match: ["/ventes"], icon: () => <IconWallet /> },
     { label: "Produits", href: "/ventes/marges", match: ["/ventes/marges"], icon: () => <IconTag /> },
-    { label: "Masse sal.", href: "/rh/masse-salariale", match: ["/rh/masse-salariale", "/ventes/simulation"], icon: () => <IconTrendingUp /> },
+    { label: "Masse sal.", href: "/rh/masse-salariale", match: ["/rh/masse-salariale"], icon: () => <IconTrendingUp /> },
     { label: "Tresorerie", href: "/tresorerie", match: ["/tresorerie"], icon: () => <IconTrendingUp /> },
   ],
 };
