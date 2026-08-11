@@ -1,10 +1,16 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import { useEtablissement } from "@/lib/EtablissementContext";
+import { fetchApi } from "@/lib/fetchApi";
 
-const eur = (n: number) => Math.round(n).toLocaleString("fr-FR") + " \u20AC";
-const pct = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
+const eurFmt = (n: number) => Math.round(n).toLocaleString("fr-FR") + " \u20AC";
+const pctFmt = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
 const dec2 = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const CHARGES_RATE = 0.42; // taux charges patronales moyen
+const TNS_TYPES = new Set(["tns", "gerant", "mandataire", "president"]);
 
 const C = {
   accent: "#3f7d8c", sal: "#3f7d8c", ger: "#e0a458", rest: "#e7e1d9",
@@ -12,6 +18,14 @@ const C = {
 };
 
 export function SimulateurRentabiliteMS() {
+  const { current: etab } = useEtablissement();
+  const etabId = etab?.id ?? null;
+  const etabNom = etab?.nom ?? "";
+
+  // Real data loading
+  const [realLoading, setRealLoading] = useState(false);
+  const [realLoaded, setRealLoaded] = useState(false);
+
   // Hypotheses
   const [tmBase, setTmBase] = useState(15);
   const [cvBase, setCvBase] = useState(150);
@@ -20,9 +34,88 @@ export function SimulateurRentabiliteMS() {
   const [jours, setJours] = useState(26);
   const [obj, setObj] = useState(35);
 
-  // Sliders (initialized from base)
+  // Sliders
   const [tm, setTm] = useState(15);
   const [cv, setCv] = useState(150);
+
+  // Load real data from current establishment
+  useEffect(() => {
+    if (!etabId) return;
+    let cancelled = false;
+
+    (async () => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setRealLoading(true);
+      // Current month bounds
+      const now = new Date();
+      const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const to = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
+
+      // Fetch ventes stats + contrats in parallel
+      const [statsRes, contratsRes] = await Promise.all([
+        fetchApi(`/api/ventes/stats?etablissement_id=${etabId}&from=${from}&to=${to}`).then(r => r.json()).catch(() => null),
+        supabase.from("contrats")
+          .select("type, remuneration, employes!inner(actif, etablissement_id)")
+          .eq("actif", true)
+          .eq("employes.actif", true)
+          .eq("employes.etablissement_id", etabId),
+      ]);
+
+      if (cancelled) return;
+
+      // Parse ventes stats
+      const stats = statsRes?.stats;
+      let realTm = 15;
+      let realCv = 150;
+      let realJours = 26;
+
+      if (stats) {
+        const totalCov = stats.couverts ?? 0;
+        const nbDays = stats.dates?.length ?? 0;
+        const caHt = stats.ca_ht ?? 0;
+
+        if (nbDays > 0 && totalCov > 0) {
+          realCv = Math.round(totalCov / nbDays);
+          realTm = Math.round((caHt / totalCov) * 100) / 100;
+          realJours = nbDays;
+        }
+      }
+
+      // Parse contrats: split salaries vs gerant/TNS
+      let totalSal = 0;
+      let totalGer = 0;
+      const contrats = (contratsRes.data ?? []) as { type: string; remuneration: number }[];
+      for (const c of contrats) {
+        const brut = Number(c.remuneration) || 0;
+        const charge = brut * (1 + CHARGES_RATE);
+        const t = (c.type ?? "").toLowerCase().trim();
+        if (TNS_TYPES.has(t)) {
+          totalGer += charge;
+        } else {
+          totalSal += charge;
+        }
+      }
+
+      // If no TNS found, use 3000 as default gerant cost
+      if (totalGer === 0 && totalSal > 0) totalGer = 3000;
+
+      // Round
+      totalSal = Math.round(totalSal);
+      totalGer = Math.round(totalGer);
+
+      // Apply
+      setTmBase(realTm); setTm(realTm);
+      setCvBase(realCv); setCv(realCv);
+      setMsSal(totalSal > 0 ? totalSal : 12000);
+      setMsGer(totalGer);
+      setJours(realJours);
+      setRealLoaded(true);
+      setRealLoading(false);
+    })();
+
+    return () => { cancelled = true; };
+  }, [etabId]);
 
   const msTot = msSal + msGer;
   const denom = tm * jours;
@@ -30,16 +123,11 @@ export function SimulateurRentabiliteMS() {
   const calc = useMemo(() => {
     const caMois = cv * tm * jours;
     const pTot = caMois > 0 ? (msTot / caMois) * 100 : 0;
-
-    // Escalier
     const cvX3 = denom > 0 ? Math.round((msSal * 3) / denom) : 0;
     const cvObjN = denom > 0 ? Math.round((msTot / (obj / 100)) / denom) : 0;
-
-    // Repartition a l&apos;objectif
     const caMoisObj = msTot / (obj / 100);
     const pSalObj = caMoisObj > 0 ? (msSal / caMoisObj) * 100 : 0;
     const pGerObj = caMoisObj > 0 ? (msGer / caMoisObj) * 100 : 0;
-
     return { caMois, pTot, cvX3, cvObjN, caMoisObj, pSalObj, pGerObj };
   }, [tm, cv, msSal, msGer, msTot, jours, obj, denom]);
 
@@ -54,17 +142,33 @@ export function SimulateurRentabiliteMS() {
 
   return (
     <div>
+      {/* Source indicator */}
+      {realLoading && (
+        <div style={{ fontSize: 12, color: "#8a8079", marginBottom: 12, fontStyle: "italic" }}>
+          Chargement des donnees {etabNom}...
+        </div>
+      )}
+      {realLoaded && (
+        <div style={{ background: "#eef4f5", borderRadius: 10, padding: "10px 14px", fontSize: 12.5, color: "#3a5157", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 16 }}>&#9432;</span>
+          <span>
+            Donnees pre-remplies depuis <b>{etabNom}</b> (mois en cours).
+            Ticket moyen, couverts/jour et masse salariale calcules automatiquement. Ajustez si besoin.
+          </span>
+        </div>
+      )}
+
       {/* Hypotheses */}
-      <details open style={{ background: "#fff", border: "1px solid #e7e1d9", borderRadius: 16, padding: "16px 18px", marginBottom: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+      <details open={!realLoaded} style={{ background: "#fff", border: "1px solid #e7e1d9", borderRadius: 16, padding: "16px 18px", marginBottom: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
         <summary style={{ cursor: "pointer", fontSize: 15, fontWeight: 700, listStyle: "none" }}>
           Hypotheses de base
           <span style={{ fontSize: 12.5, color: "#8a8079", fontWeight: 500, marginLeft: 8 }}>
-            MS {eur(msTot)} / {jours} j / objectif {obj} %
+            MS {eurFmt(msTot)} / {jours} j / objectif {obj} %
           </span>
         </summary>
         <div style={{ paddingTop: 16 }}>
           <div style={{ background: "#eef4f5", borderRadius: 10, padding: "11px 13px", fontSize: 12.5, color: "#3a5157", marginBottom: 14 }}>
-            <b style={{ color: C.accent }}>Charges comprises :</b> indique ce que chaque personne coute reellement (brut + charges patronales), pas le net.
+            <b style={{ color: C.accent }}>Charges comprises :</b> indique ce que chaque personne coute reellement (brut + charges patronales ~{Math.round(CHARGES_RATE * 100)}%), pas le net.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             {([
@@ -103,7 +207,7 @@ export function SimulateurRentabiliteMS() {
           </label>
           <input type="range" min={5} max={100} step={0.05} value={tm} onChange={e => setTm(parseFloat(e.target.value))}
             style={{ width: "100%", accentColor: C.accent }} />
-          <div style={{ fontSize: 12, color: "#8a8079", marginTop: 7 }}>Base : {dec2(tmBase)} \u20AC HT</div>
+          <div style={{ fontSize: 12, color: "#8a8079", marginTop: 7 }}>Base reelle : {dec2(tmBase)} \u20AC HT</div>
         </div>
 
         <div style={{ marginBottom: 10 }}>
@@ -112,7 +216,7 @@ export function SimulateurRentabiliteMS() {
           </label>
           <input type="range" min={10} max={600} step={1} value={cv} onChange={e => setCv(parseInt(e.target.value))}
             style={{ width: "100%", accentColor: C.accent }} />
-          <div style={{ fontSize: 12, color: "#8a8079", marginTop: 7 }}>Base : {cvBase} couverts/jour</div>
+          <div style={{ fontSize: 12, color: "#8a8079", marginTop: 7 }}>Base reelle : {cvBase} couverts/jour</div>
         </div>
 
         {/* Live indicator */}
@@ -124,10 +228,10 @@ export function SimulateurRentabiliteMS() {
         }}>
           <span>{liveStatus === "ok" ? "\u2713" : liveStatus === "warn" ? "!" : "\u2715"}</span>
           <span>
-            A cette activite : CA HT <b>{eur(calc.caMois)}</b>/mois → MS = <b>{pct(calc.pTot)}</b> du CA
+            A cette activite : CA HT <b>{eurFmt(calc.caMois)}</b>/mois → MS = <b>{pctFmt(calc.pTot)}</b> du CA
             {calc.pTot <= obj
-              ? ` (sous l&apos;objectif de ${obj} %)`
-              : ` (au-dessus de l&apos;objectif de ${obj} %)`}
+              ? ` (sous l\u2019objectif de ${obj} %)`
+              : ` (au-dessus de l\u2019objectif de ${obj} %)`}
           </span>
         </div>
       </div>
@@ -146,8 +250,8 @@ export function SimulateurRentabiliteMS() {
             <div style={{ fontSize: 11, color: "#8a8079", textTransform: "uppercase", letterSpacing: ".04em" }}>couverts / jour</div>
             <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, marginTop: 2 }}>{denom > 0 ? calc.cvX3 : "\u2014"}</div>
             <div style={{ marginTop: 14 }}>
-              <Row label="CA HT / jour" value={eur(calc.cvX3 * tm)} first />
-              <Row label="CA HT / mois" value={eur(calc.cvX3 * tm * jours)} />
+              <Row label="CA HT / jour" value={eurFmt(calc.cvX3 * tm)} first />
+              <Row label="CA HT / mois" value={eurFmt(calc.cvX3 * tm * jours)} />
             </div>
           </div>
 
@@ -167,8 +271,8 @@ export function SimulateurRentabiliteMS() {
             <div style={{ fontSize: 11, color: "#8a8079", textTransform: "uppercase", letterSpacing: ".04em" }}>couverts / jour</div>
             <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, marginTop: 2, color: C.accent }}>{denom > 0 ? calc.cvObjN : "\u2014"}</div>
             <div style={{ marginTop: 14 }}>
-              <Row label="CA HT / jour" value={eur(calc.cvObjN * tm)} first />
-              <Row label="CA HT / mois" value={eur(calc.cvObjN * tm * jours)} />
+              <Row label="CA HT / jour" value={eurFmt(calc.cvObjN * tm)} first />
+              <Row label="CA HT / mois" value={eurFmt(calc.cvObjN * tm * jours)} />
             </div>
           </div>
         </div>
@@ -184,20 +288,19 @@ export function SimulateurRentabiliteMS() {
           <span><span style={{ ...dot, background: C.ger }} /> Gerant(e)</span>
           <span><span style={{ ...dot, background: C.rest }} /> Reste du CA</span>
         </div>
-        {/* Bar */}
         <div style={{ height: 44, borderRadius: 10, overflow: "hidden", display: "flex", background: C.rest, margin: "6px 0 14px" }}>
           <span style={{ width: `${Math.min(calc.pSalObj, 100)}%`, background: C.sal, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700, transition: "width .18s ease", whiteSpace: "nowrap", overflow: "hidden" }}>
-            {calc.pSalObj > 12 ? pct(calc.pSalObj) : ""}
+            {calc.pSalObj > 12 ? pctFmt(calc.pSalObj) : ""}
           </span>
           <span style={{ width: `${Math.min(calc.pGerObj, 100 - calc.pSalObj)}%`, background: C.ger, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700, transition: "width .18s ease", whiteSpace: "nowrap", overflow: "hidden" }}>
-            {calc.pGerObj > 9 ? pct(calc.pGerObj) : ""}
+            {calc.pGerObj > 9 ? pctFmt(calc.pGerObj) : ""}
           </span>
         </div>
-        <Row label="Salaries" value={pct(calc.pSalObj)} dotColor={C.sal} first />
-        <Row label="Gerant(e)" value={pct(calc.pGerObj)} dotColor={C.ger} />
+        <Row label="Salaries" value={pctFmt(calc.pSalObj)} dotColor={C.sal} first />
+        <Row label="Gerant(e)" value={pctFmt(calc.pGerObj)} dotColor={C.ger} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 0", borderTop: "1px solid #e7e1d9", fontSize: 16 }}>
           <span style={{ fontWeight: 700 }}>Masse salariale totale</span>
-          <span style={{ fontWeight: 700 }}>{pct(calc.pSalObj + calc.pGerObj)}</span>
+          <span style={{ fontWeight: 700 }}>{pctFmt(calc.pSalObj + calc.pGerObj)}</span>
         </div>
       </div>
 
@@ -207,7 +310,7 @@ export function SimulateurRentabiliteMS() {
           <summary style={{ cursor: "pointer", fontSize: 14, fontWeight: 600, color: C.accent }}>Comment lire les deux paliers ?</summary>
           <div style={{ fontSize: 13, color: "#4a433d", marginTop: 10 }}>
             <p style={{ marginBottom: 9 }}>
-              <b>Le plancher (regle du x3) :</b> chaque euro de salaire (charges comprises) doit generer ~3 \u20AC de CA HT.
+              <b>Le plancher (regle du x3) :</b> chaque euro de salaire (charges comprises) doit generer ~3 {"\u20AC"} de CA HT.
               Applique a tes salaries, c&apos;est le minimum : en dessous, tu ne couvres meme pas les salaires.
             </p>
             <p style={{ marginBottom: 9 }}>
