@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { fetchApi } from "@/lib/fetchApi";
 
-const eurFmt = (n: number) => Math.round(n).toLocaleString("fr-FR") + " \u20AC";
+const eurFmt = (n: number) => Math.round(n).toLocaleString("fr-FR") + " \u20ac";
 const pctFmt = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
 const dec2 = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -46,11 +46,12 @@ export function SimulateurRentabiliteMS() {
     (async () => {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setRealLoading(true);
-      // Current month bounds
+      // Previous full month bounds (current month is incomplete)
       const now = new Date();
-      const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      const to = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
+      const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevLastDay = new Date(now.getFullYear(), now.getMonth(), 0);
+      const from = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}-01`;
+      const to = `${prevLastDay.getFullYear()}-${String(prevLastDay.getMonth() + 1).padStart(2, "0")}-${String(prevLastDay.getDate()).padStart(2, "0")}`;
 
       // Fetch ventes stats + contrats in parallel
       const [statsRes, contratsRes] = await Promise.all([
@@ -152,7 +153,7 @@ export function SimulateurRentabiliteMS() {
         <div style={{ background: "#eef4f5", borderRadius: 10, padding: "10px 14px", fontSize: 12.5, color: "#3a5157", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 16 }}>&#9432;</span>
           <span>
-            Donnees pre-remplies depuis <b>{etabNom}</b> (mois en cours).
+            Donnees pre-remplies depuis <b>{etabNom}</b> (mois precedent complet).
             Ticket moyen, couverts/jour et masse salariale calcules automatiquement. Ajustez si besoin.
           </span>
         </div>
@@ -203,11 +204,11 @@ export function SimulateurRentabiliteMS() {
 
         <div style={{ marginBottom: 22 }}>
           <label style={{ display: "flex", justifyContent: "space-between", fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
-            Ticket moyen HT <span style={{ fontSize: 20, color: C.accent, fontWeight: 700 }}>{dec2(tm)} \u20AC</span>
+            Ticket moyen HT <span style={{ fontSize: 20, color: C.accent, fontWeight: 700 }}>{dec2(tm)} €</span>
           </label>
           <input type="range" min={5} max={100} step={0.05} value={tm} onChange={e => setTm(parseFloat(e.target.value))}
             style={{ width: "100%", accentColor: C.accent }} />
-          <div style={{ fontSize: 12, color: "#8a8079", marginTop: 7 }}>Base reelle : {dec2(tmBase)} \u20AC HT</div>
+          <div style={{ fontSize: 12, color: "#8a8079", marginTop: 7 }}>Base reelle : {dec2(tmBase)} € HT</div>
         </div>
 
         <div style={{ marginBottom: 10 }}>
