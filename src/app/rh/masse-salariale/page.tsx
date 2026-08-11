@@ -8,6 +8,7 @@ import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { useProfile } from "@/lib/ProfileContext";
 import { SimulationContent } from "@/components/rh/SimulationContent";
+import { SimulateurRentabiliteMS } from "@/components/rh/SimulateurRentabiliteMS";
 import { fetchApi } from "@/lib/fetchApi";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -117,7 +118,7 @@ export default function MasseSalarialePage() {
   const { current: etab } = useEtablissement();
   const { can } = useProfile();
   const showMoney = can("performances.show_money");
-  const [msTab, setMsTab] = useState<"reelle" | "tns" | "simulateur">("reelle");
+  const [msTab, setMsTab] = useState<"reelle" | "tns" | "simulateur" | "rentabilite">("reelle");
   const [presences, setPresences] = useState<ComboPresence[]>([]);
   const [contrats, setContrats] = useState<ContratInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -350,6 +351,7 @@ export default function MasseSalarialePage() {
             { key: "reelle" as const, label: "Masse salariale" },
             { key: "tns" as const, label: "Statuts TNS" },
             { key: "simulateur" as const, label: "Simulateur" },
+            { key: "rentabilite" as const, label: "Rentabilite MS" },
           ]).map(t => (
             <button key={t.key} type="button" onClick={() => setMsTab(t.key)} style={{
               flex: 1, padding: "8px 10px", borderRadius: 10, border: "none",
@@ -364,7 +366,9 @@ export default function MasseSalarialePage() {
           ))}
         </div>
 
-        {msTab !== "reelle" ? (
+        {msTab === "rentabilite" ? (
+          <SimulateurRentabiliteMS />
+        ) : msTab !== "reelle" ? (
           <SimulationContent activeTab={msTab} />
         ) : (<>
 
