@@ -306,9 +306,10 @@ function aggregate(rows: Row[]) {
   }
 
   // Zones par jour (TTC + HT)
-  const zoneNames = ["Salle", "Pergolas", "Terrasse", "\u00C0 emporter"];
+  const zoneNames = ["Salle", "Pergolas", "Terrasse", "Salon", "\u00C0 emporter"];
   const isEmp = (r: Row) => r.salle?.toLowerCase().includes("emporter");
-  const zoneMatch = (z: string) => z === "\u00C0 emporter" ? isEmp : (r: Row) => r.salle === z;
+  const isSalle = (r: Row) => r.salle === "Salle" || r.salle === "Salle pizza";
+  const zoneMatch = (z: string) => z === "\u00C0 emporter" ? isEmp : z === "Salle" ? isSalle : (r: Row) => r.salle === z;
 
   const zones_ttc: Record<string, number[]> = {};
   const zones_ht: Record<string, number[]> = {};
