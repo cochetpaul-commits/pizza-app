@@ -66,8 +66,11 @@ export default function InventairePage() {
   const [activeZone, setActiveZone] = useState<string>(SANS_ZONE);
   const [showAddZone, setShowAddZone] = useState(false);
   const [newZoneName, setNewZoneName] = useState("");
+  const [newZoneSupplierIds, setNewZoneSupplierIds] = useState<string[]>([]);
+  const [newZoneCategorySlugs, setNewZoneCategorySlugs] = useState<string[]>([]);
   const [addingZone, setAddingZone] = useState(false);
   const [showManageZones, setShowManageZones] = useState(false);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
 
   const [packInfo, setPackInfo] = useState<Record<string, { pack_count: number; pack_each_qty: number | null; pack_each_unit: string | null }>>({}); // ingredient_id -> pack info
 
@@ -86,6 +89,7 @@ export default function InventairePage() {
 
   // Filter: show only items not yet counted
   const [filterNonSaisis, setFilterNonSaisis] = useState(false);
+  const [searchInv, setSearchInv] = useState("");
 
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -121,7 +125,9 @@ export default function InventairePage() {
         .select("ingredient_id, pack_count, pack_each_qty, pack_each_unit")
         .eq("is_active", true)
         .not("pack_count", "is", null);
-      const [{ data, error }, { data: zData }, { data: packData }] = await Promise.all([q, zq, packQ]);
+      let supQ = supabase.from("suppliers").select("id, name").eq("is_active", true).order("name");
+      if (etabId) supQ = supQ.eq("etablissement_id", etabId);
+      const [{ data, error }, { data: zData }, { data: packData }, { data: supData }] = await Promise.all([q, zq, packQ, supQ]);
       if (error) { console.error("ingredients query:", error); }
       setIngredients((data ?? []) as Ingredient[]);
       const zList = (zData ?? []) as StorageZone[];
@@ -135,6 +141,7 @@ export default function InventairePage() {
         }
       }
       setPackInfo(pMap);
+      setSuppliers((supData ?? []) as { id: string; name: string }[]);
     })();
   }, [etabId]);
 
@@ -342,6 +349,8 @@ export default function InventairePage() {
       name,
       etablissement_id: etab?.id ?? null,
       display_order: zones.length,
+      supplier_ids: newZoneSupplierIds.length > 0 ? newZoneSupplierIds : [],
+      category_slugs: newZoneCategorySlugs.length > 0 ? newZoneCategorySlugs : [],
     });
     if (error) {
       if (error.message.includes("unique") || error.message.includes("duplicate")) {
@@ -352,8 +361,25 @@ export default function InventairePage() {
       setAddingZone(false);
       return;
     }
+    // Auto-assign ingredients matching supplier/category to this zone
+    if (newZoneSupplierIds.length > 0 || newZoneCategorySlugs.length > 0) {
+      const toUpdate = ingredients.filter(ing => {
+        if (!ing.storage_zone || ing.storage_zone === SANS_ZONE) {
+          if (newZoneSupplierIds.length > 0 && ing.supplier_id && newZoneSupplierIds.includes(ing.supplier_id)) return true;
+          if (newZoneCategorySlugs.length > 0 && newZoneCategorySlugs.includes(ing.category)) return true;
+        }
+        return false;
+      });
+      if (toUpdate.length > 0) {
+        const ids = toUpdate.map(i => i.id);
+        await supabase.from("ingredients").update({ storage_zone: name }).in("id", ids);
+        setIngredients(prev => prev.map(i => ids.includes(i.id) ? { ...i, storage_zone: name } : i));
+      }
+    }
     await loadZones();
     setNewZoneName("");
+    setNewZoneSupplierIds([]);
+    setNewZoneCategorySlugs([]);
     setShowAddZone(false);
     setAddingZone(false);
     setActiveZone(name);
@@ -400,10 +426,13 @@ export default function InventairePage() {
   // Group by category
   const categoryGroups = useMemo(() => {
     let items = zoneIngredients;
-    if (filterNonSaisis) {
+    if (searchInv.trim()) {
+      const q = searchInv.trim().toLowerCase();
+      items = ingredients.filter(i => i.name.toLowerCase().includes(q)); // search across all zones
+    } else if (filterNonSaisis) {
       items = items.filter(i => {
         const qty = Number(quantities[i.id] ?? 0);
-        return qty === 0 && quantities[i.id] !== 0; // exclude confirmed zeros too
+        return qty === 0 && quantities[i.id] !== 0;
       });
     }
     const map = new Map<Category, Ingredient[]>();
@@ -421,7 +450,7 @@ export default function InventairePage() {
         color: CAT_COLORS[cat],
         items: map.get(cat)!,
       }));
-  }, [zoneIngredients, filterNonSaisis, quantities]);
+  }, [zoneIngredients, filterNonSaisis, quantities, searchInv, ingredients]);
 
   const isActive = !!session && !viewingId;
   const isViewing = !!viewingId;
@@ -683,9 +712,8 @@ export default function InventairePage() {
         {/* Add zone inline */}
         {showAddZone && (
           <div style={{
-            display: "flex", gap: 8, marginBottom: 12, alignItems: "center",
-            padding: "10px 14px", background: "#fff", borderRadius: 10,
-            border: "1.5px solid #ddd6c8",
+            marginBottom: 12, padding: "14px 16px", background: "#fff", borderRadius: 12,
+            border: "1.5px solid #ddd6c8", display: "flex", flexDirection: "column", gap: 10,
           }}>
             <input
               autoFocus
@@ -693,32 +721,60 @@ export default function InventairePage() {
               value={newZoneName}
               onChange={(e) => setNewZoneName(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") addZone(); if (e.key === "Escape") setShowAddZone(false); }}
-              placeholder="Nom de la zone (ex: Chambre froide)"
+              placeholder="Nom de la zone (ex: Chambre froide, Reserve)"
               style={{
-                flex: 1, height: 34, borderRadius: 8, border: "1.5px solid #e5ddd0",
-                padding: "4px 12px", fontSize: 13, background: "#fff",
+                height: 38, borderRadius: 8, border: "1.5px solid #e5ddd0",
+                padding: "4px 12px", fontSize: 14, background: "#fff", width: "100%",
               }}
             />
-            <button
-              type="button"
-              onClick={addZone}
-              disabled={addingZone || !newZoneName.trim()}
-              style={{
-                padding: "8px 16px", borderRadius: 8, border: "none",
-                background: "#D4775A", color: "#fff", fontSize: 12, fontWeight: 700,
-                cursor: "pointer", opacity: addingZone || !newZoneName.trim() ? 0.5 : 1,
-              }}
-            >
-              {addingZone ? "..." : "Ajouter"}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setShowAddZone(false); setNewZoneName(""); }}
-              style={{
-                padding: "8px 12px", borderRadius: 8, border: "1px solid #ddd6c8",
-                background: "#fff", fontSize: 12, cursor: "pointer", color: "#999",
-              }}
-            >Annuler</button>
+            {/* Auto-assign: fournisseurs */}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#999", marginBottom: 4 }}>Assigner les produits de ces fournisseurs :</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {suppliers.map(s => {
+                  const sel = newZoneSupplierIds.includes(s.id);
+                  return (
+                    <button key={s.id} type="button" onClick={() => {
+                      setNewZoneSupplierIds(prev => sel ? prev.filter(x => x !== s.id) : [...prev, s.id]);
+                    }} style={{
+                      padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
+                      border: sel ? "1.5px solid #D4775A" : "1px solid #ddd6c8",
+                      background: sel ? "#D4775A" : "#fff",
+                      color: sel ? "#fff" : "#666", cursor: "pointer",
+                    }}>{s.name}</button>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Auto-assign: categories */}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#999", marginBottom: 4 }}>Ou assigner par categorie :</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {CATEGORIES.map(cat => {
+                  const sel = newZoneCategorySlugs.includes(cat);
+                  return (
+                    <button key={cat} type="button" onClick={() => {
+                      setNewZoneCategorySlugs(prev => sel ? prev.filter(x => x !== cat) : [...prev, cat]);
+                    }} style={{
+                      padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
+                      border: sel ? `1.5px solid ${CAT_COLORS[cat]}` : "1px solid #ddd6c8",
+                      background: sel ? CAT_COLORS[cat] : "#fff",
+                      color: sel ? "#fff" : "#666", cursor: "pointer",
+                    }}>{CAT_LABELS[cat]}</button>
+                  );
+                })}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button type="button" onClick={() => { setShowAddZone(false); setNewZoneName(""); setNewZoneSupplierIds([]); setNewZoneCategorySlugs([]); }}
+                style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, cursor: "pointer", color: "#999" }}>
+                Annuler
+              </button>
+              <button type="button" onClick={addZone} disabled={addingZone || !newZoneName.trim()}
+                style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "#D4775A", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: addingZone || !newZoneName.trim() ? 0.5 : 1 }}>
+                {addingZone ? "..." : "Creer la zone"}
+              </button>
+            </div>
           </div>
         )}
 
@@ -759,6 +815,29 @@ export default function InventairePage() {
             })}
           </div>
         )}
+
+        {/* Search bar */}
+        <div style={{ marginBottom: 10, position: "relative" }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+            <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            value={searchInv}
+            onChange={(e) => setSearchInv(e.target.value)}
+            placeholder="Rechercher un produit..."
+            style={{
+              width: "100%", height: 38, borderRadius: 10, border: "1.5px solid #e5ddd0",
+              padding: "0 14px 0 36px", fontSize: 13, background: "#fff", outline: "none",
+            }}
+          />
+          {searchInv && (
+            <button type="button" onClick={() => setSearchInv("")} style={{
+              position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+              background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14,
+            }}>✕</button>
+          )}
+        </div>
 
         {/* Progress bar + zone summary */}
         <div style={{ marginBottom: 12 }}>
@@ -811,7 +890,7 @@ export default function InventairePage() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
             {categoryGroups.map(({ cat, label, color, items }) => {
-              const isCollapsed = collapsedCats.has(cat);
+              const isCollapsed = searchInv.trim() ? false : collapsedCats.has(cat);
               // Category summary
               let catSaisis = 0;
               let catValue = 0;
@@ -908,15 +987,36 @@ export default function InventairePage() {
                               flexWrap: "wrap",
                             }}
                           >
-                            {/* Name + unit */}
+                            {/* Name + unit + delete */}
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{
-                                fontSize: 13, fontWeight: hasQty ? 700 : 500,
-                                color: hasQty ? "#1a1a1a" : isZeroConfirmed ? "#999" : "#666",
-                                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                textDecoration: isZeroConfirmed ? "line-through" : "none",
-                              }}>
-                                {ing.name}
+                              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                <span style={{
+                                  fontSize: 13, fontWeight: hasQty ? 700 : 500,
+                                  color: hasQty ? "#1a1a1a" : isZeroConfirmed ? "#999" : "#666",
+                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                  textDecoration: isZeroConfirmed ? "line-through" : "none",
+                                  flex: 1, minWidth: 0,
+                                }}>
+                                  {ing.name}
+                                </span>
+                                {isActive && (
+                                  <button type="button" onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (!confirm(`Retirer "${ing.name}" de cet inventaire ?`)) return;
+                                    // Remove from quantities
+                                    setQuantities(prev => { const n = { ...prev }; delete n[ing.id]; return n; });
+                                    // Delete the line from DB
+                                    if (session) await supabase.from("inventaire_lignes").delete().eq("inventaire_id", session.id).eq("ingredient_id", ing.id);
+                                    // Deactivate ingredient
+                                    await supabase.from("ingredients").update({ is_active: false }).eq("id", ing.id);
+                                    setIngredients(prev => prev.filter(p => p.id !== ing.id));
+                                  }} style={{
+                                    flexShrink: 0, width: 20, height: 20, borderRadius: 5,
+                                    border: "none", background: "none", color: "#ccc",
+                                    fontSize: 11, cursor: "pointer", display: "flex",
+                                    alignItems: "center", justifyContent: "center",
+                                  }} title="Supprimer ce produit">✕</button>
+                                )}
                               </div>
                               <div style={{ fontSize: 10, color: "#999", marginTop: 1 }}>
                                 {pack
@@ -993,23 +1093,44 @@ export default function InventairePage() {
                                 </div>
                               </div>
                             ) : (
-                              /* Simple input for items without pack */
-                              <input
-                                type="number"
-                                step="0.5"
-                                min="0"
-                                value={rawQty ?? ""}
-                                onChange={(e) => handleQtyChange(ing.id, e.target.value)}
-                                placeholder="0"
-                                style={{
-                                  width: 70, height: 36, borderRadius: 8,
-                                  border: hasQty ? `1.5px solid ${color}` : "1px solid #ddd6c8",
-                                  padding: "0 8px", fontSize: 14, fontWeight: 600,
-                                  textAlign: "right", background: "#fff", outline: "none",
-                                  color: hasQty ? color : "#1a1a1a",
-                                  flexShrink: 0,
-                                }}
-                              />
+                              /* Stepper input with +/- buttons */
+                              <div style={{ display: "flex", alignItems: "center", gap: 0, flexShrink: 0 }}>
+                                <button type="button" onClick={() => {
+                                  const cur = typeof rawQty === "number" ? rawQty : 0;
+                                  handleQtyChange(ing.id, String(Math.max(0, cur - 1)));
+                                }} style={{
+                                  width: 32, height: 36, borderRadius: "8px 0 0 8px",
+                                  border: "1px solid #ddd6c8", borderRight: "none",
+                                  background: "#f9f5ef", color: "#D4775A", fontSize: 18,
+                                  fontWeight: 700, cursor: "pointer", display: "flex",
+                                  alignItems: "center", justifyContent: "center",
+                                }}>-</button>
+                                <input
+                                  type="number"
+                                  step="0.5"
+                                  min="0"
+                                  value={rawQty ?? ""}
+                                  onChange={(e) => handleQtyChange(ing.id, e.target.value)}
+                                  placeholder="0"
+                                  style={{
+                                    width: 52, height: 36, borderRadius: 0,
+                                    border: hasQty ? `1.5px solid ${color}` : "1px solid #ddd6c8",
+                                    padding: "0 4px", fontSize: 14, fontWeight: 600,
+                                    textAlign: "center", background: "#fff", outline: "none",
+                                    color: hasQty ? color : "#1a1a1a",
+                                  }}
+                                />
+                                <button type="button" onClick={() => {
+                                  const cur = typeof rawQty === "number" ? rawQty : 0;
+                                  handleQtyChange(ing.id, String(cur + 1));
+                                }} style={{
+                                  width: 32, height: 36, borderRadius: "0 8px 8px 0",
+                                  border: "1px solid #ddd6c8", borderLeft: "none",
+                                  background: "#f9f5ef", color: "#4a6741", fontSize: 18,
+                                  fontWeight: 700, cursor: "pointer", display: "flex",
+                                  alignItems: "center", justifyContent: "center",
+                                }}>+</button>
+                              </div>
                             )}
                           </div>
                         );
