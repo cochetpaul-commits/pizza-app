@@ -80,6 +80,8 @@ export default function InventairePage() {
   const [saving, setSaving] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
   const reload = useCallback(() => setReloadTick((t) => t + 1), []);
+  const [syncActive, setSyncActive] = useState(false);
+  const [lastSyncEvent, setLastSyncEvent] = useState<string | null>(null);
 
   // Category collapse state — all collapsed by default
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set(CATEGORIES));
@@ -222,6 +224,42 @@ export default function InventairePage() {
     return () => { cancelled = true; };
   }, [reloadKey, reloadTick]);
 
+  // ── Realtime sync for multi-user ──────────────────────────
+
+  const localWriteRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!session) return;
+    const channelName = `inventaire-${session.id}`;
+    const channel = supabase
+      .channel(channelName)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "inventaire_lignes",
+        filter: `inventaire_id=eq.${session.id}`,
+      }, (payload) => {
+        const row = (payload.new ?? payload.old) as { ingredient_id: string; quantite: number } | undefined;
+        if (!row?.ingredient_id) return;
+        // Skip if this was our own write (avoid echo)
+        if (localWriteRef.current.has(row.ingredient_id)) {
+          localWriteRef.current.delete(row.ingredient_id);
+          return;
+        }
+        if (payload.eventType === "DELETE") {
+          setQuantities(prev => { const n = { ...prev }; delete n[row.ingredient_id]; return n; });
+        } else {
+          setQuantities(prev => ({ ...prev, [row.ingredient_id]: row.quantite }));
+        }
+        setLastSyncEvent(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      })
+      .subscribe((status) => {
+        setSyncActive(status === "SUBSCRIBED");
+      });
+
+    return () => { supabase.removeChannel(channel); };
+  }, [session?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Create session ────────────────────────────────────────
 
   async function createSession() {
@@ -242,6 +280,7 @@ export default function InventairePage() {
   // ── Save line (debounced upsert) ──────────────────────────
 
   const upsertLigne = useCallback(async (sessionId: string, ingredientId: string, qty: number, ing: Ingredient) => {
+    localWriteRef.current.add(ingredientId);
     if (qty <= 0) {
       await supabase.from("inventaire_lignes")
         .delete()
@@ -657,8 +696,19 @@ export default function InventairePage() {
               {isViewing ? `Inventaire du ${fmtDate(currentInv?.date ?? "")}` : "Inventaire en cours"}
             </div>
             {isActive && (
-              <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>
-                {fmtDate(session.date)} &middot; Les quantites s&apos;enregistrent automatiquement
+              <div style={{ fontSize: 12, color: "#999", marginTop: 2, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span>{fmtDate(session.date)} &middot; Sauvegarde auto</span>
+                {syncActive && (
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
+                    background: "#eaf4ec", color: "#4a6741",
+                  }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4a6741" }} />
+                    Multi-utilisateurs
+                    {lastSyncEvent && <span style={{ color: "#999", marginLeft: 4 }}>sync {lastSyncEvent}</span>}
+                  </span>
+                )}
               </div>
             )}
           </div>
