@@ -571,6 +571,19 @@ export default function PilotagePage() {
   const [annualKpis, setAnnualKpis] = useState<AnnualKpis | null>(null);
   const [annualLoading, setAnnualLoading] = useState(false);
 
+  // Month/Day view data (from /api/ventes/stats)
+  type PeriodStats = {
+    ca_ht: number; ca_ttc: number; couverts: number; tickets: number;
+    dates: string[]; day_ht: number[]; day_cov: number[];
+    tm_ht: number[]; place_sur_ht: number; place_emp_ht: number;
+    cov_sur: number; cov_emp: number;
+    services: { jour: string; svc: string; ht: number; sp_ht: number; sp_cov: number; emp_ht: number; tm_sp_ht: number }[];
+    top10_names: string[]; top10_ca_ht: number[]; top10_qty: number[];
+    day_names: string[];
+  };
+  const [periodStats, setPeriodStats] = useState<PeriodStats | null>(null);
+  const [periodStatsLoading, setPeriodStatsLoading] = useState(false);
+
   const isPiccola = etab.current?.slug?.includes("piccola");
   const currentEtabId = etab.current?.id;
 
@@ -641,18 +654,32 @@ export default function PilotagePage() {
     } else if (mode === "annee" && currentEtabId) {
       loadAnnualData(parseInt(p.from.slice(0, 4)));
     } else if ((mode === "mois" || mode === "jour") && currentEtabId) {
-      // Use the ventes stats API for month/day view
-      // Will reuse weekly view for now, adjusting date range
+      loadPeriodStats(p.from, p.to);
     }
   }
 
   function handlePeriodChange(p: PeriodValue) {
     setPeriod(p);
     if (p.mode === "semaine") {
-      // Compute ISO week from the from date
       setWeekStr(dateToISOWeek(p.from));
     } else if (p.mode === "annee" && currentEtabId) {
       loadAnnualData(parseInt(p.from.slice(0, 4)));
+    } else if ((p.mode === "mois" || p.mode === "jour") && currentEtabId) {
+      loadPeriodStats(p.from, p.to);
+    }
+  }
+
+  async function loadPeriodStats(from: string, to: string) {
+    if (!currentEtabId) return;
+    setPeriodStatsLoading(true);
+    try {
+      const res = await fetchApi(`/api/ventes/stats?etablissement_id=${currentEtabId}&from=${from}&to=${to}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPeriodStats(data.stats ?? null);
+      }
+    } finally {
+      setPeriodStatsLoading(false);
     }
   }
 
@@ -900,6 +927,141 @@ export default function PilotagePage() {
                 <div style={{ textAlign: "center", padding: 60, color: "#999" }}>Aucune donnee pour cette annee</div>
               )}
             </div>
+
+          ) : (periodMode === "mois" || periodMode === "jour") ? (
+            /* ══════════ MONTH / DAY VIEW ══════════ */
+            <div>
+              {periodStatsLoading ? (
+                <div style={{ textAlign: "center", padding: 60, color: "#999" }}>Chargement...</div>
+              ) : periodStats ? (() => {
+                const ps = periodStats;
+                const nbDays = ps.dates?.length ?? 0;
+                const tmGlobal = ps.couverts > 0 ? ps.ca_ht / ps.couverts : 0;
+                const tmSP = ps.cov_sur > 0 ? ps.place_sur_ht / ps.cov_sur : 0;
+
+                // Midi / Soir aggregation
+                const svcs = ps.services ?? [];
+                const midiHt = svcs.filter(s => s.svc === "midi").reduce((a, s) => a + s.sp_ht, 0);
+                const midiCov = svcs.filter(s => s.svc === "midi").reduce((a, s) => a + s.sp_cov, 0);
+                const soirHt = svcs.filter(s => s.svc === "soir").reduce((a, s) => a + s.sp_ht, 0);
+                const soirCov = svcs.filter(s => s.svc === "soir").reduce((a, s) => a + s.sp_cov, 0);
+
+                // Day chart data
+                const chartData = (ps.dates ?? []).map((d: string, i: number) => ({
+                  label: ps.day_names?.[i] ?? d.slice(8),
+                  ca: ps.day_ht?.[i] ?? 0,
+                  cov: ps.day_cov?.[i] ?? 0,
+                }));
+
+                return (
+                  <>
+                    {/* KPIs row 1 */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 12 }}>
+                      {[
+                        { label: "CA HT", value: fmtEuroInt(ps.ca_ht), color: ACCENT },
+                        { label: "Couverts", value: String(ps.couverts), color: "#1a1a1a" },
+                        { label: "TM HT", value: fmtEuro(tmGlobal), color: "#1a1a1a" },
+                        { label: nbDays > 1 ? "Jours" : "Service", value: nbDays > 1 ? String(nbDays) : (svcs.length > 0 ? svcs.map(s => s.svc).filter((v, i, a) => a.indexOf(v) === i).join(" + ") : "-"), color: "#1a1a1a" },
+                      ].map(k => (
+                        <div key={k.label} style={{ background: "#fff", borderRadius: 12, padding: "12px 8px", textAlign: "center", border: "1px solid #ddd6c8" }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "#999", marginBottom: 3 }}>{k.label}</div>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: k.color, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{k.value}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Midi / Soir */}
+                    {(midiHt > 0 || soirHt > 0) && (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+                        <div style={{ background: "#fff", borderRadius: 12, padding: "12px 14px", border: "1px solid #ddd6c8" }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "#999", marginBottom: 6 }}>Midi sur place</div>
+                          <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{fmtEuroInt(midiHt)}</div>
+                          <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{midiCov} cvts · TM {midiCov > 0 ? fmtEuro(midiHt / midiCov) : "-"}</div>
+                        </div>
+                        <div style={{ background: "#1a1a1a", borderRadius: 12, padding: "12px 14px" }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "#666", marginBottom: 6 }}>Soir sur place</div>
+                          <div style={{ fontSize: 20, fontWeight: 800, color: "#f2ede4", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{fmtEuroInt(soirHt)}</div>
+                          <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{soirCov} cvts · TM {soirCov > 0 ? fmtEuro(soirHt / soirCov) : "-"}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sur place / Emporter */}
+                    {ps.place_emp_ht > 0 && (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+                        <div style={{ background: "#fff", borderRadius: 12, padding: "12px 14px", border: "1px solid #ddd6c8" }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "#999", marginBottom: 3 }}>Sur place</div>
+                          <div style={{ fontSize: 16, fontWeight: 800, color: GREEN }}>{fmtEuroInt(ps.place_sur_ht)}</div>
+                          <div style={{ fontSize: 11, color: "#888" }}>{ps.cov_sur} cvts · TM {fmtEuro(tmSP)}</div>
+                        </div>
+                        <div style={{ background: "#fff", borderRadius: 12, padding: "12px 14px", border: "1px solid #ddd6c8" }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "#999", marginBottom: 3 }}>Emporter</div>
+                          <div style={{ fontSize: 16, fontWeight: 800, color: "#c9b99a" }}>{fmtEuroInt(ps.place_emp_ht)}</div>
+                          <div style={{ fontSize: 11, color: "#888" }}>{ps.cov_emp} tickets</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Daily bar chart (only for mois mode with multiple days) */}
+                    {periodMode === "mois" && chartData.length > 1 && (
+                      <div style={{ background: "#fff", borderRadius: 16, padding: "16px 12px", border: "1px solid #ddd6c8", marginBottom: 12 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "#999", marginBottom: 10 }}>
+                          CA HT par jour
+                        </div>
+                        <ResponsiveContainer width="100%" height={200}>
+                          <BarChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0ebe2" />
+                            <XAxis dataKey="label" tick={{ fontSize: 9, fill: "#999" }} interval={Math.max(0, Math.floor(chartData.length / 10) - 1)} />
+                            <YAxis tick={{ fontSize: 9, fill: "#999" }} tickFormatter={v => `${Math.round(v / 1000)}k`} />
+                            <Tooltip
+                              contentStyle={{ borderRadius: 10, border: "1px solid #ddd6c8", fontSize: 12 }}
+                              formatter={(v: unknown) => [fmtEuroInt(Number(v)), "CA HT"]}
+                            />
+                            <Bar dataKey="ca" fill={ACCENT} radius={[3, 3, 0, 0]}>
+                              {chartData.map((d, idx) => (
+                                <Cell key={idx} fill={d.ca > 0 ? ACCENT : "#e5ddd0"} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
+                    {/* Top 10 products */}
+                    {ps.top10_names?.length > 0 && (
+                      <div style={{ background: "#fff", borderRadius: 16, padding: "16px 14px", border: "1px solid #ddd6c8" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "#999", marginBottom: 10 }}>
+                          Top 10 produits
+                        </div>
+                        {ps.top10_names.map((name: string, i: number) => {
+                          const ca = ps.top10_ca_ht?.[i] ?? 0;
+                          const qty = ps.top10_qty?.[i] ?? 0;
+                          const maxCA = ps.top10_ca_ht?.[0] ?? 1;
+                          return (
+                            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: i < ps.top10_names.length - 1 ? "1px solid #f0ebe2" : "none" }}>
+                              <span style={{ fontSize: 11, fontWeight: 800, color: i < 3 ? ACCENT : "#999", width: 20, textAlign: "center" }}>{i + 1}</span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
+                                <div style={{ height: 4, borderRadius: 2, background: "#f0ebe2", marginTop: 3 }}>
+                                  <div style={{ height: "100%", borderRadius: 2, background: ACCENT, width: `${(ca / maxCA) * 100}%`, opacity: 0.7 }} />
+                                </div>
+                              </div>
+                              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT }}>{fmtEuroInt(ca)}</div>
+                                <div style={{ fontSize: 10, color: "#999" }}>{qty} ventes</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                );
+              })() : (
+                <div style={{ textAlign: "center", padding: 60, color: "#999" }}>Aucune donnee pour cette periode</div>
+              )}
+            </div>
+
           ) : (
           <>
           {/* ── TABS : Ventes | Produits ── */}
