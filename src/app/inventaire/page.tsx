@@ -12,7 +12,7 @@ import { CATEGORIES, CAT_LABELS, CAT_COLORS, type Category, type Ingredient } fr
 type Inventaire = {
   id: string;
   date: string;
-  statut: "en_cours" | "cloture";
+  statut: "en_cours" | "en_pause" | "cloture";
   total_valeur: number | null;
   created_at: string;
   notes: string | null;
@@ -168,7 +168,7 @@ export default function InventairePage() {
       if (invErr) { console.error("inventaires query:", invErr); }
       if (cancelled) return;
       const list = (data ?? []) as Inventaire[];
-      const active = list.find((i) => i.statut === "en_cours") ?? null;
+      const active = list.find((i) => i.statut === "en_cours" || i.statut === "en_pause") ?? null;
       setSession(active);
       setHistorique(list.filter((i) => i.statut === "cloture"));
 
@@ -525,8 +525,9 @@ export default function InventairePage() {
   }, [zoneIngredients, filterNonSaisis, quantities, searchInv, ingredients]);
 
   const isActive = !!session && !viewingId;
+  const isPaused = isActive && session?.statut === "en_pause";
   const isViewing = !!viewingId;
-  const readOnly = isViewing;
+  const readOnly = isViewing || isPaused;
 
   // Summary per zone
   const zoneSummary = useMemo(() => {
@@ -697,7 +698,12 @@ export default function InventairePage() {
             </div>
             {isActive && (
               <div style={{ fontSize: 12, color: "#999", marginTop: 2, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <span>{fmtDate(session.date)} &middot; Sauvegarde auto</span>
+                <span>{fmtDate(session.date)} &middot; {isPaused ? "En pause" : "Sauvegarde auto"}</span>
+                {isPaused && (
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: "#fbf1e0", color: "#D4A03C" }}>
+                    PAUSE
+                  </span>
+                )}
                 {syncActive && (
                   <span style={{
                     display: "inline-flex", alignItems: "center", gap: 4,
@@ -727,17 +733,48 @@ export default function InventairePage() {
               </button>
             )}
             {isActive && (
-              <button
-                onClick={cloturerSession}
-                disabled={saving}
-                style={{
-                  padding: "8px 18px", borderRadius: 20, border: "1.5px solid #4a6741",
-                  background: "#4a6741", color: "#fff", fontSize: 13, fontWeight: 700,
-                  cursor: "pointer", opacity: saving ? 0.6 : 1, whiteSpace: "nowrap",
-                }}
-              >
-                {saving ? "..." : "Cloturer"}
-              </button>
+              <>
+                {session.statut === "en_cours" ? (
+                  <button
+                    onClick={async () => {
+                      await supabase.from("inventaires").update({ statut: "en_pause" }).eq("id", session.id);
+                      setSession({ ...session, statut: "en_pause" });
+                    }}
+                    style={{
+                      padding: "8px 14px", borderRadius: 20, border: "1.5px solid #D4A03C",
+                      background: "#fff", color: "#D4A03C", fontSize: 12, fontWeight: 700,
+                      cursor: "pointer", whiteSpace: "nowrap",
+                    }}
+                  >
+                    Pause
+                  </button>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      await supabase.from("inventaires").update({ statut: "en_cours" }).eq("id", session.id);
+                      setSession({ ...session, statut: "en_cours" });
+                    }}
+                    style={{
+                      padding: "8px 14px", borderRadius: 20, border: "1.5px solid #D4775A",
+                      background: "#D4775A", color: "#fff", fontSize: 12, fontWeight: 700,
+                      cursor: "pointer", whiteSpace: "nowrap",
+                    }}
+                  >
+                    Reprendre
+                  </button>
+                )}
+                <button
+                  onClick={cloturerSession}
+                  disabled={saving}
+                  style={{
+                    padding: "8px 18px", borderRadius: 20, border: "1.5px solid #4a6741",
+                    background: "#4a6741", color: "#fff", fontSize: 13, fontWeight: 700,
+                    cursor: "pointer", opacity: saving ? 0.6 : 1, whiteSpace: "nowrap",
+                  }}
+                >
+                  {saving ? "..." : "Cloturer"}
+                </button>
+              </>
             )}
           </div>
         </div>
