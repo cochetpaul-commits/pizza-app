@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { stats, prev, mode, viewTab, rangeLabel, etabName, briefing, exportType } = body;
+    const { stats, prev, mode, viewTab, rangeLabel, etabName, briefing, exportType, objectifs } = body;
 
     if (!stats) {
       return NextResponse.json({ error: "stats manquant" }, { status: 400 });
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       rawType === "produits" || rawType === "complet" ? rawType : "ventes";
     console.log("[PDF export] type:", type, "body:", exportType, "query:", qType);
 
-    const el = VentesPDF({ stats, prev, mode, viewTab, rangeLabel, etabName, briefing, exportType: type }) as unknown as React.ReactElement<DocumentProps>;
+    const el = VentesPDF({ stats, prev, mode, viewTab, rangeLabel, etabName, briefing, exportType: type, objectifs }) as unknown as React.ReactElement<DocumentProps>;
     const buffer = await renderToBuffer(el);
 
     return new NextResponse(new Uint8Array(buffer), {

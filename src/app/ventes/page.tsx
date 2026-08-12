@@ -604,6 +604,7 @@ function PerformancesPage() {
         etabName: etab.nom ?? "Etablissement",
         briefing,
         exportType,
+        objectifs,
       };
       const res = await fetch(`/api/ventes/pdf?type=${exportType}`, {
         method: "POST",
