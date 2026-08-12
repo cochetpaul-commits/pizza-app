@@ -59,6 +59,7 @@ export default function InventairePage() {
   const [session, setSession] = useState<Inventaire | null>(null);
   const [historique, setHistorique] = useState<Inventaire[]>([]);
   const [viewingId, setViewingId] = useState<string | null>(null);
+  const [prevQuantities, setPrevQuantities] = useState<Record<string, number>>({});
 
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number | "">>({});
@@ -181,8 +182,22 @@ export default function InventairePage() {
           }
           setQuantities(qMap);
         }
+        // Load previous closed inventory for comparison
+        const prevClosed = list.find(i => i.statut === "cloture");
+        if (prevClosed && !cancelled) {
+          const { data: prevLignes } = await supabase
+            .from("inventaire_lignes")
+            .select("ingredient_id, quantite")
+            .eq("inventaire_id", prevClosed.id);
+          const pMap: Record<string, number> = {};
+          for (const l of prevLignes ?? []) {
+            if (l.ingredient_id && l.quantite > 0) pMap[l.ingredient_id] = l.quantite;
+          }
+          if (!cancelled) setPrevQuantities(pMap);
+        }
       } else {
         setQuantities({});
+        setPrevQuantities({});
       }
       if (!cancelled) setLoading(false);
     })();
@@ -486,17 +501,17 @@ export default function InventairePage() {
     return { saisis, value };
   }, [ingredients, quantities]);
 
-  // Zone counts for badges
-  const zoneCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
+  // Zone counts + progress for badges
+  const zoneStats = useMemo(() => {
+    const stats: Record<string, { saisis: number; total: number }> = {};
     for (const ing of ingredients) {
-      const qty = Number(quantities[ing.id] ?? 0);
-      if (qty > 0) {
-        const zone = resolveZone(ing, zones);
-        counts[zone] = (counts[zone] ?? 0) + 1;
-      }
+      const zone = resolveZone(ing, zones);
+      if (!stats[zone]) stats[zone] = { saisis: 0, total: 0 };
+      stats[zone].total++;
+      const qty = quantities[ing.id];
+      if (qty !== undefined && qty !== "") stats[zone].saisis++;
     }
-    return counts;
+    return stats;
   }, [ingredients, quantities, zones]);
 
   // ── Render: loading ───────────────────────────────────────
@@ -641,23 +656,65 @@ export default function InventairePage() {
         {/* Summary */}
         <div style={summaryCard}>
           <div style={summaryItem}>
-            <span style={summaryLabel}>Articles saisis</span>
+            <span style={summaryLabel}>Saisis</span>
             <span style={summaryValue}>{totalSummary.saisis} / {ingredients.length}</span>
           </div>
           <div style={{ width: 1, background: "#ddd6c8", alignSelf: "stretch" }} />
           <div style={summaryItem}>
-            <span style={summaryLabel}>Valeur totale</span>
+            <span style={summaryLabel}>Valeur</span>
             <span style={summaryValue}>
               {totalSummary.value > 0 ? fmtMoney(totalSummary.value) : "-"}
             </span>
           </div>
+          {Object.keys(prevQuantities).length > 0 && (
+            <>
+              <div style={{ width: 1, background: "#ddd6c8", alignSelf: "stretch" }} />
+              <div style={summaryItem}>
+                <span style={summaryLabel}>Ecart vs prec.</span>
+                <span style={summaryValue}>
+                  {(() => {
+                    let delta = 0;
+                    for (const ing of ingredients) {
+                      const cur = Number(quantities[ing.id] ?? 0);
+                      const prev = prevQuantities[ing.id] ?? 0;
+                      if (cur > 0 && prev > 0 && ing.cost_per_unit) delta += (cur - prev) * ing.cost_per_unit;
+                    }
+                    return (
+                      <span style={{ color: delta >= 0 ? "#4a6741" : "#DC2626" }}>
+                        {delta >= 0 ? "+" : ""}{fmtMoney(delta)}
+                      </span>
+                    );
+                  })()}
+                </span>
+              </div>
+            </>
+          )}
+          {/* Stock alerts count */}
+          {(() => {
+            const alerts = ingredients.filter(ing => {
+              const qty = Number(quantities[ing.id] ?? 0);
+              return qty > 0 && ing.stock_min != null && qty < ing.stock_min;
+            });
+            if (alerts.length === 0) return null;
+            return (
+              <>
+                <div style={{ width: 1, background: "#ddd6c8", alignSelf: "stretch" }} />
+                <div style={summaryItem}>
+                  <span style={summaryLabel}>Alertes</span>
+                  <span style={{ ...summaryValue, color: "#DC2626" }}>{alerts.length} sous min</span>
+                </div>
+              </>
+            );
+          })()}
         </div>
 
         {/* Zone tabs */}
         <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
           {displayZones.map((z) => {
             const isActiveZone = activeZone === z.id;
-            const count = zoneCounts[z.id] ?? 0;
+            const zs = zoneStats[z.id];
+            const pct = zs && zs.total > 0 ? Math.round((zs.saisis / zs.total) * 100) : 0;
+            const isDone = pct === 100 && zs && zs.total > 0;
             return (
               <button
                 key={z.id}
@@ -666,20 +723,20 @@ export default function InventairePage() {
                 style={{
                   padding: "8px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600,
                   cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-                  border: isActiveZone ? "1.5px solid #D4775A" : "1px solid #ddd6c8",
-                  background: isActiveZone ? "#D4775A" : "#fff",
-                  color: isActiveZone ? "#fff" : "#1a1a1a",
+                  border: isActiveZone ? "1.5px solid #D4775A" : isDone ? "1.5px solid #4a6741" : "1px solid #ddd6c8",
+                  background: isActiveZone ? "#D4775A" : isDone ? "#eaf4ec" : "#fff",
+                  color: isActiveZone ? "#fff" : isDone ? "#4a6741" : "#1a1a1a",
                   transition: "all 0.15s",
                 }}
               >
                 {z.nom}
-                {count > 0 && (
+                {zs && zs.total > 0 && (
                   <span style={{
                     fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 8,
-                    background: isActiveZone ? "rgba(255,255,255,0.3)" : "#D4775A",
-                    color: "#fff",
+                    background: isActiveZone ? "rgba(255,255,255,0.3)" : isDone ? "#4a6741" : "rgba(0,0,0,0.06)",
+                    color: isActiveZone || isDone ? "#fff" : "#999",
                   }}>
-                    {count}
+                    {pct}%
                   </span>
                 )}
               </button>
@@ -1018,11 +1075,39 @@ export default function InventairePage() {
                                   }} title="Supprimer ce produit">✕</button>
                                 )}
                               </div>
-                              <div style={{ fontSize: 10, color: "#999", marginTop: 1 }}>
-                                {pack
-                                  ? `carton de ${pack.pack_count} × ${pack.pack_each_qty ?? 1}${packUnit}`
-                                  : (ing.default_unit ?? "pcs")}
-                                {hasQty && <span style={{ marginLeft: 6, color: "#7C3AED" }}>= {rawQtyNum} {packUnit}</span>}
+                              <div style={{ fontSize: 10, color: "#999", marginTop: 1, display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                                <span>
+                                  {pack
+                                    ? `crt ${pack.pack_count} × ${pack.pack_each_qty ?? 1}${packUnit}`
+                                    : (ing.default_unit ?? "pcs")}
+                                  {hasQty && pack && <span style={{ color: "#7C3AED" }}> = {rawQtyNum} {packUnit}</span>}
+                                </span>
+                                {/* Previous inventory comparison */}
+                                {hasQty && prevQuantities[ing.id] != null && (() => {
+                                  const prev = prevQuantities[ing.id];
+                                  const delta = rawQtyNum - prev;
+                                  if (delta === 0) return null;
+                                  return (
+                                    <span style={{
+                                      fontSize: 9, fontWeight: 700, padding: "0 5px", borderRadius: 4,
+                                      background: delta > 0 ? "rgba(74,103,65,0.10)" : "rgba(220,38,38,0.10)",
+                                      color: delta > 0 ? "#4a6741" : "#DC2626",
+                                    }}>
+                                      {delta > 0 ? "+" : ""}{delta} vs prec.
+                                    </span>
+                                  );
+                                })()}
+                                {/* Stock alerts */}
+                                {hasQty && ing.stock_min != null && rawQtyNum < ing.stock_min && (
+                                  <span style={{ fontSize: 9, fontWeight: 700, padding: "0 5px", borderRadius: 4, background: "rgba(220,38,38,0.10)", color: "#DC2626" }}>
+                                    Sous min ({ing.stock_min})
+                                  </span>
+                                )}
+                                {hasQty && ing.stock_max != null && rawQtyNum > ing.stock_max && (
+                                  <span style={{ fontSize: 9, fontWeight: 700, padding: "0 5px", borderRadius: 4, background: "rgba(212,160,60,0.10)", color: "#D4A03C" }}>
+                                    Sur-stock ({ing.stock_max})
+                                  </span>
+                                )}
                               </div>
                             </div>
 
