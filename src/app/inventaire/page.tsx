@@ -60,6 +60,7 @@ export default function InventairePage() {
   const [historique, setHistorique] = useState<Inventaire[]>([]);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [prevQuantities, setPrevQuantities] = useState<Record<string, number>>({});
+  const [theoreticalStock, setTheoreticalStock] = useState<Record<string, number>>({});
 
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number | "">>({});
@@ -182,7 +183,7 @@ export default function InventairePage() {
           }
           setQuantities(qMap);
         }
-        // Load previous closed inventory for comparison
+        // Load previous closed inventory for comparison + theoretical stock
         const prevClosed = list.find(i => i.statut === "cloture");
         if (prevClosed && !cancelled) {
           const { data: prevLignes } = await supabase
@@ -194,6 +195,23 @@ export default function InventairePage() {
             if (l.ingredient_id && l.quantite > 0) pMap[l.ingredient_id] = l.quantite;
           }
           if (!cancelled) setPrevQuantities(pMap);
+
+          // Theoretical stock = prev qty + receptions - ventes since prev inventory date
+          const prevDate = prevClosed.date;
+          const { data: movements } = await supabase
+            .from("stock_movements")
+            .select("ingredient_id, type, quantity")
+            .eq("etablissement_id", reloadKey)
+            .gte("created_at", prevDate);
+          if (!cancelled && movements) {
+            const theo: Record<string, number> = { ...pMap };
+            for (const m of movements as { ingredient_id: string; type: string; quantity: number }[]) {
+              if (!theo[m.ingredient_id]) theo[m.ingredient_id] = pMap[m.ingredient_id] ?? 0;
+              if (m.type === "reception") theo[m.ingredient_id] += Number(m.quantity);
+              else if (m.type === "vente") theo[m.ingredient_id] -= Number(m.quantity);
+            }
+            setTheoreticalStock(theo);
+          }
         }
       } else {
         setQuantities({});
@@ -589,8 +607,14 @@ export default function InventairePage() {
                       Cloture
                     </div>
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "#D4775A" }}>
-                    {inv.total_valeur != null ? fmtMoney(inv.total_valeur) : "-"}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: "#D4775A" }}>
+                      {inv.total_valeur != null ? fmtMoney(inv.total_valeur) : "-"}
+                    </span>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); window.open(`/api/inventaire/pdf?id=${inv.id}`, "_blank"); }}
+                      style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", color: "#666" }}>
+                      PDF
+                    </button>
                   </div>
                 </button>
               ))}
@@ -638,19 +662,34 @@ export default function InventairePage() {
               </div>
             )}
           </div>
-          {isActive && (
-            <button
-              onClick={cloturerSession}
-              disabled={saving}
-              style={{
-                padding: "8px 18px", borderRadius: 20, border: "1.5px solid #4a6741",
-                background: "#4a6741", color: "#fff", fontSize: 13, fontWeight: 700,
-                cursor: "pointer", opacity: saving ? 0.6 : 1, whiteSpace: "nowrap",
-              }}
-            >
-              {saving ? "..." : "Cloturer"}
-            </button>
-          )}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {/* PDF export */}
+            {(isActive || isViewing) && currentInv && (
+              <button
+                onClick={() => window.open(`/api/inventaire/pdf?id=${currentInv.id}`, "_blank")}
+                style={{
+                  padding: "8px 14px", borderRadius: 20, border: "1.5px solid #ddd6c8",
+                  background: "#fff", color: "#666", fontSize: 12, fontWeight: 600,
+                  cursor: "pointer", whiteSpace: "nowrap",
+                }}
+              >
+                PDF
+              </button>
+            )}
+            {isActive && (
+              <button
+                onClick={cloturerSession}
+                disabled={saving}
+                style={{
+                  padding: "8px 18px", borderRadius: 20, border: "1.5px solid #4a6741",
+                  background: "#4a6741", color: "#fff", fontSize: 13, fontWeight: 700,
+                  cursor: "pointer", opacity: saving ? 0.6 : 1, whiteSpace: "nowrap",
+                }}
+              >
+                {saving ? "..." : "Cloturer"}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Summary */}
@@ -1094,6 +1133,21 @@ export default function InventairePage() {
                                       color: delta > 0 ? "#4a6741" : "#DC2626",
                                     }}>
                                       {delta > 0 ? "+" : ""}{delta} vs prec.
+                                    </span>
+                                  );
+                                })()}
+                                {/* Theoretical stock vs real */}
+                                {hasQty && theoreticalStock[ing.id] != null && (() => {
+                                  const theo = Math.round(theoreticalStock[ing.id] * 10) / 10;
+                                  const ecart = Math.round((rawQtyNum - theo) * 10) / 10;
+                                  if (ecart === 0 || theo <= 0) return null;
+                                  return (
+                                    <span style={{
+                                      fontSize: 9, fontWeight: 700, padding: "0 5px", borderRadius: 4,
+                                      background: Math.abs(ecart) > theo * 0.2 ? "rgba(220,38,38,0.10)" : "rgba(212,160,60,0.10)",
+                                      color: Math.abs(ecart) > theo * 0.2 ? "#DC2626" : "#D4A03C",
+                                    }}>
+                                      theo {theo} ({ecart > 0 ? "+" : ""}{ecart})
                                     </span>
                                   );
                                 })()}
